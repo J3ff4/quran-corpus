@@ -1,0 +1,40 @@
+import type { Config } from 'tailwindcss';
+
+const preset: Partial<Config> = {
+  theme: {
+    extend: {
+      fontFamily: {
+        arabic: ['var(--font-arabic)', 'serif'],
+        sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
+      },
+      colors: {
+        paper: {
+          50: '#faf8f3',
+          100: '#f3efe6',
+          200: '#e8e0d0',
+          300: '#d4c9b0',
+          400: '#b8a88a',
+          500: '#9e8c6e',
+          600: '#7d6d52',
+          700: '#5e5040',
+          800: '#3e3429',
+          900: '#1f1a14',
+        },
+        night: {
+          50: '#2a2a2a',
+          100: '#242424',
+          200: '#1e1e1e',
+          300: '#181818',
+          400: '#141414',
+          500: '#111111',
+          600: '#0e0e0e',
+          700: '#0a0a0a',
+          800: '#080808',
+          900: '#050505',
+        },
+      },
+    },
+  },
+};
+
+export default preset;
