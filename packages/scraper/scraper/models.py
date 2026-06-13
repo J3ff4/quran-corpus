@@ -49,3 +49,10 @@ class WordGlossModel(BaseModel):
     word_id: int
     language_code: str
     gloss_text: str
+
+
+class LanguageModel(BaseModel):
+    code: str
+    name_native: str
+    name_english: str
+    direction: Literal["ltr", "rtl"]

@@ -1,7 +1,7 @@
 import sqlite3
 from pathlib import Path
 
-from .models import AyahModel, SurahModel, TranslationModel, WordGlossModel, WordModel
+from .models import AyahModel, LanguageModel, SurahModel, TranslationModel, WordGlossModel, WordModel
 
 # schema.sql lives at packages/data/schema.sql — single source of truth for DDL
 _SCHEMA_PATH = Path(__file__).parents[2] / "data" / "schema.sql"
@@ -44,6 +44,18 @@ class ScraperDatabase:
                 surah.ayah_count,
                 surah.order_number,
             ),
+        )
+        self._conn.commit()
+
+    def upsert_language(self, language: LanguageModel) -> None:
+        self._conn.execute(
+            """INSERT INTO languages (code, name_native, name_english, direction)
+               VALUES (?, ?, ?, ?)
+               ON CONFLICT(code) DO UPDATE SET
+                 name_native  = excluded.name_native,
+                 name_english = excluded.name_english,
+                 direction    = excluded.direction""",
+            (language.code, language.name_native, language.name_english, language.direction),
         )
         self._conn.commit()
 
