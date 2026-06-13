@@ -1,0 +1,32 @@
+import Link from 'next/link';
+import type { Surah } from '@quran-corpus/data';
+
+interface SurahHeaderProps {
+  surah: Surah;
+}
+
+export function SurahHeader({ surah }: SurahHeaderProps) {
+  return (
+    <header className="mb-8">
+      <div className="mb-4">
+        <Link
+          href="/surah"
+          className="text-sm text-paper-500 transition-colors hover:text-paper-700 dark:hover:text-paper-300"
+        >
+          ← Surahs
+        </Link>
+      </div>
+      <div className="text-center">
+        <p className="font-arabic text-4xl text-paper-900 dark:text-paper-100 mb-1">
+          {surah.name_arabic}
+        </p>
+        <p className="text-paper-500 text-lg">{surah.name_translit}</p>
+        <p className="mt-1 text-sm text-paper-400 dark:text-paper-500">
+          {surah.name_translation} ·{' '}
+          {surah.revelation_type.charAt(0).toUpperCase() + surah.revelation_type.slice(1)} ·{' '}
+          {surah.ayah_count} ayahs
+        </p>
+      </div>
+    </header>
+  );
+}
