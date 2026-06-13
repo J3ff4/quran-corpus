@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS languages (
 CREATE TABLE IF NOT EXISTS translations (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   ayah_id       INTEGER NOT NULL REFERENCES ayahs(id) ON DELETE CASCADE,
-  language_code TEXT    NOT NULL REFERENCES languages(code),
+  language_code TEXT    NOT NULL REFERENCES languages(code) ON DELETE CASCADE,
   translator    TEXT    NOT NULL,
   text          TEXT    NOT NULL,
   UNIQUE(ayah_id, language_code, translator)
@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS translations (
 CREATE TABLE IF NOT EXISTS word_glosses (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   word_id       INTEGER NOT NULL REFERENCES words(id) ON DELETE CASCADE,
-  language_code TEXT    NOT NULL REFERENCES languages(code),
+  language_code TEXT    NOT NULL REFERENCES languages(code) ON DELETE CASCADE,
   gloss_text    TEXT    NOT NULL,
   UNIQUE(word_id, language_code)
 );
