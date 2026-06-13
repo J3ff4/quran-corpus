@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createDatabase, type Client } from '../src/db.js';
 import { runMigrations } from '../src/migrate.js';
-import { getTranslationsByAyah, getTranslation } from '../src/queries/translations.js';
+import { getTranslationsByAyah, getTranslation, getTranslationsBySurahAndLang } from '../src/queries/translations.js';
 
 let db: Client;
 let ayahId: number;
@@ -64,5 +64,23 @@ describe('getTranslation', () => {
   it('returns null for missing language', async () => {
     const t = await getTranslation(db, ayahId, 'ru');
     expect(t).toBeNull();
+  });
+});
+
+describe('getTranslationsBySurahAndLang', () => {
+  it('returns translations for a surah in given language', async () => {
+    const translations = await getTranslationsBySurahAndLang(db, 1, 'en');
+    expect(translations.length).toBeGreaterThan(0);
+    expect(translations[0]?.language_code).toBe('en');
+  });
+
+  it('returns empty array when language has no translations', async () => {
+    const translations = await getTranslationsBySurahAndLang(db, 1, 'uz');
+    expect(translations).toHaveLength(1);
+  });
+
+  it('returns empty array for unknown surah', async () => {
+    const translations = await getTranslationsBySurahAndLang(db, 999, 'en');
+    expect(translations).toHaveLength(0);
   });
 });

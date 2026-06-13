@@ -31,3 +31,19 @@ export async function getTranslation(
   const row = result.rows[0];
   return row != null ? rowToTranslation(row) : null;
 }
+
+export async function getTranslationsBySurahAndLang(
+  db: Client,
+  surahId: number,
+  languageCode: string,
+): Promise<Translation[]> {
+  const result = await db.execute({
+    sql: `SELECT t.*
+          FROM translations t
+          JOIN ayahs a ON a.id = t.ayah_id
+          WHERE a.surah_id = ? AND t.language_code = ?
+          ORDER BY a.ayah_number`,
+    args: [surahId, languageCode],
+  });
+  return result.rows.map(rowToTranslation);
+}

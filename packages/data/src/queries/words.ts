@@ -22,3 +22,15 @@ export async function getWordsByAyah(db: Client, ayahId: number): Promise<Word[]
   });
   return result.rows.map(rowToWord);
 }
+
+export async function getWordsBySurah(db: Client, surahId: number): Promise<Word[]> {
+  const result = await db.execute({
+    sql: `SELECT w.*
+          FROM words w
+          JOIN ayahs a ON a.id = w.ayah_id
+          WHERE a.surah_id = ?
+          ORDER BY a.ayah_number, w.position`,
+    args: [surahId],
+  });
+  return result.rows.map(rowToWord);
+}
