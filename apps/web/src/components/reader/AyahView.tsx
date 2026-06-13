@@ -1,4 +1,5 @@
 import type { Ayah, Word, Translation } from '@quran-corpus/data';
+import { WordToken } from './WordToken';
 
 interface AyahViewProps {
   ayah: Ayah;
@@ -15,23 +16,17 @@ export function AyahView({ ayah, words, translation, onWordClick }: AyahViewProp
           {ayah.ayah_number}
         </span>
       </div>
+
       <div dir="rtl" className="flex flex-wrap gap-x-1 gap-y-2 font-arabic text-3xl leading-loose">
         {words.length > 0 ? (
           words.map((word) => (
-            <button
-              key={word.id}
-              type="button"
-              aria-label={`Word: ${word.transliteration ?? word.text_arabic}, position ${word.position}`}
-              onClick={() => onWordClick(word)}
-              className="cursor-pointer rounded px-0.5 hover:bg-paper-200 dark:hover:bg-night-100"
-            >
-              {word.text_arabic}
-            </button>
+            <WordToken key={word.id} word={word} onClick={onWordClick} />
           ))
         ) : (
-          <span>{ayah.text_uthmani}</span>
+          <span className="text-paper-900 dark:text-paper-100">{ayah.text_uthmani}</span>
         )}
       </div>
+
       {translation && (
         <p className="mt-4 text-base leading-relaxed text-paper-600 dark:text-paper-400">
           {translation.text}

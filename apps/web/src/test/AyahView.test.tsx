@@ -1,0 +1,63 @@
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { AyahView } from '../components/reader/AyahView';
+import type { Ayah, Word, Translation } from '@quran-corpus/data';
+
+const ayah: Ayah = {
+  id: 1,
+  surah_id: 1,
+  ayah_number: 1,
+  text_uthmani: 'بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ',
+  text_simple: null,
+  juz: 1,
+  page: 1,
+  audio_url: null,
+};
+
+const words: Word[] = [
+  { id: 1, ayah_id: 1, position: 1, text_arabic: 'بِسْمِ', transliteration: 'bismi', root: null, lemma: null, pos_tag: 'P', morphology_json: null },
+  { id: 2, ayah_id: 1, position: 2, text_arabic: 'ٱللَّهِ', transliteration: 'l-lahi', root: null, lemma: null, pos_tag: 'PN', morphology_json: null },
+];
+
+const translation: Translation = {
+  id: 1,
+  ayah_id: 1,
+  language_code: 'en',
+  translator: 'Sahih International',
+  text: 'In the name of Allah, the Entirely Merciful, the Especially Merciful.',
+};
+
+describe('AyahView', () => {
+  it('renders ayah number badge', () => {
+    render(<AyahView ayah={ayah} words={[]} onWordClick={vi.fn()} />);
+    expect(screen.getByText('1')).toBeInTheDocument();
+  });
+
+  it('renders word tokens when words are provided', () => {
+    render(<AyahView ayah={ayah} words={words} onWordClick={vi.fn()} />);
+    expect(screen.getByText('بِسْمِ')).toBeInTheDocument();
+    expect(screen.getByText('ٱللَّهِ')).toBeInTheDocument();
+  });
+
+  it('falls back to text_uthmani block when no words', () => {
+    render(<AyahView ayah={ayah} words={[]} onWordClick={vi.fn()} />);
+    expect(screen.getByText(ayah.text_uthmani)).toBeInTheDocument();
+  });
+
+  it('calls onWordClick when a word token is clicked', () => {
+    const onWordClick = vi.fn();
+    render(<AyahView ayah={ayah} words={words} onWordClick={onWordClick} />);
+    fireEvent.click(screen.getByText('بِسْمِ'));
+    expect(onWordClick).toHaveBeenCalledWith(words[0]);
+  });
+
+  it('renders translation when provided', () => {
+    render(<AyahView ayah={ayah} words={[]} translation={translation} onWordClick={vi.fn()} />);
+    expect(screen.getByText(translation.text)).toBeInTheDocument();
+  });
+
+  it('renders nothing for translation when not provided', () => {
+    render(<AyahView ayah={ayah} words={[]} onWordClick={vi.fn()} />);
+    expect(screen.queryByText(translation.text)).toBeNull();
+  });
+});
