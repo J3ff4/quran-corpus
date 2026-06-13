@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  --font-sans: 'Geist', system-ui, sans-serif;
+  --font-sans: system-ui, sans-serif;
   --font-arabic: 'Amiri', 'Noto Naskh Arabic', serif;
 }
 
