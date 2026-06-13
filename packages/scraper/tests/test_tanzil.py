@@ -25,9 +25,9 @@ def test_import_tanzil_inserts_all_ayahs():
         import_tanzil_text(FIXTURE, db)
         db.close()
         conn = sqlite3.connect(path)
-        count = conn.execute(
-            "SELECT COUNT(*) FROM ayahs WHERE surah_id=1"
-        ).fetchone()[0]
+        count = conn.execute("SELECT COUNT(*) FROM ayahs WHERE surah_id=1").fetchone()[
+            0
+        ]
         assert count == 7
         conn.close()
     finally:
@@ -56,9 +56,9 @@ def test_import_tanzil_is_idempotent():
         import_tanzil_text(FIXTURE, db)
         db.close()
         conn = sqlite3.connect(path)
-        count = conn.execute(
-            "SELECT COUNT(*) FROM ayahs WHERE surah_id=1"
-        ).fetchone()[0]
+        count = conn.execute("SELECT COUNT(*) FROM ayahs WHERE surah_id=1").fetchone()[
+            0
+        ]
         assert count == 7
         conn.close()
     finally:

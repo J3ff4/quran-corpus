@@ -5,6 +5,7 @@ Download a translation JSON from QuranEnc.com. The format is:
 
 Pass language_code and translator as CLI arguments.
 """
+
 import json
 from pathlib import Path
 

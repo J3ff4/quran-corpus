@@ -2,6 +2,7 @@
 
 Download the Uthmani XML from tanzil.net/trans/ once; do not re-scrape.
 """
+
 from pathlib import Path
 
 from defusedxml import ElementTree

@@ -16,10 +16,19 @@ def test_create_schema_creates_all_tables():
         tables = {
             r[0]
             for r in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+                "SELECT name FROM sqlite_master"
+                " WHERE type='table' AND name NOT LIKE 'sqlite_%'"
             ).fetchall()
         }
-        assert tables == {"surahs", "ayahs", "words", "languages", "translations", "word_glosses"}
+        expected = {
+            "surahs",
+            "ayahs",
+            "words",
+            "languages",
+            "translations",
+            "word_glosses",
+        }
+        assert tables == expected
         conn.close()
     finally:
         os.unlink(path)

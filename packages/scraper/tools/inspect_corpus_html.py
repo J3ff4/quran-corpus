@@ -3,6 +3,7 @@
 Run: uv run python tools/inspect_corpus_html.py
 Output: tests/fixtures/corpus_1_1.html
 """
+
 import asyncio
 from pathlib import Path
 

@@ -60,8 +60,8 @@ def _process_page(html: str, chapter_id: int, db: ScraperDatabase) -> None:
         ).fetchone()
         if ayah_row is None:
             continue
-        ayah_id: int = ayah_row[0]
-        text_uthmani: str | None = ayah_row[1]
+        ayah_id: int = ayah_row["id"]
+        text_uthmani: str | None = ayah_row["text_uthmani"]
 
         word_texts = text_uthmani.split() if text_uthmani else []
         text_arabic = (
