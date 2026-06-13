@@ -35,7 +35,10 @@ def test_upsert_language_is_idempotent():
     db, path = _make_db()
     try:
         lang = LanguageModel(
-            code="ar", name_native="العربية", name_english="Arabic", direction="rtl"
+            code="ar",
+            name_native="العربية",
+            name_english="Arabic",
+            direction="rtl",
         )
         db.upsert_language(lang)
         db.upsert_language(lang)

@@ -101,8 +101,8 @@ class ScraperDatabase:
                 ayah.audio_url,
             ),
         )
-        self._conn.commit()
         row = cursor.fetchone()
+        self._conn.commit()
         return int(row[0])
 
     def upsert_word(self, word: WordModel) -> int:
@@ -138,8 +138,8 @@ class ScraperDatabase:
                 word.morphology_json,
             ),
         )
-        self._conn.commit()
         row = cursor.fetchone()
+        self._conn.commit()
         return int(row[0])
 
     def upsert_translation(self, translation: TranslationModel) -> None:

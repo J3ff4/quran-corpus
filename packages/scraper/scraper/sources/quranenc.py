@@ -2,6 +2,7 @@
 
 Supports Uzbek, Russian, and other QuranEnc languages. Full implementation in Phase 2.
 """
+
 from pathlib import Path
 
 from ..db import ScraperDatabase

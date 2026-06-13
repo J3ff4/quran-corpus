@@ -42,7 +42,9 @@ def import_tanzil(xml_path: str, db: str) -> None:
 @click.argument("language_code")
 @click.argument("translator")
 @click.option("--db", default="quran.db", show_default=True)
-def import_quranenc(json_path: str, language_code: str, translator: str, db: str) -> None:
+def import_quranenc(
+    json_path: str, language_code: str, translator: str, db: str
+) -> None:
     """Import a QuranEnc JSON translation file into the database."""
     from pathlib import Path
 

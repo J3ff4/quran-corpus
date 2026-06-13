@@ -15,6 +15,7 @@ dependencies = [
   "tqdm>=4.67.0",
   "click>=8.1.0",
   "lxml>=5.3.0",
+  "defusedxml>=0.0.1",
 ]
 
 [project.scripts]
