@@ -12,7 +12,7 @@ interface ReaderViewProps {
   lang: string;
 }
 
-export function ReaderView({ ayahs, wordsByAyah, translationsByAyah }: ReaderViewProps) {
+export function ReaderView({ ayahs, wordsByAyah, translationsByAyah, lang: _lang }: ReaderViewProps) {
   const [selectedWord, setSelectedWord] = useState<Word | null>(null);
 
   return (

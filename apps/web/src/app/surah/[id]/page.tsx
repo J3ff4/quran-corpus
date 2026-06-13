@@ -16,9 +16,18 @@ interface PageProps {
   searchParams: Promise<{ lang?: string }>;
 }
 
+// Must match LanguageBar.LANGUAGES
+const VALID_LANGS = ['en', 'uz', 'ru'] as const;
+type ValidLang = (typeof VALID_LANGS)[number];
+
+function isValidLang(v: string | undefined): v is ValidLang {
+  return VALID_LANGS.includes(v as ValidLang);
+}
+
 export default async function SurahPage({ params, searchParams }: PageProps) {
   const { id } = await params;
-  const { lang = 'en' } = await searchParams;
+  const { lang: rawLang } = await searchParams;
+  const lang: ValidLang = isValidLang(rawLang) ? rawLang : 'en';
   const surahId = parseInt(id, 10);
 
   if (isNaN(surahId) || surahId < 1 || surahId > 114) notFound();
@@ -39,7 +48,7 @@ export default async function SurahPage({ params, searchParams }: PageProps) {
     (wordsByAyah[word.ayah_id] ??= []).push(word);
   }
 
-  // Index one translation per ayah for this lang
+  // One translation per ayah for this language; last writer wins if multiple translators exist.
   const translationsByAyah: Record<number, Translation> = {};
   for (const t of translations) {
     translationsByAyah[t.ayah_id] = t;

@@ -20,6 +20,8 @@ export function AyahView({ ayah, words, translation, onWordClick }: AyahViewProp
           words.map((word) => (
             <button
               key={word.id}
+              type="button"
+              aria-label={`Word: ${word.transliteration ?? word.text_arabic}, position ${word.position}`}
               onClick={() => onWordClick(word)}
               className="cursor-pointer rounded px-0.5 hover:bg-paper-200 dark:hover:bg-night-100"
             >
