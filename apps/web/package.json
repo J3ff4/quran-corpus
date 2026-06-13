@@ -3,10 +3,10 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint src --ext .ts,.tsx",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
@@ -17,11 +17,16 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.5",
+    "@next/eslint-plugin-next": "^16.2.9",
     "@quran-corpus/config": "workspace:*",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.61.0",
+    "@typescript-eslint/parser": "^8.61.0",
     "autoprefixer": "^10.4.0",
+    "eslint": "^9.39.4",
     "postcss": "^8.4.0",
     "prettier": "^3.3.3",
     "prettier-plugin-tailwindcss": "^0.6.0",
