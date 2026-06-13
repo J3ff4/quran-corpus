@@ -41,8 +41,8 @@ def scrape(db: str, checkpoint: str, surah: int | None, rate_limit: float) -> No
         click.echo(f"Scraping surah {chapter_id}...")
         scrape_chapter(chapter_id, database, ckpt, rate_limit=rate_limit)
 
-    database.close()
     click.echo("Done.")
+    database.close()
 
 
 @main.command("import-tanzil")
