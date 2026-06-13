@@ -1,7 +1,14 @@
 import sqlite3
 from pathlib import Path
 
-from .models import AyahModel, LanguageModel, SurahModel, TranslationModel, WordGlossModel, WordModel
+from .models import (
+    AyahModel,
+    LanguageModel,
+    SurahModel,
+    TranslationModel,
+    WordGlossModel,
+    WordModel,
+)
 
 # schema.sql lives at packages/data/schema.sql — single source of truth for DDL
 _SCHEMA_PATH = Path(__file__).parents[2] / "data" / "schema.sql"
@@ -26,7 +33,15 @@ class ScraperDatabase:
     def upsert_surah(self, surah: SurahModel) -> None:
         self._conn.execute(
             """INSERT INTO surahs
-               (id, name_arabic, name_translit, name_translation, revelation_type, ayah_count, order_number)
+               (
+                   id,
+                   name_arabic,
+                   name_translit,
+                   name_translation,
+                   revelation_type,
+                   ayah_count,
+                   order_number
+               )
                VALUES (?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(id) DO UPDATE SET
                  name_arabic      = excluded.name_arabic,
@@ -55,7 +70,12 @@ class ScraperDatabase:
                  name_native  = excluded.name_native,
                  name_english = excluded.name_english,
                  direction    = excluded.direction""",
-            (language.code, language.name_native, language.name_english, language.direction),
+            (
+                language.code,
+                language.name_native,
+                language.name_english,
+                language.direction,
+            ),
         )
         self._conn.commit()
 
@@ -88,7 +108,16 @@ class ScraperDatabase:
     def upsert_word(self, word: WordModel) -> int:
         cursor = self._conn.execute(
             """INSERT INTO words
-               (ayah_id, position, text_arabic, transliteration, root, lemma, pos_tag, morphology_json)
+               (
+                   ayah_id,
+                   position,
+                   text_arabic,
+                   transliteration,
+                   root,
+                   lemma,
+                   pos_tag,
+                   morphology_json
+               )
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(ayah_id, position) DO UPDATE SET
                  text_arabic     = excluded.text_arabic,
@@ -119,7 +148,12 @@ class ScraperDatabase:
                VALUES (?, ?, ?, ?)
                ON CONFLICT(ayah_id, language_code, translator) DO UPDATE SET
                  text = excluded.text""",
-            (translation.ayah_id, translation.language_code, translation.translator, translation.text),
+            (
+                translation.ayah_id,
+                translation.language_code,
+                translation.translator,
+                translation.text,
+            ),
         )
         self._conn.commit()
 

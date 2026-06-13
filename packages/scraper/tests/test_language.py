@@ -16,11 +16,15 @@ def _make_db() -> tuple[ScraperDatabase, str]:
 def test_upsert_language_inserts_row():
     db, path = _make_db()
     try:
-        lang = LanguageModel(code="en", name_native="English", name_english="English", direction="ltr")
+        lang = LanguageModel(
+            code="en", name_native="English", name_english="English", direction="ltr"
+        )
         db.upsert_language(lang)
         db.close()
         conn = sqlite3.connect(path)
-        row = conn.execute("SELECT code, direction FROM languages WHERE code='en'").fetchone()
+        row = conn.execute(
+            "SELECT code, direction FROM languages WHERE code='en'"
+        ).fetchone()
         assert row == ("en", "ltr")
         conn.close()
     finally:
@@ -30,12 +34,16 @@ def test_upsert_language_inserts_row():
 def test_upsert_language_is_idempotent():
     db, path = _make_db()
     try:
-        lang = LanguageModel(code="ar", name_native="العربية", name_english="Arabic", direction="rtl")
+        lang = LanguageModel(
+            code="ar", name_native="العربية", name_english="Arabic", direction="rtl"
+        )
         db.upsert_language(lang)
         db.upsert_language(lang)
         db.close()
         conn = sqlite3.connect(path)
-        count = conn.execute("SELECT COUNT(*) FROM languages WHERE code='ar'").fetchone()[0]
+        count = conn.execute(
+            "SELECT COUNT(*) FROM languages WHERE code='ar'"
+        ).fetchone()[0]
         assert count == 1
         conn.close()
     finally:
@@ -45,13 +53,22 @@ def test_upsert_language_is_idempotent():
 def test_upsert_language_updates_name_on_conflict():
     db, path = _make_db()
     try:
-        lang = LanguageModel(code="uz", name_native="Oʻzbekcha", name_english="Uzbek", direction="ltr")
+        lang = LanguageModel(
+            code="uz", name_native="Oʻzbekcha", name_english="Uzbek", direction="ltr"
+        )
         db.upsert_language(lang)
-        updated = LanguageModel(code="uz", name_native="Oʻzbekcha (yangilangan)", name_english="Uzbek", direction="ltr")
+        updated = LanguageModel(
+            code="uz",
+            name_native="Oʻzbekcha (yangilangan)",
+            name_english="Uzbek",
+            direction="ltr",
+        )
         db.upsert_language(updated)
         db.close()
         conn = sqlite3.connect(path)
-        row = conn.execute("SELECT name_native FROM languages WHERE code='uz'").fetchone()
+        row = conn.execute(
+            "SELECT name_native FROM languages WHERE code='uz'"
+        ).fetchone()
         assert row[0] == "Oʻzbekcha (yangilangan)"
         conn.close()
     finally:

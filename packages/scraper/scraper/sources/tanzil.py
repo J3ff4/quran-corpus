@@ -1,7 +1,9 @@
 """Importer for Tanzil.net Quran text and translations (XML format).
 
-Download the dataset from tanzil.net once; do not re-scrape. Full implementation in Phase 2.
+Download the dataset from tanzil.net once; do not re-scrape.
+Full implementation in Phase 2.
 """
+
 from pathlib import Path
 
 from ..db import ScraperDatabase

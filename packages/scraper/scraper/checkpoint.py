@@ -3,7 +3,7 @@ from pathlib import Path
 
 
 class Checkpoint:
-    """Persists scraping progress so a run can be resumed without re-scraping completed surahs."""
+    """Persist scraping progress for resumable runs without re-scraping surahs."""
 
     def __init__(self, path: str = "checkpoint.json") -> None:
         self._path = Path(path)
