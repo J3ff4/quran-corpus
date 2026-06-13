@@ -75,8 +75,8 @@ describe('getTranslationsBySurahAndLang', () => {
   });
 
   it('returns empty array when language has no translations', async () => {
-    const translations = await getTranslationsBySurahAndLang(db, 1, 'uz');
-    expect(translations).toHaveLength(1);
+    const translations = await getTranslationsBySurahAndLang(db, 1, 'ru');
+    expect(translations).toHaveLength(0);
   });
 
   it('returns empty array for unknown surah', async () => {
