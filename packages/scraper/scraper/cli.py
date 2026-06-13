@@ -16,7 +16,7 @@ def main() -> None:
 def scrape(db: str, checkpoint: str, surah: int | None) -> None:
     """Scrape corpus.quran.com morphology data (rate-limited, resumable)."""
     database = ScraperDatabase(db)
-    cp = Checkpoint(checkpoint)
+    _ = Checkpoint(checkpoint)  # Phase 2: checkpoint will track per-surah progress
     surah_range = [surah] if surah else list(range(1, 115))
     click.echo(f"Target surahs: {surah_range}")
     click.echo("Phase 2: full scraping implementation pending.")

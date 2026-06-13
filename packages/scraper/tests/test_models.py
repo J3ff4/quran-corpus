@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from scraper.models import AyahModel, SurahModel, TranslationModel, WordModel
+from scraper.models import SurahModel, TranslationModel, WordModel
 
 
 def test_surah_model_valid():
