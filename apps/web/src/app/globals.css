@@ -3,10 +3,18 @@
 @tailwind utilities;
 
 :root {
-  --font-sans: system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
   --font-arabic: 'Amiri', 'Noto Naskh Arabic', serif;
 }
 
 [dir='rtl'] {
   font-family: var(--font-arabic);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+::selection {
+  background-color: rgb(180 160 120 / 0.3);
 }

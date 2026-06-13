@@ -1,11 +1,17 @@
 import type { Metadata, Viewport } from 'next';
-import { Amiri } from 'next/font/google';
+import { Amiri, Inter } from 'next/font/google';
 import './globals.css';
 
 const amiri = Amiri({
   weight: ['400', '700'],
   subsets: ['arabic', 'latin'],
   variable: '--font-arabic',
+  display: 'swap',
+});
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-sans',
   display: 'swap',
 });
 
@@ -28,8 +34,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={amiri.variable}>
-      <body className="bg-paper-50 text-paper-900 antialiased dark:bg-night-300 dark:text-paper-100">
+    <html lang="en" className={`${amiri.variable} ${inter.variable}`}>
+      <body className="bg-paper-50 font-sans text-paper-900 antialiased dark:bg-night-300 dark:text-paper-100">
         {children}
       </body>
     </html>
