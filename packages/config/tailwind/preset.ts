@@ -1,3 +1,5 @@
+// This file is intentionally .ts — Tailwind config loading (jiti) and Next.js (Turbopack/webpack)
+// resolve .ts files directly. Do not compile to .js.
 import type { Config } from 'tailwindcss';
 
 const preset: Partial<Config> = {
