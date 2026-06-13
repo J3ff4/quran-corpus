@@ -20,11 +20,9 @@ def import_quranenc_translation(
     verses: list[dict] = json.loads(json_path.read_text(encoding="utf-8"))
 
     # Build a lookup: (surah_id, ayah_number) -> ayah_id
-    ayah_rows = db._conn.execute(
-        "SELECT id, surah_id, ayah_number FROM ayahs"
-    ).fetchall()
     ayah_map: dict[tuple[int, int], int] = {
-        (int(r[1]), int(r[2])): int(r[0]) for r in ayah_rows
+        (int(r["surah_id"]), int(r["ayah_number"])): int(r["id"])
+        for r in db.get_all_ayahs()
     }
 
     for verse in verses:

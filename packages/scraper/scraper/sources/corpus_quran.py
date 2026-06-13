@@ -54,10 +54,7 @@ def scrape_chapter(
 def _process_page(html: str, chapter_id: int, db: ScraperDatabase) -> None:
     """Parse one page of words and upsert into the database."""
     for pw in parse_verse_words(html):
-        ayah_row = db._conn.execute(
-            "SELECT id, text_uthmani FROM ayahs WHERE surah_id = ? AND ayah_number = ?",
-            (chapter_id, pw.verse_number),
-        ).fetchone()
+        ayah_row = db.get_ayah(chapter_id, pw.verse_number)
         if ayah_row is None:
             continue
         ayah_id: int = ayah_row["id"]

@@ -167,5 +167,16 @@ class ScraperDatabase:
         )
         self._conn.commit()
 
+    def get_ayah(self, surah_id: int, ayah_number: int) -> sqlite3.Row | None:
+        return self._conn.execute(
+            "SELECT id, text_uthmani FROM ayahs WHERE surah_id = ? AND ayah_number = ?",
+            (surah_id, ayah_number),
+        ).fetchone()
+
+    def get_all_ayahs(self) -> list[sqlite3.Row]:
+        return self._conn.execute(
+            "SELECT id, surah_id, ayah_number FROM ayahs"
+        ).fetchall()
+
     def close(self) -> None:
         self._conn.close()

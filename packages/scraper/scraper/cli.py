@@ -49,12 +49,13 @@ def scrape(db: str, checkpoint: str, surah: int | None, rate_limit: float) -> No
 @click.argument("xml_path")
 @click.option("--db", default="quran.db", show_default=True)
 def import_tanzil(xml_path: str, db: str) -> None:
-    """Import a Tanzil XML file into the database."""
+    """Import a Tanzil XML file into the database (runs seed first)."""
     from pathlib import Path
 
     from .sources.tanzil import import_tanzil_text
 
     database = ScraperDatabase(db)
+    seed_database(database)
     import_tanzil_text(Path(xml_path), database)
     database.close()
     click.echo("Import complete.")
@@ -68,12 +69,13 @@ def import_tanzil(xml_path: str, db: str) -> None:
 def import_quranenc(
     json_path: str, language_code: str, translator: str, db: str
 ) -> None:
-    """Import a QuranEnc JSON translation file into the database."""
+    """Import a QuranEnc JSON translation file into the database (runs seed first)."""
     from pathlib import Path
 
     from .sources.quranenc import import_quranenc_translation
 
     database = ScraperDatabase(db)
+    seed_database(database)
     import_quranenc_translation(Path(json_path), language_code, translator, database)
     database.close()
     click.echo("Import complete.")
