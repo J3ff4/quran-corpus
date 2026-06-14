@@ -18,11 +18,13 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'Quran Corpus',
   description: 'Word-by-word Quranic morphology, grammar, and translations',
-  manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
     title: 'Quran Corpus',
+  },
+  icons: {
+    apple: '/icons/apple-touch-icon.png',
   },
 };
 
