@@ -7,6 +7,10 @@ node_modules/
 dist/
 out/
 
+# Serwist-generated service worker (build artifact, not source)
+apps/web/public/sw.js
+apps/web/public/sw.js.map
+
 # Database files — data artifacts stay out of git
 *.db
 *.db-shm
