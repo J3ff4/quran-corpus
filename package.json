@@ -18,6 +18,8 @@
   "devDependencies": {
     "@quran-corpus/config": "workspace:*",
     "prettier": "^3.3.3",
+    "sharp": "^0.33.0",
+    "tsx": "^4.0.0",
     "turbo": "^2.3.0"
   }
 }
