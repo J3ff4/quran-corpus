@@ -21,8 +21,8 @@ const serwist = new Serwist({
       matcher: ({ request }) => request.mode === 'navigate',
       handler: new NetworkFirst({
         cacheName: 'pages',
-        plugins: [new ExpirationPlugin({ maxAgeSeconds: 7 * 24 * 60 * 60 })],
-        networkTimeoutSeconds: 3,
+        plugins: [new ExpirationPlugin({ maxAgeSeconds: 7 * 24 * 60 * 60, maxEntries: 64 })],
+        networkTimeoutSeconds: 5,
       }),
     },
     ...defaultCache,
