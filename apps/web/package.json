@@ -13,7 +13,6 @@
   },
   "dependencies": {
     "@quran-corpus/data": "workspace:*",
-    "@serwist/next": "^9.0.0",
     "framer-motion": "^11.0.0",
     "next": "^15.0.0",
     "react": "^19.0.0",
@@ -22,6 +21,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",
+    "@serwist/next": "^9.0.0",
     "@next/eslint-plugin-next": "^16.2.9",
     "@quran-corpus/config": "workspace:*",
     "@testing-library/jest-dom": "^6.9.1",
