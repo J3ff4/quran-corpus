@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Ayah } from '@quran-corpus/data';
 
-function ayahAudioUrl(surahId: number, ayahNumber: number): string {
-  const s = String(surahId).padStart(3, '0');
-  const a = String(ayahNumber).padStart(3, '0');
+function buildAudioUrl(ayah: Ayah): string {
+  if (ayah.audio_url) return ayah.audio_url;
+  const s = String(ayah.surah_id).padStart(3, '0');
+  const a = String(ayah.ayah_number).padStart(3, '0');
   return `https://everyayah.com/data/Abdul_Basit_Murattal_64kbps/${s}${a}.mp3`;
 }
 
@@ -46,9 +47,11 @@ export function useAyahAudio(ayahs: Ayah[]): AyahAudioState {
       const list = ayahsRef.current;
       const idx = list.findIndex((a) => a.id === playingAyahIdRef.current);
       if (idx !== -1 && idx < list.length - 1) {
-        const next = list[idx + 1];
-        audio.src = ayahAudioUrl(next.surah_id, next.ayah_number);
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        const next = list[idx + 1]!;
+        audio.src = buildAudioUrl(next);
         setPlayingAyahId(next.id);
+        setIsPlaying(true);
         audio.play().catch(console.error);
       } else {
         setIsPlaying(false);
@@ -71,11 +74,17 @@ export function useAyahAudio(ayahs: Ayah[]): AyahAudioState {
   const play = useCallback((ayah: Ayah) => {
     const audio = audioRef.current;
     if (!audio) return;
-    if (playingAyahIdRef.current !== ayah.id) {
-      audio.src = ayahAudioUrl(ayah.surah_id, ayah.ayah_number);
+    const prevId = playingAyahIdRef.current;
+    if (prevId !== ayah.id) {
+      audio.src = buildAudioUrl(ayah);
       setPlayingAyahId(ayah.id);
     }
-    audio.play().then(() => setIsPlaying(true)).catch(console.error);
+    audio.play()
+      .then(() => setIsPlaying(true))
+      .catch((err) => {
+        console.error('[useAyahAudio] play failed', err);
+        setPlayingAyahId(prevId);
+      });
   }, []);
 
   const pause = useCallback(() => {
