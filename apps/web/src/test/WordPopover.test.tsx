@@ -28,6 +28,8 @@ const word: Word = {
   transliteration: 'bismi',
   root: 'س م و',
   lemma: null,
+  root_buckwalter: null,
+  lemma_buckwalter: null,
   pos_tag: 'P',
   morphology_json: '["P","N"]',
 };
@@ -57,6 +59,26 @@ describe('WordPopover', () => {
   it('renders root when present', () => {
     render(<WordPopover word={word} onClose={vi.fn()} />);
     expect(screen.getByText('س م و')).toBeInTheDocument();
+  });
+
+  it('renders lemma when present', () => {
+    render(<WordPopover word={{ ...word, lemma: 'ٱسْم' }} onClose={vi.fn()} />);
+    expect(screen.getByText('ٱسْم')).toBeInTheDocument();
+  });
+
+  it('does not render a lemma badge when lemma is null', () => {
+    render(<WordPopover word={{ ...word, lemma: null }} onClose={vi.fn()} />);
+    expect(screen.queryByText('ٱسْم')).toBeNull();
+  });
+
+  it('renders the English gloss when provided', () => {
+    render(<WordPopover word={word} gloss="In (the) name" onClose={vi.fn()} />);
+    expect(screen.getByText('In (the) name')).toBeInTheDocument();
+  });
+
+  it('does not render a gloss when none is provided', () => {
+    render(<WordPopover word={word} onClose={vi.fn()} />);
+    expect(screen.queryByText('In (the) name')).toBeNull();
   });
 
   it('calls onClose when close button is clicked', () => {

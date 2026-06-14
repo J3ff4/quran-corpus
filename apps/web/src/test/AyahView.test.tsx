@@ -15,8 +15,8 @@ const ayah: Ayah = {
 };
 
 const words: Word[] = [
-  { id: 1, ayah_id: 1, position: 1, text_arabic: 'بِسْمِ', transliteration: 'bismi', root: null, lemma: null, pos_tag: 'P', morphology_json: null },
-  { id: 2, ayah_id: 1, position: 2, text_arabic: 'ٱللَّهِ', transliteration: 'l-lahi', root: null, lemma: null, pos_tag: 'PN', morphology_json: null },
+  { id: 1, ayah_id: 1, position: 1, text_arabic: 'بِسْمِ', transliteration: 'bismi', root: null, lemma: null, root_buckwalter: null, lemma_buckwalter: null, pos_tag: 'P', morphology_json: null },
+  { id: 2, ayah_id: 1, position: 2, text_arabic: 'ٱللَّهِ', transliteration: 'l-lahi', root: null, lemma: null, root_buckwalter: null, lemma_buckwalter: null, pos_tag: 'PN', morphology_json: null },
 ];
 
 const translation: Translation = {

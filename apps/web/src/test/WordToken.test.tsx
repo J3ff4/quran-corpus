@@ -11,6 +11,8 @@ const word: Word = {
   transliteration: 'bismi',
   root: null,
   lemma: null,
+  root_buckwalter: null,
+  lemma_buckwalter: null,
   pos_tag: 'P',
   morphology_json: '["P","N"]',
 };
