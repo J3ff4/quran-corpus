@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { AyahAudioButton } from '../components/reader/AyahAudioButton';
 import type { Ayah } from '@quran-corpus/data';
@@ -25,6 +25,8 @@ const baseProps = {
 };
 
 describe('AyahAudioButton', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
   it('renders a play button with ayah number in aria-label', () => {
     render(<AyahAudioButton {...baseProps} />);
     expect(screen.getByRole('button', { name: /play ayah 5/i })).toBeInTheDocument();
