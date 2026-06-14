@@ -1,7 +1,7 @@
 import sharp from 'sharp';
 import path from 'path';
 
-const OUTPUT_DIR = path.resolve('apps/web/public/icons');
+const OUTPUT_DIR = path.resolve(__dirname, '../apps/web/public/icons');
 const BG = '#faf8f3';
 const FG = '#1f1a14';
 
@@ -39,8 +39,8 @@ async function main(): Promise<void> {
   await generate(makeSvg(512), `${OUTPUT_DIR}/icon-512.png`);
   await generate(makeSvg(192), `${OUTPUT_DIR}/icon-192.png`);
   await generate(makeSvg(192, { padFactor: 0.12, rounded: false }), `${OUTPUT_DIR}/icon-maskable-192.png`);
-  await generate(makeSvg(180), `${OUTPUT_DIR}/apple-touch-icon.png`);
+  await generate(makeSvg(180, { rounded: false }), `${OUTPUT_DIR}/apple-touch-icon.png`);
   console.log('All icons generated.');
 }
 
-main().catch(console.error);
+main().catch((err) => { console.error(err); process.exit(1); });
