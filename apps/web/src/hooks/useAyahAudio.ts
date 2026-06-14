@@ -47,7 +47,6 @@ export function useAyahAudio(ayahs: Ayah[]): AyahAudioState {
       const list = ayahsRef.current;
       const idx = list.findIndex((a) => a.id === playingAyahIdRef.current);
       if (idx !== -1 && idx < list.length - 1) {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const next = list[idx + 1]!;
         audio.src = buildAudioUrl(next);
         setPlayingAyahId(next.id);
