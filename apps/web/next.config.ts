@@ -1,3 +1,4 @@
+import withSerwist from '@serwist/next';
 import type { NextConfig } from 'next';
 
 const config: NextConfig = {
@@ -24,6 +25,7 @@ const config: NextConfig = {
             "font-src 'self' data: https://fonts.gstatic.com",
             "connect-src 'self'",
             "media-src 'self' https:",
+            "worker-src 'self'",
           ].join('; '),
         },
       ],
@@ -31,4 +33,8 @@ const config: NextConfig = {
   ],
 };
 
-export default config;
+export default withSerwist({
+  swSrc: 'src/sw.ts',
+  swDest: 'public/sw.js',
+  disable: process.env.NODE_ENV === 'development',
+})(config);
