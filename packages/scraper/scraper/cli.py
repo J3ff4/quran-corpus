@@ -45,6 +45,27 @@ def scrape(db: str, checkpoint: str, surah: int | None, rate_limit: float) -> No
     database.close()
 
 
+@main.command("import-corpus")
+@click.argument("txt_path")
+@click.option("--db", default="quran.db", show_default=True)
+def import_corpus(txt_path: str, db: str) -> None:
+    """Import the Quranic Arabic Corpus morphology file (runs seed first).
+
+    Download quranic-corpus-morphology-0.4.txt from
+    https://corpus.quran.com/download/ first. Ayah text must already be
+    imported (run import-tanzil) so word Arabic text can be derived.
+    """
+    from pathlib import Path
+
+    from .sources.corpus_import import import_corpus_morphology
+
+    database = ScraperDatabase(db)
+    seed_database(database)
+    count = import_corpus_morphology(Path(txt_path), database)
+    database.close()
+    click.echo(f"Import complete: {count} words.")
+
+
 @main.command("import-tanzil")
 @click.argument("xml_path")
 @click.option("--db", default="quran.db", show_default=True)

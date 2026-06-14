@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS words (
   transliteration TEXT,
   root            TEXT,
   lemma           TEXT,
+  root_buckwalter TEXT,
+  lemma_buckwalter TEXT,
   pos_tag         TEXT,
   morphology_json TEXT,
   UNIQUE(ayah_id, position)

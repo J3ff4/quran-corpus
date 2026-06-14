@@ -32,6 +32,8 @@ class WordModel(BaseModel):
     transliteration: str | None = None
     root: str | None = None
     lemma: str | None = None
+    root_buckwalter: str | None = None
+    lemma_buckwalter: str | None = None
     pos_tag: str | None = None
     morphology_json: str | None = None
 

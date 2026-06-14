@@ -27,6 +27,8 @@ export interface Word {
   transliteration: string | null;
   root: string | null;
   lemma: string | null;
+  root_buckwalter: string | null;
+  lemma_buckwalter: string | null;
   pos_tag: string | null;
   morphology_json: string | null;
 }
