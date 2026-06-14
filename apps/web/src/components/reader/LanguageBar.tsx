@@ -33,7 +33,7 @@ export function LanguageBar({ surahId, activeLang }: LanguageBarProps) {
             onClick={() => {
               if (!isActive) router.push(`/surah/${surahId}?lang=${code}`);
             }}
-            className="relative rounded-full px-3 py-1 text-xs"
+            className="relative rounded-full px-3 py-1 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-paper-500"
           >
             {isActive &&
               (reducedMotion ? (
