@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { Ayah, Word, Translation } from '@quran-corpus/data';
 import { AyahView } from './AyahView';
 import { WordPopover } from './WordPopover';
+import { useAyahAudio } from '../../hooks/useAyahAudio';
 
 interface ReaderViewProps {
   ayahs: Ayah[];
@@ -21,6 +22,7 @@ export function ReaderView({
   lang: _lang,
 }: ReaderViewProps) {
   const [selectedWord, setSelectedWord] = useState<Word | null>(null);
+  const { playingAyahId, isPlaying, isRepeat, play, pause, toggleRepeat } = useAyahAudio(ayahs);
 
   return (
     <div>
@@ -33,6 +35,12 @@ export function ReaderView({
             ? { translation: translationsByAyah[ayah.id] }
             : {})}
           onWordClick={setSelectedWord}
+          isThisPlaying={playingAyahId === ayah.id}
+          isPlaying={isPlaying}
+          isRepeat={isRepeat}
+          onPlay={() => play(ayah)}
+          onPause={pause}
+          onToggleRepeat={toggleRepeat}
         />
       ))}
       <WordPopover
