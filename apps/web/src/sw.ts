@@ -20,7 +20,7 @@ const serwist = new Serwist({
       // Cache-on-navigate: NetworkFirst for all document requests (surah pages, list, etc.)
       matcher: ({ request }) => request.mode === 'navigate',
       handler: new NetworkFirst({
-        cacheName: 'pages',
+        cacheName: 'navigate-pages',
         plugins: [new ExpirationPlugin({ maxAgeSeconds: 7 * 24 * 60 * 60, maxEntries: 64 })],
         networkTimeoutSeconds: 5,
       }),
