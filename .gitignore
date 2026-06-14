@@ -13,6 +13,10 @@ apps/web/public/sw.js.map
 
 # Database files — data artifacts stay out of git
 *.db
+
+# Raw scraped/imported data snapshots — re-fetch, never commit (CLAUDE.md §11)
+data-snapshots/
+packages/scraper/checkpoint.json
 *.db-shm
 *.db-wal
 raw-scrape/

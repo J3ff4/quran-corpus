@@ -91,27 +91,44 @@ def parse_verse_words(html: str) -> list[ParsedWord]:
     return words
 
 
-def parse_next_verse_url(html: str) -> int | None:
-    """Return the starting verse number of the next page, or None if on the last page.
+def parse_next_verse_url(
+    html: str, current_chapter: int, current_verse: int
+) -> int | None:
+    """Return the next page's starting verse in this chapter, or None if last.
 
-    Inspects the first ``href`` containing ``verse=`` inside the
-    ``.navigationPane`` div. Returns ``None`` when no such link exists (i.e.
-    the current page is the last page for this chapter).
+    The ``.navigationPane`` contains both backward and forward links (e.g. on
+    the last page of chapter 1 the first ``verse=`` link points *back* to
+    verse 1, and another points to the *next chapter*). Selecting the first
+    link blindly causes the scraper to oscillate forever (1 -> 7 -> 1 -> ...).
+
+    To advance reliably we consider only links that stay within
+    ``current_chapter`` and target a verse strictly greater than
+    ``current_verse``, and return the smallest such verse. ``None`` means
+    there is no forward link for this chapter — i.e. the current page is the
+    last one.
     """
     soup = BeautifulSoup(html, "lxml")
     nav = soup.find("div", class_="navigationPane")
     if nav is None:
         return None
+
+    forward_verses: list[int] = []
     for link in nav.find_all("a", href=True):
         href = link["href"]
-        if not isinstance(href, str):
+        if not isinstance(href, str) or "verse=" not in href:
             continue
-        if "verse=" in href:
-            qs = parse_qs(urlparse(href).query)
-            verses = qs.get("verse", [])
-            if verses:
-                try:
-                    return int(verses[0])
-                except ValueError:
-                    pass
-    return None
+        qs = parse_qs(urlparse(href).query)
+        verses = qs.get("verse", [])
+        # A link without an explicit chapter stays in the current chapter.
+        chapters = qs.get("chapter", [str(current_chapter)])
+        if not verses:
+            continue
+        try:
+            link_chapter = int(chapters[0])
+            link_verse = int(verses[0])
+        except ValueError:
+            continue
+        if link_chapter == current_chapter and link_verse > current_verse:
+            forward_verses.append(link_verse)
+
+    return min(forward_verses) if forward_verses else None

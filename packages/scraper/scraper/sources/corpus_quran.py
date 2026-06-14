@@ -33,20 +33,21 @@ def scrape_chapter(
     if checkpoint.is_done(ck_key):
         return
 
-    next_verse: int | None = 1
+    current_verse: int | None = 1
 
     with httpx.Client(timeout=30.0) as client:
-        while next_verse is not None:
-            url = f"{_BASE_URL}?chapter={chapter_id}&verse={next_verse}"
+        while current_verse is not None:
+            url = f"{_BASE_URL}?chapter={chapter_id}&verse={current_verse}"
             response = client.get(url)
             response.raise_for_status()
             html = response.text
 
             _process_page(html, chapter_id, db)
 
-            next_verse = parse_next_verse_url(html)
+            next_verse = parse_next_verse_url(html, chapter_id, current_verse)
             if next_verse is not None:
                 time.sleep(rate_limit)
+            current_verse = next_verse
 
     checkpoint.mark_done(ck_key)
 
