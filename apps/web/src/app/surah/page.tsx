@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { getDatabase } from '../../lib/db';
 import { getAllSurahs } from '@quran-corpus/data';
 import { SurahCard } from '../../components/surah-list/SurahCard';
@@ -13,9 +14,17 @@ export default async function SurahListPage() {
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="mb-6 text-2xl font-semibold text-paper-900 dark:text-paper-100">
-        Quran
-      </h1>
+      <div className="mb-6 flex items-baseline justify-between">
+        <h1 className="text-2xl font-semibold text-paper-900 dark:text-paper-100">
+          Quran
+        </h1>
+        <Link
+          href="/about"
+          className="text-sm text-paper-500 transition-colors hover:text-paper-800 dark:hover:text-paper-200"
+        >
+          About &amp; Credits
+        </Link>
+      </div>
       {surahs.length === 0 ? (
         <p className="text-paper-500">
           No surahs found. Run{' '}
