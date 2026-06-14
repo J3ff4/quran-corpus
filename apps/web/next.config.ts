@@ -15,6 +15,7 @@ const config: NextConfig = {
     }
     return webpackConfig;
   },
+  // CSP with per-request nonce is set in middleware.ts — only static headers here.
   headers: async () => [
     {
       source: '/(.*)',
@@ -27,21 +28,6 @@ const config: NextConfig = {
         {
           key: 'Strict-Transport-Security',
           value: 'max-age=31536000; includeSubDomains',
-        },
-        {
-          key: 'Content-Security-Policy',
-          value: [
-            "default-src 'self'",
-            "script-src 'self' 'unsafe-inline'",
-            "style-src 'self' 'unsafe-inline'",
-            "img-src 'self' data: blob:",
-            "font-src 'self' data:",
-            "connect-src 'self'",
-            "media-src 'self' https:",
-            "worker-src 'self'",
-            "object-src 'none'",
-            "base-uri 'self'",
-          ].join('; '),
         },
       ],
     },
