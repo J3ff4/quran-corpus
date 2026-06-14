@@ -18,7 +18,16 @@ describe('manifest', () => {
 
   it('does not combine maskable and any in a single entry', () => {
     const m = manifest();
-    const combined = m.icons?.find((i) => i.purpose === 'maskable any');
+    const combined = m.icons?.find(
+      (i) => i.purpose?.includes('any') && i.purpose?.includes('maskable')
+    );
     expect(combined).toBeUndefined();
+  });
+
+  it('has correct colors and scope', () => {
+    const m = manifest();
+    expect(m.background_color).toBe('#faf8f3');
+    expect(m.theme_color).toBe('#1f1a14');
+    expect((m as Record<string, unknown>).scope).toBe('/');
   });
 });

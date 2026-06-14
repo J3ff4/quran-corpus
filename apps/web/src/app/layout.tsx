@@ -24,6 +24,7 @@ export const metadata: Metadata = {
     title: 'Quran Corpus',
   },
   icons: {
+    icon: '/icons/icon-192.png',
     apple: '/icons/apple-touch-icon.png',
   },
 };

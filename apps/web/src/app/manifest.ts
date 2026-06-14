@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next';
 
-export default function manifest(): MetadataRoute.Manifest {
+export default function manifest(): MetadataRoute.Manifest & { scope?: string } {
   return {
     name: 'Quran Corpus',
     short_name: 'Quran',
@@ -10,6 +10,7 @@ export default function manifest(): MetadataRoute.Manifest {
     background_color: '#faf8f3',
     theme_color: '#1f1a14',
     orientation: 'portrait',
+    scope: '/',
     icons: [
       {
         src: '/icons/icon-192.png',
@@ -28,6 +29,12 @@ export default function manifest(): MetadataRoute.Manifest {
         sizes: '512x512',
         type: 'image/png',
         purpose: 'any',
+      },
+      {
+        src: '/icons/icon-maskable-512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'maskable',
       },
     ],
   };

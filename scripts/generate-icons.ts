@@ -39,6 +39,7 @@ async function main(): Promise<void> {
   await generate(makeSvg(512), `${OUTPUT_DIR}/icon-512.png`);
   await generate(makeSvg(192), `${OUTPUT_DIR}/icon-192.png`);
   await generate(makeSvg(192, { padFactor: 0.12, rounded: false }), `${OUTPUT_DIR}/icon-maskable-192.png`);
+  await generate(makeSvg(512, { padFactor: 0.12, rounded: false }), `${OUTPUT_DIR}/icon-maskable-512.png`);
   await generate(makeSvg(180, { rounded: false }), `${OUTPUT_DIR}/apple-touch-icon.png`);
   console.log('All icons generated.');
 }
