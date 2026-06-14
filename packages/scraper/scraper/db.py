@@ -136,14 +136,18 @@ class ScraperDatabase:
                )
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(ayah_id, position) DO UPDATE SET
-                 text_arabic      = excluded.text_arabic,
-                 transliteration  = excluded.transliteration,
-                 root             = excluded.root,
-                 lemma            = excluded.lemma,
-                 root_buckwalter  = excluded.root_buckwalter,
-                 lemma_buckwalter = excluded.lemma_buckwalter,
-                 pos_tag          = excluded.pos_tag,
-                 morphology_json  = excluded.morphology_json
+                 text_arabic = excluded.text_arabic,
+                 transliteration = COALESCE(
+                   excluded.transliteration, words.transliteration),
+                 root = COALESCE(excluded.root, words.root),
+                 lemma = COALESCE(excluded.lemma, words.lemma),
+                 root_buckwalter = COALESCE(
+                   excluded.root_buckwalter, words.root_buckwalter),
+                 lemma_buckwalter = COALESCE(
+                   excluded.lemma_buckwalter, words.lemma_buckwalter),
+                 pos_tag = COALESCE(excluded.pos_tag, words.pos_tag),
+                 morphology_json = COALESCE(
+                   excluded.morphology_json, words.morphology_json)
                RETURNING id""",
             (
                 word.ayah_id,
