@@ -1,9 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
+import type { ReactNode } from 'react';
 import { render, screen } from '@testing-library/react';
 import OfflinePage from '../app/offline/page';
 
 vi.mock('next/link', () => ({
-  default: ({ href, children }: { href: string; children: React.ReactNode }) => (
+  default: ({ href, children }: { href: string; children: ReactNode }) => (
     <a href={href}>{children}</a>
   ),
 }));
@@ -11,7 +12,7 @@ vi.mock('next/link', () => ({
 describe('OfflinePage', () => {
   it('renders a heading', () => {
     render(<OfflinePage />);
-    expect(screen.getByRole('heading', { level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
   });
 
   it('renders a link back to the surah list', () => {
