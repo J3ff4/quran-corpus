@@ -2,6 +2,19 @@ import withSerwist from '@serwist/next';
 import type { NextConfig } from 'next';
 
 const config: NextConfig = {
+  // @libsql/client uses native Node.js bindings — must not be bundled by webpack.
+  // serverExternalPackages is listed here for clarity; webpack externals below handles pnpm virtual store paths.
+  serverExternalPackages: ['@libsql/client', 'libsql'],
+  webpack: (webpackConfig, { isServer }) => {
+    if (isServer) {
+      webpackConfig.externals = [
+        ...(Array.isArray(webpackConfig.externals) ? webpackConfig.externals : []),
+        /^@libsql\//,
+        'libsql',
+      ];
+    }
+    return webpackConfig;
+  },
   headers: async () => [
     {
       source: '/(.*)',

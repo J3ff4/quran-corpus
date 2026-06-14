@@ -1,3 +1,6 @@
+// DB-dependent page — opt out of static pre-rendering
+export const dynamic = 'force-dynamic';
+
 import { notFound } from 'next/navigation';
 import { getDatabase } from '../../../lib/db';
 import {
