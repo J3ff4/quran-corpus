@@ -12,8 +12,10 @@
     }
   },
   "scripts": {
-    "build": "tsc",
-    "type-check": "tsc --noEmit",
+    "generate:schema": "node scripts/generate-schema.mjs",
+    "build": "node scripts/generate-schema.mjs && tsc",
+    "type-check": "node scripts/generate-schema.mjs && tsc --noEmit",
+    "pretest": "node scripts/generate-schema.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
