@@ -9,10 +9,17 @@ interface ReaderViewProps {
   ayahs: Ayah[];
   wordsByAyah: Record<number, Word[]>;
   translationsByAyah: Record<number, Translation>;
+  glossesByWordId: Record<number, string>;
   lang: string;
 }
 
-export function ReaderView({ ayahs, wordsByAyah, translationsByAyah, lang: _lang }: ReaderViewProps) {
+export function ReaderView({
+  ayahs,
+  wordsByAyah,
+  translationsByAyah,
+  glossesByWordId,
+  lang: _lang,
+}: ReaderViewProps) {
   const [selectedWord, setSelectedWord] = useState<Word | null>(null);
 
   return (
@@ -28,7 +35,13 @@ export function ReaderView({ ayahs, wordsByAyah, translationsByAyah, lang: _lang
           onWordClick={setSelectedWord}
         />
       ))}
-      <WordPopover word={selectedWord} onClose={() => setSelectedWord(null)} />
+      <WordPopover
+        word={selectedWord}
+        {...(selectedWord != null && glossesByWordId[selectedWord.id] != null
+          ? { gloss: glossesByWordId[selectedWord.id] }
+          : {})}
+        onClose={() => setSelectedWord(null)}
+      />
     </div>
   );
 }

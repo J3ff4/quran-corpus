@@ -31,6 +31,11 @@ _HTML_NO_NAV = FIXTURE_HTML.replace(
 def db(tmp_path: Path) -> ScraperDatabase:
     """In-memory DB seeded with Al-Fatiha surah and ayahs 1-6."""
     d = ScraperDatabase(str(tmp_path / "test.db"))
+    # Languages are FK targets for word_glosses; the real CLI seeds them first.
+    d._conn.execute(
+        "INSERT INTO languages (code, name_native, name_english, direction) "
+        "VALUES ('en', 'English', 'English', 'ltr')"
+    )
     d._conn.execute(
         "INSERT INTO surahs "
         "(id, name_arabic, name_translit, name_translation, "
@@ -100,6 +105,20 @@ def test_process_page_sets_transliteration(db: ScraperDatabase) -> None:
     ).fetchone()
     assert row is not None
     assert row[0] == "bis'mi"
+
+
+def test_process_page_stores_english_gloss(db: ScraperDatabase) -> None:
+    """The parsed english_gloss is stored in word_glosses under language 'en'."""
+    _process_page(FIXTURE_HTML, 1, db)
+    row = db._conn.execute(
+        "SELECT g.gloss_text FROM word_glosses g "
+        "JOIN words w ON w.id = g.word_id "
+        "WHERE w.ayah_id = "
+        "(SELECT id FROM ayahs WHERE surah_id=1 AND ayah_number=1) "
+        "AND w.position=1 AND g.language_code='en'"
+    ).fetchone()
+    assert row is not None
+    assert row[0] == "In (the) name"
 
 
 def test_process_page_skips_missing_ayah(db: ScraperDatabase) -> None:

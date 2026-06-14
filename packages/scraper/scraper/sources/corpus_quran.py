@@ -11,7 +11,7 @@ import httpx
 
 from ..checkpoint import Checkpoint
 from ..db import ScraperDatabase
-from ..models import WordModel
+from ..models import WordGlossModel, WordModel
 from .corpus_parser import parse_next_verse_url, parse_verse_words
 
 _BASE_URL = "https://corpus.quran.com/wordbyword.jsp"
@@ -66,7 +66,7 @@ def _process_page(html: str, chapter_id: int, db: ScraperDatabase) -> None:
             word_texts[pw.position - 1] if 0 < pw.position <= len(word_texts) else ""
         )
 
-        db.upsert_word(
+        word_id = db.upsert_word(
             WordModel(
                 ayah_id=ayah_id,
                 position=pw.position,
@@ -76,3 +76,12 @@ def _process_page(html: str, chapter_id: int, db: ScraperDatabase) -> None:
                 morphology_json=pw.morphology_json,
             )
         )
+
+        if pw.english_gloss:
+            db.upsert_word_gloss(
+                WordGlossModel(
+                    word_id=word_id,
+                    language_code="en",
+                    gloss_text=pw.english_gloss,
+                )
+            )
