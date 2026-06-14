@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { AyahView } from '../components/reader/AyahView';
 import type { Ayah, Word, Translation } from '@quran-corpus/data';
@@ -37,6 +37,8 @@ const audioProps = {
 };
 
 describe('AyahView', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
   it('renders ayah number badge', () => {
     render(<AyahView ayah={ayah} words={[]} onWordClick={vi.fn()} {...audioProps} />);
     expect(screen.getByText('1')).toBeInTheDocument();
