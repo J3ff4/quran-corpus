@@ -27,37 +27,51 @@ const translation: Translation = {
   text: 'In the name of Allah, the Entirely Merciful, the Especially Merciful.',
 };
 
+const audioProps = {
+  isThisPlaying: false,
+  isPlaying: false,
+  isRepeat: false,
+  onPlay: vi.fn(),
+  onPause: vi.fn(),
+  onToggleRepeat: vi.fn(),
+};
+
 describe('AyahView', () => {
   it('renders ayah number badge', () => {
-    render(<AyahView ayah={ayah} words={[]} onWordClick={vi.fn()} />);
+    render(<AyahView ayah={ayah} words={[]} onWordClick={vi.fn()} {...audioProps} />);
     expect(screen.getByText('1')).toBeInTheDocument();
   });
 
   it('renders word tokens when words are provided', () => {
-    render(<AyahView ayah={ayah} words={words} onWordClick={vi.fn()} />);
+    render(<AyahView ayah={ayah} words={words} onWordClick={vi.fn()} {...audioProps} />);
     expect(screen.getByText('بِسْمِ')).toBeInTheDocument();
     expect(screen.getByText('ٱللَّهِ')).toBeInTheDocument();
   });
 
   it('falls back to text_uthmani block when no words', () => {
-    render(<AyahView ayah={ayah} words={[]} onWordClick={vi.fn()} />);
+    render(<AyahView ayah={ayah} words={[]} onWordClick={vi.fn()} {...audioProps} />);
     expect(screen.getByText(ayah.text_uthmani)).toBeInTheDocument();
   });
 
   it('calls onWordClick when a word token is clicked', () => {
     const onWordClick = vi.fn();
-    render(<AyahView ayah={ayah} words={words} onWordClick={onWordClick} />);
+    render(<AyahView ayah={ayah} words={words} onWordClick={onWordClick} {...audioProps} />);
     fireEvent.click(screen.getByText('بِسْمِ'));
     expect(onWordClick).toHaveBeenCalledWith(words[0]);
   });
 
   it('renders translation when provided', () => {
-    render(<AyahView ayah={ayah} words={[]} translation={translation} onWordClick={vi.fn()} />);
+    render(<AyahView ayah={ayah} words={[]} translation={translation} onWordClick={vi.fn()} {...audioProps} />);
     expect(screen.getByText(translation.text)).toBeInTheDocument();
   });
 
   it('renders nothing for translation when not provided', () => {
-    render(<AyahView ayah={ayah} words={[]} onWordClick={vi.fn()} />);
+    render(<AyahView ayah={ayah} words={[]} onWordClick={vi.fn()} {...audioProps} />);
     expect(screen.queryByText(translation.text)).toBeNull();
+  });
+
+  it('renders play button for the ayah', () => {
+    render(<AyahView ayah={ayah} words={[]} onWordClick={vi.fn()} {...audioProps} />);
+    expect(screen.getByRole('button', { name: /play ayah 1/i })).toBeInTheDocument();
   });
 });
