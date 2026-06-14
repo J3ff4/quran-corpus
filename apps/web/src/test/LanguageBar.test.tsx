@@ -12,10 +12,14 @@ vi.mock('framer-motion', () => ({
   motion: {
     div: ({
       children,
+      layoutId: _layoutId,
+      transition: _transition,
       ...props
-    }: React.HTMLAttributes<HTMLDivElement> & { children?: React.ReactNode }) => (
-      <div {...props}>{children}</div>
-    ),
+    }: React.HTMLAttributes<HTMLDivElement> & {
+      children?: React.ReactNode;
+      layoutId?: string;
+      transition?: unknown;
+    }) => <div {...props}>{children}</div>,
   },
   useReducedMotion: () => false,
 }));

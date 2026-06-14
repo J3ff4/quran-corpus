@@ -9,6 +9,8 @@ const LANGUAGES = [
   { code: 'ru', label: 'Russian' },
 ] as const;
 
+export const VALID_LANG_CODES = LANGUAGES.map((l) => l.code);
+
 interface LanguageBarProps {
   surahId: number;
   activeLang: string;
@@ -27,7 +29,7 @@ export function LanguageBar({ surahId, activeLang }: LanguageBarProps) {
             key={code}
             type="button"
             aria-label={label}
-            aria-current={isActive ? 'true' : undefined}
+            aria-current={isActive ? 'page' : undefined}
             onClick={() => {
               if (!isActive) router.push(`/surah/${surahId}?lang=${code}`);
             }}

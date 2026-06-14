@@ -13,19 +13,17 @@ import {
 import type { Word, Translation } from '@quran-corpus/data';
 import { SurahHeader } from '../../../components/reader/SurahHeader';
 import { ReaderView } from '../../../components/reader/ReaderView';
-import { LanguageBar } from '../../../components/reader/LanguageBar';
+import { LanguageBar, VALID_LANG_CODES } from '../../../components/reader/LanguageBar';
 
 interface PageProps {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ lang?: string }>;
 }
 
-// Must match LanguageBar.LANGUAGES
-const VALID_LANGS = ['en', 'uz', 'ru'] as const;
-type ValidLang = (typeof VALID_LANGS)[number];
+type ValidLang = (typeof VALID_LANG_CODES)[number];
 
 function isValidLang(v: string | undefined): v is ValidLang {
-  return VALID_LANGS.includes(v as ValidLang);
+  return (VALID_LANG_CODES as ReadonlyArray<string>).includes(v ?? '');
 }
 
 export default async function SurahPage({ params, searchParams }: PageProps) {
