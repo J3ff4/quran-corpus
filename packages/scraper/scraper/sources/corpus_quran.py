@@ -11,7 +11,7 @@ import httpx
 
 from ..checkpoint import Checkpoint
 from ..db import ScraperDatabase
-from ..models import WordModel
+from ..models import WordGlossModel, WordModel
 from .corpus_parser import parse_next_verse_url, parse_verse_words
 
 _BASE_URL = "https://corpus.quran.com/wordbyword.jsp"
@@ -33,20 +33,21 @@ def scrape_chapter(
     if checkpoint.is_done(ck_key):
         return
 
-    next_verse: int | None = 1
+    current_verse: int | None = 1
 
     with httpx.Client(timeout=30.0) as client:
-        while next_verse is not None:
-            url = f"{_BASE_URL}?chapter={chapter_id}&verse={next_verse}"
+        while current_verse is not None:
+            url = f"{_BASE_URL}?chapter={chapter_id}&verse={current_verse}"
             response = client.get(url)
             response.raise_for_status()
             html = response.text
 
             _process_page(html, chapter_id, db)
 
-            next_verse = parse_next_verse_url(html)
+            next_verse = parse_next_verse_url(html, chapter_id, current_verse)
             if next_verse is not None:
                 time.sleep(rate_limit)
+            current_verse = next_verse
 
     checkpoint.mark_done(ck_key)
 
@@ -65,7 +66,7 @@ def _process_page(html: str, chapter_id: int, db: ScraperDatabase) -> None:
             word_texts[pw.position - 1] if 0 < pw.position <= len(word_texts) else ""
         )
 
-        db.upsert_word(
+        word_id = db.upsert_word(
             WordModel(
                 ayah_id=ayah_id,
                 position=pw.position,
@@ -75,3 +76,12 @@ def _process_page(html: str, chapter_id: int, db: ScraperDatabase) -> None:
                 morphology_json=pw.morphology_json,
             )
         )
+
+        if pw.english_gloss:
+            db.upsert_word_gloss(
+                WordGlossModel(
+                    word_id=word_id,
+                    language_code="en",
+                    gloss_text=pw.english_gloss,
+                )
+            )

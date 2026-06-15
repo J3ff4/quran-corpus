@@ -28,7 +28,21 @@ class ScraperDatabase:
             stmt = stmt.strip()
             if stmt and not stmt.upper().startswith("PRAGMA"):
                 self._conn.execute(stmt)
+        self._migrate_add_word_columns()
         self._conn.commit()
+
+    def _migrate_add_word_columns(self) -> None:
+        """Add columns introduced after a DB was first created.
+
+        CREATE TABLE IF NOT EXISTS will not alter an existing table, and SQLite
+        has no ADD COLUMN IF NOT EXISTS, so add any missing columns explicitly.
+        """
+        existing = {
+            row["name"] for row in self._conn.execute("PRAGMA table_info(words)")
+        }
+        for column in ("root_buckwalter", "lemma_buckwalter"):
+            if column not in existing:
+                self._conn.execute(f"ALTER TABLE words ADD COLUMN {column} TEXT")
 
     def upsert_surah(self, surah: SurahModel) -> None:
         self._conn.execute(
@@ -115,17 +129,25 @@ class ScraperDatabase:
                    transliteration,
                    root,
                    lemma,
+                   root_buckwalter,
+                   lemma_buckwalter,
                    pos_tag,
                    morphology_json
                )
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(ayah_id, position) DO UPDATE SET
-                 text_arabic     = excluded.text_arabic,
-                 transliteration = excluded.transliteration,
-                 root            = excluded.root,
-                 lemma           = excluded.lemma,
-                 pos_tag         = excluded.pos_tag,
-                 morphology_json = excluded.morphology_json
+                 text_arabic = excluded.text_arabic,
+                 transliteration = COALESCE(
+                   excluded.transliteration, words.transliteration),
+                 root = COALESCE(excluded.root, words.root),
+                 lemma = COALESCE(excluded.lemma, words.lemma),
+                 root_buckwalter = COALESCE(
+                   excluded.root_buckwalter, words.root_buckwalter),
+                 lemma_buckwalter = COALESCE(
+                   excluded.lemma_buckwalter, words.lemma_buckwalter),
+                 pos_tag = COALESCE(excluded.pos_tag, words.pos_tag),
+                 morphology_json = COALESCE(
+                   excluded.morphology_json, words.morphology_json)
                RETURNING id""",
             (
                 word.ayah_id,
@@ -134,6 +156,8 @@ class ScraperDatabase:
                 word.transliteration,
                 word.root,
                 word.lemma,
+                word.root_buckwalter,
+                word.lemma_buckwalter,
                 word.pos_tag,
                 word.morphology_json,
             ),

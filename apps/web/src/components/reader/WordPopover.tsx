@@ -5,6 +5,7 @@ import type { Word } from '@quran-corpus/data';
 
 interface WordPopoverProps {
   word: Word | null;
+  gloss?: string;
   onClose: () => void;
 }
 
@@ -18,7 +19,7 @@ function parseMorphology(json: string | null): string[] {
   }
 }
 
-export function WordPopover({ word, onClose }: WordPopoverProps) {
+export function WordPopover({ word, gloss, onClose }: WordPopoverProps) {
   const segments = parseMorphology(word?.morphology_json ?? null);
 
   return (
@@ -68,7 +69,12 @@ export function WordPopover({ word, onClose }: WordPopoverProps) {
 
             {/* Transliteration */}
             {word.transliteration && (
-              <p className="mb-4 text-lg text-paper-500">{word.transliteration}</p>
+              <p className="mb-1 text-lg text-paper-500">{word.transliteration}</p>
+            )}
+
+            {/* English gloss */}
+            {gloss && (
+              <p className="mb-4 text-base text-paper-700 dark:text-paper-300">{gloss}</p>
             )}
 
             {/* Metadata row */}
@@ -81,6 +87,11 @@ export function WordPopover({ word, onClose }: WordPopoverProps) {
               {word.root && (
                 <span className="font-arabic rounded-full bg-paper-200 px-3 py-0.5 text-sm text-paper-700 dark:bg-night-100 dark:text-paper-300">
                   {word.root}
+                </span>
+              )}
+              {word.lemma && (
+                <span className="font-arabic rounded-full bg-paper-200 px-3 py-0.5 text-sm text-paper-700 dark:bg-night-100 dark:text-paper-300">
+                  {word.lemma}
                 </span>
               )}
             </div>

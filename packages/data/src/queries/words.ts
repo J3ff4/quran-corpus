@@ -10,6 +10,8 @@ function rowToWord(row: Row): Word {
     transliteration: (row['transliteration'] as string | null) ?? null,
     root: (row['root'] as string | null) ?? null,
     lemma: (row['lemma'] as string | null) ?? null,
+    root_buckwalter: (row['root_buckwalter'] as string | null) ?? null,
+    lemma_buckwalter: (row['lemma_buckwalter'] as string | null) ?? null,
     pos_tag: (row['pos_tag'] as string | null) ?? null,
     morphology_json: (row['morphology_json'] as string | null) ?? null,
   };

@@ -167,18 +167,47 @@ def test_verse_6_word_1_has_three_pos_codes(parsed_words: list[ParsedWord]) -> N
 
 def test_parse_next_verse_url(fixture_html: str) -> None:
     """Navigation pane links to ?chapter=1&verse=7, so next verse is 7."""
-    assert parse_next_verse_url(fixture_html) == 7
+    assert parse_next_verse_url(fixture_html, 1, 1) == 7
 
 
 def test_parse_next_verse_url_no_nav() -> None:
     """HTML with no navigationPane div returns None."""
-    assert parse_next_verse_url("<html><body></body></html>") is None
+    assert parse_next_verse_url("<html><body></body></html>", 1, 1) is None
 
 
 def test_parse_next_verse_url_last_page() -> None:
     """navigationPane with no verse= links (e.g. last page) returns None."""
     html = '<div class="navigationPane">Verse <b>7-7</b></div>'
-    assert parse_next_verse_url(html) is None
+    assert parse_next_verse_url(html, 1, 7) is None
+
+
+def test_parse_next_verse_url_ignores_backward_link() -> None:
+    """On the last page the first link points backward; must not be followed.
+
+    Regression: corpus.quran.com's last-page nav lists the 'previous' link
+    first (e.g. back to verse 1) plus a next-chapter link. Returning the first
+    verse= link caused an infinite 7 -> 1 -> 7 loop.
+    """
+    html = (
+        '<div class="navigationPane">'
+        '<a href="?chapter=1&verse=1">prev</a>'
+        '<a href="?chapter=1&verse=1">prev</a>'
+        '<a href="?chapter=2&verse=1">next chapter</a>'
+        "</div>"
+    )
+    assert parse_next_verse_url(html, 1, 7) is None
+
+
+def test_parse_next_verse_url_picks_forward_same_chapter() -> None:
+    """With both backward and forward same-chapter links, return the forward one."""
+    html = (
+        '<div class="navigationPane">'
+        '<a href="?chapter=2&verse=1">prev</a>'
+        '<a href="?chapter=2&verse=6">next</a>'
+        '<a href="?chapter=3&verse=1">next chapter</a>'
+        "</div>"
+    )
+    assert parse_next_verse_url(html, 2, 5) == 6
 
 
 # ---------------------------------------------------------------------------
@@ -195,4 +224,4 @@ def test_no_morphology_table_returns_empty() -> None:
 
 
 def test_empty_html_next_url_returns_none() -> None:
-    assert parse_next_verse_url("") is None
+    assert parse_next_verse_url("", 1, 1) is None

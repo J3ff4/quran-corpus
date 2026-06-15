@@ -8,6 +8,7 @@ import {
   getAyahsBySurah,
   getWordsBySurah,
   getTranslationsBySurahAndLang,
+  getGlossesBySurahAndLang,
 } from '@quran-corpus/data';
 import type { Word, Translation } from '@quran-corpus/data';
 import { SurahHeader } from '../../../components/reader/SurahHeader';
@@ -36,11 +37,12 @@ export default async function SurahPage({ params, searchParams }: PageProps) {
   if (isNaN(surahId) || surahId < 1 || surahId > 114) notFound();
 
   const db = await getDatabase();
-  const [surah, ayahs, words, translations] = await Promise.all([
+  const [surah, ayahs, words, translations, glosses] = await Promise.all([
     getSurahById(db, surahId),
     getAyahsBySurah(db, surahId),
     getWordsBySurah(db, surahId),
     getTranslationsBySurahAndLang(db, surahId, lang),
+    getGlossesBySurahAndLang(db, surahId, lang),
   ]);
 
   if (!surah) notFound();
@@ -57,6 +59,12 @@ export default async function SurahPage({ params, searchParams }: PageProps) {
     translationsByAyah[t.ayah_id] = t;
   }
 
+  // word_id -> gloss text for this language.
+  const glossesByWordId: Record<number, string> = {};
+  for (const g of glosses) {
+    glossesByWordId[g.word_id] = g.gloss_text;
+  }
+
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
       <SurahHeader surah={surah} />
@@ -65,6 +73,7 @@ export default async function SurahPage({ params, searchParams }: PageProps) {
         ayahs={ayahs}
         wordsByAyah={wordsByAyah}
         translationsByAyah={translationsByAyah}
+        glossesByWordId={glossesByWordId}
         lang={lang}
       />
     </main>

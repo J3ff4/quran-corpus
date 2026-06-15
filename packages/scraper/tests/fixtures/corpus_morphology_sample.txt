@@ -1,0 +1,12 @@
+# Quranic Arabic Corpus (Version 0.4)
+# Copyright (C) 2011 Kais Dukes
+# License: GNU General Public License
+#
+LOCATION	FORM	TAG	FEATURES
+(1:1:1:1)	bi	P	PREFIX|bi+
+(1:1:1:2)	somi	N	STEM|POS:N|LEM:{som|ROOT:smw|M|GEN
+(1:1:2:1)	{ll~ahi	PN	STEM|POS:PN|LEM:{ll~ah|ROOT:Alh|GEN
+(1:1:3:1)	{l	DET	PREFIX|Al+
+(1:1:3:2)	r~aHoma`ni	ADJ	STEM|POS:ADJ|LEM:r~aHoma`n|ROOT:rHm|MS|GEN
+(1:2:1:1)	{lo	DET	PREFIX|Al+
+(1:2:1:2)	Hamodu	N	STEM|POS:N|LEM:Hamod|ROOT:Hmd|M|NOM
