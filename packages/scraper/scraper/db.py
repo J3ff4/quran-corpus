@@ -3,11 +3,16 @@ from pathlib import Path
 
 from .models import (
     AyahModel,
+    ConceptTagModel,
     LanguageModel,
+    RootDefinitionModel,
+    RootFormModel,
+    RootModel,
     SurahModel,
     TranslationModel,
     WordGlossModel,
     WordModel,
+    WordSegmentModel,
 )
 
 # schema.sql lives at packages/data/schema.sql — single source of truth for DDL
@@ -24,11 +29,20 @@ class ScraperDatabase:
 
     def _apply_schema(self) -> None:
         sql = _SCHEMA_PATH.read_text()
-        for stmt in sql.split(";"):
-            stmt = stmt.strip()
-            if stmt and not stmt.upper().startswith("PRAGMA"):
-                self._conn.execute(stmt)
+        statements = [
+            stmt
+            for raw in sql.split(";")
+            if (stmt := raw.strip()) and not stmt.upper().startswith("PRAGMA")
+        ]
+        # Create tables first, then add any columns missing on legacy DBs, then
+        # indexes — so an index never references a column the migration adds.
+        indexes = [s for s in statements if s.upper().startswith("CREATE INDEX")]
+        tables = [s for s in statements if not s.upper().startswith("CREATE INDEX")]
+        for stmt in tables:
+            self._conn.execute(stmt)
         self._migrate_add_word_columns()
+        for stmt in indexes:
+            self._conn.execute(stmt)
         self._conn.commit()
 
     def _migrate_add_word_columns(self) -> None:
@@ -40,7 +54,13 @@ class ScraperDatabase:
         existing = {
             row["name"] for row in self._conn.execute("PRAGMA table_info(words)")
         }
-        for column in ("root_buckwalter", "lemma_buckwalter"):
+        for column in (
+            "root_buckwalter",
+            "lemma_buckwalter",
+            "morphology_description",
+            "grammar_arabic",
+            "audio_url",
+        ):
             if column not in existing:
                 self._conn.execute(f"ALTER TABLE words ADD COLUMN {column} TEXT")
 
@@ -132,9 +152,11 @@ class ScraperDatabase:
                    root_buckwalter,
                    lemma_buckwalter,
                    pos_tag,
-                   morphology_json
+                   morphology_json,
+                   morphology_description,
+                   grammar_arabic
                )
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(ayah_id, position) DO UPDATE SET
                  text_arabic = excluded.text_arabic,
                  transliteration = COALESCE(
@@ -147,7 +169,11 @@ class ScraperDatabase:
                    excluded.lemma_buckwalter, words.lemma_buckwalter),
                  pos_tag = COALESCE(excluded.pos_tag, words.pos_tag),
                  morphology_json = COALESCE(
-                   excluded.morphology_json, words.morphology_json)
+                   excluded.morphology_json, words.morphology_json),
+                 morphology_description = COALESCE(
+                   excluded.morphology_description, words.morphology_description),
+                 grammar_arabic = COALESCE(
+                   excluded.grammar_arabic, words.grammar_arabic)
                RETURNING id""",
             (
                 word.ayah_id,
@@ -160,6 +186,8 @@ class ScraperDatabase:
                 word.lemma_buckwalter,
                 word.pos_tag,
                 word.morphology_json,
+                word.morphology_description,
+                word.grammar_arabic,
             ),
         )
         row = cursor.fetchone()
@@ -190,6 +218,108 @@ class ScraperDatabase:
             (gloss.word_id, gloss.language_code, gloss.gloss_text),
         )
         self._conn.commit()
+
+    def upsert_root(self, root: RootModel) -> int:
+        cur = self._conn.execute(
+            """INSERT INTO roots (root_buckwalter, root_arabic, occurrence_count)
+               VALUES (?, ?, ?)
+               ON CONFLICT(root_buckwalter) DO UPDATE SET
+                 root_arabic      = excluded.root_arabic,
+                 occurrence_count = excluded.occurrence_count
+               RETURNING id""",
+            (root.root_buckwalter, root.root_arabic, root.occurrence_count),
+        )
+        rid = int(cur.fetchone()[0])
+        self._conn.commit()
+        return rid
+
+    def upsert_root_form(self, form: RootFormModel) -> None:
+        self._conn.execute(
+            """INSERT INTO root_forms
+               (root_id, sort_order, pos_label, form_arabic, form_translit,
+                gloss, occurrence_count)
+               VALUES (?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(root_id, sort_order) DO UPDATE SET
+                 pos_label        = excluded.pos_label,
+                 form_arabic      = excluded.form_arabic,
+                 form_translit    = excluded.form_translit,
+                 gloss            = excluded.gloss,
+                 occurrence_count = excluded.occurrence_count""",
+            (
+                form.root_id,
+                form.sort_order,
+                form.pos_label,
+                form.form_arabic,
+                form.form_translit,
+                form.gloss,
+                form.occurrence_count,
+            ),
+        )
+        self._conn.commit()
+
+    def upsert_root_definition(self, d: RootDefinitionModel) -> None:
+        self._conn.execute(
+            """INSERT INTO root_definitions (root_id, source, definition)
+               VALUES (?, ?, ?)
+               ON CONFLICT(root_id, source) DO UPDATE SET
+                 definition = excluded.definition""",
+            (d.root_id, d.source, d.definition),
+        )
+        self._conn.commit()
+
+    def upsert_word_segment(self, s: WordSegmentModel) -> None:
+        self._conn.execute(
+            """INSERT INTO word_segments
+               (word_id, segment_index, segment_type, pos_tag, form_arabic,
+                form_buckwalter, features_json, lemma, root)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(word_id, segment_index) DO UPDATE SET
+                 segment_type    = excluded.segment_type,
+                 pos_tag         = excluded.pos_tag,
+                 form_arabic     = excluded.form_arabic,
+                 form_buckwalter = excluded.form_buckwalter,
+                 features_json   = excluded.features_json,
+                 lemma           = excluded.lemma,
+                 root            = excluded.root""",
+            (
+                s.word_id,
+                s.segment_index,
+                s.segment_type,
+                s.pos_tag,
+                s.form_arabic,
+                s.form_buckwalter,
+                s.features_json,
+                s.lemma,
+                s.root,
+            ),
+        )
+        self._conn.commit()
+
+    def upsert_concept_tag(self, t: ConceptTagModel) -> None:
+        self._conn.execute(
+            """INSERT INTO word_concept_tags (word_id, tag_label, tag_type)
+               VALUES (?, ?, ?)
+               ON CONFLICT(word_id, tag_label) DO UPDATE SET
+                 tag_type = excluded.tag_type""",
+            (t.word_id, t.tag_label, t.tag_type),
+        )
+        self._conn.commit()
+
+    def get_distinct_roots(self) -> list[str]:
+        return [
+            r[0]
+            for r in self._conn.execute(
+                "SELECT DISTINCT root_buckwalter FROM words "
+                "WHERE root_buckwalter IS NOT NULL ORDER BY root_buckwalter"
+            ).fetchall()
+        ]
+
+    def get_all_words_with_location(self) -> list[sqlite3.Row]:
+        return self._conn.execute(
+            """SELECT w.id AS word_id, a.surah_id, a.ayah_number, w.position
+               FROM words w JOIN ayahs a ON a.id = w.ayah_id
+               ORDER BY a.surah_id, a.ayah_number, w.position"""
+        ).fetchall()
 
     def get_ayah(self, surah_id: int, ayah_number: int) -> sqlite3.Row | None:
         return self._conn.execute(
