@@ -1,0 +1,70 @@
+import type { RootEntry as RootEntryT, ConcordanceEntry } from '@quran-corpus/data';
+import { FormGroup } from './FormGroup';
+import { ConcordanceList } from './ConcordanceList';
+
+interface RootEntryProps {
+  entry: RootEntryT;
+  concordance: ConcordanceEntry[];
+}
+
+const sourceLabel = (source: string): string =>
+  source === 'lane' ? "Lane's Lexicon" : source;
+
+/**
+ * Full root entry: header, Lane's definition (additive — omitted when empty),
+ * derived form groups, and the concordance section.
+ */
+export function RootEntry({ entry, concordance }: RootEntryProps) {
+  const { root, forms, definitions } = entry;
+  return (
+    <article>
+      <header className="mb-6">
+        <h1
+          dir="rtl"
+          className="font-arabic text-4xl text-paper-900 dark:text-paper-100"
+        >
+          {root.root_arabic}
+        </h1>
+        <p className="mt-1 text-sm text-paper-500">
+          {root.root_buckwalter} · occurs {root.occurrence_count} times
+        </p>
+      </header>
+
+      {definitions.length > 0 && (
+        <section className="mb-8 space-y-3">
+          {definitions.map((d) => (
+            <div
+              key={d.id}
+              className="rounded-lg border border-paper-200 bg-paper-100 px-4 py-3 dark:border-night-100 dark:bg-night-50"
+            >
+              <p className="text-sm leading-relaxed text-paper-800 dark:text-paper-200">
+                {d.definition}
+              </p>
+              <p className="mt-2 text-xs text-paper-500">{sourceLabel(d.source)}</p>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {forms.length > 0 && (
+        <section className="mb-8">
+          <h2 className="mb-2 text-sm font-medium text-paper-600 dark:text-paper-400">
+            Derived forms
+          </h2>
+          <div className="divide-y divide-paper-200 dark:divide-night-100">
+            {forms.map((f) => (
+              <FormGroup key={f.id} form={f} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section>
+        <h2 className="mb-2 text-sm font-medium text-paper-600 dark:text-paper-400">
+          Concordance ({concordance.length})
+        </h2>
+        <ConcordanceList entries={concordance} />
+      </section>
+    </article>
+  );
+}
