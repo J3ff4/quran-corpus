@@ -18,12 +18,20 @@ export default async function SurahListPage() {
         <h1 className="text-2xl font-semibold text-paper-900 dark:text-paper-100">
           Quran
         </h1>
-        <Link
-          href="/about"
-          className="text-sm text-paper-500 transition-colors hover:text-paper-800 dark:hover:text-paper-200"
-        >
-          About &amp; Credits
-        </Link>
+        <nav className="flex items-baseline gap-4">
+          <Link
+            href="/dictionary"
+            className="text-sm text-paper-500 transition-colors hover:text-paper-800 dark:hover:text-paper-200"
+          >
+            Dictionary
+          </Link>
+          <Link
+            href="/about"
+            className="text-sm text-paper-500 transition-colors hover:text-paper-800 dark:hover:text-paper-200"
+          >
+            About &amp; Credits
+          </Link>
+        </nav>
       </div>
       {surahs.length === 0 ? (
         <p className="text-paper-500">
