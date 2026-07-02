@@ -1,191 +1,187 @@
-# Product Requirements Document: Quranic Corpus Mobile-First PWA
+# Product Requirements Document: Quranic Corpus Mobile-First PWA (v2)
+
+> **Status:** Active. Supersedes v1 (archived at `docs/PRD-v1-corpus-reader-archived.md`).
+> **What changed from v1:** v1 drifted into a generic Quran-reader-with-translations — a commodity. v2 refocuses on the original intent: a faithful, mobile-first port of **corpus.quran.com** itself (word-by-word morphology, grammar, dictionary, treebank), which is desktop-only and has no API. The v1 codebase (phases 01–05: monorepo, `packages/data`, reader UI, translations, audio, PWA) is **kept as the foundation** and re-scoped, not discarded.
+> CLAUDE.md governs *how* we build; this PRD governs *what*.
+
+-----
 
 ## 1. Overview
 
-### 1.1 Problem Statement
-
-corpus.quran.com is an invaluable resource for word-by-word Quranic morphology, grammar, and translation data, but its UI is desktop-only, dated, and not mobile-friendly. There is no public API, so data must be scraped once and stored locally.
+### 1.1 Problem
+corpus.quran.com (Quranic Arabic Corpus, © Kais Dukes / University of Leeds) is the definitive source for word-by-word Quranic morphology, syntactic grammar, and a root-based dictionary. It is **desktop-only, dated, and has no public API**. Its linguistic depth is inaccessible to the mobile-majority audience and to other developers.
 
 ### 1.2 Vision
+Reproduce corpus.quran.com's linguistic depth as a **beautiful, fast, mobile-first, installable PWA** — responsive, richly animated, offline-capable — and expose it through a **typed backend API that corpus.quran.com never had**. The data and API layers are designed so a future native mobile app consumes the same backend with a bundled local-first DB.
 
-Build a beautiful, fast, mobile-first Progressive Web App that presents the Quranic corpus (Arabic text, word-by-word morphology, grammar tags, root words, and multiple translations) in a modern, polished interface — with multi-language support (English, Uzbek, Russian, and extensible to others). The data layer must be designed so a native mobile app can consume the same backend/data store later.
-
-### 1.3 Non-Goals (v1)
-
-- No user accounts / auth (read-only public resource initially)
-- No live re-scraping pipeline (one-time scrape; manual re-run capability only)
-- No server-side rendering of audio playback UI complexity beyond basic recitation player
-- No CMS for content editing (data is static/scraped)
+### 1.3 Non-Goals (v2 near-term)
+- No user accounts / auth (read-only public resource; bookmarks/last-read stay device-local).
+- No live re-scraping pipeline (one-time scrape; manual re-run only).
+- No CMS / content editing (data is scraped/imported, immutable at runtime).
+- No fabricated linguistic data — every field traces to a named source (see §3).
 
 -----
 
-## 2. Data Acquisition Strategy
+## 2. Product Scope & Feature Vision
 
-### 2.1 Source
+Four committed pillars, plus a reserved future set. Pillar depth ships across phases (§8).
 
-corpus.quran.com (Quranic Arabic Corpus by Kais Dukes) — no public API available.
+### 2.1 Word-by-word morphology (core)
+Per word, faithfully reproduced from corpus.quran.com:
+- Arabic text, transliteration, English gloss.
+- Part-of-speech + the **verbatim** human-readable English morphology description (e.g. "prefixed preposition bi + genitive masculine noun") **and** the Arabic grammar label (e.g. جار ومجرور).
+- Structured grammar features (POS, gender, number, person, case, mood, state) stored alongside the verbatim strings.
+- Segmentation (prefix / stem / suffix segments).
+- Root (Arabic + Buckwalter) and lemma, root linking into the dictionary.
+- Named-entity / concept tags captured now, shown as non-clickable labels until the ontology phase.
+- **Presentation:** tap a word → quick bottom-sheet (root/lemma/POS/gloss); "more" → a dedicated full word-detail route with complete morphology, grammar, and a link into the dictionary.
 
-### 2.2 Approach: One-Time Scrape → Normalized Local Database
+### 2.2 Quranic Dictionary (core)
+- **By-root entry:** root (Arabic + Buckwalter), total occurrence count, derived forms grouped by POS with per-form counts, and a full **concordance** (every occurrence: verse ref + transliterated form + English gloss + full Arabic verse + link to that word's morphology).
+- **Curated definitions:** each root enriched with a definition from **Lane's Lexicon** (public domain), imported as an **additive layer** — shown when present, does not gate the dictionary UI.
+- **Sibling tools (in scope for the dictionary phase):** **Verb Concordance** (verb forms grouped) and **Lemma Frequency** (frequency ranking by lemma).
+- **Navigation:** tap a word's root → its entry; browse all roots alphabetically; browse by frequency; search by root (Arabic/Buckwalter) or meaning.
 
-- Build a dedicated scraper (separate repo/package, Python or Node — Claude Code’s choice based on best scraping ergonomics, likely Python + BeautifulSoup/Playwright for JS-rendered pages).
-- Scrape systematically per Surah → Ayah → Word, capturing:
-  - Arabic word text (uthmani + simple script if available)
-  - Root (triliteral root)
-  - Lemma
-  - Part-of-speech tag
-  - Morphological segmentation (prefixes/stems/suffixes)
-  - Grammatical features (case, mood, person, gender, number, etc.)
-  - Word-by-word gloss/translation
-- Respect robots.txt and rate-limit aggressively (e.g., 1 request per 1-2 seconds) to avoid hammering the source site. Run as a background batch job, resumable/checkpointed (store progress so it can be paused/resumed without re-scraping completed Surahs).
-- Store raw scraped HTML/JSON snapshots in addition to parsed data, so re-parsing doesn’t require re-scraping if the schema needs adjustment later.
+### 2.3 Syntactic treebank / grammar
+- Interactive, **pan/zoom** dependency graph of a verse's grammatical relations (nodes = tokens, edges = labelled relations), adapted for touch. Hardest to make mobile-friendly → sequenced last (§8), begins with a rendering research spike.
 
-### 2.3 Supplementary Data Sources
+### 2.4 Translations, audio, search (first-class supporting)
+- **Per-word gloss:** English (scraped) now; Uzbek + Russian per-word glosses **machine-translated from the English gloss, human-reviewed, provenance-tagged** (added in a later phase — schema supports per-language glosses from day one).
+- **Full-verse translations:** English, Uzbek, Russian (Tanzil / QuranEnc). Language-agnostic schema → new languages are data-only.
+- **Audio:** per-ayah recitation (existing). **Per-word audio is deferred** to a future phase; schema reserves a per-word audio slot.
+- **Search:** by surah/ayah number and by root/meaning now; full-text search over translations/morphology later.
 
-Since corpus.quran.com itself doesn’t provide full verse translations in many target languages:
-
-- **Tanzil Project** (tanzil.net) — Quran text (multiple script styles) + verified translations in many languages including Russian; commonly used as a clean, open dataset.
-- **QuranEnc.com** — translations including Uzbek, Russian, and many other languages, designed for programmatic/API consumption.
-- Cross-reference scraped corpus.quran.com morphology data with Tanzil/QuranEnc translation sets via Surah:Ayah:Word indexing (the standard Quranic addressing scheme makes this straightforward — every dataset uses Surah/Ayah numbering as the join key).
-
-### 2.4 Audio
-
-- Use an open audio CDN (e.g., EveryAyah.com or similar widely-used Quran audio repositories) for per-ayah and per-word recitation files, referenced by URL — not necessarily mirrored locally initially, but architecture should allow caching/self-hosting later.
-
-### 2.5 Data Storage Format
-
-- Normalize everything into a relational schema (see Section 5) in SQLite (via Turso/libSQL for easy embedded + remote-replica capability).
-- Export a versioned “data package” (SQLite file or seed scripts) that can be:
-  - Bundled with the web app
-  - Shipped to the future native mobile app (as a bundled local DB, enabling fully offline use)
-  - Synced via Turso embedded replicas for future updates
+### 2.5 Future (named, unscheduled)
+Ontology of Quranic concepts · tafsir/commentary · grammar tutorial articles · community features · per-word audio · additional gloss/translation languages. **Architecture and schema must not block these**, but none gets a committed phase number now.
 
 -----
 
-## 3. Target Users & Use Cases
+## 3. Data Acquisition & Sources
 
-- Arabic learners studying word-by-word grammar and morphology
-- Quran readers wanting translations in their native language (English, Uzbek, Russian, with room for more)
-- Mobile-first users (majority of Quran app usage is on phones)
-- Users wanting offline access (PWA installable, works without connection)
+### 3.1 Primary: scrape corpus.quran.com
+- Scrape the site's HTML for **all** corpus data — word-by-word (grammar, gloss, transliteration, concept tags), dictionary root/verb-concordance/lemma-frequency pages, and (its phase) the treebank.
+- Rate-limit ~1 req / 1.5 s, respect `robots.txt`, run resumable/checkpointed, and **persist raw HTML snapshots** so re-parsing never requires re-scraping. Raw snapshots are **never** committed to git.
+- Parsers are pure functions (HTML string → records) so they are unit-testable without a network.
 
-### Core User Flows
+### 3.2 Ground-truth validation
+- The downloaded GPL morphology file (`quranic-corpus-morphology-0.4.txt`) contains the same POS/root/lemma/feature annotations the site renders. It is **retained solely to cross-check the scrape** and catch parsing errors — it is not a user-facing source.
 
-1. Browse Surah list → select Surah → read Ayah-by-Ayah with Arabic + translation
-1. Tap/long-press any word → see word-by-word morphology breakdown (root, lemma, POS, grammar, translation) in a beautiful bottom-sheet/popover
-1. Switch interface + translation language (English / Uzbek / Russian / extensible)
-1. Play audio recitation per Ayah (and optionally per word)
-1. Search (by Surah/Ayah number initially; text search as stretch goal)
-1. Bookmark/last-read position (local storage, no account needed for v1)
-1. Install as PWA, use offline
+### 3.3 Supplementary datasets
+- **Tanzil** — Uthmani Arabic verse text (existing).
+- **QuranEnc / Tanzil** — full-verse translations (English/Uzbek/Russian).
+- **Lane's Lexicon (public domain)** — curated root definitions, keyed by root, imported as an additive layer.
 
------
+### 3.4 Generated data (provenance-tagged)
+- Uzbek/Russian **per-word glosses** are machine-translated from the English gloss, human-reviewed, and stored with an explicit machine-assisted provenance marker so they are never presented as authoritative source data.
 
-## 4. Design & UX Requirements
-
-**The product must NOT look like generic AI-generated UI.** This is a primary success criterion.
-
-### 4.1 Design Process
-
-- Use a **UI/UX design plugin** (Figma-based or equivalent) for mockups before implementation — design first, code second.
-- Apply the **Emil Kowalski design/animation skill** for interaction details, micro-animations, and motion design principles (Vaul-style bottom sheets, smooth transitions, easing curves, optimistic UI feel).
-- Pull layout/component inspiration from curated **21st.dev** templates/components — adapt, don’t copy verbatim; ensure originality in final composition.
-- Animations should be purposeful and abundant but performant: page transitions, word-tap morphology reveal, language switcher, ayah highlight-on-scroll/audio sync, skeleton loading states, micro-interactions on buttons/toggles.
-
-### 4.2 Visual Direction
-
-- Distinctive typography: a proper Arabic typeface (e.g., Amiri, Lateef, or Noto Naskh Arabic / KFGQPC fonts for Uthmani script) paired with a refined Latin typeface for translations/UI — avoid default system fonts.
-- Custom color system reflecting a calm, focused “reading” aesthetic (avoid generic purple-gradient SaaS look). Consider warm paper tones for light mode and deep, low-contrast dark mode optimized for night reading.
-- RTL/LTR mixed-layout handling done elegantly (Arabic RTL blocks within an LTR app shell, and full RTL shell when interface language itself is Arabic-compatible in future).
-- Mobile-first responsive breakpoints; tablet/desktop are enhanced layouts, not afterthoughts.
-
-### 4.3 Accessibility
-
-- WCAG AA minimum: color contrast, font scaling, screen-reader labels for Arabic + translation content, focus states for keyboard nav (desktop).
+### 3.5 Join model
+- All data joins on the standard Surah:Ayah:Word address, source-agnostic. The normalized schema never leaks where a field came from.
 
 -----
 
-## 5. Technical Architecture
+## 4. Target Users & Core Flows
 
-### 5.1 Stack
+**Users:** Arabic/Quranic-grammar learners; readers wanting native-language translation; mobile-first users; offline users; (later) developers consuming the API.
 
-- **Framework**: Next.js (App Router), TypeScript
-- **Styling**: Tailwind CSS
-- **Database**: SQLite via Turso/libSQL — embedded for self-hosted simplicity, with optional embedded-replica sync model that maps cleanly to future mobile app’s local-first storage
-- **PWA**: next-pwa or native Next.js PWA setup — service worker, offline caching, installable manifest, app icons
-- **Animation**: Framer Motion (pairs well with Emil Kowalski-style interaction patterns)
-- **Hosting**: Self-hosted on existing Proxmox homelab (Docker container, behind existing Caddy reverse proxy + Cloudflare Tunnel setup)
-
-### 5.2 Data Schema (high-level)
-
-- `surahs` (id, name_arabic, name_translit, name_translation, revelation_type, ayah_count, order)
-- `ayahs` (id, surah_id, ayah_number, text_uthmani, text_simple, juz, page, audio_url)
-- `words` (id, ayah_id, position, text_arabic, transliteration, root, lemma, pos_tag, morphology_json)
-- `translations` (id, ayah_id, language_code, translator, text)
-- `word_glosses` (id, word_id, language_code, gloss_text)
-- `languages` (code, name_native, name_english, direction)
-
-This schema is normalized and source-agnostic — both web and future mobile app query the same shape regardless of whether data came from corpus.quran.com, Tanzil, or QuranEnc.
-
-### 5.3 i18n
-
-- next-intl or similar for UI string localization (English, Uzbek, Russian initially)
-- Translation content (Quran translations) stored in DB per `language_code`, decoupled from UI locale — a user could read UI in English while viewing a Russian Quran translation
-- Architecture must allow adding new languages by inserting rows, no code changes required for new translation languages (only UI locale strings need code-level additions)
-
-### 5.4 Scalability Considerations
-
-- Static generation (SSG/ISR) for Surah/Ayah pages — content is immutable, perfect for pre-rendering
-- CDN-friendly asset delivery for fonts/audio
-- Database read-replica pattern (Turso embedded replicas) allows the same data file to scale to edge locations or be bundled into the mobile app without server dependency
-- API routes designed RESTfully/typed (tRPC or typed REST) so the future mobile app can either reuse the same API or ship the bundled SQLite directly for fully offline operation
+**Core flows:**
+1. Browse surahs → open a surah → read ayah-by-ayah (Arabic + translation).
+2. Tap a word → quick morphology sheet → "more" → full word-detail route.
+3. From a word, tap its root → dictionary entry (definition, derived forms, concordance).
+4. Explore the dictionary directly (browse alphabetical / by frequency, search, verb concordance, lemma frequency).
+5. Switch UI locale and translation language independently.
+6. Play per-ayah audio.
+7. (Treebank phase) open a verse's interactive dependency graph.
+8. Bookmark / last-read (device-local), install as PWA, use offline.
 
 -----
 
-## 6. Engineering Process & Quality Standards
+## 5. Design & UX
 
-### 6.1 Principles
-
-Strict adherence to:
-
-- **DRY** (Don’t Repeat Yourself)
-- **SOLID** principles for all service/business-logic layers
-- **OWASP Top 10** — input validation, output encoding (especially for any user-generated content like bookmarks/notes if added later), secure headers, dependency auditing, no secrets in client bundle
-
-### 6.2 Claude Code Workflow
-
-Every feature/PR must follow this cycle:
-
-1. **Implement** — write code per spec
-1. **Code Review** — self-review against DRY/SOLID/OWASP and project conventions
-1. **Quality Review** — run linting, type-checking, tests
-1. **Final Review** — re-review after fixes, confirm nothing regressed
-
-### 6.3 Greptile Quality Gate
-
-- Run Greptile code review on every meaningful change.
-- **Hard gate: any score below 4/5 must be fixed before merge/proceeding.** No exceptions — iterate until threshold is met.
-
-### 6.4 Testing
-
-- Unit tests for data access layer and morphology parsing logic
-- Component tests for key interactive UI (word popover, language switcher, audio player)
-- E2E smoke test (Playwright) for core reading flow on mobile viewport
+Governed by CLAUDE.md §8. Summary: **must not look like AI slop.** Distinctive Uthmani Arabic + refined Latin typography; warm-paper light / low-contrast night dark modes; elegant mixed RTL/LTR; purposeful, performant animation (60fps, respect `prefers-reduced-motion`); WCAG AA minimum. Design before code — mockups first, motion detail via the Emil Kowalski skill, anti-slop via the design skills (Hallmark / Impeccable / frontend-design), layout inspiration adapted (never copied) from 21st.dev.
 
 -----
 
-## 7. Future / Phase 2 Considerations (not in scope now, but architecture must not block)
+## 6. Technical Architecture
 
-- Native mobile app (React Native or similar) consuming the same bundled SQLite/Turso data
-- Additional translation languages via data insertion only
-- Full-text search across translations and morphology
-- User accounts, bookmarks sync, reading plans, notes
-- Self-hosted audio mirroring for offline word-level audio
-- Tafsir (commentary) integration
+### 6.1 Stack
+Next.js (App Router) + TypeScript + Tailwind; SQLite via Turso/libSQL (embedded, replica model → future mobile local-first); Framer Motion; next-intl (UI i18n; translation *content* lives in the DB per `language_code`); scraper in `packages/scraper` (Python). Self-hosted on Proxmox via Docker behind Caddy + Cloudflare Tunnel.
+
+### 6.2 Data layer (`packages/data`)
+Single source of truth for schema + queries; web, API, scraper, and future mobile all depend on it. Stays free of Next/web imports (portable).
+
+### 6.3 Schema extensions (source-agnostic; exact DDL per phase plan)
+The v1 schema (surahs, ayahs, words, translations, word_glosses, languages) extends with:
+- A **roots / dictionary** layer (root, Buckwalter, occurrence count, derived-form groupings) + a **Lane's-definition** layer keyed by root.
+- **Structured word-segment + grammar-feature** detail (beyond today's flat POS JSON), plus the **verbatim** morphology description + Arabic grammar label strings.
+- **Concept / named-entity tags** per word.
+- A **reserved per-word audio URL** column (unused until per-word audio ships).
+- **Treebank dependency edges** (its phase).
+`word_glosses` already keys on `language_code` → multi-language glosses are data-only.
+
+### 6.4 Offline
+Bundle the full text/morphology/dictionary/translations SQLite for **complete offline** reading and lookup (maps to the mobile app's local-first DB). **Audio streams online only** (kept out of the offline bundle for size). Service worker continues cache-on-navigate for shell/assets.
+
+### 6.5 i18n
+UI locale (next-intl) decoupled from content language. Adding a translation/gloss language = inserting rows; only UI strings need code changes.
+
+### 6.6 Scalability
+SSG/ISR for immutable surah/ayah pages; CDN-friendly fonts/audio; Turso embedded-replica pattern so the same data file scales to edge or bundles into the mobile app without a server dependency.
 
 -----
 
-## 8. Open Questions / Assumptions to Validate During Build
+## 7. Backend API
 
-- Confirm corpus.quran.com’s terms of use / robots.txt allow scraping for this purpose (personal/educational self-hosted project)
-- Confirm licensing terms for Tanzil and QuranEnc translation datasets (most are free for non-commercial use with attribution — attribution requirements must be surfaced in app’s About/Credits section)
-- Verify Uzbek translation availability/quality on QuranEnc vs. other sources
+The differentiator corpus.quran.com lacks.
+- **Style:** typed **REST + OpenAPI** — language-agnostic, generates typed clients, works for a React Native app or external consumers.
+- **Audience/rollout:** **internal now, architected to be promoted to public later** — versioning seam (`/v1/...`) and clean resource boundaries from the start, so opening it publicly needs no rewrite.
+- **When:** its own later phase (§8). **Phase 1 (word-by-word + dictionary) reads via `packages/data` directly in Server Components** — no HTTP hop yet. The API reuses the same `packages/data` queries (DRY, zero duplication).
+- **Resources (initial):** surahs, ayahs, words/morphology, roots/dictionary (+ verb concordance, lemma frequency), translations, glosses, search; treebank when it ships.
+- **Security (OWASP):** input validation at every boundary, output encoding, secure headers, no secrets in the client bundle. When promoted to public: API keys, rate limiting/quotas, CORS, abuse controls.
+
+-----
+
+## 8. Roadmap (repo phase numbering continues after 05)
+
+- **Phase 06 — "Phase 1" of the vision:** scraper work to acquire word-by-word + dictionary data (with GPL-file validation) → **word-by-word morphology** (quick sheet + full word-detail route) + **Quranic Dictionary** (by-root entry with concordance; Verb Concordance; Lemma Frequency; browse alphabetical + by frequency; search by root/meaning; Lane's definitions imported as an additive layer).
+- **Phase 07 — Search + translation/audio expansion:** global search; full-verse Uzbek/Russian translations surfaced; machine-translated + reviewed Uzbek/Russian **per-word glosses**.
+- **Phase 08 — Syntactic treebank:** interactive pan/zoom dependency graph (opens with a mobile-rendering research spike).
+- **Phase 09 — Backend API:** internal typed REST + OpenAPI layer over `packages/data`, built for later public promotion.
+- **Future (unscheduled):** ontology/concepts, tafsir, grammar articles, community, per-word audio, more languages.
+
+-----
+
+## 9. Engineering Process & Quality
+
+Governed by CLAUDE.md; summarized here for scope.
+- **5-step loop** per unit of work: Implement → Code Review → Quality Review (lint/type/test) → **Greptile** → Final Review.
+- **Greptile ≥ 4/5 is a hard block** — no merge/next-task below threshold.
+- **Planning:** `superpowers` (brainstorming → writing-plans) generates each phase plan, **authored with `/caveman` active** so plans are terse and token-efficient from the first draft (thorough but tight — CLAUDE.md §6). One plan file per phase in `docs/plans/`.
+- **Discipline:** ponytail (laziest solution that works) + Karpathy guidelines (no assumptions, surgical changes, verifiable success criteria).
+- **Compaction:** mandatory after every completed task **and** after every completed + approved phase (CLAUDE.md §13).
+- **Subagents:** Sonnet floor, never Haiku (CLAUDE.md §13).
+- **Testing:** unit tests for `packages/data` + scraper parsing; component tests for key interactive UI (word sheet/detail, dictionary, language switcher, audio); Playwright mobile E2E for the core reading flow. New logic ships with tests.
+- **Commits:** Conventional Commits, one logical change each, only after the loop passes and Greptile ≥ 4/5.
+
+-----
+
+## 10. Data & Legal Care
+
+- Respect corpus.quran.com `robots.txt`; rate-limit (~1 req / 1–2 s); resumable/checkpointed; persist raw snapshots (never committed).
+- Verify licensing before shipping any dataset. corpus.quran.com annotations are **GPL** (attribute © Kais Dukes / Language Research Group, Leeds, with a clear source link). **Lane's Lexicon is public domain.** Tanzil / QuranEnc used unmodified with required attribution. Machine-translated glosses carry a machine-assisted provenance marker.
+- Surface all attributions in the in-app About/Credits section, updated as each source ships.
+
+-----
+
+## 11. Resolved Decisions (v2 build)
+
+Recorded so they are not re-litigated:
+- Faithful corpus port, not a generic reader; v1 code kept as foundation.
+- Scrape the site for all corpus data; GPL file kept only for validation.
+- Curated root definitions from Lane's Lexicon (public domain), additive (not a Phase-1 gate).
+- Grammar stored verbatim **and** structured. Concept tags captured, non-clickable until ontology phase.
+- Uzbek/Russian per-word glosses: machine-translated + reviewed + provenance-tagged (later phase).
+- Per-word audio deferred; per-ayah only now.
+- Offline: full corpus DB bundled; audio streams online.
+- API: typed REST + OpenAPI, internal → publicly promotable, built in Phase 09; Phase 1 uses direct `packages/data` access.
+- Dictionary phase includes Verb Concordance + Lemma Frequency.
+- Out-of-scope items reserved in a named Future section, no committed phase.
