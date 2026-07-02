@@ -332,6 +332,14 @@ class ScraperDatabase:
             ).fetchall()
         ]
 
+    def get_all_word_annotations(self) -> list[sqlite3.Row]:
+        return self._conn.execute(
+            """SELECT a.surah_id, a.ayah_number, w.position,
+                      w.root_buckwalter, w.pos_tag
+               FROM words w JOIN ayahs a ON a.id = w.ayah_id
+               ORDER BY a.surah_id, a.ayah_number, w.position"""
+        ).fetchall()
+
     def get_all_words_with_location(self) -> list[sqlite3.Row]:
         return self._conn.execute(
             """SELECT w.id AS word_id, a.surah_id, a.ayah_number, w.position

@@ -118,6 +118,32 @@ def import_lane(tsv_path: str, db: str) -> None:
     click.echo(f"Lane import complete: {count} definitions.")
 
 
+@main.command("validate")
+@click.argument("gpl_txt_path")
+@click.option("--db", default="quran.db", show_default=True)
+@click.option("--limit", default=20, show_default=True, help="Max mismatches to print")
+def validate_cmd(gpl_txt_path: str, db: str, limit: int) -> None:
+    """Cross-check DB annotations against the GPL morphology file (exit 1 if any)."""
+    import sys
+    from pathlib import Path
+
+    from .validate import validate_against_gpl
+
+    database = ScraperDatabase(db)
+    mismatches = validate_against_gpl(Path(gpl_txt_path), database)
+    database.close()
+    if not mismatches:
+        click.echo("Validation clean: no mismatches.")
+        return
+    click.echo(f"Found {len(mismatches)} mismatches:")
+    for m in mismatches[:limit]:
+        click.echo(
+            f"  ({m.surah}:{m.ayah}:{m.position}) {m.field}: "
+            f"scraped={m.scraped!r} expected={m.expected!r}"
+        )
+    sys.exit(1)
+
+
 @main.command("import-tanzil")
 @click.argument("xml_path")
 @click.option("--db", default="quran.db", show_default=True)
