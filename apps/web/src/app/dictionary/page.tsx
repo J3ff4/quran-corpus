@@ -3,10 +3,7 @@ export const dynamic = 'force-dynamic';
 import { getAllRoots, getRootsByFrequency, searchRoots } from '@quran-corpus/data';
 import { getDatabase } from '../../lib/db';
 import { DictionaryIndex } from '../../components/dictionary/DictionaryIndex';
-
-export function parseSort(v: string | undefined): 'alpha' | 'freq' {
-  return v === 'freq' ? 'freq' : 'alpha';
-}
+import { parseSort } from './sort';
 
 interface PageProps {
   searchParams: Promise<{ q?: string; sort?: string }>;

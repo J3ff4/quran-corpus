@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseSort } from '../app/dictionary/page';
+import { parseSort } from '../app/dictionary/sort';
 
 describe('parseSort', () => {
   it('defaults to alpha', () => expect(parseSort(undefined)).toBe('alpha'));
