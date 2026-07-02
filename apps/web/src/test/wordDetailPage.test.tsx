@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseWordParams } from '../app/word/[surah]/[ayah]/[position]/page';
+import { parseWordParams } from '../app/word/[surah]/[ayah]/[position]/params';
 
 describe('parseWordParams', () => {
   it('parses numeric params', () => {
