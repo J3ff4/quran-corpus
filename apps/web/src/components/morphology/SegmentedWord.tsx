@@ -72,7 +72,7 @@ export function SegmentedWord({ word, segments, gloss }: SegmentedWordProps) {
           <text
             x={CX}
             y={WORD_Y}
-            dir="rtl"
+            style={{ direction: 'rtl' }}
             textAnchor="middle"
             className="font-arabic"
             fontSize={48}
@@ -106,7 +106,7 @@ export function SegmentedWord({ word, segments, gloss }: SegmentedWordProps) {
         <text
           x={CX}
           y={WORD_Y}
-          dir="rtl"
+          style={{ direction: 'rtl' }}
           textAnchor="middle"
           className="font-arabic"
           fontSize={48}
