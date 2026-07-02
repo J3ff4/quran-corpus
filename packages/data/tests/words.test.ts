@@ -54,6 +54,17 @@ describe('getWordsByAyah', () => {
     const words = await getWordsByAyah(db, 999);
     expect(words).toHaveLength(0);
   });
+
+  it('maps morphology_description, grammar_arabic, audio_url', async () => {
+    await db.execute(
+      `UPDATE words SET morphology_description='desc', grammar_arabic='جار ومجرور' WHERE position=1 AND ayah_id=${ayahId}`,
+    );
+    const words = await getWordsByAyah(db, ayahId);
+    const w = words.find((x) => x.position === 1)!;
+    expect(w.morphology_description).toBe('desc');
+    expect(w.grammar_arabic).toBe('جار ومجرور');
+    expect(w.audio_url).toBeNull();
+  });
 });
 
 describe('getWordsBySurah', () => {

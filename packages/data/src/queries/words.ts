@@ -14,6 +14,9 @@ function rowToWord(row: Row): Word {
     lemma_buckwalter: (row['lemma_buckwalter'] as string | null) ?? null,
     pos_tag: (row['pos_tag'] as string | null) ?? null,
     morphology_json: (row['morphology_json'] as string | null) ?? null,
+    morphology_description: (row['morphology_description'] as string | null) ?? null,
+    grammar_arabic: (row['grammar_arabic'] as string | null) ?? null,
+    audio_url: (row['audio_url'] as string | null) ?? null,
   };
 }
 
