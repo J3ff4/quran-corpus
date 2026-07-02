@@ -31,6 +31,13 @@ const sources: Source[] = [
     license: 'Tanzil terms of use',
     note: 'Quran text is distributed by the Tanzil project and used unmodified, with attribution and a link to tanzil.net as required.',
   },
+  {
+    name: "Lane's Lexicon",
+    href: 'https://lexicon.quranic-research.net',
+    provides: 'Classical Arabic root definitions in the Quranic Dictionary.',
+    license: 'Public domain',
+    note: "An Arabic-English Lexicon by Edward William Lane (1863), long in the public domain; surfaced per-root alongside the corpus's derived forms.",
+  },
 ];
 
 export default function AboutPage() {
@@ -76,6 +83,7 @@ export default function AboutPage() {
                 {source.license}
               </span>
             </div>
+            <p className="mb-1 text-xs text-paper-400">{new URL(source.href).host}</p>
             <p className="mb-1 text-sm text-paper-700 dark:text-paper-300">
               {source.provides}
             </p>
