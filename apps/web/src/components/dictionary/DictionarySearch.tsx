@@ -1,5 +1,5 @@
 interface DictionarySearchProps {
-  defaultValue?: string;
+  defaultValue?: string | undefined;
 }
 
 /**
