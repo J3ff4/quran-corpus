@@ -103,6 +103,21 @@ def import_corpus(txt_path: str, db: str) -> None:
     click.echo(f"Import complete: {count} words.")
 
 
+@main.command("import-lane")
+@click.argument("tsv_path")
+@click.option("--db", default="quran.db", show_default=True)
+def import_lane(tsv_path: str, db: str) -> None:
+    """Import Lane's Lexicon root definitions from a TSV (root<TAB>definition)."""
+    from pathlib import Path
+
+    from .sources.lane import import_lane_definitions
+
+    database = ScraperDatabase(db)
+    count = import_lane_definitions(Path(tsv_path), database)
+    database.close()
+    click.echo(f"Lane import complete: {count} definitions.")
+
+
 @main.command("import-tanzil")
 @click.argument("xml_path")
 @click.option("--db", default="quran.db", show_default=True)
