@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createDatabase, type Client } from '../src/db.js';
 import { runMigrations } from '../src/migrate.js';
-import { getWordsByAyah, getWordsBySurah } from '../src/queries/words.js';
+import {
+  getWordsByAyah,
+  getWordsBySurah,
+  getWordByLocation,
+  getWordDetail,
+} from '../src/queries/words.js';
 
 let db: Client;
 let ayahId: number;
@@ -70,5 +75,37 @@ describe('getWordsBySurah', () => {
   it('returned words include ayah_id', async () => {
     const words = await getWordsBySurah(db, 1);
     expect(words[0]?.ayah_id).toBe(ayahId);
+  });
+});
+
+describe('getWordByLocation / getWordDetail', () => {
+  it('getWordByLocation returns the word at (surah:ayah:position)', async () => {
+    const w = await getWordByLocation(db, 1, 1, 1);
+    expect(w?.text_arabic).toBe('بِسْمِ');
+  });
+
+  it('getWordByLocation returns null for unknown position', async () => {
+    expect(await getWordByLocation(db, 1, 1, 99)).toBeNull();
+  });
+
+  it('getWordDetail bundles segments (ordered) + concept tags', async () => {
+    const w = await getWordByLocation(db, 1, 1, 1);
+    await db.execute({
+      sql: `INSERT INTO word_segments (word_id,segment_index,segment_type,pos_tag,form_arabic)
+            VALUES (?,0,'prefix','P','بِ'),(?,1,'stem','N','سْمِ')`,
+      args: [w!.id, w!.id],
+    });
+    await db.execute({
+      sql: `INSERT INTO word_concept_tags (word_id,tag_label,tag_type) VALUES (?, 'Allah','named-entity')`,
+      args: [w!.id],
+    });
+    const detail = await getWordDetail(db, w!.id);
+    expect(detail?.segments.map((s) => s.pos_tag)).toEqual(['P', 'N']);
+    expect(detail?.segments[0]?.form_arabic).toBe('بِ');
+    expect(detail?.concept_tags[0]?.tag_label).toBe('Allah');
+  });
+
+  it('getWordDetail returns null for unknown word id', async () => {
+    expect(await getWordDetail(db, 99999)).toBeNull();
   });
 });

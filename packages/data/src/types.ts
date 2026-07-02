@@ -96,3 +96,41 @@ export interface ConcordanceEntry {
   gloss: string | null;
   verse_text: string;
 }
+
+export interface WordSegment {
+  id: number;
+  word_id: number;
+  segment_index: number;
+  segment_type: string | null;
+  pos_tag: string | null;
+  form_arabic: string | null;
+  form_buckwalter: string | null;
+  features_json: string | null;
+  lemma: string | null;
+  root: string | null;
+}
+
+export interface ConceptTag {
+  id: number;
+  word_id: number;
+  tag_label: string;
+  tag_type: string | null;
+}
+
+export interface WordDetail {
+  word: Word;
+  segments: WordSegment[];
+  concept_tags: ConceptTag[];
+}
+
+export interface LemmaFrequencyEntry {
+  lemma: string;
+  lemma_buckwalter: string | null;
+  count: number;
+}
+
+export interface VerbConcordanceEntry {
+  lemma: string | null;
+  form_arabic: string;
+  count: number;
+}
