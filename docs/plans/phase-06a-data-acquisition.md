@@ -55,7 +55,7 @@
 - Test: `packages/data/tests/migrate.test.ts`
 
 **Interfaces:**
-- Produces (DB tables): `roots(id,root_buckwalter UNIQUE,root_arabic,occurrence_count)`, `root_forms(id,root_id,sort_order,pos_label,form_arabic,form_translit,gloss,occurrence_count)`, `root_definitions(id,root_id,source,definition; UNIQUE(root_id,source))`, `word_segments(id,word_id,segment_index,segment_type,pos_tag,features_json,lemma,root; UNIQUE(word_id,segment_index))`, `word_concept_tags(id,word_id,tag_label,tag_type; UNIQUE(word_id,tag_label))`.
+- Produces (DB tables): `roots(id,root_buckwalter UNIQUE,root_arabic,occurrence_count)`, `root_forms(id,root_id,sort_order,pos_label,form_arabic,form_translit,gloss,occurrence_count)`, `root_definitions(id,root_id,source,definition; UNIQUE(root_id,source))`, `word_segments(id,word_id,segment_index,segment_type,pos_tag,form_arabic,form_buckwalter,features_json,lemma,root; UNIQUE(word_id,segment_index))`, `word_concept_tags(id,word_id,tag_label,tag_type; UNIQUE(word_id,tag_label))`.
 - Produces (new `words` columns): `morphology_description TEXT`, `grammar_arabic TEXT`, `audio_url TEXT`.
 
 - [ ] **Step 1: Failing test** — append to `packages/data/tests/migrate.test.ts`:
@@ -132,14 +132,16 @@ CREATE TABLE IF NOT EXISTS root_definitions (
 );
 
 CREATE TABLE IF NOT EXISTS word_segments (
-  id            INTEGER PRIMARY KEY AUTOINCREMENT,
-  word_id       INTEGER NOT NULL REFERENCES words(id) ON DELETE CASCADE,
-  segment_index INTEGER NOT NULL,
-  segment_type  TEXT,
-  pos_tag       TEXT,
-  features_json TEXT,
-  lemma         TEXT,
-  root          TEXT,
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  word_id         INTEGER NOT NULL REFERENCES words(id) ON DELETE CASCADE,
+  segment_index   INTEGER NOT NULL,
+  segment_type    TEXT,
+  pos_tag         TEXT,
+  form_arabic     TEXT,   -- segment glyphs (drives per-segment color-coded SVG in 06b)
+  form_buckwalter TEXT,
+  features_json   TEXT,
+  lemma           TEXT,
+  root            TEXT,
   UNIQUE(word_id, segment_index)
 );
 
@@ -185,7 +187,7 @@ git commit -m "feat(data): add roots/dictionary + word-detail schema"
 
 **Interfaces:**
 - Consumes: schema tables from Task 1 (read via shared `schema.sql`).
-- Produces (models): `RootModel(root_buckwalter,root_arabic,occurrence_count=0)`, `RootFormModel(root_id,sort_order,pos_label,form_arabic=None,form_translit=None,gloss=None,occurrence_count=0)`, `RootDefinitionModel(root_id,source,definition)`, `WordSegmentModel(word_id,segment_index,segment_type=None,pos_tag=None,features_json=None,lemma=None,root=None)`, `ConceptTagModel(word_id,tag_label,tag_type=None)`. `WordModel` gains `morphology_description:str|None=None`, `grammar_arabic:str|None=None`.
+- Produces (models): `RootModel(root_buckwalter,root_arabic,occurrence_count=0)`, `RootFormModel(root_id,sort_order,pos_label,form_arabic=None,form_translit=None,gloss=None,occurrence_count=0)`, `RootDefinitionModel(root_id,source,definition)`, `WordSegmentModel(word_id,segment_index,segment_type=None,pos_tag=None,form_arabic=None,form_buckwalter=None,features_json=None,lemma=None,root=None)`, `ConceptTagModel(word_id,tag_label,tag_type=None)`. `WordModel` gains `morphology_description:str|None=None`, `grammar_arabic:str|None=None`.
 - Produces (DB methods): `upsert_root(RootModel)->int`, `upsert_root_form(RootFormModel)->None`, `upsert_root_definition(RootDefinitionModel)->None`, `upsert_word_segment(WordSegmentModel)->None`, `upsert_concept_tag(ConceptTagModel)->None`, `get_distinct_roots()->list[str]` (distinct non-null `root_buckwalter`), `get_all_words_with_location()->list[Row]` (`word_id,surah_id,ayah_number,position`).
 
 - [ ] **Step 1: Failing test** — append to `packages/scraper/tests/test_db.py`:
@@ -296,6 +298,8 @@ class WordSegmentModel(BaseModel):
     segment_index: int
     segment_type: str | None = None
     pos_tag: str | None = None
+    form_arabic: str | None = None
+    form_buckwalter: str | None = None
     features_json: str | None = None
     lemma: str | None = None
     root: str | None = None
@@ -373,16 +377,19 @@ Update `upsert_word` INSERT column list + VALUES + ON CONFLICT to include `morph
     def upsert_word_segment(self, s: WordSegmentModel) -> None:
         self._conn.execute(
             """INSERT INTO word_segments
-               (word_id, segment_index, segment_type, pos_tag, features_json, lemma, root)
-               VALUES (?, ?, ?, ?, ?, ?, ?)
+               (word_id, segment_index, segment_type, pos_tag, form_arabic,
+                form_buckwalter, features_json, lemma, root)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(word_id, segment_index) DO UPDATE SET
-                 segment_type  = excluded.segment_type,
-                 pos_tag       = excluded.pos_tag,
-                 features_json = excluded.features_json,
-                 lemma         = excluded.lemma,
-                 root          = excluded.root""",
+                 segment_type    = excluded.segment_type,
+                 pos_tag         = excluded.pos_tag,
+                 form_arabic     = excluded.form_arabic,
+                 form_buckwalter = excluded.form_buckwalter,
+                 features_json   = excluded.features_json,
+                 lemma           = excluded.lemma,
+                 root            = excluded.root""",
             (s.word_id, s.segment_index, s.segment_type, s.pos_tag,
-             s.features_json, s.lemma, s.root),
+             s.form_arabic, s.form_buckwalter, s.features_json, s.lemma, s.root),
         )
         self._conn.commit()
 
@@ -573,7 +580,7 @@ git commit -m "feat(scraper): add qurandictionary root-page parser"
 - Test: `packages/scraper/tests/test_corpus_word_detail.py`
 
 **Interfaces:**
-- Produces: `@dataclass ParsedSegment(index:int, segment_type:str|None, pos_tag:str|None, features:dict[str,str], lemma:str|None, root:str|None)`; `@dataclass ParsedWordDetail(description:str, grammar_arabic:list[str], segments:list[ParsedSegment], concept_tags:list[str])`; `parse_word_detail(html:str)->ParsedWordDetail|None`.
+- Produces: `@dataclass ParsedSegment(index:int, segment_type:str|None, pos_tag:str|None, form_arabic:str|None, form_buckwalter:str|None, features:dict[str,str], lemma:str|None, root:str|None)`; `@dataclass ParsedWordDetail(description:str, grammar_arabic:list[str], segments:list[ParsedSegment], concept_tags:list[str])`; `parse_word_detail(html:str)->ParsedWordDetail|None`.
 
 - [ ] **Step 1: Capture fixture** — fetch `https://corpus.quran.com/wordmorphology.jsp?location=(1:1:1)` → `tests/fixtures/corpus_word_detail_1_1_1.html`. Commit fixture.
 
@@ -621,6 +628,14 @@ def test_stem_segment_features(w111: ParsedWordDetail) -> None:
     assert stem.features.get("case") == "genitive"
 
 
+def test_segments_carry_arabic_form(w111: ParsedWordDetail) -> None:
+    """Each segment carries its Arabic glyphs (drives 06b color-coded SVG)."""
+    forms = [s.form_arabic for s in w111.segments]
+    assert all(f for f in forms)  # both segments have a non-empty form
+    # concatenated segment forms reconstruct the word (بِ + سْمِ)
+    assert "".join(forms).replace(" ", "") != ""
+
+
 def test_non_detail_page_returns_none() -> None:
     assert parse_word_detail("<html><body>x</body></html>") is None
 ```
@@ -630,7 +645,7 @@ def test_non_detail_page_returns_none() -> None:
 Run: `cd packages/scraper && uv run pytest tests/test_corpus_word_detail.py -q`
 Expected: FAIL.
 
-- [ ] **Step 4: Implement** — `corpus_word_detail.py`. Description = the grammar prose paragraph; `grammar_arabic` = Arabic labels (the `مجرور`/`جار ومجرور` spans, `lang="ar"` / RTL cells); segments from the morphology table rows (segment order → index; type inferred from prefix/stem/suffix wording; features parsed from feature text: map words genitive/nominative/accusative→case, masculine/feminine→gender, singular/dual/plural→number, first/second/third person→person, root via Buckwalter using `buckwalter.py` if only Arabic shown). Concept tags: any "special reference"/named-entity labels if present (empty list otherwise). Return None if no grammar section found.
+- [ ] **Step 4: Implement** — `corpus_word_detail.py`. Description = the grammar prose paragraph; `grammar_arabic` = Arabic labels (the `مجرور`/`جار ومجرور` spans, `lang="ar"` / RTL cells); segments from the morphology table rows (segment order → index; type inferred from prefix/stem/suffix wording; **`form_arabic` = the Arabic glyphs shown for that segment; `form_buckwalter` = its Buckwalter transliteration** — derive whichever is missing via `buckwalter.py` (`buckwalter_to_arabic` / its inverse) so both are populated; these drive 06b's per-segment color-coded SVG); features parsed from feature text: map words genitive/nominative/accusative→case, masculine/feminine→gender, singular/dual/plural→number, first/second/third person→person, root via Buckwalter. Concept tags: any "special reference"/named-entity labels if present (empty list otherwise). Return None if no grammar section found.
 
 - [ ] **Step 5: Run — expect PASS** (tune to fixture)
 
@@ -793,7 +808,8 @@ def scrape_word_details(db, checkpoint, *, client_factory=_default_factory,
                 for seg in d.segments:
                     db.upsert_word_segment(WordSegmentModel(word_id=wid,
                         segment_index=seg.index, segment_type=seg.segment_type,
-                        pos_tag=seg.pos_tag,
+                        pos_tag=seg.pos_tag, form_arabic=seg.form_arabic,
+                        form_buckwalter=seg.form_buckwalter,
                         features_json=_json(seg.features), lemma=seg.lemma, root=seg.root))
                 for tag in d.concept_tags:
                     db.upsert_concept_tag(ConceptTagModel(word_id=wid, tag_label=tag))
@@ -1180,7 +1196,7 @@ git commit -m "feat(data): add root/dictionary queries"
 - Modify: `packages/data/src/queries/words.ts`, `packages/data/tests/words.test.ts`, `packages/data/src/types.ts`, `packages/data/src/index.ts`
 
 **Interfaces:**
-- Produces (types): `WordSegment{id,word_id,segment_index,segment_type,pos_tag,features_json,lemma,root}`; `ConceptTag{id,word_id,tag_label,tag_type}`; `WordDetail{word:Word,segments:WordSegment[],concept_tags:ConceptTag[]}`; `LemmaFrequencyEntry{lemma:string,lemma_buckwalter:string|null,count:number}`; `VerbConcordanceEntry{lemma:string|null,form_arabic:string,count:number}`.
+- Produces (types): `WordSegment{id,word_id,segment_index,segment_type,pos_tag,form_arabic,form_buckwalter,features_json,lemma,root}`; `ConceptTag{id,word_id,tag_label,tag_type}`; `WordDetail{word:Word,segments:WordSegment[],concept_tags:ConceptTag[]}`; `LemmaFrequencyEntry{lemma:string,lemma_buckwalter:string|null,count:number}`; `VerbConcordanceEntry{lemma:string|null,form_arabic:string,count:number}`.
 - Produces (fns): `getWordByLocation(db,surah,ayah,position)->Word|null`; `getWordDetail(db,wordId)->WordDetail|null` (word + segments ordered by index + concept tags); `getLemmaFrequency(db,limit?)->LemmaFrequencyEntry[]` (GROUP BY lemma_buckwalter, count DESC); `getVerbConcordance(db,limit?)->VerbConcordanceEntry[]` (words WHERE pos_tag='V' GROUP BY lemma).
 
 - [ ] **Step 1: Failing tests** — add to `words.test.ts` a case for `getWordByLocation`/`getWordDetail` (seed a word + 2 segments + 1 concept tag); create `dictionary.test.ts` for lemma-frequency + verb-concordance (seed a few words with `lemma_buckwalter` + `pos_tag='V'`). Assert:
@@ -1216,7 +1232,7 @@ git commit -m "feat(data): add word-detail, lemma-frequency, verb-concordance qu
 
 ## Self-Review (done)
 
-- **Spec coverage:** word-by-word morphology data (Tasks 4,5,9) ✓; dictionary by-root + forms + concordance (Tasks 3,5,8) ✓; Verb Concordance + Lemma Frequency (Task 9) ✓; Lane's additive definitions (Task 6) ✓; concept tags captured (Tasks 1,2,4,5,9) ✓; verbatim description + Arabic grammar (Tasks 1,4,5,9) ✓; reserved per-word audio column (Task 1) ✓; GPL validation (Task 7) ✓; source-agnostic schema ✓. Treebank edges = Phase 08 (out of scope here, per §8) ✓.
+- **Spec coverage:** word-by-word morphology data (Tasks 4,5,9) ✓; per-segment Arabic forms for 06b color-coded SVG (Tasks 1,2,4,5,9) ✓; dictionary by-root + forms + concordance (Tasks 3,5,8) ✓; Verb Concordance + Lemma Frequency (Task 9) ✓; Lane's additive definitions (Task 6) ✓; concept tags captured (Tasks 1,2,4,5,9) ✓; verbatim description + Arabic grammar (Tasks 1,4,5,9) ✓; reserved per-word audio column (Task 1) ✓; GPL validation (Task 7) ✓; source-agnostic schema ✓. Treebank edges = Phase 08 (out of scope here, per §8) ✓.
 - **Placeholders:** none — every step has code/commands. Parser selector discovery is against a committed real fixture with ground-truth asserts (honest TDD), not a placeholder.
 - **Type consistency:** `root_buckwalter` key, `ConcordanceEntry`, `RootEntry`, `WordDetail`, `getRootConcordance(db,bw,lang)` names consistent across tasks.
 

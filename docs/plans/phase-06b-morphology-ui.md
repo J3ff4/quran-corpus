@@ -28,6 +28,8 @@
 - `packages/data/src/types.ts` — MODIFY: extend `Word` with new fields (if not already).
 - `packages/data/src/queries/words.ts` — MODIFY: map new `Word` columns in `rowToWord`.
 - `apps/web/src/lib/wordLocation.ts` — CREATE: pure `Ayah`+`Word` → `{surah,ayah,position}` + href helper.
+- `apps/web/src/lib/posColor.ts` — CREATE: POS/segment → theme-aware color map (pure).
+- `apps/web/src/components/morphology/SegmentedWord.tsx` — CREATE: text-based SVG renderer of the joined Arabic word, per-segment colored, with POS labels beneath each segment (corpus-faithful; uses `<text>/<tspan>` so glyphs stay real Unicode — selectable/searchable/a11y — and vector/theme-able).
 - `apps/web/src/components/morphology/MorphologySummary.tsx` — CREATE: shared presenter (description + grammar label + POS/root/lemma chips).
 - `apps/web/src/components/reader/WordPopover.tsx` — MODIFY: use `MorphologySummary` + add details link.
 - `apps/web/src/components/reader/ReaderView.tsx` — MODIFY: compute + pass word location to popover.
@@ -221,6 +223,153 @@ git commit -m "feat(web): add shared MorphologySummary presenter"
 
 ---
 
+### Task 3a: POS → theme-aware color map (pure)
+
+**Files:**
+- Create: `apps/web/src/lib/posColor.ts`, `apps/web/src/test/posColor.test.tsx`
+- Modify: the global stylesheet (`apps/web/src/app/globals.css` or the layout's CSS) — add `--pos-*` CSS custom properties for light + dark.
+
+**Interfaces:**
+- Produces: `posColor(posTag: string | null) -> string` returning a CSS color reference (a `var(--pos-*)` string) keyed by POS **category** (noun family N/PN/ADJ, verb V, preposition P, pronoun PRON, particle/other → default). Color encodes grammar (like corpus). Theme-awareness lives in the CSS var (light/dark values), so the same reference adapts.
+
+- [ ] **Step 1: Failing test** — `posColor.test.tsx`:
+
+```ts
+import { describe, it, expect } from 'vitest';
+import { posColor } from '../lib/posColor';
+
+describe('posColor', () => {
+  it('returns a CSS var reference', () => {
+    expect(posColor('N')).toMatch(/^var\(--pos-/);
+  });
+  it('maps distinct categories to distinct colors', () => {
+    expect(posColor('N')).not.toBe(posColor('V'));
+    expect(posColor('P')).not.toBe(posColor('N'));
+  });
+  it('groups the noun family together', () => {
+    expect(posColor('PN')).toBe(posColor('N'));
+    expect(posColor('ADJ')).toBe(posColor('N'));
+  });
+  it('falls back for null/unknown', () => {
+    expect(posColor(null)).toBe(posColor('ZZZ'));
+  });
+});
+```
+
+- [ ] **Step 2: Run — expect FAIL**
+
+Run: `pnpm --filter @quran-corpus/web test -- posColor`
+Expected: FAIL.
+
+- [ ] **Step 3: Implement** — `posColor.ts`:
+
+```ts
+const NOUN = new Set(['N', 'PN', 'ADJ']);
+export function posColor(posTag: string | null): string {
+  if (posTag && NOUN.has(posTag)) return 'var(--pos-noun)';
+  switch (posTag) {
+    case 'V': return 'var(--pos-verb)';
+    case 'P': return 'var(--pos-prep)';
+    case 'PRON': return 'var(--pos-pron)';
+    default: return 'var(--pos-other)';
+  }
+}
+```
+
+Add to the global stylesheet (WCAG-AA contrast both themes; final palette per design skills, §8):
+
+```css
+:root { --pos-noun:#2469c0; --pos-verb:#b23b2e; --pos-prep:#0f8a6a; --pos-pron:#8a5a0f; --pos-other:#555; }
+.dark { --pos-noun:#7fb0ff; --pos-verb:#ff9a8f; --pos-prep:#6fd9b8; --pos-pron:#e0b877; --pos-other:#aaa; }
+```
+
+- [ ] **Step 4: Run — expect PASS**
+
+Run: `pnpm --filter @quran-corpus/web test -- posColor`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add apps/web/src/lib/posColor.ts apps/web/src/test/posColor.test.tsx apps/web/src/app/globals.css
+git commit -m "feat(web): add POS→color map for morphology color-coding"
+```
+
+---
+
+### Task 3b: `SegmentedWord` color-coded SVG renderer
+
+**Files:**
+- Create: `apps/web/src/components/morphology/SegmentedWord.tsx`, `apps/web/src/test/SegmentedWord.test.tsx`
+
+**Interfaces:**
+- Consumes: `WordSegment[]` (needs `form_arabic`, `pos_tag`), `Word` (fallback text), `posColor`.
+- Produces: `<SegmentedWord word={Word} segments={WordSegment[]} />` — an inline **text-based SVG** (`'use client'`): one `<text dir="rtl" class="font-arabic">` whose `<tspan fill={posColor(seg.pos_tag)}>` renders each segment's `form_arabic` (single `<text>` ⇒ Arabic joining preserved across colors); a second row of `<text>` POS labels, one per segment, positioned beneath its segment. Positions come from measuring each `<tspan>` on mount (`useLayoutEffect` + `getSubStringLength`/`getComputedTextLength`); pre-measure fallback = even distribution. If `segments` is empty, render the whole `word.text_arabic` in one neutral color (graceful degrade before the detail scrape lands). **Uses real `<text>` nodes (not converted paths) so glyphs stay selectable, searchable, and screen-reader-readable** — plus an `<title>` = full word + gloss for a11y.
+
+- [ ] **Step 1: Failing test** — `SegmentedWord.test.tsx`:
+
+```tsx
+import { describe, it, expect } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { SegmentedWord } from '../components/morphology/SegmentedWord';
+import type { Word, WordSegment } from '@quran-corpus/data';
+
+const word = { id: 1, text_arabic: 'بِسْمِ', pos_tag: 'N' } as Word;
+const segments: WordSegment[] = [
+  { id: 1, word_id: 1, segment_index: 0, segment_type: 'prefix', pos_tag: 'P',
+    form_arabic: 'بِ', form_buckwalter: 'bi', features_json: null, lemma: null, root: null },
+  { id: 2, word_id: 1, segment_index: 1, segment_type: 'stem', pos_tag: 'N',
+    form_arabic: 'سْمِ', form_buckwalter: 'somi', features_json: null, lemma: null, root: 'smw' },
+];
+
+describe('SegmentedWord', () => {
+  it('renders a colored tspan per segment', () => {
+    const { container } = render(<SegmentedWord word={word} segments={segments} />);
+    const tspans = container.querySelectorAll('tspan');
+    expect(tspans).toHaveLength(2);
+    expect(tspans[0]).toHaveTextContent('بِ');
+    expect(tspans[0]?.getAttribute('fill')).not.toBe(tspans[1]?.getAttribute('fill'));
+  });
+  it('renders a POS label per segment', () => {
+    render(<SegmentedWord word={word} segments={segments} />);
+    expect(screen.getByText('P')).toBeInTheDocument();
+    expect(screen.getByText('N')).toBeInTheDocument();
+  });
+  it('exposes full word + kept as real text (searchable)', () => {
+    const { container } = render(<SegmentedWord word={word} segments={segments} />);
+    // concatenated tspan text reconstructs the word
+    expect(container.textContent).toContain('بِ');
+    expect(container.textContent).toContain('سْمِ');
+    expect(container.querySelector('title')?.textContent).toContain('بِسْمِ');
+  });
+  it('degrades to whole word when no segments', () => {
+    const { container } = render(<SegmentedWord word={word} segments={[]} />);
+    expect(container.querySelector('text')?.textContent).toContain('بِسْمِ');
+  });
+});
+```
+
+- [ ] **Step 2: Run — expect FAIL**
+
+Run: `pnpm --filter @quran-corpus/web test -- SegmentedWord`
+Expected: FAIL.
+
+- [ ] **Step 3: Implement** — `SegmentedWord.tsx` (`'use client'`). Render `<svg role="img" aria-label={word + gloss}>` with `<title>`; a glyph `<text dir="rtl" className="font-arabic">` mapping segments → `<tspan fill={posColor(seg.pos_tag)}>{seg.form_arabic}</tspan>`; a labels group mapping segments → `<text>` (POS code) at computed x-centers. `useLayoutEffect` measures each tspan (`getComputedTextLength`) → state `positions`; initial render uses even-split fallback so SSR/jsdom is deterministic. Empty-segments branch renders one `<text>`.
+
+- [ ] **Step 4: Run — expect PASS**
+
+Run: `pnpm --filter @quran-corpus/web test -- SegmentedWord`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add apps/web/src/components/morphology/SegmentedWord.tsx apps/web/src/test/SegmentedWord.test.tsx
+git commit -m "feat(web): add color-coded SegmentedWord SVG renderer"
+```
+
+---
+
 ### Task 4: Enrich `WordPopover` (use summary + details link)
 
 **Files:**
@@ -353,8 +502,8 @@ git commit -m "feat(web): add SegmentCard component"
 - Create: `apps/web/src/components/morphology/WordDetailView.tsx`, `apps/web/src/test/WordDetailView.test.tsx`
 
 **Interfaces:**
-- Consumes: `WordDetail` (`{word, segments, concept_tags}`), optional `gloss`, optional `rootHref` (link into dictionary, `/dictionary/${root_buckwalter}`).
-- Produces: `<WordDetailView detail={WordDetail} gloss?={string} rootHref?={string} />` — Arabic word heading, `MorphologySummary`, a segments section (`SegmentCard[]`), concept-tag labels (non-clickable), and a "View root in dictionary" link when `rootHref`.
+- Consumes: `WordDetail` (`{word, segments, concept_tags}`), `SegmentedWord`, `MorphologySummary`, `SegmentCard`, optional `gloss`, optional `rootHref` (link into dictionary, `/dictionary/${root_buckwalter}`).
+- Produces: `<WordDetailView detail={WordDetail} gloss?={string} rootHref?={string} />` — the color-coded `SegmentedWord` as the word heading, `MorphologySummary`, a segments section (`SegmentCard[]`), concept-tag labels (non-clickable), and a "View root in dictionary" link when `rootHref`.
 
 - [ ] **Step 1: Failing test** — `WordDetailView.test.tsx` (mock `next/link`):
 
@@ -366,6 +515,12 @@ import type { WordDetail } from '@quran-corpus/data';
 
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a>,
+}));
+
+// Stub the SVG child so this stays a WordDetailView unit test.
+vi.mock('../components/morphology/SegmentedWord', () => ({
+  SegmentedWord: ({ word, segments }: { word: { text_arabic: string }; segments: unknown[] }) =>
+    <div data-testid="segmented">{word.text_arabic} [{segments.length}]</div>,
 }));
 
 const detail: WordDetail = {
@@ -381,9 +536,9 @@ const detail: WordDetail = {
 };
 
 describe('WordDetailView', () => {
-  it('renders the Arabic word', () => {
+  it('renders the color-coded word heading via SegmentedWord', () => {
     render(<WordDetailView detail={detail} />);
-    expect(screen.getByText('بِسْمِ')).toBeInTheDocument();
+    expect(screen.getByTestId('segmented')).toHaveTextContent('بِسْمِ');
   });
   it('renders one card per segment', () => {
     render(<WordDetailView detail={detail} />);
@@ -407,7 +562,7 @@ describe('WordDetailView', () => {
 Run: `pnpm --filter @quran-corpus/web test -- WordDetailView`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement** — `WordDetailView.tsx`: heading (`font-arabic text-6xl`, dir="rtl"), `<MorphologySummary word={detail.word} gloss={gloss} />`, a "Segments" section mapping `detail.segments` (sorted by `segment_index`) to `<SegmentCard>`, concept tags as `<span>` labels, and `rootHref` `<Link>` "View root in dictionary →". Guard empty segments/tags.
+- [ ] **Step 3: Implement** — `WordDetailView.tsx`: heading = `<SegmentedWord word={detail.word} segments={detail.segments} {...(gloss?{gloss}:{})} />` (color-coded word), then `<MorphologySummary word={detail.word} gloss={gloss} />`, a "Segments" section mapping `detail.segments` (sorted by `segment_index`) to `<SegmentCard>`, concept tags as `<span>` labels, and `rootHref` `<Link>` "View root in dictionary →". Guard empty segments/tags. (`SegmentedWord` guards missing SVG-measurement APIs so it renders in jsdom/SSR.)
 
 - [ ] **Step 4: Run — expect PASS**
 
@@ -532,7 +687,7 @@ Expected: all PASS. Fix any regressions, re-run (loop step 2 of CLAUDE.md §4).
 
 ## Self-Review (done)
 
-- **Spec coverage (§2.1):** verbatim English description + Arabic grammar label (Tasks 3,4,6) ✓; structured features/segments (Tasks 5,6) ✓; root→dictionary link (Tasks 6,7) ✓; quick sheet + full detail route (Tasks 4,7) ✓; concept tags non-clickable (Task 6) ✓.
+- **Spec coverage (§2.1):** verbatim English description + Arabic grammar label (Tasks 3,4,6) ✓; structured features/segments (Tasks 5,6) ✓; corpus-style per-segment color-coded word as vector SVG w/ POS labels beneath, kept as real searchable text (Tasks 3a,3b,6) ✓; root→dictionary link (Tasks 6,7) ✓; quick sheet + full detail route (Tasks 4,7) ✓; concept tags non-clickable (Task 6) ✓.
 - **Placeholders:** none — full code/commands per step. Gloss on detail route noted as optional-additive (not a gap; §2.1 quick-sheet gloss already ships).
 - **Type consistency:** `WordDetail{word,segments,concept_tags}`, `WordSegment`, `wordHref`/`WordLoc`, `rootHref=/dictionary/<buckwalter>` consistent across tasks and with 06a exports.
 
