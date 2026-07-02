@@ -31,6 +31,9 @@ export interface Word {
   lemma_buckwalter: string | null;
   pos_tag: string | null;
   morphology_json: string | null;
+  morphology_description: string | null;
+  grammar_arabic: string | null;
+  audio_url: string | null;
 }
 
 export interface Language {

@@ -5,6 +5,24 @@
 :root {
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-arabic: 'Amiri', 'Noto Naskh Arabic', serif;
+
+  /* POS morphology color-coding (WCAG-AA on paper light background). */
+  --pos-noun: #2469c0;
+  --pos-verb: #b23b2e;
+  --pos-prep: #0f8a6a;
+  --pos-pron: #8a5a0f;
+  --pos-other: #555;
+}
+
+/* App dark mode is media-driven (Tailwind default darkMode: 'media'). */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pos-noun: #7fb0ff;
+    --pos-verb: #ff9a8f;
+    --pos-prep: #6fd9b8;
+    --pos-pron: #e0b877;
+    --pos-other: #aaa;
+  }
 }
 
 [dir='rtl'] {

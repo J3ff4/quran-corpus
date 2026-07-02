@@ -5,6 +5,7 @@ import type { Ayah, Word, Translation } from '@quran-corpus/data';
 import { AyahView } from './AyahView';
 import { WordPopover } from './WordPopover';
 import { useAyahAudio } from '../../hooks/useAyahAudio';
+import { wordHref, wordLocation } from '../../lib/wordLocation';
 
 interface ReaderViewProps {
   ayahs: Ayah[];
@@ -23,6 +24,10 @@ export function ReaderView({
 }: ReaderViewProps) {
   const [selectedWord, setSelectedWord] = useState<Word | null>(null);
   const { playingAyahId, isPlaying, isRepeat, play, pause, toggleRepeat } = useAyahAudio(ayahs);
+
+  const selectedAyah = selectedWord ? ayahs.find((a) => a.id === selectedWord.ayah_id) : undefined;
+  const selectedHref =
+    selectedWord && selectedAyah ? wordHref(wordLocation(selectedAyah, selectedWord)) : undefined;
 
   return (
     <div>
@@ -48,6 +53,7 @@ export function ReaderView({
         {...(selectedWord != null && glossesByWordId[selectedWord.id] != null
           ? { gloss: glossesByWordId[selectedWord.id] }
           : {})}
+        {...(selectedHref ? { href: selectedHref } : {})}
         onClose={() => setSelectedWord(null)}
       />
     </div>

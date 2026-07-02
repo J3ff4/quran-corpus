@@ -1,0 +1,23 @@
+import { describe, it, expect } from 'vitest';
+import { parseWordParams } from '../app/word/[surah]/[ayah]/[position]/params';
+
+describe('parseWordParams', () => {
+  it('parses numeric params', () => {
+    expect(parseWordParams({ surah: '1', ayah: '1', position: '1' })).toEqual({
+      surah: 1,
+      ayah: 1,
+      position: 1,
+    });
+  });
+  it('rejects non-numeric', () => {
+    expect(parseWordParams({ surah: 'x', ayah: '1', position: '1' })).toBeNull();
+  });
+  it('rejects out-of-range surah', () => {
+    expect(parseWordParams({ surah: '200', ayah: '1', position: '1' })).toBeNull();
+  });
+  it('rejects scientific-notation / non-decimal input', () => {
+    expect(parseWordParams({ surah: '1e2', ayah: '1', position: '1' })).toBeNull();
+    expect(parseWordParams({ surah: '0x1', ayah: '1', position: '1' })).toBeNull();
+    expect(parseWordParams({ surah: ' 1', ayah: '1', position: '1' })).toBeNull();
+  });
+});

@@ -1,27 +1,18 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
+import Link from 'next/link';
 import type { Word } from '@quran-corpus/data';
+import { MorphologySummary } from '../morphology/MorphologySummary';
 
 interface WordPopoverProps {
   word: Word | null;
   gloss?: string;
+  href?: string;
   onClose: () => void;
 }
 
-function parseMorphology(json: string | null): string[] {
-  if (!json) return [];
-  try {
-    const parsed: unknown = JSON.parse(json);
-    return Array.isArray(parsed) ? (parsed as string[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function WordPopover({ word, gloss, onClose }: WordPopoverProps) {
-  const segments = parseMorphology(word?.morphology_json ?? null);
-
+export function WordPopover({ word, gloss, href, onClose }: WordPopoverProps) {
   return (
     <AnimatePresence>
       {word && (
@@ -62,52 +53,20 @@ export function WordPopover({ word, gloss, onClose }: WordPopoverProps) {
             <p
               id="word-popover-title"
               dir="rtl"
-              className="mb-1 font-arabic text-5xl text-paper-900 dark:text-paper-100"
+              className="mb-3 font-arabic text-5xl text-paper-900 dark:text-paper-100"
             >
               {word.text_arabic}
             </p>
 
-            {/* Transliteration */}
-            {word.transliteration && (
-              <p className="mb-1 text-lg text-paper-500">{word.transliteration}</p>
-            )}
+            <MorphologySummary word={word} {...(gloss ? { gloss } : {})} />
 
-            {/* English gloss */}
-            {gloss && (
-              <p className="mb-4 text-base text-paper-700 dark:text-paper-300">{gloss}</p>
-            )}
-
-            {/* Metadata row */}
-            <div className="mb-4 flex flex-wrap gap-2">
-              {word.pos_tag && (
-                <span className="rounded-full bg-paper-200 px-3 py-0.5 text-sm font-medium text-paper-700 dark:bg-night-100 dark:text-paper-300">
-                  {word.pos_tag}
-                </span>
-              )}
-              {word.root && (
-                <span className="font-arabic rounded-full bg-paper-200 px-3 py-0.5 text-sm text-paper-700 dark:bg-night-100 dark:text-paper-300">
-                  {word.root}
-                </span>
-              )}
-              {word.lemma && (
-                <span className="font-arabic rounded-full bg-paper-200 px-3 py-0.5 text-sm text-paper-700 dark:bg-night-100 dark:text-paper-300">
-                  {word.lemma}
-                </span>
-              )}
-            </div>
-
-            {/* Morphology segments */}
-            {segments.length > 1 && (
-              <div className="flex flex-wrap gap-2">
-                {segments.map((seg, i) => (
-                  <span
-                    key={i}
-                    className="rounded bg-paper-100 px-2 py-0.5 text-xs text-paper-600 dark:bg-night-100 dark:text-paper-400"
-                  >
-                    {seg}
-                  </span>
-                ))}
-              </div>
+            {href && (
+              <Link
+                href={href}
+                className="mt-5 inline-flex items-center gap-1 rounded-full bg-paper-900 px-4 py-2 text-sm font-medium text-paper-50 transition-colors hover:bg-paper-700 dark:bg-paper-100 dark:text-night-200"
+              >
+                More details →
+              </Link>
             )}
           </motion.div>
         </>

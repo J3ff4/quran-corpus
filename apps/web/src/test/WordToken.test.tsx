@@ -15,6 +15,9 @@ const word: Word = {
   lemma_buckwalter: null,
   pos_tag: 'P',
   morphology_json: '["P","N"]',
+  morphology_description: null,
+  grammar_arabic: null,
+  audio_url: null,
 };
 
 describe('WordToken', () => {
