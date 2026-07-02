@@ -13,7 +13,8 @@ import {
 import type { Word, Translation } from '@quran-corpus/data';
 import { SurahHeader } from '../../../components/reader/SurahHeader';
 import { ReaderView } from '../../../components/reader/ReaderView';
-import { LanguageBar, VALID_LANG_CODES } from '../../../components/reader/LanguageBar';
+import { LanguageBar } from '../../../components/reader/LanguageBar';
+import { VALID_LANG_CODES } from '../../../components/reader/languages';
 
 interface PageProps {
   params: Promise<{ id: string }>;

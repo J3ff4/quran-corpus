@@ -2,14 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { motion, useReducedMotion } from 'framer-motion';
-
-const LANGUAGES = [
-  { code: 'en', label: 'English' },
-  { code: 'uz', label: 'Uzbek' },
-  { code: 'ru', label: 'Russian' },
-] as const;
-
-export const VALID_LANG_CODES = LANGUAGES.map((l) => l.code);
+import { LANGUAGES } from './languages';
 
 interface LanguageBarProps {
   surahId: number;
