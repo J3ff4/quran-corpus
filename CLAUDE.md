@@ -69,12 +69,12 @@ If any step surfaces an issue, fix and **restart from step 2** for the affected 
 
 Work proceeds in phases. Before writing code for a phase:
 
-1. Use the **superpowers** skill to generate the phase plan. One plan file per phase in `docs/plans/phase-NN-<slug>.md`.
-1. Run the plan through the **caveman** skill as a thoroughness pass — it should catch gaps, hand-waving, and unstated assumptions. **Target: thorough but tight.** The plan must cover every step, decision, and risk — but no padding, no restating the obvious, no filler. If caveman inflates the plan with verbosity that doesn’t add decision-relevant content, trim it back.
+1. Use the **superpowers** skill (`superpowers:writing-plans`, and `superpowers:brainstorming` upstream for new features) to generate the phase plan. One plan file per phase in `docs/plans/phase-NN-<slug>.md`.
+1. **Mandatory, not optional:** activate `/caveman` **before/while** `writing-plans` runs, so the plan is *authored* in caveman's terse, token-efficient style from the first draft — not written verbose and trimmed later. The point is to spend fewer tokens producing and re-reading plans. **Target: thorough but tight** — the plan must still cover every step, decision, risk, file/module mapping, and testable acceptance criteria; caveman removes padding and filler, never decision-relevant content. A plan not authored in caveman style is not ready. (Skills do not invoke each other automatically; you, the agent running the workflow, must have caveman active when you write the plan.)
 1. A plan is “ready” only when: every task maps to a file/module, every external dependency is named, risks and rollbacks are listed, and the acceptance criteria are testable.
 1. Do not start implementation until the phase plan is written and reviewed.
 
-> Note: `superpowers`, `caveman`, and the setup/marketplace plugin are external Claude Code plugins. Confirm exact names in the marketplace at install time; if a name is wrong the plugin silently won’t load. Use the **Claude Code setup/marketplace plugin** early to install these plus any other useful skills/plugins (commit helpers, test runners, etc.).
+> Note: `superpowers` and `caveman` are installed Claude Code plugins (`caveman` from github.com/JuliusBrussee/caveman — its manifest wires SessionStart + UserPromptSubmit hooks). Newly installed plugin skills only register on the next session start, so if `/caveman` isn’t yet invokable, apply its thorough-but-tight style manually until then. Confirm exact skill names before relying on them; a wrong name silently won’t load.
 
 -----
 
@@ -139,3 +139,4 @@ Stop and ask rather than guess on: schema changes, adding a dependency, anything
 
 - **Minimum model: Sonnet.** Never dispatch a subagent on Haiku. The floor is `claude-sonnet-4-6` (or newer Sonnet/Opus). Haiku is too weak for the code-quality bar required here.
 - **Compact after every completed task.** When running Subagent-Driven Development, trigger a context compaction after each task's review cycle passes before dispatching the next task's implementer.
+- **Compact after every completed + approved phase.** In addition to per-task compaction, trigger a compaction once a full phase is complete and the user has approved it, before starting the next phase. Both levels are mandatory: task-level and phase-level.
