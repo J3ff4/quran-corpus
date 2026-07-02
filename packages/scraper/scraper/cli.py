@@ -45,6 +45,43 @@ def scrape(db: str, checkpoint: str, surah: int | None, rate_limit: float) -> No
     database.close()
 
 
+@main.command("scrape-dictionary")
+@click.option("--db", default="quran.db", show_default=True, help="SQLite output path")
+@click.option("--checkpoint", default="dict_checkpoint.json", show_default=True)
+@click.option(
+    "--rate-limit", default=1.5, show_default=True, help="Seconds between requests"
+)
+def scrape_dictionary_cmd(db: str, checkpoint: str, rate_limit: float) -> None:
+    """Scrape qurandictionary.jsp for every distinct root (rate-limited, resumable).
+
+    Requires roots to exist in the DB first (run import-corpus).
+    """
+    from .sources.dictionary_scrape import scrape_dictionary
+
+    database = ScraperDatabase(db)
+    ckpt = Checkpoint(checkpoint)
+    count = scrape_dictionary(database, ckpt, rate_limit=rate_limit)
+    database.close()
+    click.echo(f"Dictionary scrape complete: {count} roots.")
+
+
+@main.command("scrape-word-details")
+@click.option("--db", default="quran.db", show_default=True, help="SQLite output path")
+@click.option("--checkpoint", default="worddetail_checkpoint.json", show_default=True)
+@click.option(
+    "--rate-limit", default=1.5, show_default=True, help="Seconds between requests"
+)
+def scrape_word_details_cmd(db: str, checkpoint: str, rate_limit: float) -> None:
+    """Scrape wordmorphology.jsp verbatim strings for every word (resumable)."""
+    from .sources.dictionary_scrape import scrape_word_details
+
+    database = ScraperDatabase(db)
+    ckpt = Checkpoint(checkpoint)
+    count = scrape_word_details(database, ckpt, rate_limit=rate_limit)
+    database.close()
+    click.echo(f"Word-detail scrape complete: {count} words.")
+
+
 @main.command("import-corpus")
 @click.argument("txt_path")
 @click.option("--db", default="quran.db", show_default=True)
