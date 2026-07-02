@@ -17,7 +17,7 @@ export function WordDetailView({ detail, gloss, rootHref }: WordDetailViewProps)
   return (
     <article className="space-y-8">
       <header className="mx-auto max-w-md">
-        <SegmentedWord word={word} segments={segments} {...(gloss ? { gloss } : {})} />
+        <SegmentedWord word={word} segments={orderedSegments} {...(gloss ? { gloss } : {})} />
       </header>
 
       <MorphologySummary word={word} {...(gloss ? { gloss } : {})} />
