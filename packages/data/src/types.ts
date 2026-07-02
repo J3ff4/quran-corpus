@@ -54,3 +54,45 @@ export interface WordGloss {
   language_code: string;
   gloss_text: string;
 }
+
+export interface Root {
+  id: number;
+  root_buckwalter: string;
+  root_arabic: string;
+  occurrence_count: number;
+}
+
+export interface RootForm {
+  id: number;
+  root_id: number;
+  sort_order: number;
+  pos_label: string;
+  form_arabic: string | null;
+  form_translit: string | null;
+  gloss: string | null;
+  occurrence_count: number;
+}
+
+export interface RootDefinition {
+  id: number;
+  root_id: number;
+  source: string;
+  definition: string;
+}
+
+export interface RootEntry {
+  root: Root;
+  forms: RootForm[];
+  definitions: RootDefinition[];
+}
+
+export interface ConcordanceEntry {
+  surah_id: number;
+  ayah_number: number;
+  position: number;
+  word_id: number;
+  text_arabic: string;
+  transliteration: string | null;
+  gloss: string | null;
+  verse_text: string;
+}
