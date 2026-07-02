@@ -20,19 +20,24 @@ const toolLink =
  * root rows. Purely presentational — the route supplies the resolved roots.
  */
 export function DictionaryIndex({ roots, sort, query }: DictionaryIndexProps) {
+  const sortHref = (s: 'alpha' | 'freq'): string => {
+    const params = new URLSearchParams({ sort: s });
+    if (query) params.set('q', query);
+    return `/dictionary?${params.toString()}`;
+  };
   return (
     <div>
       <DictionarySearch defaultValue={query} />
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <Link
-          href="/dictionary?sort=alpha"
+          href={sortHref('alpha')}
           className={`${toggleBase} ${sort === 'alpha' ? toggleActive : toggleIdle}`}
         >
           Alphabetical
         </Link>
         <Link
-          href="/dictionary?sort=freq"
+          href={sortHref('freq')}
           className={`${toggleBase} ${sort === 'freq' ? toggleActive : toggleIdle}`}
         >
           By frequency

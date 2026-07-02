@@ -38,4 +38,11 @@ describe('DictionaryIndex', () => {
     render(<DictionaryIndex roots={roots} sort="alpha" query="ktb" />);
     expect(screen.getByText(/results for/i)).toBeInTheDocument();
   });
+  it('keeps the active query in the sort toggle links', () => {
+    render(<DictionaryIndex roots={roots} sort="alpha" query="ktb" />);
+    expect(screen.getByRole('link', { name: /by frequency/i })).toHaveAttribute(
+      'href',
+      '/dictionary?sort=freq&q=ktb',
+    );
+  });
 });
