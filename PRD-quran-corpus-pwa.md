@@ -63,8 +63,8 @@ Ontology of Quranic concepts · tafsir/commentary · grammar tutorial articles �
 - Rate-limit ~1 req / 1.5 s, respect `robots.txt`, run resumable/checkpointed, and **persist raw HTML snapshots** so re-parsing never requires re-scraping. Raw snapshots are **never** committed to git.
 - Parsers are pure functions (HTML string → records) so they are unit-testable without a network.
 
-### 3.2 Ground-truth validation
-- The downloaded GPL morphology file (`quranic-corpus-morphology-0.4.txt`) contains the same POS/root/lemma/feature annotations the site renders. It is **retained solely to cross-check the scrape** and catch parsing errors — it is not a user-facing source.
+### 3.2 Structured morphology + ground-truth validation
+- The downloaded GPL morphology file (`quranic-corpus-morphology-0.4.txt`) is the authoritative **structured** annotation — per-segment form, POS, features, root/lemma — and is the exact data corpus.quran.com renders (its word-images are generated from it). It serves two roles: **(a) source of the structured per-segment data** — segment forms (Buckwalter→Arabic), POS, and grammar features — used to render our own color-coded word (corpus exposes those segment glyphs *only* as bitmaps, never as page text); and **(b) cross-check** of the scraped pages to catch parsing errors. The **site scrape remains the source** of the human-readable verbatim strings (the morphology description sentence, the Arabic grammar label) and of all dictionary data. Attribution unchanged (GPL, © Kais Dukes / Language Research Group, Leeds).
 
 ### 3.3 Supplementary datasets
 - **Tanzil** — Uthmani Arabic verse text (existing).
@@ -176,7 +176,7 @@ Governed by CLAUDE.md; summarized here for scope.
 
 Recorded so they are not re-litigated:
 - Faithful corpus port, not a generic reader; v1 code kept as foundation.
-- Scrape the site for all corpus data; GPL file kept only for validation.
+- Scrape the site for the verbatim human-readable morphology strings + all dictionary data + cross-validation; the GPL morphology file supplies the structured per-segment data (forms/POS/features) that corpus exposes only as bitmaps, and still cross-checks the scrape (§3.2).
 - Curated root definitions from Lane's Lexicon (public domain), additive (not a Phase-1 gate).
 - Grammar stored verbatim **and** structured. Concept tags captured, non-clickable until ontology phase.
 - Uzbek/Russian per-word glosses: machine-translated + reviewed + provenance-tagged (later phase).
