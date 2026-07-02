@@ -123,3 +123,85 @@ def parse_corpus_morphology(path: Path) -> Iterator[ParsedCorpusWord]:
 
     if current is not None:
         yield current
+
+
+@dataclass
+class ParsedCorpusSegment:
+    surah: int
+    ayah: int
+    word: int
+    segment_index: int  # 0-based position of the segment within the word
+    form_buckwalter: str
+    tag: str | None
+    segment_type: str | None  # 'prefix' | 'stem' | 'suffix'
+    features_json: str | None
+    lemma_buckwalter: str | None
+    root_buckwalter: str | None
+
+
+# Buckwalter FEATURE tokens -> (structured key, value). Only the unambiguous
+# single-token features are mapped; anything else is kept under "raw".
+_FEATURE_MAP: dict[str, tuple[str, str]] = {
+    "M": ("gender", "masculine"),
+    "F": ("gender", "feminine"),
+    "GEN": ("case", "genitive"),
+    "NOM": ("case", "nominative"),
+    "ACC": ("case", "accusative"),
+}
+_STRUCTURAL = {"PREFIX", "STEM", "SUFFIX"}
+
+
+def _segment_type(tokens: list[str]) -> str | None:
+    for tok in tokens:
+        if tok in _STRUCTURAL:
+            return tok.lower()
+    return None
+
+
+def _segment_features_json(tokens: list[str]) -> str | None:
+    mapped: dict[str, str] = {}
+    raw: list[str] = []
+    for tok in tokens:
+        if tok in _STRUCTURAL or ":" in tok or tok.endswith("+") or not tok:
+            continue
+        if tok in _FEATURE_MAP:
+            key, value = _FEATURE_MAP[tok]
+            mapped[key] = value
+        else:
+            raw.append(tok)
+    if raw:
+        mapped["raw"] = raw  # type: ignore[assignment]
+    return json.dumps(mapped, ensure_ascii=False) if mapped else None
+
+
+def parse_corpus_segments(path: Path) -> Iterator[ParsedCorpusSegment]:
+    """Yield one ParsedCorpusSegment per segment line (in file order)."""
+    with path.open(encoding="utf-8") as fh:
+        for raw in fh:
+            line = raw.rstrip("\n")
+            if not line or line.startswith("#"):
+                continue
+            cols = line.split("\t")
+            if cols[0].strip().upper() == "LOCATION" or len(cols) < 3:
+                continue
+            parsed_loc = _parse_location(cols[0])
+            if parsed_loc is None:
+                continue
+            surah, ayah, word, seg = parsed_loc
+            form = cols[1].strip()
+            tag = cols[2].strip() or None
+            features = cols[3] if len(cols) > 3 else ""
+            tokens = [t for t in features.split("|") if t]
+            lemma_bw, root_bw = _parse_features(features)
+            yield ParsedCorpusSegment(
+                surah=surah,
+                ayah=ayah,
+                word=word,
+                segment_index=seg - 1,
+                form_buckwalter=form,
+                tag=tag,
+                segment_type=_segment_type(tokens),
+                features_json=_segment_features_json(tokens),
+                lemma_buckwalter=lemma_bw,
+                root_buckwalter=root_bw,
+            )

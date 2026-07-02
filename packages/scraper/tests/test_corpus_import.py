@@ -103,3 +103,42 @@ def test_migration_adds_columns_to_old_db(tmp_path: Path) -> None:
     database.close()
     assert "root_buckwalter" in cols
     assert "lemma_buckwalter" in cols
+
+
+def test_import_populates_word_segments(tmp_path):
+    """Each GPL segment becomes a word_segments row with Arabic form + type."""
+    from scraper.db import ScraperDatabase
+    from scraper.models import AyahModel, SurahModel
+    from scraper.sources.corpus_import import import_corpus_morphology
+
+    gpl = tmp_path / "m.txt"
+    gpl.write_text(
+        "LOCATION\tFORM\tTAG\tFEATURES\n"
+        "(1:1:1:1)\tbi\tP\tPREFIX|bi+\n"
+        "(1:1:1:2)\tsomi\tN\tSTEM|POS:N|LEM:{som|ROOT:smw|M|GEN\n",
+        encoding="utf-8",
+    )
+    db = ScraperDatabase(str(tmp_path / "d.db"))
+    db.upsert_surah(
+        SurahModel(
+            id=1,
+            name_arabic="ا",
+            name_translit="a",
+            name_translation="a",
+            revelation_type="meccan",
+            ayah_count=7,
+            order_number=1,
+        )
+    )
+    db.upsert_ayah(AyahModel(surah_id=1, ayah_number=1, text_uthmani="بِسْمِ"))
+    import_corpus_morphology(gpl, db)
+    rows = db._conn.execute(
+        "SELECT segment_index, segment_type, pos_tag, form_arabic, root "
+        "FROM word_segments ORDER BY segment_index"
+    ).fetchall()
+    assert [r["pos_tag"] for r in rows] == ["P", "N"]
+    assert rows[0]["segment_type"] == "prefix"
+    assert rows[1]["segment_type"] == "stem"
+    assert rows[1]["root"] == "smw"
+    assert rows[0]["form_arabic"]  # non-empty Arabic glyphs
+    db.close()

@@ -305,6 +305,24 @@ class ScraperDatabase:
         )
         self._conn.commit()
 
+    def get_word_id(self, surah_id: int, ayah_number: int, position: int) -> int | None:
+        row = self._conn.execute(
+            """SELECT w.id FROM words w JOIN ayahs a ON a.id = w.ayah_id
+               WHERE a.surah_id = ? AND a.ayah_number = ? AND w.position = ?""",
+            (surah_id, ayah_number, position),
+        ).fetchone()
+        return int(row[0]) if row is not None else None
+
+    def update_word_detail(
+        self, word_id: int, description: str | None, grammar_arabic: str | None
+    ) -> None:
+        self._conn.execute(
+            "UPDATE words SET morphology_description = ?, grammar_arabic = ? "
+            "WHERE id = ?",
+            (description, grammar_arabic, word_id),
+        )
+        self._conn.commit()
+
     def get_distinct_roots(self) -> list[str]:
         return [
             r[0]
