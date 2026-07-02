@@ -36,6 +36,8 @@ class WordModel(BaseModel):
     lemma_buckwalter: str | None = None
     pos_tag: str | None = None
     morphology_json: str | None = None
+    morphology_description: str | None = None
+    grammar_arabic: str | None = None
 
 
 class TranslationModel(BaseModel):
@@ -58,3 +60,48 @@ class LanguageModel(BaseModel):
     name_native: str
     name_english: str
     direction: Literal["ltr", "rtl"]
+
+
+class RootModel(BaseModel):
+    id: int | None = None
+    root_buckwalter: str
+    root_arabic: str
+    occurrence_count: int = 0
+
+
+class RootFormModel(BaseModel):
+    id: int | None = None
+    root_id: int
+    sort_order: int
+    pos_label: str
+    form_arabic: str | None = None
+    form_translit: str | None = None
+    gloss: str | None = None
+    occurrence_count: int = 0
+
+
+class RootDefinitionModel(BaseModel):
+    id: int | None = None
+    root_id: int
+    source: str
+    definition: str
+
+
+class WordSegmentModel(BaseModel):
+    id: int | None = None
+    word_id: int
+    segment_index: int
+    segment_type: str | None = None
+    pos_tag: str | None = None
+    form_arabic: str | None = None
+    form_buckwalter: str | None = None
+    features_json: str | None = None
+    lemma: str | None = None
+    root: str | None = None
+
+
+class ConceptTagModel(BaseModel):
+    id: int | None = None
+    word_id: int
+    tag_label: str
+    tag_type: str | None = None

@@ -2,8 +2,34 @@ import os
 import sqlite3
 import tempfile
 
+import pytest
+
 from scraper.db import ScraperDatabase
 from scraper.models import SurahModel
+
+
+@pytest.fixture
+def seeded_word_id():
+    def _make(tmp_path):
+        from scraper.models import AyahModel, WordModel
+
+        db = ScraperDatabase(str(tmp_path / "s.db"))
+        db.upsert_surah(
+            SurahModel(
+                id=1,
+                name_arabic="الفاتحة",
+                name_translit="Al-Fatihah",
+                name_translation="The Opening",
+                revelation_type="meccan",
+                ayah_count=7,
+                order_number=1,
+            )
+        )
+        aid = db.upsert_ayah(AyahModel(surah_id=1, ayah_number=1, text_uthmani="بِسْمِ"))
+        wid = db.upsert_word(WordModel(ayah_id=aid, position=1, text_arabic="بِسْمِ"))
+        return db, wid
+
+    return _make
 
 
 def test_create_schema_creates_all_tables():
@@ -27,6 +53,11 @@ def test_create_schema_creates_all_tables():
             "languages",
             "translations",
             "word_glosses",
+            "roots",
+            "root_forms",
+            "root_definitions",
+            "word_segments",
+            "word_concept_tags",
         }
         assert tables == expected
         conn.close()
@@ -149,3 +180,69 @@ def test_upsert_word_does_not_clobber_existing_fields_with_null():
         assert row[5] == "bis'mi"  # transliteration added
     finally:
         os.unlink(path)
+
+
+def test_upsert_root_and_form(tmp_path):
+    from scraper.models import RootFormModel, RootModel
+
+    db = ScraperDatabase(str(tmp_path / "t.db"))
+    rid = db.upsert_root(
+        RootModel(root_buckwalter="ktb", root_arabic="ك ت ب", occurrence_count=319)
+    )
+    assert rid > 0
+    # idempotent: same buckwalter returns same id, updates count
+    rid2 = db.upsert_root(
+        RootModel(root_buckwalter="ktb", root_arabic="ك ت ب", occurrence_count=320)
+    )
+    assert rid2 == rid
+    db.upsert_root_form(
+        RootFormModel(
+            root_id=rid,
+            sort_order=0,
+            pos_label="Noun",
+            form_arabic="كِتَٰب",
+            occurrence_count=260,
+        )
+    )
+    rows = db._conn.execute("SELECT occurrence_count FROM root_forms").fetchall()
+    assert rows[0][0] == 260
+    db.close()
+
+
+def test_upsert_word_detail_columns_and_segments(tmp_path, seeded_word_id):
+    from scraper.models import ConceptTagModel, WordSegmentModel
+
+    db, wid = seeded_word_id(tmp_path)
+    db.upsert_word_segment(
+        WordSegmentModel(
+            word_id=wid, segment_index=0, segment_type="prefix", pos_tag="P"
+        )
+    )
+    db.upsert_word_segment(
+        WordSegmentModel(
+            word_id=wid,
+            segment_index=1,
+            segment_type="stem",
+            pos_tag="N",
+            features_json='{"case":"genitive"}',
+            root="smw",
+        )
+    )
+    db.upsert_concept_tag(
+        ConceptTagModel(word_id=wid, tag_label="Allah", tag_type="named-entity")
+    )
+    segs = db._conn.execute(
+        "SELECT segment_index,pos_tag FROM word_segments ORDER BY segment_index"
+    ).fetchall()
+    assert [s[1] for s in segs] == ["P", "N"]
+    tags = db._conn.execute("SELECT tag_label FROM word_concept_tags").fetchall()
+    assert tags[0][0] == "Allah"
+    db.close()
+
+
+def test_get_distinct_roots(tmp_path, seeded_word_id):
+    db, wid = seeded_word_id(tmp_path)
+    db._conn.execute("UPDATE words SET root_buckwalter='smw' WHERE id=?", (wid,))
+    db._conn.commit()
+    assert db.get_distinct_roots() == ["smw"]
+    db.close()

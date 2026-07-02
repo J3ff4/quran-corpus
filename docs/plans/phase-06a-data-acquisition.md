@@ -580,7 +580,8 @@ git commit -m "feat(scraper): add qurandictionary root-page parser"
 - Test: `packages/scraper/tests/test_corpus_word_detail.py`
 
 **Interfaces:**
-- Produces: `@dataclass ParsedSegment(index:int, segment_type:str|None, pos_tag:str|None, form_arabic:str|None, form_buckwalter:str|None, features:dict[str,str], lemma:str|None, root:str|None)`; `@dataclass ParsedWordDetail(description:str, grammar_arabic:list[str], segments:list[ParsedSegment], concept_tags:list[str])`; `parse_word_detail(html:str)->ParsedWordDetail|None`.
+- Produces: `@dataclass ParsedWordDetail(description:str, grammar_arabic:list[str], concept_tags:list[str])`; `parse_word_detail(html:str)->ParsedWordDetail|None`.
+- **Note (revised):** the detail page has **no per-segment Arabic glyphs** (only bitmaps) and encodes features as prose. So structured per-segment data (`word_segments`: form/POS/features/root/lemma) comes from the **GPL file** (Task 4b), not this parser. This parser extracts only what is uniquely on the site: the verbatim `description` sentence, the Arabic grammar label(s), and concept tags.
 
 - [ ] **Step 1: Capture fixture** — fetch `https://corpus.quran.com/wordmorphology.jsp?location=(1:1:1)` → `tests/fixtures/corpus_word_detail_1_1_1.html`. Commit fixture.
 
@@ -613,27 +614,8 @@ def test_grammar_arabic_present(w111: ParsedWordDetail) -> None:
     assert "جار" in joined  # جار ومجرور
 
 
-def test_two_segments(w111: ParsedWordDetail) -> None:
-    assert len(w111.segments) == 2
-
-
-def test_prefix_segment(w111: ParsedWordDetail) -> None:
-    assert w111.segments[0].pos_tag == "P"
-
-
-def test_stem_segment_features(w111: ParsedWordDetail) -> None:
-    stem = w111.segments[1]
-    assert stem.pos_tag == "N"
-    assert stem.root == "smw"
-    assert stem.features.get("case") == "genitive"
-
-
-def test_segments_carry_arabic_form(w111: ParsedWordDetail) -> None:
-    """Each segment carries its Arabic glyphs (drives 06b color-coded SVG)."""
-    forms = [s.form_arabic for s in w111.segments]
-    assert all(f for f in forms)  # both segments have a non-empty form
-    # concatenated segment forms reconstruct the word (بِ + سْمِ)
-    assert "".join(forms).replace(" ", "") != ""
+def test_description_mentions_segments(w111: ParsedWordDetail) -> None:
+    assert "morphological segment" in w111.description
 
 
 def test_non_detail_page_returns_none() -> None:
@@ -645,7 +627,7 @@ def test_non_detail_page_returns_none() -> None:
 Run: `cd packages/scraper && uv run pytest tests/test_corpus_word_detail.py -q`
 Expected: FAIL.
 
-- [ ] **Step 4: Implement** — `corpus_word_detail.py`. Description = the grammar prose paragraph; `grammar_arabic` = Arabic labels (the `مجرور`/`جار ومجرور` spans, `lang="ar"` / RTL cells); segments from the morphology table rows (segment order → index; type inferred from prefix/stem/suffix wording; **`form_arabic` = the Arabic glyphs shown for that segment; `form_buckwalter` = its Buckwalter transliteration** — derive whichever is missing via `buckwalter.py` (`buckwalter_to_arabic` / its inverse) so both are populated; these drive 06b's per-segment color-coded SVG); features parsed from feature text: map words genitive/nominative/accusative→case, masculine/feminine→gender, singular/dual/plural→number, first/second/third person→person, root via Buckwalter. Concept tags: any "special reference"/named-entity labels if present (empty list otherwise). Return None if no grammar section found.
+- [ ] **Step 4: Implement** — `corpus_word_detail.py`. `description` = the grammar prose paragraph (the `<td class="contentCell">` text containing "morphological segment"); `grammar_arabic` = the Arabic grammar label spans (`<span class="at">`) that are NOT the root — pragmatically, capture all `.at` texts in the description and let the caller/consumer treat them as labels (the phrase name جار ومجرور is the salient one). Concept tags: any named-entity/"special reference" labels if present (empty list otherwise). Return None if no grammar description found. (No segment parsing — see Task 4b.)
 
 - [ ] **Step 5: Run — expect PASS** (tune to fixture)
 
@@ -657,6 +639,69 @@ Expected: PASS.
 ```bash
 git add packages/scraper/scraper/sources/corpus_word_detail.py packages/scraper/tests/test_corpus_word_detail.py packages/scraper/tests/fixtures/corpus_word_detail_1_1_1.html packages/scraper/tools/inspect_corpus_dict.py
 git commit -m "feat(scraper): add word-morphology detail parser"
+```
+
+---
+
+### Task 4b: Populate `word_segments` from the GPL morphology file
+
+**Files:**
+- Modify: `packages/scraper/scraper/sources/corpus_morphology.py` (add a per-segment generator), `packages/scraper/scraper/sources/corpus_import.py` (upsert segments), `packages/scraper/scraper/db.py` (add `update_word_detail`, `get_word_id`)
+- Test: `packages/scraper/tests/test_corpus_import.py`
+
+**Interfaces:**
+- Consumes: GPL file lines (`(s:a:w:seg)\tFORM\tTAG\tFEATURES`), `buckwalter_to_arabic`, `ScraperDatabase.upsert_word_segment`.
+- Produces: `@dataclass ParsedCorpusSegment(surah,ayah,word,segment_index, form_buckwalter, tag, segment_type, features_json, lemma_buckwalter, root_buckwalter)`; `parse_corpus_segments(path)->Iterator[ParsedCorpusSegment]`. `import_corpus_morphology` also upserts one `word_segments` row per segment (`form_arabic = buckwalter_to_arabic(form_buckwalter.rstrip('+'))`, `segment_type` from PREFIX/STEM/SUFFIX marker, `features_json` = mapped features). `db.update_word_detail(word_id, description, grammar_arabic)`; `db.get_word_id(surah,ayah,position)->int|None`.
+
+- [ ] **Step 1: Failing test** — append to `tests/test_corpus_import.py`. Reuse the existing import fixture flow (it already imports a small GPL sample after seeding + tanzil); assert segments land:
+
+```python
+def test_import_populates_word_segments(tmp_path):
+    """Each GPL segment becomes a word_segments row with Arabic form + type."""
+    from scraper.sources.corpus_import import import_corpus_morphology
+    from scraper.db import ScraperDatabase
+    from scraper.models import SurahModel, AyahModel
+    gpl = tmp_path / "m.txt"
+    gpl.write_text(
+        "LOCATION\tFORM\tTAG\tFEATURES\n"
+        "(1:1:1:1)\tbi\tP\tPREFIX|bi+\n"
+        "(1:1:1:2)\tsomi\tN\tSTEM|POS:N|LEM:{som|ROOT:smw|M|GEN\n",
+        encoding="utf-8",
+    )
+    db = ScraperDatabase(str(tmp_path / "d.db"))
+    db.upsert_surah(SurahModel(id=1, name_arabic="ا", name_translit="a",
+        name_translation="a", revelation_type="meccan", ayah_count=7, order_number=1))
+    db.upsert_ayah(AyahModel(surah_id=1, ayah_number=1, text_uthmani="بِسْمِ"))
+    import_corpus_morphology(gpl, db)
+    rows = db._conn.execute(
+        "SELECT segment_index, segment_type, pos_tag, form_arabic, root "
+        "FROM word_segments ORDER BY segment_index"
+    ).fetchall()
+    assert [r["pos_tag"] for r in rows] == ["P", "N"]
+    assert rows[0]["segment_type"] == "prefix"
+    assert rows[1]["segment_type"] == "stem"
+    assert rows[1]["root"] == "smw"
+    assert rows[0]["form_arabic"]  # non-empty Arabic glyphs
+    db.close()
+```
+
+- [ ] **Step 2: Run — expect FAIL**
+
+Run: `cd packages/scraper && uv run pytest tests/test_corpus_import.py::test_import_populates_word_segments -q`
+Expected: FAIL.
+
+- [ ] **Step 3: Implement** — in `corpus_morphology.py` add `ParsedCorpusSegment` + `parse_corpus_segments(path)` (one record per non-header line; `segment_index` = seg-1; `segment_type` from `PREFIX`/`STEM`/`SUFFIX` token in FEATURES; `features_json` = `json.dumps` of a mapped dict — map `M`→gender:masculine, `F`→feminine, `GEN`→case:genitive, `NOM`→nominative, `ACC`→accusative, and keep other tokens under `raw`). In `corpus_import.py`, after upserting the word, look up `word_id = db.get_word_id(s,a,w)` and `db.upsert_word_segment(...)` per segment with `form_arabic=buckwalter_to_arabic(form_buckwalter.rstrip('+'))`. Add `get_word_id` + `update_word_detail` to `db.py`.
+
+- [ ] **Step 4: Run — expect PASS**
+
+Run: `cd packages/scraper && uv run pytest tests/test_corpus_import.py -q`
+Expected: PASS.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add packages/scraper/scraper/sources/corpus_morphology.py packages/scraper/scraper/sources/corpus_import.py packages/scraper/scraper/db.py packages/scraper/tests/test_corpus_import.py
+git commit -m "feat(scraper): populate word_segments (forms/POS/features) from GPL file"
 ```
 
 ---
@@ -744,8 +789,7 @@ import httpx
 from ..buckwalter import buckwalter_to_arabic
 from ..checkpoint import Checkpoint
 from ..db import ScraperDatabase
-from ..models import (ConceptTagModel, RootFormModel, RootModel,
-                      WordModel, WordSegmentModel)
+from ..models import ConceptTagModel, RootFormModel, RootModel
 from .corpus_dictionary import parse_root_page
 from .corpus_word_detail import parse_word_detail
 
@@ -801,19 +845,12 @@ def scrape_word_details(db, checkpoint, *, client_factory=_default_factory,
             resp.raise_for_status()
             d = parse_word_detail(resp.text)
             if d is not None:
-                db.upsert_word(WordModel(ayah_id=_ayah_id(db, wid), position=row["position"],
-                    text_arabic=_text(db, wid),
-                    morphology_description=d.description,
-                    grammar_arabic=" ".join(d.grammar_arabic) or None))
-                for seg in d.segments:
-                    db.upsert_word_segment(WordSegmentModel(word_id=wid,
-                        segment_index=seg.index, segment_type=seg.segment_type,
-                        pos_tag=seg.pos_tag, form_arabic=seg.form_arabic,
-                        form_buckwalter=seg.form_buckwalter,
-                        features_json=_json(seg.features), lemma=seg.lemma, root=seg.root))
+                db.update_word_detail(wid, d.description,
+                    " ".join(d.grammar_arabic) or None)
                 for tag in d.concept_tags:
                     db.upsert_concept_tag(ConceptTagModel(word_id=wid, tag_label=tag))
                 stored += 1
+                # word_segments are populated from the GPL file (Task 4b), not here.
             checkpoint.mark_done(key)
             if rate_limit:
                 time.sleep(rate_limit)
@@ -1232,7 +1269,7 @@ git commit -m "feat(data): add word-detail, lemma-frequency, verb-concordance qu
 
 ## Self-Review (done)
 
-- **Spec coverage:** word-by-word morphology data (Tasks 4,5,9) ✓; per-segment Arabic forms for 06b color-coded SVG (Tasks 1,2,4,5,9) ✓; dictionary by-root + forms + concordance (Tasks 3,5,8) ✓; Verb Concordance + Lemma Frequency (Task 9) ✓; Lane's additive definitions (Task 6) ✓; concept tags captured (Tasks 1,2,4,5,9) ✓; verbatim description + Arabic grammar (Tasks 1,4,5,9) ✓; reserved per-word audio column (Task 1) ✓; GPL validation (Task 7) ✓; source-agnostic schema ✓. Treebank edges = Phase 08 (out of scope here, per §8) ✓.
+- **Spec coverage:** word verbatim description + Arabic grammar (site scrape, Tasks 4,5) ✓; structured per-segment data incl. Arabic forms for 06b color-coded SVG (GPL file, Tasks 1,2,4b,9) ✓; dictionary by-root + forms + concordance (Tasks 3,5,8) ✓; Verb Concordance + Lemma Frequency (Task 9) ✓; Lane's additive definitions (Task 6) ✓; concept tags captured (Tasks 1,2,4,5,9) ✓; verbatim description + Arabic grammar (Tasks 1,4,5,9) ✓; reserved per-word audio column (Task 1) ✓; GPL validation (Task 7) ✓; source-agnostic schema ✓. Treebank edges = Phase 08 (out of scope here, per §8) ✓.
 - **Placeholders:** none — every step has code/commands. Parser selector discovery is against a committed real fixture with ground-truth asserts (honest TDD), not a placeholder.
 - **Type consistency:** `root_buckwalter` key, `ConcordanceEntry`, `RootEntry`, `WordDetail`, `getRootConcordance(db,bw,lang)` names consistent across tasks.
 

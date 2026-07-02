@@ -45,6 +45,43 @@ def scrape(db: str, checkpoint: str, surah: int | None, rate_limit: float) -> No
     database.close()
 
 
+@main.command("scrape-dictionary")
+@click.option("--db", default="quran.db", show_default=True, help="SQLite output path")
+@click.option("--checkpoint", default="dict_checkpoint.json", show_default=True)
+@click.option(
+    "--rate-limit", default=1.5, show_default=True, help="Seconds between requests"
+)
+def scrape_dictionary_cmd(db: str, checkpoint: str, rate_limit: float) -> None:
+    """Scrape qurandictionary.jsp for every distinct root (rate-limited, resumable).
+
+    Requires roots to exist in the DB first (run import-corpus).
+    """
+    from .sources.dictionary_scrape import scrape_dictionary
+
+    database = ScraperDatabase(db)
+    ckpt = Checkpoint(checkpoint)
+    count = scrape_dictionary(database, ckpt, rate_limit=rate_limit)
+    database.close()
+    click.echo(f"Dictionary scrape complete: {count} roots.")
+
+
+@main.command("scrape-word-details")
+@click.option("--db", default="quran.db", show_default=True, help="SQLite output path")
+@click.option("--checkpoint", default="worddetail_checkpoint.json", show_default=True)
+@click.option(
+    "--rate-limit", default=1.5, show_default=True, help="Seconds between requests"
+)
+def scrape_word_details_cmd(db: str, checkpoint: str, rate_limit: float) -> None:
+    """Scrape wordmorphology.jsp verbatim strings for every word (resumable)."""
+    from .sources.dictionary_scrape import scrape_word_details
+
+    database = ScraperDatabase(db)
+    ckpt = Checkpoint(checkpoint)
+    count = scrape_word_details(database, ckpt, rate_limit=rate_limit)
+    database.close()
+    click.echo(f"Word-detail scrape complete: {count} words.")
+
+
 @main.command("import-corpus")
 @click.argument("txt_path")
 @click.option("--db", default="quran.db", show_default=True)
@@ -64,6 +101,47 @@ def import_corpus(txt_path: str, db: str) -> None:
     count = import_corpus_morphology(Path(txt_path), database)
     database.close()
     click.echo(f"Import complete: {count} words.")
+
+
+@main.command("import-lane")
+@click.argument("tsv_path")
+@click.option("--db", default="quran.db", show_default=True)
+def import_lane(tsv_path: str, db: str) -> None:
+    """Import Lane's Lexicon root definitions from a TSV (root<TAB>definition)."""
+    from pathlib import Path
+
+    from .sources.lane import import_lane_definitions
+
+    database = ScraperDatabase(db)
+    count = import_lane_definitions(Path(tsv_path), database)
+    database.close()
+    click.echo(f"Lane import complete: {count} definitions.")
+
+
+@main.command("validate")
+@click.argument("gpl_txt_path")
+@click.option("--db", default="quran.db", show_default=True)
+@click.option("--limit", default=20, show_default=True, help="Max mismatches to print")
+def validate_cmd(gpl_txt_path: str, db: str, limit: int) -> None:
+    """Cross-check DB annotations against the GPL morphology file (exit 1 if any)."""
+    import sys
+    from pathlib import Path
+
+    from .validate import validate_against_gpl
+
+    database = ScraperDatabase(db)
+    mismatches = validate_against_gpl(Path(gpl_txt_path), database)
+    database.close()
+    if not mismatches:
+        click.echo("Validation clean: no mismatches.")
+        return
+    click.echo(f"Found {len(mismatches)} mismatches:")
+    for m in mismatches[:limit]:
+        click.echo(
+            f"  ({m.surah}:{m.ayah}:{m.position}) {m.field}: "
+            f"scraped={m.scraped!r} expected={m.expected!r}"
+        )
+    sys.exit(1)
 
 
 @main.command("import-tanzil")

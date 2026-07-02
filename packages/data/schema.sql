@@ -35,6 +35,9 @@ CREATE TABLE IF NOT EXISTS words (
   lemma_buckwalter TEXT,
   pos_tag         TEXT,
   morphology_json TEXT,
+  morphology_description TEXT,
+  grammar_arabic  TEXT,
+  audio_url       TEXT,
   UNIQUE(ayah_id, position)
 );
 
@@ -62,7 +65,62 @@ CREATE TABLE IF NOT EXISTS word_glosses (
   UNIQUE(word_id, language_code)
 );
 
+CREATE TABLE IF NOT EXISTS roots (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  root_buckwalter  TEXT    NOT NULL UNIQUE,
+  root_arabic      TEXT    NOT NULL,
+  occurrence_count INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS root_forms (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  root_id          INTEGER NOT NULL REFERENCES roots(id) ON DELETE CASCADE,
+  sort_order       INTEGER NOT NULL,
+  pos_label        TEXT    NOT NULL,
+  form_arabic      TEXT,
+  form_translit    TEXT,
+  gloss            TEXT,
+  occurrence_count INTEGER NOT NULL DEFAULT 0,
+  UNIQUE(root_id, sort_order)
+);
+
+CREATE TABLE IF NOT EXISTS root_definitions (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  root_id    INTEGER NOT NULL REFERENCES roots(id) ON DELETE CASCADE,
+  source     TEXT    NOT NULL,
+  definition TEXT    NOT NULL,
+  UNIQUE(root_id, source)
+);
+
+CREATE TABLE IF NOT EXISTS word_segments (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  word_id         INTEGER NOT NULL REFERENCES words(id) ON DELETE CASCADE,
+  segment_index   INTEGER NOT NULL,
+  segment_type    TEXT,
+  pos_tag         TEXT,
+  form_arabic     TEXT,
+  form_buckwalter TEXT,
+  features_json   TEXT,
+  lemma           TEXT,
+  root            TEXT,
+  UNIQUE(word_id, segment_index)
+);
+
+CREATE TABLE IF NOT EXISTS word_concept_tags (
+  id        INTEGER PRIMARY KEY AUTOINCREMENT,
+  word_id   INTEGER NOT NULL REFERENCES words(id) ON DELETE CASCADE,
+  tag_label TEXT    NOT NULL,
+  tag_type  TEXT,
+  UNIQUE(word_id, tag_label)
+);
+
 CREATE INDEX IF NOT EXISTS idx_ayahs_surah         ON ayahs(surah_id);
 CREATE INDEX IF NOT EXISTS idx_words_ayah          ON words(ayah_id);
 CREATE INDEX IF NOT EXISTS idx_translations_ayah   ON translations(ayah_id, language_code);
 CREATE INDEX IF NOT EXISTS idx_word_glosses_word   ON word_glosses(word_id, language_code);
+CREATE INDEX IF NOT EXISTS idx_words_root_bw       ON words(root_buckwalter);
+CREATE INDEX IF NOT EXISTS idx_words_lemma_bw      ON words(lemma_buckwalter);
+CREATE INDEX IF NOT EXISTS idx_root_forms_root     ON root_forms(root_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_root_defs_root      ON root_definitions(root_id);
+CREATE INDEX IF NOT EXISTS idx_word_segments_word  ON word_segments(word_id, segment_index);
+CREATE INDEX IF NOT EXISTS idx_word_concept_word   ON word_concept_tags(word_id);

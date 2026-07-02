@@ -11,9 +11,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from ..buckwalter import buckwalter_to_arabic
 from ..db import ScraperDatabase
-from ..models import WordModel
-from .corpus_morphology import parse_corpus_morphology
+from ..models import WordModel, WordSegmentModel
+from .corpus_morphology import parse_corpus_morphology, parse_corpus_segments
 
 
 def import_corpus_morphology(path: Path, db: ScraperDatabase) -> int:
@@ -51,4 +52,27 @@ def import_corpus_morphology(path: Path, db: ScraperDatabase) -> int:
             )
         )
         imported += 1
+
+    # Second pass: populate structured per-segment rows (forms/POS/features).
+    # corpus renders segment glyphs only as bitmaps, so the GPL file is the
+    # segment-glyph source (PRD §3.2). Requires the words to exist (pass one).
+    for seg in parse_corpus_segments(path):
+        word_id = db.get_word_id(seg.surah, seg.ayah, seg.word)
+        if word_id is None:
+            continue
+        db.upsert_word_segment(
+            WordSegmentModel(
+                word_id=word_id,
+                segment_index=seg.segment_index,
+                segment_type=seg.segment_type,
+                pos_tag=seg.tag,
+                form_buckwalter=seg.form_buckwalter,
+                form_arabic=buckwalter_to_arabic(seg.form_buckwalter.rstrip("+")),
+                features_json=seg.features_json,
+                lemma=buckwalter_to_arabic(seg.lemma_buckwalter)
+                if seg.lemma_buckwalter
+                else None,
+                root=seg.root_buckwalter,
+            )
+        )
     return imported
