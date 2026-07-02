@@ -20,7 +20,14 @@ from dataclasses import dataclass
 
 from bs4 import BeautifulSoup, Tag
 
-_TOTAL_RE = re.compile(r"occurs\s+([\d,]+)\s+times")
+# Totals appear as digits ("occurs 319 times") or number-words for low
+# frequencies ("occurs three times", "occurs only once"). An optional "only"
+# precedes rare counts. once/twice/thrice take no trailing "times"; everything
+# else does. Both feed _parse_count.
+_TOTAL_RE = re.compile(r"occurs\s+(?:only\s+)?([\w,]+)\s+times?\b", re.IGNORECASE)
+_TOTAL_ONCE_RE = re.compile(
+    r"occurs\s+(?:only\s+)?(once|twice|thrice)\b", re.IGNORECASE
+)
 # "49 times as the form I verb", "once as the noun", "six times as the ..."
 _FORM_RE = re.compile(r"^\s*(.+?)\s+as the\s+(.+?)\s*$")
 _NUMBER_WORDS = {
@@ -50,7 +57,7 @@ class ParsedRoot:
 
 def _parse_count(phrase: str) -> int:
     """'49 times' -> 49, 'once' -> 1, 'six times' -> 6."""
-    phrase = phrase.strip().lower()
+    phrase = phrase.strip().lower().replace(",", "")
     m = re.match(r"(\d+)", phrase)
     if m:
         return int(m.group(1))
@@ -106,10 +113,10 @@ def _extract_lane_url(soup: BeautifulSoup) -> str | None:
 def parse_root_page(html: str) -> ParsedRoot | None:
     soup = BeautifulSoup(html, "lxml")
     text = soup.get_text(" ", strip=True)
-    m = _TOTAL_RE.search(text)
+    m = _TOTAL_RE.search(text) or _TOTAL_ONCE_RE.search(text)
     if m is None:
         return None
-    total = int(m.group(1).replace(",", ""))
+    total = _parse_count(m.group(1))
 
     # Root Arabic = first <span class="at"> (the header's "( ك ت ب )").
     root_el = soup.find("span", class_="at")

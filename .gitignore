@@ -21,6 +21,11 @@ packages/scraper/checkpoint.json
 *.db-wal
 raw-scrape/
 checkpoint.json
+*checkpoint*.json
+*.stale.bak
+
+# Impeccable copy-edit tool scratch fixtures
+.impeccable/
 
 # Environment
 .env

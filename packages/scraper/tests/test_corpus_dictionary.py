@@ -59,3 +59,46 @@ def test_lane_link(ktb: ParsedRoot) -> None:
 
 def test_non_root_page_returns_none() -> None:
     assert parse_root_page("<html><body>404</body></html>") is None
+
+
+# Low-frequency roots spell the total as a number-word ("occurs three times",
+# "occurs once") instead of digits — these must still parse (regression: the
+# digit-only total regex silently dropped ~1000 roots).
+_WORD_TOTAL_HTML = (
+    '<html><body>The triliteral root shīn hamza mīm '
+    '(<span class="at">ش أ م</span>) occurs three times in the Quran as the noun '
+    '<i class="ab">mashamat</i> (<span class="at">مَشْـَٔمَة</span>).'
+    '<ul class="also"><li>three times as the noun '
+    '<i class="ab">mashamat</i> (<span class="at">مَشْـَٔمَة</span>)</li></ul>'
+    "</body></html>"
+)
+
+
+def test_word_number_total_parses() -> None:
+    parsed = parse_root_page(_WORD_TOTAL_HTML)
+    assert parsed is not None
+    assert parsed.occurrence_count == 3
+    assert len(parsed.forms) == 1
+
+
+def test_occurs_once_parses() -> None:
+    html = _WORD_TOTAL_HTML.replace("occurs three times", "occurs once")
+    parsed = parse_root_page(html)
+    assert parsed is not None
+    assert parsed.occurrence_count == 1
+
+
+def test_thousands_comma_total_parses() -> None:
+    html = _WORD_TOTAL_HTML.replace("occurs three times", "occurs 1,722 times")
+    parsed = parse_root_page(html)
+    assert parsed is not None
+    assert parsed.occurrence_count == 1722
+
+
+def test_occurs_only_once_parses() -> None:
+    # Hapax roots read "occurs only once in the Quran" — the "only" must not
+    # break total detection (regression: dropped ~395 roots).
+    html = _WORD_TOTAL_HTML.replace("occurs three times", "occurs only once")
+    parsed = parse_root_page(html)
+    assert parsed is not None
+    assert parsed.occurrence_count == 1
