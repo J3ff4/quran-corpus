@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 
-import { search } from '@quran-corpus/data';
+import { search, EMPTY_SEARCH_RESULT } from '@quran-corpus/data';
 import { getDatabase } from '../../lib/db';
 import { SearchResults } from '../../components/search/SearchResults';
 import { parseSearchQuery } from './params';
@@ -9,13 +9,11 @@ interface PageProps {
   searchParams: Promise<{ q?: string | string[] }>;
 }
 
-const EMPTY = { jump: null, verses: [], roots: [] };
-
 export default async function SearchPage({ searchParams }: PageProps) {
   const { q } = await searchParams;
   const query = parseSearchQuery(q);
   const db = await getDatabase();
-  const result = query ? await search(db, query) : EMPTY;
+  const result = query ? await search(db, query) : EMPTY_SEARCH_RESULT;
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
       <h1 className="mb-6 text-2xl font-semibold text-paper-900 dark:text-paper-100">Search</h1>

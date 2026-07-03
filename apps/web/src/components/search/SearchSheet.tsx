@@ -4,13 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import Link from 'next/link';
 import type { SearchResult } from '@quran-corpus/data';
+import { EMPTY_SEARCH_RESULT } from '@quran-corpus/data';
 import { SearchResults } from './SearchResults';
-
-const EMPTY: SearchResult = { jump: null, verses: [], roots: [] };
 
 export function SearchSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [q, setQ] = useState('');
-  const [result, setResult] = useState<SearchResult>(EMPTY);
+  const [result, setResult] = useState<SearchResult>(EMPTY_SEARCH_RESULT);
   const reduce = useReducedMotion();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -18,17 +17,37 @@ export function SearchSheet({ open, onClose }: { open: boolean; onClose: () => v
     if (timer.current) clearTimeout(timer.current);
     const term = q.trim();
     if (term.length === 0) {
-      setResult(EMPTY);
+      setResult(EMPTY_SEARCH_RESULT);
       return;
     }
+    const ctrl = new AbortController();
     timer.current = setTimeout(async () => {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(term)}`);
-      setResult((await res.json()) as SearchResult);
+      try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(term)}`, {
+          signal: ctrl.signal,
+        });
+        if (!res.ok) return;
+        setResult((await res.json()) as SearchResult);
+      } catch {
+        // Aborted (superseded by a newer query) or network error — the stale
+        // response is intentionally dropped so results can't land out of order.
+      }
     }, 200);
     return () => {
       if (timer.current) clearTimeout(timer.current);
+      ctrl.abort();
     };
   }, [q]);
+
+  // Esc closes the sheet while it is open.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
 
   return (
     <AnimatePresence>

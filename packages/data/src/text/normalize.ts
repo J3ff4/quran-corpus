@@ -25,6 +25,15 @@ export function normalizeArabic(s: string): string {
   return s.replace(ARABIC_MARKS, '').replace(ALEF_VARIANTS, '\u0627');
 }
 
-export function escapeFtsQuery(s: string): string {
-  return `"${s.replace(/"/g, '""')}"`;
+// Build an FTS5 MATCH expression from a user query: split on whitespace and
+// require every term (AND), each wrapped as a quoted phrase so FTS operators
+// (*, OR, NEAR, ^) in the input are treated as literal text, not syntax. A
+// single-term query collapses to one quoted phrase. Embedded double quotes are
+// doubled per FTS5 phrase-escaping rules.
+export function buildFtsMatch(s: string): string {
+  return s
+    .split(/\s+/)
+    .filter((t) => t.length > 0)
+    .map((t) => `"${t.replace(/"/g, '""')}"`)
+    .join(' AND ');
 }

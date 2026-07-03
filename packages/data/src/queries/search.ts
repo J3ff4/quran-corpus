@@ -1,8 +1,12 @@
 import type { Client } from '@libsql/client';
-import { normalizeArabic, escapeFtsQuery } from '../text/normalize.js';
+import { normalizeArabic, buildFtsMatch } from '../text/normalize.js';
 import { searchRoots } from './roots.js';
 import { getWordsByAyah } from './words.js';
 import type { VerseRef, VerseHit, JumpVerse, SearchResult } from '../types.js';
+
+// Canonical empty result — returned for blank queries and used by UI surfaces
+// as the initial/reset state. Never mutated by consumers.
+export const EMPTY_SEARCH_RESULT: SearchResult = { jump: null, verses: [], roots: [] };
 
 // One-time populate of search_fts. Arabic rows are normalized here (source='ar')
 // because SQL triggers cannot run the JS normalizer; translation rows are kept
@@ -107,7 +111,7 @@ export async function searchVerses(
   const limit = opts?.limit ?? 50;
   const term = normalizeArabic(q).trim();
   if (term.length === 0) return [];
-  const match = escapeFtsQuery(term);
+  const match = buildFtsMatch(term);
   // body is column index 4; \u0002/\u0003 wrap matched tokens (rendered as <mark>
   // in React text nodes, never raw HTML). bm25 ascending = most relevant first.
   const res = await db.execute({
@@ -129,7 +133,7 @@ export async function searchVerses(
 
 export async function search(db: Client, q: string): Promise<SearchResult> {
   const query = q.trim();
-  if (query.length === 0) return { jump: null, verses: [], roots: [] };
+  if (query.length === 0) return EMPTY_SEARCH_RESULT;
 
   const ref = await parseVerseRef(db, query);
   let jump: JumpVerse | null = null;

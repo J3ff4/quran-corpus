@@ -11,7 +11,13 @@ export {
 export { getLemmaFrequency, getVerbConcordance } from './queries/dictionary.js';
 export { getTranslationsByAyah, getTranslation, getTranslationsBySurahAndLang } from './queries/translations.js';
 export { getGlossesBySurahAndLang } from './queries/glosses.js';
-export { backfillSearchIndex, parseVerseRef, searchVerses, search } from './queries/search.js';
+export {
+  backfillSearchIndex,
+  parseVerseRef,
+  searchVerses,
+  search,
+  EMPTY_SEARCH_RESULT,
+} from './queries/search.js';
 export {
   getRootByBuckwalter,
   getAllRoots,

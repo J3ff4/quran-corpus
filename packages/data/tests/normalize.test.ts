@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeArabic, escapeFtsQuery } from '../src/text/normalize.js';
+import { normalizeArabic, buildFtsMatch } from '../src/text/normalize.js';
 
 describe('normalizeArabic', () => {
   it('strips harakat and folds alef-wasla to bare alef (Al-Fatiha 1:1)', () => {
@@ -18,14 +18,20 @@ describe('normalizeArabic', () => {
   });
 });
 
-describe('escapeFtsQuery', () => {
-  it('quotes the term as a phrase', () => {
-    expect(escapeFtsQuery('throne')).toBe('"throne"');
+describe('buildFtsMatch', () => {
+  it('quotes a single term as a phrase', () => {
+    expect(buildFtsMatch('throne')).toBe('"throne"');
   });
-  it('neutralizes FTS operators by quoting', () => {
-    expect(escapeFtsQuery('a* OR b')).toBe('"a* OR b"');
+  it('ANDs multiple terms, each quoted (any order, any position)', () => {
+    expect(buildFtsMatch('throne god')).toBe('"throne" AND "god"');
   });
-  it('escapes embedded double quotes', () => {
-    expect(escapeFtsQuery('say "hi"')).toBe('"say ""hi"""');
+  it('neutralizes FTS operators by quoting each term', () => {
+    expect(buildFtsMatch('a* OR b')).toBe('"a*" AND "OR" AND "b"');
+  });
+  it('collapses runs of whitespace and ignores leading/trailing spaces', () => {
+    expect(buildFtsMatch('  throne   god  ')).toBe('"throne" AND "god"');
+  });
+  it('escapes embedded double quotes per term', () => {
+    expect(buildFtsMatch('say "hi"')).toBe('"say" AND """hi"""');
   });
 });

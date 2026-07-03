@@ -6,7 +6,7 @@ const result = { jump: null, verses: [{ surah_id: 2, ayah_number: 255, source: '
 
 beforeEach(() => {
   vi.useFakeTimers();
-  vi.stubGlobal('fetch', vi.fn(async () => ({ json: async () => result }) as Response));
+  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => result }) as Response));
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -23,12 +23,21 @@ describe('SearchSheet', () => {
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'throne' } });
     expect(fetch).not.toHaveBeenCalled(); // not yet — still within debounce
     await vi.advanceTimersByTimeAsync(250);
-    expect(fetch).toHaveBeenCalledWith('/api/search?q=throne');
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/search?q=throne',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
   });
   it('calls onClose from the close control', () => {
     const onClose = vi.fn();
     render(<SearchSheet open onClose={onClose} />);
     fireEvent.click(screen.getByRole('button', { name: /close/i }));
+    expect(onClose).toHaveBeenCalled();
+  });
+  it('closes on Escape while open', () => {
+    const onClose = vi.fn();
+    render(<SearchSheet open onClose={onClose} />);
+    fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalled();
   });
 });
