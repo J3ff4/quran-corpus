@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('@quran-corpus/data', () => ({
+  EMPTY_SEARCH_RESULT: { jump: null, verses: [], roots: [] },
   search: vi.fn(async (_db: unknown, q: string) => ({
     jump: null,
     verses: [{ surah_id: 1, ayah_number: 1, source: 'en', snippet: `hit:${q}` }],

@@ -62,6 +62,7 @@ export function SearchSheet({ open, onClose }: { open: boolean; onClose: () => v
           />
           <motion.div
             role="dialog"
+            aria-modal="true"
             aria-label="Search"
             className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-2xl bg-paper-50 p-4 dark:bg-night-300"
             initial={reduce ? { opacity: 0 } : { y: '100%' }}
@@ -83,7 +84,7 @@ export function SearchSheet({ open, onClose }: { open: boolean; onClose: () => v
                 ✕
               </button>
             </div>
-            <SearchResults result={result} />
+            {q.trim().length > 0 && <SearchResults result={result} />}
             {q.trim().length > 0 && (
               <Link
                 href={`/search?q=${encodeURIComponent(q.trim())}`}
