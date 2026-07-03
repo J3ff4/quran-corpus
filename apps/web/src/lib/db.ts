@@ -1,4 +1,4 @@
-import { createDatabase, runMigrations } from '@quran-corpus/data';
+import { createDatabase, runMigrations, backfillSearchIndex } from '@quran-corpus/data';
 import type { Client } from '@quran-corpus/data';
 
 let _dbPromise: Promise<Client> | null = null;
@@ -17,6 +17,7 @@ export function getDatabase(): Promise<Client> {
       const db = createDatabase(url);
       if (shouldRunMigrations()) {
         await runMigrations(db);
+        await backfillSearchIndex(db);
       }
       return db;
     })();

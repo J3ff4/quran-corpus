@@ -1,3 +1,9 @@
+export interface VerseRef {
+  surah: number;
+  ayah: number | null;
+  position: number | null;
+}
+
 export interface Surah {
   id: number;
   name_arabic: string;
@@ -136,4 +142,25 @@ export interface VerbConcordanceEntry {
   lemma: string | null;
   form_arabic: string;
   count: number;
+}
+
+export interface VerseHit {
+  surah_id: number;
+  ayah_number: number;
+  source: string;
+  snippet: string;
+}
+
+export interface JumpVerse {
+  surah_id: number;
+  ayah_number: number | null;
+  text_uthmani: string;
+  words: { position: number; text_arabic: string }[];
+  highlightPosition: number | null;
+}
+
+export interface SearchResult {
+  jump: JumpVerse | null;
+  verses: VerseHit[];
+  roots: Root[];
 }

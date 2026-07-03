@@ -124,3 +124,33 @@ CREATE INDEX IF NOT EXISTS idx_root_forms_root     ON root_forms(root_id, sort_o
 CREATE INDEX IF NOT EXISTS idx_root_defs_root      ON root_definitions(root_id);
 CREATE INDEX IF NOT EXISTS idx_word_segments_word  ON word_segments(word_id, segment_index);
 CREATE INDEX IF NOT EXISTS idx_word_concept_word   ON word_concept_tags(word_id);
+
+-- Global search (Phase 07b). Unified FTS5 over normalized Arabic + translation
+-- text. Arabic body is normalized in app code before insert (backfill) --
+-- the tokenizer only folds Latin/Cyrillic. ref_id = ayahs.id for source='ar',
+-- translations.id for translation rows (stable key for trigger sync).
+CREATE VIRTUAL TABLE IF NOT EXISTS search_fts USING fts5(
+  surah_id UNINDEXED,
+  ayah_number UNINDEXED,
+  source UNINDEXED,
+  ref_id UNINDEXED,
+  body,
+  tokenize = 'unicode61 remove_diacritics 2'
+);
+
+CREATE TRIGGER IF NOT EXISTS trg_translations_ai AFTER INSERT ON translations BEGIN
+  INSERT INTO search_fts (surah_id, ayah_number, source, ref_id, body)
+  SELECT a.surah_id, a.ayah_number, NEW.language_code, NEW.id, NEW.text
+  FROM ayahs a WHERE a.id = NEW.ayah_id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_translations_ad AFTER DELETE ON translations BEGIN
+  DELETE FROM search_fts WHERE source = OLD.language_code AND ref_id = OLD.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_translations_au AFTER UPDATE ON translations BEGIN
+  DELETE FROM search_fts WHERE source = OLD.language_code AND ref_id = OLD.id;
+  INSERT INTO search_fts (surah_id, ayah_number, source, ref_id, body)
+  SELECT a.surah_id, a.ayah_number, NEW.language_code, NEW.id, NEW.text
+  FROM ayahs a WHERE a.id = NEW.ayah_id;
+END;

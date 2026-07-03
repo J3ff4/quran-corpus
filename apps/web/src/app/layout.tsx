@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Amiri, Inter } from 'next/font/google';
 import './globals.css';
+import { SearchTrigger } from '../components/search/SearchTrigger';
 
 const amiri = Amiri({
   weight: ['400', '700'],
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${amiri.variable} ${inter.variable}`}>
       <body className="bg-paper-50 font-sans text-paper-900 antialiased dark:bg-night-300 dark:text-paper-100">
         {children}
+        <SearchTrigger />
       </body>
     </html>
   );

@@ -11,6 +11,7 @@ export {
 export { getLemmaFrequency, getVerbConcordance } from './queries/dictionary.js';
 export { getTranslationsByAyah, getTranslation, getTranslationsBySurahAndLang } from './queries/translations.js';
 export { getGlossesBySurahAndLang } from './queries/glosses.js';
+export { backfillSearchIndex, parseVerseRef, searchVerses, search } from './queries/search.js';
 export {
   getRootByBuckwalter,
   getAllRoots,
@@ -38,5 +39,9 @@ export type {
   WordDetail,
   LemmaFrequencyEntry,
   VerbConcordanceEntry,
+  VerseRef,
+  VerseHit,
+  JumpVerse,
+  SearchResult,
 } from './types.js';
 export type { Client } from './db.js';
