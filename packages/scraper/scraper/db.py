@@ -1,3 +1,4 @@
+import re
 import sqlite3
 from pathlib import Path
 
@@ -18,6 +19,44 @@ from .models import (
 # schema.sql lives at packages/data/schema.sql — single source of truth for DDL
 _SCHEMA_PATH = Path(__file__).parents[2] / "data" / "schema.sql"
 
+_STMT_TOKEN = re.compile(r"\bBEGIN\b|\bEND\b|;", re.IGNORECASE)
+
+
+def _strip_line_comments(sql: str) -> str:
+    """Drop `-- …` to end-of-line so comment text can't confuse the splitter."""
+    return re.sub(r"--[^\n]*", "", sql)
+
+
+def _split_statements(sql: str) -> list[str]:
+    """Split DDL on top-level `;` only, tracking BEGIN/END depth so a trigger
+    body (which contains inner `;`) stays one statement. Mirrors
+    packages/data splitStatements — schema.sql is the shared source of truth,
+    so both consumers must parse its triggers identically.
+
+    ponytail: not quote-aware for BEGIN/END/`;` inside string literals — same
+    trusted-DDL ceiling as the TS side. Make both quote-aware if that changes.
+    """
+    statements: list[str] = []
+    current = ""
+    depth = 0
+    last = 0
+    for m in _STMT_TOKEN.finditer(sql):
+        current += sql[last : m.start()] + m.group(0)
+        last = m.end()
+        kw = m.group(0).upper()
+        if kw == "BEGIN":
+            depth += 1
+        elif kw == "END":
+            if depth > 0:
+                depth -= 1
+        elif depth == 0:  # top-level ';'
+            statements.append(current)
+            current = ""
+    current += sql[last:]
+    if current.strip():
+        statements.append(current)
+    return statements
+
 
 class ScraperDatabase:
     def __init__(self, db_path: str) -> None:
@@ -28,10 +67,10 @@ class ScraperDatabase:
         self._apply_schema()
 
     def _apply_schema(self) -> None:
-        sql = _SCHEMA_PATH.read_text()
+        sql = _strip_line_comments(_SCHEMA_PATH.read_text())
         statements = [
             stmt
-            for raw in sql.split(";")
+            for raw in _split_statements(sql)
             if (stmt := raw.strip()) and not stmt.upper().startswith("PRAGMA")
         ]
         # Create tables first, then add any columns missing on legacy DBs, then

@@ -21,6 +21,7 @@ export {
 export {
   getRootByBuckwalter,
   getAllRoots,
+  getRootArabicList,
   getRootsByFrequency,
   searchRoots,
   getRootForms,
@@ -28,7 +29,7 @@ export {
   getRootEntry,
   getRootConcordance,
 } from './queries/roots.js';
-export { buckwalterToArabic, compareRootsArabic, ARABIC_ALPHABET_ORDER } from './text/arabic.js';
+export { buckwalterToArabic, compareRootsArabic, rootFirstLetter, ARABIC_ALPHABET_ORDER } from './text/arabic.js';
 export type {
   Surah,
   Ayah,
@@ -41,6 +42,7 @@ export type {
   RootDefinition,
   RootEntry,
   ConcordanceEntry,
+  VerseWord,
   WordSegment,
   ConceptTag,
   WordDetail,

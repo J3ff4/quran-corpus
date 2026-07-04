@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buckwalterToArabic, compareRootsArabic } from '../src/text/arabic.js';
+import { buckwalterToArabic, compareRootsArabic, rootFirstLetter } from '../src/text/arabic.js';
 
 describe('buckwalterToArabic', () => {
   it('maps consonant roots', () => {
@@ -34,5 +34,21 @@ describe('compareRootsArabic', () => {
   });
   it('unknown letters sort last', () => {
     expect(compareRootsArabic('ب', 'Q')).toBeLessThan(0);
+  });
+});
+
+describe('rootFirstLetter', () => {
+  it('returns the first letter of a spaced root', () => {
+    expect(rootFirstLetter('ب أ ر')).toBe('ب');
+  });
+  it('folds a hamza-seat first letter to bare alef', () => {
+    expect(rootFirstLetter('أ ك ل')).toBe('ا');
+  });
+  it('folds alef-maqsura first letter to ya', () => {
+    expect(rootFirstLetter('ى س ر')).toBe('ي');
+  });
+  it('tolerates leading space; empty -> ""', () => {
+    expect(rootFirstLetter(' ب ')).toBe('ب');
+    expect(rootFirstLetter('')).toBe('');
   });
 });

@@ -4,6 +4,7 @@ import { runMigrations } from '../src/migrate.js';
 import {
   getRootByBuckwalter,
   getAllRoots,
+  getRootArabicList,
   getRootsByFrequency,
   searchRoots,
   getRootEntry,
@@ -74,10 +75,49 @@ describe('roots queries', () => {
     expect(e?.forms.length).toBe(1);
     expect(e?.definitions[0]?.definition).toBe('To be high');
   });
-  it('getRootConcordance returns occurrences with gloss + verse text', async () => {
+  it('getRootConcordance rebuilds verse from words + keeps gloss', async () => {
     const c = await getRootConcordance(db, 'smw');
     expect(c).toHaveLength(1);
     expect(c[0]?.gloss).toBe('In (the) name');
-    expect(c[0]?.verse_text).toContain('بِسْمِ');
+    expect(c[0]?.verse_words.map((w) => w.text_arabic)).toEqual(['بِسْمِ', 'ٱللَّهِ']);
+    const ids = c[0]!.verse_words.map((w) => w.id);
+    expect(ids).toContain(c[0]!.word_id); // matched word is among the verse words
+  });
+  it('getRootConcordance unknown root -> []', async () => {
+    expect(await getRootConcordance(db, 'zzz')).toEqual([]);
+  });
+  it('getRootArabicList returns every root_arabic', async () => {
+    expect((await getRootArabicList(db)).sort()).toEqual(['س م و', 'ش أ م', 'ك ت ب']);
+  });
+  it('getRootConcordance batches ayah IDs (batchSize=1) without dropping words', async () => {
+    // a2 in a second ayah; same root 'bat' matched in two ayahs -> two batches
+    const a2 = await db.execute(
+      `INSERT INTO ayahs (surah_id,ayah_number,text_uthmani) VALUES (1,2,'x') RETURNING id`,
+    );
+    const a2id = a2.rows[0]!['id'] as number;
+    const a1 = await db.execute(`SELECT id FROM ayahs WHERE surah_id=1 AND ayah_number=1`);
+    const a1id = a1.rows[0]!['id'] as number;
+    await db.execute({
+      sql: `INSERT INTO words (ayah_id,position,text_arabic,root_buckwalter,pos_tag)
+            VALUES (?,9,'بَتْ','bat','N'),(?,1,'بَتّ','bat','N')`,
+      args: [a1id, a2id],
+    });
+    const c = await getRootConcordance(db, 'bat', 'en', 1);
+    expect(c).toHaveLength(2);
+    // each entry's verse_words come from its own ayah (batch boundary intact)
+    expect(c.every((e) => e.verse_words.some((w) => w.id === e.word_id))).toBe(true);
+  });
+  it('two matches in one ayah -> two entries, same verse_words, distinct word_id', async () => {
+    const a = await db.execute(`SELECT id FROM ayahs WHERE surah_id=1 AND ayah_number=1`);
+    const aid = a.rows[0]!['id'] as number;
+    await db.execute({
+      sql: `INSERT INTO words (ayah_id,position,text_arabic,root_buckwalter,pos_tag)
+            VALUES (?,3,'كَتَبَ','ktb','V'),(?,4,'كِتَٰب','ktb','N')`,
+      args: [aid, aid],
+    });
+    const c = await getRootConcordance(db, 'ktb');
+    expect(c).toHaveLength(2);
+    expect(c[0]!.word_id).not.toBe(c[1]!.word_id);
+    expect(c[0]!.verse_words).toEqual(c[1]!.verse_words);
   });
 });

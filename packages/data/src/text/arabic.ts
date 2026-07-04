@@ -102,15 +102,29 @@ const FOLD: Record<string, string> = {
   'ى': 'ي',
 };
 
+function foldLetter(ch: string): string {
+  return FOLD[ch] ?? ch;
+}
+
 function orderKey(root: string): number[] {
   const key: number[] = [];
   for (const ch of root) {
     if (ch === ' ') continue;
-    const folded = FOLD[ch] ?? ch;
-    const idx = ARABIC_ALPHABET_ORDER.indexOf(folded);
+    const idx = ARABIC_ALPHABET_ORDER.indexOf(foldLetter(ch));
     key.push(idx === -1 ? ARABIC_ALPHABET_ORDER.length : idx); // unknown last
   }
   return key;
+}
+
+/** First Arabic letter of a root string, folded to its collation base
+ * (أ إ آ ٱ -> ا, ى -> ي) so it matches ARABIC_ALPHABET_ORDER buckets.
+ * Returns '' for empty/whitespace input. */
+export function rootFirstLetter(rootArabic: string): string {
+  for (const ch of rootArabic) {
+    if (ch === ' ') continue;
+    return foldLetter(ch);
+  }
+  return '';
 }
 
 // Compare two `root_arabic` strings (e.g. "ش أ م") in Arabic dictionary order.

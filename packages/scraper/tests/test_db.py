@@ -59,8 +59,38 @@ def test_create_schema_creates_all_tables():
             "word_segments",
             "word_concept_tags",
         }
-        assert tables == expected
+        # Superset, not equality: schema.sql also declares the search_fts FTS5
+        # virtual table, which materializes search_fts_* shadow tables we don't
+        # pin here.
+        assert expected <= tables
         conn.close()
+    finally:
+        os.unlink(path)
+
+
+def test_schema_applies_fts_triggers_intact():
+    """Regression: schema.sql has BEGIN…END trigger bodies (Phase 07b FTS sync).
+    A naive `;`-split shreds them into 'incomplete input' — the splitter must
+    keep each trigger whole so schema application succeeds and the triggers land.
+    """
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+        path = f.name
+    try:
+        db = ScraperDatabase(path)  # would raise OperationalError if split broke
+        db.close()
+        conn = sqlite3.connect(path)
+        trigs = {
+            r[0]
+            for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='trigger'"
+            ).fetchall()
+        }
+        conn.close()
+        assert {
+            "trg_translations_ai",
+            "trg_translations_ad",
+            "trg_translations_au",
+        } <= trigs
     finally:
         os.unlink(path)
 

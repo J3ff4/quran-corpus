@@ -95,6 +95,12 @@ export interface RootEntry {
   definitions: RootDefinition[];
 }
 
+export interface VerseWord {
+  id: number;
+  position: number;
+  text_arabic: string;
+}
+
 export interface ConcordanceEntry {
   surah_id: number;
   ayah_number: number;
@@ -103,7 +109,7 @@ export interface ConcordanceEntry {
   text_arabic: string;
   transliteration: string | null;
   gloss: string | null;
-  verse_text: string;
+  verse_words: VerseWord[];
 }
 
 export interface WordSegment {

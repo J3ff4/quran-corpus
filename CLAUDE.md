@@ -59,7 +59,7 @@ If any step surfaces an issue, fix and **restart from step 2** for the affected 
 ## 5. Greptile Quality Gate (HARD BLOCK)
 
 - Run Greptile on every meaningful change.
-- **A score below 4/5 is a hard block. Never proceed, never merge, never move to the next task until the change scores ≥ 4/5.** There is no override.
+- **A score below 5/5 is a hard block. Never proceed, never merge, never move to the next task until the change scores 5/5.** There is no override.
 - Address every Greptile finding (fix it, or if it’s a false positive, document why in the PR/commit body — but the score itself must still reach the threshold).
 - Re-run Greptile after fixes to confirm the new score. A claimed fix without a re-run does not count.
 
