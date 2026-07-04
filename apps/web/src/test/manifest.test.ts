@@ -5,7 +5,7 @@ describe('manifest', () => {
   it('has correct name and start_url', () => {
     const m = manifest();
     expect(m.name).toBe('Quran Corpus');
-    expect(m.start_url).toBe('/surah');
+    expect(m.start_url).toBe('/');
     expect(m.display).toBe('standalone');
   });
 

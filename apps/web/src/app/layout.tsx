@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Amiri, Inter } from 'next/font/google';
 import './globals.css';
-import { SearchTrigger } from '../components/search/SearchTrigger';
+import { BottomNav } from '../components/shell/BottomNav';
 
 const amiri = Amiri({
   weight: ['400', '700'],
@@ -39,9 +39,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${amiri.variable} ${inter.variable}`}>
-      <body className="bg-paper-50 font-sans text-paper-900 antialiased dark:bg-night-300 dark:text-paper-100">
+      <body className="bg-paper-50 pb-[calc(4rem+env(safe-area-inset-bottom))] font-sans text-paper-900 antialiased dark:bg-night-300 dark:text-paper-100">
         {children}
-        <SearchTrigger />
+        <BottomNav />
       </body>
     </html>
   );

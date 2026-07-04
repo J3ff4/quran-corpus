@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest & { scope?: string } 
     name: 'Quran Corpus',
     short_name: 'Quran',
     description: 'Word-by-word Quranic morphology, grammar, and translations',
-    start_url: '/surah',
+    start_url: '/',
     display: 'standalone',
     background_color: '#faf8f3',
     theme_color: '#1f1a14',
