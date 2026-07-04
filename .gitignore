@@ -47,3 +47,6 @@ Thumbs.db
 # Editor
 .vscode/settings.json
 .idea/
+
+# Screenshot / scratch reference (not source)
+temp/

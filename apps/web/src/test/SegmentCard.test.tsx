@@ -34,4 +34,14 @@ describe('SegmentCard', () => {
     render(<SegmentCard segment={{ ...seg, features_json: null }} index={1} />);
     expect(screen.getByText('N')).toBeInTheDocument();
   });
+  it('renders the Arabic root, not Buckwalter', () => {
+    const segment = {
+      id: 1, word_id: 1, segment_index: 0, segment_type: 'STEM', pos_tag: 'V',
+      form_arabic: 'حَشَرَ', form_buckwalter: 'H$r', features_json: null,
+      lemma: 'حَشَرَ', root: 'H$r',
+    };
+    render(<SegmentCard segment={segment} index={0} />);
+    expect(screen.queryByText('H$r')).toBeNull();
+    expect(screen.getByText('حشر')).toBeInTheDocument();
+  });
 });

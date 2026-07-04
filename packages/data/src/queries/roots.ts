@@ -6,6 +6,7 @@ import type {
   RootEntry,
   ConcordanceEntry,
 } from '../types.js';
+import { compareRootsArabic } from '../text/arabic.js';
 
 function rowToRoot(r: Row): Root {
   return {
@@ -47,8 +48,8 @@ export async function getRootByBuckwalter(db: Client, bw: string): Promise<Root 
 }
 
 export async function getAllRoots(db: Client): Promise<Root[]> {
-  const res = await db.execute('SELECT * FROM roots ORDER BY root_buckwalter');
-  return res.rows.map(rowToRoot);
+  const res = await db.execute('SELECT * FROM roots');
+  return res.rows.map(rowToRoot).sort((a, b) => compareRootsArabic(a.root_arabic, b.root_arabic));
 }
 
 export async function getRootsByFrequency(db: Client, limit = 200): Promise<Root[]> {

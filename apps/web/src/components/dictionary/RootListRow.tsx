@@ -6,9 +6,9 @@ interface RootListRowProps {
 }
 
 /**
- * Shared root list row: Arabic root, Buckwalter, occurrence count, linking to
- * the root entry. Reused by the dictionary index, search results, and the
- * frequency browse (DRY).
+ * Shared root list row: Arabic root + occurrence count, linking to the root
+ * entry (href keyed by Buckwalter slug). Reused by the dictionary index, search
+ * results, and the frequency browse (DRY).
  */
 export function RootListRow({ root }: RootListRowProps) {
   return (
@@ -20,7 +20,6 @@ export function RootListRow({ root }: RootListRowProps) {
         <span dir="rtl" className="font-arabic text-2xl text-paper-900 dark:text-paper-100">
           {root.root_arabic}
         </span>
-        <span className="text-sm text-paper-500">{root.root_buckwalter}</span>
       </span>
       <span className="rounded-full bg-paper-200 px-3 py-0.5 text-sm text-paper-700 dark:bg-night-100 dark:text-paper-300">
         {root.occurrence_count}

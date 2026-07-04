@@ -28,6 +28,7 @@ export {
   getRootEntry,
   getRootConcordance,
 } from './queries/roots.js';
+export { buckwalterToArabic, compareRootsArabic, ARABIC_ALPHABET_ORDER } from './text/arabic.js';
 export type {
   Surah,
   Ayah,

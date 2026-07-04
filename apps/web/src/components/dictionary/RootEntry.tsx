@@ -25,9 +25,21 @@ export function RootEntry({ entry, concordance }: RootEntryProps) {
         >
           {root.root_arabic}
         </h1>
-        <p className="mt-1 text-sm text-paper-500">
-          {root.root_buckwalter} · occurs {root.occurrence_count} times
-        </p>
+        <div className="mt-2 flex items-center gap-2">
+          <span dir="rtl" className="flex gap-1.5">
+            {Array.from(root.root_arabic.replace(/\s+/g, '')).map((letter, i) => (
+              <span
+                key={i}
+                className="font-arabic rounded-md bg-paper-200 px-2.5 py-1 text-lg text-paper-800 dark:bg-night-100 dark:text-paper-200"
+              >
+                {letter}
+              </span>
+            ))}
+          </span>
+          <span className="text-sm text-paper-500">
+            occurs {root.occurrence_count} time{root.occurrence_count === 1 ? '' : 's'}
+          </span>
+        </div>
       </header>
 
       {definitions.length > 0 && (

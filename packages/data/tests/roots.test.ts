@@ -36,7 +36,7 @@ beforeAll(async () => {
     args: [wid],
   });
   const r = await db.execute(
-    `INSERT INTO roots (root_buckwalter,root_arabic,occurrence_count) VALUES ('smw','س م و',5),('ktb','ك ت ب',319) RETURNING id`,
+    `INSERT INTO roots (root_buckwalter,root_arabic,occurrence_count) VALUES ('smw','س م و',5),('ktb','ك ت ب',319),('$Am','ش أ م',3) RETURNING id`,
   );
   const smwId = r.rows[0]!['id'] as number;
   await db.execute({
@@ -57,8 +57,11 @@ describe('roots queries', () => {
   it('getRootByBuckwalter unknown -> null', async () => {
     expect(await getRootByBuckwalter(db, 'zzz')).toBeNull();
   });
-  it('getAllRoots alphabetical', async () => {
-    expect((await getAllRoots(db)).map((r) => r.root_buckwalter)).toEqual(['ktb', 'smw']);
+  it('getAllRoots is in Arabic hijāʾī order, not Buckwalter', async () => {
+    // hijāʾī index: س=12 (smw) < ش=13 ($Am) < ك=22 (ktb)
+    expect((await getAllRoots(db)).map((r) => r.root_buckwalter)).toEqual([
+      'smw', '$Am', 'ktb',
+    ]);
   });
   it('getRootsByFrequency', async () => {
     expect((await getRootsByFrequency(db))[0]?.root_buckwalter).toBe('ktb');

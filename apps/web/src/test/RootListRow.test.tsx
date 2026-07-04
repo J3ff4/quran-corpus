@@ -21,4 +21,9 @@ describe('RootListRow', () => {
     expect(screen.getByText('ك ت ب')).toBeInTheDocument();
     expect(screen.getByText(/319/)).toBeInTheDocument();
   });
+  it('does not render the raw Buckwalter subtitle', () => {
+    render(<RootListRow root={{ id: 1, root_buckwalter: '$Am', root_arabic: 'ش أ م', occurrence_count: 3 }} />);
+    expect(screen.queryByText('$Am')).toBeNull();
+    expect(screen.getByText('ش أ م')).toBeInTheDocument();
+  });
 });

@@ -1,4 +1,5 @@
 import type { WordSegment } from '@quran-corpus/data';
+import { buckwalterToArabic } from '@quran-corpus/data';
 
 interface SegmentCardProps {
   segment: WordSegment;
@@ -47,7 +48,7 @@ export function SegmentCard({ segment, index }: SegmentCardProps) {
         <div className="mt-2 flex flex-wrap gap-2" dir="rtl">
           {segment.root && (
             <span className="font-arabic text-sm text-paper-700 dark:text-paper-300">
-              {segment.root}
+              {buckwalterToArabic(segment.root)}
             </span>
           )}
           {segment.lemma && (

@@ -45,4 +45,17 @@ describe('RootEntry', () => {
     render(<RootEntry entry={{ ...entry, definitions: [] }} concordance={concordance} />);
     expect(screen.queryByText(/To write/)).toBeNull();
   });
+  it('shows 3 letter pills and singular "1 time", no Buckwalter', () => {
+    const entry = {
+      root: { id: 1, root_buckwalter: 'dxl', root_arabic: 'د خ ل', occurrence_count: 1 },
+      forms: [],
+      definitions: [],
+    };
+    render(<RootEntry entry={entry} concordance={[]} />);
+    expect(screen.queryByText(/dxl/)).toBeNull();
+    expect(screen.getByText(/occurs 1 time(?!s)/)).toBeInTheDocument();
+    for (const letter of ['د', 'خ', 'ل']) {
+      expect(screen.getByText(letter)).toBeInTheDocument();
+    }
+  });
 });
