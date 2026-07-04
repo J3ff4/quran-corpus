@@ -170,3 +170,18 @@ export interface SearchResult {
   verses: VerseHit[];
   roots: Root[];
 }
+
+export interface DecodedFeature {
+  key: string;
+  label: string;
+  value: string;
+}
+
+export interface DecodedSegment {
+  role: 'prefix' | 'stem' | 'suffix';
+  pos: { code: string; en: string; ar?: string };
+  features: DecodedFeature[];
+  rootArabic?: string;
+  lemma?: string;
+  unknownTags: string[];
+}

@@ -115,13 +115,13 @@ describe('WordPopover', () => {
     expect(link).toHaveAttribute('href', '/word/1/1/1');
   });
 
-  it('renders verbatim description via MorphologySummary', () => {
+  it('does not render verbatim description (moved to the full word page)', () => {
     render(
       <WordPopover
         word={{ ...word, morphology_description: 'prefixed preposition bi + noun' }}
         onClose={vi.fn()}
       />,
     );
-    expect(screen.getByText(/prefixed preposition bi/)).toBeInTheDocument();
+    expect(screen.queryByText(/prefixed preposition bi/)).not.toBeInTheDocument();
   });
 });

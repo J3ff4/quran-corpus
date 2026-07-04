@@ -1,47 +1,53 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import type { DecodedSegment } from '@quran-corpus/data';
 import { SegmentCard } from '../components/morphology/SegmentCard';
-import type { WordSegment } from '@quran-corpus/data';
 
-const seg: WordSegment = {
-  id: 1,
-  word_id: 1,
-  segment_index: 1,
-  segment_type: 'stem',
-  pos_tag: 'N',
-  form_arabic: 'سْمِ',
-  form_buckwalter: 'somi',
-  features_json: '{"case":"genitive","gender":"masculine"}',
-  lemma: 'ٱسْم',
-  root: 'smw',
-};
+function decoded(over: Partial<DecodedSegment> = {}): DecodedSegment {
+  return {
+    role: 'stem',
+    pos: { code: 'N', en: 'Noun', ar: 'اسم' },
+    features: [],
+    unknownTags: [],
+    ...over,
+  };
+}
 
 describe('SegmentCard', () => {
-  it('renders POS tag', () => {
-    render(<SegmentCard segment={seg} index={1} />);
-    expect(screen.getByText('N')).toBeInTheDocument();
+  it('renders role and POS English + Arabic labels', () => {
+    render(<SegmentCard segment={decoded({ role: 'prefix' })} index={0} />);
+    expect(screen.getByText(/prefix/i)).toBeInTheDocument();
+    expect(screen.getByText('Noun')).toBeInTheDocument();
+    expect(screen.getByText('اسم')).toBeInTheDocument();
   });
-  it('renders segment type', () => {
-    render(<SegmentCard segment={seg} index={1} />);
-    expect(screen.getByText(/stem/i)).toBeInTheDocument();
+
+  it('renders labeled features and plain feature chips', () => {
+    render(
+      <SegmentCard
+        index={0}
+        segment={decoded({
+          features: [
+            { key: 'case', label: 'Case', value: 'Genitive' },
+            { key: 'feature', label: '', value: 'Perfect' },
+          ],
+        })}
+      />,
+    );
+    expect(screen.getByText('Case')).toBeInTheDocument();
+    expect(screen.getByText('Genitive')).toBeInTheDocument();
+    expect(screen.getByText('Perfect')).toBeInTheDocument();
   });
-  it('renders parsed features', () => {
-    render(<SegmentCard segment={seg} index={1} />);
-    expect(screen.getByText(/genitive/)).toBeInTheDocument();
-    expect(screen.getByText(/masculine/)).toBeInTheDocument();
+
+  it('renders unknown tags verbatim as fallback chips', () => {
+    render(<SegmentCard index={0} segment={decoded({ unknownTags: ['ZZZ'] })} />);
+    expect(screen.getByText('ZZZ')).toBeInTheDocument();
   });
-  it('handles null/invalid features_json gracefully', () => {
-    render(<SegmentCard segment={{ ...seg, features_json: null }} index={1} />);
-    expect(screen.getByText('N')).toBeInTheDocument();
-  });
-  it('renders the Arabic root, not Buckwalter', () => {
-    const segment = {
-      id: 1, word_id: 1, segment_index: 0, segment_type: 'STEM', pos_tag: 'V',
-      form_arabic: 'حَشَرَ', form_buckwalter: 'H$r', features_json: null,
-      lemma: 'حَشَرَ', root: 'H$r',
-    };
-    render(<SegmentCard segment={segment} index={0} />);
-    expect(screen.queryByText('H$r')).toBeNull();
-    expect(screen.getByText('حشر')).toBeInTheDocument();
+
+  it('renders Arabic root and lemma when present', () => {
+    render(
+      <SegmentCard index={0} segment={decoded({ rootArabic: 'سمو', lemma: 'ٱسْم' })} />,
+    );
+    expect(screen.getByText('سمو')).toBeInTheDocument();
+    expect(screen.getByText('ٱسْم')).toBeInTheDocument();
   });
 });

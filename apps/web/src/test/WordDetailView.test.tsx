@@ -1,94 +1,77 @@
 import { describe, it, expect, vi } from 'vitest';
+import type { ReactNode } from 'react';
 import { render, screen } from '@testing-library/react';
+import type { WordDetail, Word, WordSegment } from '@quran-corpus/data';
 import { WordDetailView } from '../components/morphology/WordDetailView';
-import type { WordDetail } from '@quran-corpus/data';
 
 vi.mock('next/link', () => ({
-  default: ({ href, children }: { href: string; children: React.ReactNode }) => (
+  default: ({ href, children }: { href: string; children: ReactNode }) => (
     <a href={href}>{children}</a>
   ),
 }));
-
-// Stub the SVG child so this stays a WordDetailView unit test.
-vi.mock('../components/morphology/SegmentedWord', () => ({
-  SegmentedWord: ({
-    word,
-    segments,
-  }: {
-    word: { text_arabic: string };
-    segments: unknown[];
-  }) => (
-    <div data-testid="segmented">
-      {word.text_arabic} [{segments.length}]
-    </div>
+// FullAnalysis is a client component with framer — stub to a plain always-open box.
+vi.mock('../components/morphology/FullAnalysis', () => ({
+  FullAnalysis: ({ description, grammarArabic }: { description?: string; grammarArabic?: string }) => (
+    <div data-testid="full-analysis">{description}{grammarArabic}</div>
   ),
 }));
 
-const detail: WordDetail = {
-  word: {
-    id: 1,
-    ayah_id: 1,
-    position: 1,
-    text_arabic: 'بِسْمِ',
-    transliteration: 'bismi',
-    root: 'س م و',
-    lemma: null,
-    root_buckwalter: 'smw',
-    lemma_buckwalter: null,
-    pos_tag: 'N',
-    morphology_json: null,
-    morphology_description: 'prefixed preposition bi + noun',
-    grammar_arabic: 'جار ومجرور',
-    audio_url: null,
-  },
-  segments: [
-    {
-      id: 1,
-      word_id: 1,
-      segment_index: 0,
-      segment_type: 'prefix',
-      pos_tag: 'P',
-      form_arabic: 'بِ',
-      form_buckwalter: 'bi',
-      features_json: null,
-      lemma: null,
-      root: null,
-    },
-    {
-      id: 2,
-      word_id: 1,
-      segment_index: 1,
-      segment_type: 'stem',
-      pos_tag: 'N',
-      form_arabic: 'سْمِ',
-      form_buckwalter: 'somi',
-      features_json: '{"case":"genitive"}',
-      lemma: null,
-      root: 'smw',
-    },
-  ],
-  concept_tags: [{ id: 1, word_id: 1, tag_label: 'Allah', tag_type: 'named-entity' }],
+const baseWord: Word = {
+  id: 1, ayah_id: 1, position: 1, text_arabic: 'بِسْمِ',
+  transliteration: 'bismi', root: 'س م و', lemma: 'ٱسْم',
+  root_buckwalter: 'smw', lemma_buckwalter: null, pos_tag: 'N',
+  morphology_json: null, morphology_description: 'In the name — genitive noun.',
+  grammar_arabic: 'اسم مجرور', audio_url: null,
 };
 
+function segment(over: Partial<WordSegment>): WordSegment {
+  return {
+    id: 1, word_id: 1, segment_index: 0, segment_type: 'stem', pos_tag: 'N',
+    form_arabic: null, form_buckwalter: null, features_json: null,
+    lemma: null, root: null, ...over,
+  };
+}
+
+function detail(segments: WordSegment[]): WordDetail {
+  return { word: baseWord, segments, concept_tags: [] };
+}
+
 describe('WordDetailView', () => {
-  it('renders the color-coded word heading via SegmentedWord', () => {
-    render(<WordDetailView detail={detail} />);
-    expect(screen.getByTestId('segmented')).toHaveTextContent('بِسْمِ');
+  it('decodes segments into cards with human POS labels', () => {
+    render(<WordDetailView detail={detail([segment({ pos_tag: 'P' })])} />);
+    expect(screen.getByText('Preposition')).toBeInTheDocument();
   });
-  it('renders one card per segment', () => {
-    render(<WordDetailView detail={detail} />);
-    // Card labels are "<n>. <segment_type>"; anchor to avoid matching the
-    // morphology description prose (e.g. "prefixed …").
-    expect(screen.getAllByText(/^\d+\.\s(prefix|stem)$/i).length).toBe(2);
+
+  it('omits the Segments section when there are no segments', () => {
+    render(<WordDetailView detail={detail([])} />);
+    expect(screen.queryByRole('heading', { name: /segments/i })).not.toBeInTheDocument();
   });
-  it('renders concept tags as non-clickable labels', () => {
-    render(<WordDetailView detail={detail} />);
-    const tag = screen.getByText('Allah');
-    expect(tag.closest('a')).toBeNull();
-    expect(tag.closest('button')).toBeNull();
+
+  it('passes scraped prose + Arabic grammar to FullAnalysis', () => {
+    render(<WordDetailView detail={detail([])} />);
+    const fa = screen.getByTestId('full-analysis');
+    expect(fa).toHaveTextContent('In the name — genitive noun.');
+    expect(fa).toHaveTextContent('اسم مجرور');
   });
-  it('renders dictionary root link when rootHref provided', () => {
-    render(<WordDetailView detail={detail} rootHref="/dictionary/smw" />);
-    expect(screen.getByRole('link', { name: /root/i })).toHaveAttribute('href', '/dictionary/smw');
+
+  it('renders a link to the root in the dictionary when rootHref is given', () => {
+    render(<WordDetailView detail={detail([])} rootHref="/dictionary/smw" />);
+    const link = screen.getByRole('link', { name: /view root in dictionary/i });
+    expect(link).toHaveAttribute('href', '/dictionary/smw');
+  });
+
+  it('renders concept tag labels when concept_tags are present', () => {
+    const withTags: WordDetail = {
+      word: baseWord,
+      segments: [],
+      concept_tags: [{ id: 1, word_id: 1, tag_label: 'Allah', tag_type: 'named-entity' }],
+    };
+    render(<WordDetailView detail={withTags} />);
+    expect(screen.getByText('Allah')).toBeInTheDocument();
+  });
+
+  it('renders the SegmentedWord heading with the word Arabic text', () => {
+    render(<WordDetailView detail={detail([])} />);
+    expect(screen.getByTitle(baseWord.text_arabic)).toBeInTheDocument();
   });
 });

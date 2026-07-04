@@ -1,59 +1,66 @@
-import type { WordSegment } from '@quran-corpus/data';
-import { buckwalterToArabic } from '@quran-corpus/data';
+import type { DecodedSegment } from '@quran-corpus/data';
 
 interface SegmentCardProps {
-  segment: WordSegment;
+  segment: DecodedSegment;
   index: number;
-}
-
-function parseFeatures(json: string | null): Record<string, string> {
-  if (!json) return {};
-  try {
-    const parsed: unknown = JSON.parse(json);
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      return parsed as Record<string, string>;
-    }
-    return {};
-  } catch {
-    return {};
-  }
 }
 
 const chip =
   'rounded-full bg-paper-200 px-2.5 py-0.5 text-xs text-paper-700 dark:bg-night-100 dark:text-paper-300';
 
 export function SegmentCard({ segment, index }: SegmentCardProps) {
-  const features = parseFeatures(segment.features_json);
+  const { role, pos, features, rootArabic, lemma, unknownTags } = segment;
 
   return (
     <div className="rounded-xl border border-paper-200 p-4 dark:border-night-100">
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="text-xs font-medium uppercase tracking-wide text-paper-500">
-          {index + 1}. {segment.segment_type ?? 'segment'}
+          {index + 1}. {role}
         </span>
-        {segment.pos_tag && <span className={`${chip} font-medium`}>{segment.pos_tag}</span>}
+        <span className={`${chip} font-medium`}>{pos.en}</span>
+        {pos.ar && (
+          <span className={`${chip} font-arabic`} dir="rtl">
+            {pos.ar}
+          </span>
+        )}
       </div>
 
-      {Object.entries(features).length > 0 && (
+      {features.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {Object.entries(features).map(([k, v]) => (
-            <span key={k} className={chip}>
-              {k}: {String(v)}
+          {features.map((f, i) => (
+            <span key={`${f.key}-${i}`} className={chip}>
+              {f.label ? (
+                <>
+                  <span className="font-medium">{f.label}</span>: <span>{f.value}</span>
+                </>
+              ) : (
+                f.value
+              )}
             </span>
           ))}
         </div>
       )}
 
-      {(segment.root || segment.lemma) && (
+      {unknownTags.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {unknownTags.map((t, i) => (
+            <span key={`${t}-${i}`} className={`${chip} font-mono`}>
+              {t}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {(rootArabic || lemma) && (
         <div className="mt-2 flex flex-wrap gap-2" dir="rtl">
-          {segment.root && (
+          {rootArabic && (
             <span className="font-arabic text-sm text-paper-700 dark:text-paper-300">
-              {buckwalterToArabic(segment.root)}
+              {rootArabic}
             </span>
           )}
-          {segment.lemma && (
+          {lemma && (
             <span className="font-arabic text-sm text-paper-700 dark:text-paper-300">
-              {segment.lemma}
+              {lemma}
             </span>
           )}
         </div>

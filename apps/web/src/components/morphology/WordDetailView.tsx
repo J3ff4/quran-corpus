@@ -1,8 +1,10 @@
 import Link from 'next/link';
 import type { WordDetail } from '@quran-corpus/data';
+import { decodeSegment } from '@quran-corpus/data';
 import { SegmentedWord } from './SegmentedWord';
 import { MorphologySummary } from './MorphologySummary';
 import { SegmentCard } from './SegmentCard';
+import { FullAnalysis } from './FullAnalysis';
 
 interface WordDetailViewProps {
   detail: WordDetail;
@@ -13,6 +15,7 @@ interface WordDetailViewProps {
 export function WordDetailView({ detail, gloss, rootHref }: WordDetailViewProps) {
   const { word, segments, concept_tags } = detail;
   const orderedSegments = [...segments].sort((a, b) => a.segment_index - b.segment_index);
+  const decoded = orderedSegments.map((seg) => ({ id: seg.id, decoded: decodeSegment(seg) }));
 
   return (
     <article className="space-y-8">
@@ -22,18 +25,23 @@ export function WordDetailView({ detail, gloss, rootHref }: WordDetailViewProps)
 
       <MorphologySummary word={word} {...(gloss ? { gloss } : {})} />
 
-      {orderedSegments.length > 0 && (
+      {decoded.length > 0 && (
         <section>
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-paper-500">
             Segments
           </h2>
           <div className="space-y-3">
-            {orderedSegments.map((seg, i) => (
-              <SegmentCard key={seg.id} segment={seg} index={i} />
+            {decoded.map((d, i) => (
+              <SegmentCard key={d.id} segment={d.decoded} index={i} />
             ))}
           </div>
         </section>
       )}
+
+      <FullAnalysis
+        {...(word.morphology_description ? { description: word.morphology_description } : {})}
+        {...(word.grammar_arabic ? { grammarArabic: word.grammar_arabic } : {})}
+      />
 
       {concept_tags.length > 0 && (
         <section>

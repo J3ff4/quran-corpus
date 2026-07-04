@@ -30,6 +30,7 @@ export {
   getRootConcordance,
 } from './queries/roots.js';
 export { buckwalterToArabic, compareRootsArabic, rootFirstLetter, ARABIC_ALPHABET_ORDER } from './text/arabic.js';
+export { decodeSegment } from './morphology/decode.js';
 export type {
   Surah,
   Ayah,
@@ -46,6 +47,8 @@ export type {
   WordSegment,
   ConceptTag,
   WordDetail,
+  DecodedSegment,
+  DecodedFeature,
   LemmaFrequencyEntry,
   VerbConcordanceEntry,
   VerseRef,
