@@ -394,6 +394,22 @@ class ScraperDatabase:
         )
         self._conn.commit()
 
+    def get_words_with_description(self) -> list[sqlite3.Row]:
+        return self._conn.execute(
+            "SELECT id, morphology_description FROM words "
+            "WHERE morphology_description IS NOT NULL AND morphology_description <> ''"
+        ).fetchall()
+
+    def update_word_descriptions_bulk(
+        self, updates: list[tuple[str, int]]
+    ) -> None:
+        """Apply many (description, word_id) updates in one transaction."""
+        self._conn.executemany(
+            "UPDATE words SET morphology_description = ? WHERE id = ?",
+            updates,
+        )
+        self._conn.commit()
+
     def get_distinct_roots(self) -> list[str]:
         return [
             r[0]

@@ -11,9 +11,22 @@ segment glyphs only as bitmaps — never as page text (PRD §3.2).
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from bs4 import BeautifulSoup, Tag
+
+# The grammar prose is followed on-page by a contextual block that always opens
+# "Chapter (N) sūrat …" (verse translation, recitation credit, word nav). The
+# description cell's get_text() swallows all of it, so cut at that boundary to
+# keep only the grammar sentence(s). Reused by the one-off backfill that cleans
+# rows scraped before this trim existed.
+_CONTEXT_BOUNDARY = re.compile(r"\s*Chapter\s*\(\d+\)\s+sūrat")
+
+
+def trim_description(text: str) -> str:
+    """Strip trailing page chrome, keeping only the grammar prose."""
+    return _CONTEXT_BOUNDARY.split(text, maxsplit=1)[0].strip()
 
 
 @dataclass
@@ -23,9 +36,20 @@ class ParsedWordDetail:
     concept_tags: list[str]
 
 
+# Three prose phrasings open the grammar cell:
+#  - multi-segment word:  "The Nth word of verse (S:A) is divided into ..."
+#  - single-segment word: "The Nth word of verse (S:A) is a masculine noun ..."
+#  - Quranic initials (muqaṭṭaʿāt, POS=INL): "Verse N of chapter M begins with
+#    the Quranic initials ..." — no "word of verse" phrase at all.
+# Anchor on whichever opener is present; matching only "morphological segment"
+# dropped every single-segment word, and "word of verse" alone still drops INL.
+_CELL_ANCHORS = ("word of verse", "begins with the Quranic initials")
+
+
 def _find_description_cell(soup: BeautifulSoup) -> Tag | None:
     for cell in soup.find_all(["td", "p", "div"]):
-        if "morphological segment" in cell.get_text(" ", strip=True):
+        text = cell.get_text(" ", strip=True)
+        if any(anchor in text for anchor in _CELL_ANCHORS):
             return cell
     return None
 
@@ -36,7 +60,7 @@ def parse_word_detail(html: str) -> ParsedWordDetail | None:
     if cell is None:
         return None
 
-    description = cell.get_text(" ", strip=True)
+    description = trim_description(cell.get_text(" ", strip=True))
     grammar_arabic = [
         span.get_text(strip=True)
         for span in cell.find_all("span", class_="at")

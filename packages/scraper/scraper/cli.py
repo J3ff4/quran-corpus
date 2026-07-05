@@ -89,6 +89,18 @@ def scrape_word_details_cmd(db: str, checkpoint: str, rate_limit: float) -> None
     click.echo(f"Word-detail scrape complete: {count} words.")
 
 
+@main.command("trim-word-descriptions")
+@click.option("--db", default="quran.db", show_default=True, help="SQLite output path")
+def trim_word_descriptions_cmd(db: str) -> None:
+    """Trim trailing page chrome from stored word descriptions (idempotent)."""
+    from .backfill_descriptions import trim_stored_descriptions
+
+    database = ScraperDatabase(db)
+    changed = trim_stored_descriptions(database)
+    database.close()
+    click.echo(f"trim-word-descriptions: {changed} rows trimmed.")
+
+
 @main.command("import-corpus")
 @click.argument("txt_path")
 @click.option("--db", default="quran.db", show_default=True)
