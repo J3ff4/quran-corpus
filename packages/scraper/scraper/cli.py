@@ -27,7 +27,12 @@ def seed(db: str) -> None:
 @click.option(
     "--rate-limit", default=1.5, show_default=True, help="Seconds between requests"
 )
-def scrape(db: str, checkpoint: str, surah: int | None, rate_limit: float) -> None:
+@click.option(
+    "--force", is_flag=True, help="Re-scrape even if checkpoint marks a chapter done"
+)
+def scrape(
+    db: str, checkpoint: str, surah: int | None, rate_limit: float, force: bool
+) -> None:
     """Scrape corpus.quran.com morphology data (rate-limited, resumable)."""
     from .sources.corpus_quran import scrape_chapter
 
@@ -38,6 +43,8 @@ def scrape(db: str, checkpoint: str, surah: int | None, rate_limit: float) -> No
 
     surah_range = [surah] if surah else list(range(1, 115))
     for chapter_id in surah_range:
+        if force:
+            ckpt.clear(f"chapter_{chapter_id}")
         click.echo(f"Scraping surah {chapter_id}...")
         scrape_chapter(chapter_id, database, ckpt, rate_limit=rate_limit)
 
@@ -158,6 +165,40 @@ def import_tanzil(xml_path: str, db: str) -> None:
     import_tanzil_text(Path(xml_path), database)
     database.close()
     click.echo("Import complete.")
+
+
+@main.command("derive-word-arabic")
+@click.option("--db", default="quran.db", show_default=True)
+def derive_word_arabic_cmd(db: str) -> None:
+    """Rebuild words.text_arabic from word_segments (corpus-aligned)."""
+    from .word_arabic import derive_word_arabic
+
+    database = ScraperDatabase(db)
+    try:
+        changed = derive_word_arabic(database)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+    finally:
+        database.close()
+    click.echo(f"derive-word-arabic: {changed} words updated.")
+
+
+@main.command("validate-alignment")
+@click.option("--db", default="quran.db", show_default=True)
+def validate_alignment_cmd(db: str) -> None:
+    """Assert text_arabic aligns with translit/segments. Exit 1 on any failure."""
+    import sys
+
+    from .validate_alignment import validate_alignment
+
+    database = ScraperDatabase(db)
+    errs = validate_alignment(database)
+    database.close()
+    if errs:
+        for e in errs:
+            click.echo(f"FAIL: {e}")
+        sys.exit(1)
+    click.echo("validate-alignment: OK")
 
 
 @main.command("import-quranenc")

@@ -81,8 +81,12 @@ def test_process_page_inserts_words_for_verse_1(db: ScraperDatabase) -> None:
     assert [r[0] for r in rows] == [1, 2, 3, 4]
 
 
-def test_process_page_sets_text_arabic_from_tanzil(db: ScraperDatabase) -> None:
-    """text_arabic for word 1:1:1 is the first space-split token of text_uthmani."""
+def test_process_page_leaves_text_arabic_empty(db: ScraperDatabase) -> None:
+    """text_arabic is left empty; it is derived later from word_segments.
+
+    Deriving it here from text_uthmani.split()[position-1] misaligned with
+    corpus word positions (Basmala + pause-mark tokens shift the index).
+    """
     _process_page(FIXTURE_HTML, 1, db)
     row = db._conn.execute(
         "SELECT text_arabic FROM words "
@@ -91,7 +95,7 @@ def test_process_page_sets_text_arabic_from_tanzil(db: ScraperDatabase) -> None:
         "AND position=1"
     ).fetchone()
     assert row is not None
-    assert row[0] == "بِسۡمِ"
+    assert row[0] == ""
 
 
 def test_process_page_sets_transliteration(db: ScraperDatabase) -> None:

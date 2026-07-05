@@ -58,6 +58,38 @@ def _split_statements(sql: str) -> list[str]:
     return statements
 
 
+# Shared CTE: reconstruct each word's Arabic from its segments, concatenated in
+# segment order. word_segments is the corpus-aligned source of truth. The ORDER
+# BY lives *inside* group_concat (SQLite >= 3.44), which the SQL spec guarantees
+# — unlike ordering via an inner subquery, whose aggregation order is undefined.
+# Reused by the rebuild (UPDATE) and the misalignment count so the two can never
+# drift apart. Fails loudly (OperationalError) on SQLite < 3.44 rather than
+# silently mis-ordering.
+_WORD_ARABIC_CONCAT_CTE = """WITH concat AS (
+  SELECT word_id, group_concat(form_arabic, '' ORDER BY segment_index) AS ta
+  FROM word_segments
+  GROUP BY word_id
+)"""
+
+# These two SQL statements share the CTE above and differ only in their final
+# clause. Both are built purely from module-level string literals — no user
+# input is interpolated — so S608 (SQL injection via string construction) is a
+# false positive here; suppressed with justification.
+#
+# Rebuild every word's text_arabic from its segment concat, but only where it
+# actually differs (idempotent; IS NOT is NULL-safe).
+_REBUILD_TEXT_ARABIC_SQL = _WORD_ARABIC_CONCAT_CTE + """
+UPDATE words
+   SET text_arabic = (SELECT ta FROM concat WHERE concat.word_id = words.id)
+ WHERE EXISTS (SELECT 1 FROM concat WHERE concat.word_id = words.id)
+   AND text_arabic IS NOT (SELECT ta FROM concat WHERE concat.word_id = words.id)"""  # noqa: S608
+
+# Count words whose text_arabic disagrees with their segment concat.
+_COUNT_MISALIGNED_SQL = _WORD_ARABIC_CONCAT_CTE + """
+SELECT count(*) FROM words w JOIN concat c ON c.word_id = w.id
+WHERE w.text_arabic IS NOT c.ta"""  # noqa: S608
+
+
 class ScraperDatabase:
     def __init__(self, db_path: str) -> None:
         self._conn = sqlite3.connect(db_path)
@@ -396,6 +428,47 @@ class ScraperDatabase:
         return self._conn.execute(
             "SELECT id, surah_id, ayah_number FROM ayahs"
         ).fetchall()
+
+    def count_words_without_segments(self) -> int:
+        return int(self._conn.execute(
+            "SELECT count(*) FROM words WHERE id NOT IN "
+            "(SELECT DISTINCT word_id FROM word_segments)"
+        ).fetchone()[0])
+
+    def rebuild_text_arabic_from_segments(self) -> int:
+        """Set words.text_arabic = concat(form_arabic ORDER BY segment_index).
+        Segments are the corpus-aligned source of truth. Returns rows changed.
+
+        ponytail: reads back via SELECT changes() rather than cursor.rowcount —
+        Python's sqlite3 module reports rowcount=-1 for `WITH ... UPDATE`
+        (CTE) statements since it only pattern-matches a leading UPDATE
+        keyword, even though the update itself applies correctly.
+        """
+        self._conn.execute(_REBUILD_TEXT_ARABIC_SQL)
+        changed = int(self._conn.execute("SELECT changes()").fetchone()[0])
+        self._conn.commit()
+        return changed
+
+    def count_text_arabic_misaligned(self) -> int:
+        return int(
+            self._conn.execute(_COUNT_MISALIGNED_SQL).fetchone()[0]
+        )
+
+    def count_words_missing_translit(self) -> int:
+        return int(self._conn.execute(
+            "SELECT count(*) FROM words "
+            "WHERE transliteration IS NULL OR transliteration = ''"
+        ).fetchone()[0])
+
+    def get_word_align(
+        self, surah_id: int, ayah_number: int, position: int
+    ) -> sqlite3.Row | None:
+        return self._conn.execute(
+            """SELECT w.text_arabic, w.transliteration
+               FROM words w JOIN ayahs a ON a.id = w.ayah_id
+               WHERE a.surah_id = ? AND a.ayah_number = ? AND w.position = ?""",
+            (surah_id, ayah_number, position),
+        ).fetchone()
 
     def close(self) -> None:
         self._conn.close()

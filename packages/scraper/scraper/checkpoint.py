@@ -17,9 +17,18 @@ class Checkpoint:
     def is_done(self, key: str) -> bool:
         return bool(self._state.get(key))
 
+    def _persist(self) -> None:
+        self._path.write_text(json.dumps(self._state, indent=2))
+
     def mark_done(self, key: str) -> None:
         self._state[key] = True
-        self._path.write_text(json.dumps(self._state, indent=2))
+        self._persist()
+
+    def clear(self, key: str) -> None:
+        """Remove a single checkpoint key so its unit re-runs. Persists."""
+        if key in self._state:
+            del self._state[key]
+            self._persist()
 
     def reset(self) -> None:
         self._state = {}

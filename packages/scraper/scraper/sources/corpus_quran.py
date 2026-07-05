@@ -26,8 +26,7 @@ def scrape_chapter(
     """Scrape all words for a chapter, following pagination, with checkpoint resumption.
 
     Skips chapters already marked complete in the checkpoint.
-    Derives text_arabic from text_uthmani stored in DB (split by whitespace,
-    1-indexed by position).
+    Word text_arabic is filled later from word_segments (see derive-word-arabic).
     """
     ck_key = f"chapter_{chapter_id}"
     if checkpoint.is_done(ck_key):
@@ -53,24 +52,24 @@ def scrape_chapter(
 
 
 def _process_page(html: str, chapter_id: int, db: ScraperDatabase) -> None:
-    """Parse one page of words and upsert into the database."""
+    """Parse one page of words and upsert into the database.
+
+    text_arabic is intentionally left empty here — it is derived from
+    word_segments (the corpus-aligned source of truth) by the
+    derive-word-arabic step. Deriving it from text_uthmani.split() misaligns
+    with corpus word positions (Basmala + pause-mark tokens shift the index).
+    """
     for pw in parse_verse_words(html):
         ayah_row = db.get_ayah(chapter_id, pw.verse_number)
         if ayah_row is None:
             continue
         ayah_id: int = ayah_row["id"]
-        text_uthmani: str | None = ayah_row["text_uthmani"]
-
-        word_texts = text_uthmani.split() if text_uthmani else []
-        text_arabic = (
-            word_texts[pw.position - 1] if 0 < pw.position <= len(word_texts) else ""
-        )
 
         word_id = db.upsert_word(
             WordModel(
                 ayah_id=ayah_id,
                 position=pw.position,
-                text_arabic=text_arabic,
+                text_arabic="",
                 transliteration=pw.transliteration,
                 pos_tag=pw.pos_tag,
                 morphology_json=pw.morphology_json,
