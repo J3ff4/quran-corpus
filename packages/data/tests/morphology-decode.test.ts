@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { decodeSegment } from '../src/morphology/decode.js';
+import { decodeSegment, posLabelEn } from '../src/morphology/decode.js';
 import type { WordSegment } from '../src/types.js';
 
 function seg(over: Partial<WordSegment>): WordSegment {
@@ -84,5 +84,20 @@ describe('decodeSegment', () => {
     const d = decodeSegment(seg({ root: null, lemma: null }));
     expect(d.rootArabic).toBeUndefined();
     expect(d.lemma).toBeUndefined();
+  });
+});
+
+describe('posLabelEn', () => {
+  it('maps a known POS code to its English label', () => {
+    expect(posLabelEn('N')).toBe('Noun');
+    expect(posLabelEn('V')).toBe('Verb');
+  });
+  it('returns the raw code for an unknown tag', () => {
+    expect(posLabelEn('ZZZ')).toBe('ZZZ');
+  });
+  it('returns null for null/empty', () => {
+    expect(posLabelEn(null)).toBeNull();
+    expect(posLabelEn(undefined)).toBeNull();
+    expect(posLabelEn('')).toBeNull();
   });
 });

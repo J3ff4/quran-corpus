@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { getDatabase } from '../lib/db';
 import { getAllSurahs } from '@quran-corpus/data';
 import { SurahCard } from '../components/surah-list/SurahCard';
+import { VersePicker } from '../components/wbw/VersePicker';
+import { toPickerSurah, type PickerSurah } from '../components/wbw/types';
 
 // DB-dependent page — opt out of static pre-rendering (matches /surah).
 export const dynamic = 'force-dynamic';
@@ -20,6 +22,7 @@ const TILES = [
 export default async function HomePage() {
   const db = await getDatabase();
   const surahs = await getAllSurahs(db);
+  const pickerSurahs: PickerSurah[] = surahs.map(toPickerSurah);
   const featured = FEATURED_SURAH_IDS.map((id) => surahs.find((s) => s.id === id)).filter(
     (s): s is NonNullable<typeof s> => s != null,
   );
@@ -44,6 +47,13 @@ export default async function HomePage() {
           </svg>
           <span>Search the Quran…</span>
         </Link>
+      </section>
+
+      <section className="mb-10">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-paper-500 dark:text-paper-400">
+          Go to verse
+        </h2>
+        <VersePicker surahs={pickerSurahs} />
       </section>
 
       {featured.length > 0 && (

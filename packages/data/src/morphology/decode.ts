@@ -54,3 +54,13 @@ export function decodeSegment(segment: WordSegment): DecodedSegment {
   if (segment.lemma) decoded.lemma = segment.lemma;
   return decoded;
 }
+
+/**
+ * English POS label for a word-level pos_tag. Same table as decodeSegment
+ * (one source of truth). Unknown non-empty tag → raw tag; null/empty → null
+ * (caller hides the chip).
+ */
+export function posLabelEn(tag: string | null | undefined): string | null {
+  if (!tag) return null;
+  return POS_LABELS[tag]?.en ?? tag;
+}

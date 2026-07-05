@@ -6,12 +6,34 @@ import Link from 'next/link';
 import type { SearchResult } from '@quran-corpus/data';
 import { EMPTY_SEARCH_RESULT } from '@quran-corpus/data';
 import { SearchResults } from './SearchResults';
+import { VersePicker } from '../wbw/VersePicker';
+import type { PickerSurah } from '../wbw/types';
 
 export function SearchSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [q, setQ] = useState('');
   const [result, setResult] = useState<SearchResult>(EMPTY_SEARCH_RESULT);
+  const [surahs, setSurahs] = useState<PickerSurah[] | null>(null);
   const reduce = useReducedMotion();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Lazy-load the surah list the first time the sheet opens (cached after).
+  useEffect(() => {
+    if (!open || surahs !== null) return;
+    const ctrl = new AbortController();
+    (async () => {
+      try {
+        const res = await fetch('/api/surahs', { signal: ctrl.signal });
+        if (!res.ok) return;
+        const data = (await res.json()) as PickerSurah[];
+        setSurahs(data);
+      } catch {
+        // Network/DB error or abort — picker stays hidden, search still works.
+      }
+    })();
+    return () => {
+      ctrl.abort();
+    };
+  }, [open, surahs]);
 
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current);
@@ -70,6 +92,14 @@ export function SearchSheet({ open, onClose }: { open: boolean; onClose: () => v
             exit={reduce ? { opacity: 0 } : { y: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
           >
+            {surahs && (
+              <div className="mb-4 border-b border-paper-200 pb-4 dark:border-night-100">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-paper-500 dark:text-paper-400">
+                  Go to verse
+                </p>
+                <VersePicker surahs={surahs} />
+              </div>
+            )}
             <div className="mb-4 flex items-center gap-2">
               <input
                 type="search"

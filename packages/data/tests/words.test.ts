@@ -4,6 +4,7 @@ import { runMigrations } from '../src/migrate.js';
 import {
   getWordsByAyah,
   getWordsBySurah,
+  getWordsBySurahAyahRange,
   getWordByLocation,
   getWordDetail,
 } from '../src/queries/words.js';
@@ -86,6 +87,38 @@ describe('getWordsBySurah', () => {
   it('returned words include ayah_id', async () => {
     const words = await getWordsBySurah(db, 1);
     expect(words[0]?.ayah_id).toBe(ayahId);
+  });
+});
+
+describe('getWordsBySurahAyahRange', () => {
+  it('returns only words within the ayah range, ordered', async () => {
+    // add ayah 2 with one word (seed in beforeAll has only ayah 1)
+    const r = await db.execute({
+      sql: `INSERT INTO ayahs (surah_id, ayah_number, text_uthmani)
+            VALUES (1, 2, 'قُلْ') RETURNING id`,
+      args: [],
+    });
+    const ayah2Id = r.rows[0]?.['id'] as number;
+    await db.execute({
+      sql: `INSERT INTO words (ayah_id, position, text_arabic, transliteration, pos_tag)
+            VALUES (?, 1, 'قُلْ', 'qul', 'V')`,
+      args: [ayah2Id],
+    });
+
+    const only1 = await getWordsBySurahAyahRange(db, 1, 1, 1);
+    expect(only1).toHaveLength(3);
+
+    const only2 = await getWordsBySurahAyahRange(db, 1, 2, 2);
+    expect(only2.map((w) => w.text_arabic)).toEqual(['قُلْ']);
+
+    const both = await getWordsBySurahAyahRange(db, 1, 1, 2);
+    expect(both).toHaveLength(4);
+    // ordered ayah then position: ayah1 pos1..3, then ayah2 pos1
+    expect(both.map((w) => w.position)).toEqual([1, 2, 3, 1]);
+  });
+
+  it('returns empty array for an out-of-range window', async () => {
+    expect(await getWordsBySurahAyahRange(db, 1, 50, 60)).toHaveLength(0);
   });
 });
 

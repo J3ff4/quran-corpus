@@ -5,6 +5,7 @@ export { getAyahsBySurah, getAyahWithWords } from './queries/ayahs.js';
 export {
   getWordsByAyah,
   getWordsBySurah,
+  getWordsBySurahAyahRange,
   getWordByLocation,
   getWordDetail,
 } from './queries/words.js';
@@ -30,7 +31,7 @@ export {
   getRootConcordance,
 } from './queries/roots.js';
 export { buckwalterToArabic, compareRootsArabic, rootFirstLetter, ARABIC_ALPHABET_ORDER } from './text/arabic.js';
-export { decodeSegment } from './morphology/decode.js';
+export { decodeSegment, posLabelEn } from './morphology/decode.js';
 export type {
   Surah,
   Ayah,

@@ -1,12 +1,10 @@
 import type { DecodedSegment } from '@quran-corpus/data';
+import { chip } from '../ui/chip';
 
 interface SegmentCardProps {
   segment: DecodedSegment;
   index: number;
 }
-
-const chip =
-  'rounded-full bg-paper-200 px-2.5 py-0.5 text-xs text-paper-700 dark:bg-night-100 dark:text-paper-300';
 
 export function SegmentCard({ segment, index }: SegmentCardProps) {
   const { role, pos, features, rootArabic, lemma, unknownTags } = segment;

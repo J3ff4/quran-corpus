@@ -26,6 +26,12 @@ export function SurahHeader({ surah }: SurahHeaderProps) {
           {surah.revelation_type.charAt(0).toUpperCase() + surah.revelation_type.slice(1)} ·{' '}
           {surah.ayah_count} ayahs
         </p>
+        <Link
+          href={`/surah/${surah.id}/words`}
+          className="mt-3 inline-block text-sm text-paper-600 hover:text-paper-900 dark:text-paper-400 dark:hover:text-paper-100"
+        >
+          Word by word →
+        </Link>
       </div>
     </header>
   );

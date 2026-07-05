@@ -40,6 +40,23 @@ export async function getWordsBySurah(db: Client, surahId: number): Promise<Word
   return result.rows.map(rowToWord);
 }
 
+export async function getWordsBySurahAyahRange(
+  db: Client,
+  surahId: number,
+  loAyah: number,
+  hiAyah: number,
+): Promise<Word[]> {
+  const result = await db.execute({
+    sql: `SELECT w.*
+          FROM words w
+          JOIN ayahs a ON a.id = w.ayah_id
+          WHERE a.surah_id = ? AND a.ayah_number BETWEEN ? AND ?
+          ORDER BY a.ayah_number, w.position`,
+    args: [surahId, loAyah, hiAyah],
+  });
+  return result.rows.map(rowToWord);
+}
+
 function rowToSegment(row: Row): WordSegment {
   return {
     id: row['id'] as number,
