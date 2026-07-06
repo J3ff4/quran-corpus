@@ -72,6 +72,7 @@ def build_rows(
         "empty": 0,
         "unknown_root": 0,
         "apparatus_only": 0,
+        "duplicate": 0,
         "kept": 0,
     }
     seen: set[str] = set()
@@ -90,7 +91,8 @@ def build_rows(
         if not definition:  # was pure apparatus, no real gloss
             stats["apparatus_only"] += 1
             continue
-        if bw in seen:  # meanings.json has no dups today; guard anyway
+        if bw in seen:  # meanings.json has no dups today; count if it ever does
+            stats["duplicate"] += 1
             continue
         seen.add(bw)
         rows.append((bw, definition))
@@ -123,7 +125,8 @@ def main() -> None:
         f"qurandev/roots → TSV: {stats['kept']} kept "
         f"({stats['total']} total, {stats['empty']} empty, "
         f"{stats['unknown_root']} not-a-DB-root, "
-        f"{stats['apparatus_only']} apparatus-only) → {args.out}"
+        f"{stats['apparatus_only']} apparatus-only, "
+        f"{stats['duplicate']} duplicate) → {args.out}"
     )
 
 

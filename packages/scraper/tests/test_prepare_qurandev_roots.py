@@ -29,8 +29,32 @@ def test_filters_and_decodes():
         "empty": 1,
         "unknown_root": 1,
         "apparatus_only": 0,
+        "duplicate": 0,
         "kept": 2,
     }
+
+
+def test_duplicate_rootcode_counted_and_stats_balance():
+    # meanings.json has no dups today, but a dup must be counted (not silently
+    # dropped) so total always equals the sum of the outcome buckets.
+    raw = _cp1252(
+        [
+            {"RootCode": "ktb", "Meanings": "to write"},
+            {"RootCode": "ktb", "Meanings": "to prescribe"},  # duplicate root
+        ]
+    )
+    rows, stats = build_rows(raw, valid_roots={"ktb"})
+    assert rows == [("ktb", "to write")]  # first wins
+    assert stats["duplicate"] == 1
+    assert stats["kept"] == 1
+    # every entry lands in exactly one bucket
+    assert stats["total"] == (
+        stats["empty"]
+        + stats["unknown_root"]
+        + stats["apparatus_only"]
+        + stats["duplicate"]
+        + stats["kept"]
+    )
 
 
 def test_clean_meaning_keeps_gloss_strips_apparatus():
