@@ -8,7 +8,7 @@ interface RootEntryProps {
 }
 
 const sourceLabel = (source: string): string =>
-  source === 'lane' ? "Lane's Lexicon" : source;
+  source === 'lane' || source === 'qurandev-lane' ? "Lane's Lexicon" : source;
 
 /**
  * Full root entry: header, Lane's definition (additive — omitted when empty),

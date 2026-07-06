@@ -37,6 +37,17 @@ describe('RootEntry', () => {
     expect(screen.getByText(/To write/)).toBeInTheDocument();
     expect(screen.getByText(/lane/i)).toBeInTheDocument();
   });
+  it("labels the qurandev-lane source as Lane's Lexicon", () => {
+    const qd = {
+      ...entry,
+      definitions: [
+        { id: 1, root_id: 1, source: 'qurandev-lane', definition: 'To write.' },
+      ],
+    };
+    render(<RootEntry entry={qd} concordance={concordance} />);
+    expect(screen.getByText("Lane's Lexicon")).toBeInTheDocument();
+    expect(screen.queryByText(/qurandev-lane/)).toBeNull();
+  });
   it('renders form groups', () => {
     render(<RootEntry entry={entry} concordance={concordance} />);
     expect(screen.getByText('Noun')).toBeInTheDocument();
