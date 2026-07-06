@@ -3,9 +3,17 @@ import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
+  // Next dev's Fast-Refresh runtime evaluates strings as JS (eval). Without
+  // 'unsafe-eval' the browser throws EvalError during the webpack bootstrap,
+  // aborting it so no client component hydrates. Dev-only — the production
+  // bundle contains no eval, so the strict policy applies there.
+  const scriptSrc =
+    process.env.NODE_ENV === 'development'
+      ? `script-src 'self' 'unsafe-eval' 'nonce-${nonce}'`
+      : `script-src 'self' 'nonce-${nonce}'`;
   const csp = [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}'`,
+    scriptSrc,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",

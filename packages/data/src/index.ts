@@ -29,6 +29,9 @@ export {
   getRootDefinitions,
   getRootEntry,
   getRootConcordance,
+  getRootConcordancePage,
+  countRootConcordance,
+  getRootSearchList,
 } from './queries/roots.js';
 export { buckwalterToArabic, compareRootsArabic, rootFirstLetter, ARABIC_ALPHABET_ORDER } from './text/arabic.js';
 export { decodeSegment, posLabelEn } from './morphology/decode.js';
@@ -40,6 +43,7 @@ export type {
   Translation,
   WordGloss,
   Root,
+  RootSearchItem,
   RootForm,
   RootDefinition,
   RootEntry,

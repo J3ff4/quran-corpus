@@ -4,9 +4,7 @@ import { getAllSurahs } from '@quran-corpus/data';
 import { SurahCard } from '../components/surah-list/SurahCard';
 import { VersePicker } from '../components/wbw/VersePicker';
 import { toPickerSurah, type PickerSurah } from '../components/wbw/types';
-
-// DB-dependent page — opt out of static pre-rendering (matches /surah).
-export const dynamic = 'force-dynamic';
+import { SearchTrigger } from '../components/search/SearchTrigger';
 
 export const metadata = { title: 'Quran Corpus' };
 
@@ -37,16 +35,7 @@ export default async function HomePage() {
         <p className="mt-1 text-sm text-paper-500 dark:text-paper-400">
           Word-by-word morphology, grammar, and translations
         </p>
-        <Link
-          href="/search"
-          className="mt-6 flex items-center gap-2 rounded-full border border-paper-200 bg-paper-100 px-4 py-3 text-left text-paper-500 transition-colors hover:bg-paper-200 dark:border-night-100 dark:bg-night-200 dark:text-paper-400 dark:hover:bg-night-100"
-        >
-          <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <circle cx="11" cy="11" r="7" />
-            <path d="m20 20-3.5-3.5" />
-          </svg>
-          <span>Search the Quran…</span>
-        </Link>
+        <SearchTrigger />
       </section>
 
       <section className="mb-10">

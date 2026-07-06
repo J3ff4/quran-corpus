@@ -3,9 +3,6 @@ import { getDatabase } from '../../lib/db';
 import { getAllSurahs } from '@quran-corpus/data';
 import { SurahCard } from '../../components/surah-list/SurahCard';
 
-// DB-dependent page — opt out of static pre-rendering
-export const dynamic = 'force-dynamic';
-
 export const metadata = { title: 'Surahs — Quran Corpus' };
 
 export default async function SurahListPage() {

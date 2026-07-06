@@ -71,6 +71,16 @@ export interface Root {
   occurrence_count: number;
 }
 
+export interface RootSearchItem {
+  id: number;
+  root_buckwalter: string;
+  root_arabic: string;
+  occurrence_count: number;
+  /** Space-joined form glosses for this root, lowercased at the call site for
+   *  search matching. Null when the root has no forms with a gloss. */
+  gloss_blob: string | null;
+}
+
 export interface RootForm {
   id: number;
   root_id: number;

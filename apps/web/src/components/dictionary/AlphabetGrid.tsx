@@ -1,9 +1,9 @@
-import Link from 'next/link';
-import { ARABIC_ALPHABET_ORDER } from '@quran-corpus/data';
+import { ARABIC_ALPHABET_ORDER } from '@quran-corpus/data/client';
 
 interface AlphabetGridProps {
   counts: Record<string, number>;
   activeLetter?: string;
+  onSelect: (letter: string) => void;
 }
 
 const base =
@@ -14,11 +14,11 @@ const idle =
 const off = 'cursor-default bg-paper-100 text-paper-300 dark:bg-night-50 dark:text-paper-600';
 
 /**
- * Arabic letter picker. Present letters link to `?letter=X`; the active one
- * links back to `/dictionary` (clear). Empty letters render disabled. Pure
- * server component — navigation is plain links.
+ * Arabic letter picker. Present letters are buttons calling `onSelect`
+ * (parent owns the toggle-off-if-already-active behavior); empty letters
+ * render disabled. Client-state only — no navigation.
  */
-export function AlphabetGrid({ counts, activeLetter }: AlphabetGridProps) {
+export function AlphabetGrid({ counts, activeLetter, onSelect }: AlphabetGridProps) {
   return (
     <nav dir="rtl" aria-label="Filter roots by letter" className="mb-6 flex flex-wrap gap-1.5">
       {ARABIC_ALPHABET_ORDER.map((letter) => {
@@ -32,14 +32,15 @@ export function AlphabetGrid({ counts, activeLetter }: AlphabetGridProps) {
         }
         const isActive = letter === activeLetter;
         return (
-          <Link
+          <button
             key={letter}
-            href={isActive ? '/dictionary' : `/dictionary?letter=${encodeURIComponent(letter)}`}
+            type="button"
+            onClick={() => onSelect(letter)}
             {...(isActive ? { 'aria-current': 'true' as const } : {})}
             className={`${base} ${isActive ? active : idle}`}
           >
             {letter}
-          </Link>
+          </button>
         );
       })}
     </nav>

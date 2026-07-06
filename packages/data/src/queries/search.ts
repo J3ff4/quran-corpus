@@ -3,15 +3,12 @@ import { normalizeArabic, buildFtsMatch } from '../text/normalize.js';
 import { searchRoots } from './roots.js';
 import { getWordsByAyah } from './words.js';
 import type { VerseRef, VerseHit, JumpVerse, SearchResult } from '../types.js';
+import { EMPTY_SEARCH_RESULT } from '../constants.js';
 
-// Canonical empty result — returned for blank queries and used by UI surfaces
-// as the initial/reset state. Frozen (incl. nested arrays) so a consumer that
-// mutates it (e.g. result.verses.push) can't corrupt the shared reference.
-export const EMPTY_SEARCH_RESULT: SearchResult = Object.freeze({
-  jump: null,
-  verses: Object.freeze([]) as unknown as SearchResult['verses'],
-  roots: Object.freeze([]) as unknown as SearchResult['roots'],
-}) as SearchResult;
+// Re-exported so the barrel (`@quran-corpus/data`) keeps its public surface;
+// the definition now lives in the DB-free ../constants.js so client code can
+// import it without the libsql driver. See constants.ts.
+export { EMPTY_SEARCH_RESULT };
 
 // One-time populate of search_fts. Arabic rows are normalized here (source='ar')
 // because SQL triggers cannot run the JS normalizer; translation rows are kept

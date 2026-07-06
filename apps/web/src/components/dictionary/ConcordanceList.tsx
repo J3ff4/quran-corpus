@@ -1,42 +1,71 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { ConcordanceEntry } from '@quran-corpus/data';
 import { verseRef, concordanceHref } from '../../lib/concordance';
-import { useIncrementalReveal } from '../../hooks/useIncrementalReveal';
 
-// Reuse the 08c reveal tuning: long concordances mount INITIAL, reveal STEP.
-const THRESHOLD = 40;
-const INITIAL = 20;
-const STEP = 20;
+const PAGE = 20;
 
 const wash =
   'rounded-md bg-accent-100 px-1 font-semibold text-accent-700 dark:bg-accent-900/40 dark:text-accent-300';
 
 interface ConcordanceListProps {
-  entries: ConcordanceEntry[];
+  /** First page, server-rendered. */
+  initialEntries: ConcordanceEntry[];
+  /** Total occurrences across the whole concordance (from countRootConcordance). */
+  total: number;
+  /** Buckwalter root — keys the paging API. */
+  rootBw: string;
 }
 
 /** Occurrence list: verse-ref link, matched form/translit/gloss, and the verse
- * rebuilt word-by-word from `verse_words` with the matched word washed. Long
- * lists reveal incrementally (reuses useIncrementalReveal). */
-export function ConcordanceList({ entries }: ConcordanceListProps) {
-  const paginate = entries.length > THRESHOLD;
-  const { visibleCount, sentinelRef, done, revealTo } = useIncrementalReveal<HTMLButtonElement>(
-    entries.length,
-    INITIAL,
-    STEP,
-  );
+ * rebuilt word-by-word with the matched word washed. Big roots page in from
+ * `/api/roots/<bw>/concordance` on Load-more instead of dumping every verse. */
+export function ConcordanceList({ initialEntries, total, rootBw }: ConcordanceListProps) {
+  const [entries, setEntries] = useState(initialEntries);
+  const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const hasMore = entries.length < total;
+
+  // Abort an in-flight page request if the user navigates away mid-fetch, so
+  // its resolution can't fire setState on an unmounted component.
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  async function loadMore() {
+    if (loading) return;
+    setLoading(true);
+    setFailed(false);
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    try {
+      const res = await fetch(
+        `/api/roots/${encodeURIComponent(rootBw)}/concordance?offset=${entries.length}&limit=${PAGE}`,
+        { signal: ctrl.signal },
+      );
+      if (!res.ok) {
+        setFailed(true);
+        return;
+      }
+      const data = (await res.json()) as { entries: ConcordanceEntry[]; total: number };
+      setEntries((prev) => [...prev, ...data.entries]);
+    } catch {
+      // Abort on unmount is expected — don't surface it (and don't setState).
+      if (!ctrl.signal.aborted) setFailed(true);
+    } finally {
+      if (!ctrl.signal.aborted) setLoading(false);
+    }
+  }
 
   if (entries.length === 0) {
     return <p className="px-4 py-6 text-center text-paper-500">No occurrences.</p>;
   }
 
-  const visible = paginate ? entries.slice(0, visibleCount) : entries;
   return (
     <>
       <ul className="divide-y divide-paper-200 dark:divide-night-100">
-        {visible.map((e) => (
+        {entries.map((e) => (
           <li key={e.word_id} className="py-3">
             <div className="mb-1 flex items-baseline justify-between gap-3">
               <Link
@@ -71,14 +100,19 @@ export function ConcordanceList({ entries }: ConcordanceListProps) {
           </li>
         ))}
       </ul>
-      {paginate && !done && (
+      {failed && (
+        <p role="alert" className="mt-4 text-center text-sm text-red-600 dark:text-red-400">
+          Couldn’t load more. Tap “Load more” to try again.
+        </p>
+      )}
+      {hasMore && (
         <button
-          ref={sentinelRef}
           type="button"
-          onClick={() => revealTo(visibleCount + STEP)}
-          className="mx-auto mt-4 block rounded-full bg-paper-200 px-6 py-2 text-sm text-paper-700 transition-colors hover:bg-paper-300 dark:bg-night-100 dark:text-paper-300 dark:hover:bg-night-200"
+          onClick={loadMore}
+          disabled={loading}
+          className="mx-auto mt-4 block rounded-full bg-paper-200 px-6 py-2 text-sm text-paper-700 transition-colors hover:bg-paper-300 disabled:opacity-60 dark:bg-night-100 dark:text-paper-300 dark:hover:bg-night-200"
         >
-          Load more
+          {loading ? 'Loading…' : 'Load more'}
         </button>
       )}
     </>

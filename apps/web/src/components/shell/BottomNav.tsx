@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { SearchSheet } from '../search/SearchSheet';
+import { useSearch } from '../search/SearchProvider';
 
 interface LinkItem {
   href: string;
@@ -60,39 +60,36 @@ const idleColor = 'text-paper-500 dark:text-paper-400';
 
 export function BottomNav() {
   const pathname = usePathname() ?? '/';
-  const [searchOpen, setSearchOpen] = useState(false);
+  const { open: openSearch } = useSearch();
 
   return (
-    <>
-      <nav
-        aria-label="Primary"
-        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-paper-200 bg-paper-50/95 pb-[env(safe-area-inset-bottom)] backdrop-blur dark:border-night-100 dark:bg-night-300/95"
+    <nav
+      aria-label="Primary"
+      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-paper-200 bg-paper-50/95 pb-[env(safe-area-inset-bottom)] backdrop-blur dark:border-night-100 dark:bg-night-300/95"
+    >
+      {LINK_ITEMS.map((item) => {
+        const active = item.match(pathname);
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            aria-current={active ? 'page' : undefined}
+            className={`${itemClass} ${active ? activeColor : idleColor}`}
+          >
+            {item.icon}
+            <span>{item.label}</span>
+          </Link>
+        );
+      })}
+      <button
+        type="button"
+        aria-label="Search"
+        onClick={openSearch}
+        className={`${itemClass} ${idleColor}`}
       >
-        {LINK_ITEMS.map((item) => {
-          const active = item.match(pathname);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-current={active ? 'page' : undefined}
-              className={`${itemClass} ${active ? activeColor : idleColor}`}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
-        <button
-          type="button"
-          aria-label="Search"
-          onClick={() => setSearchOpen(true)}
-          className={`${itemClass} ${searchOpen ? activeColor : idleColor}`}
-        >
-          {SearchIcon}
-          <span>Search</span>
-        </button>
-      </nav>
-      <SearchSheet open={searchOpen} onClose={() => setSearchOpen(false)} />
-    </>
+        {SearchIcon}
+        <span>Search</span>
+      </button>
+    </nav>
   );
 }

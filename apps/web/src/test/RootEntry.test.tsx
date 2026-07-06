@@ -29,11 +29,11 @@ const concordance: ConcordanceEntry[] = [];
 
 describe('RootEntry', () => {
   it('renders occurrence count', () => {
-    render(<RootEntry entry={entry} concordance={concordance} />);
+    render(<RootEntry entry={entry} initialConcordance={concordance} total={0} />);
     expect(screen.getByText(/319/)).toBeInTheDocument();
   });
   it("renders Lane's definition with attribution", () => {
-    render(<RootEntry entry={entry} concordance={concordance} />);
+    render(<RootEntry entry={entry} initialConcordance={concordance} total={0} />);
     expect(screen.getByText(/To write/)).toBeInTheDocument();
     expect(screen.getByText(/lane/i)).toBeInTheDocument();
   });
@@ -44,16 +44,16 @@ describe('RootEntry', () => {
         { id: 1, root_id: 1, source: 'qurandev-lane', definition: 'To write.' },
       ],
     };
-    render(<RootEntry entry={qd} concordance={concordance} />);
+    render(<RootEntry entry={qd} initialConcordance={concordance} total={0} />);
     expect(screen.getByText("Lane's Lexicon")).toBeInTheDocument();
     expect(screen.queryByText(/qurandev-lane/)).toBeNull();
   });
   it('renders form groups', () => {
-    render(<RootEntry entry={entry} concordance={concordance} />);
+    render(<RootEntry entry={entry} initialConcordance={concordance} total={0} />);
     expect(screen.getByText('Noun')).toBeInTheDocument();
   });
   it('omits definition block when none', () => {
-    render(<RootEntry entry={{ ...entry, definitions: [] }} concordance={concordance} />);
+    render(<RootEntry entry={{ ...entry, definitions: [] }} initialConcordance={concordance} total={0} />);
     expect(screen.queryByText(/To write/)).toBeNull();
   });
   it('shows 3 letter pills and singular "1 time", no Buckwalter', () => {
@@ -62,7 +62,7 @@ describe('RootEntry', () => {
       forms: [],
       definitions: [],
     };
-    render(<RootEntry entry={entry} concordance={[]} />);
+    render(<RootEntry entry={entry} initialConcordance={[]} total={0} />);
     expect(screen.queryByText(/dxl/)).toBeNull();
     expect(screen.getByText(/occurs 1 time(?!s)/)).toBeInTheDocument();
     for (const letter of ['د', 'خ', 'ل']) {

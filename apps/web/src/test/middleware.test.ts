@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 
 // Mock next/server before importing middleware
 const mockNext = vi.fn();
@@ -82,5 +82,29 @@ describe('CSP middleware', () => {
     const csp = responseHeaders.get('Content-Security-Policy') ?? '';
     expect(csp).toContain("object-src 'none'");
     expect(csp).toContain("base-uri 'self'");
+  });
+
+  // Next dev's Fast-Refresh runtime evaluates strings as JS (eval). A strict
+  // prod CSP with no 'unsafe-eval' throws EvalError there, aborting the webpack
+  // bootstrap so nothing hydrates. Dev must permit eval; prod must not.
+  describe("script-src 'unsafe-eval' gating", () => {
+    afterEach(() => vi.unstubAllEnvs());
+
+    function scriptSrc() {
+      const { responseHeaders } = captureResponse();
+      middleware(makeRequest());
+      const csp = responseHeaders.get('Content-Security-Policy') ?? '';
+      return csp.split(';').find((d) => d.trim().startsWith('script-src')) ?? '';
+    }
+
+    it("permits 'unsafe-eval' in development", () => {
+      vi.stubEnv('NODE_ENV', 'development');
+      expect(scriptSrc()).toContain("'unsafe-eval'");
+    });
+
+    it("forbids 'unsafe-eval' in production", () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      expect(scriptSrc()).not.toContain("'unsafe-eval'");
+    });
   });
 });

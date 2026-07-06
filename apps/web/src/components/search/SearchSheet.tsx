@@ -2,9 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import Link from 'next/link';
-import type { SearchResult } from '@quran-corpus/data';
-import { EMPTY_SEARCH_RESULT } from '@quran-corpus/data';
+import { EMPTY_SEARCH_RESULT, type SearchResult } from '@quran-corpus/data/client';
 import { SearchResults } from './SearchResults';
 import { VersePicker } from '../wbw/VersePicker';
 import type { PickerSurah } from '../wbw/types';
@@ -115,15 +113,6 @@ export function SearchSheet({ open, onClose }: { open: boolean; onClose: () => v
               </button>
             </div>
             {q.trim().length > 0 && <SearchResults result={result} />}
-            {q.trim().length > 0 && (
-              <Link
-                href={`/search?q=${encodeURIComponent(q.trim())}`}
-                onClick={onClose}
-                className="mt-4 block text-center text-sm text-paper-600 underline dark:text-paper-300"
-              >
-                See all results
-              </Link>
-            )}
           </motion.div>
         </>
       )}

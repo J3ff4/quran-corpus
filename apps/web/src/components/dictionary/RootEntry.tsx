@@ -4,7 +4,10 @@ import { ConcordanceList } from './ConcordanceList';
 
 interface RootEntryProps {
   entry: RootEntryT;
-  concordance: ConcordanceEntry[];
+  /** First page of the concordance; the rest is paged in client-side. */
+  initialConcordance: ConcordanceEntry[];
+  /** Total occurrences across the whole concordance. */
+  total: number;
 }
 
 const sourceLabel = (source: string): string =>
@@ -14,7 +17,7 @@ const sourceLabel = (source: string): string =>
  * Full root entry: header, Lane's definition (additive — omitted when empty),
  * derived form groups, and the concordance section.
  */
-export function RootEntry({ entry, concordance }: RootEntryProps) {
+export function RootEntry({ entry, initialConcordance, total }: RootEntryProps) {
   const { root, forms, definitions } = entry;
   return (
     <article>
@@ -73,9 +76,13 @@ export function RootEntry({ entry, concordance }: RootEntryProps) {
 
       <section>
         <h2 className="mb-2 text-sm font-medium text-paper-600 dark:text-paper-400">
-          Concordance ({concordance.length})
+          Concordance ({total})
         </h2>
-        <ConcordanceList entries={concordance} />
+        <ConcordanceList
+          initialEntries={initialConcordance}
+          total={total}
+          rootBw={root.root_buckwalter}
+        />
       </section>
     </article>
   );

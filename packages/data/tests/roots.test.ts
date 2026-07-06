@@ -9,6 +9,9 @@ import {
   searchRoots,
   getRootEntry,
   getRootConcordance,
+  getRootConcordancePage,
+  countRootConcordance,
+  getRootSearchList,
 } from '../src/queries/roots.js';
 
 let db: Client;
@@ -89,6 +92,20 @@ describe('roots queries', () => {
   it('getRootArabicList returns every root_arabic', async () => {
     expect((await getRootArabicList(db)).sort()).toEqual(['س م و', 'ش أ م', 'ك ت ب']);
   });
+  it('getRootSearchList returns every root, ktb (no forms) with a null blob', async () => {
+    const list = await getRootSearchList(db);
+    expect(list.length).toBe(3);
+    expect(list.find((r) => r.root_buckwalter === 'ktb')?.gloss_blob).toBeNull();
+  });
+  it('getRootSearchList concatenates a root’s form glosses', async () => {
+    const smwId = (await getRootByBuckwalter(db, 'smw'))!.id;
+    await db.execute({
+      sql: `INSERT INTO root_forms (root_id,sort_order,pos_label,gloss,occurrence_count) VALUES (?,1,'Noun','name',1),(?,2,'Noun','high place',1)`,
+      args: [smwId, smwId],
+    });
+    const smw = (await getRootSearchList(db)).find((r) => r.root_buckwalter === 'smw');
+    expect(smw?.gloss_blob).toBe('name high place');
+  });
   it('getRootConcordance batches ayah IDs (batchSize=1) without dropping words', async () => {
     // a2 in a second ayah; same root 'bat' matched in two ayahs -> two batches
     const a2 = await db.execute(
@@ -106,6 +123,32 @@ describe('roots queries', () => {
     expect(c).toHaveLength(2);
     // each entry's verse_words come from its own ayah (batch boundary intact)
     expect(c.every((e) => e.verse_words.some((w) => w.id === e.word_id))).toBe(true);
+  });
+  it('getRootConcordancePage windows with limit/offset; count is total', async () => {
+    await db.execute(
+      `INSERT INTO surahs (id,name_arabic,name_translit,name_translation,revelation_type,ayah_count,order_number) VALUES (2,'ب','b','b','meccan',5,2)`,
+    );
+    // 5 matched words for root 'pag', one per ayah of surah 2 (deterministic order)
+    for (let n = 1; n <= 5; n++) {
+      const a = await db.execute({
+        sql: `INSERT INTO ayahs (surah_id,ayah_number,text_uthmani) VALUES (2,?,'ص') RETURNING id`,
+        args: [n],
+      });
+      const aid = a.rows[0]!['id'] as number;
+      await db.execute({
+        sql: `INSERT INTO words (ayah_id,position,text_arabic,root_buckwalter,pos_tag) VALUES (?,1,'ص','pag','N')`,
+        args: [aid],
+      });
+    }
+    expect(await countRootConcordance(db, 'pag')).toBe(5);
+    expect(await countRootConcordance(db, 'zzz')).toBe(0);
+    expect((await getRootConcordancePage(db, 'pag', { limit: 2, offset: 0 })).length).toBe(2);
+    const last = await getRootConcordancePage(db, 'pag', { limit: 2, offset: 4 });
+    expect(last.length).toBe(1);
+    // paged entries still rebuild their verse via the shared helper
+    expect(last[0]!.verse_words.some((w) => w.id === last[0]!.word_id)).toBe(true);
+    // offset past the end -> empty
+    expect((await getRootConcordancePage(db, 'pag', { limit: 2, offset: 5 })).length).toBe(0);
   });
   it('two matches in one ayah -> two entries, same verse_words, distinct word_id', async () => {
     const a = await db.execute(`SELECT id FROM ayahs WHERE surah_id=1 AND ayah_number=1`);

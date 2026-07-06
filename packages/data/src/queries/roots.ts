@@ -6,6 +6,7 @@ import type {
   RootEntry,
   ConcordanceEntry,
   VerseWord,
+  RootSearchItem,
 } from '../types.js';
 import { compareRootsArabic } from '../text/arabic.js';
 
@@ -60,6 +61,27 @@ export async function getRootArabicList(db: Client): Promise<string[]> {
   return res.rows.map((r) => r['root_arabic'] as string);
 }
 
+/** Every root plus a concatenated gloss blob, for a one-shot static payload
+ *  that the dictionary page's client-side search can filter by meaning
+ *  without a per-keystroke server round-trip. */
+export async function getRootSearchList(db: Client): Promise<RootSearchItem[]> {
+  const res = await db.execute(
+    `SELECT r.id, r.root_buckwalter, r.root_arabic, r.occurrence_count,
+            GROUP_CONCAT(f.gloss, ' ') AS gloss_blob
+     FROM roots r
+     LEFT JOIN root_forms f ON f.root_id = r.id
+     GROUP BY r.id
+     ORDER BY r.root_arabic`,
+  );
+  return res.rows.map((r) => ({
+    id: r['id'] as number,
+    root_buckwalter: r['root_buckwalter'] as string,
+    root_arabic: r['root_arabic'] as string,
+    occurrence_count: r['occurrence_count'] as number,
+    gloss_blob: (r['gloss_blob'] as string | null) ?? null,
+  }));
+}
+
 export async function getRootsByFrequency(db: Client, limit = 200): Promise<Root[]> {
   const res = await db.execute({
     sql: 'SELECT * FROM roots ORDER BY occurrence_count DESC, root_buckwalter LIMIT ?',
@@ -109,12 +131,40 @@ export async function getRootEntry(db: Client, bw: string): Promise<RootEntry | 
   return { root, forms, definitions };
 }
 
-export async function getRootConcordance(
+export interface ConcordancePageOpts {
+  /** Omit for the full, unbounded list; set for server-side paging. */
+  limit?: number;
+  offset?: number;
+  lang?: string;
+  batchSize?: number;
+}
+
+/** Total matched occurrences for a root — the paging total, cheap COUNT with no
+ *  verse rebuild. One row per matched word (no join fan-out), so this equals the
+ *  entry count of the concordance. */
+export async function countRootConcordance(db: Client, bw: string): Promise<number> {
+  const res = await db.execute({
+    sql: 'SELECT COUNT(*) AS n FROM words WHERE root_buckwalter = ?',
+    args: [bw],
+  });
+  return res.rows[0]!['n'] as number;
+}
+
+/** One page of a root's concordance (or all of it when `limit` is omitted).
+ *  Deterministic surah→ayah→position order so LIMIT/OFFSET paging never repeats
+ *  or skips an occurrence. */
+export async function getRootConcordancePage(
   db: Client,
   bw: string,
-  lang = 'en',
-  batchSize = 500,
+  opts: ConcordancePageOpts = {},
 ): Promise<ConcordanceEntry[]> {
+  const { limit, offset = 0, lang = 'en', batchSize = 500 } = opts;
+  const args: (string | number)[] = [lang, bw];
+  let paging = '';
+  if (limit !== undefined) {
+    paging = ' LIMIT ? OFFSET ?';
+    args.push(limit, offset);
+  }
   const matched = await db.execute({
     sql: `SELECT a.surah_id, a.ayah_number, w.position, w.id AS word_id,
                  w.ayah_id AS ayah_id, w.text_arabic, w.transliteration,
@@ -123,8 +173,8 @@ export async function getRootConcordance(
           JOIN ayahs a ON a.id = w.ayah_id
           LEFT JOIN word_glosses g ON g.word_id = w.id AND g.language_code = ?
           WHERE w.root_buckwalter = ?
-          ORDER BY a.surah_id, a.ayah_number, w.position`,
-    args: [lang, bw],
+          ORDER BY a.surah_id, a.ayah_number, w.position${paging}`,
+    args,
   });
   if (matched.rows.length === 0) return [];
 
@@ -163,4 +213,14 @@ export async function getRootConcordance(
     gloss: (r['gloss'] as string | null) ?? null,
     verse_words: wordsByAyah.get(r['ayah_id'] as number) ?? [],
   }));
+}
+
+/** Full concordance for a root (unbounded). Thin wrapper over the paged query. */
+export async function getRootConcordance(
+  db: Client,
+  bw: string,
+  lang = 'en',
+  batchSize = 500,
+): Promise<ConcordanceEntry[]> {
+  return getRootConcordancePage(db, bw, { lang, batchSize });
 }

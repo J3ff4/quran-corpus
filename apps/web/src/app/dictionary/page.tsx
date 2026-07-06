@@ -1,63 +1,23 @@
-export const dynamic = 'force-dynamic';
-
-import type { Root } from '@quran-corpus/data';
-import {
-  getAllRoots,
-  getRootArabicList,
-  getRootsByFrequency,
-  searchRoots,
-  rootFirstLetter,
-} from '@quran-corpus/data';
+import { getRootSearchList } from '@quran-corpus/data';
 import { getDatabase } from '../../lib/db';
-import { DictionaryIndex } from '../../components/dictionary/DictionaryIndex';
-import { AlphabetGrid } from '../../components/dictionary/AlphabetGrid';
+import { DictionaryBrowser } from '../../components/dictionary/DictionaryBrowser';
 import { letterCounts } from './letters';
-import { parseSort } from './sort';
 
-interface PageProps {
-  searchParams: Promise<{ q?: string; sort?: string; letter?: string }>;
-}
-
-export default async function DictionaryPage({ searchParams }: PageProps) {
-  const { q, sort: rawSort, letter } = await searchParams;
-  const sort = parseSort(rawSort);
+// Static: the full root list (~1642 rows, ~100-150KB) ships once at build
+// time and is cached by the service worker. All search/sort/letter filtering
+// happens client-side in DictionaryBrowser — no per-request SSR, no
+// searchParams, no navigation on filter.
+export default async function DictionaryPage() {
   const db = await getDatabase();
-  const query = q?.trim();
-
-  // Alpha/letter views need every root as the display list, so derive letter
-  // counts from that same read. Freq/search views only need counts, so fetch a
-  // slim root_arabic list instead of reading + sorting all rows twice.
-  const needsAllRoots = !!letter || (!query && sort !== 'freq');
-  let roots: Root[];
-  let counts: Record<string, number>;
-  if (needsAllRoots) {
-    const allRoots = await getAllRoots(db);
-    counts = letterCounts(allRoots.map((r) => r.root_arabic));
-    roots = letter
-      ? allRoots.filter((r) => rootFirstLetter(r.root_arabic) === letter)
-      : allRoots;
-  } else {
-    const [list, arabics] = await Promise.all([
-      query ? searchRoots(db, query) : getRootsByFrequency(db),
-      getRootArabicList(db),
-    ]);
-    roots = list;
-    counts = letterCounts(arabics);
-  }
-
-  const effectiveSort = letter ? 'alpha' : sort;
+  const roots = await getRootSearchList(db);
+  const counts = letterCounts(roots.map((r) => r.root_arabic));
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
       <h1 className="mb-6 text-2xl font-semibold text-paper-900 dark:text-paper-100">
         Quranic Dictionary
       </h1>
-      <AlphabetGrid counts={counts} {...(letter ? { activeLetter: letter } : {})} />
-      <DictionaryIndex
-        roots={roots}
-        sort={effectiveSort}
-        {...(query && !letter ? { query } : {})}
-      />
+      <DictionaryBrowser roots={roots} counts={counts} />
     </main>
   );
 }
