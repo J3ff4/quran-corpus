@@ -33,10 +33,10 @@ const sources: Source[] = [
   },
   {
     name: "Lane's Lexicon",
-    href: 'https://lexicon.quranic-research.net',
+    href: 'https://github.com/qurandev/roots',
     provides: 'Classical Arabic root definitions in the Quranic Dictionary.',
     license: 'Public domain',
-    note: "An Arabic-English Lexicon by Edward William Lane (1863), long in the public domain; surfaced per-root alongside the corpus's derived forms.",
+    note: "An Arabic-English Lexicon by Edward William Lane (1863), long in the public domain, compiled per Quranic root by the qurandev/roots project; surfaced per-root alongside the corpus's derived forms.",
   },
 ];
 

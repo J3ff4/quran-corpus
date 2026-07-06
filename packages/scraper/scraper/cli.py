@@ -125,16 +125,22 @@ def import_corpus(txt_path: str, db: str) -> None:
 @main.command("import-lane")
 @click.argument("tsv_path")
 @click.option("--db", default="quran.db", show_default=True)
-def import_lane(tsv_path: str, db: str) -> None:
+@click.option(
+    "--source",
+    default="lane",
+    show_default=True,
+    help="root_definitions.source tag (e.g. qurandev-lane)",
+)
+def import_lane(tsv_path: str, db: str, source: str) -> None:
     """Import Lane's Lexicon root definitions from a TSV (root<TAB>definition)."""
     from pathlib import Path
 
     from .sources.lane import import_lane_definitions
 
     database = ScraperDatabase(db)
-    count = import_lane_definitions(Path(tsv_path), database)
+    count = import_lane_definitions(Path(tsv_path), database, source=source)
     database.close()
-    click.echo(f"Lane import complete: {count} definitions.")
+    click.echo(f"Lane import complete: {count} definitions (source={source}).")
 
 
 @main.command("validate")
