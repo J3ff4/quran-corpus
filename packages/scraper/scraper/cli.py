@@ -101,6 +101,18 @@ def trim_word_descriptions_cmd(db: str) -> None:
     click.echo(f"trim-word-descriptions: {changed} rows trimmed.")
 
 
+@main.command("fix-root-data")
+@click.option("--db", default="quran.db", show_default=True, help="SQLite output path")
+def fix_root_data_cmd(db: str) -> None:
+    """Re-derive occurrence_count from word_segments + drop junk forms (idempotent)."""
+    from .fix_root_data import fix_root_data
+
+    database = ScraperDatabase(db)
+    counts, forms = fix_root_data(database)
+    database.close()
+    click.echo(f"fix-root-data: {counts} counts updated, {forms} junk forms deleted.")
+
+
 @main.command("import-corpus")
 @click.argument("txt_path")
 @click.option("--db", default="quran.db", show_default=True)
@@ -237,3 +249,7 @@ def import_quranenc(
     import_quranenc_translation(Path(json_path), language_code, translator, database)
     database.close()
     click.echo("Import complete.")
+
+
+if __name__ == "__main__":
+    main()

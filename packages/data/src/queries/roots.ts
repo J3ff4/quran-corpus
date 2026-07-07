@@ -104,7 +104,10 @@ export async function searchRoots(db: Client, q: string): Promise<Root[]> {
 
 export async function getRootForms(db: Client, rootId: number): Promise<RootForm[]> {
   const res = await db.execute({
-    sql: 'SELECT * FROM root_forms WHERE root_id = ? ORDER BY sort_order',
+    // form_arabic IS NULL only ever marked See-Also junk (external dictionary
+    // links the pre-fix scraper mistook for forms); real forms always carry
+    // Arabic. Excluding them keeps the UI's empty-section guard correct.
+    sql: 'SELECT * FROM root_forms WHERE root_id = ? AND form_arabic IS NOT NULL ORDER BY sort_order',
     args: [rootId],
   });
   return res.rows.map(rowToForm);

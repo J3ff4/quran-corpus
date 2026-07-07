@@ -410,6 +410,43 @@ class ScraperDatabase:
         )
         self._conn.commit()
 
+    def recompute_occurrence_counts(self) -> int:
+        """Set every root's occurrence_count to its word_segments count.
+
+        word_segments.root is the corpus-aligned occurrence signal (it counts
+        a compound word's secondary root, which words.root_buckwalter misses).
+        Idempotent: re-running yields the same counts. Returns rows changed.
+        """
+        cur = self._conn.execute(
+            """UPDATE roots SET occurrence_count = (
+                   SELECT COUNT(*) FROM word_segments
+                   WHERE word_segments.root = roots.root_buckwalter)
+               WHERE occurrence_count != (
+                   SELECT COUNT(*) FROM word_segments
+                   WHERE word_segments.root = roots.root_buckwalter)"""
+        )
+        self._conn.commit()
+        return cur.rowcount
+
+    def delete_null_arabic_root_forms(self) -> int:
+        """Delete root_forms rows with no Arabic (See-Also junk). Idempotent."""
+        cur = self._conn.execute(
+            "DELETE FROM root_forms WHERE form_arabic IS NULL"
+        )
+        self._conn.commit()
+        return cur.rowcount
+
+    def get_root_by_buckwalter(self, bw: str) -> sqlite3.Row | None:
+        return self._conn.execute(
+            "SELECT * FROM roots WHERE root_buckwalter = ?", (bw,)
+        ).fetchone()
+
+    def get_root_forms_raw(self, root_id: int) -> list[sqlite3.Row]:
+        return self._conn.execute(
+            "SELECT * FROM root_forms WHERE root_id = ? ORDER BY sort_order",
+            (root_id,),
+        ).fetchall()
+
     def get_distinct_roots(self) -> list[str]:
         return [
             r[0]

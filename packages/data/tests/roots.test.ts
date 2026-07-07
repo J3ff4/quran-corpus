@@ -12,6 +12,7 @@ import {
   getRootConcordancePage,
   countRootConcordance,
   getRootSearchList,
+  getRootForms,
 } from '../src/queries/roots.js';
 
 let db: Client;
@@ -44,7 +45,7 @@ beforeAll(async () => {
   );
   const smwId = r.rows[0]!['id'] as number;
   await db.execute({
-    sql: `INSERT INTO root_forms (root_id,sort_order,pos_label,form_translit,occurrence_count) VALUES (?,0,'Noun','ism',5)`,
+    sql: `INSERT INTO root_forms (root_id,sort_order,pos_label,form_arabic,form_translit,occurrence_count) VALUES (?,0,'Noun','ٱسْم','ism',5)`,
     args: [smwId],
   });
   await db.execute({
@@ -77,6 +78,17 @@ describe('roots queries', () => {
     const e = await getRootEntry(db, 'smw');
     expect(e?.forms.length).toBe(1);
     expect(e?.definitions[0]?.definition).toBe('To be high');
+  });
+  it('getRootForms excludes null-arabic (junk) rows', async () => {
+    const smwId = (await getRootByBuckwalter(db, 'smw'))!.id;
+    // a See-Also-style junk row: pos_label set, form_arabic NULL
+    await db.execute({
+      sql: `INSERT INTO root_forms (root_id,sort_order,pos_label,form_arabic,occurrence_count) VALUES (?,50,'Lane''s Lexicon',NULL,0)`,
+      args: [smwId],
+    });
+    const forms = await getRootForms(db, smwId);
+    expect(forms.every((f) => f.form_arabic !== null)).toBe(true);
+    expect(forms.some((f) => f.pos_label === "Lane's Lexicon")).toBe(false);
   });
   it('getRootConcordance rebuilds verse from words + keeps gloss', async () => {
     const c = await getRootConcordance(db, 'smw');

@@ -102,3 +102,22 @@ def test_occurs_only_once_parses() -> None:
     parsed = parse_root_page(html)
     assert parsed is not None
     assert parsed.occurrence_count == 1
+
+
+# A root with NO derived forms: its only <ul class="also"> is the See-Also box.
+# Its <li> (a Lane's Lexicon link, no <span class="at">) must NOT become a form.
+_SEE_ALSO_ONLY_HTML = (
+    '<html><body>The triliteral root hamza bā dāl '
+    '(<span class="at">أ ب د</span>) occurs 28 times in the Quran.'
+    '<h4>See Also</h4><ul class="also"><li>'
+    '<a href="https://lexicon.quranic-research.net/">Lane\'s Lexicon</a>'
+    " - Classical Arabic dictionary</li></ul>"
+    "</body></html>"
+)
+
+
+def test_see_also_only_page_has_no_forms() -> None:
+    parsed = parse_root_page(_SEE_ALSO_ONLY_HTML)
+    assert parsed is not None
+    assert parsed.occurrence_count == 28
+    assert parsed.forms == []

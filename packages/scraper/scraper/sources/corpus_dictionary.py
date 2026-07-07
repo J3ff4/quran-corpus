@@ -70,35 +70,42 @@ def _cap_first(s: str) -> str:
 
 
 def _extract_forms(soup: BeautifulSoup) -> list[ParsedRootForm]:
-    ul = soup.find("ul", class_="also")
-    if not isinstance(ul, Tag):
-        return []
     forms: list[ParsedRootForm] = []
-    for i, li in enumerate(ul.find_all("li")):
-        translit_el = li.find("i", class_="ab")
-        arabic_el = li.find("span", class_="at")
-        form_translit = translit_el.get_text(strip=True) if translit_el else None
-        form_arabic = arabic_el.get_text(strip=True) if arabic_el else None
-        # Text before the translit tag: "49 times as the form I verb"
-        lead = li.get_text(" ", strip=True)
-        if form_translit:
-            lead = lead.split(form_translit)[0]
-        m = _FORM_RE.match(lead)
-        if m:
-            count = _parse_count(m.group(1))
-            pos_label = _cap_first(m.group(2).strip())
-        else:
-            count, pos_label = 0, lead.strip()
-        forms.append(
-            ParsedRootForm(
-                sort_order=i,
-                pos_label=pos_label,
-                form_arabic=form_arabic,
-                form_translit=form_translit,
-                gloss=None,
-                occurrence_count=count,
+    # The page reuses class="also" for both the derived-forms list and the
+    # "See Also" box. Real derived-form <li>s carry a <span class="at"> (the
+    # form's Arabic); See-Also <li>s (external dictionary links) do not. Scan
+    # every ul.also and keep only Arabic-bearing entries — this drops the
+    # See-Also junk whether or not a forms list is present.
+    for ul in soup.find_all("ul", class_="also"):
+        if not isinstance(ul, Tag):
+            continue
+        for li in ul.find_all("li"):
+            arabic_el = li.find("span", class_="at")
+            if arabic_el is None:
+                continue
+            translit_el = li.find("i", class_="ab")
+            form_translit = translit_el.get_text(strip=True) if translit_el else None
+            form_arabic = arabic_el.get_text(strip=True)
+            # Text before the translit tag: "49 times as the form I verb"
+            lead = li.get_text(" ", strip=True)
+            if form_translit:
+                lead = lead.split(form_translit)[0]
+            m = _FORM_RE.match(lead)
+            if m:
+                count = _parse_count(m.group(1))
+                pos_label = _cap_first(m.group(2).strip())
+            else:
+                count, pos_label = 0, lead.strip()
+            forms.append(
+                ParsedRootForm(
+                    sort_order=len(forms),
+                    pos_label=pos_label,
+                    form_arabic=form_arabic,
+                    form_translit=form_translit,
+                    gloss=None,
+                    occurrence_count=count,
+                )
             )
-        )
     return forms
 
 
