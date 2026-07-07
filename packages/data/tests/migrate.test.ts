@@ -41,6 +41,22 @@ describe('runMigrations', () => {
     await expect(runMigrations(db)).resolves.not.toThrow();
   });
 
+  it('indexes word_segments.root (concordance lookup by segment root)', async () => {
+    // Concordance queries match word_segments.root via EXISTS; without this
+    // index that is a full scan of ~77k words on the force-dynamic root page.
+    const idx = await db.execute(
+      "SELECT name FROM sqlite_master WHERE type='index' AND name = 'idx_word_segments_root'",
+    );
+    expect(idx.rows).toHaveLength(1);
+  });
+
+  it('indexes roots.sort_order (O(1) neighbor lookup)', async () => {
+    const idx = await db.execute(
+      "SELECT name FROM sqlite_master WHERE type='index' AND name = 'idx_roots_sort_order'",
+    );
+    expect(idx.rows).toHaveLength(1);
+  });
+
   it('creates dictionary + morphology-detail tables', async () => {
     const d = createDatabase('file::memory:');
     await runMigrations(d);

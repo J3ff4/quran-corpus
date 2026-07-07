@@ -3,12 +3,46 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { ConcordanceEntry } from '@quran-corpus/data';
+import { trimConcordanceVerse } from '@quran-corpus/data/client';
 import { verseRef, concordanceHref } from '../../lib/concordance';
 
 const PAGE = 20;
 
 const wash =
   'rounded-md bg-accent-100 px-1 font-semibold text-accent-700 dark:bg-accent-900/40 dark:text-accent-300';
+
+/** One occurrence's verse, trimmed to a window around the matched word by
+ * default with a per-row toggle to reveal the whole ayah. */
+function ConcordanceVerse({ entry }: { entry: ConcordanceEntry }) {
+  const [expanded, setExpanded] = useState(false);
+  const trimmed = trimConcordanceVerse(entry.verse_words, entry.word_id);
+  const shown = expanded ? entry.verse_words : trimmed.words;
+  const canExpand = trimmed.words.length < entry.verse_words.length;
+  return (
+    <>
+      <p dir="rtl" className="font-arabic text-lg leading-loose text-paper-800 dark:text-paper-200">
+        {!expanded && trimmed.truncatedBefore && <span className="text-paper-400">… </span>}
+        {shown.map((w, i) => (
+          <span key={w.id}>
+            {i > 0 && ' '}
+            <span className={w.id === entry.word_id ? wash : undefined}>{w.text_arabic}</span>
+          </span>
+        ))}
+        {!expanded && trimmed.truncatedAfter && <span className="text-paper-400"> …</span>}
+      </p>
+      {canExpand && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          className="mt-1 text-xs text-paper-500 underline-offset-2 hover:underline"
+        >
+          {expanded ? 'Show less' : 'Show full verse'}
+        </button>
+      )}
+    </>
+  );
+}
 
 interface ConcordanceListProps {
   /** First page, server-rendered. */
@@ -86,17 +120,7 @@ export function ConcordanceList({ initialEntries, total, rootBw }: ConcordanceLi
             {e.gloss && (
               <p className="mb-1 text-sm text-paper-700 dark:text-paper-300">{e.gloss}</p>
             )}
-            <p
-              dir="rtl"
-              className="font-arabic text-lg leading-loose text-paper-800 dark:text-paper-200"
-            >
-              {e.verse_words.map((w, i) => (
-                <span key={w.id}>
-                  {i > 0 && ' '}
-                  <span className={w.id === e.word_id ? wash : undefined}>{w.text_arabic}</span>
-                </span>
-              ))}
-            </p>
+            <ConcordanceVerse entry={e} />
           </li>
         ))}
       </ul>

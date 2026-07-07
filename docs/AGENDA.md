@@ -51,9 +51,11 @@ Spec/plan: `docs/superpowers/{specs,plans}/2026-07-06-dictionary-data-correctnes
   roots; order = current sort — confirm alphabetical vs frequency at plan time).
 - ⬜ **Pill-letter centering** (screenshot 2922). Root-letter pills not
   horizontally centered. CSS.
-- 🔁 **Dictionary "load more does nothing."** Reported on yesterday's build; both
-  dictionary Show-more and concordance Load-more reimplemented since. User to
-  re-test current build; treat as live bug only if it reproduces.
+- ✅ **Dictionary "load more does nothing."** Re-tested on a **prod build**
+  (2026-07-07, Phase 11 Task 1): no repro. Concordance Load-more API pages
+  cleanly (total 35, page1 20 + page2 15, offset-past-end 0, zero overlap, 35
+  distinct); Show-more + ConcordanceList append covered by 18/18 component tests.
+  Logic/API sound. (Visual jank spot-check left to user; not a code bug.)
 - ⬜ **Concordance undercounts compound secondary roots.** occurrence_count
   (from `word_segments`, corpus-correct) counts a compound word's secondary root;
   the concordance query uses `words.root_buckwalter` (primary root only), so it

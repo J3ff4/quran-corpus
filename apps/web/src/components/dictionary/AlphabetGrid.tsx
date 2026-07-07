@@ -20,7 +20,7 @@ const off = 'cursor-default bg-paper-100 text-paper-300 dark:bg-night-50 dark:te
  */
 export function AlphabetGrid({ counts, activeLetter, onSelect }: AlphabetGridProps) {
   return (
-    <nav dir="rtl" aria-label="Filter roots by letter" className="mb-6 flex flex-wrap gap-1.5">
+    <nav dir="rtl" aria-label="Filter roots by letter" className="mb-6 flex flex-wrap justify-center gap-1.5">
       {ARABIC_ALPHABET_ORDER.map((letter) => {
         const has = (counts[letter] ?? 0) > 0;
         if (!has) {

@@ -109,6 +109,9 @@ export interface VerseWord {
   id: number;
   position: number;
   text_arabic: string;
+  /** True if this word begins a new clause (first segment's pos_tag ∈ boundary
+   *  set: CONJ/SUB[/…]). Present only on concordance verses; absent elsewhere. */
+  starts_clause?: boolean;
 }
 
 export interface ConcordanceEntry {

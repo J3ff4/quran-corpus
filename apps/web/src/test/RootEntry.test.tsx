@@ -4,8 +4,14 @@ import { RootEntry } from '../components/dictionary/RootEntry';
 import type { RootEntry as RootEntryT, ConcordanceEntry } from '@quran-corpus/data';
 
 vi.mock('next/link', () => ({
-  default: ({ href, children }: { href: string; children: React.ReactNode }) => (
-    <a href={href}>{children}</a>
+  default: ({
+    href,
+    children,
+    ...rest
+  }: { href: string; children: React.ReactNode } & Record<string, unknown>) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
   ),
 }));
 
@@ -29,11 +35,11 @@ const concordance: ConcordanceEntry[] = [];
 
 describe('RootEntry', () => {
   it('renders occurrence count', () => {
-    render(<RootEntry entry={entry} initialConcordance={concordance} total={0} />);
+    render(<RootEntry entry={entry} initialConcordance={concordance} total={0} prevBw={null} nextBw={null} />);
     expect(screen.getByText(/319/)).toBeInTheDocument();
   });
   it("renders Lane's definition with attribution", () => {
-    render(<RootEntry entry={entry} initialConcordance={concordance} total={0} />);
+    render(<RootEntry entry={entry} initialConcordance={concordance} total={0} prevBw={null} nextBw={null} />);
     expect(screen.getByText(/To write/)).toBeInTheDocument();
     expect(screen.getByText(/lane/i)).toBeInTheDocument();
   });
@@ -44,16 +50,16 @@ describe('RootEntry', () => {
         { id: 1, root_id: 1, source: 'qurandev-lane', definition: 'To write.' },
       ],
     };
-    render(<RootEntry entry={qd} initialConcordance={concordance} total={0} />);
+    render(<RootEntry entry={qd} initialConcordance={concordance} total={0} prevBw={null} nextBw={null} />);
     expect(screen.getByText("Lane's Lexicon")).toBeInTheDocument();
     expect(screen.queryByText(/qurandev-lane/)).toBeNull();
   });
   it('renders form groups', () => {
-    render(<RootEntry entry={entry} initialConcordance={concordance} total={0} />);
+    render(<RootEntry entry={entry} initialConcordance={concordance} total={0} prevBw={null} nextBw={null} />);
     expect(screen.getByText('Noun')).toBeInTheDocument();
   });
   it('omits definition block when none', () => {
-    render(<RootEntry entry={{ ...entry, definitions: [] }} initialConcordance={concordance} total={0} />);
+    render(<RootEntry entry={{ ...entry, definitions: [] }} initialConcordance={concordance} total={0} prevBw={null} nextBw={null} />);
     expect(screen.queryByText(/To write/)).toBeNull();
   });
   it('shows 3 letter pills and singular "1 time", no Buckwalter', () => {
@@ -62,11 +68,35 @@ describe('RootEntry', () => {
       forms: [],
       definitions: [],
     };
-    render(<RootEntry entry={entry} initialConcordance={[]} total={0} />);
+    render(
+      <RootEntry
+        entry={entry}
+        initialConcordance={[]}
+        total={0}
+        prevBw={null}
+        nextBw={null}
+      />,
+    );
     expect(screen.queryByText(/dxl/)).toBeNull();
     expect(screen.getByText(/occurs 1 time(?!s)/)).toBeInTheDocument();
     for (const letter of ['د', 'خ', 'ل']) {
       expect(screen.getByText(letter)).toBeInTheDocument();
     }
+  });
+  it('renders prev/next root links, disabled at an end', () => {
+    render(
+      <RootEntry
+        entry={entry}
+        initialConcordance={concordance}
+        total={0}
+        prevBw="smw"
+        nextBw={null}
+      />,
+    );
+    const prev = screen.getByRole('link', { name: /previous root/i });
+    expect(prev).toHaveAttribute('href', '/dictionary/smw');
+    // next is at the end → not a link
+    expect(screen.queryByRole('link', { name: /next root/i })).toBeNull();
+    expect(screen.getByLabelText(/next root/i)).toHaveAttribute('aria-disabled', 'true');
   });
 });

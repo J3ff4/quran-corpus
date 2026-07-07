@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ConcordanceEntry } from '@quran-corpus/data';
 
 vi.mock('next/link', () => ({
@@ -85,6 +86,26 @@ describe('ConcordanceList', () => {
     await screen.findByRole('alert');
     // Button remains (not stuck on "Loading…") so the user can retry.
     expect(screen.getByRole('button', { name: /load more/i })).toBeInTheDocument();
+  });
+
+  it('trims a long verse to a window and expands on click', async () => {
+    const verse_words = Array.from({ length: 20 }, (_, i) => ({
+      id: i + 1, position: i + 1, text_arabic: `و${i + 1}`,
+    }));
+    const entry = {
+      // ponytail: text_arabic set distinct from verse_words[9] ('و10') — the brief's
+      // literal fixture had both equal, so the pre-existing header span (which always
+      // renders entry.text_arabic) and the matched-word span both show 'و10',
+      // making getByText('و10') ambiguous in every state. Not a trimming bug.
+      surah_id: 2, ayah_number: 282, position: 10, word_id: 10,
+      text_arabic: 'HEAD', transliteration: null, gloss: null, verse_words,
+    };
+    render(<ConcordanceList initialEntries={[entry]} total={1} rootBw="tst" />);
+    // trimmed: matched word visible, far word (id 1 / و1) hidden until expanded
+    expect(screen.getByText('و10')).toBeInTheDocument();
+    expect(screen.queryByText('و1')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: /show full verse/i }));
+    expect(screen.getByText('و1')).toBeInTheDocument();
   });
 
   it('aborts an in-flight request on unmount', () => {

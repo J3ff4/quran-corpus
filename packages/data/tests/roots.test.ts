@@ -13,9 +13,21 @@ import {
   countRootConcordance,
   getRootSearchList,
   getRootForms,
+  getRootNeighbors,
+  backfillRootSortOrder,
 } from '../src/queries/roots.js';
 
 let db: Client;
+
+/** Insert a stem segment carrying `root` for an existing word, so the
+ *  concordance queries (which now match word_segments.root) see it. */
+async function seedSegment(wordId: number, root: string): Promise<void> {
+  await db.execute({
+    sql: `INSERT INTO word_segments (word_id,segment_index,segment_type,root)
+          VALUES (?,0,'stem',?)`,
+    args: [wordId, root],
+  });
+}
 
 beforeAll(async () => {
   db = createDatabase('file::memory:');
@@ -40,6 +52,7 @@ beforeAll(async () => {
     sql: `INSERT INTO word_glosses (word_id,language_code,gloss_text) VALUES (?, 'en','In (the) name')`,
     args: [wid],
   });
+  await seedSegment(wid, 'smw');
   const r = await db.execute(
     `INSERT INTO roots (root_buckwalter,root_arabic,occurrence_count) VALUES ('smw','س م و',5),('ktb','ك ت ب',319),('$Am','ش أ م',3) RETURNING id`,
   );
@@ -67,6 +80,32 @@ describe('roots queries', () => {
     expect((await getAllRoots(db)).map((r) => r.root_buckwalter)).toEqual([
       'smw', '$Am', 'ktb',
     ]);
+  });
+  it('getRootNeighbors returns hijāʾī-adjacent roots; null at ends (fallback, no sort_order)', async () => {
+    // Shared db is seeded without sort_order, so this exercises the full-sort
+    // fallback path. order: smw < $Am < ktb
+    expect(await getRootNeighbors(db, '$Am')).toEqual({ prev: 'smw', next: 'ktb' });
+    expect(await getRootNeighbors(db, 'smw')).toEqual({ prev: null, next: '$Am' });
+    expect(await getRootNeighbors(db, 'ktb')).toEqual({ prev: '$Am', next: null });
+    expect(await getRootNeighbors(db, 'zzz')).toEqual({ prev: null, next: null });
+  });
+  it('backfillRootSortOrder materializes hijāʾī rank; getRootNeighbors then uses it', async () => {
+    const d = createDatabase('file::memory:');
+    await runMigrations(d);
+    await d.execute(
+      `INSERT INTO roots (root_buckwalter,root_arabic,occurrence_count)
+       VALUES ('ktb','ك ت ب',319),('smw','س م و',5),('$Am','ش أ م',3)`,
+    );
+    const n = await backfillRootSortOrder(d);
+    expect(n).toBe(3);
+    // ranks 1..N in hijāʾī order regardless of insert order: smw < $Am < ktb
+    const ranked = await d.execute('SELECT root_buckwalter FROM roots ORDER BY sort_order');
+    expect(ranked.rows.map((r) => r['root_buckwalter'])).toEqual(['smw', '$Am', 'ktb']);
+    // indexed path returns the same neighbors as the fallback would
+    expect(await getRootNeighbors(d, '$Am')).toEqual({ prev: 'smw', next: 'ktb' });
+    expect(await getRootNeighbors(d, 'smw')).toEqual({ prev: null, next: '$Am' });
+    expect(await getRootNeighbors(d, 'ktb')).toEqual({ prev: '$Am', next: null });
+    d.close();
   });
   it('getRootsByFrequency', async () => {
     expect((await getRootsByFrequency(db))[0]?.root_buckwalter).toBe('ktb');
@@ -131,6 +170,8 @@ describe('roots queries', () => {
             VALUES (?,9,'بَتْ','bat','N'),(?,1,'بَتّ','bat','N')`,
       args: [a1id, a2id],
     });
+    const bws = await db.execute(`SELECT id FROM words WHERE root_buckwalter='bat'`);
+    for (const row of bws.rows) await seedSegment(row['id'] as number, 'bat');
     const c = await getRootConcordance(db, 'bat', 'en', 1);
     expect(c).toHaveLength(2);
     // each entry's verse_words come from its own ayah (batch boundary intact)
@@ -147,10 +188,11 @@ describe('roots queries', () => {
         args: [n],
       });
       const aid = a.rows[0]!['id'] as number;
-      await db.execute({
-        sql: `INSERT INTO words (ayah_id,position,text_arabic,root_buckwalter,pos_tag) VALUES (?,1,'ص','pag','N')`,
+      const wr = await db.execute({
+        sql: `INSERT INTO words (ayah_id,position,text_arabic,root_buckwalter,pos_tag) VALUES (?,1,'ص','pag','N') RETURNING id`,
         args: [aid],
       });
+      await seedSegment(wr.rows[0]!['id'] as number, 'pag');
     }
     expect(await countRootConcordance(db, 'pag')).toBe(5);
     expect(await countRootConcordance(db, 'zzz')).toBe(0);
@@ -170,9 +212,68 @@ describe('roots queries', () => {
             VALUES (?,3,'كَتَبَ','ktb','V'),(?,4,'كِتَٰب','ktb','N')`,
       args: [aid, aid],
     });
+    const kws = await db.execute(`SELECT id FROM words WHERE root_buckwalter='ktb'`);
+    for (const row of kws.rows) await seedSegment(row['id'] as number, 'ktb');
     const c = await getRootConcordance(db, 'ktb');
     expect(c).toHaveLength(2);
     expect(c[0]!.word_id).not.toBe(c[1]!.word_id);
     expect(c[0]!.verse_words).toEqual(c[1]!.verse_words);
+  });
+
+  it('concordance matches a compound word via its secondary segment root', async () => {
+    // A word whose PRIMARY root is 'bny' but whose second segment carries 'Amm'
+    // (the يَبْنَؤُمَّ / 20:94:2 shape). The old words.root_buckwalter match missed it.
+    const a = await db.execute(
+      `INSERT INTO ayahs (surah_id,ayah_number,text_uthmani) VALUES (1,3,'يَبْنَؤُمَّ') RETURNING id`,
+    );
+    const aid = a.rows[0]!['id'] as number;
+    const w = await db.execute({
+      sql: `INSERT INTO words (ayah_id,position,text_arabic,root_buckwalter,pos_tag)
+            VALUES (?,1,'يَبْنَؤُمَّ','bny','N') RETURNING id`,
+      args: [aid],
+    });
+    const cid = w.rows[0]!['id'] as number;
+    await db.execute({
+      sql: `INSERT INTO word_segments (word_id,segment_index,segment_type,root) VALUES (?,0,'stem','bny'),(?,1,'stem','Amm')`,
+      args: [cid, cid],
+    });
+    // Also a plain word carrying Amm as its primary/only segment.
+    const w2 = await db.execute({
+      sql: `INSERT INTO words (ayah_id,position,text_arabic,root_buckwalter,pos_tag)
+            VALUES (?,2,'أُمّ','Amm','N') RETURNING id`,
+      args: [aid],
+    });
+    await seedSegment(w2.rows[0]!['id'] as number, 'Amm');
+
+    expect(await countRootConcordance(db, 'Amm')).toBe(2);
+    const list = await getRootConcordancePage(db, 'Amm');
+    expect(list.map((e) => e.word_id)).toContain(cid); // compound included
+  });
+
+  it('concordance verse_words carry starts_clause from segment pos_tag', async () => {
+    const a = await db.execute(
+      `INSERT INTO ayahs (surah_id,ayah_number,text_uthmani) VALUES (1,4,'x y') RETURNING id`,
+    );
+    const aid = a.rows[0]!['id'] as number;
+    const w1 = await db.execute({
+      sql: `INSERT INTO words (ayah_id,position,text_arabic,root_buckwalter) VALUES (?,1,'x','clx') RETURNING id`,
+      args: [aid],
+    });
+    const w2 = await db.execute({
+      sql: `INSERT INTO words (ayah_id,position,text_arabic,root_buckwalter) VALUES (?,2,'y','cly') RETURNING id`,
+      args: [aid],
+    });
+    await db.execute({
+      sql: `INSERT INTO word_segments (word_id,segment_index,segment_type,pos_tag,root) VALUES (?,0,'stem','N','clx')`,
+      args: [w1.rows[0]!['id']],
+    });
+    await db.execute({
+      sql: `INSERT INTO word_segments (word_id,segment_index,segment_type,pos_tag,root) VALUES (?,0,'prefix','CONJ',NULL),(?,1,'stem','N','cly')`,
+      args: [w2.rows[0]!['id'], w2.rows[0]!['id']],
+    });
+    const c = await getRootConcordancePage(db, 'clx');
+    const vw = c[0]!.verse_words;
+    expect(vw.find((w) => w.text_arabic === 'x')!.starts_clause).toBe(false);
+    expect(vw.find((w) => w.text_arabic === 'y')!.starts_clause).toBe(true);
   });
 });

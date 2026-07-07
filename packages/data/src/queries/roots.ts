@@ -54,6 +54,62 @@ export async function getAllRoots(db: Client): Promise<Root[]> {
   return res.rows.map(rowToRoot).sort((a, b) => compareRootsArabic(a.root_arabic, b.root_arabic));
 }
 
+/** Materialize hijāʾī rank into roots.sort_order (1..N) so getRootNeighbors is
+ *  an indexed O(1) lookup. compareRootsArabic (via getAllRoots) stays the single
+ *  ordering source — sort_order is a derived cache, so re-run this whenever the
+ *  roots set changes (post-scrape / after any roots insert). Returns rows written. */
+export async function backfillRootSortOrder(db: Client): Promise<number> {
+  const ordered = await getAllRoots(db);
+  if (ordered.length === 0) return 0;
+  await db.batch(
+    ordered.map((r, i) => ({
+      sql: 'UPDATE roots SET sort_order = ? WHERE id = ?',
+      args: [i + 1, r.id],
+    })),
+    'write',
+  );
+  return ordered.length;
+}
+
+/** Hijāʾī-adjacent roots (by root_buckwalter) for prev/next navigation, so the
+ *  arrows always agree with the browse list. O(1) via the indexed sort_order
+ *  column (backfillRootSortOrder). Falls back to a full compareRootsArabic sort
+ *  when sort_order hasn't been backfilled (fresh rebuild), keeping correctness. */
+export async function getRootNeighbors(
+  db: Client,
+  bw: string,
+): Promise<{ prev: string | null; next: string | null }> {
+  const cur = await db.execute({
+    sql: 'SELECT sort_order FROM roots WHERE root_buckwalter = ?',
+    args: [bw],
+  });
+  const rank = cur.rows[0]?.['sort_order'] as number | null | undefined;
+  if (rank === null || rank === undefined) {
+    // Root missing, or sort_order not backfilled — degrade to the full sort.
+    if (cur.rows.length === 0) return { prev: null, next: null };
+    const all = await getAllRoots(db);
+    const i = all.findIndex((r) => r.root_buckwalter === bw);
+    return {
+      prev: i > 0 ? all[i - 1]!.root_buckwalter : null,
+      next: i < all.length - 1 ? all[i + 1]!.root_buckwalter : null,
+    };
+  }
+  const [prev, next] = await Promise.all([
+    db.execute({
+      sql: 'SELECT root_buckwalter FROM roots WHERE sort_order < ? ORDER BY sort_order DESC LIMIT 1',
+      args: [rank],
+    }),
+    db.execute({
+      sql: 'SELECT root_buckwalter FROM roots WHERE sort_order > ? ORDER BY sort_order ASC LIMIT 1',
+      args: [rank],
+    }),
+  ]);
+  return {
+    prev: (prev.rows[0]?.['root_buckwalter'] as string) ?? null,
+    next: (next.rows[0]?.['root_buckwalter'] as string) ?? null,
+  };
+}
+
 /** Slim: just root_arabic for every root — for alphabet letter counts without
  *  reading/sorting full rows when the display list comes from another query. */
 export async function getRootArabicList(db: Client): Promise<string[]> {
@@ -143,11 +199,15 @@ export interface ConcordancePageOpts {
 }
 
 /** Total matched occurrences for a root — the paging total, cheap COUNT with no
- *  verse rebuild. One row per matched word (no join fan-out), so this equals the
- *  entry count of the concordance. */
+ *  verse rebuild. One row per matching word (EXISTS, no join fan-out), so this
+ *  equals the entry count of the concordance.
+ *  ponytail: word-based count. If a single word ever carried the same root in
+ *  two segments, this would read one under roots.occurrence_count (segment-based);
+ *  no such word exists in the corpus. Revisit only if that changes. */
 export async function countRootConcordance(db: Client, bw: string): Promise<number> {
   const res = await db.execute({
-    sql: 'SELECT COUNT(*) AS n FROM words WHERE root_buckwalter = ?',
+    sql: `SELECT COUNT(*) AS n FROM words w
+          WHERE EXISTS (SELECT 1 FROM word_segments s WHERE s.word_id = w.id AND s.root = ?)`,
     args: [bw],
   });
   return res.rows[0]!['n'] as number;
@@ -175,7 +235,7 @@ export async function getRootConcordancePage(
           FROM words w
           JOIN ayahs a ON a.id = w.ayah_id
           LEFT JOIN word_glosses g ON g.word_id = w.id AND g.language_code = ?
-          WHERE w.root_buckwalter = ?
+          WHERE EXISTS (SELECT 1 FROM word_segments s WHERE s.word_id = w.id AND s.root = ?)
           ORDER BY a.surah_id, a.ayah_number, w.position${paging}`,
     args,
   });
@@ -189,9 +249,14 @@ export async function getRootConcordancePage(
     const chunk = ayahIds.slice(i, i + batchSize);
     const placeholders = chunk.map(() => '?').join(',');
     const sib = await db.execute({
-      sql: `SELECT ayah_id, id, position, text_arabic FROM words
-            WHERE ayah_id IN (${placeholders})
-            ORDER BY ayah_id, position`,
+      sql: `SELECT w.ayah_id, w.id, w.position, w.text_arabic,
+                   EXISTS (SELECT 1 FROM word_segments s
+                           WHERE s.word_id = w.id
+                             AND s.segment_index = (SELECT MIN(segment_index) FROM word_segments WHERE word_id = w.id)
+                             AND s.pos_tag IN ('CONJ','SUB')) AS starts_clause
+            FROM words w
+            WHERE w.ayah_id IN (${placeholders})
+            ORDER BY w.ayah_id, w.position`,
       args: chunk,
     });
     for (const r of sib.rows) {
@@ -201,6 +266,7 @@ export async function getRootConcordancePage(
         id: r['id'] as number,
         position: r['position'] as number,
         text_arabic: r['text_arabic'] as string,
+        starts_clause: (r['starts_clause'] as number) === 1,
       });
       wordsByAyah.set(aid, list);
     }

@@ -11,6 +11,8 @@ export {
   rootFirstLetter,
   ARABIC_ALPHABET_ORDER,
 } from './text/arabic.js';
+export { trimConcordanceVerse } from './text/concordanceTrim.js';
+export type { TrimmedVerse } from './text/concordanceTrim.js';
 
 // Types are erased at build time (no runtime import), but re-exporting the ones
 // client components use lets them source both value and type from one path.

@@ -69,7 +69,12 @@ CREATE TABLE IF NOT EXISTS roots (
   id               INTEGER PRIMARY KEY AUTOINCREMENT,
   root_buckwalter  TEXT    NOT NULL UNIQUE,
   root_arabic      TEXT    NOT NULL,
-  occurrence_count INTEGER NOT NULL DEFAULT 0
+  occurrence_count INTEGER NOT NULL DEFAULT 0,
+  -- Materialized hijāʾī rank (1..N) from compareRootsArabic, written by
+  -- backfillRootSortOrder so prev/next neighbor lookup is an indexed O(1) query
+  -- instead of sorting every root per force-dynamic page view. NULL until
+  -- backfilled (fresh rebuild); getRootNeighbors falls back to the full sort.
+  sort_order       INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS root_forms (
@@ -122,7 +127,9 @@ CREATE INDEX IF NOT EXISTS idx_words_root_bw       ON words(root_buckwalter);
 CREATE INDEX IF NOT EXISTS idx_words_lemma_bw      ON words(lemma_buckwalter);
 CREATE INDEX IF NOT EXISTS idx_root_forms_root     ON root_forms(root_id, sort_order);
 CREATE INDEX IF NOT EXISTS idx_root_defs_root      ON root_definitions(root_id);
+CREATE INDEX IF NOT EXISTS idx_roots_sort_order     ON roots(sort_order);
 CREATE INDEX IF NOT EXISTS idx_word_segments_word  ON word_segments(word_id, segment_index);
+CREATE INDEX IF NOT EXISTS idx_word_segments_root  ON word_segments(root);
 CREATE INDEX IF NOT EXISTS idx_word_concept_word   ON word_concept_tags(word_id);
 
 -- Global search (Phase 07b). Unified FTS5 over normalized Arabic + translation
