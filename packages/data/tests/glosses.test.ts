@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createDatabase, type Client } from '../src/db.js';
 import { runMigrations } from '../src/migrate.js';
-import { getGlossesBySurahAndLang } from '../src/queries/glosses.js';
+import { getGlossesBySurahAndLang, getGlossesWithFallback } from '../src/queries/glosses.js';
 
 let db: Client;
 
@@ -42,6 +42,16 @@ beforeAll(async () => {
           (?, 'en', 'Allah')`,
     args: [word1Id, word2Id],
   });
+
+  await db.execute({
+    sql: `INSERT INTO languages (code, name_native, name_english, direction)
+          VALUES ('uz', 'O''zbekcha', 'Uzbek', 'ltr')`,
+    args: [],
+  });
+  await db.execute({
+    sql: `INSERT INTO word_glosses (word_id, language_code, gloss_text) VALUES (?, 'uz', 'dan')`,
+    args: [word1Id],
+  });
 });
 
 afterAll(() => db.close());
@@ -62,5 +72,19 @@ describe('getGlossesBySurahAndLang', () => {
   it('returns empty for a surah with no words', async () => {
     const glosses = await getGlossesBySurahAndLang(db, 2, 'en');
     expect(glosses).toEqual([]);
+  });
+});
+
+describe('getGlossesWithFallback', () => {
+  it('returns uz gloss where present, EN fallback where missing', async () => {
+    const rows = await getGlossesWithFallback(db, 1, 'uz');
+    const byWord = Object.fromEntries(rows.map((r) => [r.word_id, r]));
+    expect(byWord[1]).toMatchObject({ gloss_text: 'dan', gloss_lang: 'uz' });
+    expect(byWord[2]).toMatchObject({ gloss_text: 'Allah', gloss_lang: 'en' });
+  });
+
+  it('lang=en yields all gloss_lang=en', async () => {
+    const rows = await getGlossesWithFallback(db, 1, 'en');
+    expect(rows.every((r) => r.gloss_lang === 'en')).toBe(true);
   });
 });

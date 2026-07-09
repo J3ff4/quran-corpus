@@ -18,7 +18,7 @@ interface ReaderViewProps {
   ayahs: Ayah[];
   wordsByAyah: Record<number, Word[]>;
   translationsByAyah: Record<number, Translation>;
-  glossesByWordId: Record<number, string>;
+  glossesByWordId: Record<number, { text: string; lang: string }>;
   lang: string;
 }
 
@@ -27,7 +27,7 @@ export function ReaderView({
   wordsByAyah,
   translationsByAyah,
   glossesByWordId,
-  lang: _lang,
+  lang,
 }: ReaderViewProps) {
   const [selectedWord, setSelectedWord] = useState<Word | null>(null);
   const { playingAyahId, isPlaying, isRepeat, play, pause, toggleRepeat } = useAyahAudio(ayahs);
@@ -83,8 +83,12 @@ export function ReaderView({
       <WordPopover
         word={selectedWord}
         {...(selectedWord != null && glossesByWordId[selectedWord.id] != null
-          ? { gloss: glossesByWordId[selectedWord.id] }
+          ? {
+              gloss: glossesByWordId[selectedWord.id]!.text,
+              glossLang: glossesByWordId[selectedWord.id]!.lang,
+            }
           : {})}
+        pageLang={lang}
         {...(selectedHref ? { href: selectedHref } : {})}
         onClose={() => setSelectedWord(null)}
       />

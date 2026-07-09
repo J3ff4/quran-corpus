@@ -6,7 +6,7 @@ import type { WbwCell } from '../components/wbw/types';
 function cell(over: Partial<WbwCell> = {}): WbwCell {
   return {
     surahId: 1, ayahNumber: 1, position: 1,
-    arabic: 'بِسْمِ', translit: "bis'mi", gloss: 'In (the) name', posLabel: 'Preposition',
+    arabic: 'بِسْمِ', translit: "bis'mi", gloss: 'In (the) name', glossLang: null, posLabel: 'Preposition',
     ...over,
   };
 }
@@ -29,5 +29,25 @@ describe('WbwWordCell', () => {
     render(<WbwWordCell cell={cell({ translit: null, gloss: null, posLabel: null })} />);
     expect(screen.getAllByText('—').length).toBe(2);
     expect(screen.queryByText('Preposition')).toBeNull();
+  });
+
+  it('marks an EN-fallback gloss while viewing uz', () => {
+    render(
+      <WbwWordCell
+        cell={cell({ gloss: 'Allah', glossLang: 'en' })}
+        pageLang="uz"
+      />,
+    );
+    expect(screen.getByText(/\(en\)/i)).toBeInTheDocument();
+  });
+
+  it('no hint when gloss lang matches page lang', () => {
+    render(
+      <WbwWordCell
+        cell={cell({ gloss: 'dan', glossLang: 'uz' })}
+        pageLang="uz"
+      />,
+    );
+    expect(screen.queryByText(/\(en\)/i)).toBeNull();
   });
 });

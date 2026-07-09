@@ -14,4 +14,10 @@ describe('About page', () => {
     expect(screen.getByText(/corpus\.quran\.com/i)).toBeInTheDocument();
     expect(screen.getByText(/Lane's Lexicon/i)).toBeInTheDocument();
   });
+
+  it('credits machine-assisted Uzbek glosses (NLLB)', () => {
+    render(<About />);
+    expect(screen.getAllByText(/NLLB/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/machine-assisted/i)).toBeInTheDocument();
+  });
 });

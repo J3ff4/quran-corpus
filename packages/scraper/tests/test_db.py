@@ -276,3 +276,28 @@ def test_get_distinct_roots(tmp_path, seeded_word_id):
     db._conn.commit()
     assert db.get_distinct_roots() == ["smw"]
     db.close()
+
+
+def test_gloss_source_column_and_backfill(tmp_path) -> None:
+    p = str(tmp_path / "s.db")
+    # simulate a legacy DB: create word_glosses WITHOUT source, insert an EN row
+    import sqlite3
+    raw = sqlite3.connect(p)
+    raw.executescript(
+        """CREATE TABLE word_glosses(
+             id INTEGER PRIMARY KEY AUTOINCREMENT,
+             word_id INTEGER NOT NULL, language_code TEXT NOT NULL,
+             gloss_text TEXT NOT NULL, UNIQUE(word_id, language_code));
+           INSERT INTO word_glosses(word_id,language_code,gloss_text)
+             VALUES (1,'en','from');"""
+    )
+    raw.commit(); raw.close()
+
+    db = ScraperDatabase(p)  # _apply_schema runs the migration
+    cols = {r["name"] for r in db._conn.execute("PRAGMA table_info(word_glosses)")}
+    assert "source" in cols
+    src = db._conn.execute(
+        "SELECT source FROM word_glosses WHERE word_id=1 AND language_code='en'"
+    ).fetchone()["source"]
+    assert src == "corpus"
+    db.close()

@@ -251,5 +251,52 @@ def import_quranenc(
     click.echo("Import complete.")
 
 
+@main.command("translate-glosses")
+@click.option("--db", default="quran.db", show_default=True, help="SQLite output path")
+@click.option("--batch-size", default=256, show_default=True)
+def translate_glosses_cmd(db: str, batch_size: int) -> None:
+    """Generate Uzbek word glosses via NLLB-200 (idempotent). Needs the `mt` extra."""
+    from .mt import NllbMt
+    from .translate_glosses import translate_glosses
+
+    database = ScraperDatabase(db)
+    n = translate_glosses(database, NllbMt(), batch_size=batch_size)
+    database.close()
+    click.echo(f"translate-glosses: {n} uz rows written.")
+
+
+@main.command("glosses-export")
+@click.option("--db", default="quran.db", show_default=True)
+@click.option("--top", default=500, show_default=True, help="How many distinct glosses")
+@click.option("--out", default="gloss-review.json", show_default=True)
+def glosses_export_cmd(db: str, top: int, out: str) -> None:
+    """Export top-N Uzbek glosses for human review (JSON)."""
+    import json
+    from .review_glosses import export_top
+
+    database = ScraperDatabase(db)
+    rows = export_top(database, top)
+    database.close()
+    with open(out, "w", encoding="utf-8") as fh:
+        json.dump(rows, fh, ensure_ascii=False, indent=2)
+    click.echo(f"glosses-export: {len(rows)} rows -> {out}")
+
+
+@main.command("glosses-import")
+@click.argument("path")
+@click.option("--db", default="quran.db", show_default=True)
+def glosses_import_cmd(path: str, db: str) -> None:
+    """Import reviewed Uzbek glosses; flips them to mt-reviewed (idempotent)."""
+    import json
+    from .review_glosses import import_reviewed
+
+    with open(path, encoding="utf-8") as fh:
+        entries = json.load(fh)
+    database = ScraperDatabase(db)
+    n = import_reviewed(database, entries)
+    database.close()
+    click.echo(f"glosses-import: {n} uz rows reviewed.")
+
+
 if __name__ == "__main__":
     main()

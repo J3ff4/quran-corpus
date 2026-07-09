@@ -17,6 +17,7 @@ export interface WbwCell {
   arabic: string;
   translit: string | null;
   gloss: string | null;
+  glossLang: string | null;
   posLabel: string | null;
 }
 

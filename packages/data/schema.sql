@@ -62,6 +62,10 @@ CREATE TABLE IF NOT EXISTS word_glosses (
   word_id       INTEGER NOT NULL REFERENCES words(id) ON DELETE CASCADE,
   language_code TEXT    NOT NULL REFERENCES languages(code) ON DELETE CASCADE,
   gloss_text    TEXT    NOT NULL,
+  -- Provenance: 'corpus' (scraped EN), 'mt' (machine-translated, unreviewed),
+  -- 'mt-reviewed' (MT then human-checked). NULL only on pre-provenance rows
+  -- until backfilled; legacy DBs backfilled to 'corpus' by db.py.
+  source        TEXT,
   UNIQUE(word_id, language_code)
 );
 

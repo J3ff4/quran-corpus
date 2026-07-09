@@ -8,11 +8,13 @@ import { MorphologySummary } from '../morphology/MorphologySummary';
 interface WordPopoverProps {
   word: Word | null;
   gloss?: string;
+  glossLang?: string;
+  pageLang?: string;
   href?: string;
   onClose: () => void;
 }
 
-export function WordPopover({ word, gloss, href, onClose }: WordPopoverProps) {
+export function WordPopover({ word, gloss, glossLang, pageLang, href, onClose }: WordPopoverProps) {
   return (
     <AnimatePresence>
       {word && (
@@ -59,6 +61,11 @@ export function WordPopover({ word, gloss, href, onClose }: WordPopoverProps) {
             </p>
 
             <MorphologySummary word={word} {...(gloss ? { gloss } : {})} />
+            {gloss && glossLang && pageLang && glossLang !== pageLang && (
+              <span className="ml-1 text-xs text-paper-400" aria-label={`in ${glossLang}`}>
+                ({glossLang})
+              </span>
+            )}
 
             {href && (
               <Link

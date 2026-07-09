@@ -11,9 +11,10 @@ interface WbwViewProps {
   page: number;
   totalPages: number;
   scrollAyah: number | null;
+  pageLang?: string;
 }
 
-export function WbwView({ surah, ayahs, page, totalPages, scrollAyah }: WbwViewProps) {
+export function WbwView({ surah, ayahs, page, totalPages, scrollAyah, pageLang }: WbwViewProps) {
   return (
     <div>
       <header className="mb-4 text-center">
@@ -30,7 +31,7 @@ export function WbwView({ surah, ayahs, page, totalPages, scrollAyah }: WbwViewP
       </header>
 
       {ayahs.map((ayah) => (
-        <WbwAyahBlock key={ayah.ayahNumber} ayah={ayah} />
+        <WbwAyahBlock key={ayah.ayahNumber} ayah={ayah} {...(pageLang ? { pageLang } : {})} />
       ))}
 
       <Pager surahId={surah.id} page={page} totalPages={totalPages} />

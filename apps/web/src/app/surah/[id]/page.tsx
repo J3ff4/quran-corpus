@@ -8,23 +8,17 @@ import {
   getAyahsBySurah,
   getWordsBySurah,
   getTranslationsBySurahAndLang,
-  getGlossesBySurahAndLang,
+  getGlossesWithFallback,
 } from '@quran-corpus/data';
 import type { Word, Translation } from '@quran-corpus/data';
 import { SurahHeader } from '../../../components/reader/SurahHeader';
 import { ReaderView } from '../../../components/reader/ReaderView';
 import { LanguageBar } from '../../../components/reader/LanguageBar';
-import { VALID_LANG_CODES } from '../../../components/reader/languages';
+import { isValidLang, type ValidLang } from '../../../components/reader/languages';
 
 interface PageProps {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ lang?: string }>;
-}
-
-type ValidLang = (typeof VALID_LANG_CODES)[number];
-
-function isValidLang(v: string | undefined): v is ValidLang {
-  return (VALID_LANG_CODES as ReadonlyArray<string>).includes(v ?? '');
 }
 
 export default async function SurahPage({ params, searchParams }: PageProps) {
@@ -41,7 +35,7 @@ export default async function SurahPage({ params, searchParams }: PageProps) {
     getAyahsBySurah(db, surahId),
     getWordsBySurah(db, surahId),
     getTranslationsBySurahAndLang(db, surahId, lang),
-    getGlossesBySurahAndLang(db, surahId, lang),
+    getGlossesWithFallback(db, surahId, lang),
   ]);
 
   if (!surah) notFound();
@@ -58,10 +52,10 @@ export default async function SurahPage({ params, searchParams }: PageProps) {
     translationsByAyah[t.ayah_id] = t;
   }
 
-  // word_id -> gloss text for this language.
-  const glossesByWordId: Record<number, string> = {};
+  // word_id -> gloss text + the lang it was actually found in (may be the EN fallback).
+  const glossesByWordId: Record<number, { text: string; lang: string }> = {};
   for (const g of glosses) {
-    glossesByWordId[g.word_id] = g.gloss_text;
+    glossesByWordId[g.word_id] = { text: g.gloss_text, lang: g.gloss_lang };
   }
 
   return (

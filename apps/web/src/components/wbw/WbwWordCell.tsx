@@ -2,8 +2,8 @@ import Link from 'next/link';
 import { chip } from '../ui/chip';
 import type { WbwCell } from './types';
 
-export function WbwWordCell({ cell }: { cell: WbwCell }) {
-  const { surahId, ayahNumber, position, arabic, translit, gloss, posLabel } = cell;
+export function WbwWordCell({ cell, pageLang }: { cell: WbwCell; pageLang?: string }) {
+  const { surahId, ayahNumber, position, arabic, translit, gloss, glossLang, posLabel } = cell;
   return (
     <Link
       href={`/word/${surahId}/${ayahNumber}/${position}`}
@@ -13,7 +13,14 @@ export function WbwWordCell({ cell }: { cell: WbwCell }) {
         {arabic}
       </span>
       <span className="text-xs text-paper-500 dark:text-paper-400">{translit ?? '—'}</span>
-      <span className="text-xs text-paper-700 dark:text-paper-300">{gloss ?? '—'}</span>
+      <span className="text-xs text-paper-700 dark:text-paper-300">
+        {gloss ?? '—'}
+        {gloss && glossLang && pageLang && glossLang !== pageLang && (
+          <span className="ml-1 text-paper-400" aria-label={`in ${glossLang}`}>
+            ({glossLang})
+          </span>
+        )}
+      </span>
       {posLabel && <span className={chip}>{posLabel}</span>}
     </Link>
   );

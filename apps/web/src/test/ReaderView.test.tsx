@@ -50,7 +50,7 @@ function makeAyahs(n: number): Ayah[] {
 const empties = {
   wordsByAyah: {} as Record<number, Word[]>,
   translationsByAyah: {} as Record<number, Translation>,
-  glossesByWordId: {} as Record<number, string>,
+  glossesByWordId: {} as Record<number, { text: string; lang: string }>,
   lang: 'en',
 };
 const articleCount = (c: HTMLElement) => c.querySelectorAll('article').length;

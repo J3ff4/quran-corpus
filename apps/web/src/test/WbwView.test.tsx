@@ -9,7 +9,7 @@ const surah: Surah = {
   revelation_type: 'meccan', ayah_count: 7, order_number: 1,
 };
 const ayahs: WbwAyah[] = [
-  { ayahNumber: 1, cells: [{ surahId: 1, ayahNumber: 1, position: 1, arabic: 'بِسْمِ', translit: "bis'mi", gloss: 'In (the) name', posLabel: 'Preposition' }], textUthmani: 'x' },
+  { ayahNumber: 1, cells: [{ surahId: 1, ayahNumber: 1, position: 1, arabic: 'بِسْمِ', translit: "bis'mi", gloss: 'In (the) name', glossLang: null, posLabel: 'Preposition' }], textUthmani: 'x' },
 ];
 
 describe('WbwView', () => {

@@ -38,6 +38,13 @@ const sources: Source[] = [
     license: 'Public domain',
     note: "An Arabic-English Lexicon by Edward William Lane (1863), long in the public domain, compiled per Quranic root by the qurandev/roots project; surfaced per-root alongside the corpus's derived forms.",
   },
+  {
+    name: 'NLLB-200 (Meta AI)',
+    href: 'https://huggingface.co/facebook/nllb-200-distilled-600M',
+    provides: 'Uzbek word-by-word glosses, machine-translated from the English glosses.',
+    license: 'CC-BY-NC 4.0 (model)',
+    note: 'Uzbek per-word glosses are machine-assisted (NLLB-200), generated from the corpus English glosses and partially human-reviewed. Marked (en) where an Uzbek gloss is not yet available.',
+  },
 ];
 
 export default function AboutPage() {

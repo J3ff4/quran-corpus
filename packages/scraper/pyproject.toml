@@ -18,6 +18,9 @@ dependencies = [
   "defusedxml>=0.0.1",
 ]
 
+[project.optional-dependencies]
+mt = ["transformers>=4.44.0", "torch>=2.2.0"]
+
 [project.scripts]
 scraper = "scraper.cli:main"
 
@@ -44,6 +47,10 @@ python_version = "3.12"
 
 [[tool.mypy.overrides]]
 module = "defusedxml.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "transformers.*"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

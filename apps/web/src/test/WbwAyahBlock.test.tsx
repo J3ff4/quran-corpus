@@ -4,7 +4,7 @@ import { WbwAyahBlock } from '../components/wbw/WbwAyahBlock';
 import type { WbwAyah } from '../components/wbw/types';
 
 const c = (position: number, arabic: string) => ({
-  surahId: 1, ayahNumber: 3, position, arabic, translit: 't', gloss: 'g', posLabel: 'Noun',
+  surahId: 1, ayahNumber: 3, position, arabic, translit: 't', gloss: 'g', glossLang: null, posLabel: 'Noun',
 });
 
 describe('WbwAyahBlock', () => {

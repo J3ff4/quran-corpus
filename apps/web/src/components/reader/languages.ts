@@ -9,3 +9,9 @@ export const LANGUAGES = [
 ] as const;
 
 export const VALID_LANG_CODES = LANGUAGES.map((l) => l.code);
+
+export type ValidLang = (typeof VALID_LANG_CODES)[number];
+
+export function isValidLang(v: string | undefined): v is ValidLang {
+  return (VALID_LANG_CODES as ReadonlyArray<string>).includes(v ?? '');
+}

@@ -112,6 +112,7 @@ class ScraperDatabase:
         for stmt in tables:
             self._conn.execute(stmt)
         self._migrate_add_word_columns()
+        self._migrate_add_gloss_source()
         for stmt in indexes:
             self._conn.execute(stmt)
         self._conn.commit()
@@ -134,6 +135,22 @@ class ScraperDatabase:
         ):
             if column not in existing:
                 self._conn.execute(f"ALTER TABLE words ADD COLUMN {column} TEXT")
+
+    def _migrate_add_gloss_source(self) -> None:
+        """Add word_glosses.source on legacy DBs + backfill existing rows.
+
+        Fresh DBs get the column from schema.sql; CREATE TABLE IF NOT EXISTS
+        will not alter an older table, so add it and mark pre-existing rows
+        'corpus' (all such rows are the scraped English glosses).
+        """
+        cols = {
+            row["name"] for row in self._conn.execute("PRAGMA table_info(word_glosses)")
+        }
+        if "source" not in cols:
+            self._conn.execute("ALTER TABLE word_glosses ADD COLUMN source TEXT")
+        self._conn.execute(
+            "UPDATE word_glosses SET source = 'corpus' WHERE source IS NULL"
+        )
 
     def upsert_surah(self, surah: SurahModel) -> None:
         self._conn.execute(
@@ -289,6 +306,15 @@ class ScraperDatabase:
             (gloss.word_id, gloss.language_code, gloss.gloss_text),
         )
         self._conn.commit()
+
+    def upsert_uz_gloss(self, word_id: int, gloss_text: str, source: str) -> None:
+        self._conn.execute(
+            """INSERT INTO word_glosses (word_id, language_code, gloss_text, source)
+               VALUES (?, 'uz', ?, ?)
+               ON CONFLICT(word_id, language_code) DO UPDATE SET
+                 gloss_text = excluded.gloss_text, source = excluded.source""",
+            (word_id, gloss_text, source),
+        )
 
     def upsert_root(self, root: RootModel) -> int:
         cur = self._conn.execute(

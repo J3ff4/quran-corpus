@@ -124,4 +124,18 @@ describe('WordPopover', () => {
     );
     expect(screen.queryByText(/prefixed preposition bi/)).not.toBeInTheDocument();
   });
+
+  it('shows (en) hint when gloss language differs from page lang', () => {
+    render(
+      <WordPopover word={word} gloss="Allah" glossLang="en" pageLang="uz" onClose={vi.fn()} />,
+    );
+    expect(screen.getByText(/\(en\)/i)).toBeInTheDocument();
+  });
+
+  it('no hint when gloss lang matches page lang', () => {
+    render(
+      <WordPopover word={word} gloss="dan" glossLang="uz" pageLang="uz" onClose={vi.fn()} />,
+    );
+    expect(screen.queryByText(/\(en\)/i)).not.toBeInTheDocument();
+  });
 });
