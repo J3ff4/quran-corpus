@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { Surah } from '@quran-corpus/data';
+import { SurahFrame } from './ornaments/SurahFrame';
 
 interface SurahHeaderProps {
   surah: Surah;
@@ -17,9 +18,11 @@ export function SurahHeader({ surah }: SurahHeaderProps) {
         </Link>
       </div>
       <div className="text-center">
-        <p className="font-arabic text-4xl text-paper-900 dark:text-paper-100 mb-1">
-          {surah.name_arabic}
-        </p>
+        <SurahFrame className="mb-1">
+          <p className="font-arabic text-4xl text-paper-900 dark:text-paper-100">
+            {surah.name_arabic}
+          </p>
+        </SurahFrame>
         <p className="text-paper-500 text-lg">{surah.name_translit}</p>
         <p className="mt-1 text-sm text-paper-400 dark:text-paper-500">
           {surah.name_translation} ·{' '}
