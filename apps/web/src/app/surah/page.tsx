@@ -5,7 +5,8 @@ import { SurahCard } from '../../components/surah-list/SurahCard';
 
 export const metadata = { title: 'Surahs — Quran Corpus' };
 
-// Dynamic so the per-request CSP nonce reaches inline scripts (see app/page.tsx).
+// Dynamic so the per-request CSP nonce reaches inline scripts (see app/page.tsx
+// and src/test/route-render-mode.test.ts).
 export const dynamic = 'force-dynamic';
 
 export default async function SurahListPage() {

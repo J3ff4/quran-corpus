@@ -1,5 +1,10 @@
 import Link from 'next/link';
 
+// Override the root layout's force-dynamic: /offline must stay statically
+// prerendered so the service worker can precache it as the document fallback
+// shown when the network is unavailable.
+export const dynamic = 'force-static';
+
 export default function OfflinePage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center px-6 text-center">

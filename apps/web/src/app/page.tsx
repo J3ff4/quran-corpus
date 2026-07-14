@@ -9,8 +9,9 @@ import { SearchTrigger } from '../components/search/SearchTrigger';
 export const metadata = { title: 'Quran Corpus' };
 
 // Dynamic render so middleware's per-request CSP nonce lands on the inline
-// bootstrap/RSC scripts. A static prerender bakes them nonce-less; the strict
-// prod script-src then blocks them and the page hydrates to blank.
+// bootstrap/RSC scripts; a static prerender bakes them nonce-less and the
+// strict prod script-src blocks them, hydrating to blank. Enforced for every
+// paramless page by src/test/route-render-mode.test.ts.
 export const dynamic = 'force-dynamic';
 
 const FEATURED_SURAH_IDS = [1, 2, 36, 67];
