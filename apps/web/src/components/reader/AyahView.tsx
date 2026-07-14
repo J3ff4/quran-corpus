@@ -44,7 +44,7 @@ export function AyahView({
         />
       </div>
 
-      <div dir="rtl" className="flex flex-wrap gap-x-1 gap-y-2 font-arabic text-3xl leading-loose">
+      <div dir="rtl" className="flex flex-wrap gap-x-1 gap-y-2 font-arabic text-3xl leading-[2.4]">
         {words.length > 0 ? (
           words.map((word) => (
             <WordToken key={word.id} word={word} onClick={onWordClick} />

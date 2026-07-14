@@ -1,8 +1,15 @@
 import type { Metadata, Viewport } from 'next';
 import { Amiri, Inter } from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
 import { BottomNav } from '../components/shell/BottomNav';
 import { SearchProvider } from '../components/search/SearchProvider';
+
+const kfgqpc = localFont({
+  src: './fonts/hafs.18.woff2',
+  variable: '--font-kfgqpc',
+  display: 'swap',
+});
 
 const amiri = Amiri({
   weight: ['400', '700'],
@@ -39,7 +46,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${amiri.variable} ${inter.variable}`}>
+    <html lang="en" className={`${kfgqpc.variable} ${amiri.variable} ${inter.variable}`}>
       <body className="bg-paper-50 pb-[calc(4rem+env(safe-area-inset-bottom))] font-sans text-paper-900 antialiased dark:bg-night-300 dark:text-paper-100">
         <SearchProvider>
           {children}

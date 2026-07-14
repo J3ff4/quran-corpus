@@ -14,7 +14,7 @@ export function WbwAyahBlock({ ayah, pageLang }: { ayah: WbwAyah; pageLang?: str
           ))}
         </div>
       ) : (
-        <p className="font-arabic text-2xl leading-loose text-paper-900 dark:text-paper-100" dir="rtl">
+        <p className="font-arabic text-2xl leading-[2.4] text-paper-900 dark:text-paper-100" dir="rtl">
           {ayah.textUthmani}
         </p>
       )}

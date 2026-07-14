@@ -9,7 +9,7 @@ export function WbwWordCell({ cell, pageLang }: { cell: WbwCell; pageLang?: stri
       href={`/word/${surahId}/${ayahNumber}/${position}`}
       className="flex min-w-[4.5rem] flex-col items-center gap-1 rounded-xl border border-paper-200 px-3 py-2 text-center transition-colors hover:bg-paper-100 dark:border-night-100 dark:hover:bg-night-200"
     >
-      <span className="font-arabic text-2xl leading-tight text-paper-900 dark:text-paper-100" dir="rtl">
+      <span className="font-arabic text-2xl leading-[1.8] text-paper-900 dark:text-paper-100" dir="rtl">
         {arabic}
       </span>
       <span className="text-xs text-paper-500 dark:text-paper-400" dir="ltr">{translit ?? '—'}</span>

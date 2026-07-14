@@ -20,4 +20,9 @@ describe('About page', () => {
     expect(screen.getAllByText(/NLLB/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/machine-assisted/i)).toBeInTheDocument();
   });
+
+  it('credits the KFGQPC Uthmanic Hafs mushaf font', () => {
+    render(<About />);
+    expect(screen.getAllByText(/KFGQPC/i).length).toBeGreaterThan(0);
+  });
 });
