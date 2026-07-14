@@ -3,10 +3,14 @@ import { getDatabase } from '../../lib/db';
 import { DictionaryBrowser } from '../../components/dictionary/DictionaryBrowser';
 import { letterCounts } from './letters';
 
-// Static: the full root list (~1642 rows, ~100-150KB) ships once at build
-// time and is cached by the service worker. All search/sort/letter filtering
-// happens client-side in DictionaryBrowser — no per-request SSR, no
-// searchParams, no navigation on filter.
+// The full root list (~1642 rows, ~100-150KB) renders once per request; all
+// search/sort/letter filtering then happens client-side in DictionaryBrowser
+// (no searchParams, no navigation on filter). Rendered dynamically rather than
+// statically prerendered so the per-request CSP nonce reaches the inline
+// bootstrap scripts (see app/page.tsx) — DictionaryBrowser must hydrate to
+// filter. The service worker (NetworkFirst) still caches the response.
+export const dynamic = 'force-dynamic';
+
 export default async function DictionaryPage() {
   const db = await getDatabase();
   const roots = await getRootSearchList(db);

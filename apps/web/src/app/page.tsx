@@ -8,6 +8,11 @@ import { SearchTrigger } from '../components/search/SearchTrigger';
 
 export const metadata = { title: 'Quran Corpus' };
 
+// Dynamic render so middleware's per-request CSP nonce lands on the inline
+// bootstrap/RSC scripts. A static prerender bakes them nonce-less; the strict
+// prod script-src then blocks them and the page hydrates to blank.
+export const dynamic = 'force-dynamic';
+
 const FEATURED_SURAH_IDS = [1, 2, 36, 67];
 
 const TILES = [

@@ -5,6 +5,9 @@ export const metadata = {
   description: 'Data sources, licenses, and attribution for the Quran Corpus app.',
 };
 
+// Dynamic so the per-request CSP nonce reaches inline scripts (see app/page.tsx).
+export const dynamic = 'force-dynamic';
+
 interface Source {
   name: string;
   href: string;

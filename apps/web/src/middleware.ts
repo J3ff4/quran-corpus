@@ -26,6 +26,11 @@ export function middleware(request: NextRequest) {
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce);
+  // Next reads the nonce by parsing the CSP on the REQUEST headers and stamps it
+  // onto its inline bootstrap/RSC scripts. Without this the strict prod policy
+  // (no 'unsafe-inline') blocks those inline scripts, hydration never boots, and
+  // the page flashes then blanks. Must mirror the response CSP exactly.
+  requestHeaders.set('Content-Security-Policy', csp);
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set('Content-Security-Policy', csp);

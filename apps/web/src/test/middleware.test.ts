@@ -57,6 +57,17 @@ describe('CSP middleware', () => {
     expect(requestHeaders['x-nonce']).toBe(nonceMatch![1]);
   });
 
+  it('mirrors the CSP onto the request header so Next stamps the same nonce on inline scripts', () => {
+    // Regression: without a matching Content-Security-Policy on the REQUEST
+    // headers, Next cannot read the nonce and its inline bootstrap scripts get
+    // no (or a mismatched) nonce. Under the strict prod script-src the browser
+    // then blocks them, hydration never boots, and the page flashes then blanks.
+    const { responseHeaders, requestHeaders } = captureResponse();
+    middleware(makeRequest());
+    const responseCsp = responseHeaders.get('Content-Security-Policy') ?? '';
+    expect(requestHeaders['content-security-policy']).toBe(responseCsp);
+  });
+
   it('generates a different nonce per request', () => {
     const nonces: string[] = [];
     for (let i = 0; i < 3; i++) {
