@@ -1,6 +1,7 @@
 import type { Ayah, Word, Translation } from '@quran-corpus/data';
 import { WordToken } from './WordToken';
 import { AyahAudioButton } from './AyahAudioButton';
+import { AyahMedallion } from './ornaments/AyahMedallion';
 
 interface AyahViewProps {
   ayah: Ayah;
@@ -30,9 +31,7 @@ export function AyahView({
   return (
     <article className="mb-10">
       <div className="mb-3 flex items-center gap-2">
-        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-paper-200 text-xs text-paper-600 dark:bg-night-100 dark:text-paper-400">
-          {ayah.ayah_number}
-        </span>
+        <AyahMedallion n={ayah.ayah_number} />
         <AyahAudioButton
           ayah={ayah}
           isThisPlaying={isThisPlaying}
@@ -44,7 +43,7 @@ export function AyahView({
         />
       </div>
 
-      <div dir="rtl" className="flex flex-wrap gap-x-1 gap-y-2 font-arabic text-3xl leading-loose">
+      <div dir="rtl" className="flex flex-wrap gap-x-1 gap-y-2 font-arabic text-3xl leading-[2.4]">
         {words.length > 0 ? (
           words.map((word) => (
             <WordToken key={word.id} word={word} onClick={onWordClick} />

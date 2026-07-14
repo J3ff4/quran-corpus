@@ -49,6 +49,13 @@ const sources: Source[] = [
     license: 'CC-BY-NC 4.0 (model)',
     note: 'Uzbek per-word glosses are machine-assisted (NLLB-200), generated from the corpus English glosses and partially human-reviewed. Marked (en) where an Uzbek gloss is not yet available.',
   },
+  {
+    name: 'KFGQPC Uthmanic Hafs (King Fahd Glorious Quran Printing Complex)',
+    href: 'https://fonts.qurancomplex.gov.sa',
+    provides: 'The mushaf Arabic typeface used to render Quranic text.',
+    license: 'KFGQPC EULA',
+    note: 'Arabic mushaf typeface, © 2010 KFGQPC, used under its EULA for Quranic display.',
+  },
 ];
 
 export default function AboutPage() {

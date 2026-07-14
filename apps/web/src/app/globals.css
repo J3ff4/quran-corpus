@@ -4,7 +4,7 @@
 
 :root {
   --font-sans: 'Inter', system-ui, sans-serif;
-  --font-arabic: 'Amiri', 'Noto Naskh Arabic', serif;
+  --font-arabic: var(--font-kfgqpc), 'Amiri', 'Noto Naskh Arabic', serif;
 
   /* POS morphology color-coding (WCAG-AA on paper light background). */
   --pos-noun: #2469c0;
