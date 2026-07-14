@@ -12,8 +12,8 @@ export function WbwWordCell({ cell, pageLang }: { cell: WbwCell; pageLang?: stri
       <span className="font-arabic text-2xl leading-tight text-paper-900 dark:text-paper-100" dir="rtl">
         {arabic}
       </span>
-      <span className="text-xs text-paper-500 dark:text-paper-400">{translit ?? '—'}</span>
-      <span className="text-xs text-paper-700 dark:text-paper-300">
+      <span className="text-xs text-paper-500 dark:text-paper-400" dir="ltr">{translit ?? '—'}</span>
+      <span className="text-xs text-paper-700 dark:text-paper-300" dir="ltr">
         {gloss ?? '—'}
         {gloss && glossLang && pageLang && glossLang !== pageLang && (
           <span className="ml-1 text-paper-400" aria-label={`in ${glossLang}`}>

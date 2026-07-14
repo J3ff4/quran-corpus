@@ -50,4 +50,12 @@ describe('WbwWordCell', () => {
     );
     expect(screen.queryByText(/\(en\)/i)).toBeNull();
   });
+
+  it('renders latin gloss/translit LTR so trailing punctuation stays trailing', () => {
+    const c = { surahId: 2, ayahNumber: 2, position: 3, arabic: 'فِيهِ',
+      translit: 'fihi', gloss: 'in it,', glossLang: 'en', posLabel: 'Preposition' };
+    render(<WbwWordCell cell={c} pageLang="en" />);
+    expect(screen.getByText('in it,')).toHaveAttribute('dir', 'ltr');
+    expect(screen.getByText('fihi')).toHaveAttribute('dir', 'ltr');
+  });
 });
