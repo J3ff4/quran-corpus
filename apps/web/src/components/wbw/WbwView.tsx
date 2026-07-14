@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { Surah } from '@quran-corpus/data';
+import { Bismillah } from '../reader/ornaments/Bismillah';
 import { SurahFrame } from '../reader/ornaments/SurahFrame';
 import { WbwAyahBlock } from './WbwAyahBlock';
 import { Pager } from './Pager';
@@ -32,6 +33,8 @@ export function WbwView({ surah, ayahs, page, totalPages, scrollAyah, pageLang }
           ← Read (mushaf)
         </Link>
       </header>
+
+      <Bismillah surahId={surah.id} />
 
       {ayahs.map((ayah) => (
         <WbwAyahBlock key={ayah.ayahNumber} ayah={ayah} {...(pageLang ? { pageLang } : {})} />

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { Ayah, Word, Translation } from '@quran-corpus/data';
 import { AyahView } from './AyahView';
+import { Bismillah } from './ornaments/Bismillah';
 import { WordPopover } from './WordPopover';
 import { useAyahAudio } from '../../hooks/useAyahAudio';
 import { useIncrementalReveal } from '../../hooks/useIncrementalReveal';
@@ -51,8 +52,11 @@ export function ReaderView({
   const selectedHref =
     selectedWord && selectedAyah ? wordHref(wordLocation(selectedAyah, selectedWord)) : undefined;
 
+  const surahId = ayahs[0]?.surah_id;
+
   return (
     <div>
+      {surahId != null && <Bismillah surahId={surahId} />}
       {visible.map((ayah) => (
         <AyahView
           key={ayah.id}
