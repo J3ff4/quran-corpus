@@ -34,7 +34,7 @@ export function WbwView({ surah, ayahs, page, totalPages, scrollAyah, pageLang }
         </Link>
       </header>
 
-      <Bismillah surahId={surah.id} />
+      {page === 1 && <Bismillah surahId={surah.id} />}
 
       {ayahs.map((ayah) => (
         <WbwAyahBlock key={ayah.ayahNumber} ayah={ayah} {...(pageLang ? { pageLang } : {})} />

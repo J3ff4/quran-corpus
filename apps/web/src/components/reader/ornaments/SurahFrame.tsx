@@ -34,7 +34,7 @@ function EndCap() {
 
 export function SurahFrame({ children, className }: SurahFrameProps) {
   return (
-    <div className={`flex items-center justify-center gap-3 ${className ?? ''}`}>
+    <div className={`flex items-center justify-center gap-3 ${className ?? ''}`.trim()}>
       <EndCap />
       {children}
       <span className="-scale-x-100">

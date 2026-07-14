@@ -12,7 +12,8 @@ export function AyahMedallion({ n, className }: AyahMedallionProps) {
   return (
     <span
       aria-label={`Ayah ${n}`}
-      className={`relative inline-flex h-7 w-7 shrink-0 items-center justify-center text-paper-600 dark:text-paper-400 ${className ?? ''}`}
+      role="img"
+      className={`relative inline-flex h-7 w-7 shrink-0 items-center justify-center text-paper-600 dark:text-paper-400 ${className ?? ''}`.trim()}
     >
       <svg
         viewBox="0 0 28 28"
