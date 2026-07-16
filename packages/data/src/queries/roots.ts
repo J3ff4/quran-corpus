@@ -207,9 +207,12 @@ export interface ConcordancePageOpts {
  *  two segments, this would read one under roots.occurrence_count (segment-based);
  *  no such word exists in the corpus. Revisit only if that changes. */
 export async function countRootConcordance(db: Client, bw: string): Promise<number> {
+  // Driven from word_segments (indexed on root, ~hundreds of rows even for a
+  // hot root) rather than a correlated EXISTS over all `words` -- the EXISTS
+  // form makes SQLite scan every word in the corpus and re-run the root
+  // lookup per row, which is O(words x matches) and took 10s+ on common roots.
   const res = await db.execute({
-    sql: `SELECT COUNT(*) AS n FROM words w
-          WHERE EXISTS (SELECT 1 FROM word_segments s WHERE s.word_id = w.id AND s.root = ?)`,
+    sql: `SELECT COUNT(*) AS n FROM (SELECT DISTINCT word_id FROM word_segments WHERE root = ?)`,
     args: [bw],
   });
   return res.rows[0]!['n'] as number;
@@ -224,20 +227,22 @@ export async function getRootConcordancePage(
   opts: ConcordancePageOpts = {},
 ): Promise<ConcordanceEntry[]> {
   const { limit, offset = 0, lang = 'en', batchSize = 500 } = opts;
-  const args: (string | number)[] = [lang, bw];
+  const args: (string | number)[] = [bw, lang];
   let paging = '';
   if (limit !== undefined) {
     paging = ' LIMIT ? OFFSET ?';
     args.push(limit, offset);
   }
   const matched = await db.execute({
+    // Same fix as countRootConcordance: drive from the root-indexed
+    // word_segments rows, not a correlated EXISTS scanning every word.
     sql: `SELECT a.surah_id, a.ayah_number, w.position, w.id AS word_id,
                  w.ayah_id AS ayah_id, w.text_arabic, w.transliteration,
                  g.gloss_text AS gloss
-          FROM words w
+          FROM (SELECT DISTINCT word_id FROM word_segments WHERE root = ?) m
+          JOIN words w ON w.id = m.word_id
           JOIN ayahs a ON a.id = w.ayah_id
           LEFT JOIN word_glosses g ON g.word_id = w.id AND g.language_code = ?
-          WHERE EXISTS (SELECT 1 FROM word_segments s WHERE s.word_id = w.id AND s.root = ?)
           ORDER BY a.surah_id, a.ayah_number, w.position${paging}`,
     args,
   });
