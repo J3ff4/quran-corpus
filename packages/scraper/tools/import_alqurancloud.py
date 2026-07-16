@@ -16,6 +16,7 @@ import httpx
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
 from scraper.db import ScraperDatabase
+from scraper.hamza_seat import fix_seatless_hamza
 from scraper.models import AyahModel, TranslationModel
 
 EDITIONS = [
@@ -50,7 +51,7 @@ def main(db: str) -> None:
                 database.upsert_ayah(AyahModel(
                     surah_id=surah_id,
                     ayah_number=int(ayah["numberInSurah"]),
-                    text_uthmani=ayah["text"],
+                    text_uthmani=fix_seatless_hamza(ayah["text"]),
                     juz=ayah.get("juz"),
                     page=ayah.get("page"),
                 ))

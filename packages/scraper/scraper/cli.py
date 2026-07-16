@@ -113,6 +113,18 @@ def fix_root_data_cmd(db: str) -> None:
     click.echo(f"fix-root-data: {counts} counts updated, {forms} junk forms deleted.")
 
 
+@main.command("fix-hamza-seat")
+@click.option("--db", default="quran.db", show_default=True, help="SQLite output path")
+def fix_hamza_seat_cmd(db: str) -> None:
+    """Rewrite definite-article seatless-hamza to KFGQPC's tatweel-seat form."""
+    from .fix_hamza_seat import fix_hamza_seat
+
+    database = ScraperDatabase(db)
+    ayahs, words = fix_hamza_seat(database)
+    database.close()
+    click.echo(f"fix-hamza-seat: {ayahs} ayahs updated, {words} words updated.")
+
+
 @main.command("import-corpus")
 @click.argument("txt_path")
 @click.option("--db", default="quran.db", show_default=True)

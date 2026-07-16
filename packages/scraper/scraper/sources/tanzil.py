@@ -8,6 +8,7 @@ from pathlib import Path
 from defusedxml import ElementTree
 
 from ..db import ScraperDatabase
+from ..hamza_seat import fix_seatless_hamza
 from ..models import AyahModel
 
 
@@ -19,7 +20,7 @@ def import_tanzil_text(xml_path: Path, db: ScraperDatabase) -> None:
         surah_id = int(sura.attrib["index"])
         for aya in sura.findall("aya"):
             ayah_number = int(aya.attrib["index"])
-            text_uthmani = aya.attrib["text"]
+            text_uthmani = fix_seatless_hamza(aya.attrib["text"])
             ayah = AyahModel(
                 surah_id=surah_id,
                 ayah_number=ayah_number,

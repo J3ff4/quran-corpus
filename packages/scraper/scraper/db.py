@@ -462,6 +462,43 @@ class ScraperDatabase:
         self._conn.commit()
         return cur.rowcount
 
+    def _fix_seatless_hamza_in(self, table: str, text_col: str) -> int:
+        """Apply fix_seatless_hamza to every LIKE-candidate row in table.text_col.
+
+        Shared by apply_hamza_seat_fix (ayahs + words) and
+        rebuild_text_arabic_from_segments (re-applied after the segment
+        concat, since that SQL rebuild has no way to call Python and would
+        otherwise reintroduce the seatless form -- see hamza_seat.py).
+        table/text_col are module-controlled constants, never user input.
+        """
+        from .hamza_seat import HAMZA, LAM, SUKUN, fix_seatless_hamza
+
+        candidate = LAM + SUKUN + HAMZA
+        changed = 0
+        for row in self._conn.execute(
+            f"SELECT id, {text_col} FROM {table} WHERE {text_col} LIKE ?",  # noqa: S608
+            (f"%{candidate}%",),
+        ):
+            fixed = fix_seatless_hamza(row[text_col])
+            if fixed != row[text_col]:
+                self._conn.execute(
+                    f"UPDATE {table} SET {text_col} = ? WHERE id = ?",  # noqa: S608
+                    (fixed, row["id"]),
+                )
+                changed += 1
+        return changed
+
+    def apply_hamza_seat_fix(self) -> tuple[int, int]:
+        """Rewrite definite-article seatless-hamza in ayahs/words text.
+
+        See scraper.hamza_seat for the full rationale. Idempotent -- returns
+        (0, 0) on a second run. Returns (ayahs changed, words changed).
+        """
+        ayahs_changed = self._fix_seatless_hamza_in("ayahs", "text_uthmani")
+        words_changed = self._fix_seatless_hamza_in("words", "text_arabic")
+        self._conn.commit()
+        return ayahs_changed, words_changed
+
     def get_root_by_buckwalter(self, bw: str) -> sqlite3.Row | None:
         return self._conn.execute(
             "SELECT * FROM roots WHERE root_buckwalter = ?", (bw,)
@@ -522,9 +559,15 @@ class ScraperDatabase:
         Python's sqlite3 module reports rowcount=-1 for `WITH ... UPDATE`
         (CTE) statements since it only pattern-matches a leading UPDATE
         keyword, even though the update itself applies correctly.
+
+        The concat is raw SQL (group_concat), so it can't call
+        fix_seatless_hamza mid-query -- re-apply it to the rebuilt column
+        afterward, or a fresh rebuild silently restores the seatless form
+        (Greptile-flagged gap on PR #34).
         """
         self._conn.execute(_REBUILD_TEXT_ARABIC_SQL)
         changed = int(self._conn.execute("SELECT changes()").fetchone()[0])
+        self._fix_seatless_hamza_in("words", "text_arabic")
         self._conn.commit()
         return changed
 

@@ -9,6 +9,18 @@ from scraper.models import (
 )
 from scraper.word_arabic import derive_word_arabic
 
+# Built from numeric codepoints, not hand-typed literals -- see
+# scraper/hamza_seat.py and test_hamza_seat.py for why.
+_LAM, _SUKUN, _HAMZA = chr(0x0644), chr(0x0652), chr(0x0621)
+_ALEF_WASLA, _FATHA = chr(0x0671), chr(0x064E)
+_TATWEEL, _HAMZA_ABOVE = chr(0x0640), chr(0x0654)
+_SEAT = _LAM + _SUKUN + _TATWEEL + _HAMZA_ABOVE
+_ALEF, _KHA, _KASRA, _RA = chr(0x0627), chr(0x062E), chr(0x0650), chr(0x0631)
+_AKHIRI = _FATHA + _ALEF + _KHA + _KASRA + _RA + _KASRA
+_ARTICLE_SEG = _ALEF_WASLA + _LAM + _SUKUN  # "ٱلْ"
+_HAMZA_SEG = _HAMZA + _AKHIRI  # "ءَاخِرِ"
+_FIXED_WORD = _ALEF_WASLA + _SEAT + _AKHIRI
+
 
 def _mkdb(tmp_path):
     db = ScraperDatabase(str(tmp_path / "t.db"))
@@ -67,3 +79,19 @@ def test_derive_raises_when_word_lacks_segments(tmp_path):
     _word(db, 1, "x")  # no segment
     with pytest.raises(ValueError, match="lack segments"):
         derive_word_arabic(db)
+
+
+def test_derive_reapplies_hamza_seat_fix_after_rebuild(tmp_path):
+    # Regression: group_concat(form_arabic) has no way to call
+    # fix_seatless_hamza mid-query, so a fresh segment rebuild used to
+    # silently restore the seatless form (e.g. 2:8 word 8). See db.py's
+    # rebuild_text_arabic_from_segments.
+    db = _mkdb(tmp_path)
+    wid = _word(db, 1, "")
+    _seg(db, wid, 0, _ARTICLE_SEG)
+    _seg(db, wid, 1, _HAMZA_SEG)
+    derive_word_arabic(db)
+    row = db._conn.execute(
+        "SELECT text_arabic FROM words WHERE position=1"
+    ).fetchone()
+    assert row["text_arabic"] == _FIXED_WORD
