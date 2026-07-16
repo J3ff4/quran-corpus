@@ -1,6 +1,37 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { ReactNode } from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ThemeToggle } from '../components/shell/ThemeToggle';
+
+const mockUseReducedMotion = vi.fn(() => false);
+
+// vitest hoists vi.mock above imports; motion.span is stubbed with a
+// data-motion marker so tests can assert the animated path is skipped
+// under prefers-reduced-motion (same pattern as FullAnalysis.test.tsx).
+vi.mock('framer-motion', () => ({
+  AnimatePresence: ({ children }: { children: ReactNode }) => <>{children}</>,
+  motion: {
+    span: ({
+      children,
+      initial: _i,
+      animate: _a,
+      exit: _e,
+      transition: _t,
+      ...props
+    }: React.HTMLAttributes<HTMLSpanElement> & {
+      children?: ReactNode;
+      initial?: unknown;
+      animate?: unknown;
+      exit?: unknown;
+      transition?: unknown;
+    }) => (
+      <span data-motion="true" {...props}>
+        {children}
+      </span>
+    ),
+  },
+  useReducedMotion: () => mockUseReducedMotion(),
+}));
 
 function stubMatchMedia(prefersDark: boolean) {
   vi.stubGlobal(
@@ -14,6 +45,7 @@ describe('ThemeToggle', () => {
     localStorage.clear();
     document.documentElement.classList.remove('dark');
     stubMatchMedia(false);
+    mockUseReducedMotion.mockReturnValue(false);
   });
 
   it('defaults to OS preference when nothing stored (dark system)', async () => {
@@ -22,6 +54,7 @@ describe('ThemeToggle', () => {
     await waitFor(() => {
       expect(document.documentElement.classList.contains('dark')).toBe(true);
     });
+    expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'true');
   });
 
   it('stored choice beats OS preference', async () => {
@@ -31,81 +64,52 @@ describe('ThemeToggle', () => {
     await waitFor(() => {
       expect(document.documentElement.classList.contains('dark')).toBe(false);
     });
+    expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
   });
 
-  it('opens menu with Light/Dark options; selecting Dark applies class and persists', async () => {
+  it('clicking toggles theme, applies class, and persists', async () => {
     render(<ThemeToggle />);
-    const trigger = screen.getByRole('button', { name: 'Theme' });
-    expect(trigger).toHaveAttribute('aria-expanded', 'false');
-    expect(trigger).toHaveAttribute('aria-controls', 'theme-menu');
+    const toggle = screen.getByRole('switch', { name: 'Toggle dark mode' });
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
 
-    fireEvent.click(trigger);
-    expect(trigger).toHaveAttribute('aria-expanded', 'true');
-    const dark = screen.getByRole('menuitemradio', { name: /dark/i });
-    expect(screen.getByRole('menuitemradio', { name: /light/i })).toBeInTheDocument();
-
-    fireEvent.click(dark);
+    fireEvent.click(toggle);
     expect(document.documentElement.classList.contains('dark')).toBe(true);
     expect(localStorage.getItem('theme')).toBe('dark');
-    // menu closed after select
-    expect(screen.queryByRole('menu')).toBeNull();
-  });
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
 
-  it('switching back to Light removes class and persists', async () => {
-    localStorage.setItem('theme', 'dark');
-    document.documentElement.classList.add('dark');
-    render(<ThemeToggle />);
-    fireEvent.click(screen.getByRole('button', { name: 'Theme' }));
-    fireEvent.click(screen.getByRole('menuitemradio', { name: /light/i }));
+    fireEvent.click(toggle);
     expect(document.documentElement.classList.contains('dark')).toBe(false);
     expect(localStorage.getItem('theme')).toBe('light');
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
   });
 
-  it('Escape closes the menu and returns focus to the trigger', async () => {
-    render(<ThemeToggle />);
-    const trigger = screen.getByRole('button', { name: 'Theme' });
-    fireEvent.click(trigger);
-    expect(screen.getByRole('menu')).toBeInTheDocument();
-    fireEvent.keyDown(document, { key: 'Escape' });
-    expect(screen.queryByRole('menu')).toBeNull();
-    expect(document.activeElement).toBe(trigger);
-  });
-
-  it('opening moves focus to the checked item; arrows cycle items', async () => {
-    localStorage.setItem('theme', 'dark');
-    document.documentElement.classList.add('dark');
-    render(<ThemeToggle />);
-    fireEvent.click(screen.getByRole('button', { name: 'Theme' }));
-
-    const light = screen.getByRole('menuitemradio', { name: /light/i });
-    const dark = screen.getByRole('menuitemradio', { name: /dark/i });
-    expect(document.activeElement).toBe(dark); // checked item gets focus
-
-    const menu = screen.getByRole('menu');
-    fireEvent.keyDown(menu, { key: 'ArrowDown' }); // wraps past end
-    expect(document.activeElement).toBe(light);
-    fireEvent.keyDown(menu, { key: 'ArrowUp' });
-    expect(document.activeElement).toBe(dark);
-    fireEvent.keyDown(menu, { key: 'Home' });
-    expect(document.activeElement).toBe(light);
-    fireEvent.keyDown(menu, { key: 'End' });
-    expect(document.activeElement).toBe(dark);
-  });
-
-  it('ArrowDown on the trigger opens the menu', async () => {
-    render(<ThemeToggle />);
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Theme' }), { key: 'ArrowDown' });
-    expect(screen.getByRole('menu')).toBeInTheDocument();
-  });
-
-  it('storage event from another tab syncs class and icon', async () => {
+  it('storage event from another tab syncs class and state', async () => {
     render(<ThemeToggle />);
     await waitFor(() => {
       expect(document.documentElement.classList.contains('dark')).toBe(false);
     });
     fireEvent(window, new StorageEvent('storage', { key: 'theme', newValue: 'dark' }));
     expect(document.documentElement.classList.contains('dark')).toBe(true);
+    expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'true');
+
     fireEvent(window, new StorageEvent('storage', { key: 'theme', newValue: 'light' }));
     expect(document.documentElement.classList.contains('dark')).toBe(false);
+    expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('animates the icon swap normally', () => {
+    render(<ThemeToggle />);
+    expect(screen.getByRole('switch').querySelector('[data-motion="true"]')).toBeInTheDocument();
+  });
+
+  it('skips the rotate/crossfade animation under prefers-reduced-motion', () => {
+    mockUseReducedMotion.mockReturnValue(true);
+    render(<ThemeToggle />);
+    const toggle = screen.getByRole('switch', { name: 'Toggle dark mode' });
+    expect(toggle.querySelector('[data-motion="true"]')).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(document.documentElement.classList.contains('dark')).toBe(true);
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
   });
 });
