@@ -3,6 +3,10 @@
 import type { Config } from 'tailwindcss';
 
 const preset: Partial<Config> = {
+  // Class strategy so the in-app theme toggle can override the OS preference;
+  // first visit falls back to the OS via the pre-hydration script in
+  // apps/web/src/app/layout.tsx.
+  darkMode: 'class',
   theme: {
     extend: {
       fontFamily: {

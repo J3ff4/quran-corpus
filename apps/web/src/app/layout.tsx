@@ -4,6 +4,7 @@ import localFont from 'next/font/local';
 import './globals.css';
 import { BottomNav } from '../components/shell/BottomNav';
 import { SearchProvider } from '../components/search/SearchProvider';
+import { ThemeToggle } from '../components/shell/ThemeToggle';
 
 const kfgqpc = localFont({
   src: './fonts/hafs.18.woff2',
@@ -46,9 +47,20 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${kfgqpc.variable} ${amiri.variable} ${inter.variable}`}>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${kfgqpc.variable} ${amiri.variable} ${inter.variable}`}
+    >
       <body className="bg-paper-50 pb-[calc(4rem+env(safe-area-inset-bottom))] font-sans text-paper-900 antialiased dark:bg-night-300 dark:text-paper-100">
+        {/* Synchronous on purpose: sets `.dark` before content paints (no
+            wrong-theme flash). External file so CSP 'self' covers it on
+            every page, including the statically prerendered /offline. */}
+        {/* eslint-disable-next-line @next/next/no-sync-scripts -- must block
+            paint to apply the theme class first; ~300B local file, negligible */}
+        <script src="/theme-init.js" />
         <SearchProvider>
+          <ThemeToggle />
           {children}
           <BottomNav />
         </SearchProvider>
