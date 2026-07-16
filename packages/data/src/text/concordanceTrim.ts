@@ -21,8 +21,12 @@ export function trimConcordanceVerse(words: VerseWord[], matchWordId: number): T
   let lo: number;
   let hi: number;
   if (hasClauseInfo) {
-    // clause = from the boundary at/left of the match to the next boundary right of it
-    lo = mi;
+    // clause = from the boundary at/left of the match to the next boundary right of it.
+    // The scan starts at mi - 1, not mi: checking the matched word's own
+    // starts_clause would treat its own leading conjunction as the clause's
+    // left edge, producing a 1-word window when the match itself starts with
+    // one (common -- most words in a "X and Y" list do).
+    lo = Math.max(mi - 1, 0);
     while (lo > 0 && !words[lo]!.starts_clause) lo -= 1;
     hi = mi + 1;
     while (hi < words.length && !words[hi]!.starts_clause) hi += 1;

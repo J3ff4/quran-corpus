@@ -268,12 +268,41 @@ describe('roots queries', () => {
       args: [w1.rows[0]!['id']],
     });
     await db.execute({
-      sql: `INSERT INTO word_segments (word_id,segment_index,segment_type,pos_tag,root) VALUES (?,0,'prefix','CONJ',NULL),(?,1,'stem','N','cly')`,
+      sql: `INSERT INTO word_segments (word_id,segment_index,segment_type,pos_tag,root) VALUES (?,0,'prefix','REM',NULL),(?,1,'stem','N','cly')`,
       args: [w2.rows[0]!['id'], w2.rows[0]!['id']],
     });
     const c = await getRootConcordancePage(db, 'clx');
     const vw = c[0]!.verse_words;
     expect(vw.find((w) => w.text_arabic === 'x')!.starts_clause).toBe(false);
     expect(vw.find((w) => w.text_arabic === 'y')!.starts_clause).toBe(true);
+  });
+
+  it('a plain coordinating CONJ prefix does not count as a clause boundary', async () => {
+    // Regression: CONJ (wa-/fa-) fires on almost every item in an enumerated
+    // list ("X and Y and Z"), which isn't a real clause break -- only SUB/REM
+    // (subordinating/resumptive, genuine sentence-starters) should count.
+    const a = await db.execute(
+      `INSERT INTO ayahs (surah_id,ayah_number,text_uthmani) VALUES (1,5,'x y') RETURNING id`,
+    );
+    const aid = a.rows[0]!['id'] as number;
+    const w1 = await db.execute({
+      sql: `INSERT INTO words (ayah_id,position,text_arabic,root_buckwalter) VALUES (?,1,'x','clx2') RETURNING id`,
+      args: [aid],
+    });
+    const w2 = await db.execute({
+      sql: `INSERT INTO words (ayah_id,position,text_arabic,root_buckwalter) VALUES (?,2,'y','cly2') RETURNING id`,
+      args: [aid],
+    });
+    await db.execute({
+      sql: `INSERT INTO word_segments (word_id,segment_index,segment_type,pos_tag,root) VALUES (?,0,'stem','N','clx2')`,
+      args: [w1.rows[0]!['id']],
+    });
+    await db.execute({
+      sql: `INSERT INTO word_segments (word_id,segment_index,segment_type,pos_tag,root) VALUES (?,0,'prefix','CONJ',NULL),(?,1,'stem','N','cly2')`,
+      args: [w2.rows[0]!['id'], w2.rows[0]!['id']],
+    });
+    const c = await getRootConcordancePage(db, 'clx2');
+    const vw = c[0]!.verse_words;
+    expect(vw.find((w) => w.text_arabic === 'y')!.starts_clause).toBe(false);
   });
 });
