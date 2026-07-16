@@ -1,13 +1,14 @@
 import type { Client, Row } from '@libsql/client';
 import type { Ayah, Word } from '../types.js';
 import { getWordsByAyah } from './words.js';
+import { stripQuranicAnnotations } from '../text/normalize.js';
 
 function rowToAyah(row: Row): Ayah {
   return {
     id: row['id'] as number,
     surah_id: row['surah_id'] as number,
     ayah_number: row['ayah_number'] as number,
-    text_uthmani: row['text_uthmani'] as string,
+    text_uthmani: stripQuranicAnnotations(row['text_uthmani'] as string),
     text_simple: (row['text_simple'] as string | null) ?? null,
     juz: (row['juz'] as number | null) ?? null,
     page: (row['page'] as number | null) ?? null,

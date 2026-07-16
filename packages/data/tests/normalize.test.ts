@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeArabic, buildFtsMatch } from '../src/text/normalize.js';
+import { normalizeArabic, buildFtsMatch, stripQuranicAnnotations } from '../src/text/normalize.js';
 
 describe('normalizeArabic', () => {
   it('strips harakat and folds alef-wasla to bare alef (Al-Fatiha 1:1)', () => {
@@ -15,6 +15,19 @@ describe('normalizeArabic', () => {
   it('leaves Latin/Cyrillic untouched', () => {
     expect(normalizeArabic('Throne')).toBe('Throne');
     expect(normalizeArabic('Милостивый')).toBe('Милостивый');
+  });
+});
+
+describe('stripQuranicAnnotations', () => {
+  it('removes the small-high rounded zero that mis-renders as a stray circle (80:31)', () => {
+    expect(stripQuranicAnnotations('وَأَبًّا۟')).toBe('وَأَبًّا');
+  });
+  it('removes it mid-word without disturbing the letters around it (22:45 wabi-rin case)', () => {
+    expect(stripQuranicAnnotations('يَسْجُدُوا۟لِلَّهِ')).toBe('يَسْجُدُوالِلَّهِ');
+  });
+  it('leaves ordinary harakat and letters untouched', () => {
+    const uthmani = 'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ';
+    expect(stripQuranicAnnotations(uthmani)).toBe(uthmani);
   });
 });
 

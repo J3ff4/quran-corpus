@@ -9,6 +9,7 @@ import type {
   RootSearchItem,
 } from '../types.js';
 import { compareRootsArabic } from '../text/arabic.js';
+import { stripQuranicAnnotations } from '../text/normalize.js';
 
 function rowToRoot(r: Row): Root {
   return {
@@ -253,7 +254,7 @@ export async function getRootConcordancePage(
                    EXISTS (SELECT 1 FROM word_segments s
                            WHERE s.word_id = w.id
                              AND s.segment_index = (SELECT MIN(segment_index) FROM word_segments WHERE word_id = w.id)
-                             AND s.pos_tag IN ('CONJ','SUB')) AS starts_clause
+                             AND s.pos_tag IN ('SUB','REM')) AS starts_clause
             FROM words w
             WHERE w.ayah_id IN (${placeholders})
             ORDER BY w.ayah_id, w.position`,
@@ -265,7 +266,7 @@ export async function getRootConcordancePage(
       list.push({
         id: r['id'] as number,
         position: r['position'] as number,
-        text_arabic: r['text_arabic'] as string,
+        text_arabic: stripQuranicAnnotations(r['text_arabic'] as string),
         starts_clause: (r['starts_clause'] as number) === 1,
       });
       wordsByAyah.set(aid, list);
@@ -277,7 +278,7 @@ export async function getRootConcordancePage(
     ayah_number: r['ayah_number'] as number,
     position: r['position'] as number,
     word_id: r['word_id'] as number,
-    text_arabic: r['text_arabic'] as string,
+    text_arabic: stripQuranicAnnotations(r['text_arabic'] as string),
     transliteration: (r['transliteration'] as string | null) ?? null,
     gloss: (r['gloss'] as string | null) ?? null,
     verse_words: wordsByAyah.get(r['ayah_id'] as number) ?? [],

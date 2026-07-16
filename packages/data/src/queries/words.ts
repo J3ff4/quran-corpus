@@ -1,12 +1,13 @@
 import type { Client, Row } from '@libsql/client';
 import type { Word, WordSegment, ConceptTag, WordDetail } from '../types.js';
+import { stripQuranicAnnotations } from '../text/normalize.js';
 
 function rowToWord(row: Row): Word {
   return {
     id: row['id'] as number,
     ayah_id: row['ayah_id'] as number,
     position: row['position'] as number,
-    text_arabic: row['text_arabic'] as string,
+    text_arabic: stripQuranicAnnotations(row['text_arabic'] as string),
     transliteration: (row['transliteration'] as string | null) ?? null,
     root: (row['root'] as string | null) ?? null,
     lemma: (row['lemma'] as string | null) ?? null,
