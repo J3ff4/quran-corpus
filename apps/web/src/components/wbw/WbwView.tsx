@@ -21,7 +21,7 @@ export function WbwView({ surah, ayahs, page, totalPages, scrollAyah, pageLang }
     <div>
       <header className="mb-4 text-center">
         <SurahFrame>
-          <p className="font-arabic text-3xl text-paper-900 dark:text-paper-100">{surah.name_arabic}</p>
+          <p className="font-arabic text-2xl text-paper-900 dark:text-paper-100">{surah.name_arabic}</p>
         </SurahFrame>
         <h1 className="text-paper-500">
           <span>{surah.name_translit}</span> · word by word

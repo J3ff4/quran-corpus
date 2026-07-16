@@ -19,7 +19,7 @@ export function SurahHeader({ surah }: SurahHeaderProps) {
       </div>
       <div className="text-center">
         <SurahFrame className="mb-1">
-          <p className="font-arabic text-4xl text-paper-900 dark:text-paper-100">
+          <p className="font-arabic text-2xl text-paper-900 dark:text-paper-100">
             {surah.name_arabic}
           </p>
         </SurahFrame>

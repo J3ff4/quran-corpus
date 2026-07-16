@@ -15,7 +15,7 @@ interface SurahFrameProps {
  */
 export function SurahFrame({ children, className }: SurahFrameProps) {
   return (
-    <div className={`relative mx-auto aspect-[763/450] w-full max-w-xs ${className ?? ''}`.trim()}>
+    <div className={`relative mx-auto aspect-[763/450] w-full max-w-[12rem] ${className ?? ''}`.trim()}>
       <svg
         viewBox="0 0 762.89 449.5"
         className="absolute inset-0 h-full w-full"
