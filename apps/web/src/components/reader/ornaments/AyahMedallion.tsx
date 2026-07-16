@@ -4,27 +4,31 @@ interface AyahMedallionProps {
 }
 
 /**
- * Ayah-marker rosette: an 8-point star outline evoking the traditional
- * mushaf verse-end medallion, with the verse number centered inside.
- * Stroke-only so it inherits `currentColor` (theme-aware, no hardcoded hex).
+ * Ayah-marker rosette: the traditional mushaf 8-point notched star, with the
+ * verse number centered inside. Art from temp/frames/medallion-1.svg; the
+ * source cream fill + dark stroke are dropped for theme tokens so it adapts to
+ * light/dark (CLAUDE.md §8) — a faint paper backing lifts the number, the
+ * outline inherits `currentColor`.
  */
 export function AyahMedallion({ n, className }: AyahMedallionProps) {
   return (
     <span
       aria-label={`Ayah ${n}`}
       role="img"
-      className={`relative inline-flex h-7 w-7 shrink-0 items-center justify-center text-paper-600 dark:text-paper-400 ${className ?? ''}`.trim()}
+      className={`relative inline-flex h-7 w-7 shrink-0 items-center justify-center text-paper-600 dark:text-paper-200 ${className ?? ''}`.trim()}
     >
       <svg
-        viewBox="0 0 28 28"
+        viewBox="0 0 118.91 118.91"
         className="absolute inset-0 h-full w-full"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={1.5}
-        strokeLinejoin="round"
         aria-hidden="true"
       >
-        <path d="M14 2 L17 8 L23.4 5.6 L20.4 11.6 L26 14 L20.4 16.4 L23.4 22.4 L17 20 L14 26 L11 20 L4.6 22.4 L7.6 16.4 L2 14 L7.6 11.6 L4.6 5.6 L11 8 Z" />
+        <path className="fill-paper-50 dark:fill-night-100" d="M59.46,118.91h0c-.86,0-1.68-.38-2.24-1.04-.09-.1-2.05-2.44-4.78-6.52-4.99-1.55-9.71-4.77-13.77-9.4h-18.79c-1.62,0-2.93-1.31-2.93-2.93v-18.79c-4.63-4.06-7.85-8.78-9.4-13.77-4.08-2.73-6.42-4.7-6.52-4.78-.66-.56-1.04-1.37-1.04-2.24s.38-1.68,1.04-2.24c.11-.09,2.44-2.05,6.52-4.78,1.55-4.99,4.77-9.71,9.4-13.77v-18.79c0-1.62,1.31-2.93,2.93-2.93h18.79c4.06-4.63,8.78-7.85,13.77-9.4,2.73-4.08,4.69-6.42,4.78-6.52.55-.66,1.37-1.04,2.24-1.04s1.68.38,2.24,1.04c.09.1,2.05,2.44,4.78,6.52,4.99,1.55,9.71,4.77,13.77,9.4h18.79c1.62,0,2.93,1.31,2.93,2.93v18.79c4.63,4.06,7.85,8.78,9.4,13.77,4.08,2.73,6.42,4.7,6.52,4.78.66.56,1.04,1.37,1.04,2.24s-.38,1.68-1.04,2.24c-.1.09-2.44,2.05-6.52,4.78-1.55,4.99-4.77,9.71-9.4,13.77v18.79c0,1.62-1.31,2.93-2.93,2.93h-18.79c-4.06,4.63-8.78,7.85-13.77,9.4-2.73,4.08-4.7,6.42-4.78,6.52-.56.66-1.37,1.04-2.24,1.04Z" />
+        <path
+          className="fill-none stroke-current"
+          strokeWidth={4}
+          strokeLinejoin="round"
+          d="M22.81,96.1h17.22c.88,0,1.71.39,2.26,1.07,3.76,4.59,8.16,7.65,12.72,8.83.71.18,1.32.62,1.72,1.23,1.03,1.57,1.96,2.9,2.73,3.95.77-1.06,1.7-2.39,2.73-3.95.4-.61,1.01-1.05,1.72-1.23,4.56-1.18,8.96-4.23,12.72-8.83.55-.68,1.39-1.07,2.26-1.07h17.22v-17.22c0-.88.39-1.71,1.07-2.27,4.59-3.76,7.65-8.16,8.83-12.72.18-.71.62-1.32,1.23-1.72,1.57-1.03,2.89-1.96,3.95-2.73-1.06-.77-2.39-1.7-3.95-2.73-.61-.4-1.05-1.01-1.23-1.72-1.18-4.57-4.23-8.96-8.83-12.72-.68-.56-1.07-1.39-1.07-2.27v-17.22h-17.22c-.88,0-1.71-.39-2.26-1.07-3.76-4.59-8.16-7.65-12.72-8.83-.71-.18-1.32-.62-1.72-1.23-1.03-1.57-1.96-2.89-2.73-3.95-.77,1.06-1.7,2.39-2.73,3.95-.4.61-1.01,1.05-1.72,1.23-4.56,1.18-8.96,4.23-12.72,8.83-.55.68-1.39,1.07-2.26,1.07h-17.22v17.22c0,.88-.39,1.71-1.07,2.27-4.59,3.76-7.64,8.16-8.83,12.72-.18.71-.62,1.32-1.23,1.72-1.57,1.03-2.89,1.96-3.95,2.73,1.06.77,2.39,1.7,3.95,2.73.61.4,1.05,1.01,1.23,1.72,1.18,4.57,4.23,8.96,8.83,12.72.68.55,1.07,1.39,1.07,2.26v17.22Z"
+        />
       </svg>
       <span className="relative text-[0.65rem] font-medium tabular-nums">{n}</span>
     </span>
