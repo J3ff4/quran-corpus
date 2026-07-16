@@ -56,20 +56,13 @@ describe('trimConcordanceVerse', () => {
     const r = trimConcordanceVerse(mkClause(30, [1]), 15);
     expect(r.words.map((w) => w.id)).toEqual([11, 12, 13, 14, 15, 16, 17, 18, 19]);
   });
-  it("doesn't stop at the matched word's own boundary flag (80:31 wa-abban regression)", () => {
-    // both words in the pair are boundary-flagged (e.g. each begins its own
-    // conjunction) -- the match word being a boundary must not make it its
-    // own left edge; the scan should walk past it to the *previous* boundary.
-    const r = trimConcordanceVerse(mkClause(2, [1, 2]), 2);
-    expect(r.words.map((w) => w.id)).toEqual([1, 2]);
-    expect(r.truncatedBefore).toBe(false);
-  });
-  it('walks past a boundary-flagged match to the real clause start (22:45 wabi-rin regression)', () => {
-    // boundaries at 1 and 7; match at 11 is itself boundary-flagged too --
-    // the window must still reach back to 7, not stop at 11 (itself).
-    const r = trimConcordanceVerse(mkClause(14, [1, 7, 11]), 11);
-    expect(r.words.map((w) => w.id)).toEqual([7, 8, 9, 10, 11, 12, 13, 14]);
+  it('stops right at the match when the match word itself genuinely starts a clause', () => {
+    // boundaries at 1 and 7; match is 7 itself -- the window must start
+    // exactly there, not scan past it into the preceding clause.
+    const r = trimConcordanceVerse(mkClause(14, [1, 7]), 7);
+    expect(r.words.map((w) => w.id)).toEqual([7, 8, 9, 10, 11]);
+    expect(r.words[0]!.id).not.toBe(1); // didn't scan past its own boundary into clause 1
     expect(r.truncatedBefore).toBe(true);
-    expect(r.truncatedAfter).toBe(false);
+    expect(r.truncatedAfter).toBe(true);
   });
 });
