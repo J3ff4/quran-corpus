@@ -66,6 +66,15 @@ describe('getWordsByAyah', () => {
     expect(w.grammar_arabic).toBe('جار ومجرور');
     expect(w.audio_url).toBeNull();
   });
+
+  it('strips the Quranic small-high mark from text_arabic and lemma', async () => {
+    await db.execute(
+      `UPDATE words SET lemma='يَرْجُوا۟' WHERE position=1 AND ayah_id=${ayahId}`,
+    );
+    const words = await getWordsByAyah(db, ayahId);
+    const w = words.find((x) => x.position === 1)!;
+    expect(w.lemma).toBe('يَرْجُوا');
+  });
 });
 
 describe('getWordsBySurah', () => {
@@ -147,6 +156,18 @@ describe('getWordByLocation / getWordDetail', () => {
     expect(detail?.segments.map((s) => s.pos_tag)).toEqual(['P', 'N']);
     expect(detail?.segments[0]?.form_arabic).toBe('بِ');
     expect(detail?.concept_tags[0]?.tag_label).toBe('Allah');
+  });
+
+  it('strips the Quranic small-high mark from segment form_arabic and lemma', async () => {
+    const w = await getWordByLocation(db, 1, 1, 2);
+    await db.execute({
+      sql: `INSERT INTO word_segments (word_id,segment_index,segment_type,pos_tag,form_arabic,lemma)
+            VALUES (?,0,'stem','V','يَسْجُدُوا۟','يَسْجُدُوا۟')`,
+      args: [w!.id],
+    });
+    const detail = await getWordDetail(db, w!.id);
+    expect(detail?.segments[0]?.form_arabic).toBe('يَسْجُدُوا');
+    expect(detail?.segments[0]?.lemma).toBe('يَسْجُدُوا');
   });
 
   it('getWordDetail returns null for unknown word id', async () => {

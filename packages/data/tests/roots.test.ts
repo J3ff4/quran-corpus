@@ -129,6 +129,15 @@ describe('roots queries', () => {
     expect(forms.every((f) => f.form_arabic !== null)).toBe(true);
     expect(forms.some((f) => f.pos_label === "Lane's Lexicon")).toBe(false);
   });
+  it('getRootForms strips the Quranic small-high mark from form_arabic', async () => {
+    const smwId = (await getRootByBuckwalter(db, 'smw'))!.id;
+    await db.execute({
+      sql: `INSERT INTO root_forms (root_id,sort_order,pos_label,form_arabic,occurrence_count) VALUES (?,60,'verb','يَسْجُدُوا۟',1)`,
+      args: [smwId],
+    });
+    const forms = await getRootForms(db, smwId);
+    expect(forms.find((f) => f.pos_label === 'verb')?.form_arabic).toBe('يَسْجُدُوا');
+  });
   it('getRootConcordance rebuilds verse from words + keeps gloss', async () => {
     const c = await getRootConcordance(db, 'smw');
     expect(c).toHaveLength(1);

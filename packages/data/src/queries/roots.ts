@@ -26,7 +26,8 @@ function rowToForm(r: Row): RootForm {
     root_id: r['root_id'] as number,
     sort_order: r['sort_order'] as number,
     pos_label: r['pos_label'] as string,
-    form_arabic: (r['form_arabic'] as string | null) ?? null,
+    form_arabic:
+      r['form_arabic'] == null ? null : stripQuranicAnnotations(r['form_arabic'] as string),
     form_translit: (r['form_translit'] as string | null) ?? null,
     gloss: (r['gloss'] as string | null) ?? null,
     occurrence_count: r['occurrence_count'] as number,

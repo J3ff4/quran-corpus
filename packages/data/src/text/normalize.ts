@@ -25,14 +25,16 @@ export function normalizeArabic(s: string): string {
   return s.replace(ARABIC_MARKS, '').replace(ALEF_VARIANTS, '\u0627');
 }
 
-// Quranic waqf/pause + small-high annotation marks (U+06D6-06ED) -- e.g.
-// U+06DF small high rounded zero, marking a silent elided letter (common at
-// the end of "...wa" plural verb endings). The UI Arabic font (Amiri) lacks
-// working anchor/positioning data for several of these, so instead of sitting
-// as a tiny mark above the previous letter they render as an oversized
-// baseline circle -- visually a stray "medallion" between words, or splitting
-// the word they're attached to. Stripped from display text app-wide.
-const QURANIC_ANNOTATION_MARKS = /[\u06d6-\u06ed]/g;
+// U+06DF ARABIC SMALL HIGH ROUNDED ZERO -- marks a silent elided letter,
+// common at the end of "...wa" plural verb endings. The UI Arabic font
+// (Amiri) lacks working anchor/positioning data for it, so instead of
+// sitting as a tiny mark above the previous letter it renders as an
+// oversized baseline circle -- visually a stray "medallion" between words,
+// or splitting the word it's attached to. Deliberately narrow: the wider
+// U+06D6-06ED block also contains the waqf/pause signs, which render fine
+// and carry real recitation-guidance meaning -- only the one
+// confirmed-broken mark is stripped.
+const QURANIC_ANNOTATION_MARKS = /\u06df/g;
 
 export function stripQuranicAnnotations(s: string): string {
   return s.replace(QURANIC_ANNOTATION_MARKS, '');
