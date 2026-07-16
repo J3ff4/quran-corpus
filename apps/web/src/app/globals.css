@@ -14,15 +14,14 @@
   --pos-other: #555;
 }
 
-/* App dark mode is media-driven (Tailwind default darkMode: 'media'). */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --pos-noun: #7fb0ff;
-    --pos-verb: #ff9a8f;
-    --pos-prep: #6fd9b8;
-    --pos-pron: #e0b877;
-    --pos-other: #aaa;
-  }
+/* App dark mode is class-driven (darkMode: 'class' in the shared preset);
+   the ThemeToggle / layout pre-hydration script own the .dark class. */
+:root.dark {
+  --pos-noun: #7fb0ff;
+  --pos-verb: #ff9a8f;
+  --pos-prep: #6fd9b8;
+  --pos-pron: #e0b877;
+  --pos-other: #aaa;
 }
 
 [dir='rtl'] {
