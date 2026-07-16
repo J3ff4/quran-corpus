@@ -70,19 +70,37 @@ export function useAyahAudio(ayahs: Ayah[]): AyahAudioState {
     };
   }, []);
 
+  // Monotonic token per play() attempt: a settled promise only touches state
+  // if no newer attempt started meanwhile, so a stale success can't flip
+  // isPlaying and a stale failure can't revert a newer attempt's src/id.
+  const playAttemptRef = useRef(0);
+
   const play = useCallback((ayah: Ayah) => {
     const audio = audioRef.current;
     if (!audio) return;
+    const attempt = ++playAttemptRef.current;
     const prevId = playingAyahIdRef.current;
+    const prevSrc = audio.src;
     if (prevId !== ayah.id) {
       audio.src = buildAudioUrl(ayah);
       setPlayingAyahId(ayah.id);
     }
     audio.play()
-      .then(() => setIsPlaying(true))
+      .then(() => {
+        if (playAttemptRef.current !== attempt) return; // superseded
+        setIsPlaying(true);
+      })
       .catch((err) => {
         console.error('[useAyahAudio] play failed', err);
+        if (playAttemptRef.current !== attempt) return; // superseded
+        // Revert src along with the id: with only the id reverted, a retry of
+        // the previous ayah would hit the `prevId === ayah.id` skip above and
+        // play the *failed* ayah's audio under the previous ayah's label.
+        audio.src = prevSrc;
         setPlayingAyahId(prevId);
+        // The src swap above stopped whatever was playing; without this the UI
+        // would still show the previous ayah as playing when nothing is.
+        setIsPlaying(false);
       });
   }, []);
 

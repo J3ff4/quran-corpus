@@ -13,7 +13,7 @@ function shouldRunMigrations(): boolean {
 export function getDatabase(): Promise<Client> {
   if (_dbPromise == null) {
     const url = process.env['DATABASE_URL'] ?? 'file:quran.db';
-    _dbPromise = (async () => {
+    const p = (async () => {
       const db = createDatabase(url);
       if (shouldRunMigrations()) {
         await runMigrations(db);
@@ -21,6 +21,15 @@ export function getDatabase(): Promise<Client> {
       }
       return db;
     })();
+    // Drop a failed init from the cache so the next request retries instead of
+    // every request replaying the same rejected promise until process restart
+    // (e.g. a transient DB error during cold-start migration). Guarded so a
+    // later successful re-init is never clobbered. Callers still see the
+    // rejection — this handler observes p, it doesn't replace it.
+    p.catch(() => {
+      if (_dbPromise === p) _dbPromise = null;
+    });
+    _dbPromise = p;
   }
   return _dbPromise;
 }
