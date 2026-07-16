@@ -61,11 +61,51 @@ describe('ThemeToggle', () => {
     expect(localStorage.getItem('theme')).toBe('light');
   });
 
-  it('Escape closes the menu', async () => {
+  it('Escape closes the menu and returns focus to the trigger', async () => {
     render(<ThemeToggle />);
-    fireEvent.click(screen.getByRole('button', { name: 'Theme' }));
+    const trigger = screen.getByRole('button', { name: 'Theme' });
+    fireEvent.click(trigger);
     expect(screen.getByRole('menu')).toBeInTheDocument();
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('menu')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('opening moves focus to the checked item; arrows cycle items', async () => {
+    localStorage.setItem('theme', 'dark');
+    document.documentElement.classList.add('dark');
+    render(<ThemeToggle />);
+    fireEvent.click(screen.getByRole('button', { name: 'Theme' }));
+
+    const light = screen.getByRole('menuitemradio', { name: /light/i });
+    const dark = screen.getByRole('menuitemradio', { name: /dark/i });
+    expect(document.activeElement).toBe(dark); // checked item gets focus
+
+    const menu = screen.getByRole('menu');
+    fireEvent.keyDown(menu, { key: 'ArrowDown' }); // wraps past end
+    expect(document.activeElement).toBe(light);
+    fireEvent.keyDown(menu, { key: 'ArrowUp' });
+    expect(document.activeElement).toBe(dark);
+    fireEvent.keyDown(menu, { key: 'Home' });
+    expect(document.activeElement).toBe(light);
+    fireEvent.keyDown(menu, { key: 'End' });
+    expect(document.activeElement).toBe(dark);
+  });
+
+  it('ArrowDown on the trigger opens the menu', async () => {
+    render(<ThemeToggle />);
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Theme' }), { key: 'ArrowDown' });
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+  });
+
+  it('storage event from another tab syncs class and icon', async () => {
+    render(<ThemeToggle />);
+    await waitFor(() => {
+      expect(document.documentElement.classList.contains('dark')).toBe(false);
+    });
+    fireEvent(window, new StorageEvent('storage', { key: 'theme', newValue: 'dark' }));
+    expect(document.documentElement.classList.contains('dark')).toBe(true);
+    fireEvent(window, new StorageEvent('storage', { key: 'theme', newValue: 'light' }));
+    expect(document.documentElement.classList.contains('dark')).toBe(false);
   });
 });

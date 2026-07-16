@@ -1,17 +1,10 @@
 import type { Metadata, Viewport } from 'next';
-import { headers } from 'next/headers';
 import { Amiri, Inter } from 'next/font/google';
 import localFont from 'next/font/local';
 import './globals.css';
 import { BottomNav } from '../components/shell/BottomNav';
 import { SearchProvider } from '../components/search/SearchProvider';
 import { ThemeToggle } from '../components/shell/ThemeToggle';
-
-// Sets `.dark` on <html> before first paint so a stored choice (or, absent
-// one, the OS preference) never flashes the wrong theme. Constant string —
-// no user input reaches this dangerouslySetInnerHTML. Needs the per-request
-// CSP nonce (middleware.ts) to run under the strict prod script-src.
-const THEME_INIT = `try{var t=localStorage.getItem('theme');if(t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}`;
 
 const kfgqpc = localFont({
   src: './fonts/hafs.18.woff2',
@@ -52,10 +45,7 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  // Set by middleware.ts; empty on the statically prerendered /offline, where
-  // the blocked script is backstopped by ThemeToggle's mount effect.
-  const nonce = (await headers()).get('x-nonce') ?? undefined;
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="en"
@@ -63,7 +53,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       className={`${kfgqpc.variable} ${amiri.variable} ${inter.variable}`}
     >
       <body className="bg-paper-50 pb-[calc(4rem+env(safe-area-inset-bottom))] font-sans text-paper-900 antialiased dark:bg-night-300 dark:text-paper-100">
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
+        {/* Synchronous on purpose: sets `.dark` before content paints (no
+            wrong-theme flash). External file so CSP 'self' covers it on
+            every page, including the statically prerendered /offline. */}
+        {/* eslint-disable-next-line @next/next/no-sync-scripts -- must block
+            paint to apply the theme class first; ~300B local file, negligible */}
+        <script src="/theme-init.js" />
         <SearchProvider>
           <ThemeToggle />
           {children}
