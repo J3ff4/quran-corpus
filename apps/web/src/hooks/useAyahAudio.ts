@@ -74,6 +74,7 @@ export function useAyahAudio(ayahs: Ayah[]): AyahAudioState {
     const audio = audioRef.current;
     if (!audio) return;
     const prevId = playingAyahIdRef.current;
+    const prevSrc = audio.src;
     if (prevId !== ayah.id) {
       audio.src = buildAudioUrl(ayah);
       setPlayingAyahId(ayah.id);
@@ -82,7 +83,14 @@ export function useAyahAudio(ayahs: Ayah[]): AyahAudioState {
       .then(() => setIsPlaying(true))
       .catch((err) => {
         console.error('[useAyahAudio] play failed', err);
+        // Revert src along with the id: with only the id reverted, a retry of
+        // the previous ayah would hit the `prevId === ayah.id` skip above and
+        // play the *failed* ayah's audio under the previous ayah's label.
+        audio.src = prevSrc;
         setPlayingAyahId(prevId);
+        // The src swap above stopped whatever was playing; without this the UI
+        // would still show the previous ayah as playing when nothing is.
+        setIsPlaying(false);
       });
   }, []);
 

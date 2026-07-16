@@ -145,6 +145,17 @@ describe('useAyahAudio', () => {
     expect(result.current.playingAyahId).toBeNull(); // reset to prior (null)
   });
 
+  it('play() rejection while another ayah is active reverts src and id together', async () => {
+    const { result } = renderHook(() => useAyahAudio(ayahs));
+    await act(async () => { result.current.play(a0); }); // a0 playing
+    const srcA = mockSrc;
+    mockPlay.mockRejectedValueOnce(new Error('network error'));
+    await act(async () => { result.current.play(a1); }); // a1 fails
+    expect(result.current.playingAyahId).toBe(1); // reverted to a0
+    expect(mockSrc).toBe(srcA); // src reverted too — retrying a0 must not play a1's audio
+    expect(result.current.isPlaying).toBe(false); // the src swap stopped playback
+  });
+
   it('onended auto-advance keeps isPlaying=true', async () => {
     const { result } = renderHook(() => useAyahAudio(ayahs));
     await act(async () => { result.current.play(a0); });
