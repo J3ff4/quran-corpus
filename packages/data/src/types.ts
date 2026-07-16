@@ -110,7 +110,11 @@ export interface VerseWord {
   position: number;
   text_arabic: string;
   /** True if this word begins a new clause (first segment's pos_tag ∈ boundary
-   *  set: CONJ/SUB[/…]). Present only on concordance verses; absent elsewhere. */
+   *  set: SUB/REM -- subordinating conjunctions and resumptive particles,
+   *  i.e. genuine sentence-starters. Plain coordinating CONJ (wa-/fa-) is
+   *  deliberately excluded: it fires on almost every item in an enumerated
+   *  list ("X and Y and Z"), which isn't a clause boundary. Present only on
+   *  concordance verses; absent elsewhere. */
   starts_clause?: boolean;
 }
 

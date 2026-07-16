@@ -52,7 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       suppressHydrationWarning
       className={`${kfgqpc.variable} ${amiri.variable} ${inter.variable}`}
     >
-      <body className="bg-paper-50 pb-[calc(4rem+env(safe-area-inset-bottom))] font-sans text-paper-900 antialiased dark:bg-night-300 dark:text-paper-100">
+      <body className="bg-paper-50 pb-[calc(4rem+env(safe-area-inset-bottom))] pt-[calc(3.5rem+env(safe-area-inset-top))] font-sans text-paper-900 antialiased dark:bg-night-300 dark:text-paper-100">
         {/* Synchronous on purpose: sets `.dark` before content paints (no
             wrong-theme flash). External file so CSP 'self' covers it on
             every page, including the statically prerendered /offline. */}

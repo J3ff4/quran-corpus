@@ -56,4 +56,13 @@ describe('trimConcordanceVerse', () => {
     const r = trimConcordanceVerse(mkClause(30, [1]), 15);
     expect(r.words.map((w) => w.id)).toEqual([11, 12, 13, 14, 15, 16, 17, 18, 19]);
   });
+  it('stops right at the match when the match word itself genuinely starts a clause', () => {
+    // boundaries at 1 and 7; match is 7 itself -- the window must start
+    // exactly there, not scan past it into the preceding clause.
+    const r = trimConcordanceVerse(mkClause(14, [1, 7]), 7);
+    expect(r.words.map((w) => w.id)).toEqual([7, 8, 9, 10, 11]);
+    expect(r.words[0]!.id).not.toBe(1); // didn't scan past its own boundary into clause 1
+    expect(r.truncatedBefore).toBe(true);
+    expect(r.truncatedAfter).toBe(true);
+  });
 });

@@ -25,6 +25,21 @@ export function normalizeArabic(s: string): string {
   return s.replace(ARABIC_MARKS, '').replace(ALEF_VARIANTS, '\u0627');
 }
 
+// U+06DF ARABIC SMALL HIGH ROUNDED ZERO -- marks a silent elided letter,
+// common at the end of "...wa" plural verb endings. The UI Arabic font
+// (Amiri) lacks working anchor/positioning data for it, so instead of
+// sitting as a tiny mark above the previous letter it renders as an
+// oversized baseline circle -- visually a stray "medallion" between words,
+// or splitting the word it's attached to. Deliberately narrow: the wider
+// U+06D6-06ED block also contains the waqf/pause signs, which render fine
+// and carry real recitation-guidance meaning -- only the one
+// confirmed-broken mark is stripped.
+const QURANIC_ANNOTATION_MARKS = /\u06df/g;
+
+export function stripQuranicAnnotations(s: string): string {
+  return s.replace(QURANIC_ANNOTATION_MARKS, '');
+}
+
 // Build an FTS5 MATCH expression from a user query: split on whitespace and
 // require every term (AND), each wrapped as a quoted phrase so FTS operators
 // (*, OR, NEAR, ^) in the input are treated as literal text, not syntax. A

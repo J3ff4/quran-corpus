@@ -22,6 +22,7 @@ export function trimConcordanceVerse(words: VerseWord[], matchWordId: number): T
   let hi: number;
   if (hasClauseInfo) {
     // clause = from the boundary at/left of the match to the next boundary right of it
+    // (the match word itself counts: if it's a genuine clause-start, stop there).
     lo = mi;
     while (lo > 0 && !words[lo]!.starts_clause) lo -= 1;
     hi = mi + 1;

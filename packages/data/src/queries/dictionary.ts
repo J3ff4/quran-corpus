@@ -1,5 +1,6 @@
 import type { Client } from '@libsql/client';
 import type { LemmaFrequencyEntry, VerbConcordanceEntry } from '../types.js';
+import { stripQuranicAnnotations } from '../text/normalize.js';
 
 export async function getLemmaFrequency(
   db: Client,
@@ -36,7 +37,7 @@ export async function getVerbConcordance(
   });
   return res.rows.map((r) => ({
     lemma: (r['lemma'] as string | null) ?? null,
-    form_arabic: r['text_arabic'] as string,
+    form_arabic: stripQuranicAnnotations(r['text_arabic'] as string),
     count: r['count'] as number,
   }));
 }

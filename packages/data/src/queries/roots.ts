@@ -9,6 +9,7 @@ import type {
   RootSearchItem,
 } from '../types.js';
 import { compareRootsArabic } from '../text/arabic.js';
+import { stripQuranicAnnotations } from '../text/normalize.js';
 
 function rowToRoot(r: Row): Root {
   return {
@@ -25,7 +26,8 @@ function rowToForm(r: Row): RootForm {
     root_id: r['root_id'] as number,
     sort_order: r['sort_order'] as number,
     pos_label: r['pos_label'] as string,
-    form_arabic: (r['form_arabic'] as string | null) ?? null,
+    form_arabic:
+      r['form_arabic'] == null ? null : stripQuranicAnnotations(r['form_arabic'] as string),
     form_translit: (r['form_translit'] as string | null) ?? null,
     gloss: (r['gloss'] as string | null) ?? null,
     occurrence_count: r['occurrence_count'] as number,
@@ -253,7 +255,7 @@ export async function getRootConcordancePage(
                    EXISTS (SELECT 1 FROM word_segments s
                            WHERE s.word_id = w.id
                              AND s.segment_index = (SELECT MIN(segment_index) FROM word_segments WHERE word_id = w.id)
-                             AND s.pos_tag IN ('CONJ','SUB')) AS starts_clause
+                             AND s.pos_tag IN ('SUB','REM')) AS starts_clause
             FROM words w
             WHERE w.ayah_id IN (${placeholders})
             ORDER BY w.ayah_id, w.position`,
@@ -265,7 +267,7 @@ export async function getRootConcordancePage(
       list.push({
         id: r['id'] as number,
         position: r['position'] as number,
-        text_arabic: r['text_arabic'] as string,
+        text_arabic: stripQuranicAnnotations(r['text_arabic'] as string),
         starts_clause: (r['starts_clause'] as number) === 1,
       });
       wordsByAyah.set(aid, list);
@@ -277,7 +279,7 @@ export async function getRootConcordancePage(
     ayah_number: r['ayah_number'] as number,
     position: r['position'] as number,
     word_id: r['word_id'] as number,
-    text_arabic: r['text_arabic'] as string,
+    text_arabic: stripQuranicAnnotations(r['text_arabic'] as string),
     transliteration: (r['transliteration'] as string | null) ?? null,
     gloss: (r['gloss'] as string | null) ?? null,
     verse_words: wordsByAyah.get(r['ayah_id'] as number) ?? [],

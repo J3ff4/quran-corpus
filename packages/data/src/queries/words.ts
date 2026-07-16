@@ -1,21 +1,26 @@
 import type { Client, Row } from '@libsql/client';
 import type { Word, WordSegment, ConceptTag, WordDetail } from '../types.js';
+import { stripQuranicAnnotations } from '../text/normalize.js';
+
+function strip(s: string | null): string | null {
+  return s == null ? null : stripQuranicAnnotations(s);
+}
 
 function rowToWord(row: Row): Word {
   return {
     id: row['id'] as number,
     ayah_id: row['ayah_id'] as number,
     position: row['position'] as number,
-    text_arabic: row['text_arabic'] as string,
+    text_arabic: stripQuranicAnnotations(row['text_arabic'] as string),
     transliteration: (row['transliteration'] as string | null) ?? null,
     root: (row['root'] as string | null) ?? null,
-    lemma: (row['lemma'] as string | null) ?? null,
+    lemma: strip(row['lemma'] as string | null),
     root_buckwalter: (row['root_buckwalter'] as string | null) ?? null,
     lemma_buckwalter: (row['lemma_buckwalter'] as string | null) ?? null,
     pos_tag: (row['pos_tag'] as string | null) ?? null,
     morphology_json: (row['morphology_json'] as string | null) ?? null,
     morphology_description: (row['morphology_description'] as string | null) ?? null,
-    grammar_arabic: (row['grammar_arabic'] as string | null) ?? null,
+    grammar_arabic: strip(row['grammar_arabic'] as string | null),
     audio_url: (row['audio_url'] as string | null) ?? null,
   };
 }
@@ -64,10 +69,10 @@ function rowToSegment(row: Row): WordSegment {
     segment_index: row['segment_index'] as number,
     segment_type: (row['segment_type'] as string | null) ?? null,
     pos_tag: (row['pos_tag'] as string | null) ?? null,
-    form_arabic: (row['form_arabic'] as string | null) ?? null,
+    form_arabic: strip(row['form_arabic'] as string | null),
     form_buckwalter: (row['form_buckwalter'] as string | null) ?? null,
     features_json: (row['features_json'] as string | null) ?? null,
-    lemma: (row['lemma'] as string | null) ?? null,
+    lemma: strip(row['lemma'] as string | null),
     root: (row['root'] as string | null) ?? null,
   };
 }
