@@ -1,7 +1,5 @@
 import type { VerseWord } from '../types.js';
 
-/** Max words to keep on a side when its natural clause runs long. */
-const RADIUS = 6;
 /** Min words to keep on a side when its natural clause is shorter than this
  *  (common in fast narrative passages where a clause boundary can land on
  *  the very next word). */
@@ -9,6 +7,10 @@ const MIN_HALF = 3;
 /** Verses at or under this length are never trimmed -- windowing a verse
  *  this short saves no real space and risks cutting it for no reason. */
 const SHORT_VERSE_MAX = 10;
+/** Hard ceiling on the total trimmed window (both sides + match word).
+ *  A long clause is capped by shrinking whichever side is currently longer,
+ *  never below MIN_HALF -- so the cap is on the combined read, not per side. */
+const MAX_WINDOW = 11;
 
 export interface TrimmedVerse {
   words: VerseWord[];
@@ -35,19 +37,26 @@ export function trimConcordanceVerse(words: VerseWord[], matchWordId: number): T
     while (lo > 0 && !words[lo]!.starts_clause) lo -= 1;
     hi = mi + 1;
     while (hi < words.length && !words[hi]!.starts_clause) hi += 1;
-    // Each side is capped/expanded independently: a long clause gets trimmed
-    // to RADIUS, a short one gets padded out to MIN_HALF (bounded by the verse
-    // edges). Independent so, e.g., a long left side doesn't force-expand an
-    // already-correct short right side.
-    const leftLen = mi - lo;
-    const rightLen = hi - mi - 1;
-    if (leftLen > RADIUS) lo = mi - RADIUS;
-    else if (leftLen < MIN_HALF) lo = Math.max(0, mi - MIN_HALF);
-    if (rightLen > RADIUS) hi = mi + RADIUS + 1;
-    else if (rightLen < MIN_HALF) hi = Math.min(words.length, mi + MIN_HALF + 1);
+    // A short natural clause gets padded out to MIN_HALF (bounded by the verse
+    // edges); a long one is left alone here and squeezed below instead, so the
+    // cap applies to the combined window rather than each side independently.
+    let leftLen = mi - lo;
+    let rightLen = hi - mi - 1;
+    if (leftLen < MIN_HALF) leftLen = Math.min(mi, MIN_HALF);
+    if (rightLen < MIN_HALF) rightLen = Math.min(words.length - mi - 1, MIN_HALF);
+
+    while (leftLen + rightLen + 1 > MAX_WINDOW && (leftLen > MIN_HALF || rightLen > MIN_HALF)) {
+      if (leftLen >= rightLen && leftLen > MIN_HALF) leftLen -= 1;
+      else if (rightLen > MIN_HALF) rightLen -= 1;
+      else leftLen -= 1;
+    }
+
+    lo = mi - leftLen;
+    hi = mi + rightLen + 1;
   } else {
-    lo = Math.max(0, mi - RADIUS);
-    hi = Math.min(words.length, mi + RADIUS + 1);
+    const half = Math.floor((MAX_WINDOW - 1) / 2);
+    lo = Math.max(0, mi - half);
+    hi = Math.min(words.length, mi + half + 1);
   }
   return {
     words: words.slice(lo, hi),

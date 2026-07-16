@@ -18,15 +18,15 @@ describe('trimConcordanceVerse', () => {
     expect(r.truncatedBefore).toBe(false);
     expect(r.truncatedAfter).toBe(false);
   });
-  it('match in the middle of a long verse → ±6 window, both sides truncated', () => {
-    const r = trimConcordanceVerse(mk(30), 15); // ids 9..21
-    expect(r.words.map((w) => w.id)).toEqual([9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]);
+  it('match in the middle of a long verse → 11-word window, both sides truncated', () => {
+    const r = trimConcordanceVerse(mk(30), 15); // ids 10..20
+    expect(r.words.map((w) => w.id)).toEqual([10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
     expect(r.truncatedBefore).toBe(true);
     expect(r.truncatedAfter).toBe(true);
     expect(r.words.some((w) => w.id === 15)).toBe(true);
   });
   it('match near the start → no before-truncation, window still holds the match', () => {
-    const r = trimConcordanceVerse(mk(30), 2); // ids 1..8, clamped left
+    const r = trimConcordanceVerse(mk(30), 2); // ids 1..7, clamped left
     expect(r.words[0]!.id).toBe(1);
     expect(r.truncatedBefore).toBe(false);
     expect(r.truncatedAfter).toBe(true);
@@ -52,10 +52,10 @@ describe('trimConcordanceVerse', () => {
     expect(r.truncatedBefore).toBe(true);
     expect(r.truncatedAfter).toBe(true);
   });
-  it('caps an over-long clause at ±6 around the match', () => {
+  it('caps an over-long clause at 11 words total around the match', () => {
     // one clause spanning all 30 words (boundary only at 1); match at 15
     const r = trimConcordanceVerse(mkClause(30, [1]), 15);
-    expect(r.words.map((w) => w.id)).toEqual([9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]);
+    expect(r.words.map((w) => w.id)).toEqual([10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
   });
   it("doesn't trim a verse of 10 words or fewer even with clause info present", () => {
     // regression (15:31): a short verse must never be windowed, even when a
@@ -67,8 +67,9 @@ describe('trimConcordanceVerse', () => {
   });
   it("doesn't cap a clause side that isn't actually long (4:169 regression)", () => {
     // left side naturally reaches back 5 words (no boundary before it) --
-    // under the old ±4 cap this got trimmed to 4 for no real reason; ±6
-    // leaves it whole since 5 <= 6.
+    // under the old ±4 cap this got trimmed to 4 for no real reason. Per-side
+    // length is left alone here; only the combined-window squeeze can shrink
+    // it, and this window is already under the 11-word cap.
     const r = trimConcordanceVerse(mkClause(11, [7]), 6);
     expect(r.words[0]!.id).toBe(1);
     expect(r.truncatedBefore).toBe(false);
