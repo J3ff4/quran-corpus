@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 
 type Theme = 'light' | 'dark';
 
@@ -58,6 +58,7 @@ function applyTheme(theme: Theme) {
  */
 export function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>('light');
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     let stored: string | null = null;
@@ -95,18 +96,22 @@ export function ThemeToggle() {
       onClick={toggle}
       className="fixed right-3 top-3 z-30 overflow-hidden rounded-full bg-paper-100/80 p-2 text-paper-600 shadow-sm backdrop-blur transition-colors hover:bg-paper-200 hover:text-paper-900 dark:bg-night-200/80 dark:text-paper-300 dark:hover:bg-night-100 dark:hover:text-paper-100"
     >
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.span
-          key={theme}
-          className="block h-5 w-5"
-          initial={{ rotate: -90, opacity: 0 }}
-          animate={{ rotate: 0, opacity: 1 }}
-          exit={{ rotate: 90, opacity: 0 }}
-          transition={{ duration: 0.25, ease: 'easeInOut' }}
-        >
-          {theme === 'dark' ? moonIcon : sunIcon}
-        </motion.span>
-      </AnimatePresence>
+      {reducedMotion ? (
+        <span className="block h-5 w-5">{theme === 'dark' ? moonIcon : sunIcon}</span>
+      ) : (
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.span
+            key={theme}
+            className="block h-5 w-5"
+            initial={{ rotate: -90, opacity: 0 }}
+            animate={{ rotate: 0, opacity: 1 }}
+            exit={{ rotate: 90, opacity: 0 }}
+            transition={{ duration: 0.25, ease: 'easeInOut' }}
+          >
+            {theme === 'dark' ? moonIcon : sunIcon}
+          </motion.span>
+        </AnimatePresence>
+      )}
     </button>
   );
 }
