@@ -40,6 +40,21 @@ def test_hamza_forms() -> None:
     assert buckwalter_to_arabic("}") == "ئ"
 
 
+def test_tatweel_seats_a_seatless_hamza() -> None:
+    """'_' is tatweel, the seat a free-standing hamza (here '#') sits on --
+    regression: this fell through to passthrough and left a literal ASCII
+    underscore in rendered Arabic (e.g. corpus 'ya_#uwdu')."""
+    tatweel = "ـ"
+    hamza_above = "ٔ"
+    fatha = "َ"
+    dagger_alef = "ٰ"
+    noon = "ن"
+    expected = tatweel + hamza_above + fatha + dagger_alef + noon
+    out = buckwalter_to_arabic("_#a`n")
+    assert out == expected
+    assert "_" not in out
+
+
 def test_unknown_char_passthrough() -> None:
     """An unmapped character is preserved rather than dropped."""
     assert buckwalter_to_arabic("smw9") == "سمو9"

@@ -61,6 +61,7 @@ _BUCKWALTER_TO_ARABIC: dict[str, str] = {
     "#": "ٔ",  # hamza above
     "`": "ٰ",  # superscript alef
     "{": "ٱ",  # alef wasla
+    "_": "ـ",  # tatweel -- seat for a hamza written with no letter of its own
     # Quranic / extended symbols present in the corpus
     ":": "ۜ",  # small high seen
     "@": "۟",  # small high rounded zero
