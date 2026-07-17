@@ -12,6 +12,7 @@ const preset: Partial<Config> = {
       fontFamily: {
         arabic: ['var(--font-arabic)', 'serif'],
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
+        'surah-name': ['var(--font-surah-name)', 'serif'],
       },
       colors: {
         paper: {
