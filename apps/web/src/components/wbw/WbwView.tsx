@@ -22,7 +22,10 @@ export function WbwView({ surah, ayahs, page, totalPages, scrollAyah, pageLang }
     <div>
       <header className="mb-4 text-center">
         <SurahFrame>
-          <p className="font-surah-name text-3xl text-paper-900 dark:text-paper-100" aria-hidden="true">
+          <p
+            className="font-surah-name text-lg leading-none text-paper-900 dark:text-paper-100 sm:text-2xl"
+            aria-hidden="true"
+          >
             {surahNameGlyph(surah.id)}
           </p>
           <span className="sr-only">{surah.name_arabic}</span>

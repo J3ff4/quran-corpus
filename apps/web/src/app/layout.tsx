@@ -15,7 +15,10 @@ const kfgqpc = localFont({
 const surahNameV4 = localFont({
   src: './fonts/surah-name-v4.woff2',
   variable: '--font-surah-name',
-  display: 'swap',
+  // 'block' (not 'swap'): the glyphs are PUA codepoints with no fallback
+  // rendering, so swap would show a tofu/missing-glyph box during load.
+  // block briefly renders invisible text instead, then swaps in once ready.
+  display: 'block',
 });
 
 const amiri = Amiri({

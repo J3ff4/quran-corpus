@@ -8,10 +8,12 @@ interface SurahFrameProps {
 /**
  * Wide arabesque banner enclosing the surah name. Art from
  * temp/frames-1/Sura_border.svg (CC0 clipart, native viewBox 0 -500 16320
- * 2000, 8.16:1). It's a single evenodd path -- the cartouche and two
- * medallions are cutouts, so the page background shows through them
- * natively. Recolored via `currentColor` (was a hardcoded #005aff) so a
- * wrapping text-color class drives paper/night theming (CLAUDE.md §8).
+ * 2000, 8.16:1). It's a single path -- the cartouche and two medallions are
+ * cutouts, and (verified by render) the default SVG nonzero fill rule
+ * already produces those holes correctly, so no fill-rule attribute is
+ * set here (matches the source SVG, which also omits one). Recolored via
+ * `currentColor` (was a hardcoded #005aff) so a wrapping text-color class
+ * drives paper/night theming (CLAUDE.md §8).
  */
 export function SurahFrame({ children, className }: SurahFrameProps) {
   return (
