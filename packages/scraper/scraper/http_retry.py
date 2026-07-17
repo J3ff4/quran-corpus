@@ -11,7 +11,19 @@ import time
 
 import httpx
 
-_RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+_RETRYABLE_STATUS = {429, *range(500, 600)}
+
+
+def _delay_seconds(
+    attempt: int, backoff_base: float, retry_after: str | None = None
+) -> float:
+    delay = backoff_base * (2**attempt)
+    if retry_after is not None:
+        try:
+            delay = max(delay, float(retry_after))
+        except ValueError:
+            pass  # non-numeric (e.g. an HTTP-date) -- fall back to local backoff
+    return delay
 
 
 def get_with_retry(
@@ -25,7 +37,8 @@ def get_with_retry(
 
     Retries httpx.TransportError (DNS failure, connect/read timeout, etc.)
     and 429/5xx responses, up to max_retries times, doubling the delay each
-    attempt. Other HTTP errors (4xx) aren't transient and raise immediately.
+    attempt (or honoring the response's Retry-After header if it asks for
+    longer). Other HTTP errors (4xx) aren't transient and raise immediately.
     """
     attempt = 0
     while True:
@@ -36,11 +49,13 @@ def get_with_retry(
         except httpx.TransportError:
             if attempt >= max_retries:
                 raise
+            time.sleep(_delay_seconds(attempt, backoff_base))
         except httpx.HTTPStatusError as exc:
             if (
                 exc.response.status_code not in _RETRYABLE_STATUS
                 or attempt >= max_retries
             ):
                 raise
-        time.sleep(backoff_base * (2**attempt))
+            retry_after = exc.response.headers.get("Retry-After")
+            time.sleep(_delay_seconds(attempt, backoff_base, retry_after))
         attempt += 1
