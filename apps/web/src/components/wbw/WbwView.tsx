@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { Surah } from '@quran-corpus/data';
 import { Bismillah } from '../reader/ornaments/Bismillah';
 import { SurahFrame } from '../reader/ornaments/SurahFrame';
+import { surahNameGlyph } from '../reader/ornaments/surahNameGlyph';
 import { WbwAyahBlock } from './WbwAyahBlock';
 import { Pager } from './Pager';
 import { ScrollToAyah } from './ScrollToAyah';
@@ -21,7 +22,10 @@ export function WbwView({ surah, ayahs, page, totalPages, scrollAyah, pageLang }
     <div>
       <header className="mb-4 text-center">
         <SurahFrame>
-          <p className="font-arabic text-2xl text-paper-900 dark:text-paper-100">{surah.name_arabic}</p>
+          <p className="font-surah-name text-3xl text-paper-900 dark:text-paper-100" aria-hidden="true">
+            {surahNameGlyph(surah.id)}
+          </p>
+          <span className="sr-only">{surah.name_arabic}</span>
         </SurahFrame>
         <h1 className="text-paper-500">
           <span>{surah.name_translit}</span> · word by word
