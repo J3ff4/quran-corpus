@@ -11,6 +11,7 @@ import httpx
 
 from ..checkpoint import Checkpoint
 from ..db import ScraperDatabase
+from ..http_retry import get_with_retry
 from ..models import WordGlossModel, WordModel
 from .corpus_parser import parse_next_verse_url, parse_verse_words
 
@@ -37,8 +38,7 @@ def scrape_chapter(
     with httpx.Client(timeout=30.0) as client:
         while current_verse is not None:
             url = f"{_BASE_URL}?chapter={chapter_id}&verse={current_verse}"
-            response = client.get(url)
-            response.raise_for_status()
+            response = get_with_retry(client, url)
             html = response.text
 
             _process_page(html, chapter_id, db)

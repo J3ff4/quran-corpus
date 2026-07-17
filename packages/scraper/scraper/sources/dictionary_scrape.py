@@ -14,6 +14,7 @@ import httpx
 from ..buckwalter import buckwalter_to_arabic
 from ..checkpoint import Checkpoint
 from ..db import ScraperDatabase
+from ..http_retry import get_with_retry
 from ..models import ConceptTagModel, RootFormModel, RootModel
 from .corpus_dictionary import parse_root_page
 from .corpus_word_detail import parse_word_detail
@@ -46,8 +47,7 @@ def scrape_dictionary(
             key = f"root_{bw}"
             if checkpoint.is_done(key):
                 continue
-            resp = client.get(_DICT_URL.format(bw=bw))
-            resp.raise_for_status()
+            resp = get_with_retry(client, _DICT_URL.format(bw=bw))
             parsed = parse_root_page(resp.text)
             if parsed is not None:
                 rid = db.upsert_root(
@@ -97,12 +97,12 @@ def scrape_word_details(
             key = f"word_{wid}"
             if checkpoint.is_done(key):
                 continue
-            resp = client.get(
+            resp = get_with_retry(
+                client,
                 _WORD_URL.format(
                     s=row["surah_id"], a=row["ayah_number"], p=row["position"]
-                )
+                ),
             )
-            resp.raise_for_status()
             detail = parse_word_detail(resp.text)
             if detail is not None:
                 db.update_word_detail(
