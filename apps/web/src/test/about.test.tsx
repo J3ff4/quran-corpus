@@ -25,4 +25,10 @@ describe('About page', () => {
     render(<About />);
     expect(screen.getAllByText(/KFGQPC/i).length).toBeGreaterThan(0);
   });
+
+  it('credits the surah-name-v4 font and the arabesque frame art', () => {
+    render(<About />);
+    expect(screen.getByText(/surah-name-v4/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/quranfonts\.com/i).length).toBeGreaterThan(0);
+  });
 });

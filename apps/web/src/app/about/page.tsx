@@ -56,6 +56,20 @@ const sources: Source[] = [
     license: 'KFGQPC EULA',
     note: 'Arabic mushaf typeface, © 2010 KFGQPC, used under its EULA for Quranic display.',
   },
+  {
+    name: 'surah-name-v4 (quranfonts.com)',
+    href: 'https://quranfonts.com/font/surah-name-v4/',
+    provides: 'Per-surah calligraphic glyph used for the surah-name banner in the reader header.',
+    license: 'Free/open (no attribution required)',
+    note: 'Each of the 114 surah names is a dedicated glyph at Unicode PUA codepoint 0xE000 + surah number; credited here for transparency even though the license does not require it.',
+  },
+  {
+    name: 'Sura_border.svg (arabesque frame ornament)',
+    href: 'https://openclipart.org',
+    provides: 'The wide ornamental banner framing the surah name.',
+    license: 'CC0 / public domain',
+    note: 'Free clipart, used unmodified apart from recoloring to match the app’s paper/night theme tokens.',
+  },
 ];
 
 export default function AboutPage() {

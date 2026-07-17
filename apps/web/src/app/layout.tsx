@@ -12,6 +12,15 @@ const kfgqpc = localFont({
   display: 'swap',
 });
 
+const surahNameV4 = localFont({
+  src: './fonts/surah-name-v4.woff2',
+  variable: '--font-surah-name',
+  // 'block' (not 'swap'): the glyphs are PUA codepoints with no fallback
+  // rendering, so swap would show a tofu/missing-glyph box during load.
+  // block briefly renders invisible text instead, then swaps in once ready.
+  display: 'block',
+});
+
 const amiri = Amiri({
   weight: ['400', '700'],
   subsets: ['arabic', 'latin'],
@@ -50,7 +59,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${kfgqpc.variable} ${amiri.variable} ${inter.variable}`}
+      className={`${kfgqpc.variable} ${amiri.variable} ${inter.variable} ${surahNameV4.variable}`}
     >
       <body className="bg-paper-50 pb-[calc(4rem+env(safe-area-inset-bottom))] pt-[calc(3.5rem+env(safe-area-inset-top))] font-sans text-paper-900 antialiased dark:bg-night-300 dark:text-paper-100">
         {/* Synchronous on purpose: sets `.dark` before content paints (no

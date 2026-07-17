@@ -12,4 +12,29 @@ describe('SurahFrame', () => {
     expect(screen.getByText('البقرة')).toBeInTheDocument();
     expect(document.querySelector('svg[aria-hidden="true"]')).toBeInTheDocument();
   });
+
+  it('uses the wide banner aspect ratio and currentColor theming', () => {
+    const { container } = render(
+      <SurahFrame>
+        <span>test</span>
+      </SurahFrame>,
+    );
+    const wrapper = container.firstElementChild as HTMLElement;
+    expect(wrapper.className).toContain('aspect-[204/25]');
+    const path = container.querySelector('svg path');
+    expect(path).not.toBeNull();
+    expect(path?.getAttribute('fill')).toBe('currentColor');
+  });
+
+  it('a real-world caller hides the glyph and exposes an sr-only name', () => {
+    render(
+      <SurahFrame>
+        <p aria-hidden="true">{String.fromCodePoint(0xe002)}</p>
+        <span className="sr-only">البقرة</span>
+      </SurahFrame>,
+    );
+    const glyph = document.querySelector('p[aria-hidden="true"]');
+    expect(glyph).not.toBeNull();
+    expect(screen.getByText('البقرة')).toHaveClass('sr-only');
+  });
 });
