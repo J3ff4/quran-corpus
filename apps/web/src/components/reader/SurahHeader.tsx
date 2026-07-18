@@ -21,7 +21,7 @@ export function SurahHeader({ surah }: SurahHeaderProps) {
       <div className="text-center">
         <SurahFrame className="mb-1">
           <p
-            className={`text-[1.65rem] leading-none text-paper-900 dark:text-paper-100 ${
+            className={`text-[1.9rem] leading-none text-paper-900 dark:text-paper-100 ${
               surah.id === 102 ? 'font-surah-name-v4' : 'font-surah-name'
             }`}
             aria-hidden="true"
