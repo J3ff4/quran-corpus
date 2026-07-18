@@ -10,7 +10,7 @@ const c = (position: number, arabic: string) => ({
 describe('WbwAyahBlock', () => {
   it('has scroll anchor id and renders cells', () => {
     const ayah: WbwAyah = { ayahNumber: 3, cells: [c(1, 'الف'), c(2, 'باء')], textUthmani: 'x' };
-    const { container } = render(<WbwAyahBlock ayah={ayah} />);
+    const { container } = render(<WbwAyahBlock surahId={1} ayah={ayah} />);
     expect(container.querySelector('#ayah-3')).not.toBeNull();
     expect(screen.getByText('الف')).toBeInTheDocument();
     expect(screen.getByText('باء')).toBeInTheDocument();
@@ -18,15 +18,21 @@ describe('WbwAyahBlock', () => {
 
   it('falls back to text_uthmani when the ayah has no words', () => {
     const ayah: WbwAyah = { ayahNumber: 4, cells: [], textUthmani: 'نَصُّ الآية' };
-    render(<WbwAyahBlock ayah={ayah} />);
+    render(<WbwAyahBlock surahId={1} ayah={ayah} />);
     expect(screen.getByText('نَصُّ الآية')).toBeInTheDocument();
   });
 
   it('renders cells in ascending position order in the DOM (dir=rtl handles visual order)', () => {
     const ayah: WbwAyah = { ayahNumber: 3, cells: [c(1, 'الف'), c(2, 'باء')], textUthmani: 'x' };
-    render(<WbwAyahBlock ayah={ayah} />);
+    render(<WbwAyahBlock surahId={1} ayah={ayah} />);
     const links = screen.getAllByRole('link');
     expect(links[0]).toHaveTextContent('الف');
     expect(links[1]).toHaveTextContent('باء');
+  });
+
+  it('renders a bookmark button', () => {
+    const ayah: WbwAyah = { ayahNumber: 3, cells: [c(1, 'الف')], textUthmani: 'x' };
+    render(<WbwAyahBlock surahId={1} ayah={ayah} />);
+    expect(screen.getByRole('button', { name: /bookmark ayah 3/i })).toBeInTheDocument();
   });
 });

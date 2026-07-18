@@ -5,6 +5,7 @@ import type { Ayah, Word, Translation } from '@quran-corpus/data';
 import { AyahView } from './AyahView';
 import { Bismillah } from './ornaments/Bismillah';
 import { WordPopover } from './WordPopover';
+import { ScrollToAyah } from '../shared/ScrollToAyah';
 import { useAyahAudio } from '../../hooks/useAyahAudio';
 import { useIncrementalReveal } from '../../hooks/useIncrementalReveal';
 import { wordHref, wordLocation } from '../../lib/wordLocation';
@@ -21,6 +22,7 @@ interface ReaderViewProps {
   translationsByAyah: Record<number, Translation>;
   glossesByWordId: Record<number, { text: string; lang: string }>;
   lang: string;
+  scrollAyah?: number | null;
 }
 
 export function ReaderView({
@@ -29,6 +31,7 @@ export function ReaderView({
   translationsByAyah,
   glossesByWordId,
   lang,
+  scrollAyah,
 }: ReaderViewProps) {
   const [selectedWord, setSelectedWord] = useState<Word | null>(null);
   const { playingAyahId, isPlaying, isRepeat, play, pause, toggleRepeat } = useAyahAudio(ayahs);
@@ -46,7 +49,23 @@ export function ReaderView({
     if (idx !== -1) revealTo(idx + 1);
   }, [paginate, playingAyahId, ayahs, revealTo]);
 
+  useEffect(() => {
+    if (!paginate || scrollAyah == null) return;
+    const idx = ayahs.findIndex((a) => a.ayah_number === scrollAyah);
+    if (idx !== -1) revealTo(idx + 1);
+  }, [paginate, scrollAyah, ayahs, revealTo]);
+
   const visible = paginate ? ayahs.slice(0, visibleCount) : ayahs;
+
+  // Mount ScrollToAyah only once the target ayah's <article> actually exists in
+  // the DOM, so its mount-effect fires fresh exactly when getElementById can
+  // find it. For paginated surahs the target isn't guaranteed present until
+  // the reveal effect above bumps visibleCount in a later commit; for
+  // non-paginated surahs every ayah is already rendered.
+  const targetIdx =
+    scrollAyah != null ? ayahs.findIndex((a) => a.ayah_number === scrollAyah) : -1;
+  const targetRevealed =
+    scrollAyah != null && (!paginate || (targetIdx !== -1 && targetIdx < visibleCount));
 
   const selectedAyah = selectedWord ? ayahs.find((a) => a.id === selectedWord.ayah_id) : undefined;
   const selectedHref =
@@ -84,6 +103,7 @@ export function ReaderView({
           Load more ayahs
         </button>
       )}
+      {targetRevealed && <ScrollToAyah ayah={scrollAyah!} />}
       <WordPopover
         word={selectedWord}
         {...(selectedWord != null && glossesByWordId[selectedWord.id] != null

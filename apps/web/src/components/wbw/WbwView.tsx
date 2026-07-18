@@ -5,7 +5,7 @@ import { SurahFrame } from '../reader/ornaments/SurahFrame';
 import { surahNameGlyph } from '../reader/ornaments/surahNameGlyph';
 import { WbwAyahBlock } from './WbwAyahBlock';
 import { Pager } from './Pager';
-import { ScrollToAyah } from './ScrollToAyah';
+import { ScrollToAyah } from '../shared/ScrollToAyah';
 import type { WbwAyah } from './types';
 
 interface WbwViewProps {
@@ -46,7 +46,12 @@ export function WbwView({ surah, ayahs, page, totalPages, scrollAyah, pageLang }
       {page === 1 && <Bismillah surahId={surah.id} />}
 
       {ayahs.map((ayah) => (
-        <WbwAyahBlock key={ayah.ayahNumber} ayah={ayah} {...(pageLang ? { pageLang } : {})} />
+        <WbwAyahBlock
+          key={ayah.ayahNumber}
+          surahId={surah.id}
+          ayah={ayah}
+          {...(pageLang ? { pageLang } : {})}
+        />
       ))}
 
       <Pager surahId={surah.id} page={page} totalPages={totalPages} />

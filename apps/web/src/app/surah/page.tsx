@@ -26,12 +26,6 @@ export default async function SurahListPage() {
           >
             Dictionary
           </Link>
-          <Link
-            href="/about"
-            className="text-sm text-paper-500 transition-colors hover:text-paper-800 dark:hover:text-paper-200"
-          >
-            About &amp; Credits
-          </Link>
         </nav>
       </div>
       {surahs.length === 0 ? (

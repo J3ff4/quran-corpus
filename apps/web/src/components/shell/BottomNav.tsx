@@ -1,9 +1,9 @@
 'use client';
 
-import { type ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useSearch } from '../search/SearchProvider';
+import { DrawerMenu } from './DrawerMenu';
 
 interface LinkItem {
   href: string;
@@ -36,10 +36,9 @@ const DictIcon = (
   </svg>
 );
 
-const SearchIcon = (
+const MenuIcon = (
   <svg className={ICON} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <circle cx="11" cy="11" r="7" />
-    <path d="m20 20-3.5-3.5" />
+    <path d="M4 6h16M4 12h16M4 18h16" />
   </svg>
 );
 
@@ -60,36 +59,39 @@ const idleColor = 'text-paper-500 dark:text-paper-400';
 
 export function BottomNav() {
   const pathname = usePathname() ?? '/';
-  const { open: openSearch } = useSearch();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <nav
-      aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-paper-200 bg-paper-50/95 pb-[env(safe-area-inset-bottom)] backdrop-blur dark:border-night-100 dark:bg-night-300/95"
-    >
-      {LINK_ITEMS.map((item) => {
-        const active = item.match(pathname);
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            aria-current={active ? 'page' : undefined}
-            className={`${itemClass} ${active ? activeColor : idleColor}`}
-          >
-            {item.icon}
-            <span>{item.label}</span>
-          </Link>
-        );
-      })}
-      <button
-        type="button"
-        aria-label="Search"
-        onClick={openSearch}
-        className={`${itemClass} ${idleColor}`}
+    <>
+      <nav
+        aria-label="Primary"
+        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-paper-200 bg-paper-50/95 pb-[env(safe-area-inset-bottom)] backdrop-blur dark:border-night-100 dark:bg-night-300/95"
       >
-        {SearchIcon}
-        <span>Search</span>
-      </button>
-    </nav>
+        {LINK_ITEMS.map((item) => {
+          const active = item.match(pathname);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              aria-current={active ? 'page' : undefined}
+              className={`${itemClass} ${active ? activeColor : idleColor}`}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+            </Link>
+          );
+        })}
+        <button
+          type="button"
+          aria-label="Menu"
+          onClick={() => setMenuOpen(true)}
+          className={`${itemClass} ${idleColor}`}
+        >
+          {MenuIcon}
+          <span>Menu</span>
+        </button>
+      </nav>
+      <DrawerMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
+    </>
   );
 }

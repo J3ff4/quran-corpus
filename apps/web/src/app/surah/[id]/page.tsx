@@ -15,15 +15,16 @@ import { SurahHeader } from '../../../components/reader/SurahHeader';
 import { ReaderView } from '../../../components/reader/ReaderView';
 import { LanguageBar } from '../../../components/reader/LanguageBar';
 import { isValidLang, type ValidLang } from '../../../components/reader/languages';
+import { parseScrollAyah } from './params';
 
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ lang?: string }>;
+  searchParams: Promise<{ lang?: string; ayah?: string }>;
 }
 
 export default async function SurahPage({ params, searchParams }: PageProps) {
   const { id } = await params;
-  const { lang: rawLang } = await searchParams;
+  const { lang: rawLang, ayah: rawAyah } = await searchParams;
   const lang: ValidLang = isValidLang(rawLang) ? rawLang : 'en';
   const surahId = parseInt(id, 10);
 
@@ -39,6 +40,8 @@ export default async function SurahPage({ params, searchParams }: PageProps) {
   ]);
 
   if (!surah) notFound();
+
+  const scrollAyah = parseScrollAyah(rawAyah, surah.ayah_count);
 
   // Group words by ayah_id
   const wordsByAyah: Record<number, Word[]> = {};
@@ -68,6 +71,7 @@ export default async function SurahPage({ params, searchParams }: PageProps) {
         translationsByAyah={translationsByAyah}
         glossesByWordId={glossesByWordId}
         lang={lang}
+        scrollAyah={scrollAyah}
       />
     </main>
   );

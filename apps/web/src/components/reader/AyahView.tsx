@@ -2,6 +2,7 @@ import type { Ayah, Word, Translation } from '@quran-corpus/data';
 import { WordToken } from './WordToken';
 import { AyahAudioButton } from './AyahAudioButton';
 import { AyahMedallion } from './ornaments/AyahMedallion';
+import { BookmarkButton } from '../shared/BookmarkButton';
 
 interface AyahViewProps {
   ayah: Ayah;
@@ -29,7 +30,7 @@ export function AyahView({
   onToggleRepeat,
 }: AyahViewProps) {
   return (
-    <article className="mb-10">
+    <article id={`ayah-${ayah.ayah_number}`} className="mb-10">
       <div className="mb-3 flex items-center gap-2">
         <AyahMedallion n={ayah.ayah_number} />
         <AyahAudioButton
@@ -41,6 +42,7 @@ export function AyahView({
           onPause={onPause}
           onToggleRepeat={onToggleRepeat}
         />
+        <BookmarkButton surahId={ayah.surah_id} ayahNumber={ayah.ayah_number} view="reading" />
       </div>
 
       <div dir="rtl" className="flex flex-wrap gap-x-1 gap-y-2 font-arabic text-3xl leading-[2.4]">

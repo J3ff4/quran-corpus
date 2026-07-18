@@ -76,4 +76,16 @@ describe('AyahView', () => {
     render(<AyahView ayah={ayah} words={[]} onWordClick={vi.fn()} {...audioProps} />);
     expect(screen.getByRole('button', { name: /play ayah 1/i })).toBeInTheDocument();
   });
+
+  it('renders a bookmark button', () => {
+    render(<AyahView ayah={ayah} words={[]} onWordClick={vi.fn()} {...audioProps} />);
+    expect(screen.getByRole('button', { name: /bookmark ayah 1/i })).toBeInTheDocument();
+  });
+
+  it('sets the scroll-anchor id on the article', () => {
+    const { container } = render(
+      <AyahView ayah={ayah} words={[]} onWordClick={vi.fn()} {...audioProps} />,
+    );
+    expect(container.querySelector('#ayah-1')).not.toBeNull();
+  });
 });

@@ -1,11 +1,23 @@
 import { WbwWordCell } from './WbwWordCell';
 import type { WbwAyah } from './types';
 import { AyahMedallion } from '../reader/ornaments/AyahMedallion';
+import { BookmarkButton } from '../shared/BookmarkButton';
 
-export function WbwAyahBlock({ ayah, pageLang }: { ayah: WbwAyah; pageLang?: string }) {
+export function WbwAyahBlock({
+  surahId,
+  ayah,
+  pageLang,
+}: {
+  surahId: number;
+  ayah: WbwAyah;
+  pageLang?: string;
+}) {
   return (
     <section id={`ayah-${ayah.ayahNumber}`} className="scroll-mt-20 border-b border-paper-200 py-5 dark:border-night-100">
-      <AyahMedallion n={ayah.ayahNumber} className="mb-3" />
+      <div className="mb-3 flex items-center gap-2">
+        <AyahMedallion n={ayah.ayahNumber} />
+        <BookmarkButton surahId={surahId} ayahNumber={ayah.ayahNumber} view="wbw" />
+      </div>
       {ayah.cells.length > 0 ? (
         <div className="flex flex-wrap gap-2" dir="rtl">
           {ayah.cells.map((cell) => (

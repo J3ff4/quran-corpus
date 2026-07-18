@@ -4,7 +4,6 @@ import localFont from 'next/font/local';
 import './globals.css';
 import { BottomNav } from '../components/shell/BottomNav';
 import { SearchProvider } from '../components/search/SearchProvider';
-import { ThemeToggle } from '../components/shell/ThemeToggle';
 
 const kfgqpc = localFont({
   src: './fonts/hafs.18.woff2',
@@ -69,7 +68,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       suppressHydrationWarning
       className={`${kfgqpc.variable} ${amiri.variable} ${inter.variable} ${surahNameV2.variable} ${surahNameV4.variable}`}
     >
-      <body className="bg-paper-50 pb-[calc(4rem+env(safe-area-inset-bottom))] pt-[calc(3.5rem+env(safe-area-inset-top))] font-sans text-paper-900 antialiased dark:bg-night-300 dark:text-paper-100">
+      <body className="bg-paper-50 pb-[calc(4rem+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)] font-sans text-paper-900 antialiased dark:bg-night-300 dark:text-paper-100">
         {/* Synchronous on purpose: sets `.dark` before content paints (no
             wrong-theme flash). External file so CSP 'self' covers it on
             every page, including the statically prerendered /offline. */}
@@ -77,7 +76,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             paint to apply the theme class first; ~300B local file, negligible */}
         <script src="/theme-init.js" />
         <SearchProvider>
-          <ThemeToggle />
           {children}
           <BottomNav />
         </SearchProvider>

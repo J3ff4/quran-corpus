@@ -61,6 +61,7 @@ describe('ReaderView incremental render', () => {
   beforeEach(() => {
     MockIntersectionObserver.instances = [];
     audioState.playingAyahId = null;
+    Element.prototype.scrollIntoView = vi.fn();
   });
 
   it('small surah (<= threshold): renders all ayahs, no Load more', () => {
@@ -95,5 +96,30 @@ describe('ReaderView incremental render', () => {
     rerender(<ReaderView ayahs={ayahs} {...empties} />);
     expect(articleCount(container)).toBeGreaterThanOrEqual(50);
     expect(screen.getByText('50')).toBeInTheDocument();    // now revealed
+  });
+
+  it('scrollAyah beyond the initial window reveals enough ayahs to include it', () => {
+    const { container } = render(
+      <ReaderView ayahs={makeAyahs(60)} {...empties} scrollAyah={50} />,
+    );
+    expect(articleCount(container)).toBeGreaterThanOrEqual(50);
+    expect(screen.getByText('50')).toBeInTheDocument();
+  });
+
+  it('mounts the scroll anchor for the target ayah when scrollAyah is set', () => {
+    const { container } = render(
+      <ReaderView ayahs={makeAyahs(7)} {...empties} scrollAyah={3} />,
+    );
+    expect(container.querySelector('#ayah-3')).not.toBeNull();
+  });
+
+  it('scrolls to a deep-linked ayah beyond the initial reveal window once revealed', () => {
+    render(<ReaderView ayahs={makeAyahs(60)} {...empties} scrollAyah={50} />);
+    // ayah 50 is outside the initial 20-ayah window; the reveal effect must
+    // bump visibleCount and mount ScrollToAyah fresh so its effect actually runs.
+    expect(document.getElementById('ayah-50')).not.toBeNull();
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith(
+      expect.objectContaining({ block: 'start' }),
+    );
   });
 });

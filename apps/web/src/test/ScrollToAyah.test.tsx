@@ -3,7 +3,7 @@ import { render } from '@testing-library/react';
 
 vi.mock('framer-motion', () => ({ useReducedMotion: () => false }));
 
-import { ScrollToAyah } from '../components/wbw/ScrollToAyah';
+import { ScrollToAyah } from '../components/shared/ScrollToAyah';
 
 describe('ScrollToAyah', () => {
   beforeEach(() => vi.restoreAllMocks());
