@@ -13,6 +13,7 @@ const preset: Partial<Config> = {
         arabic: ['var(--font-arabic)', 'serif'],
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
         'surah-name': ['var(--font-surah-name)', 'serif'],
+        'surah-name-v4': ['var(--font-surah-name-v4)', 'serif'],
       },
       colors: {
         paper: {

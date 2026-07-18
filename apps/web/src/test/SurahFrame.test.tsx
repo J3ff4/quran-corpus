@@ -26,6 +26,22 @@ describe('SurahFrame', () => {
     expect(path?.getAttribute('fill')).toBe('currentColor');
   });
 
+  it('centers content with inset-y, not vertical padding', () => {
+    // Regression: padding-top/bottom percentages resolve against the
+    // containing block's WIDTH regardless of axis (CSS spec), which on
+    // this 8.16:1 frame overshoots the real height and pushes content
+    // out below the frame. inset-y resolves against height correctly.
+    const { container } = render(
+      <SurahFrame>
+        <span>test</span>
+      </SurahFrame>,
+    );
+    const wrapper = container.firstElementChild as HTMLElement;
+    const overlay = wrapper.querySelector(':scope > div') as HTMLElement;
+    expect(overlay.className).not.toMatch(/(^|\s)py-\[/);
+    expect(overlay.className).toMatch(/(^|\s)inset-y-\[/);
+  });
+
   it('a real-world caller hides the glyph and exposes an sr-only name', () => {
     render(
       <SurahFrame>
