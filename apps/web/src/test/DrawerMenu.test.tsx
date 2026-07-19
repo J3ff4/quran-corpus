@@ -31,11 +31,19 @@ describe('DrawerMenu', () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it('renders Search, Theme, Bookmarks, and About rows', () => {
+  it('renders Theme, Search, Bookmarks, Lemma Frequency, Verb Concordance, and About rows', () => {
     renderDrawer();
-    expect(screen.getByRole('button', { name: /^search$/i })).toBeInTheDocument();
     expect(screen.getByRole('switch')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^search$/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /bookmarks/i })).toHaveAttribute('href', '/bookmarks');
+    expect(screen.getByRole('link', { name: /lemma frequency/i })).toHaveAttribute(
+      'href',
+      '/dictionary/lemma-frequency',
+    );
+    expect(screen.getByRole('link', { name: /verb concordance/i })).toHaveAttribute(
+      'href',
+      '/dictionary/verb-concordance',
+    );
     expect(screen.getByRole('link', { name: /about/i })).toHaveAttribute('href', '/about');
   });
 
@@ -116,9 +124,12 @@ describe('DrawerMenu', () => {
 
   it('wraps Tab from the last focusable element back to the first', () => {
     renderDrawer();
+    // Real focus-trap "first" is whatever's first in DOM order (queried via
+    // querySelectorAll in the component, which includes the theme switch);
+    // testing-library's role query for button/link excludes role="switch".
+    const first = screen.getByRole('switch');
     const focusables = screen.getAllByRole('button').concat(screen.getAllByRole('link'));
     const last = focusables[focusables.length - 1]!;
-    const first = screen.getByRole('button', { name: /close menu/i });
 
     last.focus();
     fireEvent.keyDown(document, { key: 'Tab' });
@@ -127,9 +138,9 @@ describe('DrawerMenu', () => {
 
   it('wraps Shift+Tab from the first focusable element back to the last', () => {
     renderDrawer();
+    const first = screen.getByRole('switch');
     const focusables = screen.getAllByRole('button').concat(screen.getAllByRole('link'));
     const last = focusables[focusables.length - 1]!;
-    const first = screen.getByRole('button', { name: /close menu/i });
 
     first.focus();
     fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });

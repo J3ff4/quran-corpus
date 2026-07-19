@@ -7,7 +7,14 @@ import type { PickerSurah } from './types';
 const selectClass =
   'rounded-lg border border-paper-300 bg-paper-50 px-3 py-2 text-paper-900 dark:border-night-100 dark:bg-night-50 dark:text-paper-100';
 
-export function VersePicker({ surahs }: { surahs: PickerSurah[] }) {
+export function VersePicker({
+  surahs,
+  onNavigate,
+}: {
+  surahs: PickerSurah[];
+  /** Called after pushing the route — e.g. to close the sheet that hosts this picker. */
+  onNavigate?: () => void;
+}) {
   const router = useRouter();
   const [surahId, setSurahId] = useState(surahs[0]?.id ?? 1);
   const [ayah, setAyah] = useState(1);
@@ -48,7 +55,10 @@ export function VersePicker({ surahs }: { surahs: PickerSurah[] }) {
       <button
         type="button"
         aria-label="Go to selected verse"
-        onClick={() => router.push(`/surah/${surahId}/words?ayah=${ayah}`)}
+        onClick={() => {
+          router.push(`/surah/${surahId}/words?ayah=${ayah}`);
+          onNavigate?.();
+        }}
         className="rounded-lg bg-paper-900 px-4 py-2 text-sm font-medium text-paper-50 transition-colors hover:bg-paper-700 dark:bg-paper-100 dark:text-night-300 dark:hover:bg-paper-300"
       >
         Go

@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link';
 import type { SearchResult, JumpVerse, VerseHit } from '@quran-corpus/data';
 
@@ -17,12 +19,22 @@ function Highlighted({ text }: { text: string }) {
   );
 }
 
-function JumpSection({ jump }: { jump: JumpVerse }) {
+function JumpSection({
+  jump,
+  onNavigate = () => {},
+}: {
+  jump: JumpVerse;
+  onNavigate?: () => void;
+}) {
   if (jump.ayah_number === null) {
     return (
       <section className="mb-6">
         <h2 className="mb-2 text-sm font-semibold text-paper-500">Jump to</h2>
-        <Link href={`/surah/${jump.surah_id}`} className="text-paper-900 dark:text-paper-100 underline">
+        <Link
+          href={`/surah/${jump.surah_id}`}
+          onClick={onNavigate}
+          className="text-paper-900 dark:text-paper-100 underline"
+        >
           Surah {jump.surah_id}
         </Link>
       </section>
@@ -31,7 +43,7 @@ function JumpSection({ jump }: { jump: JumpVerse }) {
   return (
     <section className="mb-6">
       <h2 className="mb-2 text-sm font-semibold text-paper-500">Jump to</h2>
-      <Link href={`/surah/${jump.surah_id}`} className="block">
+      <Link href={`/surah/${jump.surah_id}?ayah=${jump.ayah_number}`} onClick={onNavigate} className="block">
         <span className="text-xs text-paper-500">{`${jump.surah_id}:${jump.ayah_number}`}</span>
         <p dir="rtl" className="font-arabic text-2xl leading-loose text-paper-900 dark:text-paper-100">
           {jump.words.length > 0
@@ -51,7 +63,13 @@ function JumpSection({ jump }: { jump: JumpVerse }) {
   );
 }
 
-export function SearchResults({ result }: { result: SearchResult }) {
+export function SearchResults({
+  result,
+  onNavigate = () => {},
+}: {
+  result: SearchResult;
+  onNavigate?: () => void;
+}) {
   const { jump, verses, roots } = result;
   const empty = !jump && verses.length === 0 && roots.length === 0;
   if (empty) {
@@ -59,7 +77,7 @@ export function SearchResults({ result }: { result: SearchResult }) {
   }
   return (
     <div>
-      {jump && <JumpSection jump={jump} />}
+      {jump && <JumpSection jump={jump} onNavigate={onNavigate} />}
 
       {verses.length > 0 && (
         <section className="mb-6">
@@ -67,7 +85,7 @@ export function SearchResults({ result }: { result: SearchResult }) {
           <ul className="space-y-3">
             {verses.map((v: VerseHit, i) => (
               <li key={`${v.source}-${v.surah_id}-${v.ayah_number}-${i}`}>
-                <Link href={`/surah/${v.surah_id}`} className="block">
+                <Link href={`/surah/${v.surah_id}?ayah=${v.ayah_number}`} onClick={onNavigate} className="block">
                   <span className="text-xs uppercase text-paper-400">
                     {`${v.surah_id}:${v.ayah_number} · ${v.source}`}
                   </span>
@@ -96,6 +114,7 @@ export function SearchResults({ result }: { result: SearchResult }) {
               <li key={r.id}>
                 <Link
                   href={`/dictionary/${r.root_buckwalter}`}
+                  onClick={onNavigate}
                   className="rounded-full bg-paper-200 px-3 py-1 text-sm dark:bg-night-100"
                 >
                   <span className="font-arabic">{r.root_arabic}</span>

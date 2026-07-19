@@ -140,3 +140,12 @@ Stop and ask rather than guess on: schema changes, adding a dependency, anything
 - **Minimum model: Sonnet.** Never dispatch a subagent on Haiku. The floor is `claude-sonnet-4-6` (or newer Sonnet/Opus). Haiku is too weak for the code-quality bar required here.
 - **Compact after every completed task.** When running Subagent-Driven Development, trigger a context compaction after each task's review cycle passes before dispatching the next task's implementer.
 - **Compact after every completed + approved phase.** In addition to per-task compaction, trigger a compaction once a full phase is complete and the user has approved it, before starting the next phase. Both levels are mandatory: task-level and phase-level.
+
+-----
+
+## 14. Status Ledger Discipline
+
+`STATUS.md` (repo root) is a live scratch board, not governance — it drifts stale across sessions and accounts. Confirmed 2026-07-18: it claimed a search feature was mid-review and a fix was "ready to merge" when both had actually been merged (and the search feature iterated further) days earlier.
+
+- Before acting on anything `STATUS.md` claims — a task pending, a fix unmerged, a job running — verify against ground truth: `git log --oneline`, `git merge-base --is-ancestor <commit> main`, `gh pr list --state all`. Never trust the narrative alone across a session boundary.
+- Update `STATUS.md` at natural checkpoints (phase done, PR merged, job finishes) so the drift stays small — but still re-verify before relying on it, since the next session may not be the one that updates it.

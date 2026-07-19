@@ -52,3 +52,37 @@ export function buildFtsMatch(s: string): string {
     .map((t) => `"${t.replace(/"/g, '""')}"`)
     .join(' AND ');
 }
+
+// The Uzbek translation set in the DB is Cyrillic-only, but most users type
+// Uzbek in the modern Latin alphabet -- so a Latin query never matches it.
+// Best-effort Latin -> Cyrillic transliteration so search still hits: covers
+// the standard letters/digraphs and the oʻ/gʻ special letters (several
+// apostrophe glyphs accepted). Not a full orthography (loanword c/w, and the
+// tutuq belgisi glottal stop, are approximated) -- good enough for search,
+// not for round-tripping arbitrary text.
+// ponytail: lookup-table transliteration, not a real Uzbek morphology pass —
+// revisit if mismatches show up in practice.
+const UZ_APOSTROPHE = /['‘’ʻʼ]/g;
+const UZ_DIGRAPHS: [RegExp, string][] = [
+  [/o['‘’ʻʼ]/g, 'ў'],
+  [/g['‘’ʻʼ]/g, 'ғ'],
+  [/sh/g, 'ш'],
+  [/ch/g, 'ч'],
+  [/yo/g, 'ё'],
+  [/yu/g, 'ю'],
+  [/ya/g, 'я'],
+];
+const UZ_LATIN_TO_CYRILLIC: Record<string, string> = {
+  a: 'а', b: 'б', c: 'ц', d: 'д', e: 'е', f: 'ф', g: 'г', h: 'ҳ', i: 'и',
+  j: 'ж', k: 'к', l: 'л', m: 'м', n: 'н', o: 'о', p: 'п', q: 'қ', r: 'р',
+  s: 'с', t: 'т', u: 'у', v: 'в', w: 'в', x: 'х', y: 'й', z: 'з',
+};
+
+export function transliterateUzbekLatinToCyrillic(s: string): string {
+  let out = s.toLowerCase();
+  for (const [pattern, replacement] of UZ_DIGRAPHS) {
+    out = out.replace(pattern, replacement);
+  }
+  out = out.replace(UZ_APOSTROPHE, '');
+  return out.replace(/[a-z]/g, (ch) => UZ_LATIN_TO_CYRILLIC[ch] ?? ch);
+}

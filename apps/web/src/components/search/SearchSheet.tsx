@@ -95,7 +95,7 @@ export function SearchSheet({ open, onClose }: { open: boolean; onClose: () => v
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-paper-500 dark:text-paper-400">
                   Go to verse
                 </p>
-                <VersePicker surahs={surahs} />
+                <VersePicker surahs={surahs} onNavigate={onClose} />
               </div>
             )}
             <div className="mb-4 flex items-center gap-2">
@@ -112,7 +112,7 @@ export function SearchSheet({ open, onClose }: { open: boolean; onClose: () => v
                 ✕
               </button>
             </div>
-            {q.trim().length > 0 && <SearchResults result={result} />}
+            {q.trim().length > 0 && <SearchResults result={result} onNavigate={onClose} />}
           </motion.div>
         </>
       )}

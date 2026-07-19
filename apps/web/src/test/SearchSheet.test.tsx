@@ -51,6 +51,17 @@ describe('SearchSheet', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).toHaveBeenCalled();
   });
+  it('closes the sheet when a search result is clicked', async () => {
+    const onClose = vi.fn();
+    render(<SearchSheet open onClose={onClose} />);
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'throne' } });
+    await vi.advanceTimersByTimeAsync(250);
+    // fetch() then res.json() each add a microtask tick beyond what
+    // advanceTimersByTimeAsync flushes for the setTimeout callback itself.
+    await vi.waitFor(() => screen.getByRole('link', { name: /2:255/ }));
+    fireEvent.click(screen.getByRole('link', { name: /2:255/ }));
+    expect(onClose).toHaveBeenCalled();
+  });
 });
 
 describe('SearchSheet verse picker', () => {

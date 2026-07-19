@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useSearch } from '../search/SearchProvider';
-import { useTheme } from '../../hooks/useTheme';
+import { ThemeToggle } from './ThemeToggle';
 
 const ROW =
   'flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-paper-700 transition-colors hover:bg-paper-100 dark:text-paper-300 dark:hover:bg-night-200';
@@ -30,22 +30,21 @@ const infoIcon = (
   </svg>
 );
 
-const sunIcon = (
-  <svg viewBox="0 0 24 24" className={ICON} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <circle cx="12" cy="12" r="4" />
-    <path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+const frequencyIcon = (
+  <svg className={ICON} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M5 20V12M12 20V6M19 20v-5" />
   </svg>
 );
 
-const moonIcon = (
-  <svg viewBox="0 0 24 24" className={ICON} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+const concordanceIcon = (
+  <svg className={ICON} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 6h16M4 12h10M4 18h13" />
+    <circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none" />
   </svg>
 );
 
 export function DrawerMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { open: openSearch } = useSearch();
-  const { theme, toggle } = useTheme();
   const reduce = useReducedMotion();
   const panelRef = useRef<HTMLDivElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
@@ -112,15 +111,18 @@ export function DrawerMenu({ open, onClose }: { open: boolean; onClose: () => vo
             exit={reduce ? { opacity: 0 } : { x: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
           >
-            <button
-              ref={closeBtnRef}
-              type="button"
-              aria-label="Close menu"
-              onClick={onClose}
-              className="mb-2 ml-auto block px-2 py-1 text-paper-500"
-            >
-              ✕
-            </button>
+            <div className="mb-2 flex items-center justify-between">
+              <ThemeToggle />
+              <button
+                ref={closeBtnRef}
+                type="button"
+                aria-label="Close menu"
+                onClick={onClose}
+                className="px-2 py-1 text-paper-500"
+              >
+                ✕
+              </button>
+            </div>
 
             <button
               type="button"
@@ -134,20 +136,19 @@ export function DrawerMenu({ open, onClose }: { open: boolean; onClose: () => vo
               <span>Search</span>
             </button>
 
-            <button
-              type="button"
-              role="switch"
-              aria-checked={theme === 'dark'}
-              onClick={toggle}
-              className={ROW}
-            >
-              {theme === 'dark' ? moonIcon : sunIcon}
-              <span>{theme === 'dark' ? 'Dark mode' : 'Light mode'}</span>
-            </button>
-
             <Link href="/bookmarks" onClick={onClose} className={ROW}>
               {bookmarkIcon}
               <span>Bookmarks</span>
+            </Link>
+
+            <Link href="/dictionary/lemma-frequency" onClick={onClose} className={ROW}>
+              {frequencyIcon}
+              <span>Lemma Frequency</span>
+            </Link>
+
+            <Link href="/dictionary/verb-concordance" onClick={onClose} className={ROW}>
+              {concordanceIcon}
+              <span>Verb Concordance</span>
             </Link>
 
             <Link href="/about" onClick={onClose} className={ROW}>

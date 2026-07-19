@@ -2,7 +2,17 @@ import type { ReactNode } from 'react';
 
 interface SurahFrameProps {
   children: ReactNode;
+  surahNumber: number;
   className?: string;
+}
+
+const EASTERN_ARABIC_DIGITS = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+
+function toEasternArabicNumeral(n: number): string {
+  return String(n)
+    .split('')
+    .map((d) => EASTERN_ARABIC_DIGITS[Number(d)])
+    .join('');
 }
 
 /**
@@ -28,8 +38,31 @@ interface SurahFrameProps {
  * (change the aspect ratio) or size the glyph via a container query against
  * the frame's own box instead of a fixed text size (needs the Tailwind
  * container-queries plugin, not installed).
+ *
+ * The two round medallions flanking the cartouche are cutouts baked into the
+ * same path (no separate <circle> elements), so their position was recovered
+ * by parsing the path's subpath bounding boxes offline (a ~1173x1154-unit
+ * square subpath, mirrored left/right) rather than guessed -- see
+ * left/rightNumeralStyle below. RTL reading starts on the right, so the
+ * Eastern Arabic-Indic numeral sits in the right medallion and the Western
+ * numeral in the left one.
  */
-export function SurahFrame({ children, className }: SurahFrameProps) {
+const medallionBase = { top: '20.5%', height: '57.7%', width: '7.19%' } as const;
+// kfgqpc (font-arabic's primary face) substitutes its own decorative
+// ayah-end roundel for plain digit glyphs, which reads as a second medallion
+// nested in the frame's medallion. Amiri has plain Eastern Arabic-Indic digit
+// forms, so it's referenced directly here instead of the font-arabic class.
+const rightMedallionStyle = { ...medallionBase, left: '75.8%', fontFamily: "'Amiri', 'Amiri Fallback'" };
+const leftMedallionStyle = { ...medallionBase, left: '17.16%' };
+
+export function SurahFrame({ children, surahNumber, className }: SurahFrameProps) {
+  // 1-2 digit surah numbers (1-99) read as visually smaller than the
+  // 3-digit ones (100-114) at the same font size, so they get a 10% bump;
+  // 3-digit numbers keep the base size.
+  const westernFontSize = String(surahNumber).length <= 2 ? '0.561rem' : '0.51rem';
+  // Inverse for the Eastern numeral: 3-digit ones read too big at the base
+  // size, so they get an 8% reduction; 1-2 digit numbers keep the base size.
+  const easternFontSize = String(surahNumber).length === 3 ? '0.782rem' : '0.85rem';
   return (
     <div
       className={`relative mx-auto aspect-[204/25] w-full max-w-md text-paper-700/80 dark:text-paper-300/70 ${className ?? ''}`.trim()}
@@ -45,6 +78,21 @@ export function SurahFrame({ children, className }: SurahFrameProps) {
       <div className="absolute inset-x-[28%] inset-y-[14%] flex items-center justify-center text-center">
         {children}
       </div>
+      <span
+        aria-hidden="true"
+        style={{ ...rightMedallionStyle, fontSize: easternFontSize }}
+        className="absolute flex items-center justify-center leading-none tabular-nums"
+      >
+        {toEasternArabicNumeral(surahNumber)}
+      </span>
+      <span
+        aria-hidden="true"
+        style={{ ...leftMedallionStyle, fontSize: westernFontSize }}
+        className="absolute flex items-center justify-center font-sans leading-none tabular-nums"
+      >
+        {surahNumber}
+      </span>
+      <span className="sr-only">Surah {surahNumber}</span>
     </div>
   );
 }

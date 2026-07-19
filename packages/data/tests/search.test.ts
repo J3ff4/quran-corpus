@@ -10,8 +10,12 @@ async function seed(db: Client): Promise<void> {
     "INSERT INTO ayahs (id,surah_id,ayah_number,text_uthmani) VALUES (1,1,1,'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ')",
   );
   await db.execute("INSERT INTO languages VALUES ('en','English','English','ltr')");
+  await db.execute("INSERT INTO languages VALUES ('uz','Uzbek','Ўзбек','ltr')");
   await db.execute(
     "INSERT INTO translations (ayah_id,language_code,translator,text) VALUES (1,'en','T','In the name of Allah')",
+  );
+  await db.execute(
+    "INSERT INTO translations (ayah_id,language_code,translator,text) VALUES (1,'uz','T','Аллоҳнинг номи билан')",
   );
 }
 
@@ -38,7 +42,7 @@ describe('backfillSearchIndex', () => {
     await backfillSearchIndex(db);
     await backfillSearchIndex(db);
     const c = await db.execute('SELECT count(*) c FROM search_fts');
-    expect(c.rows[0]!['c']).toBe(2); // 1 ar + 1 en
+    expect(c.rows[0]!['c']).toBe(3); // 1 ar + 1 en + 1 uz
   });
 });
 
@@ -87,6 +91,16 @@ describe('searchVerses', () => {
   it('returns [] for empty query', async () => {
     await backfillSearchIndex(db);
     expect(await searchVerses(db, '   ')).toEqual([]);
+  });
+  it('matches Uzbek Cyrillic translations from a Latin-typed query', async () => {
+    await backfillSearchIndex(db);
+    const hits = await searchVerses(db, 'bilan');
+    expect(hits.some((h) => h.source === 'uz')).toBe(true);
+  });
+  it('does not run the Uzbek fallback for an Arabic query', async () => {
+    await backfillSearchIndex(db);
+    const hits = await searchVerses(db, 'الرحمن');
+    expect(hits.some((h) => h.source === 'uz')).toBe(false);
   });
 });
 

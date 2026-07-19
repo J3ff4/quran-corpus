@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeArabic, buildFtsMatch, stripQuranicAnnotations } from '../src/text/normalize.js';
+import {
+  normalizeArabic,
+  buildFtsMatch,
+  stripQuranicAnnotations,
+  transliterateUzbekLatinToCyrillic,
+} from '../src/text/normalize.js';
 
 describe('normalizeArabic', () => {
   it('strips harakat and folds alef-wasla to bare alef (Al-Fatiha 1:1)', () => {
@@ -46,5 +51,25 @@ describe('buildFtsMatch', () => {
   });
   it('escapes embedded double quotes per term', () => {
     expect(buildFtsMatch('say "hi"')).toBe('"say" AND """hi"""');
+  });
+});
+
+describe('transliterateUzbekLatinToCyrillic', () => {
+  it('maps plain letters', () => {
+    expect(transliterateUzbekLatinToCyrillic('Alloh')).toBe('аллоҳ');
+  });
+  it('maps the sh digraph', () => {
+    expect(transliterateUzbekLatinToCyrillic('bilish')).toBe('билиш');
+  });
+  it('maps oʻ/gʻ across the common apostrophe glyphs', () => {
+    expect(transliterateUzbekLatinToCyrillic("o'zbek")).toBe('ўзбек');
+    expect(transliterateUzbekLatinToCyrillic('oʻzbek')).toBe('ўзбек');
+    expect(transliterateUzbekLatinToCyrillic("gʻalaba")).toBe('ғалаба');
+  });
+  it('maps ch/yo/yu/ya digraphs', () => {
+    expect(transliterateUzbekLatinToCyrillic('kitobcha')).toBe('китобча');
+    expect(transliterateUzbekLatinToCyrillic('yomon')).toBe('ёмон');
+    expect(transliterateUzbekLatinToCyrillic('yurak')).toBe('юрак');
+    expect(transliterateUzbekLatinToCyrillic('yaxshi')).toBe('яхши');
   });
 });

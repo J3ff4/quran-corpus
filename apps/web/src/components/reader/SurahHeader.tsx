@@ -19,7 +19,7 @@ export function SurahHeader({ surah }: SurahHeaderProps) {
         </Link>
       </div>
       <div className="text-center">
-        <SurahFrame className="mb-1">
+        <SurahFrame surahNumber={surah.id} className="mb-1">
           <p
             className={`text-[1.9rem] leading-none text-paper-900 dark:text-paper-100 ${
               surah.id === 102 ? 'font-surah-name-v4' : 'font-surah-name'

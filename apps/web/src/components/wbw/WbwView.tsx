@@ -21,7 +21,7 @@ export function WbwView({ surah, ayahs, page, totalPages, scrollAyah, pageLang }
   return (
     <div>
       <header className="mb-4 text-center">
-        <SurahFrame>
+        <SurahFrame surahNumber={surah.id}>
           <p
             className={`text-[1.9rem] leading-none text-paper-900 dark:text-paper-100 ${
               surah.id === 102 ? 'font-surah-name-v4' : 'font-surah-name'

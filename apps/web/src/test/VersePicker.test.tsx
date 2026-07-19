@@ -38,4 +38,12 @@ describe('VersePicker', () => {
     fireEvent.click(screen.getByRole('button', { name: /go/i }));
     expect(mockPush).toHaveBeenCalledWith('/surah/1/words?ayah=1');
   });
+
+  it('calls onNavigate after pushing, so a hosting sheet can close', () => {
+    const onNavigate = vi.fn();
+    render(<VersePicker surahs={surahs} onNavigate={onNavigate} />);
+    fireEvent.click(screen.getByRole('button', { name: /go/i }));
+    expect(mockPush).toHaveBeenCalled();
+    expect(onNavigate).toHaveBeenCalled();
+  });
 });
