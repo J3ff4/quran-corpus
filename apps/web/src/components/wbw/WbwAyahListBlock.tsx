@@ -2,6 +2,8 @@ import { WbwWordRow } from './WbwWordRow';
 import type { WbwAyah } from './types';
 import { AyahMedallion } from '../reader/ornaments/AyahMedallion';
 import { BookmarkButton } from '../shared/BookmarkButton';
+import { isSajdahAyah } from '@quran-corpus/data/client';
+import { SajdahMark } from '../reader/ornaments/SajdahMark';
 
 export function WbwAyahListBlock({
   surahId,
@@ -39,8 +41,15 @@ export function WbwAyahListBlock({
               </tr>
             </thead>
             <tbody>
-              {ayah.cells.map((cell) => (
-                <WbwWordRow key={cell.position} cell={cell} {...(pageLang ? { pageLang } : {})} />
+              {ayah.cells.map((cell, i) => (
+                <WbwWordRow
+                  key={cell.position}
+                  cell={cell}
+                  {...(pageLang ? { pageLang } : {})}
+                  {...(i === ayah.cells.length - 1 && isSajdahAyah(ayah.textUthmani)
+                    ? { trailingMark: <SajdahMark className="ml-1" /> }
+                    : {})}
+                />
               ))}
             </tbody>
           </table>

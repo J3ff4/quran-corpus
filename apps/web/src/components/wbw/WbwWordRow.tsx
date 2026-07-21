@@ -1,8 +1,17 @@
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { chip } from '../ui/chip';
 import type { WbwCell } from './types';
 
-export function WbwWordRow({ cell, pageLang }: { cell: WbwCell; pageLang?: string }) {
+export function WbwWordRow({
+  cell,
+  pageLang,
+  trailingMark,
+}: {
+  cell: WbwCell;
+  pageLang?: string;
+  trailingMark?: ReactNode;
+}) {
   const {
     surahId,
     ayahNumber,
@@ -42,6 +51,7 @@ export function WbwWordRow({ cell, pageLang }: { cell: WbwCell; pageLang?: strin
           </span>
           {posLabel && <span className={chip}>{posLabel}</span>}
         </Link>
+        {trailingMark}
       </td>
       <td className="py-3 pl-3 text-sm text-paper-700 dark:text-paper-300">
         <div>{morphologyDescription ?? '—'}</div>

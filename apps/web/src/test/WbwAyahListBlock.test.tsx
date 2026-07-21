@@ -35,4 +35,18 @@ describe('WbwAyahListBlock', () => {
     expect(screen.getByRole('columnheader', { name: 'Arabic word' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Syntax and morphology' })).toBeInTheDocument();
   });
+
+  it('shows the sajdah mark inside the last row when the ayah is a prostration verse', () => {
+    const ayah: WbwAyah = { ayahNumber: 3, cells: [c(1, 'الف'), c(2, 'باء')], textUthmani: 'نَصّ ۩' };
+    render(<WbwAyahListBlock surahId={1} ayah={ayah} />);
+    expect(screen.getByLabelText('Verse of Prostration (Sajdah)')).toBeInTheDocument();
+    const rows = screen.getAllByRole('row');
+    expect(rows[rows.length - 1]).toHaveTextContent('۩');
+  });
+
+  it('does not show the sajdah mark otherwise', () => {
+    const ayah: WbwAyah = { ayahNumber: 3, cells: [c(1, 'الف')], textUthmani: 'نَصّ' };
+    render(<WbwAyahListBlock surahId={1} ayah={ayah} />);
+    expect(screen.queryByLabelText('Verse of Prostration (Sajdah)')).toBeNull();
+  });
 });
