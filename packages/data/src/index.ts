@@ -38,6 +38,7 @@ export {
 } from './queries/roots.js';
 export { buckwalterToArabic, compareRootsArabic, rootFirstLetter, ARABIC_ALPHABET_ORDER } from './text/arabic.js';
 export { trimConcordanceVerse } from './text/concordanceTrim.js';
+export { isSajdahAyah } from './text/sajdah.js';
 export { decodeSegment, posLabelEn } from './morphology/decode.js';
 export type {
   Surah,
