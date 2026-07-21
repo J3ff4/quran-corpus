@@ -36,4 +36,16 @@ describe('WbwAyahBlock', () => {
     render(<WbwAyahBlock surahId={1} ayah={ayah} />);
     expect(screen.getByRole('button', { name: /bookmark ayah 3/i })).toBeInTheDocument();
   });
+
+  it('shows the sajdah mark when the ayah text contains it', () => {
+    const ayah: WbwAyah = { ayahNumber: 3, cells: [c(1, 'الف')], textUthmani: 'نَصّ ۩' };
+    render(<WbwAyahBlock surahId={1} ayah={ayah} />);
+    expect(screen.getByLabelText('Verse of Prostration (Sajdah)')).toBeInTheDocument();
+  });
+
+  it('does not show the sajdah mark otherwise', () => {
+    const ayah: WbwAyah = { ayahNumber: 3, cells: [c(1, 'الف')], textUthmani: 'نَصّ' };
+    render(<WbwAyahBlock surahId={1} ayah={ayah} />);
+    expect(screen.queryByLabelText('Verse of Prostration (Sajdah)')).toBeNull();
+  });
 });
