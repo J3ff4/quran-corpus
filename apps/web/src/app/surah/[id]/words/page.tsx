@@ -1,7 +1,9 @@
+import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { getDatabase } from '../../../../lib/db';
 import {
   getSurahById,
+  getAllSurahs,
   getAyahsBySurah,
   getWordsBySurahAyahRange,
   getGlossesWithFallback,
@@ -9,7 +11,9 @@ import {
 } from '@quran-corpus/data';
 import { WbwView } from '../../../../components/wbw/WbwView';
 import type { WbwCell, WbwAyah } from '../../../../components/wbw/types';
+import { toPickerSurah, type PickerSurah } from '../../../../components/wbw/types';
 import { isValidLang, type ValidLang } from '../../../../components/reader/languages';
+import { VIEW_MODE_COOKIE, isViewMode } from '../../../../components/wbw/viewMode';
 import { parseSurahId, resolvePage } from './params';
 
 export const dynamic = 'force-dynamic';
@@ -32,11 +36,17 @@ export default async function WbwPage({ params, searchParams }: PageProps) {
   const { page, lo, hi, scrollAyah, totalPages } = resolvePage(surah.ayah_count, rawPage, rawAyah);
 
   // ponytail: ayahs+glosses load the whole surah; only words are windowed. Fine at homelab scale — add getAyahsBySurahRange / getGlossesBySurahAyahRange if a large surah measures slow.
-  const [ayahRows, words, glosses] = await Promise.all([
+  const [ayahRows, words, glosses, allSurahs] = await Promise.all([
     getAyahsBySurah(db, surahId),
     getWordsBySurahAyahRange(db, surahId, lo, hi),
     getGlossesWithFallback(db, surahId, lang),
+    getAllSurahs(db),
   ]);
+  const pickerSurahs: PickerSurah[] = allSurahs.map(toPickerSurah);
+
+  const cookieStore = await cookies();
+  const storedViewMode = cookieStore.get(VIEW_MODE_COOKIE)?.value;
+  const initialViewMode = isViewMode(storedViewMode) ? storedViewMode : 'card';
 
   const glossByWordId = new Map<number, { text: string; lang: string }>();
   for (const g of glosses) glossByWordId.set(g.word_id, { text: g.gloss_text, lang: g.gloss_lang });
@@ -66,6 +76,8 @@ export default async function WbwPage({ params, searchParams }: PageProps) {
       gloss: glossByWordId.get(w.id)?.text ?? null,
       glossLang: glossByWordId.get(w.id)?.lang ?? null,
       posLabel: posLabelEn(w.pos_tag),
+      morphologyDescription: w.morphology_description,
+      grammarArabic: w.grammar_arabic,
     });
   }
 
@@ -87,6 +99,8 @@ export default async function WbwPage({ params, searchParams }: PageProps) {
         totalPages={totalPages}
         scrollAyah={scrollAyah}
         pageLang={lang}
+        pickerSurahs={pickerSurahs}
+        initialViewMode={initialViewMode}
       />
     </main>
   );

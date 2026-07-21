@@ -3,10 +3,12 @@ import type { Surah } from '@quran-corpus/data';
 import { Bismillah } from '../reader/ornaments/Bismillah';
 import { SurahFrame } from '../reader/ornaments/SurahFrame';
 import { surahNameGlyph } from '../reader/ornaments/surahNameGlyph';
-import { WbwAyahBlock } from './WbwAyahBlock';
+import { WbwAyahs } from './WbwAyahs';
 import { Pager } from './Pager';
 import { ScrollToAyah } from '../shared/ScrollToAyah';
-import type { WbwAyah } from './types';
+import { VersePicker } from './VersePicker';
+import type { ViewMode } from './ViewToggle';
+import type { WbwAyah, PickerSurah } from './types';
 
 interface WbwViewProps {
   surah: Surah;
@@ -15,9 +17,20 @@ interface WbwViewProps {
   totalPages: number;
   scrollAyah: number | null;
   pageLang?: string;
+  pickerSurahs?: PickerSurah[];
+  initialViewMode?: ViewMode;
 }
 
-export function WbwView({ surah, ayahs, page, totalPages, scrollAyah, pageLang }: WbwViewProps) {
+export function WbwView({
+  surah,
+  ayahs,
+  page,
+  totalPages,
+  scrollAyah,
+  pageLang,
+  pickerSurahs = [],
+  initialViewMode = 'card',
+}: WbwViewProps) {
   return (
     <div>
       <header className="mb-4 text-center">
@@ -43,16 +56,23 @@ export function WbwView({ surah, ayahs, page, totalPages, scrollAyah, pageLang }
         </Link>
       </header>
 
+      {pickerSurahs.length > 0 && (
+        <section className="mb-6">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-paper-500 dark:text-paper-400">
+            Go to verse
+          </h2>
+          <VersePicker surahs={pickerSurahs} />
+        </section>
+      )}
+
       {page === 1 && <Bismillah surahId={surah.id} />}
 
-      {ayahs.map((ayah) => (
-        <WbwAyahBlock
-          key={ayah.ayahNumber}
-          surahId={surah.id}
-          ayah={ayah}
-          {...(pageLang ? { pageLang } : {})}
-        />
-      ))}
+      <WbwAyahs
+        surahId={surah.id}
+        ayahs={ayahs}
+        initialViewMode={initialViewMode}
+        {...(pageLang ? { pageLang } : {})}
+      />
 
       <Pager surahId={surah.id} page={page} totalPages={totalPages} />
       {scrollAyah != null && <ScrollToAyah ayah={scrollAyah} />}

@@ -19,6 +19,8 @@ export interface WbwCell {
   gloss: string | null;
   glossLang: string | null;
   posLabel: string | null;
+  morphologyDescription: string | null;
+  grammarArabic: string | null;
 }
 
 export interface WbwAyah {
