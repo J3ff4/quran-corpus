@@ -1,4 +1,6 @@
 import type { Ayah, Word, Translation } from '@quran-corpus/data';
+import { isSajdahAyah } from '@quran-corpus/data/client';
+import { SajdahMark } from './ornaments/SajdahMark';
 import { WordToken } from './WordToken';
 import { AyahAudioButton } from './AyahAudioButton';
 import { AyahMedallion } from './ornaments/AyahMedallion';
@@ -47,9 +49,12 @@ export function AyahView({
 
       <div dir="rtl" className="flex flex-wrap gap-x-1 gap-y-2 font-arabic text-3xl leading-[2.4]">
         {words.length > 0 ? (
-          words.map((word) => (
-            <WordToken key={word.id} word={word} onClick={onWordClick} />
-          ))
+          <>
+            {words.map((word) => (
+              <WordToken key={word.id} word={word} onClick={onWordClick} />
+            ))}
+            {isSajdahAyah(ayah.text_uthmani) && <SajdahMark />}
+          </>
         ) : (
           <span className="text-paper-900 dark:text-paper-100">{ayah.text_uthmani}</span>
         )}

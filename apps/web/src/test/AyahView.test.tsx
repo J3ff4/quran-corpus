@@ -19,6 +19,21 @@ const words: Word[] = [
   { id: 2, ayah_id: 1, position: 2, text_arabic: 'ٱللَّهِ', transliteration: 'l-lahi', root: null, lemma: null, root_buckwalter: null, lemma_buckwalter: null, pos_tag: 'PN', morphology_json: null, morphology_description: null, grammar_arabic: null, audio_url: null },
 ];
 
+const sajdahAyah: Ayah = {
+  id: 2,
+  surah_id: 96,
+  ayah_number: 19,
+  text_uthmani: 'كَلَّا لَا تُطِعْهُ وَٱسْجُدْ وَٱقْتَرِب ۩',
+  text_simple: null,
+  juz: 30,
+  page: 597,
+  audio_url: null,
+};
+
+const sajdahWords: Word[] = [
+  { id: 3, ayah_id: 2, position: 1, text_arabic: 'وَٱسْجُدْ', transliteration: null, root: null, lemma: null, root_buckwalter: null, lemma_buckwalter: null, pos_tag: null, morphology_json: null, morphology_description: null, grammar_arabic: null, audio_url: null },
+];
+
 const translation: Translation = {
   id: 1,
   ayah_id: 1,
@@ -87,5 +102,15 @@ describe('AyahView', () => {
       <AyahView ayah={ayah} words={[]} onWordClick={vi.fn()} {...audioProps} />,
     );
     expect(container.querySelector('#ayah-1')).not.toBeNull();
+  });
+
+  it('shows the sajdah mark for a prostration ayah', () => {
+    render(<AyahView ayah={sajdahAyah} words={sajdahWords} onWordClick={vi.fn()} {...audioProps} />);
+    expect(screen.getByLabelText('Verse of Prostration (Sajdah)')).toBeInTheDocument();
+  });
+
+  it('does not show the sajdah mark for a non-prostration ayah', () => {
+    render(<AyahView ayah={ayah} words={words} onWordClick={vi.fn()} {...audioProps} />);
+    expect(screen.queryByLabelText('Verse of Prostration (Sajdah)')).toBeNull();
   });
 });
