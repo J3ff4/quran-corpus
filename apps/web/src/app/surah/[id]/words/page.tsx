@@ -88,9 +88,9 @@ export default async function WbwPage({ params, searchParams }: PageProps) {
       translit: w.transliteration,
       gloss: glossByWordId.get(w.id)?.text ?? null,
       glossLang: glossByWordId.get(w.id)?.lang ?? null,
+      posTag: w.pos_tag,
       posLabel: posLabelEn(w.pos_tag),
       segments: segmentsByWordId.get(w.id) ?? [],
-      morphologyDescription: w.morphology_description,
       grammarArabic: w.grammar_arabic,
     });
   }

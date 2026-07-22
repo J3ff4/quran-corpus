@@ -6,9 +6,10 @@ import type { WbwCell } from '../components/wbw/types';
 function cell(over: Partial<WbwCell> = {}): WbwCell {
   return {
     surahId: 1, ayahNumber: 1, position: 1,
-    arabic: 'بِسْمِ', translit: "bis'mi", gloss: 'In (the) name', glossLang: null, posLabel: 'Preposition',
+    arabic: 'بِسْمِ', translit: "bis'mi", gloss: 'In (the) name', glossLang: null,
+    posTag: 'P', posLabel: 'Preposition',
     segments: [],
-    morphologyDescription: 'P – prefixed preposition bi', grammarArabic: 'جار ومجرور',
+    grammarArabic: 'جار ومجرور',
     ...over,
   };
 }
@@ -24,12 +25,12 @@ function renderRow(cellProps: WbwCell, pageLang?: string) {
 }
 
 describe('WbwWordRow', () => {
-  it('renders translation, arabic, and morphology columns', () => {
+  it('renders translation, arabic, and a short POS code/label + grammar term (no full-analysis)', () => {
     renderRow(cell());
     expect(screen.getByText('In (the) name')).toBeInTheDocument();
     expect(screen.getByText("bis'mi")).toBeInTheDocument();
     expect(screen.getByText('بِسْمِ')).toBeInTheDocument();
-    expect(screen.getByText('P – prefixed preposition bi')).toBeInTheDocument();
+    expect(screen.getByText('P – Preposition')).toBeInTheDocument();
     expect(screen.getByText('جار ومجرور')).toBeInTheDocument();
     expect(screen.getByText('(1:1:1)')).toBeInTheDocument();
   });
@@ -39,12 +40,54 @@ describe('WbwWordRow', () => {
     expect(screen.getByRole('link')).toHaveAttribute('href', '/word/2/255/1');
   });
 
-  it('shows em dash for null translit/gloss/morphologyDescription/grammarArabic', () => {
+  it('shows em dash for null translit/gloss/posTag+posLabel/grammarArabic', () => {
     renderRow(
-      cell({ translit: null, gloss: null, morphologyDescription: null, grammarArabic: null }),
+      cell({ translit: null, gloss: null, posTag: null, posLabel: null, grammarArabic: null }),
     );
     expect(screen.getAllByText('—').length).toBe(4);
     expect(screen.queryByText('جار ومجرور')).toBeNull();
+  });
+
+  it('renders one POS code/label line per segment instead of the full scraped description', () => {
+    renderRow(
+      cell({
+        segments: [
+          {
+            id: 1, word_id: 1, segment_index: 0, segment_type: 'prefix',
+            pos_tag: 'P', form_arabic: 'بِ', form_buckwalter: null,
+            features_json: null, lemma: null, root: null,
+          },
+          {
+            id: 2, word_id: 1, segment_index: 1, segment_type: 'stem',
+            pos_tag: 'N', form_arabic: 'سْمِ', form_buckwalter: null,
+            features_json: null, lemma: null, root: null,
+          },
+        ],
+      }),
+    );
+    expect(screen.getByText('P – Preposition')).toBeInTheDocument();
+    expect(screen.getByText('N – Noun')).toBeInTheDocument();
+  });
+
+  it('falls back to the word-level POS code/label when any segment has a null pos_tag', () => {
+    renderRow(
+      cell({
+        segments: [
+          {
+            id: 1, word_id: 1, segment_index: 0, segment_type: 'prefix',
+            pos_tag: 'P', form_arabic: 'بِ', form_buckwalter: null,
+            features_json: null, lemma: null, root: null,
+          },
+          {
+            id: 2, word_id: 1, segment_index: 1, segment_type: 'stem',
+            pos_tag: null, form_arabic: 'سْمِ', form_buckwalter: null,
+            features_json: null, lemma: null, root: null,
+          },
+        ],
+      }),
+    );
+    expect(screen.queryByText(/–\s*\?/)).toBeNull();
+    expect(screen.getByText('P – Preposition')).toBeInTheDocument();
   });
 
   it('marks an EN-fallback gloss while viewing uz, same as the card cell', () => {

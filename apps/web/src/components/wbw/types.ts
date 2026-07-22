@@ -18,9 +18,9 @@ export interface WbwCell {
   translit: string | null;
   gloss: string | null;
   glossLang: string | null;
+  posTag: string | null;
   posLabel: string | null;
   segments: WordSegment[];
-  morphologyDescription: string | null;
   grammarArabic: string | null;
 }
 

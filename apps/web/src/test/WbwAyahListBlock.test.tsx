@@ -4,9 +4,10 @@ import { WbwAyahListBlock } from '../components/wbw/WbwAyahListBlock';
 import type { WbwAyah } from '../components/wbw/types';
 
 const c = (position: number, arabic: string) => ({
-  surahId: 1, ayahNumber: 3, position, arabic, translit: 't', gloss: 'g', glossLang: null, posLabel: 'Noun',
+  surahId: 1, ayahNumber: 3, position, arabic, translit: 't', gloss: 'g', glossLang: null,
+  posTag: 'N', posLabel: 'Noun',
   segments: [],
-  morphologyDescription: 'N – nominative masculine noun', grammarArabic: 'اسم مرفوع',
+  grammarArabic: 'اسم مرفوع',
 });
 
 describe('WbwAyahListBlock', () => {

@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { decodeSegment } from '@quran-corpus/data/client';
 import { SegmentPills } from '../morphology/SegmentPills';
+import { posColor } from '../../lib/posColor';
 import type { WbwCell } from './types';
 
 export function WbwWordRow({
@@ -21,7 +23,8 @@ export function WbwWordRow({
     gloss,
     glossLang,
     segments,
-    morphologyDescription,
+    posTag,
+    posLabel,
     grammarArabic,
   } = cell;
 
@@ -50,8 +53,24 @@ export function WbwWordRow({
         </Link>
         {trailingMark}
       </td>
-      <td className="py-3 pl-3 text-sm text-paper-700 dark:text-paper-300">
-        <div>{morphologyDescription ?? '—'}</div>
+      <td className="py-3 pl-3 text-sm">
+        {segments.length > 0 && segments.every((seg) => seg.pos_tag) ? (
+          <div className="space-y-0.5">
+            {segments.map((seg) => {
+              const { pos } = decodeSegment(seg);
+              const color = posColor(seg.pos_tag);
+              return (
+                <div key={seg.id} style={{ color }}>
+                  {pos.code} – {pos.en}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-paper-700 dark:text-paper-300">
+            {posTag && posLabel ? `${posTag} – ${posLabel}` : '—'}
+          </div>
+        )}
         <div className="font-arabic text-base text-paper-600 dark:text-paper-400" dir="rtl">
           {grammarArabic ?? '—'}
         </div>

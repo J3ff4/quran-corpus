@@ -6,9 +6,10 @@ import type { WbwCell } from '../components/wbw/types';
 function cell(over: Partial<WbwCell> = {}): WbwCell {
   return {
     surahId: 1, ayahNumber: 1, position: 1,
-    arabic: 'بِسْمِ', translit: "bis'mi", gloss: 'In (the) name', glossLang: null, posLabel: 'Preposition',
+    arabic: 'بِسْمِ', translit: "bis'mi", gloss: 'In (the) name', glossLang: null,
+    posTag: 'P', posLabel: 'Preposition',
     segments: [],
-    morphologyDescription: 'P – prefixed preposition bi', grammarArabic: 'جار ومجرور',
+    grammarArabic: 'جار ومجرور',
     ...over,
   };
 }
@@ -76,9 +77,9 @@ describe('WbwWordCell', () => {
 
   it('renders latin gloss/translit LTR so trailing punctuation stays trailing', () => {
     const c = { surahId: 2, ayahNumber: 2, position: 3, arabic: 'فِيهِ',
-      translit: 'fihi', gloss: 'in it,', glossLang: 'en', posLabel: 'Preposition',
+      translit: 'fihi', gloss: 'in it,', glossLang: 'en', posTag: 'P', posLabel: 'Preposition',
       segments: [],
-      morphologyDescription: null, grammarArabic: null };
+      grammarArabic: null };
     render(<WbwWordCell cell={c} pageLang="en" />);
     expect(screen.getByText('in it,')).toHaveAttribute('dir', 'ltr');
     expect(screen.getByText('fihi')).toHaveAttribute('dir', 'ltr');

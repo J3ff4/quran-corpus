@@ -9,9 +9,9 @@ const ayahs: WbwAyah[] = [
     cells: [
       {
         surahId: 1, ayahNumber: 1, position: 1, arabic: 'بِسْمِ', translit: "bis'mi",
-        gloss: 'In (the) name', glossLang: null, posLabel: 'Preposition',
+        gloss: 'In (the) name', glossLang: null, posTag: 'P', posLabel: 'Preposition',
         segments: [],
-        morphologyDescription: 'P', grammarArabic: 'جار ومجرور',
+        grammarArabic: 'جار ومجرور',
       },
     ],
     textUthmani: 'x',
