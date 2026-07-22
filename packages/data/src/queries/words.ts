@@ -127,3 +127,16 @@ export async function getWordDetail(
     concept_tags: tagRes.rows.map(rowToConceptTag),
   };
 }
+
+export async function getSegmentsByWordIds(
+  db: Client,
+  wordIds: number[],
+): Promise<WordSegment[]> {
+  if (wordIds.length === 0) return [];
+  const placeholders = wordIds.map(() => '?').join(',');
+  const result = await db.execute({
+    sql: `SELECT * FROM word_segments WHERE word_id IN (${placeholders}) ORDER BY word_id, segment_index`,
+    args: wordIds,
+  });
+  return result.rows.map(rowToSegment);
+}

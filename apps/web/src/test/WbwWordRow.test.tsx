@@ -7,6 +7,7 @@ function cell(over: Partial<WbwCell> = {}): WbwCell {
   return {
     surahId: 1, ayahNumber: 1, position: 1,
     arabic: 'بِسْمِ', translit: "bis'mi", gloss: 'In (the) name', glossLang: null, posLabel: 'Preposition',
+    segments: [],
     morphologyDescription: 'P – prefixed preposition bi', grammarArabic: 'جار ومجرور',
     ...over,
   };
@@ -28,7 +29,6 @@ describe('WbwWordRow', () => {
     expect(screen.getByText('In (the) name')).toBeInTheDocument();
     expect(screen.getByText("bis'mi")).toBeInTheDocument();
     expect(screen.getByText('بِسْمِ')).toBeInTheDocument();
-    expect(screen.getByText('Preposition')).toBeInTheDocument();
     expect(screen.getByText('P – prefixed preposition bi')).toBeInTheDocument();
     expect(screen.getByText('جار ومجرور')).toBeInTheDocument();
     expect(screen.getByText('(1:1:1)')).toBeInTheDocument();
@@ -41,7 +41,7 @@ describe('WbwWordRow', () => {
 
   it('shows em dash for null translit/gloss/morphologyDescription/grammarArabic', () => {
     renderRow(
-      cell({ translit: null, gloss: null, posLabel: null, morphologyDescription: null, grammarArabic: null }),
+      cell({ translit: null, gloss: null, morphologyDescription: null, grammarArabic: null }),
     );
     expect(screen.getAllByText('—').length).toBe(4);
     expect(screen.queryByText('جار ومجرور')).toBeNull();
@@ -50,5 +50,26 @@ describe('WbwWordRow', () => {
   it('marks an EN-fallback gloss while viewing uz, same as the card cell', () => {
     renderRow(cell({ gloss: 'Allah', glossLang: 'en' }), 'uz');
     expect(screen.getByText(/\(en\)/i)).toBeInTheDocument();
+  });
+
+  it('renders SegmentPills in the arabic-word column when the cell has segments', () => {
+    renderRow(
+      cell({
+        segments: [
+          {
+            id: 1, word_id: 1, segment_index: 0, segment_type: 'prefix',
+            pos_tag: 'P', form_arabic: 'بِ', form_buckwalter: null,
+            features_json: null, lemma: null, root: null,
+          },
+        ],
+      }),
+    );
+    expect(screen.getByText('بِ')).toBeInTheDocument();
+    expect(screen.getByText('P')).toBeInTheDocument();
+  });
+
+  it('falls back to the flat arabic word when segments is empty', () => {
+    renderRow(cell({ segments: [] }));
+    expect(screen.getByText('بِسْمِ')).toBeInTheDocument();
   });
 });

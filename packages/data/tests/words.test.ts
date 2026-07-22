@@ -7,6 +7,7 @@ import {
   getWordsBySurahAyahRange,
   getWordByLocation,
   getWordDetail,
+  getSegmentsByWordIds,
 } from '../src/queries/words.js';
 
 let db: Client;
@@ -172,5 +173,44 @@ describe('getWordByLocation / getWordDetail', () => {
 
   it('getWordDetail returns null for unknown word id', async () => {
     expect(await getWordDetail(db, 99999)).toBeNull();
+  });
+});
+
+describe('getSegmentsByWordIds', () => {
+  it('returns empty array for empty input, without querying', async () => {
+    expect(await getSegmentsByWordIds(db, [])).toEqual([]);
+  });
+
+  it('batches segments across multiple word ids, ordered by word then segment_index', async () => {
+    // Fresh ayah/words (not reused from earlier describe blocks): getWordByLocation(1,1,1)
+    // and (1,1,2) already carry word_segments rows from prior tests in this file, which
+    // would collide with UNIQUE(word_id, segment_index) on the inserts below.
+    const ar = await db.execute({
+      sql: `INSERT INTO ayahs (surah_id, ayah_number, text_uthmani) VALUES (1, 99, 'بِسْمِ ٱللَّهِ') RETURNING id`,
+      args: [],
+    });
+    const testAyahId = ar.rows[0]?.['id'] as number;
+    const w1r = await db.execute({
+      sql: `INSERT INTO words (ayah_id, position, text_arabic) VALUES (?, 1, 'بِسْمِ') RETURNING id`,
+      args: [testAyahId],
+    });
+    const w1Id = w1r.rows[0]?.['id'] as number;
+    const w2r = await db.execute({
+      sql: `INSERT INTO words (ayah_id, position, text_arabic) VALUES (?, 2, 'ٱللَّهِ') RETURNING id`,
+      args: [testAyahId],
+    });
+    const w2Id = w2r.rows[0]?.['id'] as number;
+    await db.execute({
+      sql: `INSERT INTO word_segments (word_id,segment_index,segment_type,pos_tag,form_arabic)
+            VALUES (?,0,'prefix','P','بِ'),(?,1,'stem','N','سْمِ'),(?,0,'stem','PN','ٱللَّهِ')`,
+      args: [w1Id, w1Id, w2Id],
+    });
+    const segs = await getSegmentsByWordIds(db, [w1Id, w2Id]);
+    expect(segs.filter((s) => s.word_id === w1Id).map((s) => s.pos_tag)).toEqual(['P', 'N']);
+    expect(segs.filter((s) => s.word_id === w2Id).map((s) => s.pos_tag)).toEqual(['PN']);
+  });
+
+  it('returns empty array when no segments exist for the given ids', async () => {
+    expect(await getSegmentsByWordIds(db, [999999])).toEqual([]);
   });
 });

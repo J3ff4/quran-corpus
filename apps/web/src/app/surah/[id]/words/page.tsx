@@ -7,8 +7,10 @@ import {
   getAyahsBySurah,
   getWordsBySurahAyahRange,
   getGlossesWithFallback,
+  getSegmentsByWordIds,
   posLabelEn,
 } from '@quran-corpus/data';
+import type { WordSegment } from '@quran-corpus/data';
 import { WbwView } from '../../../../components/wbw/WbwView';
 import type { WbwCell, WbwAyah } from '../../../../components/wbw/types';
 import { toPickerSurah, type PickerSurah } from '../../../../components/wbw/types';
@@ -42,6 +44,7 @@ export default async function WbwPage({ params, searchParams }: PageProps) {
     getGlossesWithFallback(db, surahId, lang),
     getAllSurahs(db),
   ]);
+  const segments = await getSegmentsByWordIds(db, words.map((w) => w.id));
   const pickerSurahs: PickerSurah[] = allSurahs.map(toPickerSurah);
 
   const cookieStore = await cookies();
@@ -50,6 +53,16 @@ export default async function WbwPage({ params, searchParams }: PageProps) {
 
   const glossByWordId = new Map<number, { text: string; lang: string }>();
   for (const g of glosses) glossByWordId.set(g.word_id, { text: g.gloss_text, lang: g.gloss_lang });
+
+  const segmentsByWordId = new Map<number, WordSegment[]>();
+  for (const s of segments) {
+    let arr = segmentsByWordId.get(s.word_id);
+    if (!arr) {
+      arr = [];
+      segmentsByWordId.set(s.word_id, arr);
+    }
+    arr.push(s);
+  }
 
   const numberByAyahId = new Map<number, number>();
   const uthmaniByNumber = new Map<number, string>();
@@ -76,6 +89,7 @@ export default async function WbwPage({ params, searchParams }: PageProps) {
       gloss: glossByWordId.get(w.id)?.text ?? null,
       glossLang: glossByWordId.get(w.id)?.lang ?? null,
       posLabel: posLabelEn(w.pos_tag),
+      segments: segmentsByWordId.get(w.id) ?? [],
       morphologyDescription: w.morphology_description,
       grammarArabic: w.grammar_arabic,
     });

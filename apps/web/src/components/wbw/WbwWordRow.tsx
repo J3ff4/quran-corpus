@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { chip } from '../ui/chip';
+import { SegmentPills } from '../morphology/SegmentPills';
 import type { WbwCell } from './types';
 
 export function WbwWordRow({
@@ -20,7 +20,7 @@ export function WbwWordRow({
     translit,
     gloss,
     glossLang,
-    posLabel,
+    segments,
     morphologyDescription,
     grammarArabic,
   } = cell;
@@ -46,10 +46,7 @@ export function WbwWordRow({
           href={`/word/${surahId}/${ayahNumber}/${position}`}
           className="inline-flex flex-col items-center gap-1 hover:opacity-80"
         >
-          <span className="font-arabic text-2xl leading-[1.8] text-paper-900 dark:text-paper-100" dir="rtl">
-            {arabic}
-          </span>
-          {posLabel && <span className={chip}>{posLabel}</span>}
+          <SegmentPills segments={segments} fallbackWord={arabic} />
         </Link>
         {trailingMark}
       </td>

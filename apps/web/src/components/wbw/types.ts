@@ -1,4 +1,4 @@
-import type { Surah } from '@quran-corpus/data';
+import type { Surah, WordSegment } from '@quran-corpus/data';
 
 export interface PickerSurah {
   id: number;
@@ -19,6 +19,7 @@ export interface WbwCell {
   gloss: string | null;
   glossLang: string | null;
   posLabel: string | null;
+  segments: WordSegment[];
   morphologyDescription: string | null;
   grammarArabic: string | null;
 }

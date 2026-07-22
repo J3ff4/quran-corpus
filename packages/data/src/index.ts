@@ -8,6 +8,7 @@ export {
   getWordsBySurahAyahRange,
   getWordByLocation,
   getWordDetail,
+  getSegmentsByWordIds,
 } from './queries/words.js';
 export { getLemmaFrequency, getVerbConcordance } from './queries/dictionary.js';
 export { getTranslationsByAyah, getTranslation, getTranslationsBySurahAndLang } from './queries/translations.js';
