@@ -11,7 +11,7 @@ const ayahs: WbwAyah[] = [
         surahId: 1, ayahNumber: 1, position: 1, arabic: 'بِسْمِ', translit: "bis'mi",
         gloss: 'In (the) name', glossLang: null, posTag: 'P', posLabel: 'Preposition',
         segments: [],
-        grammarArabic: 'جار ومجرور',
+        grammarNote: 'جار ومجرور',
       },
     ],
     textUthmani: 'x',

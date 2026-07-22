@@ -10,7 +10,7 @@ import json
 from dataclasses import dataclass
 from urllib.parse import parse_qs, urlparse
 
-from bs4 import BeautifulSoup, NavigableString
+from bs4 import BeautifulSoup, NavigableString, Tag
 
 
 @dataclass
@@ -21,6 +21,30 @@ class ParsedWord:
     pos_tag: str | None  # first <b> text in col3 cell
     english_gloss: str | None  # bare text node in cell 0 (not inside spans/links)
     morphology_json: str | None  # JSON array of all POS codes from <b> tags in col3
+    grammar_note: str | None = None  # arabicGrammar div text, \n-joined per <br/> clause
+
+
+def _extract_grammar_note(col3: Tag) -> str | None:
+    """Extract the arabicGrammar div's clauses, one per <br/>, \n-joined.
+
+    Returns None if the div is absent or every clause is empty after
+    stripping (matches morphology_json's None-when-absent convention).
+    """
+    div = col3.find("div", class_="arabicGrammar")
+    if div is None:
+        return None
+    clauses: list[str] = []
+    current = ""
+    for child in div.children:
+        if isinstance(child, Tag) and child.name == "br":
+            if current.strip():
+                clauses.append(current.strip())
+            current = ""
+        else:
+            current += child.get_text() if isinstance(child, Tag) else str(child)
+    if current.strip():
+        clauses.append(current.strip())
+    return "\n".join(clauses) if clauses else None
 
 
 def parse_verse_words(html: str) -> list[ParsedWord]:
@@ -65,12 +89,14 @@ def parse_verse_words(html: str) -> list[ParsedWord]:
 
         # --- Cell 2 (col3): POS codes from <b> tags ---
         pos_codes: list[str] = []
+        grammar_note: str | None = None
         if len(cells) > 2:
             col3 = cells[2]
             for b_tag in col3.find_all("b"):
                 code = b_tag.get_text(strip=True)
                 if code:
                     pos_codes.append(code)
+            grammar_note = _extract_grammar_note(col3)
 
         pos_tag = pos_codes[0] if pos_codes else None
         morphology_json = (
@@ -85,6 +111,7 @@ def parse_verse_words(html: str) -> list[ParsedWord]:
                 pos_tag=pos_tag,
                 english_gloss=english_gloss,
                 morphology_json=morphology_json,
+                grammar_note=grammar_note,
             )
         )
 

@@ -91,7 +91,7 @@ export default async function WbwPage({ params, searchParams }: PageProps) {
       posTag: w.pos_tag,
       posLabel: posLabelEn(w.pos_tag),
       segments: segmentsByWordId.get(w.id) ?? [],
-      grammarArabic: w.grammar_arabic,
+      grammarNote: w.grammar_note,
     });
   }
 

@@ -39,6 +39,19 @@ export function stripLineComments(sql: string): string {
   return sql.replace(/--[^\n]*/g, '');
 }
 
+// `CREATE TABLE IF NOT EXISTS` is a no-op against a `words` table that
+// already exists without this column (a pre-provisioned DB, or a legacy
+// snapshot opened before the scraper's own migration ran). Self-heal it here
+// too, mirroring packages/scraper's _migrate_add_word_columns, so any
+// consumer of this package — not just the scraper — gets the column.
+async function migrateAddWordColumns(db: Client): Promise<void> {
+  const info = await db.execute('PRAGMA table_info(words)');
+  const existing = new Set(info.rows.map((r) => r['name'] as string));
+  if (!existing.has('grammar_note')) {
+    await db.execute('ALTER TABLE words ADD COLUMN grammar_note TEXT');
+  }
+}
+
 export async function runMigrations(db: Client): Promise<void> {
   const statements = splitStatements(stripLineComments(SCHEMA_SQL))
     .map((s) => s.trim())
@@ -47,4 +60,6 @@ export async function runMigrations(db: Client): Promise<void> {
   for (const statement of statements) {
     await db.execute(statement);
   }
+
+  await migrateAddWordColumns(db);
 }

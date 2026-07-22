@@ -21,7 +21,7 @@ export interface WbwCell {
   posTag: string | null;
   posLabel: string | null;
   segments: WordSegment[];
-  grammarArabic: string | null;
+  grammarNote: string | null;
 }
 
 export interface WbwAyah {

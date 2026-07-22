@@ -131,6 +131,7 @@ class ScraperDatabase:
             "lemma_buckwalter",
             "morphology_description",
             "grammar_arabic",
+            "grammar_note",
             "audio_url",
         ):
             if column not in existing:
@@ -242,9 +243,10 @@ class ScraperDatabase:
                    pos_tag,
                    morphology_json,
                    morphology_description,
-                   grammar_arabic
+                   grammar_arabic,
+                   grammar_note
                )
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(ayah_id, position) DO UPDATE SET
                  text_arabic = excluded.text_arabic,
                  transliteration = COALESCE(
@@ -261,7 +263,9 @@ class ScraperDatabase:
                  morphology_description = COALESCE(
                    excluded.morphology_description, words.morphology_description),
                  grammar_arabic = COALESCE(
-                   excluded.grammar_arabic, words.grammar_arabic)
+                   excluded.grammar_arabic, words.grammar_arabic),
+                 grammar_note = COALESCE(
+                   excluded.grammar_note, words.grammar_note)
                RETURNING id""",
             (
                 word.ayah_id,
@@ -276,6 +280,7 @@ class ScraperDatabase:
                 word.morphology_json,
                 word.morphology_description,
                 word.grammar_arabic,
+                word.grammar_note,
             ),
         )
         row = cursor.fetchone()

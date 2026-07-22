@@ -21,6 +21,7 @@ function rowToWord(row: Row): Word {
     morphology_json: (row['morphology_json'] as string | null) ?? null,
     morphology_description: (row['morphology_description'] as string | null) ?? null,
     grammar_arabic: strip(row['grammar_arabic'] as string | null),
+    grammar_note: strip(row['grammar_note'] as string | null),
     audio_url: (row['audio_url'] as string | null) ?? null,
   };
 }

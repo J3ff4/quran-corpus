@@ -9,7 +9,7 @@ function word(over: Partial<Word> = {}): Word {
     transliteration: 'bismi', root: 'س م و', lemma: 'ٱسْم',
     root_buckwalter: 'smw', lemma_buckwalter: null, pos_tag: 'N',
     morphology_json: null, morphology_description: 'PROSE HERE',
-    grammar_arabic: 'ARABIC HERE', audio_url: null, ...over,
+    grammar_arabic: 'ARABIC HERE', grammar_note: null, audio_url: null, ...over,
   };
 }
 

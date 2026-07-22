@@ -9,7 +9,7 @@ function cell(over: Partial<WbwCell> = {}): WbwCell {
     arabic: 'بِسْمِ', translit: "bis'mi", gloss: 'In (the) name', glossLang: null,
     posTag: 'P', posLabel: 'Preposition',
     segments: [],
-    grammarArabic: 'جار ومجرور',
+    grammarNote: 'جار ومجرور',
     ...over,
   };
 }
@@ -35,14 +35,20 @@ describe('WbwWordRow', () => {
     expect(screen.getByText('(1:1:1)')).toBeInTheDocument();
   });
 
+  it('renders each grammar-note clause on its own line', () => {
+    renderRow(cell({ grammarNote: 'الواو عاطفة\nفعل ماض' }));
+    expect(screen.getByText('الواو عاطفة')).toBeInTheDocument();
+    expect(screen.getByText('فعل ماض')).toBeInTheDocument();
+  });
+
   it('links the arabic word to the word detail page', () => {
     renderRow(cell({ surahId: 2, ayahNumber: 255, position: 1 }));
     expect(screen.getByRole('link')).toHaveAttribute('href', '/word/2/255/1');
   });
 
-  it('shows em dash for null translit/gloss/posTag+posLabel/grammarArabic', () => {
+  it('shows em dash for null translit/gloss/posTag+posLabel/grammarNote', () => {
     renderRow(
-      cell({ translit: null, gloss: null, posTag: null, posLabel: null, grammarArabic: null }),
+      cell({ translit: null, gloss: null, posTag: null, posLabel: null, grammarNote: null }),
     );
     expect(screen.getAllByText('—').length).toBe(4);
     expect(screen.queryByText('جار ومجرور')).toBeNull();

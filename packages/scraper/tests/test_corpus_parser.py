@@ -161,6 +161,46 @@ def test_verse_6_word_1_has_three_pos_codes(parsed_words: list[ParsedWord]) -> N
 
 
 # ---------------------------------------------------------------------------
+# Arabic grammar note (arabicGrammar div)
+# ---------------------------------------------------------------------------
+
+
+def test_first_word_grammar_note(parsed_words: list[ParsedWord]) -> None:
+    """Word 1:1:1 (bismi) grammar note is the single compact relation term."""
+    assert parsed_words[0].grammar_note == "جار ومجرور"
+
+
+def test_word_1_1_2_grammar_note(parsed_words: list[ParsedWord]) -> None:
+    """Word 1:1:2 (Allah, genitive) grammar note names the proper-noun rule."""
+    word = next(w for w in parsed_words if w.verse_number == 1 and w.position == 2)
+    assert word.grammar_note == "لفظ الجلالة مجرور"
+
+
+def test_multiline_grammar_note_splits_on_br(parsed_words: list[ParsedWord]) -> None:
+    """Word 1:5:3 (wa-iyyaka) has two <br/>-separated clauses in the source div;
+    they must be joined with '\\n', not collapsed into one line."""
+    word = next(w for w in parsed_words if w.verse_number == 5 and w.position == 3)
+    assert word.grammar_note == "الواو عاطفة\nضمير منفصل"
+
+
+def test_grammar_note_absent_when_no_div() -> None:
+    """A col3 cell with no arabicGrammar div yields grammar_note=None."""
+    html = """
+    <table class="morphologyTable">
+      <tr><th>h</th></tr>
+      <tr>
+        <td><span class="location">(1:1:1)</span><a>bismi</a><br/>gloss</td>
+        <td>arabic</td>
+        <td><b>P</b> – prefixed preposition</td>
+      </tr>
+    </table>
+    """
+    words = parse_verse_words(html)
+    assert len(words) == 1
+    assert words[0].grammar_note is None
+
+
+# ---------------------------------------------------------------------------
 # Pagination — parse_next_verse_url
 # ---------------------------------------------------------------------------
 

@@ -38,6 +38,7 @@ class WordModel(BaseModel):
     morphology_json: str | None = None
     morphology_description: str | None = None
     grammar_arabic: str | None = None
+    grammar_note: str | None = None
 
 
 class TranslationModel(BaseModel):

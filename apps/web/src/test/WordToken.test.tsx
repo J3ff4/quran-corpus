@@ -17,6 +17,7 @@ const word: Word = {
   morphology_json: '["P","N"]',
   morphology_description: null,
   grammar_arabic: null,
+  grammar_note: null,
   audio_url: null,
 };
 

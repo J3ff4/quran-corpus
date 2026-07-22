@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS words (
   morphology_json TEXT,
   morphology_description TEXT,
   grammar_arabic  TEXT,
+  grammar_note    TEXT,
   audio_url       TEXT,
   UNIQUE(ayah_id, position)
 );

@@ -13,7 +13,7 @@ const surah: Surah = {
   revelation_type: 'meccan', ayah_count: 7, order_number: 1,
 };
 const ayahs: WbwAyah[] = [
-  { ayahNumber: 1, cells: [{ surahId: 1, ayahNumber: 1, position: 1, arabic: 'بِسْمِ', translit: "bis'mi", gloss: 'In (the) name', glossLang: null, posTag: 'P', posLabel: 'Preposition', segments: [], grammarArabic: 'جار ومجرور' }], textUthmani: 'x' },
+  { ayahNumber: 1, cells: [{ surahId: 1, ayahNumber: 1, position: 1, arabic: 'بِسْمِ', translit: "bis'mi", gloss: 'In (the) name', glossLang: null, posTag: 'P', posLabel: 'Preposition', segments: [], grammarNote: 'جار ومجرور' }], textUthmani: 'x' },
 ];
 
 // Al-Baqarah (id 2): not Al-Fatiha/At-Tawba, so Bismillah renders on page 1 only.
@@ -22,7 +22,7 @@ const baqarah: Surah = {
   revelation_type: 'medinan', ayah_count: 286, order_number: 2,
 };
 const midSurahAyahs: WbwAyah[] = [
-  { ayahNumber: 16, cells: [{ surahId: 2, ayahNumber: 16, position: 1, arabic: 'أُو۟لَٰٓئِكَ', translit: "ulaaika", gloss: 'Those', glossLang: null, posTag: 'PRON', posLabel: 'Pronoun', segments: [], grammarArabic: null }], textUthmani: 'x' },
+  { ayahNumber: 16, cells: [{ surahId: 2, ayahNumber: 16, position: 1, arabic: 'أُو۟لَٰٓئِكَ', translit: "ulaaika", gloss: 'Those', glossLang: null, posTag: 'PRON', posLabel: 'Pronoun', segments: [], grammarNote: null }], textUthmani: 'x' },
 ];
 
 describe('WbwView', () => {

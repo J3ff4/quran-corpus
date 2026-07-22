@@ -7,7 +7,7 @@ const c = (position: number, arabic: string) => ({
   surahId: 1, ayahNumber: 3, position, arabic, translit: 't', gloss: 'g', glossLang: null,
   posTag: 'N', posLabel: 'Noun',
   segments: [],
-  grammarArabic: 'اسم مرفوع',
+  grammarNote: 'اسم مرفوع',
 });
 
 describe('WbwAyahListBlock', () => {

@@ -73,6 +73,7 @@ def _process_page(html: str, chapter_id: int, db: ScraperDatabase) -> None:
                 transliteration=pw.transliteration,
                 pos_tag=pw.pos_tag,
                 morphology_json=pw.morphology_json,
+                grammar_note=pw.grammar_note,
             )
         )
 

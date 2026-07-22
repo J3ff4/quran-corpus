@@ -9,7 +9,7 @@ function cell(over: Partial<WbwCell> = {}): WbwCell {
     arabic: 'بِسْمِ', translit: "bis'mi", gloss: 'In (the) name', glossLang: null,
     posTag: 'P', posLabel: 'Preposition',
     segments: [],
-    grammarArabic: 'جار ومجرور',
+    grammarNote: 'جار ومجرور',
     ...over,
   };
 }
@@ -79,7 +79,7 @@ describe('WbwWordCell', () => {
     const c = { surahId: 2, ayahNumber: 2, position: 3, arabic: 'فِيهِ',
       translit: 'fihi', gloss: 'in it,', glossLang: 'en', posTag: 'P', posLabel: 'Preposition',
       segments: [],
-      grammarArabic: null };
+      grammarNote: null };
     render(<WbwWordCell cell={c} pageLang="en" />);
     expect(screen.getByText('in it,')).toHaveAttribute('dir', 'ltr');
     expect(screen.getByText('fihi')).toHaveAttribute('dir', 'ltr');

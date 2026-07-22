@@ -15,8 +15,8 @@ const ayah: Ayah = {
 };
 
 const words: Word[] = [
-  { id: 1, ayah_id: 1, position: 1, text_arabic: 'بِسْمِ', transliteration: 'bismi', root: null, lemma: null, root_buckwalter: null, lemma_buckwalter: null, pos_tag: 'P', morphology_json: null, morphology_description: null, grammar_arabic: null, audio_url: null },
-  { id: 2, ayah_id: 1, position: 2, text_arabic: 'ٱللَّهِ', transliteration: 'l-lahi', root: null, lemma: null, root_buckwalter: null, lemma_buckwalter: null, pos_tag: 'PN', morphology_json: null, morphology_description: null, grammar_arabic: null, audio_url: null },
+  { id: 1, ayah_id: 1, position: 1, text_arabic: 'بِسْمِ', transliteration: 'bismi', root: null, lemma: null, root_buckwalter: null, lemma_buckwalter: null, pos_tag: 'P', morphology_json: null, morphology_description: null, grammar_arabic: null, grammar_note: null, audio_url: null },
+  { id: 2, ayah_id: 1, position: 2, text_arabic: 'ٱللَّهِ', transliteration: 'l-lahi', root: null, lemma: null, root_buckwalter: null, lemma_buckwalter: null, pos_tag: 'PN', morphology_json: null, morphology_description: null, grammar_arabic: null, grammar_note: null, audio_url: null },
 ];
 
 const sajdahAyah: Ayah = {
@@ -31,7 +31,7 @@ const sajdahAyah: Ayah = {
 };
 
 const sajdahWords: Word[] = [
-  { id: 3, ayah_id: 2, position: 1, text_arabic: 'وَٱسْجُدْ', transliteration: null, root: null, lemma: null, root_buckwalter: null, lemma_buckwalter: null, pos_tag: null, morphology_json: null, morphology_description: null, grammar_arabic: null, audio_url: null },
+  { id: 3, ayah_id: 2, position: 1, text_arabic: 'وَٱسْجُدْ', transliteration: null, root: null, lemma: null, root_buckwalter: null, lemma_buckwalter: null, pos_tag: null, morphology_json: null, morphology_description: null, grammar_arabic: null, grammar_note: null, audio_url: null },
 ];
 
 const translation: Translation = {

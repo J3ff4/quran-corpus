@@ -21,7 +21,7 @@ const baseWord: Word = {
   transliteration: 'bismi', root: 'س م و', lemma: 'ٱسْم',
   root_buckwalter: 'smw', lemma_buckwalter: null, pos_tag: 'N',
   morphology_json: null, morphology_description: 'In the name — genitive noun.',
-  grammar_arabic: 'اسم مجرور', audio_url: null,
+  grammar_arabic: 'اسم مجرور', grammar_note: null, audio_url: null,
 };
 
 function segment(over: Partial<WordSegment>): WordSegment {

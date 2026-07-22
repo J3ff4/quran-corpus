@@ -25,7 +25,7 @@ export function WbwWordRow({
     segments,
     posTag,
     posLabel,
-    grammarArabic,
+    grammarNote,
   } = cell;
 
   return (
@@ -71,9 +71,21 @@ export function WbwWordRow({
             {posTag && posLabel ? `${posTag} – ${posLabel}` : '—'}
           </div>
         )}
-        <div className="font-arabic text-base text-paper-600 dark:text-paper-400" dir="rtl">
-          {grammarArabic ?? '—'}
-        </div>
+        {grammarNote ? (
+          grammarNote.split('\n').map((clause, i) => (
+            <div
+              key={i}
+              className="font-arabic text-base text-paper-600 dark:text-paper-400"
+              dir="rtl"
+            >
+              {clause}
+            </div>
+          ))
+        ) : (
+          <div className="font-arabic text-base text-paper-600 dark:text-paper-400" dir="rtl">
+            —
+          </div>
+        )}
       </td>
     </tr>
   );

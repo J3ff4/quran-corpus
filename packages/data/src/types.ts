@@ -39,6 +39,7 @@ export interface Word {
   morphology_json: string | null;
   morphology_description: string | null;
   grammar_arabic: string | null;
+  grammar_note: string | null;
   audio_url: string | null;
 }
 

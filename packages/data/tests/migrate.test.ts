@@ -77,9 +77,38 @@ describe('runMigrations', () => {
     const cols = new Set(
       (await d.execute('PRAGMA table_info(words)')).rows.map((r) => r['name'] as string),
     );
-    for (const c of ['morphology_description', 'grammar_arabic', 'audio_url']) {
+    for (const c of ['morphology_description', 'grammar_arabic', 'audio_url', 'grammar_note']) {
       expect(cols.has(c)).toBe(true);
     }
+    d.close();
+  });
+
+  it('self-heals grammar_note onto a legacy words table missing it', async () => {
+    const d = createDatabase('file::memory:');
+    // Simulate a pre-existing DB whose `words` table predates this column —
+    // `CREATE TABLE IF NOT EXISTS` alone would silently skip it.
+    await d.execute(`CREATE TABLE words (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      ayah_id         INTEGER NOT NULL,
+      position        INTEGER NOT NULL,
+      text_arabic     TEXT    NOT NULL,
+      transliteration TEXT,
+      root            TEXT,
+      lemma           TEXT,
+      root_buckwalter TEXT,
+      lemma_buckwalter TEXT,
+      pos_tag         TEXT,
+      morphology_json TEXT,
+      morphology_description TEXT,
+      grammar_arabic  TEXT,
+      audio_url       TEXT,
+      UNIQUE(ayah_id, position)
+    )`);
+    await runMigrations(d);
+    const cols = new Set(
+      (await d.execute('PRAGMA table_info(words)')).rows.map((r) => r['name'] as string),
+    );
+    expect(cols.has('grammar_note')).toBe(true);
     d.close();
   });
 });
