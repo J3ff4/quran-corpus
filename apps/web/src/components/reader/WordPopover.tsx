@@ -51,11 +51,11 @@ export function WordPopover({ word, gloss, glossLang, pageLang, href, onClose }:
               ✕
             </button>
 
-            {/* Arabic word */}
+            {/* Arabic word — pr-10 keeps it clear of the absolutely-positioned close button */}
             <p
               id="word-popover-title"
               dir="rtl"
-              className="mb-3 font-arabic text-5xl text-paper-900 dark:text-paper-100"
+              className="mb-3 pr-10 font-arabic text-4xl text-paper-900 dark:text-paper-100"
             >
               {word.text_arabic}
             </p>

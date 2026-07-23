@@ -7,11 +7,21 @@ load before the dictionary scrape.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from ..buckwalter import buckwalter_to_arabic
 from ..db import ScraperDatabase
 from ..models import RootDefinitionModel, RootModel
+
+# Lane's Lexicon alternatives are "/"-joined with no space (e.g.
+# "abandon/desert/relinquish"), which browsers can't wrap on — one unbroken
+# run can overflow a narrow card. Insert a space after each "/" that lacks one.
+_SLASH_NO_SPACE = re.compile(r"/(?!\s)")
+
+
+def normalize_slash_spacing(definition: str) -> str:
+    return _SLASH_NO_SPACE.sub("/ ", definition)
 
 
 def import_lane_definitions(
@@ -30,6 +40,7 @@ def import_lane_definitions(
             bw, definition = parts[0].strip(), parts[1].strip()
             if not bw or not definition:
                 continue
+            definition = normalize_slash_spacing(definition)
             rid = db.upsert_root(
                 RootModel(
                     root_buckwalter=bw, root_arabic=buckwalter_to_arabic(bw) or bw

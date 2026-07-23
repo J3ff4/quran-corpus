@@ -32,26 +32,28 @@ const segments: WordSegment[] = [
 ];
 
 describe('SegmentedWord', () => {
-  it('renders a colored tspan per segment', () => {
-    const { container } = render(<SegmentedWord word={word} segments={segments} />);
-    const tspans = container.querySelectorAll('tspan');
-    expect(tspans).toHaveLength(2);
-    expect(tspans[0]).toHaveTextContent('بِ');
-    expect(tspans[0]?.getAttribute('fill')).not.toBe(tspans[1]?.getAttribute('fill'));
+  it('renders a colored pill per segment, non-overlapping', () => {
+    render(<SegmentedWord word={word} segments={segments} />);
+    const bi = screen.getByText('بِ');
+    const smi = screen.getByText('سْمِ');
+    expect(bi).toBeInTheDocument();
+    expect(smi).toBeInTheDocument();
+    expect(bi.style.color).not.toBe(smi.style.color);
   });
   it('renders a POS label per segment', () => {
     render(<SegmentedWord word={word} segments={segments} />);
     expect(screen.getByText('P')).toBeInTheDocument();
     expect(screen.getByText('N')).toBeInTheDocument();
   });
-  it('exposes full word + kept as real text (searchable)', () => {
-    const { container } = render(<SegmentedWord word={word} segments={segments} />);
-    expect(container.textContent).toContain('بِ');
-    expect(container.textContent).toContain('سْمِ');
-    expect(container.querySelector('title')?.textContent).toContain('بِسْمِ');
+  it('exposes one accessible name via role=img while keeping real, searchable text', () => {
+    render(<SegmentedWord word={word} segments={segments} gloss="in the name" />);
+    expect(screen.getByRole('img', { name: 'بِسْمِ — in the name' })).toBeInTheDocument();
+    expect(screen.getByText('بِ')).toBeInTheDocument();
+    expect(screen.getByText('سْمِ')).toBeInTheDocument();
   });
   it('degrades to whole word when no segments', () => {
-    const { container } = render(<SegmentedWord word={word} segments={[]} />);
-    expect(container.querySelector('text')?.textContent).toContain('بِسْمِ');
+    render(<SegmentedWord word={word} segments={[]} />);
+    expect(screen.getByRole('img', { name: 'بِسْمِ' })).toBeInTheDocument();
+    expect(screen.getByText('بِسْمِ')).toBeInTheDocument();
   });
 });

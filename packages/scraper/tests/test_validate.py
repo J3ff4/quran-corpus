@@ -31,7 +31,7 @@ def _seed(tmp_path, root_bw):
             position=1,
             text_arabic="بِسْمِ",
             root_buckwalter=root_bw,
-            pos_tag="P",
+            pos_tag="N",  # stem's tag ('N'), matching the corrected GPL-derived pos_tag
         )
     )
     return db

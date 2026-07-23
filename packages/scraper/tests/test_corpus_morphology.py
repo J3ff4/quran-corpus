@@ -31,10 +31,14 @@ def test_locations_in_order(words: list[ParsedCorpusWord]) -> None:
 
 
 def test_two_segments_merge_into_one_word(words: list[ParsedCorpusWord]) -> None:
-    """1:1:1 is prefix 'bi' + stem 'somi' -> one word, two POS tags."""
+    """1:1:1 is prefix 'bi' + stem 'somi' -> one word, two POS tags.
+
+    pos_tag is the word's main part of speech — the stem's tag ('N'), not
+    the prefix's ('P') — even though 'P' is first in file/segment order.
+    """
     w = words[0]
     assert w.pos_tags == ["P", "N"]
-    assert w.pos_tag == "P"
+    assert w.pos_tag == "N"
 
 
 def test_root_from_stem_segment_buckwalter(words: list[ParsedCorpusWord]) -> None:
@@ -61,10 +65,11 @@ def test_rahman_root(words: list[ParsedCorpusWord]) -> None:
 
 
 def test_hamd_root(words: list[ParsedCorpusWord]) -> None:
-    """1:2:1 (al-hamdu): root Hmd."""
+    """1:2:1 (al-hamdu): DET prefix + N stem, root Hmd. pos_tag is the
+    stem's 'N', not the DET prefix's tag."""
     w = words[3]
     assert w.root == "حمد"
-    assert w.pos_tag == "DET"
+    assert w.pos_tag == "N"
 
 
 def test_morphology_json_is_valid_array(words: list[ParsedCorpusWord]) -> None:

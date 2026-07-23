@@ -33,6 +33,7 @@ class ParsedCorpusWord:
     root_buckwalter: str | None = None
     lemma_buckwalter: str | None = None
     pos_tags: list[str] = field(default_factory=list)
+    stem_pos_tag: str | None = None  # POS of the first STEM-typed segment
 
     @property
     def root(self) -> str | None:
@@ -44,6 +45,9 @@ class ParsedCorpusWord:
 
     @property
     def pos_tag(self) -> str | None:
+        """The word's main part of speech — the stem's tag, not a prefix's."""
+        if self.stem_pos_tag is not None:
+            return self.stem_pos_tag
         return self.pos_tags[0] if self.pos_tags else None
 
     @property
@@ -116,6 +120,9 @@ def parse_corpus_morphology(path: Path) -> Iterator[ParsedCorpusWord]:
             assert current is not None  # noqa: S101 - narrow type for mypy
             if tag:
                 current.pos_tags.append(tag)
+                is_stem = _segment_type(features.split("|")) == "stem"
+                if current.stem_pos_tag is None and is_stem:
+                    current.stem_pos_tag = tag
             if current.root_buckwalter is None and root_bw is not None:
                 current.root_buckwalter = root_bw
             if current.lemma_buckwalter is None and lemma_bw is not None:

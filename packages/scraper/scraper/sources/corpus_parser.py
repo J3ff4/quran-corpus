@@ -18,10 +18,30 @@ class ParsedWord:
     verse_number: int  # ayah number within the chapter (from location span)
     position: int  # word position within verse (from location span)
     transliteration: str | None  # from <a> or <span class="phonetic">
-    pos_tag: str | None  # first <b> text in col3 cell
+    pos_tag: str | None  # stem's <b> text in col3 (the word's main part of speech)
     english_gloss: str | None  # bare text node in cell 0 (not inside spans/links)
     morphology_json: str | None  # JSON array of all POS codes from <b> tags in col3
     grammar_note: str | None = None  # arabicGrammar div text, \n-joined per <br/> clause
+
+
+def _is_prefixed(b_tag: Tag) -> bool:
+    """True if a <b> code's trailing description reads "prefixed ..." — a
+    segment attached before the stem (e.g. "P – prefixed preposition").
+
+    col3 has no explicit prefix/stem/suffix marker (unlike word_segments,
+    sourced from the offline GPL file); this wording is the only signal.
+    Suffixes carry no equivalent "suffixed"/"attached" keyword, but that's
+    fine — we only need to skip *leading* prefix codes to find the stem,
+    which is always the first non-prefixed code by corpus segment order.
+    """
+    text = ""
+    sib = b_tag.next_sibling
+    while sib is not None and getattr(sib, "name", None) not in ("b", "br"):
+        if getattr(sib, "name", None) == "div":
+            break
+        text += sib.get_text() if isinstance(sib, Tag) else str(sib)
+        sib = sib.next_sibling
+    return "prefixed" in text.lower()
 
 
 def _extract_grammar_note(col3: Tag) -> str | None:
@@ -89,6 +109,7 @@ def parse_verse_words(html: str) -> list[ParsedWord]:
 
         # --- Cell 2 (col3): POS codes from <b> tags ---
         pos_codes: list[str] = []
+        stem_pos_tag: str | None = None
         grammar_note: str | None = None
         if len(cells) > 2:
             col3 = cells[2]
@@ -96,9 +117,13 @@ def parse_verse_words(html: str) -> list[ParsedWord]:
                 code = b_tag.get_text(strip=True)
                 if code:
                     pos_codes.append(code)
+                    if stem_pos_tag is None and not _is_prefixed(b_tag):
+                        stem_pos_tag = code
             grammar_note = _extract_grammar_note(col3)
 
-        pos_tag = pos_codes[0] if pos_codes else None
+        pos_tag = stem_pos_tag if stem_pos_tag is not None else (
+            pos_codes[0] if pos_codes else None
+        )
         morphology_json = (
             json.dumps(pos_codes, ensure_ascii=False) if pos_codes else None
         )

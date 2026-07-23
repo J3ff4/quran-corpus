@@ -4,9 +4,20 @@ from pathlib import Path
 
 from scraper.db import ScraperDatabase
 from scraper.models import RootModel
-from scraper.sources.lane import import_lane_definitions
+from scraper.sources.lane import import_lane_definitions, normalize_slash_spacing
 
 FIX = Path(__file__).parent / "fixtures"
+
+
+def test_normalize_slash_spacing_inserts_space_after_unspaced_slash():
+    assert (
+        normalize_slash_spacing("abandon/desert/relinquish")
+        == "abandon/ desert/ relinquish"
+    )
+
+
+def test_normalize_slash_spacing_leaves_already_spaced_slash_alone():
+    assert normalize_slash_spacing("rise/ stand up") == "rise/ stand up"
 
 
 def test_import_creates_definition(tmp_path):

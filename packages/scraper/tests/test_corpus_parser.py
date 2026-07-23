@@ -81,8 +81,9 @@ def test_first_word_gloss(parsed_words: list[ParsedWord]) -> None:
 
 
 def test_first_word_pos_tag(parsed_words: list[ParsedWord]) -> None:
-    """Word 1:1:1 has POS tag 'P' (prefixed preposition, first <b> in col3)."""
-    assert parsed_words[0].pos_tag == "P"
+    """Word 1:1:1 (bismi) is prefix P ("prefixed preposition") + stem N. The
+    word's main part of speech is the stem's tag, 'N' — not the prefix's."""
+    assert parsed_words[0].pos_tag == "N"
 
 
 # ---------------------------------------------------------------------------
@@ -105,12 +106,14 @@ def test_first_word_morphology_json(parsed_words: list[ParsedWord]) -> None:
     assert codes == ["P", "N"]
 
 
-def test_pos_tag_is_first_morphology_code(parsed_words: list[ParsedWord]) -> None:
-    """pos_tag must always equal the first element of morphology_json."""
+def test_pos_tag_is_a_morphology_code(parsed_words: list[ParsedWord]) -> None:
+    """pos_tag is always one of the word's own morphology codes (the stem's,
+    per test_first_word_pos_tag — not necessarily the first, e.g. when a
+    prefix precedes the stem)."""
     for word in parsed_words:
         if word.morphology_json is not None:
             codes = json.loads(word.morphology_json)
-            assert word.pos_tag == codes[0]
+            assert word.pos_tag in codes
 
 
 # ---------------------------------------------------------------------------
@@ -151,6 +154,17 @@ def test_verse_5_word_2_pos_tag(parsed_words: list[ParsedWord]) -> None:
     """Word 1:5:2 (naʿbudu) is a verb — pos_tag should be 'V'."""
     word = next(w for w in parsed_words if w.verse_number == 5 and w.position == 2)
     assert word.pos_tag == "V"
+
+
+def test_verse_2_word_2_pos_tag_skips_prefixed_preposition(
+    parsed_words: list[ParsedWord],
+) -> None:
+    """Word 1:2:2 (lillahi) is prefix P ("prefixed preposition") + stem PN.
+    pos_tag is the stem's 'PN', not the leading prefix code."""
+    word = next(w for w in parsed_words if w.verse_number == 2 and w.position == 2)
+    codes = json.loads(word.morphology_json)  # type: ignore[arg-type]
+    assert codes == ["P", "PN"]
+    assert word.pos_tag == "PN"
 
 
 def test_verse_6_word_1_has_three_pos_codes(parsed_words: list[ParsedWord]) -> None:

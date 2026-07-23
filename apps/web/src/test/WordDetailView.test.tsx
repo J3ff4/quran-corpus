@@ -72,6 +72,6 @@ describe('WordDetailView', () => {
 
   it('renders the SegmentedWord heading with the word Arabic text', () => {
     render(<WordDetailView detail={detail([])} />);
-    expect(screen.getByTitle(baseWord.text_arabic)).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: baseWord.text_arabic })).toBeInTheDocument();
   });
 });

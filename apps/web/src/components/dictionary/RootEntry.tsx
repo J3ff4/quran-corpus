@@ -92,7 +92,7 @@ export function RootEntry({ entry, initialConcordance, total, prevBw, nextBw }: 
               key={d.id}
               className="rounded-lg border border-paper-200 bg-paper-100 px-4 py-3 dark:border-night-100 dark:bg-night-50"
             >
-              <p className="text-sm leading-relaxed text-paper-800 dark:text-paper-200">
+              <p className="break-words text-sm leading-relaxed text-paper-800 dark:text-paper-200">
                 {d.definition}
               </p>
               <p className="mt-2 text-xs text-paper-500">{sourceLabel(d.source)}</p>

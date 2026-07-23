@@ -44,7 +44,7 @@ def test_import_populates_root_and_lemma(db: ScraperDatabase) -> None:
     assert row["root_buckwalter"] == "smw"
     assert row["lemma"] == "ٱسْم"
     assert row["lemma_buckwalter"] == "{som"
-    assert row["pos_tag"] == "P"
+    assert row["pos_tag"] == "N"  # stem's tag, not the "P" prefix's
     assert row["morphology_json"] == '["P", "N"]'
 
 
