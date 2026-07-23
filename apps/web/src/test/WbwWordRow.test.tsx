@@ -121,4 +121,25 @@ describe('WbwWordRow', () => {
     renderRow(cell({ segments: [] }));
     expect(screen.getByText('بِسْمِ')).toBeInTheDocument();
   });
+
+  it('hides the DET segment line from the syntax column, unlike other tags', () => {
+    renderRow(
+      cell({
+        segments: [
+          {
+            id: 1, word_id: 1, segment_index: 0, segment_type: 'prefix',
+            pos_tag: 'DET', form_arabic: 'ٱل', form_buckwalter: null,
+            features_json: null, lemma: null, root: null,
+          },
+          {
+            id: 2, word_id: 1, segment_index: 1, segment_type: 'stem',
+            pos_tag: 'N', form_arabic: 'ْكِتَابُ', form_buckwalter: null,
+            features_json: null, lemma: null, root: null,
+          },
+        ],
+      }),
+    );
+    expect(screen.queryByText(/DET/)).not.toBeInTheDocument();
+    expect(screen.getByText('N – Noun')).toBeInTheDocument();
+  });
 });

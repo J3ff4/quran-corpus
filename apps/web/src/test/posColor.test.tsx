@@ -16,4 +16,8 @@ describe('posColor', () => {
   it('falls back for null/unknown', () => {
     expect(posColor(null)).toBe(posColor('ZZZ'));
   });
+  it('gives DET no color, unlike other minor tags', () => {
+    expect(posColor('DET')).toBeNull();
+    expect(posColor('NEG')).not.toBeNull();
+  });
 });

@@ -2,8 +2,8 @@ import type { WordSegment } from '@quran-corpus/data';
 import { posColor } from '../../lib/posColor';
 
 const SIZES = {
-  sm: { word: 'text-2xl leading-[1.8]', label: 'text-[10px] leading-none', gap: 'gap-0.5' },
-  lg: { word: 'text-5xl leading-[1.8]', label: 'text-sm leading-none', gap: 'gap-1' },
+  sm: { word: 'text-2xl leading-[1.8]', label: 'text-[10px] leading-none', gap: 'gap-1' },
+  lg: { word: 'text-6xl leading-[1.8]', label: 'text-xs leading-none', gap: 'gap-1.5' },
 };
 
 export function SegmentPills({
@@ -25,25 +25,36 @@ export function SegmentPills({
     );
   }
 
+  const styled = segments.map((seg) => ({ seg, color: posColor(seg.pos_tag) }));
+
   return (
-    <span className={`flex flex-wrap items-end justify-end ${s.gap}`} dir="rtl">
-      {segments.map((seg) => {
-        const color = posColor(seg.pos_tag);
-        return (
+    <span className="flex flex-col items-center gap-1">
+      {/* Segments stay adjacent inline spans (no boxes/gaps) so Arabic letter-joining renders correctly. */}
+      <span dir="rtl">
+        {styled.map(({ seg, color }) => (
           <span
             key={seg.id}
-            className="flex flex-col items-center rounded-md px-1 py-0.5"
-            style={{ backgroundColor: `color-mix(in srgb, ${color} 16%, transparent)` }}
+            className={`font-arabic ${s.word} ${color === null ? 'text-paper-900 dark:text-paper-100' : ''}`}
+            style={color ? { color } : undefined}
           >
-            <span className={`font-arabic ${s.word}`} style={{ color }}>
-              {seg.form_arabic ?? ''}
-            </span>
-            <span className={s.label} style={{ color }}>
-              {seg.pos_tag ?? ''}
-            </span>
+            {seg.form_arabic}
           </span>
-        );
-      })}
+        ))}
+      </span>
+      {/* No-color segments (DET) get no tag pill at all -- corpus.quran.com doesn't surface DET as its own category either. */}
+      <span className={`flex flex-wrap items-center justify-center ${s.gap}`} dir="rtl">
+        {styled
+          .filter((x): x is { seg: WordSegment; color: string } => x.color !== null)
+          .map(({ seg, color }) => (
+            <span
+              key={seg.id}
+              className={`rounded-full px-1.5 py-0.5 font-medium leading-none ${s.label}`}
+              style={{ color, backgroundColor: `color-mix(in srgb, ${color} 16%, transparent)` }}
+            >
+              {seg.pos_tag}
+            </span>
+          ))}
+      </span>
     </span>
   );
 }

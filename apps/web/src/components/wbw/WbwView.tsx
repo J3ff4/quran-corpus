@@ -34,7 +34,7 @@ export function WbwView({
   return (
     <div>
       <header className="mb-4 text-center">
-        <SurahFrame surahNumber={surah.id}>
+        <SurahFrame surahNumber={surah.id} className="mb-3">
           <p
             className={`text-[1.9rem] leading-none text-paper-900 dark:text-paper-100 ${
               surah.id === 102 ? 'font-surah-name-v4' : 'font-surah-name'

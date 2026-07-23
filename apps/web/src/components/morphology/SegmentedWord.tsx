@@ -8,11 +8,9 @@ interface SegmentedWordProps {
 }
 
 /**
- * Hero rendering of the word: each morphological segment colored by POS
- * (corpus-style), POS code pilled beneath it. Delegates to SegmentPills (the
- * same per-segment pill used in the wbw list view) at the large size so the
- * two stay visually and behaviorally consistent — one flex row per word, not
- * absolutely-positioned SVG text, so labels wrap instead of overlapping.
+ * Hero rendering of the word: joined colored word + pill label row.
+ * Delegates to SegmentPills (also used by the wbw list/card views) at the
+ * large size, so both stay visually and behaviorally consistent.
  *
  * `role="img"` + `aria-label` exposes one clean accessible name (word + gloss)
  * to assistive tech, while the underlying spans remain real, selectable,

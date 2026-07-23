@@ -56,15 +56,16 @@ export function WbwWordRow({
       <td className="py-3 pl-3 text-sm">
         {segments.length > 0 && segments.every((seg) => seg.pos_tag) ? (
           <div className="space-y-0.5">
-            {segments.map((seg) => {
-              const { pos } = decodeSegment(seg);
-              const color = posColor(seg.pos_tag);
-              return (
-                <div key={seg.id} style={{ color }}>
-                  {pos.code} – {pos.en}
-                </div>
-              );
-            })}
+            {segments
+              .filter((seg) => posColor(seg.pos_tag) !== null)
+              .map((seg) => {
+                const { pos } = decodeSegment(seg);
+                return (
+                  <div key={seg.id} style={{ color: posColor(seg.pos_tag) as string }}>
+                    {pos.code} – {pos.en}
+                  </div>
+                );
+              })}
           </div>
         ) : (
           <div className="text-paper-700 dark:text-paper-300">

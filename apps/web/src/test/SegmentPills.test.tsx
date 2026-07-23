@@ -37,6 +37,17 @@ describe('SegmentPills', () => {
     expect(screen.getByText('V')).toHaveStyle({ color: 'var(--pos-verb)' });
   });
 
+  it('renders DET glyph as plain text but hides its tag pill entirely', () => {
+    const segments = [
+      seg({ id: 1, pos_tag: 'DET', form_arabic: 'ٱل' }),
+      seg({ id: 2, pos_tag: 'N', form_arabic: 'ْكِتَابُ', segment_index: 1 }),
+    ];
+    render(<SegmentPills segments={segments} fallbackWord="ٱلْكِتَابُ" />);
+    expect(screen.getByText('ٱل')).not.toHaveAttribute('style');
+    expect(screen.queryByText('DET')).not.toBeInTheDocument();
+    expect(screen.getByText('N')).toBeInTheDocument();
+  });
+
   it('renders empty pos_tag code as empty text without crashing', () => {
     const segments = [seg({ id: 1, pos_tag: null, form_arabic: 'قُلْ' })];
     render(<SegmentPills segments={segments} fallbackWord="قُلْ" />);
