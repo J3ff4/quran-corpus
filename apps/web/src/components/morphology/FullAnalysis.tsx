@@ -5,7 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 
 interface FullAnalysisProps {
   description?: string;
-  grammarArabic?: string;
+  grammarNote?: string;
 }
 
 /**
@@ -13,11 +13,11 @@ interface FullAnalysisProps {
  * Secondary to the decoded cards; also the graceful display for function words
  * that have no segments. Renders nothing when both fields are absent.
  */
-export function FullAnalysis({ description, grammarArabic }: FullAnalysisProps) {
+export function FullAnalysis({ description, grammarNote }: FullAnalysisProps) {
   const [open, setOpen] = useState(false);
   const reducedMotion = useReducedMotion();
 
-  if (!description && !grammarArabic) return null;
+  if (!description && !grammarNote) return null;
 
   const body = (
     <div id="full-analysis-body" className="space-y-3 pt-3">
@@ -26,11 +26,16 @@ export function FullAnalysis({ description, grammarArabic }: FullAnalysisProps) 
           {description}
         </p>
       )}
-      {grammarArabic && (
-        <p dir="rtl" className="font-arabic text-xl text-paper-800 dark:text-paper-200">
-          {grammarArabic}
-        </p>
-      )}
+      {grammarNote &&
+        grammarNote.split('\n').map((clause, i) => (
+          <p
+            key={i}
+            dir="rtl"
+            className="font-arabic text-xl text-paper-800 dark:text-paper-200"
+          >
+            {clause}
+          </p>
+        ))}
     </div>
   );
 

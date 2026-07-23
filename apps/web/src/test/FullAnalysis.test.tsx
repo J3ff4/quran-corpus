@@ -48,9 +48,16 @@ describe('FullAnalysis', () => {
   });
 
   it('renders Arabic grammar RTL when expanded', () => {
-    render(<FullAnalysis grammarArabic="اسم مجرور" />);
+    render(<FullAnalysis grammarNote="اسم مجرور" />);
     fireEvent.click(screen.getByRole('button', { name: /full analysis/i }));
     const ar = screen.getByText('اسم مجرور');
     expect(ar).toHaveAttribute('dir', 'rtl');
+  });
+
+  it('renders one line per \\n-separated clause', () => {
+    render(<FullAnalysis grammarNote={'مجرور\nعلم'} />);
+    fireEvent.click(screen.getByRole('button', { name: /full analysis/i }));
+    expect(screen.getByText('مجرور')).toBeInTheDocument();
+    expect(screen.getByText('علم')).toBeInTheDocument();
   });
 });

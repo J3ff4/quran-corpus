@@ -40,7 +40,7 @@ export function WordDetailView({ detail, gloss, rootHref }: WordDetailViewProps)
 
       <FullAnalysis
         {...(word.morphology_description ? { description: word.morphology_description } : {})}
-        {...(word.grammar_arabic ? { grammarArabic: word.grammar_arabic } : {})}
+        {...(word.grammar_note ? { grammarNote: word.grammar_note } : {})}
       />
 
       {concept_tags.length > 0 && (

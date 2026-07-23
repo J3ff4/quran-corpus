@@ -11,8 +11,8 @@ vi.mock('next/link', () => ({
 }));
 // FullAnalysis is a client component with framer — stub to a plain always-open box.
 vi.mock('../components/morphology/FullAnalysis', () => ({
-  FullAnalysis: ({ description, grammarArabic }: { description?: string; grammarArabic?: string }) => (
-    <div data-testid="full-analysis">{description}{grammarArabic}</div>
+  FullAnalysis: ({ description, grammarNote }: { description?: string; grammarNote?: string }) => (
+    <div data-testid="full-analysis">{description}{grammarNote}</div>
   ),
 }));
 
@@ -21,7 +21,7 @@ const baseWord: Word = {
   transliteration: 'bismi', root: 'س م و', lemma: 'ٱسْم',
   root_buckwalter: 'smw', lemma_buckwalter: null, pos_tag: 'N',
   morphology_json: null, morphology_description: 'In the name — genitive noun.',
-  grammar_arabic: 'اسم مجرور', grammar_note: null, audio_url: null,
+  grammar_arabic: null, grammar_note: 'جار ومجرور', audio_url: null,
 };
 
 function segment(over: Partial<WordSegment>): WordSegment {
@@ -47,11 +47,11 @@ describe('WordDetailView', () => {
     expect(screen.queryByRole('heading', { name: /segments/i })).not.toBeInTheDocument();
   });
 
-  it('passes scraped prose + Arabic grammar to FullAnalysis', () => {
+  it('passes scraped prose + Arabic grammar note to FullAnalysis', () => {
     render(<WordDetailView detail={detail([])} />);
     const fa = screen.getByTestId('full-analysis');
     expect(fa).toHaveTextContent('In the name — genitive noun.');
-    expect(fa).toHaveTextContent('اسم مجرور');
+    expect(fa).toHaveTextContent('جار ومجرور');
   });
 
   it('renders a link to the root in the dictionary when rootHref is given', () => {
