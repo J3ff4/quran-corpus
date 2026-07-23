@@ -12,8 +12,22 @@ Updated: 2026-07-23
 ## Now
 All work below confirmed via `gh pr list --state all` + `git merge-base --is-ancestor`,
 not carried over from prior narrative.
-- PRs #1–45 all MERGED into `main`. Current tip `2e6d513` (Full Analysis grammar_note
-  fix, #45).
+- PRs #1–46 all MERGED into `main`. Current tip `be24a42` (reader/word-detail UI
+  polish + pos_tag data fix, #46).
+- Reader/word-detail UI polish (#46): DONE, merged, this session. 4 fixes from user
+  screenshots: (1) popover Arabic glyph no longer sits under the close button
+  (text-4xl + pr-10); (2) Lane's Lexicon "/"-joined text (e.g. abandon/desert/quit)
+  no longer overflows its card — break-words CSS + normalize_slash_spacing() at
+  import, live DB's 1,386 root_definitions backfilled (633 changed); (3)
+  SegmentedWord's SVG per-segment POS labels overlapped (positioned by glyph width,
+  not label width) — rewrote to delegate to SegmentPills (same pill wbw list-view
+  uses) at a new size="lg", SVG measurement code deleted; (4) `words.pos_tag` was
+  the FIRST segment's POS (often a prefix, e.g. "EQ") instead of the STEM's ("V") for
+  25.6% of words (19,797/77,429) — fixed both scraper paths (corpus_morphology.py +
+  corpus_parser.py, the latter being the one that actually wrote live values) and
+  backfilled words.pos_tag directly from word_segments (19,797→485 mismatches, the
+  485 being genuine ambiguous double-stem compounds like مِمَّا, not a bug). Greptile:
+  pass.
 - Full Analysis grammar_note fix (#45): DONE, merged, this session. Word-detail page's
   "Full Analysis" collapsible had the SAME garbled `grammar_arabic` bug #44 fixed in the
   list view (case/verb-form term glued to spelled-out root letters) — #44 wrongly left
@@ -59,6 +73,12 @@ Re-queried directly 2026-07-22 (do not trust older counts in this file's history
   import_reviewed) exists and was itself bug-fixed but **never actually run** — 0 rows
   with source=`mt-reviewed`.
 - `root_definitions`: 1386 rows (qurandev/roots → Lane's Lexicon import). Done.
+  "/"-spacing normalized 2026-07-23 (#46, 633/1386 rows changed) so unspaced
+  "word/word/word" runs wrap instead of overflowing the card.
+- `words.pos_tag`: fixed 2026-07-23 (#46) — was first-segment POS (often a prefix)
+  for 19,797/77,429 words; backfilled from word_segments.stem. 485 words (genuine
+  double-stem compounds, e.g. مِمَّا) keep a deterministic first-stem pick, not a bug.
+  Backup: `quran.db.bak-preslashfix-20260723` (pre both this and the lexicon fix).
 - `ru` (Russian) glosses: **none** — no rows, no language_code entry at all yet, despite
   being a named target language (CLAUDE.md §1).
 
