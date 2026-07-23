@@ -128,6 +128,10 @@ export interface ConcordanceEntry {
   transliteration: string | null;
   gloss: string | null;
   verse_words: VerseWord[];
+  /** The derived form (root_forms.id) this occurrence's lemma matches, via
+   *  exact lemma-text join -- null when no root_forms row has a matching
+   *  form_arabic (data gap; occurrence still shows, just untagged/unfiltered). */
+  form_id: number | null;
 }
 
 export interface WordSegment {

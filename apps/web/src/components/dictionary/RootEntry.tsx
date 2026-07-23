@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import type { RootEntry as RootEntryT, ConcordanceEntry } from '@quran-corpus/data';
-import { FormGroup } from './FormGroup';
-import { ConcordanceList } from './ConcordanceList';
+import { ConcordanceSection } from './ConcordanceSection';
 
 interface RootEntryProps {
   entry: RootEntryT;
@@ -19,7 +18,7 @@ const sourceLabel = (source: string): string =>
 
 /**
  * Full root entry: header, Lane's definition (additive — omitted when empty),
- * derived form groups, and the concordance section.
+ * derived-form filter chips, and the concordance section.
  */
 export function RootEntry({ entry, initialConcordance, total, prevBw, nextBw }: RootEntryProps) {
   const { root, forms, definitions } = entry;
@@ -101,25 +100,13 @@ export function RootEntry({ entry, initialConcordance, total, prevBw, nextBw }: 
         </section>
       )}
 
-      {forms.length > 0 && (
-        <section className="mb-8">
-          <h2 className="mb-2 text-sm font-medium text-paper-600 dark:text-paper-400">
-            Derived forms
-          </h2>
-          <div className="divide-y divide-paper-200 dark:divide-night-100">
-            {forms.map((f) => (
-              <FormGroup key={f.id} form={f} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section>
+      <section className="mb-8">
         <h2 className="mb-2 text-sm font-medium text-paper-600 dark:text-paper-400">
           Concordance ({total})
         </h2>
-        <ConcordanceList
-          initialEntries={initialConcordance}
+        <ConcordanceSection
+          forms={forms}
+          initialConcordance={initialConcordance}
           total={total}
           rootBw={root.root_buckwalter}
         />

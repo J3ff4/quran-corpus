@@ -10,6 +10,7 @@ const e = {
   text_arabic: 'يَكْتُبُونَ',
   transliteration: 'yaktubūna',
   gloss: 'they write',
+  form_id: null,
   verse_words: [],
 } as ConcordanceEntry;
 

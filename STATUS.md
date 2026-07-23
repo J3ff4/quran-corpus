@@ -17,6 +17,13 @@ not carried over from prior narrative.
 - PR #48 OPEN, not yet merged (bookmarks-flash fix, see below) — Greptile pass
   (5/5 after 1 fix), branch rebased onto `main` post-#47, force-pushed (`b248835`).
   Awaiting merge decision.
+- Concordance derived-form filter (branch `concordance-derived-form-filter`,
+  worktree `.worktrees/concordance-derived-form-filter`, off `main` @ `f18bf01`):
+  9-task SDD plan complete, all tasks reviewed clean, full suite/tsc/lint green
+  branch-wide. Not yet pushed/PR'd — Greptile gate still to run. Root/dictionary
+  page's static "Derived forms" list replaced with `FormFilterChips`
+  (multi-select, tags each concordance row via a query-time lemma→root_forms
+  join, concordance stays chronological, never grouped).
 - Bookmarks-flash bug fix (#48): found this session (user report: opening
   /bookmarks briefly flashed "Surah 2 255"-style id-based names before
   correcting to real ones, "couldn't catch it, flashes and switches to normal").
@@ -124,6 +131,11 @@ Re-queried directly 2026-07-22 (do not trust older counts in this file's history
   Backup: `quran.db.bak-preslashfix-20260723` (pre both this and the lexicon fix).
 - `ru` (Russian) glosses: **none** — no rows, no language_code entry at all yet, despite
   being a named target language (CLAUDE.md §1).
+- Concordance derived-form join (lemma text match): spiked across all 1,642
+  roots with occurrences — 833 roots with >=1 unmatched occurrence, 49,968
+  occurrences checked, 6,768 unmatched (13.5447%). Fallback (`form_id: null`,
+  untagged under "All", excluded from every filter chip, never drops the row)
+  covers the gap; no backfill needed. See `packages/scraper/tools/spike_form_lemma_alignment.py`.
 
 ## Jobs
 - `scrape-word-details`: **DONE**. 77429/77429 checkpointed, no longer running. (Was

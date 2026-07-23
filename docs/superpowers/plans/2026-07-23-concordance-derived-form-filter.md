@@ -737,7 +737,7 @@ import { describe, it, expect, vi } from 'vitest';
 const getRootConcordancePage = vi.fn(async () => []);
 const countRootConcordance = vi.fn(async () => 0);
 vi.mock('@quran-corpus/data', () => ({ getRootConcordancePage, countRootConcordance }));
-vi.mock('../../../../../lib/db', () => ({ getDatabase: vi.fn(async () => ({})) }));
+vi.mock('../lib/db', () => ({ getDatabase: vi.fn(async () => ({})) }));
 
 const { GET } = await import('../app/api/roots/[root]/concordance/route');
 

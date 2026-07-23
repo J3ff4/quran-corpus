@@ -12,6 +12,18 @@
   --pos-prep: #0f8a6a;
   --pos-pron: #8a5a0f;
   --pos-other: #555;
+
+  /* Dictionary derived-form category color-coding (WCAG-AA on paper light
+     background). Separate taxonomy from --pos-* (dictionary derived forms,
+     not sentence-position POS tags) -- verb/noun/other reuse the same hex as
+     their --pos-* counterpart for semantic consistency, the rest are new. */
+  --form-verb: #b23b2e;
+  --form-verbal-noun: #6b4fa0;
+  --form-active-participle: #1f8a6a;
+  --form-passive-participle: #a0527a;
+  --form-noun: #2469c0;
+  --form-adjective: #b2790f;
+  --form-other: #555;
 }
 
 /* App dark mode is class-driven (darkMode: 'class' in the shared preset);
@@ -22,6 +34,14 @@
   --pos-prep: #6fd9b8;
   --pos-pron: #e0b877;
   --pos-other: #aaa;
+
+  --form-verb: #ff9a8f;
+  --form-verbal-noun: #c3b0e8;
+  --form-active-participle: #6fd9b8;
+  --form-passive-participle: #e0a8c8;
+  --form-noun: #7fb0ff;
+  --form-adjective: #e8c477;
+  --form-other: #aaa;
 }
 
 [dir='rtl'] {

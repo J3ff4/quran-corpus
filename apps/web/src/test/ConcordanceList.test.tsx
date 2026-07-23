@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ConcordanceEntry } from '@quran-corpus/data';
+import type { ConcordanceEntry, RootForm } from '@quran-corpus/data';
 
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => (
@@ -19,6 +19,7 @@ const entry = (word_id: number, ayah_number: number): ConcordanceEntry => ({
   text_arabic: 'HEAD',
   transliteration: null,
   gloss: null,
+  form_id: null,
   verse_words: [
     { id: 100, position: 1, text_arabic: 'alpha' },
     { id: word_id, position: 2, text_arabic: 'beta' },
@@ -43,6 +44,26 @@ describe('ConcordanceList', () => {
     const marks = container.querySelectorAll('.text-accent-700');
     expect(marks).toHaveLength(1);
     expect(marks[0]!.textContent).toBe('beta');
+  });
+
+  it('renders a colored tag when the entry.form_id matches a passed forms entry', () => {
+    const forms: RootForm[] = [
+      {
+        id: 9, root_id: 1, sort_order: 0, pos_label: 'Form I verb',
+        form_arabic: 'غَفَرَ', form_translit: 'ghafara', gloss: null, occurrence_count: 65,
+      },
+    ];
+    const withForm = { ...entry(200, 5), form_id: 9 };
+    render(
+      <ConcordanceList initialEntries={[withForm]} total={1} rootBw="gfr" forms={forms} />,
+    );
+    expect(screen.getByText('ghafara')).toBeInTheDocument();
+  });
+
+  it('omits the tag when form_id is null or forms is not passed', () => {
+    const noForm = { ...entry(200, 5), form_id: null };
+    render(<ConcordanceList initialEntries={[noForm]} total={1} rootBw="gfr" />);
+    expect(screen.queryByText('ghafara')).toBeNull();
   });
 
   it('no Load more when the initial page is the whole concordance', () => {
@@ -98,7 +119,7 @@ describe('ConcordanceList', () => {
       // renders entry.text_arabic) and the matched-word span both show 'و10',
       // making getByText('و10') ambiguous in every state. Not a trimming bug.
       surah_id: 2, ayah_number: 282, position: 10, word_id: 10,
-      text_arabic: 'HEAD', transliteration: null, gloss: null, verse_words,
+      text_arabic: 'HEAD', transliteration: null, gloss: null, form_id: null, verse_words,
     };
     render(<ConcordanceList initialEntries={[entry]} total={1} rootBw="tst" />);
     // trimmed: matched word visible, far word (id 1 / و1) hidden until expanded
@@ -124,5 +145,151 @@ describe('ConcordanceList', () => {
     expect(signal?.aborted).toBe(false);
     unmount();
     expect(signal?.aborted).toBe(true);
+  });
+
+  it('Load more includes forms= when a filter is already selected', async () => {
+    const initial = Array.from({ length: 20 }, (_, i) => entry(1000 + i, i + 1));
+    const next = Array.from({ length: 5 }, (_, i) => entry(2000 + i, i + 21));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ entries: next, total: 25 }) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <ConcordanceList initialEntries={initial} total={25} rootBw="Aty" selectedFormIds={[7]} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /load more/i }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/roots/Aty/concordance?offset=20&limit=20&forms=7',
+        { signal: expect.any(AbortSignal) },
+      ),
+    );
+  });
+
+  it('omits the forms= param from the initial Load-more fetch when no filter is selected', async () => {
+    const initial = Array.from({ length: 20 }, (_, i) => entry(1000 + i, i + 1));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ entries: [], total: 20 }) });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<ConcordanceList initialEntries={initial} total={25} rootBw="Aty" />);
+    fireEvent.click(screen.getByRole('button', { name: /load more/i }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/roots/Aty/concordance?offset=20&limit=20',
+      { signal: expect.any(AbortSignal) },
+    );
+  });
+
+  it('refetches from offset 0 with forms= when selectedFormIds changes', async () => {
+    const initial = Array.from({ length: 5 }, (_, i) => entry(1000 + i, i + 1));
+    const filtered = [{ ...entry(9000, 1), form_id: 3 }];
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ entries: filtered, total: 1 }) });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { rerender } = render(
+      <ConcordanceList initialEntries={initial} total={5} rootBw="Aty" selectedFormIds={[]} />,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    rerender(
+      <ConcordanceList initialEntries={initial} total={5} rootBw="Aty" selectedFormIds={[3]} />,
+    );
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/roots/Aty/concordance?offset=0&limit=20&forms=3',
+        { signal: expect.any(AbortSignal) },
+      ),
+    );
+  });
+
+  it('going back to no selection (All) restores the original unfiltered entries without refetching', async () => {
+    const initial = Array.from({ length: 5 }, (_, i) => entry(1000 + i, i + 1));
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const { rerender, container } = render(
+      <ConcordanceList initialEntries={initial} total={5} rootBw="Aty" selectedFormIds={[3]} />,
+    );
+    rerender(
+      <ConcordanceList initialEntries={initial} total={5} rootBw="Aty" selectedFormIds={[]} />,
+    );
+    await waitFor(() => expect(container.querySelectorAll('li').length).toBe(5));
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('deselecting the active filter before its request resolves does not leave the list stuck on Loading', async () => {
+    const initial = Array.from({ length: 5 }, (_, i) => entry(1000 + i, i + 1));
+    // The filtered fetch triggered by selectedFormIds=[3] never resolves --
+    // simulates deselecting back to "All" while it's still in flight.
+    const fetchMock = vi.fn(() => new Promise<never>(() => {}));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { rerender } = render(
+      <ConcordanceList initialEntries={initial} total={10} rootBw="Aty" selectedFormIds={[]} />,
+    );
+    rerender(
+      <ConcordanceList initialEntries={initial} total={10} rootBw="Aty" selectedFormIds={[3]} />,
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+
+    rerender(
+      <ConcordanceList initialEntries={initial} total={10} rootBw="Aty" selectedFormIds={[]} />,
+    );
+
+    // Restored to "All" (hasMore, since 5 < 10) -- button must be usable, not
+    // stuck showing "Loading…" from the aborted filtered request.
+    const button = await screen.findByRole('button', { name: /load more/i });
+    expect(button).not.toBeDisabled();
+  });
+
+  it('a superseded request that resolves after being aborted never overwrites the newer selection', async () => {
+    const initial = Array.from({ length: 5 }, (_, i) => entry(1000 + i, i + 1));
+    // Distinct ayah_number per entry so verseRef ("2:1:2" vs "2:2:2") lets the
+    // assertions tell stale and fresh data apart -- entry()'s verse_words
+    // text is identical regardless of word_id.
+    const staleData = [{ ...entry(9001, 1), form_id: 1 }];
+    const freshData = [{ ...entry(9002, 2), form_id: 2 }];
+
+    // Each call gets its own externally-resolvable promise, so the test
+    // controls resolution order independently of call/render order.
+    let resolveStale!: (v: unknown) => void;
+    let resolveFresh!: (v: unknown) => void;
+    const stalePromise = new Promise((r) => (resolveStale = r));
+    const freshPromise = new Promise((r) => (resolveFresh = r));
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(stalePromise)
+      .mockReturnValueOnce(freshPromise);
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { rerender } = render(
+      <ConcordanceList initialEntries={initial} total={10} rootBw="Aty" selectedFormIds={[]} />,
+    );
+    rerender(
+      <ConcordanceList initialEntries={initial} total={10} rootBw="Aty" selectedFormIds={[1]} />,
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    // Supersede before the stale request resolves -- this aborts its signal.
+    rerender(
+      <ConcordanceList initialEntries={initial} total={10} rootBw="Aty" selectedFormIds={[2]} />,
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    // The fresh (form 2) request settles first -- the normal case.
+    resolveFresh({ ok: true, json: async () => ({ entries: freshData, total: 1 }) });
+    await waitFor(() => expect(screen.getByText('2:2:2')).toBeInTheDocument());
+
+    // The stale (form 1) request's response arrives LAST, well after abort()
+    // was already called on it -- real fetch mocks don't reject just because
+    // a signal was aborted after the response already started resolving. It
+    // must not retroactively clobber the already-committed fresh selection.
+    resolveStale({ ok: true, json: async () => ({ entries: staleData, total: 1 }) });
+    await new Promise((r) => setTimeout(r, 10));
+    expect(screen.getByText('2:2:2')).toBeInTheDocument();
+    expect(screen.queryByText('2:1:2')).toBeNull();
   });
 });

@@ -213,6 +213,156 @@ describe('roots queries', () => {
     // offset past the end -> empty
     expect((await getRootConcordancePage(db, 'pag', { limit: 2, offset: 5 })).length).toBe(0);
   });
+  it('concordance entries carry form_id via exact lemma-to-root_forms text match', async () => {
+    const r = await db.execute(
+      `INSERT INTO roots (root_buckwalter,root_arabic,occurrence_count) VALUES ('gfr2','غفر2',3) RETURNING id`,
+    );
+    const rid = r.rows[0]!['id'] as number;
+    await db.execute({
+      sql: `INSERT INTO root_forms (root_id,sort_order,pos_label,form_arabic,form_translit,occurrence_count)
+            VALUES (?,0,'Form I verb','غَفَرَ','ghafara',2),(?,1,'Nominal','غَفُور','ghafūr',1)`,
+      args: [rid, rid],
+    });
+    const a = await db.execute(
+      `INSERT INTO ayahs (surah_id,ayah_number,text_uthmani) VALUES (1,10,'x') RETURNING id`,
+    );
+    const aid = a.rows[0]!['id'] as number;
+    // Two occurrences of the SAME lemma text but different pos_tag (ADJ vs
+    // N) both map to the ONE 'Nominal' root_forms row -- this is exactly the
+    // غَفُور/91-count pattern the design spike found in the live DB.
+    await db.execute({
+      sql: `INSERT INTO words (ayah_id,position,text_arabic,root_buckwalter,pos_tag)
+            VALUES (?,1,'a','gfr2','V'),(?,2,'b','gfr2','ADJ'),(?,3,'c','gfr2','N')`,
+      args: [aid, aid, aid],
+    });
+    const rows = await db.execute(`SELECT id FROM words WHERE root_buckwalter='gfr2' ORDER BY position`);
+    const [w1, w2, w3] = rows.rows.map((row) => row['id'] as number);
+    await db.execute({
+      sql: `INSERT INTO word_segments (word_id,segment_index,segment_type,root,lemma) VALUES (?,0,'stem','gfr2','غَفَرَ')`,
+      args: [w1],
+    });
+    await db.execute({
+      sql: `INSERT INTO word_segments (word_id,segment_index,segment_type,root,lemma) VALUES (?,0,'stem','gfr2','غَفُور')`,
+      args: [w2],
+    });
+    await db.execute({
+      sql: `INSERT INTO word_segments (word_id,segment_index,segment_type,root,lemma) VALUES (?,0,'stem','gfr2','غَفُور')`,
+      args: [w3],
+    });
+
+    const c = await getRootConcordancePage(db, 'gfr2');
+    const byWord = new Map(c.map((e) => [e.word_id, e.form_id]));
+    const verbFormId = (await getRootForms(db, rid)).find((f) => f.pos_label === 'Form I verb')!.id;
+    const nominalFormId = (await getRootForms(db, rid)).find((f) => f.pos_label === 'Nominal')!.id;
+    expect(byWord.get(w1)).toBe(verbFormId);
+    expect(byWord.get(w2)).toBe(nominalFormId);
+    expect(byWord.get(w3)).toBe(nominalFormId);
+  });
+
+  it('concordance entry has null form_id when the lemma matches no root_forms row', async () => {
+    await db.execute(
+      `INSERT INTO roots (root_buckwalter,root_arabic,occurrence_count) VALUES ('unk1','x',1)`,
+    );
+    const a = await db.execute(
+      `INSERT INTO ayahs (surah_id,ayah_number,text_uthmani) VALUES (1,11,'x') RETURNING id`,
+    );
+    const aid = a.rows[0]!['id'] as number;
+    const w = await db.execute({
+      sql: `INSERT INTO words (ayah_id,position,text_arabic,root_buckwalter,pos_tag) VALUES (?,1,'x','unk1','N') RETURNING id`,
+      args: [aid],
+    });
+    const wid = w.rows[0]!['id'] as number;
+    // A lemma that doesn't match any root_forms.form_arabic for this root (no
+    // root_forms row inserted at all for 'unk1').
+    await db.execute({
+      sql: `INSERT INTO word_segments (word_id,segment_index,segment_type,root,lemma) VALUES (?,0,'stem','unk1','نَادِر')`,
+      args: [wid],
+    });
+    const c = await getRootConcordancePage(db, 'unk1');
+    expect(c).toHaveLength(1);
+    expect(c[0]!.form_id).toBeNull();
+  });
+
+  it('countRootConcordance and getRootConcordancePage both accept formIds to filter', async () => {
+    const r = await db.execute(
+      `INSERT INTO roots (root_buckwalter,root_arabic,occurrence_count) VALUES ('flt1','y',2) RETURNING id`,
+    );
+    const rid = r.rows[0]!['id'] as number;
+    const forms = await db.execute({
+      sql: `INSERT INTO root_forms (root_id,sort_order,pos_label,form_arabic,occurrence_count)
+            VALUES (?,0,'Form I verb','فَعَلَ',1),(?,1,'Noun','فِعْل',1) RETURNING id`,
+      args: [rid, rid],
+    });
+    const [verbFormId, nounFormId] = forms.rows.map((row) => row['id'] as number);
+    const a = await db.execute(
+      `INSERT INTO ayahs (surah_id,ayah_number,text_uthmani) VALUES (1,12,'x') RETURNING id`,
+    );
+    const aid = a.rows[0]!['id'] as number;
+    await db.execute({
+      sql: `INSERT INTO words (ayah_id,position,text_arabic,root_buckwalter,pos_tag)
+            VALUES (?,1,'a','flt1','V'),(?,2,'b','flt1','N')`,
+      args: [aid, aid],
+    });
+    const rows = await db.execute(`SELECT id FROM words WHERE root_buckwalter='flt1' ORDER BY position`);
+    const [w1, w2] = rows.rows.map((row) => row['id'] as number);
+    await db.execute({
+      sql: `INSERT INTO word_segments (word_id,segment_index,segment_type,root,lemma) VALUES (?,0,'stem','flt1','فَعَلَ')`,
+      args: [w1],
+    });
+    await db.execute({
+      sql: `INSERT INTO word_segments (word_id,segment_index,segment_type,root,lemma) VALUES (?,0,'stem','flt1','فِعْل')`,
+      args: [w2],
+    });
+
+    expect(await countRootConcordance(db, 'flt1')).toBe(2);
+    expect(await countRootConcordance(db, 'flt1', [verbFormId])).toBe(1);
+    const filtered = await getRootConcordancePage(db, 'flt1', { formIds: [verbFormId] });
+    expect(filtered.map((e) => e.word_id)).toEqual([w1]);
+    const both = await getRootConcordancePage(db, 'flt1', { formIds: [verbFormId, nounFormId] });
+    expect(both.map((e) => e.word_id).sort()).toEqual([w1, w2].sort());
+  });
+
+  it('a duplicated form_arabic within one root does not fan out into duplicate concordance rows', async () => {
+    // The live DB has 9 roots (e.g. مَٰلِك under mlk) with two root_forms rows
+    // sharing the same form_arabic -- a JOIN on form_arabic = lemma would
+    // match a word against both rows and emit it twice.
+    const r = await db.execute(
+      `INSERT INTO roots (root_buckwalter,root_arabic,occurrence_count) VALUES ('dup1','z',1) RETURNING id`,
+    );
+    const rid = r.rows[0]!['id'] as number;
+    const forms = await db.execute({
+      sql: `INSERT INTO root_forms (root_id,sort_order,pos_label,form_arabic,occurrence_count)
+            VALUES (?,0,'Noun','مَٰلِك',1),(?,1,'Adjective','مَٰلِك',1) RETURNING id`,
+      args: [rid, rid],
+    });
+    const [formA, formB] = forms.rows.map((row) => row['id'] as number);
+    const a = await db.execute(
+      `INSERT INTO ayahs (surah_id,ayah_number,text_uthmani) VALUES (1,13,'x') RETURNING id`,
+    );
+    const aid = a.rows[0]!['id'] as number;
+    const w = await db.execute({
+      sql: `INSERT INTO words (ayah_id,position,text_arabic,root_buckwalter,pos_tag)
+            VALUES (?,1,'a','dup1','N') RETURNING id`,
+      args: [aid],
+    });
+    const wid = w.rows[0]!['id'] as number;
+    await db.execute({
+      sql: `INSERT INTO word_segments (word_id,segment_index,segment_type,root,lemma) VALUES (?,0,'stem','dup1','مَٰلِك')`,
+      args: [wid],
+    });
+
+    const unfiltered = await getRootConcordancePage(db, 'dup1');
+    expect(unfiltered).toHaveLength(1);
+    expect(unfiltered[0]!.form_id).toBe(Math.min(formA, formB));
+    expect(await countRootConcordance(db, 'dup1')).toBe(1);
+
+    // Selecting BOTH duplicate ids at once is the sharpest fan-out case: a
+    // JOIN-based filter would match the word against both rows.
+    expect(await countRootConcordance(db, 'dup1', [formA, formB])).toBe(1);
+    const filtered = await getRootConcordancePage(db, 'dup1', { formIds: [formA, formB] });
+    expect(filtered).toHaveLength(1);
+  });
+
   it('two matches in one ayah -> two entries, same verse_words, distinct word_id', async () => {
     const a = await db.execute(`SELECT id FROM ayahs WHERE surah_id=1 AND ayah_number=1`);
     const aid = a.rows[0]!['id'] as number;

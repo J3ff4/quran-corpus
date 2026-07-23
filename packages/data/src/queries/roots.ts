@@ -198,6 +198,8 @@ export interface ConcordancePageOpts {
   offset?: number;
   lang?: string;
   batchSize?: number;
+  /** root_forms.id values to narrow to (OR semantics). Omit/empty = no filter. */
+  formIds?: number[];
 }
 
 /** Total matched occurrences for a root — the paging total, cheap COUNT with no
@@ -205,29 +207,72 @@ export interface ConcordancePageOpts {
  *  equals the entry count of the concordance.
  *  ponytail: word-based count. If a single word ever carried the same root in
  *  two segments, this would read one under roots.occurrence_count (segment-based);
- *  no such word exists in the corpus. Revisit only if that changes. */
-export async function countRootConcordance(db: Client, bw: string): Promise<number> {
-  // Driven from word_segments (indexed on root, ~hundreds of rows even for a
-  // hot root) rather than a correlated EXISTS over all `words` -- the EXISTS
-  // form makes SQLite scan every word in the corpus and re-run the root
-  // lookup per row, which is O(words x matches) and took 10s+ on common roots.
+ *  no such word exists in the corpus. Revisit only if that changes.
+ *  `formIds` narrows to occurrences whose lemma matches one of those
+ *  root_forms rows; omitted/empty keeps the original fast unfiltered query
+ *  (no join) so the common "All" case doesn't pay for a feature it doesn't use. */
+export async function countRootConcordance(
+  db: Client,
+  bw: string,
+  formIds?: number[],
+): Promise<number> {
+  if (!formIds || formIds.length === 0) {
+    // Driven from word_segments (indexed on root, ~hundreds of rows even for a
+    // hot root) rather than a correlated EXISTS over all `words` -- the EXISTS
+    // form makes SQLite scan every word in the corpus and re-run the root
+    // lookup per row, which is O(words x matches) and took 10s+ on common roots.
+    const res = await db.execute({
+      sql: `SELECT COUNT(*) AS n FROM (SELECT DISTINCT word_id FROM word_segments WHERE root = ?)`,
+      args: [bw],
+    });
+    return res.rows[0]!['n'] as number;
+  }
+  const placeholders = formIds.map(() => '?').join(',');
   const res = await db.execute({
-    sql: `SELECT COUNT(*) AS n FROM (SELECT DISTINCT word_id FROM word_segments WHERE root = ?)`,
-    args: [bw],
+    // EXISTS, not a JOIN, against root_forms -- a handful of roots have two
+    // root_forms rows sharing the same form_arabic (e.g. مَٰلِك), and a JOIN
+    // there would fan out and double-count a word matching both.
+    sql: `SELECT COUNT(*) AS n FROM (
+            SELECT m.word_id
+            FROM (SELECT word_id, MIN(segment_index) AS seg_idx
+                  FROM word_segments WHERE root = ? GROUP BY word_id) m
+            JOIN word_segments ws ON ws.word_id = m.word_id AND ws.segment_index = m.seg_idx
+            WHERE EXISTS (
+              SELECT 1 FROM root_forms rf
+               WHERE rf.root_id = (SELECT id FROM roots WHERE root_buckwalter = ?)
+                 AND rf.form_arabic = ws.lemma
+                 AND rf.id IN (${placeholders})
+            )
+          )`,
+    args: [bw, bw, ...formIds],
   });
   return res.rows[0]!['n'] as number;
 }
 
 /** One page of a root's concordance (or all of it when `limit` is omitted).
  *  Deterministic surah→ayah→position order so LIMIT/OFFSET paging never repeats
- *  or skips an occurrence. */
+ *  or skips an occurrence. Always LEFT JOINs each occurrence's lemma to its
+ *  matching root_forms row (via exact text match, scoped to this root by an
+ *  inline subquery -- no extra required param) so `form_id` can tag it;
+ *  `opts.formIds` additionally narrows to specific forms when provided. */
 export async function getRootConcordancePage(
   db: Client,
   bw: string,
   opts: ConcordancePageOpts = {},
 ): Promise<ConcordanceEntry[]> {
-  const { limit, offset = 0, lang = 'en', batchSize = 500 } = opts;
-  const args: (string | number)[] = [bw, lang];
+  const { limit, offset = 0, lang = 'en', batchSize = 500, formIds } = opts;
+  const args: (string | number)[] = [bw, bw, lang];
+  let filterClause = '';
+  if (formIds && formIds.length > 0) {
+    const placeholders = formIds.map(() => '?').join(',');
+    filterClause = ` WHERE EXISTS (
+            SELECT 1 FROM root_forms rf
+             WHERE rf.root_id = (SELECT id FROM rid)
+               AND rf.form_arabic = ws.lemma
+               AND rf.id IN (${placeholders})
+          )`;
+    args.push(...formIds);
+  }
   let paging = '';
   if (limit !== undefined) {
     paging = ' LIMIT ? OFFSET ?';
@@ -236,13 +281,25 @@ export async function getRootConcordancePage(
   const matched = await db.execute({
     // Same fix as countRootConcordance: drive from the root-indexed
     // word_segments rows, not a correlated EXISTS scanning every word.
-    sql: `SELECT a.surah_id, a.ayah_number, w.position, w.id AS word_id,
+    // MIN(segment_index) picks a deterministic segment for the rare
+    // double-stem-same-root case (same tie-break as the words.pos_tag fix).
+    // form_id is a scalar subquery (MIN, not a JOIN) -- a handful of roots
+    // have two root_forms rows sharing the same form_arabic (e.g. مَٰلِك),
+    // and joining directly on that column would fan out and duplicate the
+    // occurrence row. The filter clause uses EXISTS for the same reason.
+    sql: `WITH rid AS (SELECT id FROM roots WHERE root_buckwalter = ?)
+          SELECT a.surah_id, a.ayah_number, w.position, w.id AS word_id,
                  w.ayah_id AS ayah_id, w.text_arabic, w.transliteration,
-                 g.gloss_text AS gloss
-          FROM (SELECT DISTINCT word_id FROM word_segments WHERE root = ?) m
+                 g.gloss_text AS gloss,
+                 (SELECT MIN(rf.id) FROM root_forms rf
+                   WHERE rf.root_id = (SELECT id FROM rid)
+                     AND rf.form_arabic = ws.lemma) AS form_id
+          FROM (SELECT word_id, MIN(segment_index) AS seg_idx
+                FROM word_segments WHERE root = ? GROUP BY word_id) m
+          JOIN word_segments ws ON ws.word_id = m.word_id AND ws.segment_index = m.seg_idx
           JOIN words w ON w.id = m.word_id
           JOIN ayahs a ON a.id = w.ayah_id
-          LEFT JOIN word_glosses g ON g.word_id = w.id AND g.language_code = ?
+          LEFT JOIN word_glosses g ON g.word_id = w.id AND g.language_code = ?${filterClause}
           ORDER BY a.surah_id, a.ayah_number, w.position${paging}`,
     args,
   });
@@ -287,6 +344,7 @@ export async function getRootConcordancePage(
     text_arabic: stripQuranicAnnotations(r['text_arabic'] as string),
     transliteration: (r['transliteration'] as string | null) ?? null,
     gloss: (r['gloss'] as string | null) ?? null,
+    form_id: (r['form_id'] as number | null) ?? null,
     verse_words: wordsByAyah.get(r['ayah_id'] as number) ?? [],
   }));
 }

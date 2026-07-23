@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import type { ConcordanceEntry } from '@quran-corpus/data';
+import type { ConcordanceEntry, RootForm } from '@quran-corpus/data';
 import { trimConcordanceVerse } from '@quran-corpus/data/client';
 import { verseRef, concordanceHref } from '../../lib/concordance';
+import { categorizeFormLabel, formCategoryColor } from '../../lib/formCategoryColor';
 
 const PAGE = 20;
 
@@ -44,6 +45,24 @@ function ConcordanceVerse({ entry }: { entry: ConcordanceEntry }) {
   );
 }
 
+/** Small colored tag naming an occurrence's derived form (e.g. "ghafara"),
+ *  omitted when the entry has no matching form (form_id null or forms not
+ *  supplied by the caller). */
+function FormTag({ formId, forms }: { formId: number | null; forms: RootForm[] | undefined }) {
+  if (formId === null || !forms) return null;
+  const form = forms.find((f) => f.id === formId);
+  if (!form) return null;
+  const color = formCategoryColor(categorizeFormLabel(form.pos_label));
+  return (
+    <span
+      className="rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none"
+      style={{ color, backgroundColor: `color-mix(in srgb, ${color} 16%, transparent)` }}
+    >
+      {form.form_translit ?? form.pos_label}
+    </span>
+  );
+}
+
 interface ConcordanceListProps {
   /** First page, server-rendered. */
   initialEntries: ConcordanceEntry[];
@@ -51,46 +70,111 @@ interface ConcordanceListProps {
   total: number;
   /** Buckwalter root — keys the paging API. */
   rootBw: string;
+  /** The root's derived forms, for looking up each entry's form_id -> tag.
+   *  Omit to render with no tags (e.g. a root with no forms). */
+  forms?: RootForm[];
+  /** root_forms.id values to narrow to. Empty/omitted = no filter (unchanged
+   *  default behavior, uses initialEntries/total as-is). Changing this value
+   *  (a new array reference with different contents) triggers a fresh
+   *  offset-0 fetch -- the parent (ConcordanceSection) owns this state. */
+  selectedFormIds?: number[];
 }
 
 /** Occurrence list: verse-ref link, matched form/translit/gloss, and the verse
  * rebuilt word-by-word with the matched word washed. Big roots page in from
- * `/api/roots/<bw>/concordance` on Load-more instead of dumping every verse. */
-export function ConcordanceList({ initialEntries, total, rootBw }: ConcordanceListProps) {
+ * `/api/roots/<bw>/concordance` on Load-more instead of dumping every verse.
+ * When `selectedFormIds` changes to/from a non-empty set, resets to a fresh
+ * offset-0 fetch with the new filter; an empty/omitted selection always shows
+ * the original unfiltered `initialEntries`/`total` with no extra fetch. */
+export function ConcordanceList({
+  initialEntries,
+  total,
+  rootBw,
+  forms,
+  selectedFormIds = [],
+}: ConcordanceListProps) {
   const [entries, setEntries] = useState(initialEntries);
+  const [entriesTotal, setEntriesTotal] = useState(total);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
-  const hasMore = entries.length < total;
+  const hasMore = entries.length < entriesTotal;
 
   // Abort an in-flight page request if the user navigates away mid-fetch, so
   // its resolution can't fire setState on an unmounted component.
   const abortRef = useRef<AbortController | null>(null);
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  async function loadMore() {
-    if (loading) return;
+  function buildUrl(offset: number, formIds: number[]): string {
+    const base = `/api/roots/${encodeURIComponent(rootBw)}/concordance?offset=${offset}&limit=${PAGE}`;
+    return formIds.length > 0 ? `${base}&forms=${formIds.join(',')}` : base;
+  }
+
+  async function fetchPage(offset: number, formIds: number[], replace: boolean) {
     setLoading(true);
     setFailed(false);
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     try {
-      const res = await fetch(
-        `/api/roots/${encodeURIComponent(rootBw)}/concordance?offset=${entries.length}&limit=${PAGE}`,
-        { signal: ctrl.signal },
-      );
+      const res = await fetch(buildUrl(offset, formIds), { signal: ctrl.signal });
+      // A superseding request may have called ctrl.abort() and already moved
+      // on by the time this await settles -- re-check before committing
+      // anything, since abort() doesn't retroactively unwind an in-flight
+      // response that already arrived.
+      if (ctrl.signal.aborted) return;
       if (!res.ok) {
         setFailed(true);
         return;
       }
       const data = (await res.json()) as { entries: ConcordanceEntry[]; total: number };
-      setEntries((prev) => [...prev, ...data.entries]);
+      if (ctrl.signal.aborted) return;
+      setEntries((prev) => (replace ? data.entries : [...prev, ...data.entries]));
+      setEntriesTotal(data.total);
     } catch {
-      // Abort on unmount is expected — don't surface it (and don't setState).
+      // Abort (unmount, or a newer filter change superseding this one) is
+      // expected -- don't surface it, and don't touch state for a stale request.
       if (!ctrl.signal.aborted) setFailed(true);
     } finally {
       if (!ctrl.signal.aborted) setLoading(false);
     }
   }
+
+  function loadMore() {
+    if (loading) return;
+    void fetchPage(entries.length, selectedFormIds, false);
+  }
+
+  // Skip the very first run (the default/unfiltered case is already seeded
+  // via initialEntries/total, at zero extra network cost) -- only refetch on
+  // a SUBSEQUENT change to the selection.
+  const isFirstRun = useRef(true);
+  const prevKey = useRef(selectedFormIds.slice().sort().join(','));
+  useEffect(() => {
+    const key = selectedFormIds.slice().sort().join(',');
+    if (isFirstRun.current) {
+      isFirstRun.current = false;
+      prevKey.current = key;
+      return;
+    }
+    if (key === prevKey.current) return;
+    prevKey.current = key;
+    abortRef.current?.abort();
+    // The abort above skips fetchPage's own `finally` (it bails on
+    // ctrl.signal.aborted), so an in-flight request's `loading` would
+    // otherwise never clear -- reset it here regardless of which branch runs
+    // next (fetchPage below sets it true again immediately if it fetches).
+    setLoading(false);
+    if (selectedFormIds.length === 0) {
+      // Back to "All" -- restore the original unfiltered page, no fetch needed.
+      setEntries(initialEntries);
+      setEntriesTotal(total);
+      setFailed(false);
+      return;
+    }
+    void fetchPage(0, selectedFormIds, true);
+    // Deliberately keyed on the sorted+joined content string, not the
+    // selectedFormIds array reference -- this project's eslint config has no
+    // react-hooks plugin/exhaustive-deps rule to satisfy or suppress.
+  }, [selectedFormIds.slice().sort().join(',')]);
 
   if (entries.length === 0) {
     return <p className="px-4 py-6 text-center text-paper-500">No occurrences.</p>;
@@ -109,6 +193,7 @@ export function ConcordanceList({ initialEntries, total, rootBw }: ConcordanceLi
                 {verseRef(e)}
               </Link>
               <span className="flex items-baseline gap-2">
+                <FormTag formId={e.form_id} forms={forms} />
                 <span dir="rtl" className="font-arabic text-lg text-paper-900 dark:text-paper-100">
                   {e.text_arabic}
                 </span>
