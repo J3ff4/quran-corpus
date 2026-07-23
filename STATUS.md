@@ -7,13 +7,21 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-07-22
+Updated: 2026-07-23
 
 ## Now
 All work below confirmed via `gh pr list --state all` + `git merge-base --is-ancestor`,
 not carried over from prior narrative.
-- PRs #1–44 all MERGED into `main`. Current tip `6d3a090` (wbw grammar-note fix, #44).
-  Recent chain: #44 (grammar_note correct-source fix) → #43 (shrink morphology col) →
+- PRs #1–45 all MERGED into `main`. Current tip `2e6d513` (Full Analysis grammar_note
+  fix, #45).
+- Full Analysis grammar_note fix (#45): DONE, merged, this session. Word-detail page's
+  "Full Analysis" collapsible had the SAME garbled `grammar_arabic` bug #44 fixed in the
+  list view (case/verb-form term glued to spelled-out root letters) — #44 wrongly left
+  it untouched assuming it was a different, correct use. `WordDetailView.tsx` now passes
+  `word.grammar_note` (already selected by `getWordDetail`) to `FullAnalysis`, one line
+  per `\n`-clause. `grammar_arabic` confirmed (grep) to have zero remaining UI consumers
+  — left as-is, dormant, user's call. Greptile: pass.
+  Recent chain: #45 (Full Analysis fix) → #44 (grammar_note correct-source fix) → #43 (shrink morphology col) →
   #42 (phase-16 per-segment color-coding) → #41 (sajdah mark) → #40 (wbw list view +
   go-to-verse) → #39 (search nav/uz fixes) → #38 (drawer menu + bookmarks) → back
   through phases 06–01.
