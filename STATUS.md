@@ -12,9 +12,50 @@ Updated: 2026-07-23
 ## Now
 All work below confirmed via `gh pr list --state all` + `git merge-base --is-ancestor`,
 not carried over from prior narrative.
-- PRs #1–46 all MERGED into `main`. Current tip `be24a42` (reader/word-detail UI
-  polish + pos_tag data fix, #46).
-- Reader/word-detail UI polish (#46): DONE, merged, this session. 4 fixes from user
+- PRs #1–47 all MERGED into `main`. Current tip `2e6f7a8` (joined-word segment
+  display + DET tag hidden + wbw frame spacing, #47).
+- PR #48 OPEN, not yet merged (bookmarks-flash fix, see below) — Greptile pass
+  (5/5 after 1 fix), branch rebased onto `main` post-#47, force-pushed (`b248835`).
+  Awaiting merge decision.
+- Bookmarks-flash bug fix (#48): found this session (user report: opening
+  /bookmarks briefly flashed "Surah 2 255"-style id-based names before
+  correcting to real ones, "couldn't catch it, flashes and switches to normal").
+  Root cause: `BookmarksView`'s effect treated an aborted `/api/surahs` fetch
+  identically to a real failure — both hit the same `catch { setRows(buildRows()) }`,
+  rendering id-based fallback names via the still-empty name map. React Strict
+  Mode (dev only) double-invokes the mount effect (mount→cleanup→mount); the
+  first request is always aborted by the cleanup, hits that catch, renders the
+  flash — the second (surviving) request then resolves for real and corrects
+  it. Fix: catch block now bails on `AbortError` without touching state (a
+  fresh request already supersedes it); genuine failures (offline) still fall
+  back to id-based names so bookmarks aren't dropped. Regression test
+  reproduces the exact Strict Mode race (verified it fails pre-fix, passes
+  post-fix). Greptile P2 (fake timers only restored after assertions succeeded,
+  leaking into later tests on failure) — fixed by moving `vi.useRealTimers()`
+  into the shared `afterEach`. Confirmed dev-only trigger (Strict Mode
+  double-invoke never happens in prod builds), but underlying abort-vs-failure
+  bug was real regardless of trigger.
+- Segment-pill redesign + DET hidden (#47): DONE, merged, this session. User
+  wanted individual-word-view fix (joined word, pills below) applied to wbw
+  list/card views too: `SegmentPills` reworked so segments render as adjacent
+  joined Arabic spans (correct letter-joining, no boxes) with POS labels in a
+  separate flex-wrap pill row below — `SegmentedWord` (word-detail hero) now
+  delegates to `SegmentPills` at `size="lg"` instead of duplicating the layout
+  (this reverses part of #46's split, since both views converged back to the
+  same treatment). Also: `posColor()` returns `null` for `DET` — corpus.quran.com's
+  own wordbyword.jsp doesn't surface an assimilated determiner prefix as its
+  own tag either (folded into the preposition's label) — so DET gets no pill
+  and no syntax-column line at all (not just muted-gray; fully hidden), while
+  its glyph still renders plain-colored as part of the joined word. Also
+  small unrelated fix bundled in: wbw page's surah frame had no bottom margin,
+  sat flush against the "<Surah> · word by word" caption — added `mb-3`.
+  Greptile: pass (no comment findings). NOTE: mid-session, switching branches
+  to build #48 on a clean `main` base caused the dev-server working tree to
+  temporarily lose #47's uncommitted... no, *committed-but-unmerged* changes,
+  which looked like a regression to the user twice (once before #47 merged,
+  once after rebasing #48) — not a real revert, just branch-switch visibility;
+  worth remembering that unmerged sibling PRs don't coexist in one working tree.
+- Reader/word-detail UI polish (#46): DONE, merged. 4 fixes from user
   screenshots: (1) popover Arabic glyph no longer sits under the close button
   (text-4xl + pr-10); (2) Lane's Lexicon "/"-joined text (e.g. abandon/desert/quit)
   no longer overflows its card — break-words CSS + normalize_slash_spacing() at
@@ -35,7 +76,9 @@ not carried over from prior narrative.
   `word.grammar_note` (already selected by `getWordDetail`) to `FullAnalysis`, one line
   per `\n`-clause. `grammar_arabic` confirmed (grep) to have zero remaining UI consumers
   — left as-is, dormant, user's call. Greptile: pass.
-  Recent chain: #45 (Full Analysis fix) → #44 (grammar_note correct-source fix) → #43 (shrink morphology col) →
+  Recent chain: #48 (bookmarks-flash, open) → #47 (joined-word segments + DET
+  hidden) → #46 (reader/word-detail UI polish) → #45 (Full Analysis fix) →
+  #44 (grammar_note correct-source fix) → #43 (shrink morphology col) →
   #42 (phase-16 per-segment color-coding) → #41 (sajdah mark) → #40 (wbw list view +
   go-to-verse) → #39 (search nav/uz fixes) → #38 (drawer menu + bookmarks) → back
   through phases 06–01.
