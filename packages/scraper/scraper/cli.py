@@ -276,6 +276,24 @@ def import_quranenc(
     click.echo("Import complete.")
 
 
+@main.command("import-qul")
+@click.argument("json_path")
+@click.argument("language_code")
+@click.argument("translator")
+@click.option("--db", default="quran.db", show_default=True)
+def import_qul(json_path: str, language_code: str, translator: str, db: str) -> None:
+    """Import a QUL (Tarteel AI) "simple" JSON translation file (runs seed first)."""
+    from pathlib import Path
+
+    from .sources.qul import import_qul_translation
+
+    database = ScraperDatabase(db)
+    seed_database(database)
+    import_qul_translation(Path(json_path), language_code, translator, database)
+    database.close()
+    click.echo("Import complete.")
+
+
 @main.command("translate-glosses")
 @click.option("--db", default="quran.db", show_default=True, help="SQLite output path")
 @click.option("--batch-size", default=256, show_default=True)
