@@ -32,7 +32,12 @@ export function BookmarksView() {
           ? new Map(((await res.json()) as PickerSurah[]).map((s) => [s.id, s.name_translit]))
           : new Map<number, string>();
         setRows(buildRows());
-      } catch {
+      } catch (err) {
+        // An aborted request (effect cleanup, e.g. Strict Mode's dev-only
+        // double-invoke) isn't a real failure -- a fresh request is already
+        // in flight, so bail without rendering id-based fallback names that
+        // would only flash and then be corrected.
+        if (err instanceof DOMException && err.name === 'AbortError') return;
         setRows(buildRows());
       }
     })();

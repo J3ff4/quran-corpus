@@ -1,5 +1,6 @@
+import { StrictMode } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import BookmarksPage from '../app/bookmarks/page';
 import { toggleBookmark } from '../lib/bookmarks';
 
@@ -10,7 +11,10 @@ describe('BookmarksPage', () => {
     localStorage.clear();
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => pickerSurahs }) as Response));
   });
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
 
   it('shows an empty state with no bookmarks', async () => {
     render(<BookmarksPage />);
@@ -46,5 +50,52 @@ describe('BookmarksPage', () => {
     fireEvent(window, new StorageEvent('storage', { key: 'bookmarks' }));
 
     await waitFor(() => expect(screen.getByText(/al-baqarah 255/i)).toBeInTheDocument());
+  });
+
+  it('never flashes id-based fallback names when Strict Mode double-invokes the initial effect', async () => {
+    vi.useFakeTimers();
+    toggleBookmark(2, 255, 'wbw');
+
+    let call = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string, opts?: { signal?: AbortSignal }) => {
+        call++;
+        if (call === 1) {
+          // Simulates Strict Mode's mount->cleanup->mount: this request is
+          // aborted by the first effect's cleanup before it ever resolves.
+          return new Promise((_resolve, reject) => {
+            opts?.signal?.addEventListener('abort', () =>
+              reject(new DOMException('aborted', 'AbortError')),
+            );
+          });
+        }
+        // The surviving second mount's request resolves for real.
+        return new Promise((resolve) => {
+          setTimeout(() => resolve({ ok: true, json: async () => pickerSurahs } as Response), 20);
+        });
+      }),
+    );
+
+    render(
+      <StrictMode>
+        <BookmarksPage />
+      </StrictMode>,
+    );
+
+    // Flush only the aborted first call's rejection microtask -- before the
+    // surviving second call's 20ms timeout fires. This is the exact instant
+    // the flash would render.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.queryByText(/^surah 2 255$/i)).not.toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20);
+    });
+
+    expect(screen.getByText(/al-baqarah 255/i)).toBeInTheDocument();
+    expect(screen.queryByText(/^surah 2 255$/i)).not.toBeInTheDocument();
   });
 });
