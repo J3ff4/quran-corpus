@@ -7,23 +7,29 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-07-23
+Updated: 2026-07-24
 
 ## Now
 All work below confirmed via `gh pr list --state all` + `git merge-base --is-ancestor`,
 not carried over from prior narrative.
-- PRs #1–47 all MERGED into `main`. Current tip `2e6f7a8` (joined-word segment
-  display + DET tag hidden + wbw frame spacing, #47).
-- PR #48 OPEN, not yet merged (bookmarks-flash fix, see below) — Greptile pass
-  (5/5 after 1 fix), branch rebased onto `main` post-#47, force-pushed (`b248835`).
-  Awaiting merge decision.
-- Concordance derived-form filter (branch `concordance-derived-form-filter`,
-  worktree `.worktrees/concordance-derived-form-filter`, off `main` @ `f18bf01`):
-  9-task SDD plan complete, all tasks reviewed clean, full suite/tsc/lint green
-  branch-wide. Not yet pushed/PR'd — Greptile gate still to run. Root/dictionary
-  page's static "Derived forms" list replaced with `FormFilterChips`
-  (multi-select, tags each concordance row via a query-time lemma→root_forms
-  join, concordance stays chronological, never grouped).
+- PRs #1–50 all MERGED into `main`. Current tip `c95626c` (bookmarks-flash fix, #48).
+- PR #49 (concordance derived-form filter chips) + PR #50 (alef-madda NFC fix,
+  found+fixed live via phone testing; also fixed an unrelated App Router
+  remount bug on `/dictionary/[root]`, see [[app-router-dynamic-route-remount-gotcha]])
+  both merged 2026-07-24.
+- **Russian translations (2026-07-24):** turns out NOT actually empty — Kuliev
+  (6236 rows, translator "Elmir Kuliev") was already in the DB via
+  `packages/scraper/tools/import_alqurancloud.py`, a phase-01/02 one-shot
+  scaffold script pulling from `api.alquran.cloud` (not Tanzil/QuranEnc — its
+  license/attribution has never been verified per CLAUDE.md §10/PRD §3.3).
+  Added a second Russian translation on top: QuranEnc's "Rowwad Translation
+  Center" (`russian_rwwad`, 6236 rows) via the existing `import-quranenc` CLI,
+  properly licensed/attributed. **Neither is visible in the app yet** — no
+  language switcher exists; the reader hardcodes English (`AyahView`/
+  `getTranslationsByAyah` only ever called with `language_code: 'en'` anywhere
+  in `apps/web/src`). User decided: keep both translations in the DB as-is,
+  verify Kuliev's alquran.cloud licensing before a language-switcher feature
+  ever makes it user-facing.
 - Bookmarks-flash bug fix (#48): found this session (user report: opening
   /bookmarks briefly flashed "Surah 2 255"-style id-based names before
   correcting to real ones, "couldn't catch it, flashes and switches to normal").
@@ -129,8 +135,9 @@ Re-queried directly 2026-07-22 (do not trust older counts in this file's history
   for 19,797/77,429 words; backfilled from word_segments.stem. 485 words (genuine
   double-stem compounds, e.g. مِمَّا) keep a deterministic first-stem pick, not a bug.
   Backup: `quran.db.bak-preslashfix-20260723` (pre both this and the lexicon fix).
-- `ru` (Russian) glosses: **none** — no rows, no language_code entry at all yet, despite
-  being a named target language (CLAUDE.md §1).
+- `ru` (Russian) **translations**: 12472 rows now (Kuliev via alquran.cloud +
+  Rowwad via QuranEnc, 6236 each) — see "Now" above. `ru` **per-word glosses**
+  (`word_glosses`, distinct table from `translations`): still none.
 - Concordance derived-form join (lemma text match): spiked across all 1,642
   roots with occurrences — 833 roots with >=1 unmatched occurrence, 49,968
   occurrences checked, 6,768 unmatched (13.5447%). Fallback (`form_id: null`,
@@ -157,11 +164,23 @@ Re-queried directly 2026-07-22 (do not trust older counts in this file's history
   pages") still not landed on `main` — landing method still TBD.
 
 ## Queue
-1. Uz gloss gap (1890 words, all short function words) — run the existing
-   `review_glosses.py` export/import round-trip, or accept the gap as-is.
-2. `ru` glosses — source + import path not decided yet.
-3. Land parked commit `65a7a56` — ride next scraper PR vs. standalone push, still TBD.
-4. Housekeeping above (stale branches, untracked scratch, orphan commit) — cosmetic,
+1. Uz gloss gap (1890 words, all short function words) — in talks with Tasnim
+   (user's contact) as of 2026-07-24; may not need the review_glosses.py path.
+2. `ru` per-word glosses (wbw translation, the `word_glosses` table — distinct
+   from verse-level `translations`, which is done, see "Now" above) — user
+   explicitly wants a human/reviewed source, same as the Uzbek approach via
+   Tasnim, NOT raw NLLB machine-translation. Holding until that source exists.
+   (`translate_glosses.py`/`mt.py`/`db.upsert_uz_gloss` are all Uzbek-hardcoded
+   today — would need generalizing to a target-language param if/when an MT
+   path for `ru` is ever wanted instead.)
+3. Verify `api.alquran.cloud`/Kuliev licensing before any language-switcher
+   feature ships (blocks Russian — and re-check the existing `en`/`uz`
+   alquran.cloud-sourced rows from the same script too — same unverified-source
+   gap may apply to those).
+4. Build a translation-language switcher — both `ru` translations exist in the
+   DB but are invisible in the app (reader hardcodes `en`).
+5. Land parked commit `65a7a56` — ride next scraper PR vs. standalone push, still TBD.
+6. Housekeeping above (stale branches, untracked scratch, orphan commit) — cosmetic,
    do whenever convenient.
 
 ## Notes
