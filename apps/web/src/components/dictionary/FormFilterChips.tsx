@@ -27,9 +27,9 @@ export function FormFilterChips({ forms, selected, onToggle }: FormFilterChipsPr
             type="button"
             aria-pressed={isSelected}
             onClick={() => onToggle(f.id)}
-            className="flex flex-wrap items-baseline gap-2 rounded-xl border px-3 py-2 text-left transition-colors"
+            className="flex flex-wrap items-baseline gap-2 rounded-xl border border-paper-300 px-2 py-1 text-left transition-colors dark:border-night-100"
             style={{
-              borderColor: isSelected ? color : 'transparent',
+              borderColor: isSelected ? color : undefined,
               backgroundColor: isSelected
                 ? `color-mix(in srgb, ${color} 12%, transparent)`
                 : undefined,

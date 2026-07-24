@@ -4,6 +4,7 @@ vi.mock('@quran-corpus/data', () => ({
   createDatabase: vi.fn(() => ({ mock: 'client' })),
   runMigrations: vi.fn(async () => undefined),
   backfillSearchIndex: vi.fn(async () => undefined),
+  normalizeLemmaMadda: vi.fn(async () => undefined),
 }));
 
 // getDatabase memoizes in module state — fresh module per test.
@@ -18,6 +19,7 @@ describe('getDatabase', () => {
     const data = await import('@quran-corpus/data');
     vi.mocked(data.createDatabase).mockClear();
     vi.mocked(data.runMigrations).mockClear().mockResolvedValue(undefined);
+    vi.mocked(data.normalizeLemmaMadda).mockClear().mockResolvedValue(undefined);
   });
 
   it('memoizes: repeated calls share one init', async () => {
@@ -39,5 +41,20 @@ describe('getDatabase', () => {
     // replayed the same rejected promise until process restart.
     await expect(getDatabase()).resolves.toEqual({ mock: 'client' });
     expect(data.createDatabase).toHaveBeenCalledTimes(2);
+  });
+
+  it('runs the lemma-madda self-heal even when DB_SKIP_MIGRATIONS=true skips runMigrations', async () => {
+    const prev = process.env['DB_SKIP_MIGRATIONS'];
+    process.env['DB_SKIP_MIGRATIONS'] = 'true';
+    try {
+      const getDatabase = await freshGetDatabase();
+      const data = await import('@quran-corpus/data');
+      await getDatabase();
+      expect(data.runMigrations).not.toHaveBeenCalled();
+      expect(data.normalizeLemmaMadda).toHaveBeenCalledTimes(1);
+    } finally {
+      if (prev === undefined) delete process.env['DB_SKIP_MIGRATIONS'];
+      else process.env['DB_SKIP_MIGRATIONS'] = prev;
+    }
   });
 });

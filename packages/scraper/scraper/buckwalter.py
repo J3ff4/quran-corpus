@@ -10,6 +10,8 @@ Reference: https://corpus.quran.com/java/orthographymodel.jsp
 
 from __future__ import annotations
 
+import unicodedata
+
 # Buckwalter ASCII char -> Arabic Unicode codepoint.
 _BUCKWALTER_TO_ARABIC: dict[str, str] = {
     "'": "ء",  # hamza
@@ -83,7 +85,16 @@ def buckwalter_to_arabic(text: str | None) -> str | None:
 
     Returns None for None input. Unknown characters are passed through
     unchanged (defensive: better to keep an unmapped char than drop it).
+
+    NFC-normalizes the result: the corpus sometimes spells a composable
+    letter (e.g. alef-madda) as a base letter + combining mark across two
+    ASCII chars ('A^') rather than one ('|'). Char-by-char mapping alone
+    would leave those as different Unicode sequences even though they
+    render identically, breaking exact-string matches against Arabic text
+    from other sources (root_forms.form_arabic) that use the precomposed
+    form.
     """
     if text is None:
         return None
-    return "".join(_BUCKWALTER_TO_ARABIC.get(ch, ch) for ch in text)
+    converted = "".join(_BUCKWALTER_TO_ARABIC.get(ch, ch) for ch in text)
+    return unicodedata.normalize("NFC", converted)

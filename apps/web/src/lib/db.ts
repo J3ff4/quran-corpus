@@ -1,4 +1,9 @@
-import { createDatabase, runMigrations, backfillSearchIndex } from '@quran-corpus/data';
+import {
+  createDatabase,
+  runMigrations,
+  backfillSearchIndex,
+  normalizeLemmaMadda,
+} from '@quran-corpus/data';
 import type { Client } from '@quran-corpus/data';
 
 let _dbPromise: Promise<Client> | null = null;
@@ -19,6 +24,11 @@ export function getDatabase(): Promise<Client> {
         await runMigrations(db);
         await backfillSearchIndex(db);
       }
+      // Data-only self-heal (idempotent UPDATE, no DDL) -- runs even when
+      // DB_SKIP_MIGRATIONS=true, since that flag's job is only to keep DDL
+      // out of the request path against a pre-provisioned database, not to
+      // exempt it from data corrections.
+      await normalizeLemmaMadda(db);
       return db;
     })();
     // Drop a failed init from the cache so the next request retries instead of

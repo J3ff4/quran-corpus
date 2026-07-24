@@ -125,6 +125,19 @@ def fix_hamza_seat_cmd(db: str) -> None:
     click.echo(f"fix-hamza-seat: {ayahs} ayahs updated, {words} words updated.")
 
 
+@main.command("fix-lemma-madda")
+@click.option("--db", default="quran.db", show_default=True, help="SQLite output path")
+def fix_lemma_madda_cmd(db: str) -> None:
+    """NFC-normalize words/word_segments.lemma alef-madda spelling to match
+    root_forms.form_arabic, so the concordance derived-form filter matches."""
+    from .fix_lemma_madda import fix_lemma_madda
+
+    database = ScraperDatabase(db)
+    words, segments = fix_lemma_madda(database)
+    database.close()
+    click.echo(f"fix-lemma-madda: {words} words updated, {segments} word_segments updated.")
+
+
 @main.command("import-corpus")
 @click.argument("txt_path")
 @click.option("--db", default="quran.db", show_default=True)

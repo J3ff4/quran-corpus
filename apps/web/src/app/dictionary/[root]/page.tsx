@@ -30,6 +30,7 @@ export default async function RootPage({ params }: PageProps) {
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
       <RootEntry
+        key={bw}
         entry={entry}
         initialConcordance={initialConcordance}
         total={total}

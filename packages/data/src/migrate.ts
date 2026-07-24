@@ -52,6 +52,40 @@ async function migrateAddWordColumns(db: Client): Promise<void> {
   }
 }
 
+// Built from an explicit codepoint sequence, not a hand-typed literal --
+// this pair (base alef + combining maddah above) is visually
+// indistinguishable from its precomposed form in an editor/diff.
+const DECOMPOSED_ALEF_MADDA = String.fromCodePoint(0x0627, 0x0653);
+
+// The corpus morphology import (packages/scraper) sometimes wrote alef-madda
+// as this decomposed sequence, while root_forms.form_arabic (a separate
+// import pipeline) always uses the precomposed form (U+0622) -- breaking
+// exact-string joins between them (the root/dictionary concordance's
+// derived-form filter). packages/scraper's buckwalter.py now NFC-normalizes
+// new conversions at the source, but any database that was already
+// populated before that fix needs the existing rows composed too. Exported
+// standalone (not run from runMigrations) so callers can self-heal this data
+// fix even in a DB_SKIP_MIGRATIONS=true deployment that intentionally skips
+// runMigrations' schema DDL against a pre-provisioned database -- see
+// apps/web/src/lib/db.ts, the only real caller.
+export async function normalizeLemmaMadda(db: Client): Promise<void> {
+  for (const table of ['words', 'word_segments'] as const) {
+    const candidates = await db.execute({
+      sql: `SELECT id, lemma FROM ${table} WHERE lemma LIKE '%' || ? || '%'`,
+      args: [DECOMPOSED_ALEF_MADDA],
+    });
+    for (const row of candidates.rows) {
+      const fixed = (row['lemma'] as string).normalize('NFC');
+      if (fixed !== row['lemma']) {
+        await db.execute({
+          sql: `UPDATE ${table} SET lemma = ? WHERE id = ?`,
+          args: [fixed, row['id'] as number],
+        });
+      }
+    }
+  }
+}
+
 export async function runMigrations(db: Client): Promise<void> {
   const statements = splitStatements(stripLineComments(SCHEMA_SQL))
     .map((s) => s.trim())

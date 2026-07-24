@@ -1,5 +1,6 @@
 import re
 import sqlite3
+import unicodedata
 from pathlib import Path
 
 from .models import (
@@ -503,6 +504,44 @@ class ScraperDatabase:
         words_changed = self._fix_seatless_hamza_in("words", "text_arabic")
         self._conn.commit()
         return ayahs_changed, words_changed
+
+    def _normalize_lemma_madda_in(self, table: str, col: str) -> int:
+        """NFC-normalize col in table wherever it contains the decomposed
+        alef + combining-maddah-above sequence, composing it to the
+        precomposed U+0622 form that root_forms.form_arabic already uses
+        exclusively -- see scraper.buckwalter for why the two sources
+        disagreed. Shared by apply_lemma_madda_fix (words + word_segments).
+        table/col are module-controlled constants, never user input.
+        """
+        # Built from numeric codepoints, not a hand-typed literal -- see
+        # test_fix_hamza_seat.py's comment on this module's history of
+        # diacritic-order transposition bugs from literal Arabic glyphs.
+        decomposed = chr(0x0627) + chr(0x0653)  # alef + combining maddah above
+        changed = 0
+        for row in self._conn.execute(
+            f"SELECT id, {col} FROM {table} WHERE {col} LIKE ?",  # noqa: S608
+            (f"%{decomposed}%",),
+        ):
+            fixed = unicodedata.normalize("NFC", row[col])
+            if fixed != row[col]:
+                self._conn.execute(
+                    f"UPDATE {table} SET {col} = ? WHERE id = ?",  # noqa: S608
+                    (fixed, row["id"]),
+                )
+                changed += 1
+        return changed
+
+    def apply_lemma_madda_fix(self) -> tuple[int, int]:
+        """NFC-normalize words.lemma/word_segments.lemma alef-madda spelling
+        to match root_forms.form_arabic's precomposed form, so exact-string
+        joins between them (the root/dictionary concordance filter) stop
+        silently failing. Idempotent -- returns (0, 0) on a second run.
+        Returns (words changed, word_segments changed).
+        """
+        words_changed = self._normalize_lemma_madda_in("words", "lemma")
+        segments_changed = self._normalize_lemma_madda_in("word_segments", "lemma")
+        self._conn.commit()
+        return words_changed, segments_changed
 
     def get_root_by_buckwalter(self, bw: str) -> sqlite3.Row | None:
         return self._conn.execute(

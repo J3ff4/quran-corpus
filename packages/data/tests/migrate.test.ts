@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createDatabase } from '../src/db.js';
-import { runMigrations, splitStatements, stripLineComments } from '../src/migrate.js';
+import { runMigrations, normalizeLemmaMadda, splitStatements, stripLineComments } from '../src/migrate.js';
 import type { Client } from '@libsql/client';
 
 let db: Client;
@@ -109,6 +109,36 @@ describe('runMigrations', () => {
       (await d.execute('PRAGMA table_info(words)')).rows.map((r) => r['name'] as string),
     );
     expect(cols.has('grammar_note')).toBe(true);
+    d.close();
+  });
+
+  it('normalizeLemmaMadda composes a decomposed alef-madda lemma on words and word_segments', async () => {
+    // Exercised directly (not via runMigrations) -- normalizeLemmaMadda is a
+    // data-only self-heal, called standalone by apps/web/src/lib/db.ts so it
+    // still runs under DB_SKIP_MIGRATIONS=true, which skips runMigrations' DDL.
+    const d = createDatabase('file::memory:');
+    await runMigrations(d);
+    await d.execute("INSERT INTO surahs VALUES (1,'a','A','A','meccan',7,1)");
+    const decomposed = `ب${String.fromCodePoint(0x0627, 0x0653)}س`; // "ب" + alef+madda + "س"
+    const precomposed = 'بآس';
+    await d.execute({
+      sql: "INSERT INTO ayahs (id,surah_id,ayah_number,text_uthmani) VALUES (1,1,1,'x')",
+    });
+    await d.execute({
+      sql: 'INSERT INTO words (id,ayah_id,position,text_arabic,lemma) VALUES (1,1,1,?,?)',
+      args: ['x', decomposed],
+    });
+    await d.execute({
+      sql: 'INSERT INTO word_segments (word_id,segment_index,lemma) VALUES (1,0,?)',
+      args: [decomposed],
+    });
+
+    await normalizeLemmaMadda(d);
+
+    const word = await d.execute('SELECT lemma FROM words WHERE id = 1');
+    const seg = await d.execute('SELECT lemma FROM word_segments WHERE word_id = 1');
+    expect(word.rows[0]!['lemma']).toBe(precomposed);
+    expect(seg.rows[0]!['lemma']).toBe(precomposed);
     d.close();
   });
 });
