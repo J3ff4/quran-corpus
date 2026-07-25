@@ -10,22 +10,16 @@ interface BookmarkButtonProps {
 }
 
 /**
- * Starts unbookmarked on the server-rendered markup and reconciles from
- * localStorage after mount (same SSR-safe pattern as the theme toggle) to
- * avoid a hydration mismatch.
+ * Starts unbookmarked on the server-rendered markup and reconciles after mount
+ * (same SSR-safe pattern as the theme toggle) to avoid a hydration mismatch.
+ * Unlike the bookmarks page, the surrounding ayah lists don't read the cookie
+ * server-side, so this icon still resolves on the client.
  */
 export function BookmarkButton({ surahId, ayahNumber, view }: BookmarkButtonProps) {
   const [bookmarked, setBookmarked] = useState(false);
 
   useEffect(() => {
     setBookmarked(isBookmarked(surahId, ayahNumber, view));
-
-    const onStorage = (e: StorageEvent) => {
-      if (e.key !== 'bookmarks') return;
-      setBookmarked(isBookmarked(surahId, ayahNumber, view));
-    };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
   }, [surahId, ayahNumber, view]);
 
   return (

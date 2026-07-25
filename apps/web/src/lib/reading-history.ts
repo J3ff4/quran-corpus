@@ -1,3 +1,5 @@
+import { readCookie, writeCookie } from './cookies';
+
 const MAX_ENTRIES = 4;
 const MAX_SURAH_ID = 114;
 
@@ -6,9 +8,6 @@ const MAX_SURAH_ID = 114;
  * the right list in the initial HTML — no client swap, no flash of defaults.
  */
 export const FEATURED_SURAHS_COOKIE = 'featured-surahs';
-
-// One year: long enough to feel permanent, same as the wbw-view-mode cookie.
-const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 
 /** Fatiha, Baqara, Kahf, Mulk — shown until the user has built up real history. */
 export const DEFAULT_SURAH_IDS = [1, 2, 18, 67];
@@ -23,29 +22,12 @@ function parseCookie(raw: string | undefined): number[] {
   return [...new Set(ids)].slice(0, MAX_ENTRIES);
 }
 
-function readCookie(): string | undefined {
-  try {
-    return document.cookie
-      .split(';')
-      .map((c) => c.trim())
-      .find((c) => c.startsWith(`${FEATURED_SURAHS_COOKIE}=`))
-      ?.slice(FEATURED_SURAHS_COOKIE.length + 1);
-  } catch {
-    return undefined;
-  }
-}
-
 /** Moves surahId to the front of the recency list, capped to MAX_ENTRIES. */
 export function recordSurahVisit(surahId: number): void {
-  const ids = [surahId, ...parseCookie(readCookie()).filter((id) => id !== surahId)].slice(
-    0,
-    MAX_ENTRIES,
-  );
-  try {
-    document.cookie = `${FEATURED_SURAHS_COOKIE}=${ids.join(',')}; path=/; max-age=${COOKIE_MAX_AGE_SECONDS}; SameSite=Lax`;
-  } catch {
-    // Cookies unavailable (blocked/quota) — the visit just won't be remembered.
-  }
+  const current = parseCookie(readCookie(FEATURED_SURAHS_COOKIE));
+  const ids = [surahId, ...current.filter((id) => id !== surahId)].slice(0, MAX_ENTRIES);
+  // A rejected write (blocked cookies) just means the visit isn't remembered.
+  writeCookie(FEATURED_SURAHS_COOKIE, ids.join(','));
 }
 
 /** Most-recent-first surah IDs, backfilled with defaults (no duplicates). Safe to call server-side. */

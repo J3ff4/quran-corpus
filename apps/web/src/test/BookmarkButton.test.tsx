@@ -3,8 +3,15 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BookmarkButton } from '../components/shared/BookmarkButton';
 import { toggleBookmark } from '../lib/bookmarks';
 
+function clearCookies() {
+  document.cookie.split(';').forEach((c) => {
+    const name = c.split('=')[0]?.trim();
+    if (name) document.cookie = `${name}=; path=/; max-age=0`;
+  });
+}
+
 describe('BookmarkButton', () => {
-  beforeEach(() => localStorage.clear());
+  beforeEach(clearCookies);
 
   it('starts unbookmarked and toggles on click', async () => {
     render(<BookmarkButton surahId={2} ayahNumber={255} view="reading" />);
@@ -42,19 +49,5 @@ describe('BookmarkButton', () => {
     fireEvent.click(readingBtn!);
     expect(readingBtn).toHaveAttribute('aria-pressed', 'true');
     expect(wbwBtn).toHaveAttribute('aria-pressed', 'false');
-  });
-
-  it('syncs with a bookmark change made in another tab via the storage event', async () => {
-    render(<BookmarkButton surahId={2} ayahNumber={255} view="reading" />);
-    const btn = await screen.findByRole('button', { name: /bookmark ayah 255/i });
-    expect(btn).toHaveAttribute('aria-pressed', 'false');
-
-    // Simulate another tab toggling the same bookmark, then firing storage.
-    toggleBookmark(2, 255, 'reading');
-    fireEvent(window, new StorageEvent('storage', { key: 'bookmarks' }));
-
-    expect(
-      screen.getByRole('button', { name: /remove bookmark, ayah 255/i }),
-    ).toHaveAttribute('aria-pressed', 'true');
   });
 });
