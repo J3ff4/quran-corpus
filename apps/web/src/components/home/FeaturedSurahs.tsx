@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import Link from 'next/link';
 import type { Surah } from '@quran-corpus/data';
 import { SurahCard } from '../surah-list/SurahCard';
@@ -10,15 +10,20 @@ interface FeaturedSurahsProps {
   surahs: Surah[];
 }
 
+// useLayoutEffect is a no-op (with a console warning) during SSR since it has
+// no server equivalent; fall back to useEffect there.
+const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+
 /**
- * Starts with the default surah set on the server-rendered markup and
- * reconciles from localStorage reading history after mount (same SSR-safe
- * pattern as BookmarkButton) to avoid a hydration mismatch.
+ * Starts with the default surah set on the server-rendered markup (so
+ * hydration matches), then swaps to localStorage reading history in a layout
+ * effect — synchronously, before the browser paints — so the defaults are
+ * never actually visible to a returning user.
  */
 export function FeaturedSurahs({ surahs }: FeaturedSurahsProps) {
   const [featuredIds, setFeaturedIds] = useState(DEFAULT_SURAH_IDS);
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     setFeaturedIds(getFeaturedSurahIds());
   }, []);
 
