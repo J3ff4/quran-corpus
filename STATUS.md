@@ -12,8 +12,29 @@ Updated: 2026-07-25
 ## Now
 All work below confirmed via `gh pr list --state all` + `git merge-base --is-ancestor`,
 not carried over from prior narrative.
-- PRs #1–53 all MERGED into `main`. Current tip `3435d93` (server-rendered featured
-  surahs, #53).
+- PRs #1–54 all MERGED into `main`. Current tip `2f65241` (server-rendered bookmarks,
+  #54).
+- **Bookmarks page server-rendered (#54)**: same fix as #53, applied to `/bookmarks`,
+  which rendered *nothing* until hydration and then waited on a `/api/surahs` fetch
+  before showing a row. Bookmarks moved localStorage → `bookmarks` cookie; `page.tsx`
+  reads it via `cookies()` and joins surah names straight from the DB (`getAllSurahs`),
+  so the list is in the initial HTML and `BookmarksView` is presentational. Extras
+  pulled in by self-review: `src/lib/cookies.ts` (shared cookie read/write — it was
+  about to be copy-pasted into a second lib; verifies writes by read-back, sets
+  `Secure` only over https so plain-http dev still works; `reading-history.ts` moved
+  onto it too) and `MigrateLegacyBookmarks` (one-time localStorage → cookie migration
+  + `router.refresh()`, old key cleared only after a confirmed cookie write, else
+  upgrading users silently lose their bookmarks — marked `ponytail:` for deletion
+  once everyone has rolled through). `bookmarkedAt` dropped (cookie order carries
+  recency), entries capped at 200 (~2KB, cookies ride every request).
+  **Greptile 1 round: fail → pass.** P1 was real: the cookie was only range-checked
+  Quran-wide (1..286), so `1-8-r` passed even though Al-Fatihah ends at 7 — the page
+  linked it and the reader silently opened the surah at the top. Fixed in
+  `app/bookmarks/rows.ts` (`toBookmarkRows` filters on each surah's own `ayah_count`).
+  Deliberately out of scope, still open: cross-tab `storage`-event sync is GONE
+  (cookies don't fire it; mobile PWA, single tab — `BroadcastChannel` if ever wanted),
+  and `BookmarkButton`'s icon on ayah rows still resolves after mount (unfilled →
+  filled flash) since `AyahView` + both wbw blocks don't read the cookie server-side.
 - **Home "Read" section — three PRs, one arc (#51 → #52 → #53), all merged:**
   - #51 made it dynamic: no more hardcoded Fatiha/Baqara/Yasin/Mulk — shows the
     user's last 4 distinct visited surahs (most-recent-first), tracked in new
