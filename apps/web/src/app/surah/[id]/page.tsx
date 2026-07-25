@@ -14,6 +14,7 @@ import type { Word, Translation } from '@quran-corpus/data';
 import { SurahHeader } from '../../../components/reader/SurahHeader';
 import { ReaderView } from '../../../components/reader/ReaderView';
 import { LanguageBar } from '../../../components/reader/LanguageBar';
+import { RecordSurahVisit } from '../../../components/reader/RecordSurahVisit';
 import { isValidLang, type ValidLang } from '../../../components/reader/languages';
 import { parseScrollAyah } from './params';
 
@@ -63,6 +64,7 @@ export default async function SurahPage({ params, searchParams }: PageProps) {
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
+      <RecordSurahVisit surahId={surahId} />
       <SurahHeader surah={surah} />
       <LanguageBar surahId={surahId} activeLang={lang} />
       <ReaderView
