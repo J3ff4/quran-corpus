@@ -7,12 +7,36 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-07-24
+Updated: 2026-07-25
 
 ## Now
 All work below confirmed via `gh pr list --state all` + `git merge-base --is-ancestor`,
 not carried over from prior narrative.
-- PRs #1–50 all MERGED into `main`. Current tip `c95626c` (bookmarks-flash fix, #48).
+- PRs #1–53 all MERGED into `main`. Current tip `3435d93` (server-rendered featured
+  surahs, #53).
+- **Home "Read" section — three PRs, one arc (#51 → #52 → #53), all merged:**
+  - #51 made it dynamic: no more hardcoded Fatiha/Baqara/Yasin/Mulk — shows the
+    user's last 4 distinct visited surahs (most-recent-first), tracked in new
+    `src/lib/reading-history.ts`. `RecordSurahVisit` (renders null) mounted on
+    `surah/[id]/page.tsx` logs every surah-page visit. New users / empty history:
+    4 defaults (Fatiha, Baqara, Kahf, Mulk — Yasin dropped per user's explicit
+    pick). Partial history backfills remaining slots with unvisited defaults, no
+    dupes. Storage was localStorage; SSR rendered defaults and reconciled on mount.
+  - #52 killed the visible flash of that reconcile (`useLayoutEffect` swap, before
+    paint) — but the server was still rendering defaults every time.
+  - #53 (this session) removed the reconcile entirely: reading history moved from
+    localStorage to a `featured-surahs` cookie, so `page.tsx` reads it via
+    `cookies()` and renders the real list in the initial HTML. `FeaturedSurahs`
+    dropped `'use client'` and is now a plain server component. localStorage was
+    deleted rather than kept beside the cookie — the #52-era cookie mirror had
+    left it write-only, and two stores for one list can only drift. Cookie is
+    user-writable → validated as untrusted input on read (non-integer,
+    out-of-range outside 1..114, and duplicate ids dropped; dupes would repeat a
+    card and collide on the React `key`). `page.tsx` was already `force-dynamic`,
+    so `cookies()` costs nothing. Greptile: pass, 0 comments.
+  - Lesson worth keeping: a client-side "correct it after mount" fix is a flash
+    waiting to happen. If the server can know the value (cookie), render it server-side
+    instead of animating around the swap.
 - PR #49 (concordance derived-form filter chips) + PR #50 (alef-madda NFC fix,
   found+fixed live via phone testing; also fixed an unrelated App Router
   remount bug on `/dictionary/[root]`, see [[app-router-dynamic-route-remount-gotcha]])
@@ -148,20 +172,33 @@ Re-queried directly 2026-07-22 (do not trust older counts in this file's history
 - `scrape-word-details`: **DONE**. 77429/77429 checkpointed, no longer running. (Was
   78% per an older note in this file — finished since.)
 
-## Housekeeping (found drifted 2026-07-18, not yet cleaned — flagging, no action taken)
+## Housekeeping
 - Untracked scratch sitting in the working tree, never committed/gitignored: this file,
   `docs/plans/phase-12-hamza-seat-fix.md`, `.superpowers/` (SDD task briefs/reports/
   review diffs, ~2.3M).
-- Stale local branches (already merged via squash — their tips aren't ancestors of
-  `main`, just leftover refs): `phase-09-perf-overhaul`, `phase-12-uzbek-wbw-glosses`,
-  `phase-13-reader-typography`, `phase-13b-surah-wide-frame`, `feat/phase-06a/b/c`,
-  `fix/csp-nonce-static-prerender`, `fix/surah-frame-glyph-centering`.
-- Orphan commit chain, reflog-only (no branch, will eventually gc): ends at `18d9e7e`
-  "perf(web/search): one canonical search sheet; retire /search page" — an abandoned
-  consolidation attempt, never merged. Possibly superseded by the drawer-menu's
-  Search-moved-into-menu change. Recover from reflog before it expires if wanted.
+- **2026-07-24: dead branches cleaned up.** STATUS.md's prior "already merged via
+  squash, safe to delete" claim was WRONG for 4 of them — verified via
+  `git diff main...<branch> --stat` before touching anything, not trusted blind:
+  - Deleted (confirmed zero diff vs `main`, local+remote): `phase-13-reader-typography`,
+    `phase-13b-surah-wide-frame`, `feat/phase-06a-data-acquisition`,
+    `feat/phase-06b-morphology-ui`, `feat/phase-06c-dictionary-ui`,
+    `fix/csp-nonce-static-prerender`, `fix/scraper-retry-backoff`, plus remote-only
+    `fix/dev-500-schema-migration`, `docs/phase-06-plans`, `docs/prd-v2-corpus-port`.
+  - **NOT deleted — real unmerged work, still local+remote, needs a decision:**
+    - `phase-09-perf-overhaul`: 1282 lines / 49 files not in `main`.
+    - `phase-12-uzbek-wbw-glosses`: 3877 lines / 42 files not in `main` (includes
+      `packages/scraper/tools/uz_align_spike.py`) — possibly relevant to the
+      in-progress Tasnim Uzbek-gloss conversation, worth checking before it's lost.
+    - `fix/surah-frame-glyph-centering`: 53 lines beyond what PR #37 actually merged.
+    - `feat/phase-06a-dict-parser-fix`: 59 lines — this IS the parked `65a7a56`
+      commit below, same branch.
+- Orphan commit chain ending at `18d9e7e` ("perf(web/search): one canonical search
+  sheet; retire /search page", abandoned, never merged) was reachable via
+  `phase-09-perf-overhaul` (not truly reflog-only as previously stated) — still
+  applies now that that branch is confirmed real/kept.
 - Parked commit `65a7a56` ("fix(scraper): parse number-word and comma totals in root
-  pages") still not landed on `main` — landing method still TBD.
+  pages") still not landed on `main` — lives on `feat/phase-06a-dict-parser-fix`
+  (kept, see above), landing method still TBD.
 
 ## Queue
 1. Uz gloss gap (1890 words, all short function words) — in talks with Tasnim
