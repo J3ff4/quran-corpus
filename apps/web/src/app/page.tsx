@@ -1,10 +1,12 @@
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 import { getDatabase } from '../lib/db';
 import { getAllSurahs } from '@quran-corpus/data';
 import { VersePicker } from '../components/wbw/VersePicker';
 import { toPickerSurah, type PickerSurah } from '../components/wbw/types';
 import { SearchTrigger } from '../components/search/SearchTrigger';
 import { FeaturedSurahs } from '../components/home/FeaturedSurahs';
+import { FEATURED_SURAHS_COOKIE, getFeaturedIdsFromCookie } from '../lib/reading-history';
 
 export const metadata = { title: 'Quran Corpus' };
 
@@ -26,6 +28,9 @@ export default async function HomePage() {
   const surahs = await getAllSurahs(db);
   const pickerSurahs: PickerSurah[] = surahs.map(toPickerSurah);
 
+  const cookieStore = await cookies();
+  const featuredIds = getFeaturedIdsFromCookie(cookieStore.get(FEATURED_SURAHS_COOKIE)?.value);
+
   return (
     <main className="mx-auto max-w-2xl px-4 py-10">
       <section className="mb-10 text-center">
@@ -46,7 +51,7 @@ export default async function HomePage() {
         <VersePicker surahs={pickerSurahs} />
       </section>
 
-      <FeaturedSurahs surahs={surahs} />
+      <FeaturedSurahs surahs={surahs} featuredIds={featuredIds} />
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-paper-500 dark:text-paper-400">
