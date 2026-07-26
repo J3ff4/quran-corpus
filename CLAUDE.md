@@ -42,15 +42,18 @@ See `PRD.md` for full requirements. CLAUDE.md governs *how* we build; PRD govern
 
 -----
 
-## 4. The Mandatory 5-Step Loop
+## 4. The Mandatory 6-Step Loop
 
 Every unit of work (a feature, a fix, a module) follows this loop. Do not skip steps. Do not batch multiple features through one loop.
 
 1. **Implement** — write code to spec, matching existing conventions.
-1. **Code Review** — self-review against DRY / SOLID / OWASP and this file. Check for duplication, leaked abstractions, missing validation.
+1. **Self Review** — re-read the diff against DRY / SOLID / OWASP and this file. Check for duplication, leaked abstractions, missing validation.
+1. **Code Review** — run `/code-review` on the change. This is the first *independent* read of the diff; self-review is the agent grading its own work. Plain `/code-review` is included in the Pro plan and runs locally — use it by default. `/code-review ultra` bills separately ($5–25/run) and is reserved for changes where a missed bug is expensive; never launch it without asking.
 1. **Quality Review** — run lint, type-check, and tests. All must pass. No `// @ts-ignore`, no disabled lint rules without an inline justification comment.
 1. **Greptile Review** — run Greptile on the change (see §5).
 1. **Final Review** — re-review after fixes; confirm no regression, then commit.
+
+Step 3 is **user-triggered**: the agent cannot launch `/code-review` itself. When the loop reaches it, the agent stops and asks the user to run it, then acts on the findings. Do not silently skip the step because it needs a human keystroke.
 
 If any step surfaces an issue, fix and **restart from step 2** for the affected code.
 
@@ -105,7 +108,7 @@ Work proceeds in phases. Before writing code for a phase:
 - **Conventional Commits** for every commit: `type(scope): subject`.
   - Types: `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `chore`, `style`, `build`, `ci`.
   - Scope = package or area, e.g. `feat(scraper): ...`, `fix(web/word-popover): ...`, `chore(data): ...`.
-- One logical change per commit. Commit only after the 5-step loop completes and Greptile ≥ 4/5.
+- One logical change per commit. Commit only after the 6-step loop completes and Greptile passes (§5).
 - Imperative mood, concise subject (≤ ~72 chars). Body explains *why* when non-obvious; reference Greptile false-positive justifications here.
 - Never commit secrets, scraped raw HTML dumps, or large binary data into git (use `.gitignore`; raw scrape snapshots live outside version control or in a data artifact store).
 
@@ -116,7 +119,7 @@ Work proceeds in phases. Before writing code for a phase:
 - Unit tests for `packages/data` (data-access layer) and scraper parsing/morphology logic.
 - Component tests for key interactive UI: word morphology popover, language switcher, audio player.
 - Playwright E2E smoke test for the core reading flow on a mobile viewport.
-- Tests must pass in step 3 of the loop. New logic ships with tests.
+- Tests must pass in step 4 of the loop. New logic ships with tests.
 
 -----
 
