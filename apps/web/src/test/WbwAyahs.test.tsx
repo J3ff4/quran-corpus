@@ -29,29 +29,29 @@ describe('WbwAyahs', () => {
   afterEach(() => clearCookies());
 
   it('defaults to card view when initialViewMode is omitted', () => {
-    render(<WbwAyahs surahId={1} ayahs={ayahs} />);
+    render(<WbwAyahs bookmarkedAyahs={[]} surahId={1} ayahs={ayahs} />);
     expect(screen.queryByRole('table')).toBeNull();
   });
 
   it('renders card view when initialViewMode is card (SSR-provided)', () => {
-    render(<WbwAyahs surahId={1} ayahs={ayahs} initialViewMode="card" />);
+    render(<WbwAyahs bookmarkedAyahs={[]} surahId={1} ayahs={ayahs} initialViewMode="card" />);
     expect(screen.queryByRole('table')).toBeNull();
   });
 
   it('renders list view immediately when initialViewMode is list (SSR-provided, no flash)', () => {
-    render(<WbwAyahs surahId={1} ayahs={ayahs} initialViewMode="list" />);
+    render(<WbwAyahs bookmarkedAyahs={[]} surahId={1} ayahs={ayahs} initialViewMode="list" />);
     expect(screen.getByRole('table')).toBeInTheDocument();
   });
 
   it('toggling to List switches the render and persists the choice via cookie', () => {
-    render(<WbwAyahs surahId={1} ayahs={ayahs} />);
+    render(<WbwAyahs bookmarkedAyahs={[]} surahId={1} ayahs={ayahs} />);
     fireEvent.click(screen.getByRole('button', { name: 'List' }));
     expect(screen.getByRole('table')).toBeInTheDocument();
     expect(document.cookie).toContain('wbw-view-mode=list');
   });
 
   it('toggling back to Card removes the table and persists the choice via cookie', () => {
-    render(<WbwAyahs surahId={1} ayahs={ayahs} initialViewMode="list" />);
+    render(<WbwAyahs bookmarkedAyahs={[]} surahId={1} ayahs={ayahs} initialViewMode="list" />);
     fireEvent.click(screen.getByRole('button', { name: 'Card' }));
     expect(screen.queryByRole('table')).toBeNull();
     expect(document.cookie).toContain('wbw-view-mode=card');

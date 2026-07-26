@@ -1,24 +1,44 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { isBookmarked, toggleBookmark, type Bookmark } from '../../lib/bookmarks';
+
+// useLayoutEffect warns when React renders it on the server; useEffect there is
+// equivalent since server renders run no effects at all.
+const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 interface BookmarkButtonProps {
   surahId: number;
   ayahNumber: number;
   view: Bookmark['view'];
+  /** Server-rendered state, read from the bookmarks cookie by the surah page. */
+  initialBookmarked?: boolean;
 }
 
 /**
- * Starts unbookmarked on the server-rendered markup and reconciles after mount
- * (same SSR-safe pattern as the theme toggle) to avoid a hydration mismatch.
- * Unlike the bookmarks page, the surrounding ayah lists don't read the cookie
- * server-side, so this icon still resolves on the client.
+ * Renders the saved state in the server markup — the page reads the bookmarks
+ * cookie — so the icon doesn't paint empty and fill in after hydration.
+ *
+ * The effect still re-reads the cookie: on in-app navigation between surahs
+ * React keeps this component mounted and useState ignores the new prop, so
+ * without it the icon would show the previous surah's state (see the App
+ * Router remount gotcha that bit /dictionary/[root]).
+ *
+ * It re-reads in a layout effect, not a passive one, because the prop is only
+ * a *server* snapshot. Remount the button after the user has toggled something
+ * — the WBW card/list switch swaps component type at the same key, so React
+ * unmounts and remounts — and the seed is stale; a passive effect would let
+ * that stale icon paint for a frame first.
  */
-export function BookmarkButton({ surahId, ayahNumber, view }: BookmarkButtonProps) {
-  const [bookmarked, setBookmarked] = useState(false);
+export function BookmarkButton({
+  surahId,
+  ayahNumber,
+  view,
+  initialBookmarked = false,
+}: BookmarkButtonProps) {
+  const [bookmarked, setBookmarked] = useState(initialBookmarked);
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     setBookmarked(isBookmarked(surahId, ayahNumber, view));
   }, [surahId, ayahNumber, view]);
 

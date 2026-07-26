@@ -9,16 +9,23 @@ export function WbwAyahBlock({
   surahId,
   ayah,
   pageLang,
+  bookmarked,
 }: {
   surahId: number;
   ayah: WbwAyah;
   pageLang?: string;
+  bookmarked: boolean;
 }) {
   return (
     <section id={`ayah-${ayah.ayahNumber}`} className="scroll-mt-20 border-b border-paper-200 py-5 dark:border-night-100">
       <div className="mb-3 flex items-center gap-2">
         <AyahMedallion n={ayah.ayahNumber} />
-        <BookmarkButton surahId={surahId} ayahNumber={ayah.ayahNumber} view="wbw" />
+        <BookmarkButton
+          surahId={surahId}
+          ayahNumber={ayah.ayahNumber}
+          view="wbw"
+          initialBookmarked={bookmarked}
+        />
       </div>
       {ayah.cells.length > 0 ? (
         <div className="flex flex-wrap gap-2" dir="rtl">

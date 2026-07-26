@@ -121,6 +121,21 @@ export function migrateLegacyBookmarks(): boolean {
   return true;
 }
 
+/**
+ * Ayah numbers bookmarked in one surah for one view. Lets a server page hand
+ * BookmarkButton its state so the icon isn't blank until hydration. Safe to
+ * call server-side.
+ */
+export function bookmarkedAyahsIn(
+  raw: string | undefined,
+  surahId: number,
+  view: Bookmark['view'],
+): number[] {
+  return getBookmarksFromCookie(raw)
+    .filter((b) => b.surahId === surahId && b.view === view)
+    .map((b) => b.ayahNumber);
+}
+
 /** Most-recently-bookmarked first. Client-side only; the server uses getBookmarksFromCookie. */
 export function getBookmarks(): Bookmark[] {
   return getBookmarksFromCookie(readCookie(BOOKMARKS_COOKIE));

@@ -19,6 +19,7 @@ interface WbwViewProps {
   pageLang?: string;
   pickerSurahs?: PickerSurah[];
   initialViewMode?: ViewMode;
+  bookmarkedAyahs: number[];
 }
 
 export function WbwView({
@@ -30,6 +31,7 @@ export function WbwView({
   pageLang,
   pickerSurahs = [],
   initialViewMode = 'card',
+  bookmarkedAyahs,
 }: WbwViewProps) {
   return (
     <div>
@@ -71,6 +73,7 @@ export function WbwView({
         surahId={surah.id}
         ayahs={ayahs}
         initialViewMode={initialViewMode}
+        bookmarkedAyahs={bookmarkedAyahs}
         {...(pageLang ? { pageLang } : {})}
       />
 

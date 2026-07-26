@@ -9,10 +9,12 @@ export function WbwAyahListBlock({
   surahId,
   ayah,
   pageLang,
+  bookmarked,
 }: {
   surahId: number;
   ayah: WbwAyah;
   pageLang?: string;
+  bookmarked: boolean;
 }) {
   return (
     <section
@@ -21,7 +23,12 @@ export function WbwAyahListBlock({
     >
       <div className="mb-3 flex items-center gap-2">
         <AyahMedallion n={ayah.ayahNumber} />
-        <BookmarkButton surahId={surahId} ayahNumber={ayah.ayahNumber} view="wbw" />
+        <BookmarkButton
+          surahId={surahId}
+          ayahNumber={ayah.ayahNumber}
+          view="wbw"
+          initialBookmarked={bookmarked}
+        />
       </div>
       {ayah.cells.length > 0 ? (
         <div className="overflow-x-auto">

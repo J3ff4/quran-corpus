@@ -1,6 +1,7 @@
 // DB-dependent page — opt out of static pre-rendering
 export const dynamic = 'force-dynamic';
 
+import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { getDatabase } from '../../../lib/db';
 import {
@@ -17,6 +18,7 @@ import { LanguageBar } from '../../../components/reader/LanguageBar';
 import { RecordSurahVisit } from '../../../components/reader/RecordSurahVisit';
 import { isValidLang, type ValidLang } from '../../../components/reader/languages';
 import { parseScrollAyah } from './params';
+import { BOOKMARKS_COOKIE, bookmarkedAyahsIn } from '../../../lib/bookmarks';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -43,6 +45,15 @@ export default async function SurahPage({ params, searchParams }: PageProps) {
   if (!surah) notFound();
 
   const scrollAyah = parseScrollAyah(rawAyah, surah.ayah_count);
+
+  // Read server-side so each ayah's bookmark icon renders saved, rather than
+  // painting empty and filling in after hydration.
+  const cookieStore = await cookies();
+  const bookmarkedAyahs = bookmarkedAyahsIn(
+    cookieStore.get(BOOKMARKS_COOKIE)?.value,
+    surahId,
+    'reading',
+  );
 
   // Group words by ayah_id
   const wordsByAyah: Record<number, Word[]> = {};
@@ -74,6 +85,7 @@ export default async function SurahPage({ params, searchParams }: PageProps) {
         glossesByWordId={glossesByWordId}
         lang={lang}
         scrollAyah={scrollAyah}
+        bookmarkedAyahs={bookmarkedAyahs}
       />
     </main>
   );

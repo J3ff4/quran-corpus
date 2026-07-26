@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BookmarkButton } from '../components/shared/BookmarkButton';
 import { toggleBookmark } from '../lib/bookmarks';
@@ -49,5 +50,25 @@ describe('BookmarkButton', () => {
     fireEvent.click(readingBtn!);
     expect(readingBtn).toHaveAttribute('aria-pressed', 'true');
     expect(wbwBtn).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('renders the server-known state in the SSR markup, so the icon never paints empty first', () => {
+    const html = renderToStaticMarkup(
+      <BookmarkButton surahId={2} ayahNumber={255} view="reading" initialBookmarked />,
+    );
+    expect(html).toContain('aria-pressed="true"');
+    expect(html).toContain('fill="currentColor"');
+  });
+
+  it('lets the cookie win over a stale server snapshot (remount after a client toggle)', () => {
+    // What the WBW card/list switch does: remounts the button with the prop the
+    // server rendered, after the user has already un-bookmarked the ayah.
+    render(<BookmarkButton surahId={2} ayahNumber={255} view="wbw" initialBookmarked />);
+    expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('defaults to unbookmarked when the page passes no server state', () => {
+    const html = renderToStaticMarkup(<BookmarkButton surahId={2} ayahNumber={255} view="reading" />);
+    expect(html).toContain('aria-pressed="false"');
   });
 });

@@ -27,24 +27,24 @@ const midSurahAyahs: WbwAyah[] = [
 
 describe('WbwView', () => {
   it('renders surah name, a back-to-reader link, and ayah blocks', () => {
-    render(<WbwView surah={surah} ayahs={ayahs} page={1} totalPages={1} scrollAyah={null} />);
+    render(<WbwView bookmarkedAyahs={[]} surah={surah} ayahs={ayahs} page={1} totalPages={1} scrollAyah={null} />);
     expect(screen.getByText('Al-Fatihah')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /read/i })).toHaveAttribute('href', '/surah/1');
     expect(screen.getByText('بِسْمِ')).toBeInTheDocument();
   });
 
   it('omits the Pager for a single page', () => {
-    render(<WbwView surah={surah} ayahs={ayahs} page={1} totalPages={1} scrollAyah={null} />);
+    render(<WbwView bookmarkedAyahs={[]} surah={surah} ayahs={ayahs} page={1} totalPages={1} scrollAyah={null} />);
     expect(screen.queryByText(/Page 1 \//)).toBeNull();
   });
 
   it('renders the Bismillah banner on page 1 for a non-Fatiha/Tawba surah', () => {
-    render(<WbwView surah={baqarah} ayahs={midSurahAyahs} page={1} totalPages={20} scrollAyah={null} />);
+    render(<WbwView bookmarkedAyahs={[]} surah={baqarah} ayahs={midSurahAyahs} page={1} totalPages={20} scrollAyah={null} />);
     expect(screen.getByLabelText('Bismillah')).toBeInTheDocument();
   });
 
   it('does NOT render the Bismillah banner on page 2+ (mid-surah pagination)', () => {
-    render(<WbwView surah={baqarah} ayahs={midSurahAyahs} page={2} totalPages={20} scrollAyah={null} />);
+    render(<WbwView bookmarkedAyahs={[]} surah={baqarah} ayahs={midSurahAyahs} page={2} totalPages={20} scrollAyah={null} />);
     expect(screen.queryByLabelText('Bismillah')).toBeNull();
   });
 
@@ -56,6 +56,7 @@ describe('WbwView', () => {
         page={1}
         totalPages={1}
         scrollAyah={null}
+        bookmarkedAyahs={[]}
         pickerSurahs={[{ id: 1, name_translit: 'Al-Fatihah', ayah_count: 7 }]}
       />,
     );
@@ -64,7 +65,7 @@ describe('WbwView', () => {
   });
 
   it('omits the VersePicker when pickerSurahs is not provided', () => {
-    render(<WbwView surah={surah} ayahs={ayahs} page={1} totalPages={1} scrollAyah={null} />);
+    render(<WbwView bookmarkedAyahs={[]} surah={surah} ayahs={ayahs} page={1} totalPages={1} scrollAyah={null} />);
     expect(screen.queryByLabelText(/surah/i)).toBeNull();
   });
 });

@@ -17,6 +17,7 @@ interface AyahViewProps {
   onPlay: () => void;
   onPause: () => void;
   onToggleRepeat: () => void;
+  bookmarked: boolean;
 }
 
 export function AyahView({
@@ -30,6 +31,7 @@ export function AyahView({
   onPlay,
   onPause,
   onToggleRepeat,
+  bookmarked,
 }: AyahViewProps) {
   return (
     <article id={`ayah-${ayah.ayah_number}`} className="mb-10">
@@ -44,7 +46,12 @@ export function AyahView({
           onPause={onPause}
           onToggleRepeat={onToggleRepeat}
         />
-        <BookmarkButton surahId={ayah.surah_id} ayahNumber={ayah.ayah_number} view="reading" />
+        <BookmarkButton
+          surahId={ayah.surah_id}
+          ayahNumber={ayah.ayah_number}
+          view="reading"
+          initialBookmarked={bookmarked}
+        />
       </div>
 
       <div dir="rtl" className="flex flex-wrap gap-x-1 gap-y-2 font-arabic text-3xl leading-[2.4]">

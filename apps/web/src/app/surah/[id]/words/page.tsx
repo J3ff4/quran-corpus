@@ -17,6 +17,7 @@ import { toPickerSurah, type PickerSurah } from '../../../../components/wbw/type
 import { isValidLang, type ValidLang } from '../../../../components/reader/languages';
 import { VIEW_MODE_COOKIE, isViewMode } from '../../../../components/wbw/viewMode';
 import { parseSurahId, resolvePage } from './params';
+import { BOOKMARKS_COOKIE, bookmarkedAyahsIn } from '../../../../lib/bookmarks';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,6 +51,8 @@ export default async function WbwPage({ params, searchParams }: PageProps) {
   const cookieStore = await cookies();
   const storedViewMode = cookieStore.get(VIEW_MODE_COOKIE)?.value;
   const initialViewMode = isViewMode(storedViewMode) ? storedViewMode : 'card';
+  // Server-side so bookmark icons render saved instead of filling in post-hydration.
+  const bookmarkedAyahs = bookmarkedAyahsIn(cookieStore.get(BOOKMARKS_COOKIE)?.value, surahId, 'wbw');
 
   const glossByWordId = new Map<number, { text: string; lang: string }>();
   for (const g of glosses) glossByWordId.set(g.word_id, { text: g.gloss_text, lang: g.gloss_lang });
@@ -115,6 +118,7 @@ export default async function WbwPage({ params, searchParams }: PageProps) {
         pageLang={lang}
         pickerSurahs={pickerSurahs}
         initialViewMode={initialViewMode}
+        bookmarkedAyahs={bookmarkedAyahs}
       />
     </main>
   );

@@ -49,6 +49,7 @@ const audioProps = {
   onPlay: vi.fn(),
   onPause: vi.fn(),
   onToggleRepeat: vi.fn(),
+  bookmarked: false,
 };
 
 describe('AyahView', () => {

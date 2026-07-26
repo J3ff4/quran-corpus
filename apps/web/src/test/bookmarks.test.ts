@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   BOOKMARKS_COOKIE,
+  bookmarkedAyahsIn,
   getBookmarks,
   getBookmarksFromCookie,
   isBookmarked,
@@ -145,6 +146,20 @@ describe('bookmarks', () => {
         cookie.mockRestore();
       }
       expect(localStorage.getItem('bookmarks')).not.toBeNull();
+    });
+  });
+
+  describe('bookmarkedAyahsIn', () => {
+    const cookie = '2-255-w,2-255-r,2-1-r,1-1-r';
+
+    it('keeps only the given surah and view', () => {
+      expect(bookmarkedAyahsIn(cookie, 2, 'reading')).toEqual([255, 1]);
+      expect(bookmarkedAyahsIn(cookie, 2, 'wbw')).toEqual([255]);
+      expect(bookmarkedAyahsIn(cookie, 1, 'wbw')).toEqual([]);
+    });
+
+    it('returns nothing without a cookie', () => {
+      expect(bookmarkedAyahsIn(undefined, 2, 'reading')).toEqual([]);
     });
   });
 });

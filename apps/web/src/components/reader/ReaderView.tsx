@@ -23,6 +23,8 @@ interface ReaderViewProps {
   glossesByWordId: Record<number, { text: string; lang: string }>;
   lang: string;
   scrollAyah?: number | null;
+  /** Ayahs already bookmarked in this surah, from the cookie the page read. */
+  bookmarkedAyahs: number[];
 }
 
 export function ReaderView({
@@ -32,7 +34,9 @@ export function ReaderView({
   glossesByWordId,
   lang,
   scrollAyah,
+  bookmarkedAyahs,
 }: ReaderViewProps) {
+  const bookmarked = new Set(bookmarkedAyahs);
   const [selectedWord, setSelectedWord] = useState<Word | null>(null);
   const { playingAyahId, isPlaying, isRepeat, play, pause, toggleRepeat } = useAyahAudio(ayahs);
   const paginate = ayahs.length > THRESHOLD;
@@ -91,6 +95,7 @@ export function ReaderView({
           onPlay={() => play(ayah)}
           onPause={pause}
           onToggleRepeat={toggleRepeat}
+          bookmarked={bookmarked.has(ayah.ayah_number)}
         />
       ))}
       {paginate && !done && (

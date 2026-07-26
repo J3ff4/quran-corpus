@@ -52,6 +52,7 @@ const empties = {
   translationsByAyah: {} as Record<number, Translation>,
   glossesByWordId: {} as Record<number, { text: string; lang: string }>,
   lang: 'en',
+  bookmarkedAyahs: [] as number[],
 };
 const articleCount = (c: HTMLElement) => c.querySelectorAll('article').length;
 const lastObserver = () =>
