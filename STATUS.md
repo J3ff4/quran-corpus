@@ -7,13 +7,30 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-07-25
+Updated: 2026-07-26
 
 ## Now
 All work below confirmed via `gh pr list --state all` + `git merge-base --is-ancestor`,
 not carried over from prior narrative.
-- PRs #1–54 all MERGED into `main`. Current tip `2f65241` (server-rendered bookmarks,
-  #54).
+- PRs #1–55 all MERGED into `main`. Current tip `46b94fa` (server-rendered ayah
+  bookmark icons, #55).
+- **Ayah bookmark icons server-rendered (#55)**: closes the gap #54 left open below.
+  `bookmarkedAyahsIn(raw, surahId, view)` in `lib/bookmarks.ts` reuses the validating
+  `getBookmarksFromCookie`, so cookie input stays sanitized; `/surah/[id]` and
+  `/surah/[id]/words` (both already `force-dynamic` + `await cookies()`) thread
+  `bookmarkedAyahs` through `ReaderView`/`WbwView`/`WbwAyahs` into each button's
+  `initialBookmarked`. `WbwAyahs`'s inline `document.cookie` write swapped for the
+  shared `writeCookie`.
+  **Greptile 1 round: pass, zero comments.** The one real finding came from
+  `/code-review` instead (first run of it on this repo — now CLAUDE.md §4 step 3):
+  the WBW card/list switch swaps `WbwAyahBlock` for `WbwAyahListBlock` at the *same
+  key*, so React remounts `BookmarkButton` and re-seeds `useState` from the server
+  snapshot — stale after any client toggle, painting the wrong icon for one frame.
+  Fixed by moving the cookie re-read to a layout effect behind `typeof window ===
+  'undefined' ? useEffect : useLayoutEffect` (bare `useLayoutEffect` warns on server
+  render). Not #52's band-aid: there the server rendered a guess, here it renders the
+  truth and only a client toggle can stale it. Still open from #54: cross-tab
+  `storage`-event sync.
 - **Bookmarks page server-rendered (#54)**: same fix as #53, applied to `/bookmarks`,
   which rendered *nothing* until hydration and then waited on a `/api/surahs` fetch
   before showing a row. Bookmarks moved localStorage → `bookmarks` cookie; `page.tsx`
@@ -31,10 +48,10 @@ not carried over from prior narrative.
   Quran-wide (1..286), so `1-8-r` passed even though Al-Fatihah ends at 7 — the page
   linked it and the reader silently opened the surah at the top. Fixed in
   `app/bookmarks/rows.ts` (`toBookmarkRows` filters on each surah's own `ayah_count`).
-  Deliberately out of scope, still open: cross-tab `storage`-event sync is GONE
-  (cookies don't fire it; mobile PWA, single tab — `BroadcastChannel` if ever wanted),
-  and `BookmarkButton`'s icon on ayah rows still resolves after mount (unfilled →
-  filled flash) since `AyahView` + both wbw blocks don't read the cookie server-side.
+  Deliberately out of scope: cross-tab `storage`-event sync is GONE (cookies don't
+  fire it; mobile PWA, single tab — `BroadcastChannel` if ever wanted). The other gap
+  left here — `BookmarkButton`'s icon on ayah rows resolving after mount — was closed
+  by #55 above.
 - **Home "Read" section — three PRs, one arc (#51 → #52 → #53), all merged:**
   - #51 made it dynamic: no more hardcoded Fatiha/Baqara/Yasin/Mulk — shows the
     user's last 4 distinct visited surahs (most-recent-first), tracked in new
