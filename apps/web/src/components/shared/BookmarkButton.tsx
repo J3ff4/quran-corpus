@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { isBookmarked, toggleBookmark, type Bookmark } from '../../lib/bookmarks';
 
 // useLayoutEffect warns when React renders it on the server; useEffect there is
@@ -37,10 +38,27 @@ export function BookmarkButton({
   initialBookmarked = false,
 }: BookmarkButtonProps) {
   const [bookmarked, setBookmarked] = useState(initialBookmarked);
+  const router = useRouter();
 
   useIsomorphicLayoutEffect(() => {
     setBookmarked(isBookmarked(surahId, ayahNumber, view));
   }, [surahId, ayahNumber, view]);
+
+  function handleToggle() {
+    // Read the cookie rather than trusting `bookmarked`: the layout effect only
+    // re-syncs when the ayah identity changes, so another tab (or the
+    // MAX_BOOKMARKS eviction) can leave this state disagreeing with the store.
+    const before = isBookmarked(surahId, ayahNumber, view);
+    const next = toggleBookmark(surahId, ayahNumber, view);
+    setBookmarked(next);
+    // /bookmarks is rendered on the server from this cookie, and the App
+    // Router replays it from the client cache on a back navigation — a payload
+    // built before this toggle, so a removed ayah stays listed until a hard
+    // reload. Refreshing drops that cache, and the page is rebuilt from the
+    // cookie we just wrote. Skipped when the write failed (blocked cookies,
+    // size cap): nothing changed, so there is nothing to invalidate.
+    if (next !== before) router.refresh();
+  }
 
   return (
     <button
@@ -49,7 +67,7 @@ export function BookmarkButton({
         bookmarked ? `Remove bookmark, ayah ${ayahNumber}` : `Bookmark ayah ${ayahNumber}`
       }
       aria-pressed={bookmarked}
-      onClick={() => setBookmarked(toggleBookmark(surahId, ayahNumber, view))}
+      onClick={handleToggle}
       className="flex h-6 w-6 items-center justify-center rounded-full text-paper-500 transition-colors hover:bg-paper-200 dark:text-paper-400 dark:hover:bg-night-100"
     >
       <svg
