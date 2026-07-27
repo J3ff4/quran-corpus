@@ -12,7 +12,44 @@ Updated: 2026-07-27
 ## Now
 All work below confirmed via `gh pr list --state all` + `git merge-base --is-ancestor`,
 not carried over from prior narrative.
-- PRs #1–56 all MERGED into `main`. Current tip `3cbe267` (typing empty states, #56).
+- PRs #1–57 all MERGED into `main`. Current tip `25fffa1` (bookmark nav fixes, #57).
+- **Bookmark nav, two bugs (#57)**: rebase-merged, both commits kept (`488b443`,
+  `25fffa1`). Greptile pass.
+  1. *Tapping a bookmark landed in the wrong place.* `ScrollToAyah` scrolled once on
+     mount, against **fallback font metrics** — the Arabic faces load `display: 'swap'`,
+     so the real face arrives later and reflows every ayah above the target, sliding it
+     out of view. Worst in WBW (grid of Arabic cells re-wraps). Fix = scroll twice:
+     immediately, then again after `document.fonts.ready`.
+     Also `behavior: 'auto'` → `'instant'`. `'auto'` **defers to the CSS
+     `scroll-behavior`**, which `globals.css:52` sets to `smooth`; a smooth scroll picks
+     its destination once and never re-aims, so it *caused* the drift. `'instant'` is a
+     WebIDL enum member → old engines (Safari <15.4, Chrome <97) *throw* rather than
+     ignore it, hence the `try/catch` → `scrollIntoView(true)` fallback.
+     Dropped `useReducedMotion`: an instant jump honours the preference by construction
+     (the old `'auto'` gave those users a smooth scroll anyway).
+     **Reader-intent is read from input events** (`wheel`/`touchstart`/`keydown`,
+     passive+once), *not* from `scrollY` drift — the first version used a drift guard and
+     `/code-review` killed it: the swap moves `scrollY` by itself (height clamping,
+     scroll anchoring is default-on and fires exactly when content above the viewport
+     resizes), so the guard would skip the re-aim on precisely the long surahs it exists
+     for. Regression test pins this.
+     Fixed in the *shared* component, so the reading view gets it too, not just the WBW
+     path the bug was reported against.
+  2. *Removed bookmark stayed on `/bookmarks` until refresh.* The list is server-rendered
+     from the cookie, and the App Router **Client Router Cache** replays a back
+     navigation from the RSC payload built *before* the client-side cookie write.
+     `BookmarkButton` now calls `router.refresh()` on toggle. Compares `isBookmarked()`
+     before/after — cookie truth, not React state, which another tab or MAX_BOOKMARKS
+     eviction can desync — and skips the refresh when the write failed (blocked cookies,
+     size cap). Verified `router.refresh()` does *not* remount `ScrollToAyah`, so no
+     re-jump after tapping a bookmark.
+     Declined the `/code-review` finding that this re-runs the whole `force-dynamic`
+     surah page: the trade-off was stated in the option text the user picked.
+  Test infra: `next/navigation` `useRouter` stubbed once in `test/setup.ts` (spreading
+  `importActual` so page suites keep the real `notFound`/`redirect`); `BookmarkButton`'s
+  own suite overrides it via `vi.hoisted` to assert on `refresh`.
+  Not verified headlessly — no Playwright in the repo yet. Check landing accuracy on a
+  long surah, where the swap reflow is largest.
 - **Empty states type themselves in (#56)**: new `components/ui/TypingText.tsx`, used
   by bookmarks, search, concordance and the dictionary root list.
   **CSS, not JS** — one span per char carrying its own `animation-delay`, faded in by
