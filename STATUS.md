@@ -316,8 +316,13 @@ Re-queried directly 2026-07-22 (do not trust older counts in this file's history
   comma-strip are byte-identical there, comment included, and `main`'s
   `test_corpus_dictionary.py` has every test the branch added plus one more. It
   landed via a later PR and nobody noticed, so the branch sat "parked" for 25 days.
-  Only real difference was a `.gitignore` hunk adding `temp/` + `.worktrees/`, which
-  `main` deliberately does *not* ignore. Branch deleted, Queue item dropped.
+  Only real difference was a `.gitignore` hunk for `temp/` + `.worktrees/`, which
+  `main` already covers. Branch deleted, Queue item dropped.
+- **`.gitignore` has ignored `temp/` since PR #9 (`7f515b1`) — the 98 MB got in
+  anyway.** Every one of those commits is titled "Add files via upload", i.e. dragged
+  into GitHub's web UI, **which does not honour `.gitignore`**. Nothing was
+  misconfigured and no rule was missing; the browser upload path simply bypasses the
+  check. Worth knowing before assuming an ignore rule protects anything.
 
 ## Queue
 1. Uz gloss gap (1890 words, all short function words) — in talks with Tasnim
