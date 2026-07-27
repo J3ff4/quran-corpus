@@ -7,13 +7,35 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-07-26
+Updated: 2026-07-27
 
 ## Now
 All work below confirmed via `gh pr list --state all` + `git merge-base --is-ancestor`,
 not carried over from prior narrative.
-- PRs #1–55 all MERGED into `main`. Current tip `46b94fa` (server-rendered ayah
-  bookmark icons, #55).
+- PRs #1–56 all MERGED into `main`. Current tip `3cbe267` (typing empty states, #56).
+- **Empty states type themselves in (#56)**: new `components/ui/TypingText.tsx`, used
+  by bookmarks, search, concordance and the dictionary root list.
+  **CSS, not JS** — one span per char carrying its own `animation-delay`, faded in by
+  `.typing-char` in `globals.css`. No state, no effect, no timer.
+  A JS version (`useState(0)` + self-rescheduling `setTimeout`) was built first and
+  killed by `/code-review`: seeding the count at 0 shipped the whole message invisible
+  in the server HTML, legible only after hydration — on `/bookmarks`, a `force-dynamic`
+  page whose *point* is server rendering, that's a heading over a blank page on a slow
+  phone. The obvious patch (visible tail, effect hides it) just trades that for a
+  full-text-then-retype flash = the #52 bug. Any JS reveal must pick one; CSS avoids
+  both. Same reason `prefers-reduced-motion` is a media query, not `useReducedMotion()`
+  — the hook is client-only and would honour it one hydration too late.
+  Per-char delays are a fixed jitter cycle, not `Math.random()` (baked into server HTML,
+  must match both sides; test pins two renders byte-identical). Untyped tail is
+  transparent, not absent → no reflow/re-wrap, and the full string stays in the DOM in
+  reading order for AT/find-in-page/copy-paste, no `aria-hidden` duplicate.
+  Follow-up commit dropped the punctuation hold (read as a stall) and sped it up:
+  90ms start, 12ms/char, 80ms fade → ~1.2s for the 69-char message, was ~2.8s.
+  **Greptile pass, zero comments, both rounds.** Declined one `/code-review` finding:
+  keeping `text-center` on the centred empty states, since not reserving the tail's
+  width makes the sentence re-centre on every character.
+  Known cost: per-char spans break `getByText` (3 call-site tests moved to
+  `textContent`) and confuse in-page translation tools.
 - **Ayah bookmark icons server-rendered (#55)**: closes the gap #54 left open below.
   `bookmarkedAyahsIn(raw, surahId, view)` in `lib/bookmarks.ts` reuses the validating
   `getBookmarksFromCookie`, so cookie input stays sanitized; `/surah/[id]` and
