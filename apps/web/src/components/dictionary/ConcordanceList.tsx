@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { ConcordanceEntry, RootForm } from '@quran-corpus/data';
 import { trimConcordanceVerse } from '@quran-corpus/data/client';
+import { TypingText } from '../ui/TypingText';
 import { verseRef, concordanceHref } from '../../lib/concordance';
 import { categorizeFormLabel, formCategoryColor } from '../../lib/formCategoryColor';
 
@@ -177,7 +178,7 @@ export function ConcordanceList({
   }, [selectedFormIds.slice().sort().join(',')]);
 
   if (entries.length === 0) {
-    return <p className="px-4 py-6 text-center text-paper-500">No occurrences.</p>;
+    return <TypingText text="No occurrences." className="px-4 py-6 text-center text-paper-500" />;
   }
 
   return (

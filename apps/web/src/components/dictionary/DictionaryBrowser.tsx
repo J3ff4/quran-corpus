@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { rootFirstLetter, compareRootsArabic, type RootSearchItem } from '@quran-corpus/data/client';
 import { RootListRow } from './RootListRow';
 import { AlphabetGrid } from './AlphabetGrid';
+import { TypingText } from '../ui/TypingText';
 import { parseSort, type DictionarySort } from '../../app/dictionary/sort';
 
 interface DictionaryBrowserProps {
@@ -149,7 +150,7 @@ export function DictionaryBrowser({ roots, counts }: DictionaryBrowserProps) {
       )}
 
       {visible.length === 0 ? (
-        <p className="px-4 py-8 text-center text-paper-500">No roots found.</p>
+        <TypingText text="No roots found." className="px-4 py-8 text-center text-paper-500" />
       ) : (
         <>
           <ul className="divide-y divide-paper-200 dark:divide-night-100">

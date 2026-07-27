@@ -55,3 +55,29 @@ html {
 ::selection {
   background-color: rgb(180 160 120 / 0.3);
 }
+
+/* Typewriter reveal for empty-state text (TypingText). One span per character,
+   each carrying its own animation-delay. Kept in CSS rather than JS so the
+   reveal runs from the first paint and completes without hydration; the fade is
+   longer than the per-character stagger, so several characters are mid-fade at
+   once and the leading edge stays soft. */
+@keyframes typing-char-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.typing-char {
+  opacity: 0;
+  animation: typing-char-in 80ms ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .typing-char {
+    opacity: 1;
+    animation: none;
+  }
+}

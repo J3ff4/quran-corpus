@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { TypingText } from '../ui/TypingText';
 import type { SearchResult, JumpVerse, VerseHit } from '@quran-corpus/data';
 
 // Snippet matches are wrapped by FTS5 in STX (code 2) / ETX (code 3) sentinel
@@ -73,7 +74,7 @@ export function SearchResults({
   const { jump, verses, roots } = result;
   const empty = !jump && verses.length === 0 && roots.length === 0;
   if (empty) {
-    return <p className="py-8 text-center text-paper-500">No results.</p>;
+    return <TypingText text="No results." className="py-8 text-center text-paper-500" />;
   }
   return (
     <div>

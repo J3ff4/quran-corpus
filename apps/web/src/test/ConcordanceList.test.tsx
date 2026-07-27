@@ -33,8 +33,9 @@ describe('ConcordanceList', () => {
   });
 
   it('empty -> No occurrences', () => {
-    render(<ConcordanceList initialEntries={[]} total={0} rootBw="Aty" />);
-    expect(screen.getByText(/No occurrences/)).toBeInTheDocument();
+    // TypingText renders one span per character; assert on textContent.
+    const { container } = render(<ConcordanceList initialEntries={[]} total={0} rootBw="Aty" />);
+    expect(container).toHaveTextContent(/No occurrences/);
   });
 
   it('washes only the matched word', () => {

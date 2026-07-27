@@ -66,7 +66,8 @@ describe('SearchResults', () => {
     expect(screen.getByRole('link', { name: /surah 2/i })).toHaveAttribute('href', '/surah/2');
   });
   it('shows an empty state when nothing matches', () => {
-    render(<SearchResults result={base} />);
-    expect(screen.getByText(/no results/i)).toBeInTheDocument();
+    // TypingText renders one span per character; assert on textContent.
+    const { container } = render(<SearchResults result={base} />);
+    expect(container).toHaveTextContent(/no results/i);
   });
 });

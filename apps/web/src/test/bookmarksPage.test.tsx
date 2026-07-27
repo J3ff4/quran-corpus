@@ -40,8 +40,10 @@ describe('toBookmarkRows', () => {
 
 describe('BookmarksView', () => {
   it('shows an empty state with no bookmarks', () => {
-    render(<BookmarksView rows={[]} />);
-    expect(screen.getByText(/no bookmarks yet/i)).toBeInTheDocument();
+    // TypingText splits the message into one span per character, so match on
+    // the container's textContent rather than a single text node.
+    const { container } = render(<BookmarksView rows={[]} />);
+    expect(container).toHaveTextContent(/no bookmarks yet/i);
   });
 
   it('lists a bookmark with surah name, ayah number, and view tag', () => {
