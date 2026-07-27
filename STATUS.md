@@ -13,6 +13,13 @@ Updated: 2026-07-27
 All work below confirmed via `gh pr list --state all` + `git merge-base --is-ancestor`,
 not carried over from prior narrative.
 - PRs #1–57 all MERGED into `main`. Current tip `25fffa1` (bookmark nav fixes, #57).
+- **Uzbek alignment spike: docs kept, code archived out of git (2026-07-27)**.
+  The spike tooling (`uz_text.py`, `uz_align_eval.py`, `tools/uz_align_spike.py`
+  + tests) lives at `/home/claude/quran-data/spike/` with a README, NOT in this
+  repo — it scores against scraped third-party reference DBs, which reads badly
+  in a public repo. PR #58 closed unmerged; only the plan/spec/report landed.
+  The islom SQLCipher key was stripped from the design spec and must never be
+  re-added: it is a third party's credential, unrotatable by us.
 - **Bookmark nav, two bugs (#57)**: rebase-merged, both commits kept (`488b443`,
   `25fffa1`). Greptile pass.
   1. *Tapping a bookmark landed in the wrong place.* `ScrollToAyah` scrolled once on
@@ -281,25 +288,43 @@ Re-queried directly 2026-07-22 (do not trust older counts in this file's history
     `feat/phase-06b-morphology-ui`, `feat/phase-06c-dictionary-ui`,
     `fix/csp-nonce-static-prerender`, `fix/scraper-retry-backoff`, plus remote-only
     `fix/dev-500-schema-migration`, `docs/phase-06-plans`, `docs/prd-v2-corpus-port`.
-  - **NOT deleted — real unmerged work, still local+remote, needs a decision:**
-    - `phase-09-perf-overhaul`: 1282 lines / 49 files not in `main`.
-    - `phase-12-uzbek-wbw-glosses`: 3877 lines / 42 files not in `main` (includes
-      `packages/scraper/tools/uz_align_spike.py`) — possibly relevant to the
-      in-progress Tasnim Uzbek-gloss conversation, worth checking before it's lost.
-    - `fix/surah-frame-glyph-centering`: 53 lines beyond what PR #37 actually merged.
-    - `feat/phase-06a-dict-parser-fix`: 59 lines — this IS the parked `65a7a56`
-      commit below, same branch.
+  - The 4 held back on 2026-07-24 as "real unmerged work" are now **resolved and
+    deleted** (2026-07-27) — see below. **Zero branches remain** besides `main`.
+- **2026-07-27: the last 7 branches deleted, local + remote, and 3 worktrees removed**
+  (`.claude/worktrees/phase-14…`, `.claude/worktrees/phase-16…`,
+  `.worktrees/drawer-menu-and-ayah-bookmarks`, all clean).
+  All 7 had squash-merged PRs, which is *why* `git branch --no-merged` kept listing
+  them — squash rewrites the hash, so git cannot tell. **`--no-merged` and
+  `git diff main...<branch>` are both useless here**: three-dot diffs from an old
+  merge-base show the branch's whole original diff whether or not `main` has the
+  content. What actually works: `git log --since=<PR mergedAt> <branch>` for residual
+  commits, then `git cat-file -e main:<path>` per file.
+  - Fully landed, nothing lost: `drawer-menu-and-ayah-bookmarks` (#38),
+    `fix/surah-frame-glyph-centering` (#37), `phase-09-perf-overhaul` (#19),
+    `worktree-phase-14-wbw-list-view-verse-nav` (#40),
+    `worktree-phase-16-wbw-segment-colors` (#42).
+  - `feat/phase-06a-dict-parser-fix` — **obsolete**, see the parked-commit note below.
+  - `phase-12-uzbek-wbw-glosses` — had 9 genuinely orphaned files, landed first in
+    `chore(scraper): land the orphaned Uzbek alignment spike` (see "Now").
 - Orphan commit chain ending at `18d9e7e` ("perf(web/search): one canonical search
   sheet; retire /search page", abandoned, never merged) was reachable via
-  `phase-09-perf-overhaul` (not truly reflog-only as previously stated) — still
-  applies now that that branch is confirmed real/kept.
-- Parked commit `65a7a56` ("fix(scraper): parse number-word and comma totals in root
-  pages") still not landed on `main` — lives on `feat/phase-06a-dict-parser-fix`
-  (kept, see above), landing method still TBD.
+  `phase-09-perf-overhaul`, now deleted → reflog-only for real this time, and
+  garbage-collectable. Deliberate: the search sheet it proposed already shipped.
+- ~~Parked commit `65a7a56`~~ — **RESOLVED 2026-07-27, was a false alarm the whole
+  time.** Its fix ("parse number-word and comma totals in root pages") has been on
+  `main` for a while: `_TOTAL_RE`, `_TOTAL_ONCE_RE` and the `_parse_count`
+  comma-strip are byte-identical there, comment included, and `main`'s
+  `test_corpus_dictionary.py` has every test the branch added plus one more. It
+  landed via a later PR and nobody noticed, so the branch sat "parked" for 25 days.
+  Only real difference was a `.gitignore` hunk adding `temp/` + `.worktrees/`, which
+  `main` deliberately does *not* ignore. Branch deleted, Queue item dropped.
 
 ## Queue
 1. Uz gloss gap (1890 words, all short function words) — in talks with Tasnim
    (user's contact) as of 2026-07-24; may not need the review_glosses.py path.
+   The alignment spike that informs this (`uz_text.py`, `uz_align_eval.py`,
+   `tools/uz_align_spike.py` + the go/no-go report) is now on `main` — it was
+   stranded on a deleted branch until 2026-07-27.
 2. `ru` per-word glosses (wbw translation, the `word_glosses` table — distinct
    from verse-level `translations`, which is done, see "Now" above) — user
    explicitly wants a human/reviewed source, same as the Uzbek approach via
@@ -313,9 +338,9 @@ Re-queried directly 2026-07-22 (do not trust older counts in this file's history
    gap may apply to those).
 4. Build a translation-language switcher — both `ru` translations exist in the
    DB but are invisible in the app (reader hardcodes `en`).
-5. Land parked commit `65a7a56` — ride next scraper PR vs. standalone push, still TBD.
-6. Housekeeping above (stale branches, untracked scratch, orphan commit) — cosmetic,
-   do whenever convenient.
+5. Housekeeping above — branches are DONE (zero remain, 2026-07-27). Left: the
+   untracked scratch (`.superpowers/`, `docs/plans/phase-12-hamza-seat-fix.md`),
+   cosmetic, do whenever convenient.
 
 ## Notes
 - Uzbek edition = Cyrillic (uz.sodik). Latin variant not done.
