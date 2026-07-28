@@ -1,0 +1,198 @@
+# CodeRabbit review config. Governance itself lives in CLAUDE.md — this file
+# only teaches the bot where to look and which mistakes this repo actually makes.
+language: en-US
+tone_instructions: "Direct and technical. Skip praise. Name the failure case, not the style preference."
+
+reviews:
+  # CLAUDE.md §5 gates merges on the review passing, so the bot should push back
+  # rather than wave things through.
+  profile: assertive
+  request_changes_workflow: true
+  # request_changes_workflow only covers findings. Without this, a failure of the
+  # review service itself leaves the outward status green — the gate fails open,
+  # which is the exact Greptile behaviour this switch exists to get rid of.
+  fail_commit_status: true
+  high_level_summary: true
+  collapse_walkthrough: true
+
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    # Defaults to 5: after five reviewed commits it stops auto-reviewing, so a
+    # fix pushed later lands with no pass at all. CLAUDE.md §5 requires a re-run
+    # after every fix, so never pause.
+    auto_pause_after_reviewed_commits: 0
+    # Defaults to false, which skips draft PRs entirely — work could be pushed,
+    # reviewed by nobody, and marked ready with only the final diff ever seen.
+    # CLAUDE.md §5 gates every meaningful change, drafts included.
+    drafts: true
+
+  # The closest thing to Greptile's 5/5: named checks with deterministic
+  # pass/fail criteria. `error` blocks the merge (needs request_changes_workflow,
+  # set above); `warning` only annotates. These are what request_changes_workflow
+  # waits on before it flips to Approve — with none defined there is nothing to
+  # satisfy, so define them.
+  pre_merge_checks:
+    # Without this the PR author can tick "ignore failed checks" themselves,
+    # which makes every error-mode check above advisory. CLAUDE.md §5 says there
+    # is no override, so the author must not be able to grant themselves one.
+    override_requested_reviewers_only: true
+    title:
+      mode: error
+      requirements: >-
+        Conventional Commits: type(scope): subject. Type is one of feat, fix,
+        refactor, perf, test, docs, chore, style, build, ci. Scope names the
+        package or area (scraper, data, web/reader, web/bookmarks...). Imperative
+        mood, subject under ~72 chars.
+    description:
+      mode: error
+    # The two below are deliberately non-blocking, not an oversight.
+    #
+    # docstrings: measured coverage of exported functions is ~25% in
+    # packages/data and ~44% in apps/web components, against this threshold of
+    # 80. As `error` it would block every PR from the day it lands, including
+    # PRs that raise coverage — a gate nobody can pass gets switched off, and a
+    # gate that gets switched off protects nothing. Keep it annotating until
+    # coverage is near the threshold, then promote it.
+    #
+    # issue_assessment: this repo has never opened a GitHub issue (0, all
+    # states). The check grades a PR against its linked issues, so as `error` it
+    # would fail on every PR for lacking a link to a workflow we do not use.
+    docstrings:
+      mode: warning
+      threshold: 80
+    issue_assessment:
+      mode: warning
+
+    custom_checks:
+      - name: No secrets or credentials
+        mode: error
+        instructions: >-
+          Fail if the diff adds any credential: API key, token, password, or
+          database encryption key — including third-party ones, which cannot be
+          rotated on our side. Applies to documentation and test fixtures, not
+          just source. A long hex string presented as a key fails.
+      - name: No duplicated data logic
+        mode: error
+        instructions: >-
+          Fail if schema definitions or SQL/query logic are added to apps/ rather
+          than packages/data, or if packages/data gains a web- or Next-specific
+          import. packages/data is the single source of truth and must stay
+          portable for apps/mobile.
+      - name: Client bundle stays clean
+        mode: error
+        instructions: >-
+          Fail if a file containing 'use client' imports from
+          '@quran-corpus/data' instead of '@quran-corpus/data/client'. The
+          package barrel pulls libsql into the client bundle and breaks hydration
+          across the whole app.
+      # Blocking: CLAUDE.md §10 says "New logic ships with tests" outright, and
+      # §5 says the gate has no override. A warning-mode check for a
+      # non-negotiable rule is just a comment.
+      - name: New logic ships with tests
+        mode: error
+        instructions: >-
+          Fail if the diff adds a branch, parser, or data-access function with no
+          corresponding test. Docs-only and config-only changes are exempt.
+
+  path_filters:
+    - "!**/*.lock"
+    - "!**/uv.lock"
+    # This repo is pnpm (package.json packageManager). `!**/*.lock` does not
+    # match pnpm-lock.yaml, so name it.
+    - "!pnpm-lock.yaml"
+    - "!**/*.woff2"
+    - "!**/*.woff"
+    - "!**/*.ttf"
+    - "!**/*.otf"
+    - "!temp/**"
+    - "!.superpowers/**"
+    - "!apps/web/.next/**"
+    - "!**/dist/**"
+
+  path_instructions:
+    - path: "apps/web/src/components/**"
+      instructions: >-
+        Client components must import from @quran-corpus/data/client, never the
+        package barrel — the barrel drags libsql into the client bundle and kills
+        hydration app-wide. Flag any `from '@quran-corpus/data'` in a file with
+        'use client'.
+
+        Pair aria-expanded with aria-controls on every disclosure/collapsible.
+
+        Entrance and reveal animations on server-rendered pages must be CSS, not
+        JS: a JS reveal either blanks the content until hydration or flashes the
+        full text and retypes it.
+
+    - path: "apps/web/src/**"
+      instructions: >-
+        Anything that measures layout or scrolls on mount is computed against
+        fallback font metrics — the Arabic faces load with display:swap. Re-run
+        after document.fonts.ready, and read user-intent from input events, never
+        from scrollY (the swap moves scrollY by itself via height clamping and
+        scroll anchoring).
+
+        A client-side cookie write that feeds a server-rendered page must be
+        followed by router.refresh(), or the App Router replays a stale RSC
+        payload on back-navigation.
+
+        Pages relying on a CSP nonce cannot be statically prerendered.
+
+    - path: "packages/data/**"
+      instructions: >-
+        Single source of truth for schema and queries — flag any query or schema
+        logic duplicated into apps/. Must stay free of web/Next-specific imports
+        so apps/mobile can reuse it.
+
+        Idempotent data-only self-heals belong unconditionally in db.ts, never
+        nested inside runMigrations (DB_SKIP_MIGRATIONS skips migrations, not
+        data repair).
+
+    - path: "packages/scraper/**"
+      instructions: >-
+        Respect robots.txt and keep the ~1 req/1-2s rate limit; scrapes must stay
+        resumable and checkpointed.
+
+        Never verify an import or scrape by row count alone — count parity hides
+        misalignment. Require spot-checked alignment.
+
+    - path: "docs/**"
+      instructions: >-
+        Documentation must never record credentials, API keys, or database
+        encryption keys — including third-party ones, which cannot be rotated on
+        our side. Flag any hex string, key, or token that looks like a secret,
+        even in a design doc or a spike report.
+
+  tools:
+    # Would have caught the third-party SQLCipher key committed in a design doc.
+    gitleaks:
+      enabled: true
+    ruff:
+      enabled: true
+    eslint:
+      enabled: true
+    semgrep:
+      enabled: true
+    actionlint:
+      enabled: true
+    # Off on purpose. The Markdown here is governance and planning prose, not
+    # rendered docs — line length, heading increments and list indentation carry
+    # no meaning, and CLAUDE.md/PRD.md would drown every PR touching them in
+    # style findings. Turn it on if these files ever get published.
+    markdownlint:
+      enabled: false
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "CLAUDE.md"
+      - "PRD.md"
+  learnings:
+    scope: local
+  web_search:
+    enabled: true
+
+chat:
+  art: false
+  auto_reply: true
