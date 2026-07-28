@@ -7,16 +7,18 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-07-27
+Updated: 2026-07-28
 
 ## Now
 All work below confirmed via `gh pr list --state all` + `git merge-base --is-ancestor`,
 not carried over from prior narrative.
 - PRs #1–57 MERGED. **#58 CLOSED unmerged** (payload split, see below). **#59 OPEN,
-  CHANGES_REQUESTED.** Current tip `5f2dffd`.
+  CHANGES_REQUESTED.** **#60 MERGED** (phase 17). Current tip `edea0a0`.
   **Commit SHAs before 2026-07-27 are all dead** — history was rewritten, see purge.
+- **Next up: re-scrape the remaining 930 roots** (user-directed, after phase 17
+  landed). Carry-forward list at the end of the phase-17 section below.
 
-### Phase 17 — single-form root_forms fix, DONE (2026-07-27)
+### Phase 17 — single-form root_forms fix, DONE + MERGED (PR #60, `edea0a0`)
 
 Cause: corpus.quran.com omits `<ul class="also">` when a root has exactly
 one derived form — names it inline in prose instead. Old parser only read
@@ -48,6 +50,51 @@ letter-bucket lookup, and search — the inconsistency is invisible to every
 consumer that matters.
 Web suite: 402 tests pass (401 + 1 new), `tsc --noEmit` clean, `eslint`
 clean.
+
+**Review rounds before merge.** `/code-review` raised 5 findings; 4 fixed
+(`bdd7e7b`), 1 deferred. The two MEDIUMs were both in the new prose
+fallback: reading translit+Arabic out of `soup.get_text()` lost the tag
+boundary, so a multi-word translit (`banī isrāīl`) kept only its last token
+and glued the rest onto the POS label, and the forward `.+?` match could
+fabricate a form from an unrelated parenthesis later on the page. Fix reads
+both from the `<i class="ab">` / `<span class="at">` tags like
+`_extract_forms` already does; only the POS comes from text. Third MEDIUM:
+snapshot filenames collided on case — Buckwalter separates roots by letter
+case alone (t/T, d/D, s/S, z/Z, h/H, y/Y), 137 collision groups across 1642
+roots, so on APFS/NTFS each group would silently collapse to one file.
+Filenames now percent-encode everything outside `[a-z0-9-_.]`.
+The `nwn` catch: the first structural fix derived the lead clause by
+splitting the sentence on the translit, which breaks when the form translit
+also appears in the root header (`root nūn wāw nūn ... as the noun nūn`) —
+the split cut at the header and dropped the root's only form. **Every unit
+test stayed green.** What caught it was re-parsing all 712 saved snapshots
+old-parser vs new. Lead now walks `previous_siblings`. Post-fix the
+712-snapshot diff is identical, so no already-scraped data needs re-parsing.
+CodeRabbit: CHANGES_REQUESTED → 2 findings (rescrape command tested only its
+no-op path; MD022 here) → fixed `61c244a` → **APPROVED**.
+Final: 223 python tests, ruff 10 pre-existing / 0 new, mypy 1 pre-existing
+(`mt.py:37`) / 0 new.
+
+#### Carry into the 930-root re-scrape phase
+1. **No snapshot replay path.** Snapshots are written but nothing reads
+   them, so the next parser fix still costs a live re-fetch — exactly what
+   phase 17 paid. CLAUDE.md §11 wants "re-parsing never requires
+   re-scraping"; only the write half exists. Deferred `/code-review`
+   finding.
+2. **Resume skips done roots BEFORE the snapshot write**, so turning
+   `--snapshot-dir` on mid-run yields a partial archive with no signal it is
+   incomplete. Archive today holds 712 of 1642.
+3. **Filename encoding changed in this PR.** The 712 snapshots already on
+   disk keep their old names; any key with an uppercase letter gets
+   rewritten under a new name and leaves an orphan. Re-encode or wipe
+   `~/quran-data/.snapshots/roots` before the re-scrape.
+4. **`lane.py` `import-lane` reverts all 74 hamza seats and zeroes every
+   root's `occurrence_count`.** Fix before any re-import.
+5. `cli.py` `rescrape-formless-roots --checkpoint` still defaults to the
+   main `dict_checkpoint.json`; phase 17 passed the phase-specific one
+   explicitly. Easy footgun.
+6. Per the 2026-07-28 ruling, `root_arabic` hamza seats get levelled **up**
+   during this re-scrape (930 roots), never folded down.
 
 ### GOING PUBLIC — in progress, BLOCKED (2026-07-27)
 Decision: repo goes public, review bot switches Greptile → CodeRabbit.
