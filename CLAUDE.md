@@ -113,6 +113,16 @@ gate anyway (see below).
   self-modifying: review the gate change on its own merits before the code it
   would let through, and never in the same PR as work that benefits from the
   loosening.
+- **Read the pre-merge check table, not just the review verdict.** A failed
+  `mode: error` check holds the PR in requested-changes with no finding and no
+  comment attached to it — the reason lives only inside a collapsed `<details>`
+  block in CodeRabbit's walkthrough comment. On PR #59 (2026-07-28) that was the
+  title check, failing for a missing Conventional Commits scope while the review
+  itself read "No actionable comments were generated"; two re-reviews were spent
+  guessing before anyone opened the block, and the second exhausted the quota for
+  48 minutes. Before re-requesting a review to clear a stuck state, open the
+  walkthrough and find which check failed — re-running does not re-read what you
+  have not fixed.
 
 ### Greptile (advisory, being retired)
 - Free plan: 50 reviews/month. Quota exhaustion looks like 0 check-runs.
