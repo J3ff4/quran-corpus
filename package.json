@@ -1,0 +1,27 @@
+{
+  "name": "quran-corpus-android-app",
+  "private": true,
+  "version": "0.0.1",
+  "packageManager": "pnpm@10.34.3",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev --parallel",
+    "android": "pnpm --filter @quran-corpus/mobile android",
+    "lint": "turbo lint",
+    "type-check": "turbo type-check",
+    "test": "turbo test",
+    "generate:m0-db": "pnpm --filter @quran-corpus/mobile-data generate:m0-db",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,css,md}\" --ignore-path .gitignore"
+  },
+  "devDependencies": {
+    "@quran-corpus/config": "workspace:*",
+    "prettier": "^3.3.3",
+    "sharp": "^0.33.0",
+    "tsx": "^4.0.0",
+    "turbo": "^2.3.0"
+  }
+}

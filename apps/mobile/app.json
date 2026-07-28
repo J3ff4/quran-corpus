@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "Quran Corpus",
+    "slug": "quran-corpus-mobile",
+    "scheme": "qurancorpus",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": [
+      "assets/**/*"
+    ],
+    "android": {
+      "package": "com.qurancorpus.mobile",
+      "minSdkVersion": 26,
+      "permissions": []
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          }
+        }
+      ]
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "extends": "@quran-corpus/config/tsconfig/base",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "types": ["node"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["tests/**/*", "dist/**/*", "node_modules/**/*"]
+}
