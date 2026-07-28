@@ -48,10 +48,12 @@ so 71 is the complete population at risk and 61 is the complete unknown set.
   `scraper` for everything here.
 - Python entrypoint in `packages/scraper` is `.venv/bin/python` — plain
   `python` is not on PATH.
-- Lint/type baseline to preserve: **ruff 10 pre-existing errors**
-  (`--config pyproject.toml` — ruff resolves config relative to the linted
-  file, so an unpinned run silently reports different numbers), **mypy 1
-  pre-existing error** (`scraper/mt.py:37`). Zero new of either.
+- Lint/type baseline to preserve: **ruff 10 pre-existing errors**, measured
+  as `.venv/bin/python -m ruff check --config pyproject.toml scraper tests`.
+  Both halves matter: ruff resolves config relative to the linted file, and
+  the scope must be `scraper tests` — a bare `.` also scans `tools/` and
+  reads **12**, which is likewise pre-existing but is not this baseline.
+  Also **mypy 1 pre-existing error** (`scraper/mt.py:37`). Zero new of either.
 - Test baseline: **223 passing** in `packages/scraper`.
 - `roots.root_arabic` carries **no inter-letter spaces** — user ruling.
   `parse_root_page` already strips them; do not reintroduce.
@@ -765,7 +767,8 @@ def test_done_root_is_refetched_when_its_snapshot_is_missing(tmp_path):
     )
 
     assert len(calls) == 1
-    assert (tmp_path / "snaps" / "root_%41rD.html.gz").exists()
+    # _encode_key escapes EVERY uppercase letter, not only the first.
+    assert (tmp_path / "snaps" / "root_%41r%44.html.gz").exists()
     db.close()
 
 

@@ -336,6 +336,28 @@ class ScraperDatabase:
         self._conn.commit()
         return rid
 
+    def get_or_create_root(self, root_buckwalter: str, root_arabic: str) -> int:
+        """Return the root's id, inserting it only if absent.
+
+        Unlike upsert_root this never writes over an existing row. Additive
+        importers (Lane definitions) need a root_id but are not an authority
+        on spelling or counts -- upsert_root would fold every scraped hamza
+        seat back to bare alif and zero every occurrence_count.
+        """
+        row = self._conn.execute(
+            "SELECT id FROM roots WHERE root_buckwalter = ?", (root_buckwalter,)
+        ).fetchone()
+        if row is not None:
+            return int(row[0])
+        cur = self._conn.execute(
+            "INSERT INTO roots (root_buckwalter, root_arabic, occurrence_count)"
+            " VALUES (?, ?, 0) RETURNING id",
+            (root_buckwalter, root_arabic),
+        )
+        rid = int(cur.fetchone()[0])
+        self._conn.commit()
+        return rid
+
     def upsert_root_form(self, form: RootFormModel) -> None:
         self._conn.execute(
             """INSERT INTO root_forms
@@ -359,6 +381,19 @@ class ScraperDatabase:
             ),
         )
         self._conn.commit()
+
+    def delete_root_forms(self, root_id: int) -> int:
+        """Drop every root_forms row for ``root_id``. Returns rows deleted.
+
+        A re-parse or re-scrape replaces a root's form list wholesale.
+        Merging on ON CONFLICT(root_id, sort_order) alone would leave stale
+        tail rows whenever the page now yields fewer forms than are stored.
+        """
+        cur = self._conn.execute(
+            "DELETE FROM root_forms WHERE root_id = ?", (root_id,)
+        )
+        self._conn.commit()
+        return int(cur.rowcount)
 
     def upsert_root_definition(self, d: RootDefinitionModel) -> None:
         self._conn.execute(

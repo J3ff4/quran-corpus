@@ -15,8 +15,9 @@ not carried over from prior narrative.
 - PRs #1–57 MERGED. **#58 CLOSED unmerged** (payload split, see below). **#59 OPEN,
   CHANGES_REQUESTED.** **#60 MERGED** (phase 17). Current tip `edea0a0`.
   **Commit SHAs before 2026-07-27 are all dead** — history was rewritten, see purge.
-- **Next up: re-scrape the remaining 930 roots** (user-directed, after phase 17
-  landed). Carry-forward list at the end of the phase-17 section below.
+- **Phase 18 (930-root re-scrape) code + live run DONE** on branch
+  `feat/phase-18-remaining-roots`, not yet merged. All six phase-17 carry items
+  closed. See the Phase 18 section below.
 
 ### Phase 17 — single-form root_forms fix, DONE + MERGED (PR #60, `edea0a0`)
 
@@ -76,6 +77,7 @@ Final: 223 python tests, ruff 10 pre-existing / 0 new, mypy 1 pre-existing
 (`mt.py:37`) / 0 new.
 
 #### Carry into the 930-root re-scrape phase
+All six closed by phase 18 below.
 1. **No snapshot replay path.** Snapshots are written but nothing reads
    them, so the next parser fix still costs a live re-fetch — exactly what
    phase 17 paid. CLAUDE.md §11 wants "re-parsing never requires
@@ -95,6 +97,65 @@ Final: 223 python tests, ruff 10 pre-existing / 0 new, mypy 1 pre-existing
    explicitly. Easy footgun.
 6. Per the 2026-07-28 ruling, `root_arabic` hamza seats get levelled **up**
    during this re-scrape (930 roots), never folded down.
+
+### Phase 18 — 930-root re-scrape, code + live run DONE, NOT yet merged
+
+Branch `feat/phase-18-remaining-roots` off `edea0a0`… (`1c4d1e8`). Six
+commits, SDD run, every task reviewed clean on the first round.
+
+**Code (tasks 1–4).** `migrate-snapshot-names` re-encodes pre-`bdd7e7b`
+filenames (carry 3). `reparse-snapshots` + `scraper/replay.py` re-parse the
+archive with no network reachable from the import chain (carry 1).
+`has_snapshot` joins the resume condition, so a done-but-unarchived root is
+fetched exactly once (carry 2). `delete_root_forms` before each re-insert
+kills the stale-tail bug `ON CONFLICT(root_id, sort_order)` left behind.
+`get_or_create_root` gives `lane.py` a creation-only path so `import-lane`
+can no longer clobber scraped spellings or zero `occurrence_count` — the
+dictionary scrape stays the authority via `upsert_root` (carry 4).
+`rescrape-formless-roots --checkpoint` is now `required=True` (carry 5).
+245 python tests (223 + 22 new), ruff 10 pre-existing / 0 new, mypy 1
+pre-existing / 0 new.
+
+**Live differential before crawling (task 5).** 348 legacy filenames
+renamed, archive count held at 712, second run a no-op. Then all 712
+snapshots replayed into a copy of the live DB and diffed: **0 root rows
+differing, 0 form rows only-in-live, 0 only-in-replay, 0 differing.** The
+replay path reproduces the scrape exactly — the same technique that caught
+`root_nwn` in phase 17. Backup: `~/quran-data/quran.db.bak-phase18-20260728`
+(`VACUUM INTO`, integrity ok), checkpoint backup
+`dict_checkpoint.json.pre-phase18-20260728`.
+
+**Live crawl (task 6).** 930 roots at `--rate-limit 1.5` in three
+foreground `timeout 540` chunks, ~24 min. **Archive 712 → 1642 — every root
+in the corpus is now snapshotted**, so no future parser fix needs the
+network.
+
+Result, all acceptance criteria met:
+- **`root_arabic` changed on exactly 61 roots, all bare alif → hamza seat**
+  (`ا` → `أ`), asserted programmatically: 0 level-downs, 0 length changes,
+  0 unexpected substitutions (carry 6). Bare-alif roots remaining: **0** —
+  in root notation alif is always a seat, never a radical.
+- `occurrence_count` changed on **0** roots; mismatches vs
+  `COUNT(word_segments.root)` = **0**. The re-scrape did not undo
+  `fix-root-data`; corpus page totals agree with our derived counts.
+- Form counts changed on **0** roots. Roots with 0 forms: **0**. Roots with
+  a space in `root_arabic`: **0**. No new roots appeared.
+- Five levelled-up roots spot-checked against live pages (`Alh` `Ajr` `Akl`
+  `qrA` `sAl`) — every seat matches the page header, spaces stripped as
+  required.
+- Web 403 tests pass, data 176 pass, `tsc --noEmit` clean. (Phase 17's note
+  said 402; 403 is the current count and this branch touches no web code.)
+  `foldLetter` still folds hamza variants, so the 61 spelling changes are
+  invisible to sorting, bucket lookup, and search.
+
+Deferred minors for the final review: `_ONE_FORM_HTML` byte-duplicated in
+`test_dictionary_scrape.py` and `test_replay.py`; redundant local re-imports
+in `test_lane.py`.
+
+Two plan defects were caught by reviewing subagents and fixed in the plan:
+the ruff baseline needed its scope pinned (`scraper tests` = 10, `.` = 12),
+and a snapshot filename literal was wrong (`_encode_key` escapes **every**
+uppercase letter, so `root_ArD` → `root_%41r%44`, not `root_%41rD`).
 
 ### GOING PUBLIC — in progress, BLOCKED (2026-07-27)
 Decision: repo goes public, review bot switches Greptile → CodeRabbit.

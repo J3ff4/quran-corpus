@@ -345,3 +345,58 @@ def test_get_roots_without_forms(tmp_path):
     )
     assert db.get_roots_without_forms() == ["Alh", "ArD"]
     db.close()
+
+
+def test_delete_root_forms_removes_only_that_root(tmp_path):
+    from scraper.models import RootFormModel, RootModel
+
+    db = ScraperDatabase(str(tmp_path / "d.db"))
+    keep = db.upsert_root(
+        RootModel(root_buckwalter="ktb", root_arabic="كتب", occurrence_count=319)
+    )
+    drop = db.upsert_root(
+        RootModel(root_buckwalter="ArD", root_arabic="أرض", occurrence_count=461)
+    )
+    for rid in (keep, drop):
+        db.upsert_root_form(
+            RootFormModel(
+                root_id=rid, sort_order=0, pos_label="Noun",
+                form_arabic="ك", occurrence_count=1,
+            )
+        )
+
+    assert db.delete_root_forms(drop) == 1
+
+    remaining = db._conn.execute("SELECT root_id FROM root_forms").fetchall()
+    assert [r[0] for r in remaining] == [keep]
+    db.close()
+
+
+def test_get_or_create_root_preserves_an_existing_row(tmp_path):
+    from scraper.models import RootModel
+
+    db = ScraperDatabase(str(tmp_path / "d.db"))
+    rid = db.upsert_root(
+        RootModel(root_buckwalter="ArD", root_arabic="أرض", occurrence_count=461)
+    )
+
+    # Naive Buckwalter renders bare alif; the scraped seat must win.
+    again = db.get_or_create_root("ArD", "ارض")
+
+    assert again == rid
+    row = db._conn.execute(
+        "SELECT root_arabic, occurrence_count FROM roots WHERE id=?", (rid,)
+    ).fetchone()
+    assert (row[0], row[1]) == ("أرض", 461)
+    db.close()
+
+
+def test_get_or_create_root_inserts_when_absent(tmp_path):
+    db = ScraperDatabase(str(tmp_path / "d.db"))
+    rid = db.get_or_create_root("ktb", "كتب")
+    row = db._conn.execute(
+        "SELECT root_buckwalter, root_arabic, occurrence_count FROM roots"
+        " WHERE id=?", (rid,)
+    ).fetchone()
+    assert tuple(row) == ("ktb", "كتب", 0)
+    db.close()

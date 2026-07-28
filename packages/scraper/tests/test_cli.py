@@ -189,6 +189,16 @@ def test_rescrape_formless_roots_targets_only_formless(runner, tmp_path):
     assert reloaded.is_done("root_ktb")
 
 
+def test_rescrape_formless_roots_requires_an_explicit_checkpoint(runner, tmp_path):
+    # Sharing the main dict_checkpoint.json silently rewrites the state the
+    # full scrape resumes from. Make the operator name the file.
+    db = str(tmp_path / "t.db")
+    runner.invoke(main, ["seed", "--db", db])
+    result = runner.invoke(main, ["rescrape-formless-roots", "--db", db])
+    assert result.exit_code != 0
+    assert "checkpoint" in result.output.lower()
+
+
 def _seed_roots(db: str) -> None:
     conn = sqlite3.connect(db)
     conn.execute(
@@ -244,3 +254,77 @@ def test_normalize_root_arabic_keeps_hamza(runner, tmp_path):
     conn.close()
     runner.invoke(main, ["normalize-root-arabic", "--db", db])
     assert _root_arabic(db, ">rD") == "أرض"  # أرض, hamza kept
+
+
+def test_migrate_snapshot_names_dry_run_changes_nothing(runner, tmp_path):
+    (tmp_path / "root_lHn.html.gz").write_bytes(b"legacy")
+    result = runner.invoke(
+        main, ["migrate-snapshot-names", "--snapshot-dir", str(tmp_path), "--dry-run"]
+    )
+    assert result.exit_code == 0
+    assert "1 would be renamed" in result.output
+    # The point of --dry-run: the file is still there under its old name.
+    assert (tmp_path / "root_lHn.html.gz").exists()
+
+
+def test_migrate_snapshot_names_renames(runner, tmp_path):
+    (tmp_path / "root_lHn.html.gz").write_bytes(b"legacy")
+    result = runner.invoke(
+        main, ["migrate-snapshot-names", "--snapshot-dir", str(tmp_path)]
+    )
+    assert result.exit_code == 0
+    assert "1 renamed" in result.output
+    assert (tmp_path / "root_l%48n.html.gz").read_bytes() == b"legacy"
+
+
+def test_reparse_snapshots_reads_the_archive(runner, tmp_path):
+    from scraper.snapshots import save_snapshot
+
+    html = (
+        '<html><body>The triliteral root hamza rā ḍād '
+        '(<span class="at">أ ر ض</span>) occurs 461 times in the Quran as the '
+        'noun <i class="ab">arḍ</i> (<span class="at">أَرْض</span>).</body></html>'
+    )
+    snaps = tmp_path / "snaps"
+    save_snapshot(snaps, "root_ArD", html)
+    db = str(tmp_path / "t.db")
+    runner.invoke(main, ["seed", "--db", db])
+
+    result = runner.invoke(
+        main, ["reparse-snapshots", "--db", db, "--snapshot-dir", str(snaps)]
+    )
+
+    assert result.exit_code == 0
+    assert "1 roots updated, 0 unparseable" in result.output
+    conn = sqlite3.connect(db)
+    assert conn.execute(
+        "SELECT root_arabic FROM roots WHERE root_buckwalter='ArD'"
+    ).fetchone()[0] == "أرض"
+    conn.close()
+
+
+@pytest.mark.parametrize(
+    "cmd", ["reparse-snapshots", "migrate-snapshot-names"]
+)
+def test_snapshot_commands_reject_a_missing_archive(runner, cmd):
+    # Path.glob on a nonexistent directory yields nothing without raising, so
+    # a typo'd --snapshot-dir used to print "0 roots updated" and exit 0 --
+    # the same silent-nothing mode that hid 712 unarchived roots.
+    result = runner.invoke(main, [cmd, "--snapshot-dir", "/nonexistent/typo"])
+    assert result.exit_code != 0
+    assert "does not exist" in result.output
+
+
+def test_migrate_snapshot_names_warns_about_duplicate_keys(runner, tmp_path):
+    # An archive where every affected key already has both names renames
+    # nothing. Reporting only the count is indistinguishable from clean.
+    (tmp_path / "root_lHn.html.gz").write_bytes(b"legacy")
+    (tmp_path / "root_l%48n.html.gz").write_bytes(b"current")
+
+    result = runner.invoke(
+        main, ["migrate-snapshot-names", "--snapshot-dir", str(tmp_path)]
+    )
+
+    assert result.exit_code == 0
+    assert "0 renamed" in result.output
+    assert "warning: root_lHn archived under 2 names" in result.output

@@ -92,7 +92,12 @@ def scrape_dictionary_cmd(
 
 @main.command("rescrape-formless-roots")
 @click.option("--db", default="quran.db", show_default=True, help="SQLite output path")
-@click.option("--checkpoint", default="dict_checkpoint.json", show_default=True)
+@click.option(
+    "--checkpoint",
+    required=True,
+    help="Checkpoint file. Required: defaulting to the main dict_checkpoint"
+         " would mark roots done in the checkpoint the full scrape depends on.",
+)
 @click.option(
     "--snapshot-dir", default=".snapshots/roots", show_default=True,
     help="Persist raw HTML here so a future parser fix needs no re-fetch",
@@ -134,6 +139,65 @@ def rescrape_formless_roots_cmd(
     click.echo(
         f"rescrape-formless-roots: {count} roots re-scraped, "
         f"{remaining} still without forms."
+    )
+
+
+@main.command("migrate-snapshot-names")
+@click.option(
+    "--snapshot-dir", default=".snapshots/roots", show_default=True,
+    type=click.Path(exists=True, file_okay=False),
+    help="Snapshot archive to rename in place",
+)
+@click.option("--dry-run", is_flag=True, help="List renames without doing them")
+def migrate_snapshot_names_cmd(snapshot_dir: str, dry_run: bool) -> None:
+    """Rename snapshots written before the filename encoder changed.
+
+    Idempotent. Run once against an archive predating the uppercase-escaping
+    encoder, or a re-scrape leaves a second file per affected root.
+    """
+    from .snapshots import (
+        duplicate_key_names,
+        legacy_names_to_migrate,
+        migrate_legacy_names,
+    )
+
+    # Duplicates are exactly what the migration declines to touch, so reporting
+    # only the rename count would print "0 renamed" for an archive that still
+    # holds a stale copy of every affected root.
+    for key, names in duplicate_key_names(snapshot_dir):
+        click.echo(f"warning: {key} archived under {len(names)} names: {names}")
+    if dry_run:
+        pending = legacy_names_to_migrate(snapshot_dir)
+        for old, new in pending:
+            click.echo(f"{old} -> {new}")
+        click.echo(f"migrate-snapshot-names: {len(pending)} would be renamed.")
+        return
+    moved = migrate_legacy_names(snapshot_dir)
+    click.echo(f"migrate-snapshot-names: {len(moved)} renamed.")
+
+
+@main.command("reparse-snapshots")
+@click.option("--db", default="quran.db", show_default=True, help="SQLite output path")
+@click.option(
+    "--snapshot-dir", default=".snapshots/roots", show_default=True,
+    type=click.Path(exists=True, file_okay=False),
+    help="Archive to re-parse (written by scrape-dictionary --snapshot-dir)",
+)
+def reparse_snapshots_cmd(db: str, snapshot_dir: str) -> None:
+    """Re-parse saved root HTML into the DB. No network, idempotent.
+
+    Use after any change to parse_root_page instead of re-crawling.
+    """
+    from .replay import replay_root_snapshots
+
+    database = ScraperDatabase(db)
+    try:
+        updated, bad, unreadable = replay_root_snapshots(snapshot_dir, database)
+    finally:
+        database.close()
+    click.echo(
+        f"reparse-snapshots: {updated} roots updated, {bad} unparseable, "
+        f"{unreadable} unreadable."
     )
 
 

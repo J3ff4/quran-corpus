@@ -12,7 +12,7 @@ from pathlib import Path
 
 from ..buckwalter import buckwalter_to_arabic
 from ..db import ScraperDatabase
-from ..models import RootDefinitionModel, RootModel
+from ..models import RootDefinitionModel
 
 # Lane's Lexicon alternatives are "/"-joined with no space (e.g.
 # "abandon/desert/relinquish"), which browsers can't wrap on — one unbroken
@@ -41,11 +41,10 @@ def import_lane_definitions(
             if not bw or not definition:
                 continue
             definition = normalize_slash_spacing(definition)
-            rid = db.upsert_root(
-                RootModel(
-                    root_buckwalter=bw, root_arabic=buckwalter_to_arabic(bw) or bw
-                )
-            )
+            # get_or_create, not upsert: Lane is an additive definitions
+            # layer. Overwriting would revert every scraped hamza seat to
+            # bare alif and zero every occurrence_count.
+            rid = db.get_or_create_root(bw, buckwalter_to_arabic(bw) or bw)
             db.upsert_root_definition(
                 RootDefinitionModel(root_id=rid, source=source, definition=definition)
             )

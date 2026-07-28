@@ -40,3 +40,45 @@ def test_import_creates_missing_root(tmp_path):
     assert n == 2
     assert db._conn.execute("SELECT COUNT(*) FROM roots").fetchone()[0] == 2
     db.close()
+
+
+def test_import_lane_does_not_revert_a_scraped_hamza_seat(tmp_path):
+    from scraper.db import ScraperDatabase
+    from scraper.models import RootModel
+    from scraper.sources.lane import import_lane_definitions
+
+    db = ScraperDatabase(str(tmp_path / "t.db"))
+    db.upsert_root(
+        RootModel(root_buckwalter="ArD", root_arabic="أرض", occurrence_count=461)
+    )
+    tsv = tmp_path / "lane.tsv"
+    tsv.write_text("ArD\tearth/land\n", encoding="utf-8")
+
+    assert import_lane_definitions(tsv, db) == 1
+
+    row = db._conn.execute(
+        "SELECT root_arabic, occurrence_count FROM roots"
+        " WHERE root_buckwalter='ArD'"
+    ).fetchone()
+    # Lane is an additive definitions layer. It is not an authority on
+    # spelling or counts, and re-running it must not undo the scrape.
+    assert (row[0], row[1]) == ("أرض", 461)
+    db.close()
+
+
+def test_import_lane_still_creates_a_missing_root(tmp_path):
+    from scraper.db import ScraperDatabase
+    from scraper.sources.lane import import_lane_definitions
+
+    db = ScraperDatabase(str(tmp_path / "t.db"))
+    tsv = tmp_path / "lane.tsv"
+    tsv.write_text("ktb\twrite/inscribe\n", encoding="utf-8")
+
+    assert import_lane_definitions(tsv, db) == 1
+
+    # Definitions must still be loadable before the dictionary scrape runs.
+    row = db._conn.execute(
+        "SELECT root_arabic FROM roots WHERE root_buckwalter='ktb'"
+    ).fetchone()
+    assert row is not None
+    db.close()

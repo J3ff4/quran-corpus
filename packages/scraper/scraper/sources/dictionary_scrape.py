@@ -17,7 +17,7 @@ from ..checkpoint import Checkpoint
 from ..db import ScraperDatabase
 from ..http_retry import get_with_retry
 from ..models import ConceptTagModel, RootFormModel, RootModel
-from ..snapshots import save_snapshot
+from ..snapshots import has_snapshot, save_snapshot
 from .corpus_dictionary import parse_root_page
 from .corpus_word_detail import parse_word_detail
 
@@ -54,9 +54,22 @@ def scrape_dictionary(
     with client_factory() as client:
         for bw in roots:
             key = f"root_{bw}"
-            if checkpoint.is_done(key):
+            # Two completeness conditions, not one. The checkpoint says the DB
+            # row is written; the archive says the raw HTML is kept (§11).
+            # Requiring both lets --snapshot-dir back-fill an already-scraped
+            # corpus, instead of silently archiving nothing -- which is how
+            # 712 of 1642 roots ended up on disk.
+            if checkpoint.is_done(key) and (
+                snapshot_dir is None or has_snapshot(snapshot_dir, key)
+            ):
                 continue
             resp = get_with_retry(client, _DICT_URL.format(bw=bw))
+            # Saving the snapshot satisfies the second resume condition while
+            # the first may already be satisfied, so an interrupt before the
+            # forms below are re-inserted would skip this root forever -- with
+            # delete_root_forms having already emptied it. Drop the checkpoint
+            # first; line ~97 re-marks it once the row is actually written.
+            checkpoint.clear(key)
             if snapshot_dir is not None:
                 save_snapshot(snapshot_dir, key, resp.text)
             parsed = parse_root_page(resp.text)
@@ -70,6 +83,10 @@ def scrape_dictionary(
                         occurrence_count=parsed.occurrence_count,
                     )
                 )
+                # The page is authoritative for the whole form list. Merging
+                # per sort_order would keep stale tail rows when a root now
+                # yields fewer forms than are stored.
+                db.delete_root_forms(rid)
                 for form in parsed.forms:
                     db.upsert_root_form(
                         RootFormModel(
