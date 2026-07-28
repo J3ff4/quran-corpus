@@ -18,7 +18,9 @@ def ktb() -> ParsedRoot:
 
 
 def test_root_arabic(ktb: ParsedRoot) -> None:
-    assert ktb.root_arabic.replace(" ", "") == "كتب"
+    # Compact is canonical: corpus renders the header as "ك ت ب" but roots
+    # carry NO inter-letter whitespace in the DB.
+    assert ktb.root_arabic == "كتب"
 
 
 def test_total_occurrence(ktb: ParsedRoot) -> None:
@@ -121,3 +123,131 @@ def test_see_also_only_page_has_no_forms() -> None:
     assert parsed is not None
     assert parsed.occurrence_count == 28
     assert parsed.forms == []
+
+
+# Corpus omits <ul class="also"> when a root has exactly ONE derived form and
+# states it inline instead. 712 roots (43.4%) hit this. Real sentences, 2026-07-27.
+_ONE_FORM_ONCE_HTML = (
+    '<html><body>The triliteral root shīn ʿayn lām '
+    '(<span class="at">ش ع ل</span>) occurs only once in the Quran, as the '
+    'form VIII verb <i class="ab">ish\'taʿala</i> '
+    '(<span class="at">ٱشْتَعَلَ</span>).</body></html>'
+)
+_ONE_FORM_MANY_HTML = (
+    '<html><body>The triliteral root hamza rā ḍād '
+    '(<span class="at">أ ر ض</span>) occurs 461 times in the Quran as the '
+    'noun <i class="ab">arḍ</i> (<span class="at">أَرْض</span>).</body></html>'
+)
+
+
+def test_single_form_root_once_is_parsed() -> None:
+    parsed = parse_root_page(_ONE_FORM_ONCE_HTML)
+    assert parsed is not None
+    assert parsed.occurrence_count == 1
+    assert len(parsed.forms) == 1
+    f = parsed.forms[0]
+    assert f.sort_order == 0
+    assert f.pos_label == "Form VIII verb"
+    assert f.form_translit == "ish'taʿala"
+    assert f.form_arabic == "ٱشْتَعَلَ"
+    # Only form, so it accounts for every occurrence of the root.
+    assert f.occurrence_count == 1
+
+
+def test_single_form_root_high_frequency_is_parsed() -> None:
+    # Trigger is ONE form, not low frequency -- this root occurs 461 times.
+    parsed = parse_root_page(_ONE_FORM_MANY_HTML)
+    assert parsed is not None
+    assert len(parsed.forms) == 1
+    assert parsed.forms[0].pos_label == "Noun"
+    assert parsed.forms[0].form_translit == "arḍ"
+    assert parsed.forms[0].occurrence_count == 461
+
+
+# A multi-word translit must stay whole. Reading it out of flattened text with
+# a \S+ match kept only the last token and glued the rest onto the POS label
+# ("Proper noun banī" / "isrāīl").
+_MULTI_WORD_TRANSLIT_HTML = (
+    '<html><body>The triliteral root bā nūn yā '
+    '(<span class="at">ب ن ي</span>) occurs 5 times in the Quran as the '
+    'proper noun <i class="ab">banī isrāīl</i> '
+    '(<span class="at">بَنِىٓ إِسْرَٰٓءِيل</span>).</body></html>'
+)
+
+
+def test_single_form_multi_word_translit_stays_whole() -> None:
+    parsed = parse_root_page(_MULTI_WORD_TRANSLIT_HTML)
+    assert parsed is not None
+    assert len(parsed.forms) == 1
+    f = parsed.forms[0]
+    assert f.form_translit == "banī isrāīl"
+    assert f.pos_label == "Proper noun"
+    assert f.form_arabic == "بَنِىٓ إِسْرَٰٓءِيل"
+
+
+# The inline sentence names no Arabic, so there is no form to record. Matching
+# forward through flattened text used to fabricate one from the next
+# parenthesis anywhere on the page ("Lane Lexicon (page 42)").
+_NO_ARABIC_INLINE_HTML = (
+    '<html><body><p>The triliteral root kāf tā bā '
+    '(<span class="at">ك ت ب</span>) occurs 319 times in the Quran, as the '
+    "noun kitab.</p>"
+    '<p>See Also: <i class="ab">Lane Lexicon</i> (page 42).</p>'
+    "</body></html>"
+)
+
+
+def test_single_form_without_arabic_fabricates_nothing() -> None:
+    parsed = parse_root_page(_NO_ARABIC_INLINE_HTML)
+    assert parsed is not None
+    assert parsed.occurrence_count == 319
+    assert parsed.forms == []
+
+
+# Root nwn: the form's translit ("nūn") also occurs inside the root header
+# ("nūn wāw nūn"). Deriving the lead text by splitting the sentence on the
+# translit cuts at the header and drops the whole "as the noun" clause.
+_TRANSLIT_REPEATS_IN_HEADER_HTML = (
+    '<html><body><p>The triliteral root nūn wāw nūn '
+    '(<span class="at">ن و ن</span>) occurs only once in the Quran, as the '
+    'noun <i class="ab">nūn</i> (<span class="at">نُّون</span>).</p>'
+    "</body></html>"
+)
+
+
+def test_single_form_translit_repeated_in_header_still_parses() -> None:
+    parsed = parse_root_page(_TRANSLIT_REPEATS_IN_HEADER_HTML)
+    assert parsed is not None
+    assert len(parsed.forms) == 1
+    assert parsed.forms[0].pos_label == "Noun"
+    assert parsed.forms[0].form_translit == "nūn"
+    assert parsed.forms[0].form_arabic == "نُّون"
+
+
+def test_multi_form_page_ignores_the_prose_fallback(ktb: ParsedRoot) -> None:
+    # The fallback must never fire when the list parsed; guards against a
+    # stray sentence match overwriting real per-form counts.
+    # ktb: 319 occurrences across 7 forms counting [49,1,1,260,1,6,1] --
+    # none equals the total, so a fallback form would stand out immediately.
+    assert len(ktb.forms) == 7
+    assert all(f.occurrence_count != ktb.occurrence_count for f in ktb.forms)
+
+
+# The root header is HTML, so the separator between letters may be any
+# whitespace -- a plain space, a newline, or a non-breaking space. All of it
+# must go; `get_text(strip=True)` only trims the ends.
+def test_root_arabic_strips_every_whitespace_form() -> None:
+    html = _WORD_TOTAL_HTML.replace(
+        '<span class="at">ش أ م</span>', '<span class="at">ش\nط\u00a0ن</span>'
+    )
+    parsed = parse_root_page(html)
+    assert parsed is not None
+    assert parsed.root_arabic == "شطن"
+
+
+def test_root_arabic_keeps_corpus_hamza() -> None:
+    # Whitespace-only normalization: corpus's hamza spelling is the correct
+    # orthography and must survive (>rD -> أرض, never ارض).
+    parsed = parse_root_page(_ONE_FORM_MANY_HTML)
+    assert parsed is not None
+    assert parsed.root_arabic == "أرض"

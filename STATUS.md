@@ -16,6 +16,39 @@ not carried over from prior narrative.
   CHANGES_REQUESTED.** Current tip `5f2dffd`.
   **Commit SHAs before 2026-07-27 are all dead** — history was rewritten, see purge.
 
+### Phase 17 — single-form root_forms fix, DONE (2026-07-27)
+
+Cause: corpus.quran.com omits `<ul class="also">` when a root has exactly
+one derived form — names it inline in prose instead. Old parser only read
+the list → 712/1642 roots (43.4%) had zero `root_forms` rows. Fixed:
+`_extract_forms(soup) or <prose fallback>`, fallback only fires when the
+list is genuinely empty (structurally can't clobber a multi-form page).
+Re-scraped all 712 zero-form roots against live corpus.quran.com (1.5s/req,
+resumable checkpoint `dict_checkpoint_phase17.json`, separate from the main
+one). Raw HTML snapshotted gzipped to `~/quran-data/.snapshots/roots/`
+(one `.html.gz` per root, `.snapshots/` gitignored, outside repo in
+practice — regenerable, referenced by nothing).
+Result, re-verified live: **0 zero-form roots** (was 712), `1 form` bucket
+= **712** exactly, no residue to explain. `ArD` → `('Noun', 'أَرْض', 461)`.
+`FormFilterChips` needed no code change (already renders any non-empty
+`forms`) — added a regression test pinning a single-form root still
+renders its chip, so a future "optimize away the useless 1-option filter"
+PR can't silently hide it. `/dictionary/ArD` spot-checked via curl: exactly
+one chip, `Noun` / `أَرْض` / `461`.
+Side effect surfaced by the re-scrape: **`roots.root_arabic` had
+inter-letter spaces on 846 rows** (603 introduced by this phase's
+re-scrape, 243 pre-existing from earlier scrapes) — e.g. `أ ر ض` instead
+of `أرض`. New `scraper normalize-root-arabic` CLI command strips them;
+ran once, live DB now has 0 rows with a space in `root_arabic`. For 58 of
+those roots the corpus spelling *also* differs from ours in hamza seat —
+kept deliberately (`ArD` stays `أرض`, not `ارض`), so hamza is inconsistent
+across the table **by design**. Safe because `foldLetter` in
+`packages/data/src/text/arabic.ts` folds hamza variants before sorting,
+letter-bucket lookup, and search — the inconsistency is invisible to every
+consumer that matters.
+Web suite: 402 tests pass (401 + 1 new), `tsc --noEmit` clean, `eslint`
+clean.
+
 ### GOING PUBLIC — in progress, BLOCKED (2026-07-27)
 Decision: repo goes public, review bot switches Greptile → CodeRabbit.
 

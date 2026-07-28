@@ -106,6 +106,34 @@ function foldLetter(ch: string): string {
   return FOLD[ch] ?? ch;
 }
 
+/** Normal form for comparing a root against user input: whitespace dropped,
+ *  alef/ya variants folded. `أرض`, `ارض` and `أ ر ض` all reduce to the same
+ *  key, so a search matches whatever spelling the keyboard produced. */
+export function foldRootArabic(root: string): string {
+  let out = '';
+  for (const ch of root) {
+    if (/\s/.test(ch)) continue;
+    out += foldLetter(ch);
+  }
+  return out;
+}
+
+/** The SQL half of `foldRootArabic`: an expression folding `col` the same way,
+ *  built by reducing over FOLD so the pairs are never restated (CLAUDE.md §3).
+ *  FOLD is a module constant and `col` is a caller-written column reference —
+ *  no user input reaches this string; queries still bind their `?` params.
+ *
+ *  ponytail: strips U+0020 only, where the TS side strips all `\s` — the
+ *  column is whitespace-free by construction (parser + normalize-root-arabic),
+ *  so this is just belt-and-braces for a legacy DB. Extend the chain with
+ *  char(9)/char(10)/char(160) if that ever stops holding. */
+export function foldRootArabicSql(col: string): string {
+  return Object.entries(FOLD).reduce(
+    (expr, [from, to]) => `replace(${expr},'${from}','${to}')`,
+    `replace(${col},' ','')`,
+  );
+}
+
 function orderKey(root: string): number[] {
   const key: number[] = [];
   for (const ch of root) {

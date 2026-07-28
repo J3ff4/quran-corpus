@@ -8,6 +8,7 @@ export { EMPTY_SEARCH_RESULT } from './constants.js';
 export {
   buckwalterToArabic,
   compareRootsArabic,
+  foldRootArabic,
   rootFirstLetter,
   ARABIC_ALPHABET_ORDER,
 } from './text/arabic.js';

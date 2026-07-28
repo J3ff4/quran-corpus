@@ -465,3 +465,35 @@ describe('roots queries', () => {
     expect(vw.find((w) => w.text_arabic === 'y')!.starts_clause).toBe(false);
   });
 });
+
+// searchRoots must be blind to the two ways a user's Arabic differs from the
+// stored spelling: inter-letter spaces, and hamza seat. The DB stores compact
+// corpus orthography ("أرض"); most keyboards produce bare alef first ("ارض").
+describe('searchRoots normalizes Arabic', () => {
+  let sdb: Client;
+  beforeAll(async () => {
+    sdb = createDatabase('file::memory:');
+    await runMigrations(sdb);
+    await sdb.execute(
+      `INSERT INTO roots (root_buckwalter,root_arabic,occurrence_count)
+       VALUES ('ArD','\u0623\u0631\u0636',461),('ktb','\u0643\u062a\u0628',319)`,
+    );
+  });
+  afterAll(() => sdb.close());
+
+  it('bare-alef query matches a hamza-seat root', async () => {
+    const hits = await searchRoots(sdb, '\u0627\u0631\u0636'); // ارض
+    expect(hits.map((r) => r.root_buckwalter)).toEqual(['ArD']);
+  });
+  it('spaced query matches a compact root', async () => {
+    const hits = await searchRoots(sdb, '\u0643 \u062a \u0628'); // ك ت ب
+    expect(hits.map((r) => r.root_buckwalter)).toEqual(['ktb']);
+  });
+  it('exact stored spelling still matches', async () => {
+    const hits = await searchRoots(sdb, '\u0623\u0631\u0636'); // أرض
+    expect(hits.map((r) => r.root_buckwalter)).toEqual(['ArD']);
+  });
+  it('a non-matching root is not returned', async () => {
+    expect(await searchRoots(sdb, '\u0632\u0632\u0632')).toEqual([]); // ززز
+  });
+});

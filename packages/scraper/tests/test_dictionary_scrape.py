@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import patch
 
 from scraper.checkpoint import Checkpoint
 from scraper.db import ScraperDatabase
@@ -73,6 +74,49 @@ def test_scrape_dictionary_writes_root(tmp_path):
         == 0
     )
     db.close()
+
+
+def test_scrape_dictionary_honours_explicit_root_list(tmp_path):
+    # Re-scraping only the broken roots must not re-fetch all 1,642.
+    db = _seed(tmp_path)
+    html = (FIX / "corpus_dict_ktb.html").read_text(encoding="utf-8")
+    ck = Checkpoint(str(tmp_path / "c.json"))
+    n = scrape_dictionary(
+        db, ck, client_factory=lambda: _FakeClient(html), rate_limit=0, roots=[]
+    )
+    assert n == 0
+    assert not ck.is_done("root_ktb")
+
+
+def test_scrape_dictionary_writes_snapshots(tmp_path):
+    db = _seed(tmp_path)
+    html = (FIX / "corpus_dict_ktb.html").read_text(encoding="utf-8")
+    ck = Checkpoint(str(tmp_path / "c.json"))
+    snaps = tmp_path / "snaps"
+    scrape_dictionary(
+        db,
+        ck,
+        client_factory=lambda: _FakeClient(html),
+        rate_limit=0,
+        snapshot_dir=snaps,
+    )
+    written = list(snaps.glob("*.html.gz"))
+    assert len(written) == 1
+
+
+def test_scrape_dictionary_writes_no_snapshots_by_default(tmp_path):
+    db = _seed(tmp_path)
+    html = (FIX / "corpus_dict_ktb.html").read_text(encoding="utf-8")
+    ck = Checkpoint(str(tmp_path / "c.json"))
+    # Assert the behaviour, not a filesystem side effect: pytest's CWD is the
+    # package root, not tmp_path, so globbing tmp_path would miss a snapshot
+    # written to the CLI's relative default (".snapshots/roots") and pass
+    # vacuously. Patching at the call site is CWD-independent.
+    with patch("scraper.sources.dictionary_scrape.save_snapshot") as mock_save:
+        scrape_dictionary(
+            db, ck, client_factory=lambda: _FakeClient(html), rate_limit=0
+        )
+    mock_save.assert_not_called()
 
 
 def test_scrape_word_details_writes_description(tmp_path):

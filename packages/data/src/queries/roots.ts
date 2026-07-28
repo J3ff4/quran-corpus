@@ -8,7 +8,7 @@ import type {
   VerseWord,
   RootSearchItem,
 } from '../types.js';
-import { compareRootsArabic } from '../text/arabic.js';
+import { compareRootsArabic, foldRootArabic, foldRootArabicSql } from '../text/arabic.js';
 import { stripQuranicAnnotations } from '../text/normalize.js';
 
 function rowToRoot(r: Row): Root {
@@ -150,12 +150,18 @@ export async function getRootsByFrequency(db: Client, limit = 200): Promise<Root
 
 export async function searchRoots(db: Client, q: string): Promise<Root[]> {
   const like = `%${q}%`;
+  // Arabic is matched on the folded form of BOTH sides: the stored spelling is
+  // corpus orthography (`أرض`) but most keyboards produce bare alef first, and
+  // a pasted root may still carry inter-letter spaces.
+  const arabicLike = `%${foldRootArabic(q)}%`;
   const res = await db.execute({
     sql: `SELECT DISTINCT r.* FROM roots r
           LEFT JOIN root_forms f ON f.root_id = r.id
-          WHERE r.root_buckwalter LIKE ? OR r.root_arabic LIKE ? OR f.gloss LIKE ?
+          WHERE r.root_buckwalter LIKE ?
+             OR ${foldRootArabicSql('r.root_arabic')} LIKE ?
+             OR f.gloss LIKE ?
           ORDER BY r.occurrence_count DESC LIMIT 100`,
-    args: [like, like, like],
+    args: [like, arabicLike, like],
   });
   return res.rows.map(rowToRoot);
 }

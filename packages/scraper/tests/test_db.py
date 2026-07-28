@@ -301,3 +301,47 @@ def test_gloss_source_column_and_backfill(tmp_path) -> None:
     ).fetchone()["source"]
     assert src == "corpus"
     db.close()
+
+
+def test_get_roots_without_forms(tmp_path):
+    from scraper.db import ScraperDatabase
+    from scraper.models import RootFormModel, RootModel
+
+    db = ScraperDatabase(str(tmp_path / "d.db"))
+    with_forms = db.upsert_root(
+        RootModel(root_buckwalter="ktb", root_arabic="ك ت ب", occurrence_count=319)
+    )
+    db.upsert_root(
+        RootModel(root_buckwalter="ArD", root_arabic="أ ر ض", occurrence_count=461)
+    )
+    db.upsert_root_form(
+        RootFormModel(
+            root_id=with_forms,
+            sort_order=0,
+            pos_label="Noun",
+            form_arabic="كِتَٰب",
+            form_translit="kitāb",
+            gloss=None,
+            occurrence_count=230,
+        )
+    )
+    assert db.get_roots_without_forms() == ["ArD"]
+
+    # A form row with no Arabic is See-Also junk from an old scrape: the UI
+    # filters it out, so it must not count as "has forms" here either.
+    junk_root = db.upsert_root(
+        RootModel(root_buckwalter="Alh", root_arabic="أ ل ه", occurrence_count=2851)
+    )
+    db.upsert_root_form(
+        RootFormModel(
+            root_id=junk_root,
+            sort_order=0,
+            pos_label="Lane's Lexicon",
+            form_arabic=None,
+            form_translit=None,
+            gloss=None,
+            occurrence_count=0,
+        )
+    )
+    assert db.get_roots_without_forms() == ["Alh", "ArD"]
+    db.close()

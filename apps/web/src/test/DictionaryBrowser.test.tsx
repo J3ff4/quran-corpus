@@ -57,6 +57,17 @@ describe('DictionaryBrowser', () => {
     expect(screen.getByText('س م و')).toBeInTheDocument();
   });
 
+  // The branch stores corpus's hamza seat (ArD -> أرض). A bare-alif keyboard
+  // spelling must still find it — same folding the server-side searchRoots does.
+  it('typing folds the hamza seat (ارض finds أرض)', () => {
+    const seated: RootSearchItem[] = [
+      { id: 1, root_buckwalter: 'ArD', root_arabic: 'أرض', occurrence_count: 461, gloss_blob: null },
+    ];
+    render(<DictionaryBrowser roots={seated} counts={{ ا: 1 }} />);
+    fireEvent.change(screen.getByRole('searchbox', { name: /search/i }), { target: { value: 'ارض' } });
+    expect(screen.getByText('أرض')).toBeInTheDocument();
+  });
+
   it('typing filters by meaning (gloss)', () => {
     render(<DictionaryBrowser roots={roots} counts={counts} />);
     fireEvent.change(screen.getByRole('searchbox', { name: /search/i }), { target: { value: 'book' } });

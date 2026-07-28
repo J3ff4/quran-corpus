@@ -10,6 +10,20 @@ def main() -> None:
     """Quran corpus scraper and data importer."""
 
 
+# Shared --rate-limit for every command that hits corpus.quran.com.
+# CLAUDE.md §11 pins the crawl to ~1 req / 1.5-2s and calls it non-negotiable,
+# so the floor is enforced by click rather than left to the operator. Defined
+# once, not copied per command: a new scrape command wired with this decorator
+# cannot silently disagree with its neighbours about the floor.
+rate_limit_option = click.option(
+    "--rate-limit",
+    type=click.FloatRange(min=1.5),
+    default=1.5,
+    show_default=True,
+    help="Seconds between requests (floor 1.5, CLAUDE.md §11)",
+)
+
+
 @main.command()
 @click.option("--db", default="quran.db", show_default=True)
 def seed(db: str) -> None:
@@ -24,9 +38,7 @@ def seed(db: str) -> None:
 @click.option("--db", default="quran.db", show_default=True, help="SQLite output path")
 @click.option("--checkpoint", default="checkpoint.json", show_default=True)
 @click.option("--surah", type=int, default=None, help="Scrape single surah (1-114)")
-@click.option(
-    "--rate-limit", default=1.5, show_default=True, help="Seconds between requests"
-)
+@rate_limit_option
 @click.option(
     "--force", is_flag=True, help="Re-scrape even if checkpoint marks a chapter done"
 )
@@ -56,9 +68,13 @@ def scrape(
 @click.option("--db", default="quran.db", show_default=True, help="SQLite output path")
 @click.option("--checkpoint", default="dict_checkpoint.json", show_default=True)
 @click.option(
-    "--rate-limit", default=1.5, show_default=True, help="Seconds between requests"
+    "--snapshot-dir", default=".snapshots/roots", show_default=True,
+    help="Persist raw HTML here (CLAUDE.md §11)",
 )
-def scrape_dictionary_cmd(db: str, checkpoint: str, rate_limit: float) -> None:
+@rate_limit_option
+def scrape_dictionary_cmd(
+    db: str, checkpoint: str, snapshot_dir: str, rate_limit: float
+) -> None:
     """Scrape qurandictionary.jsp for every distinct root (rate-limited, resumable).
 
     Requires roots to exist in the DB first (run import-corpus).
@@ -67,17 +83,64 @@ def scrape_dictionary_cmd(db: str, checkpoint: str, rate_limit: float) -> None:
 
     database = ScraperDatabase(db)
     ckpt = Checkpoint(checkpoint)
-    count = scrape_dictionary(database, ckpt, rate_limit=rate_limit)
+    count = scrape_dictionary(
+        database, ckpt, rate_limit=rate_limit, snapshot_dir=snapshot_dir
+    )
     database.close()
     click.echo(f"Dictionary scrape complete: {count} roots.")
+
+
+@main.command("rescrape-formless-roots")
+@click.option("--db", default="quran.db", show_default=True, help="SQLite output path")
+@click.option("--checkpoint", default="dict_checkpoint.json", show_default=True)
+@click.option(
+    "--snapshot-dir", default=".snapshots/roots", show_default=True,
+    help="Persist raw HTML here so a future parser fix needs no re-fetch",
+)
+@rate_limit_option
+def rescrape_formless_roots_cmd(
+    db: str, checkpoint: str, snapshot_dir: str, rate_limit: float
+) -> None:
+    """Re-scrape only roots that currently have zero derived forms.
+
+    Phase 17: the old parser dropped single-form roots, leaving 712 of them
+    empty. Clears just those roots' checkpoint keys so the run is resumable
+    without redoing the other ~930.
+    """
+    from .sources.dictionary_scrape import scrape_dictionary
+
+    database = ScraperDatabase(db)
+    try:
+        targets = database.get_roots_without_forms()
+        if not targets:
+            click.echo("rescrape-formless-roots: nothing to do.")
+            return
+
+        ckpt = Checkpoint(checkpoint)
+        for bw in targets:
+            ckpt.clear(f"root_{bw}")
+
+        click.echo(f"re-scraping {len(targets)} formless roots...")
+        count = scrape_dictionary(
+            database,
+            ckpt,
+            rate_limit=rate_limit,
+            roots=targets,
+            snapshot_dir=snapshot_dir,
+        )
+        remaining = len(database.get_roots_without_forms())
+    finally:
+        database.close()
+    click.echo(
+        f"rescrape-formless-roots: {count} roots re-scraped, "
+        f"{remaining} still without forms."
+    )
 
 
 @main.command("scrape-word-details")
 @click.option("--db", default="quran.db", show_default=True, help="SQLite output path")
 @click.option("--checkpoint", default="worddetail_checkpoint.json", show_default=True)
-@click.option(
-    "--rate-limit", default=1.5, show_default=True, help="Seconds between requests"
-)
+@rate_limit_option
 def scrape_word_details_cmd(db: str, checkpoint: str, rate_limit: float) -> None:
     """Scrape wordmorphology.jsp verbatim strings for every word (resumable)."""
     from .sources.dictionary_scrape import scrape_word_details
@@ -236,6 +299,18 @@ def derive_word_arabic_cmd(db: str) -> None:
     finally:
         database.close()
     click.echo(f"derive-word-arabic: {changed} words updated.")
+
+
+@main.command("normalize-root-arabic")
+@click.option("--db", default="quran.db", show_default=True)
+def normalize_root_arabic_cmd(db: str) -> None:
+    """Strip inter-letter whitespace from roots.root_arabic (idempotent)."""
+    database = ScraperDatabase(db)
+    try:
+        changed = database.normalize_root_arabic()
+    finally:
+        database.close()
+    click.echo(f"normalize-root-arabic: {changed} roots updated.")
 
 
 @main.command("validate-alignment")

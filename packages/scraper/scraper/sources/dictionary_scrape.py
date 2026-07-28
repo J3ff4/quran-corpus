@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
+from pathlib import Path
 
 import httpx
 
@@ -16,6 +17,7 @@ from ..checkpoint import Checkpoint
 from ..db import ScraperDatabase
 from ..http_retry import get_with_retry
 from ..models import ConceptTagModel, RootFormModel, RootModel
+from ..snapshots import save_snapshot
 from .corpus_dictionary import parse_root_page
 from .corpus_word_detail import parse_word_detail
 
@@ -38,16 +40,25 @@ def scrape_dictionary(
     *,
     client_factory: ClientFactory = _default_factory,
     rate_limit: float = 1.5,
+    roots: list[str] | None = None,
+    snapshot_dir: str | Path | None = None,
 ) -> int:
-    """Scrape each distinct root's dictionary page. Returns #roots stored."""
+    """Scrape each distinct root's dictionary page. Returns #roots stored.
+
+    ``roots`` overrides the full root list -- used to re-scrape only the roots
+    a parser fix affects. ``snapshot_dir`` persists the raw HTML so a future
+    parser change can re-parse without re-fetching (CLAUDE.md §11).
+    """
     stored = 0
-    roots = db.get_distinct_roots()
+    roots = roots if roots is not None else db.get_distinct_roots()
     with client_factory() as client:
         for bw in roots:
             key = f"root_{bw}"
             if checkpoint.is_done(key):
                 continue
             resp = get_with_retry(client, _DICT_URL.format(bw=bw))
+            if snapshot_dir is not None:
+                save_snapshot(snapshot_dir, key, resp.text)
             parsed = parse_root_page(resp.text)
             if parsed is not None:
                 rid = db.upsert_root(

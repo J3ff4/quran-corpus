@@ -16,6 +16,7 @@ apps/web/public/sw.js.map
 
 # Raw scraped/imported data snapshots — re-fetch, never commit (CLAUDE.md §11)
 data-snapshots/
+.snapshots/
 packages/scraper/checkpoint.json
 *.db-shm
 *.db-wal
@@ -56,3 +57,6 @@ Thumbs.db
 # Screenshot / scratch reference (not source)
 temp/
 .worktrees/
+
+# SDD workspace scratch (subagent-driven-development)
+.superpowers/

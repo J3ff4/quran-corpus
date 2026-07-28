@@ -468,6 +468,25 @@ class ScraperDatabase:
         self._conn.commit()
         return cur.rowcount
 
+    def normalize_root_arabic(self) -> int:
+        """Rewrite roots.root_arabic without inter-letter whitespace.
+
+        Whitespace only — hamza seats are corpus orthography and stay as-is.
+        Done in Python so "whitespace" means exactly what the parser means by
+        it (nbsp included), not SQLite's narrower notion. Idempotent.
+        """
+        changed = 0
+        for row in self._conn.execute("SELECT id, root_arabic FROM roots").fetchall():
+            compact = "".join((row["root_arabic"] or "").split())
+            if compact != row["root_arabic"]:
+                self._conn.execute(
+                    "UPDATE roots SET root_arabic = ? WHERE id = ?",
+                    (compact, row["id"]),
+                )
+                changed += 1
+        self._conn.commit()
+        return changed
+
     def _fix_seatless_hamza_in(self, table: str, text_col: str) -> int:
         """Apply fix_seatless_hamza to every LIKE-candidate row in table.text_col.
 
@@ -560,6 +579,26 @@ class ScraperDatabase:
             for r in self._conn.execute(
                 "SELECT DISTINCT root_buckwalter FROM words "
                 "WHERE root_buckwalter IS NOT NULL ORDER BY root_buckwalter"
+            ).fetchall()
+        ]
+
+    def get_roots_without_forms(self) -> list[str]:
+        """Buckwalter roots that render no derived forms.
+
+        Phase 17: these are the single-form roots the old parser dropped.
+        "No forms" must mean what the reader sees, so this matches
+        getRootForms (packages/data/src/queries/roots.ts) and ignores rows
+        with a NULL form_arabic -- See-Also junk an old scrape left behind,
+        which renders nothing but would otherwise mask the root as done.
+        """
+        return [
+            r[0]
+            for r in self._conn.execute(
+                "SELECT r.root_buckwalter FROM roots r "
+                "WHERE NOT EXISTS "
+                "  (SELECT 1 FROM root_forms f WHERE f.root_id = r.id "
+                "   AND f.form_arabic IS NOT NULL) "
+                "ORDER BY r.root_buckwalter"
             ).fetchall()
         ]
 

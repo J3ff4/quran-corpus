@@ -45,4 +45,23 @@ describe('FormFilterChips', () => {
     const { container } = render(<FormFilterChips forms={[]} selected={[]} onToggle={vi.fn()} />);
     expect(container).toBeEmptyDOMElement();
   });
+
+  it('renders a chip for a root with only one derived form', () => {
+    // 712 roots have exactly one form (Phase 17). The chip is informational --
+    // it names the form even though filtering by the only option is a no-op --
+    // so it must render rather than be hidden as a useless control.
+    const single: RootForm[] = [
+      {
+        id: 1, root_id: 1, sort_order: 0, pos_label: 'Noun',
+        form_arabic: 'أَرْض', form_translit: 'arḍ', gloss: null,
+        occurrence_count: 461,
+      },
+    ];
+
+    render(<FormFilterChips forms={single} selected={[]} onToggle={vi.fn()} />);
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+    expect(screen.getByText('Noun')).toBeInTheDocument();
+    expect(screen.getByText('أَرْض')).toBeInTheDocument();
+    expect(screen.getByText('461')).toBeInTheDocument();
+  });
 });

@@ -2,7 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { rootFirstLetter, compareRootsArabic, type RootSearchItem } from '@quran-corpus/data/client';
+import {
+  rootFirstLetter,
+  compareRootsArabic,
+  foldRootArabic,
+  type RootSearchItem,
+} from '@quran-corpus/data/client';
 import { RootListRow } from './RootListRow';
 import { AlphabetGrid } from './AlphabetGrid';
 import { TypingText } from '../ui/TypingText';
@@ -74,9 +79,14 @@ export function DictionaryBrowser({ roots, counts }: DictionaryBrowserProps) {
     let list = roots;
     if (letter) list = list.filter((r) => rootFirstLetter(r.root_arabic) === letter);
     if (q) {
+      // Arabic arm folds both sides (hamza seat + inter-letter spaces) so `ارض`
+      // finds the stored `أرض` — same normalization as server-side searchRoots.
+      // Latin arms stay raw: foldRootArabic('ktb') === 'ktb', and a folded Latin
+      // needle never occurs inside an Arabic haystack, so folding q is harmless.
+      const qf = foldRootArabic(q);
       list = list.filter(
         (r) =>
-          r.root_arabic.toLowerCase().includes(q) ||
+          foldRootArabic(r.root_arabic).includes(qf) ||
           r.root_buckwalter.toLowerCase().includes(q) ||
           (r.gloss_blob?.toLowerCase().includes(q) ?? false),
       );
