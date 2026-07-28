@@ -3,6 +3,7 @@ import {
   runMigrations,
   backfillSearchIndex,
   normalizeLemmaMadda,
+  backfillRootSortOrderIfStale,
 } from '@quran-corpus/data';
 import type { Client } from '@quran-corpus/data';
 
@@ -23,11 +24,30 @@ export function getDatabase(): Promise<Client> {
       if (shouldRunMigrations()) {
         await runMigrations(db);
         await backfillSearchIndex(db);
+        // Inside the guard, unlike normalizeLemmaMadda below, because this one
+        // is not self-contained: what marks the cache dirty is the
+        // trg_roots_sort_order_* DDL that runMigrations installs. Under
+        // DB_SKIP_MIGRATIONS=true those triggers never exist, so nothing ever
+        // nulls a rank, the probe finds none, and running it would only
+        // pretend to heal while stale ranks were served. It also keeps the
+        // build (which sets that flag) from issuing a full-table write against
+        // the live database it is only supposed to read.
+        //
+        // Never fatal: this is a cache warm-up and getRootNeighbors is correct
+        // without it, falling back to the full sort. Letting it reject would
+        // fail the memoized init and 500 every SSR page over a slow sort — and
+        // SQLITE_BUSY is expected here whenever the scraper holds the write
+        // lock on the same file.
+        try {
+          await backfillRootSortOrderIfStale(db);
+        } catch (err) {
+          console.warn('root sort_order backfill skipped; using the full-sort fallback', err);
+        }
       }
-      // Data-only self-heal (idempotent UPDATE, no DDL) -- runs even when
-      // DB_SKIP_MIGRATIONS=true, since that flag's job is only to keep DDL
-      // out of the request path against a pre-provisioned database, not to
-      // exempt it from data corrections.
+      // Data-only self-heal (idempotent UPDATE, no DDL, no schema dependency)
+      // -- runs even when DB_SKIP_MIGRATIONS=true, since that flag's job is
+      // only to keep DDL out of the request path against a pre-provisioned
+      // database, not to exempt it from data corrections.
       await normalizeLemmaMadda(db);
       return db;
     })();

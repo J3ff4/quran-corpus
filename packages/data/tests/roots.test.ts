@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { createDatabase, type Client } from '../src/db.js';
 import { runMigrations } from '../src/migrate.js';
 import {
@@ -15,9 +18,23 @@ import {
   getRootForms,
   getRootNeighbors,
   backfillRootSortOrder,
+  backfillRootSortOrderIfStale,
 } from '../src/queries/roots.js';
 
 let db: Client;
+
+/** A throwaway file-backed database.
+ *
+ *  Anything that calls backfillRootSortOrder needs one: it works inside a
+ *  transaction, and libsql opens `file::memory:` per connection, so the
+ *  transaction would see an empty database rather than this one. Production is
+ *  always file-backed, so this costs the tests a tmp dir and nothing else. */
+const tmpDbDir = mkdtempSync(join(tmpdir(), 'quran-roots-'));
+let tmpDbCount = 0;
+function newFileDb(): Client {
+  return createDatabase(`file:${join(tmpDbDir, `t${tmpDbCount++}.db`)}`);
+}
+afterAll(() => rmSync(tmpDbDir, { recursive: true, force: true }));
 
 /** Insert a stem segment carrying `root` for an existing word, so the
  *  concordance queries (which now match word_segments.root) see it. */
@@ -90,7 +107,7 @@ describe('roots queries', () => {
     expect(await getRootNeighbors(db, 'zzz')).toEqual({ prev: null, next: null });
   });
   it('backfillRootSortOrder materializes hijāʾī rank; getRootNeighbors then uses it', async () => {
-    const d = createDatabase('file::memory:');
+    const d = newFileDb();
     await runMigrations(d);
     await d.execute(
       `INSERT INTO roots (root_buckwalter,root_arabic,occurrence_count)
@@ -106,6 +123,152 @@ describe('roots queries', () => {
     expect(await getRootNeighbors(d, 'smw')).toEqual({ prev: null, next: '$Am' });
     expect(await getRootNeighbors(d, 'ktb')).toEqual({ prev: '$Am', next: null });
     d.close();
+  });
+  describe('sort_order cache invalidation', () => {
+    /** Three roots with the rank cache already materialized. */
+    async function seedRanked(): Promise<Client> {
+      const d = newFileDb();
+      await runMigrations(d);
+      await d.execute(
+        `INSERT INTO roots (root_buckwalter,root_arabic,occurrence_count)
+         VALUES ('ktb','ك ت ب',319),('smw','س م و',5),('$Am','ش أ م',3)`,
+      );
+      await backfillRootSortOrder(d);
+      return d;
+    }
+    const ranks = async (d: Client): Promise<(number | null)[]> =>
+      (await d.execute('SELECT sort_order FROM roots ORDER BY id')).rows.map(
+        (r) => r['sort_order'] as number | null,
+      );
+
+    it('inserting a root nulls every rank, not just the new row', async () => {
+      const d = await seedRanked();
+      // Nulling only the new row would be worse than nothing: getRootNeighbors
+      // walks `sort_order < ?` / `> ?`, which skip NULLs, so the other three
+      // roots' arrows would jump clean over the newcomer with no error.
+      await d.execute(
+        `INSERT INTO roots (root_buckwalter,root_arabic,occurrence_count) VALUES ('Erb','ع ر ب',9)`,
+      );
+      expect(await ranks(d)).toEqual([null, null, null, null]);
+      d.close();
+    });
+
+    it('an insert that supplies its own rank has it nulled too', async () => {
+      const d = await seedRanked();
+      // Only backfillRootSortOrder may compute a rank, and it uses UPDATE — so
+      // a rank arriving in an INSERT came from somewhere unauthorized and
+      // cannot be assumed to agree with the rest of the column.
+      await d.execute(
+        `INSERT INTO roots (root_buckwalter,root_arabic,occurrence_count,sort_order)
+         VALUES ('Erb','ع ر ب',9,99)`,
+      );
+      expect(await ranks(d)).toEqual([null, null, null, null]);
+      d.close();
+    });
+
+    it('respelling root_arabic nulls the ranks it reordered', async () => {
+      const d = await seedRanked();
+      // The 930-root hamza seat level-up: ش ا م -> ش أ م changes where the root
+      // sorts, so ranks materialized before it are now simply wrong.
+      await d.execute(`UPDATE roots SET root_arabic = 'ش ا م' WHERE root_buckwalter = '$Am'`);
+      expect(await ranks(d)).toEqual([null, null, null]);
+      d.close();
+    });
+
+    it('an upsert that rewrites root_arabic to the same value keeps the cache', async () => {
+      const d = await seedRanked();
+      // upsert_root's ON CONFLICT DO UPDATE always lists root_arabic in its SET
+      // clause, so without the WHEN guard an idempotent re-scrape would throw
+      // the whole cache away on every one of 1642 rows.
+      await d.execute(
+        `INSERT INTO roots (root_buckwalter,root_arabic,occurrence_count) VALUES ('ktb','ك ت ب',400)
+         ON CONFLICT(root_buckwalter) DO UPDATE SET
+           root_arabic = excluded.root_arabic, occurrence_count = excluded.occurrence_count`,
+      );
+      expect(await ranks(d)).toEqual([3, 1, 2]);
+      d.close();
+    });
+
+    it('backfillRootSortOrder does not invalidate its own writes', async () => {
+      // It writes `UPDATE roots SET sort_order = ?` — an UPDATE OF sort_order.
+      // Were the trigger a bare AFTER UPDATE ON roots it would null each rank
+      // as fast as the batch wrote it, leaving the column entirely NULL.
+      const d = await seedRanked();
+      expect(await ranks(d)).toEqual([3, 1, 2]);
+      d.close();
+    });
+
+    it('deleting a root leaves a harmless rank gap, not a wipe', async () => {
+      const d = await seedRanked();
+      await d.execute(`DELETE FROM roots WHERE root_buckwalter = '$Am'`);
+      expect(await ranks(d)).toEqual([3, 1]);
+      // ranks 1 and 3 with 2 missing: the survivors still find each other.
+      expect(await getRootNeighbors(d, 'smw')).toEqual({ prev: null, next: 'ktb' });
+      expect(await getRootNeighbors(d, 'ktb')).toEqual({ prev: 'smw', next: null });
+      d.close();
+    });
+
+    it('backfillRootSortOrderIfStale rebuilds after invalidation and no-ops after that', async () => {
+      const d = await seedRanked();
+      expect(await backfillRootSortOrderIfStale(d)).toBe(0);
+      await d.execute(
+        `INSERT INTO roots (root_buckwalter,root_arabic,occurrence_count) VALUES ('Erb','ع ر ب',9)`,
+      );
+      expect(await backfillRootSortOrderIfStale(d)).toBe(4);
+      // ع sorts after ش but before ك: smw < $Am < Erb < ktb
+      const ordered = await d.execute('SELECT root_buckwalter FROM roots ORDER BY sort_order');
+      expect(ordered.rows.map((r) => r['root_buckwalter'])).toEqual([
+        'smw',
+        '$Am',
+        'Erb',
+        'ktb',
+      ]);
+      expect(await backfillRootSortOrderIfStale(d)).toBe(0);
+      d.close();
+    });
+
+    it('a root inserted mid-backfill never leaves one NULL rank among live ones', async () => {
+      // The read and the write must be one transaction. Split apart, an insert
+      // landing between them fires its trigger against an already-NULL column
+      // (a no-op) and is then missed by the write, which only knows the stale
+      // snapshot -- one NULL stranded among live ranks, which the neighbour
+      // queries step straight over. Needs a real file: two clients, one lock.
+      const file = join(tmpDbDir, `race${tmpDbCount++}.db`);
+      const a = createDatabase(`file:${file}`);
+      await runMigrations(a);
+      await a.execute(
+        `INSERT INTO roots (root_buckwalter,root_arabic,occurrence_count)
+         VALUES ('ktb','ك ت ب',319),('smw','س م و',5),('$Am','ش أ م',3)`,
+      );
+      const b = createDatabase(`file:${file}`);
+
+      await Promise.allSettled([
+        backfillRootSortOrder(a),
+        b.execute(
+          `INSERT INTO roots (root_buckwalter,root_arabic,occurrence_count) VALUES ('Erb','ع ر ب',9)`,
+        ),
+      ]);
+
+      const counts = await a.execute(
+        'SELECT COUNT(*) AS n, COUNT(sort_order) AS ranked FROM roots',
+      );
+      const n = counts.rows[0]!['n'] as number;
+      const ranked = counts.rows[0]!['ranked'] as number;
+      // All ranked or all NULL -- the mixed state is the bug.
+      expect([0, n]).toContain(ranked);
+      a.close();
+      b.close();
+    });
+
+    it('backfillRootSortOrderIfStale no-ops on an empty roots table', async () => {
+      // File-backed like the rest: this passes today only because the stale
+      // probe short-circuits before a transaction opens. Fold the probe in and
+      // an in-memory DB would start passing for the wrong reason.
+      const d = newFileDb();
+      await runMigrations(d);
+      expect(await backfillRootSortOrderIfStale(d)).toBe(0);
+      d.close();
+    });
   });
   it('getRootsByFrequency', async () => {
     expect((await getRootsByFrequency(db))[0]?.root_buckwalter).toBe('ktb');

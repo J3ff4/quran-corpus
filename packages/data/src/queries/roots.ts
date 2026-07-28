@@ -51,26 +51,75 @@ export async function getRootByBuckwalter(db: Client, bw: string): Promise<Root 
   return res.rows[0] ? rowToRoot(res.rows[0]) : null;
 }
 
+/** The one hijāʾī ordering. Shared so backfillRootSortOrder, which must read
+ *  inside its own transaction, cannot drift from what getAllRoots returns. */
+function orderRoots(rows: Row[]): Root[] {
+  return rows.map(rowToRoot).sort((a, b) => compareRootsArabic(a.root_arabic, b.root_arabic));
+}
+
 export async function getAllRoots(db: Client): Promise<Root[]> {
-  const res = await db.execute('SELECT * FROM roots');
-  return res.rows.map(rowToRoot).sort((a, b) => compareRootsArabic(a.root_arabic, b.root_arabic));
+  return orderRoots((await db.execute('SELECT * FROM roots')).rows);
 }
 
 /** Materialize hijāʾī rank into roots.sort_order (1..N) so getRootNeighbors is
- *  an indexed O(1) lookup. compareRootsArabic (via getAllRoots) stays the single
- *  ordering source — sort_order is a derived cache, so re-run this whenever the
- *  roots set changes (post-scrape / after any roots insert). Returns rows written. */
+ *  an indexed O(1) lookup. compareRootsArabic (via orderRoots) stays the single
+ *  ordering source — sort_order is a derived cache, invalidated wholesale by the
+ *  trg_roots_sort_order_* triggers in schema.sql whenever a root is inserted or
+ *  respelled. Returns rows written. */
 export async function backfillRootSortOrder(db: Client): Promise<number> {
-  const ordered = await getAllRoots(db);
-  if (ordered.length === 0) return 0;
-  await db.batch(
-    ordered.map((r, i) => ({
-      sql: 'UPDATE roots SET sort_order = ? WHERE id = ?',
-      args: [i + 1, r.id],
-    })),
-    'write',
-  );
-  return ordered.length;
+  // Read and write in one write transaction. Split across two statements, a
+  // root inserted between them would fire its invalidation trigger against an
+  // already-NULL column (a no-op) and then be missed by the batch, which only
+  // knows the stale snapshot -- leaving one NULL rank stranded among live ones
+  // with no trigger left to fire. That is precisely the invisible-skip case
+  // the whole-column nulling exists to prevent: `sort_order < ?` / `> ?` step
+  // straight over it. Atomicity makes the outcome all-ranked or all-NULL,
+  // never mixed. Reachable because the web cold start now runs this against
+  // the same file the scraper writes.
+  const tx = await db.transaction('write');
+  try {
+    const ordered = orderRoots((await tx.execute('SELECT * FROM roots')).rows);
+    if (ordered.length === 0) {
+      await tx.rollback();
+      return 0;
+    }
+    // One batch, not a statement per root: against a remote libsql this is 1
+    // round trip instead of ~1.6k. tx.batch does not roll back on failure --
+    // the finally's close() does that for us.
+    await tx.batch(
+      ordered.map((r, i) => ({
+        sql: 'UPDATE roots SET sort_order = ? WHERE id = ?',
+        args: [i + 1, r.id],
+      })),
+    );
+    await tx.commit();
+    return ordered.length;
+  } finally {
+    // No-op once committed/rolled back; releases the write lock if we threw.
+    tx.close();
+  }
+}
+
+/** Rebuild the sort_order cache if anything invalidated it, else do nothing.
+ *
+ *  The invalidation triggers null the whole column, so one indexed probe for a
+ *  NULL rank answers "is the cache dirty" for every root at once. Returns rows
+ *  written.
+ *
+ *  Only meaningful where those triggers exist — call it from the same branch
+ *  that installs them (see apps/web/src/lib/db.ts). Without them nothing ever
+ *  nulls a rank, so this finds a clean cache forever while stale ranks are
+ *  served, which reads as healthy and is not.
+ *
+ *  The probe is deliberately outside backfillRootSortOrder's transaction: a
+ *  write racing it can only cost a redundant rebuild or defer one to the next
+ *  cold start, and the rebuild itself is atomic. A scrape landing while the
+ *  process is already up is likewise not seen until restart; until then
+ *  getRootNeighbors takes its full-sort fallback, slower but never wrong. */
+export async function backfillRootSortOrderIfStale(db: Client): Promise<number> {
+  const stale = await db.execute('SELECT 1 FROM roots WHERE sort_order IS NULL LIMIT 1');
+  if (stale.rows.length === 0) return 0;
+  return backfillRootSortOrder(db);
 }
 
 /** Hijāʾī-adjacent roots (by root_buckwalter) for prev/next navigation, so the

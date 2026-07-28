@@ -36,6 +36,7 @@ export {
   getRootSearchList,
   getRootNeighbors,
   backfillRootSortOrder,
+  backfillRootSortOrderIfStale,
 } from './queries/roots.js';
 export { buckwalterToArabic, compareRootsArabic, rootFirstLetter, ARABIC_ALPHABET_ORDER } from './text/arabic.js';
 export { trimConcordanceVerse } from './text/concordanceTrim.js';

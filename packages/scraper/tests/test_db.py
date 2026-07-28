@@ -5,7 +5,7 @@ import tempfile
 import pytest
 
 from scraper.db import ScraperDatabase
-from scraper.models import SurahModel
+from scraper.models import RootModel, SurahModel
 
 
 @pytest.fixture
@@ -400,3 +400,94 @@ def test_get_or_create_root_inserts_when_absent(tmp_path):
     ).fetchone()
     assert tuple(row) == ("ktb", "كتب", 0)
     db.close()
+
+
+def _seed_ranked_roots(db) -> None:
+    """Two roots with a materialized sort_order, as backfillRootSortOrder leaves them.
+
+    Ranks are written directly: the hijāʾī ordering is compareRootsArabic in
+    packages/data (TypeScript) and deliberately has no Python twin -- Python
+    only ever marks this cache dirty, never rebuilds it.
+
+    Insert first, rank second, exactly as backfillRootSortOrder does it. Ranks
+    supplied in the INSERT itself would not survive: the insert trigger nulls
+    the whole column including the incoming row, which is right -- an inserted
+    rank can only have come from outside the one function allowed to compute
+    ranks, so it is untrustworthy by construction.
+    """
+    db._conn.execute(
+        "INSERT INTO roots (root_buckwalter, root_arabic, occurrence_count)"
+        " VALUES ('ktb', 'ك ت ب', 319), ('smw', 'س م و', 5)"
+    )
+    db._conn.execute(
+        "UPDATE roots SET sort_order = CASE root_buckwalter"
+        " WHEN 'smw' THEN 1 ELSE 2 END"
+    )
+    db._conn.commit()
+    assert _ranks(db) == [2, 1], "fixture did not establish a warm cache"
+
+
+def _ranks(db) -> list:
+    return [
+        r[0]
+        for r in db._conn.execute("SELECT sort_order FROM roots ORDER BY id")
+    ]
+
+
+@pytest.fixture
+def ranked_db(tmp_path):
+    """A ScraperDatabase whose roots already carry a warm sort_order cache.
+
+    Closes in a finally so a failing assertion does not leak the connection.
+    """
+    db = ScraperDatabase(str(tmp_path / "d.db"))
+    _seed_ranked_roots(db)
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+def test_upsert_root_insert_invalidates_the_sort_order_cache(ranked_db):
+    # The trigger lives in packages/data/schema.sql, so this also proves
+    # _split_statements carries a WHEN-guarded trigger body across the language
+    # boundary intact -- a splitter that broke it would fail open, silently.
+    db = ranked_db
+
+    db.upsert_root(RootModel(root_buckwalter="ArD", root_arabic="أ ر ض"))
+
+    # Every rank, not just the new row's: getRootNeighbors walks
+    # `sort_order < ?` / `> ?`, which skip NULLs, so a lone NULL newcomer is
+    # jumped clean over by the other roots' arrows with no error.
+    assert _ranks(db) == [None, None, None]
+
+
+def test_upsert_root_respelling_invalidates_the_sort_order_cache(ranked_db):
+    # The 930-root hamza seat level-up rewrites root_arabic in bulk, which is
+    # exactly what reorders the roots and strands the ranks.
+    ranked_db.upsert_root(
+        RootModel(root_buckwalter="smw", root_arabic="س م ي", occurrence_count=5)
+    )
+
+    assert _ranks(ranked_db) == [None, None]
+
+
+def test_upsert_root_keeps_the_cache_when_the_spelling_is_unchanged(ranked_db):
+    # ON CONFLICT DO UPDATE always lists root_arabic in its SET clause, so
+    # without the trigger's WHEN guard an idempotent re-scrape would throw the
+    # cache away on every one of 1642 rows and leave the site on the slow path.
+    ranked_db.upsert_root(
+        RootModel(root_buckwalter="ktb", root_arabic="ك ت ب", occurrence_count=320)
+    )
+
+    assert _ranks(ranked_db) == [2, 1]
+
+
+def test_get_or_create_root_invalidates_only_when_it_inserts(ranked_db):
+    # Additive importers (Lane definitions) resolve ids for roots that already
+    # exist. That writes nothing, so it must not thrash the cache either.
+    ranked_db.get_or_create_root("ktb", "كتب")
+    assert _ranks(ranked_db) == [2, 1]
+
+    ranked_db.get_or_create_root("ArD", "أرض")
+    assert _ranks(ranked_db) == [None, None, None]

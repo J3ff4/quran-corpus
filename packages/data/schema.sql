@@ -77,10 +77,50 @@ CREATE TABLE IF NOT EXISTS roots (
   occurrence_count INTEGER NOT NULL DEFAULT 0,
   -- Materialized hijāʾī rank (1..N) from compareRootsArabic, written by
   -- backfillRootSortOrder so prev/next neighbor lookup is an indexed O(1) query
-  -- instead of sorting every root per force-dynamic page view. NULL until
-  -- backfilled (fresh rebuild); getRootNeighbors falls back to the full sort.
+  -- instead of sorting every root per force-dynamic page view. NULL on a fresh
+  -- rebuild and after the trg_roots_sort_order_* invalidation below;
+  -- getRootNeighbors falls back to the full sort while it is.
   sort_order       INTEGER
 );
+
+-- sort_order is a cache of a hijāʾī ordering that only compareRootsArabic (TS)
+-- can compute, so no other writer can refresh it -- but every writer can mark
+-- it dirty. Nulling the whole column is the invalidation: getRootNeighbors
+-- degrades to the full sort when a rank is NULL, so the arrows stay correct
+-- (just slower) until backfillRootSortOrderIfStale rebuilds them.
+--
+-- Nulling only the touched row would be worse than doing nothing: the
+-- neighbour lookups are `sort_order < ?` / `> ?`, which skip NULL rows
+-- silently, so a freshly-inserted root would be jumped clean over by every
+-- other root's arrows with no error anywhere.
+--
+-- Triggers rather than a call in each writer because the writers are in two
+-- languages (packages/scraper is Python) plus the occasional manual sqlite3
+-- session, and an invalidation that binds only the writers who remembered it
+-- is the bug this fixes.
+--
+-- This nulls the incoming row's own sort_order too, which is intended: only
+-- backfillRootSortOrder may compute a rank and it does so with an UPDATE, so a
+-- rank arriving in an INSERT came from outside that function and cannot be
+-- trusted to agree with the rest of the column.
+CREATE TRIGGER IF NOT EXISTS trg_roots_sort_order_ai AFTER INSERT ON roots BEGIN
+  UPDATE roots SET sort_order = NULL WHERE sort_order IS NOT NULL;
+END;
+
+-- WHEN, not just UPDATE OF: upsert_root's ON CONFLICT DO UPDATE always lists
+-- root_arabic in its SET clause, so an idempotent re-scrape that changes
+-- nothing would otherwise throw the whole cache away on every row.
+CREATE TRIGGER IF NOT EXISTS trg_roots_sort_order_au AFTER UPDATE OF root_arabic ON roots
+WHEN NEW.root_arabic <> OLD.root_arabic BEGIN
+  UPDATE roots SET sort_order = NULL WHERE sort_order IS NOT NULL;
+END;
+
+-- No DELETE trigger: dropping a root leaves a gap in the ranks, and a gap is
+-- harmless -- `sort_order < ?` still finds the correct surviving neighbour.
+-- `WHERE sort_order IS NOT NULL` keeps a bulk rewrite cheap: the first row to
+-- change clears the column, and every firing after that is an indexed no-op.
+-- Neither body touches root_arabic, so neither can re-enter the other even
+-- with PRAGMA recursive_triggers on.
 
 CREATE TABLE IF NOT EXISTS root_forms (
   id               INTEGER PRIMARY KEY AUTOINCREMENT,
