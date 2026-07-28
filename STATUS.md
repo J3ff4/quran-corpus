@@ -13,11 +13,15 @@ Updated: 2026-07-28
 All work below confirmed via `gh pr list --state all` + `git merge-base --is-ancestor`,
 not carried over from prior narrative.
 - PRs #1–57 MERGED. **#58 CLOSED unmerged** (payload split, see below). **#59 OPEN,
-  CHANGES_REQUESTED.** **#60 MERGED** (phase 17). Current tip `edea0a0`.
+  CHANGES_REQUESTED.** **#60 MERGED** (phase 17). **#61 MERGED** (phase 18,
+  `6113fd3`, 2026-07-28). **#62 OPEN, APPROVED, not merged** (sort_order
+  invalidation). Current `main` tip `6113fd3`; branch tip `7edac44`.
   **Commit SHAs before 2026-07-27 are all dead** — history was rewritten, see purge.
-- **Phase 18 (930-root re-scrape) code + live run DONE** on branch
-  `feat/phase-18-remaining-roots`, not yet merged. All six phase-17 carry items
-  closed. See the Phase 18 section below.
+- **Phase 18 (930-root re-scrape) DONE + MERGED.** All six phase-17 carry items
+  closed. **The 930-root crawl itself has been run** (see Phase 18 below) — nothing
+  is pending there.
+- **Open loose end: #62** (`roots.sort_order` cache invalidation), a deferred
+  finding carried out of #61. Green and awaiting the user's merge call.
 
 ### Phase 17 — single-form root_forms fix, DONE + MERGED (PR #60, `edea0a0`)
 
@@ -98,10 +102,11 @@ All six closed by phase 18 below.
 6. Per the 2026-07-28 ruling, `root_arabic` hamza seats get levelled **up**
    during this re-scrape (930 roots), never folded down.
 
-### Phase 18 — 930-root re-scrape, code + live run DONE, NOT yet merged
+### Phase 18 — 930-root re-scrape, DONE + MERGED (PR #61, `6113fd3`)
 
 Branch `feat/phase-18-remaining-roots` off `edea0a0`… (`1c4d1e8`). Six
 commits, SDD run, every task reviewed clean on the first round.
+Squash-merged 2026-07-28T10:43Z; branch deleted.
 
 **Code (tasks 1–4).** `migrate-snapshot-names` re-encodes pre-`bdd7e7b`
 filenames (carry 3). `reparse-snapshots` + `scraper/replay.py` re-parse the
@@ -148,14 +153,76 @@ Result, all acceptance criteria met:
   `foldLetter` still folds hamza variants, so the 61 spelling changes are
   invisible to sorting, bucket lookup, and search.
 
-Deferred minors for the final review: `_ONE_FORM_HTML` byte-duplicated in
-`test_dictionary_scrape.py` and `test_replay.py`; redundant local re-imports
-in `test_lane.py`.
+Deferred minors, **still open after merge** (verified 2026-07-28):
+`_ONE_FORM_HTML` byte-duplicated in `test_dictionary_scrape.py` and
+`test_replay.py`; redundant local re-imports in `test_lane.py`. Cosmetic.
 
 Two plan defects were caught by reviewing subagents and fixed in the plan:
 the ruff baseline needed its scope pinned (`scraper tests` = 10, `.` = 12),
 and a snapshot filename literal was wrong (`_encode_key` escapes **every**
 uppercase letter, so `root_ArD` → `root_%41r%44`, not `root_%41rD`).
+
+**One finding was deferred out of #61 rather than fixed: finding 6,
+`roots.sort_order` invalidation.** That is #62 below.
+
+### #62 — `roots.sort_order` cache invalidation, APPROVED, NOT merged
+
+Branch `fix/root-sort-order-invalidation` off `6113fd3`. Three commits
+(`5df0700`, `e004162`, `7edac44`). Cross-package: TS cache + Python writers.
+
+**The bug.** `roots.sort_order` is a materialized hijāʾī rank, and
+`backfillRootSortOrder` had **zero production callers** while
+`upsert_root` / `get_or_create_root` insert and respell roots freely.
+`getRootNeighbors` navigates with `sort_order < ?` / `> ?`, and **SQL
+comparison silently skips NULLs** — so one NULL rank among live ones is
+*worse* than an all-NULL column: that root's own arrows degrade correctly
+to the full sort, but every other root's arrows step clean over it. No
+error, no log. That is why the invalidation nulls the **whole** column.
+
+**Fix.** Two triggers in `packages/data/schema.sql`, not a call per writer
+— the writers are in two languages plus manual `sqlite3` sessions, and an
+invalidation binding only the writers who remembered it is the bug itself.
+The scraper re-applies `schema.sql` on every `ScraperDatabase.__init__`, so
+they self-install before any scrape write. Two load-bearing details:
+`WHEN NEW.root_arabic <> OLD.root_arabic` (bare `UPDATE OF` fires when the
+column is merely *listed* in SET, and `upsert_root`'s `ON CONFLICT DO
+UPDATE` always lists it → an idempotent 1642-root re-scrape would discard
+the cache every row), and `WHERE sort_order IS NOT NULL` in the body (every
+firing after the first is an indexed no-op). No DELETE trigger — a rank gap
+is harmless. `backfillRootSortOrderIfStale` rebuilds on web cold start.
+
+**Preventive, not a repair.** Live ranks were already correct — 0/1642
+mismatched vs `compareRootsArabic` — so no manual live-DB step is needed.
+Dry-run on a *copy* of the real DB: triggers self-install on connect, an
+idempotent re-scrape preserves all 1642 ranks, one respelling drops the
+cache to 0.
+
+**Review.** `/code-review` found 3, all real, and the sharpest was
+self-inflicted: putting the backfill on an automatic path against the file
+the scraper writes, while its read and write were two statements,
+**reintroduced the exact bug the PR fixes** (insert lands between them →
+trigger fires against an already-NULL column, a no-op → row missed by the
+stale snapshot → one NULL stranded, no trigger left to fire). Now one
+`db.transaction('write')`. Also: the self-heal was inert under
+`DB_SKIP_MIGRATIONS=true` (it depends on the trigger DDL that flag skips —
+the `normalizeLemmaMadda` analogy I reasoned from is invalid, that one is
+pure data), and an unguarded `await` in the memoized init would have let a
+`SQLITE_BUSY` warm-up 500 every SSR page.
+CodeRabbit: 5 findings, all 🔵 Trivial → 4 taken (`tx.batch` for the
+~1642 UPDATEs, `newFileDb()` for the last `file::memory:` test, an
+init-continued assertion, a `ranked_db` pytest fixture that closes in a
+`finally`), **1 declined** — timing metrics with no metrics sink to emit
+to; rationale in the `7edac44` body and on the resolved thread → **APPROVED**.
+
+**Mutation-checked**, since these tests assert an *absence*: dropping the
+`WHEN` guard, nulling only the touched row, deleting either trigger, and
+reverting the transaction to a two-step read/write each kill their own
+named test (the race test 5 runs out of 5, deterministic).
+Gate: 185 data / 404 web / 262 scraper; ruff 10 / mypy 1 unchanged.
+
+Test-only gotcha worth keeping: libsql opens `file::memory:` **per
+connection**, so anything touching a transaction needs a file-backed temp
+DB or the transaction sees an empty database.
 
 ### GOING PUBLIC — in progress, BLOCKED (2026-07-27)
 Decision: repo goes public, review bot switches Greptile → CodeRabbit.
@@ -198,6 +265,20 @@ Greptile stays installed as advisory (user's call), no longer gates.
 - All these default to fail-open and are now set: `fail_commit_status: true`,
   `auto_pause_after_reviewed_commits: 0` (default 5 stops reviewing *fix* commits),
   `override_requested_reviewers_only: true` (else the author self-grants an override).
+- **Clearing a CHANGES_REQUESTED takes three steps** (learned on #62, 2026-07-28).
+  Pushing fixes is not enough and neither is resolving threads:
+  1. Push the fix. CodeRabbit re-reviews and **auto-resolves what it considers
+     addressed** — but a clean incremental pass submits **no new review**, so
+     `reviewDecision` does not move. Check-run `SUCCESS` + no new review = clean,
+     and it looks *identical* to "nothing ran". Verify the head SHA.
+  2. A thread you **declined** stays unresolved and holds the decision alone.
+     Reply with the rationale, then resolve via the GraphQL `resolveReviewThread`
+     mutation — `gh pr` has no command for it.
+  3. Even with every thread resolved `reviewDecision` stays put: GitHub pins the
+     last *submitted review* state. Comment `@coderabbitai full review` to make it
+     submit a superseding APPROVED.
+  `reviewDecision`, `mergeStateStatus` and the unresolved-thread count disagree
+  with each other constantly — check all three.
 - CLAUDE.md §5 rewritten. New rule: **0 check-runs is a lapse signature, not a pass.**
   "Unlimited repos/PRs" is a *volume* cap, not a *rate* cap — public OSS reviews are
   still rate-limited hourly, so this rule survives going public.
@@ -452,6 +533,13 @@ Re-queried directly 2026-07-22 (do not trust older counts in this file's history
   confirmed in commit `44b9022`. Review round-trip (`review_glosses.py` export_top/
   import_reviewed) exists and was itself bug-fixed but **never actually run** — 0 rows
   with source=`mt-reviewed`.
+- `roots`: 1642 rows. Verified live 2026-07-28 — `sort_order` ranked on all 1642
+  (0 NULL, 0 mismatched vs `compareRootsArabic`), 0 rows with a space in
+  `root_arabic`, and **0 `trg_roots_sort_order_*` triggers installed**: they
+  arrive with #62, which is unmerged. Until then nothing invalidates that cache,
+  so any scrape or `import-lane` run before #62 lands leaves stale ranks that
+  *look* healthy. Every root is snapshotted (1642 `.html.gz` in
+  `~/quran-data/.snapshots/roots/`), so no parser fix needs the network again.
 - `root_definitions`: 1386 rows (qurandev/roots → Lane's Lexicon import). Done.
   "/"-spacing normalized 2026-07-23 (#46, 633/1386 rows changed) so unspaced
   "word/word/word" runs wrap instead of overflowing the card.
@@ -473,9 +561,12 @@ Re-queried directly 2026-07-22 (do not trust older counts in this file's history
   78% per an older note in this file — finished since.)
 
 ## Housekeeping
-- Untracked scratch sitting in the working tree, never committed/gitignored: this file,
-  `docs/plans/phase-12-hamza-seat-fix.md`, `.superpowers/` (SDD task briefs/reports/
-  review diffs, ~2.3M).
+- ~~Untracked scratch: this file, the phase-12 plan, `.superpowers/`~~ — **two of
+  the three were wrong, corrected 2026-07-28.** `git status` says: **STATUS.md is
+  tracked and in `main`** (last written by `6113fd3`), and **`.superpowers/` is
+  gitignored** (`.gitignore:62`). Only `docs/plans/phase-12-hamza-seat-fix.md` is
+  genuinely untracked-and-unignored. Checked with `git cat-file -e main:<path>`
+  and `git check-ignore -v`, not by reading this file's own prior claim.
 - **2026-07-24: dead branches cleaned up.** STATUS.md's prior "already merged via
   squash, safe to delete" claim was WRONG for 4 of them — verified via
   `git diff main...<branch> --stat` before touching anything, not trusted blind:
@@ -546,8 +637,16 @@ Re-queried directly 2026-07-22 (do not trust older counts in this file's history
    d. Only then flip visibility.
    e. After public: enable branch protection (free once public) requiring the
       CodeRabbit check, or §5 stays convention-only.
-6. Housekeeping — branches DONE (zero remain, 2026-07-27). Left: the untracked
-   scratch (`.superpowers/`, `docs/plans/phase-12-hamza-seat-fix.md`), cosmetic.
+6. Housekeeping — branches DONE (zero remain, 2026-07-27). Left: one genuinely
+   untracked file, `docs/plans/phase-12-hamza-seat-fix.md` (cosmetic; the other
+   two in the old claim were tracked/ignored all along — see Housekeeping).
+   Plus `fix/root-sort-order-invalidation`, alive on purpose until #62 merges.
+7. **#62 merge decision** — APPROVED and green, unmerged pending the user's call.
+   Note the approval is **advisory**: branch protection needs a public repo (5e),
+   so nothing mechanically enforces §5 yet.
+8. Phase 18's deferred cosmetic minors, still open: `_ONE_FORM_HTML` duplicated
+   across `test_dictionary_scrape.py` / `test_replay.py`, local re-imports in
+   `test_lane.py`.
 
 ## Notes
 - Uzbek edition = Cyrillic (uz.sodik). Latin variant not done.
