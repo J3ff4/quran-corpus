@@ -12,16 +12,25 @@ Updated: 2026-07-28
 ## Now
 All work below confirmed via `gh pr list --state all` + `git merge-base --is-ancestor`,
 not carried over from prior narrative.
-- PRs #1–57 MERGED. **#58 CLOSED unmerged** (payload split, see below). **#59 OPEN,
-  CHANGES_REQUESTED.** **#60 MERGED** (phase 17). **#61 MERGED** (phase 18,
-  `6113fd3`, 2026-07-28). **#62 OPEN, APPROVED, not merged** (sort_order
-  invalidation). Current `main` tip `6113fd3`; branch tip `7edac44`.
+- PRs #1–57 MERGED. **#58 CLOSED unmerged** (payload split, see below). **#59 MERGED**
+  (`0095c2c`, 2026-07-28 19:01Z — CodeRabbit gate). **#60 MERGED** (phase 17).
+  **#61 MERGED** (phase 18, `6113fd3`). **#62 MERGED** (`97d78bb`, sort_order
+  invalidation). Current `main` tip `0095c2c`. Nothing open.
   **Commit SHAs before 2026-07-27 are all dead** — history was rewritten, see purge.
 - **Phase 18 (930-root re-scrape) DONE + MERGED.** All six phase-17 carry items
   closed. **The 930-root crawl itself has been run** (see Phase 18 below) — nothing
   is pending there.
-- **Open loose end: #62** (`roots.sort_order` cache invalidation), a deferred
-  finding carried out of #61. Green and awaiting the user's merge call.
+- **#62 merged, but its triggers are not live yet.** `trg_roots_sort_order_*` are
+  installed by migrations — the web app must restart and run them. Until it does, a
+  scrape or `import-lane` run leaves stale ranks that look healthy.
+- **CodeRabbit is the gate as of #59.** Two lapse signatures learned the hard way,
+  both now in CLAUDE.md §5: a quota-refused review posts a **green `success`** status
+  reading `Review rate limited`, and a failed error-mode pre-merge check pins
+  requested-changes with the reason buried in the walkthrough's collapsed block.
+- **Next: the GitHub Support GC** (`~/quran-data/github-support-request.md`, still
+  unsubmitted). Longest-lead blocker — the repo cannot go public until the
+  pre-rewrite objects are gone, and branch protection (which is what would make §5
+  enforceable rather than conventional) needs public.
 
 ### Phase 17 — single-form root_forms fix, DONE + MERGED (PR #60, `edea0a0`)
 
