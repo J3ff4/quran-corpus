@@ -12,7 +12,62 @@ Updated: 2026-07-27
 ## Now
 All work below confirmed via `gh pr list --state all` + `git merge-base --is-ancestor`,
 not carried over from prior narrative.
-- PRs #1–57 all MERGED into `main`. Current tip `25fffa1` (bookmark nav fixes, #57).
+- PRs #1–57 MERGED. **#58 CLOSED unmerged** (payload split, see below). **#59 OPEN,
+  CHANGES_REQUESTED.** Current tip `5f2dffd`.
+  **Commit SHAs before 2026-07-27 are all dead** — history was rewritten, see purge.
+
+### GOING PUBLIC — in progress, BLOCKED (2026-07-27)
+Decision: repo goes public, review bot switches Greptile → CodeRabbit.
+
+- **`temp/` PURGED from all history.** Was 98 MB of third-party proprietary
+  material: islom.uz APK (22 MB, embeds a live SQLCipher key), its encrypted
+  `database.db`, `TasnimDatabase.db`, `hilol.zip`, an iOS extract, `.so` binaries,
+  mixed-provenance fonts. Publishing = redistributing two commercial apps + a
+  decryption credential. `git filter-repo --path temp/ --invert-paths`, force-pushed
+  **while still private** (order matters — rewriting after going public would expose
+  the objects permanently).
+  `.git` 117 MB → 2.0 MB. 291 → 241 commits (50 were upload-only). Verified: 0
+  commits contain the key, 0 touch `temp/`, no blob > 2 MB.
+- **Nothing lost.** Reference data → `~/quran-data/refdata/` (98 MB). Spike code →
+  `~/quran-data/spike/` + README. Verified backup bundle →
+  `~/quran-data/qcp-backup-20260727-183938.bundle` ("records a complete history").
+- 🔴 **BLOCKER — do NOT flip visibility.** GitHub still serves the pre-rewrite blobs
+  by SHA, and **all 58 PR timelines still list those SHAs**, so the purged key is
+  discoverable, not merely guessable:
+  ```
+  gh api "repos/J3ff4/quran-corpus-pwa/contents/temp/split_config.arm64_v8a.apk?ref=8ce09b6" --jq .size
+  → 23257744
+  ```
+  Only GitHub Support can GC it. Request drafted:
+  `~/quran-data/github-support-request.md` — ends with the two commands that must
+  BOTH 404 before visibility changes.
+- Also unlocked by going public: **branch protection**, unavailable on free private
+  repos (403 "Upgrade to GitHub Pro or make this repository public"). Until then
+  §5 is convention, not a mechanical block.
+- Fonts: user's call — **no attribution needed**, do not re-raise.
+
+### Review gate: CodeRabbit (#59, OPEN)
+Greptile blew its 50/mo free cap **mid-review** on #58 → 0 check-runs on the fixed
+head. A quota-limited reviewer **fails open**; silence looked like a pass. Switched.
+Greptile stays installed as advisory (user's call), no longer gates.
+- **No N/5 score exists.** Gate = `reviewDecision` (APPROVED/CHANGES_REQUESTED) +
+  **pre-merge checks** (`error` blocks, `warning` annotates).
+- `.coderabbit.yaml` points `knowledge_base` at CLAUDE.md → **rules added there are
+  enforced by the bot.** Keep the two in sync.
+- All these default to fail-open and are now set: `fail_commit_status: true`,
+  `auto_pause_after_reviewed_commits: 0` (default 5 stops reviewing *fix* commits),
+  `override_requested_reviewers_only: true` (else the author self-grants an override).
+- CLAUDE.md §5 rewritten. New rule: **0 check-runs is a lapse signature, not a pass.**
+  "Unlimited repos/PRs" is a *volume* cap, not a *rate* cap — public OSS reviews are
+  still rate-limited hourly, so this rule survives going public.
+- **#59 still CHANGES_REQUESTED. 1 real finding open:** *"Make these checks
+  blocking"* — wants `docstrings` / `issue_assessment` / *New logic ships with tests*
+  moved `warning` → `error`. **User decision:** `error` on docstrings at 80% would
+  block a docs-only PR. The other unresolved thread is already fixed in `a4f9bbf`,
+  just not marked resolved.
+- CodeRabbit's first outing caught a fail-open **in the config written to prevent
+  fail-open**. Good signal for the switch.
+
 - **Uzbek alignment spike: docs kept, code archived out of git (2026-07-27)**.
   The spike tooling (`uz_text.py`, `uz_align_eval.py`, `tools/uz_align_spike.py`
   + tests) lives at `/home/claude/quran-data/spike/` with a README, NOT in this
@@ -343,11 +398,17 @@ Re-queried directly 2026-07-22 (do not trust older counts in this file's history
    gap may apply to those).
 4. Build a translation-language switcher — both `ru` translations exist in the
    DB but are invisible in the app (reader hardcodes `en`).
-5. Housekeeping above — branches are DONE (zero remain, 2026-07-27). Left: the
-   untracked scratch (`.superpowers/`, `docs/plans/phase-12-hamza-seat-fix.md`),
-   cosmetic, do whenever convenient.
+5. **Going public — next actions, in order:**
+   a. Decide the #59 blocking-mode question (warning → error?), land #59.
+   b. Submit `~/quran-data/github-support-request.md`; wait for GC confirmation.
+   c. Re-run the two verification commands — BOTH must 404.
+   d. Only then flip visibility.
+   e. After public: enable branch protection (free once public) requiring the
+      CodeRabbit check, or §5 stays convention-only.
+6. Housekeeping — branches DONE (zero remain, 2026-07-27). Left: the untracked
+   scratch (`.superpowers/`, `docs/plans/phase-12-hamza-seat-fix.md`), cosmetic.
 
 ## Notes
 - Uzbek edition = Cyrillic (uz.sodik). Latin variant not done.
-- Greptile: trial→free-plan transition already happened 2026-07-16 (50/mo cap) — watch
-  usage against that cap going forward.
+- Greptile: DEMOTED to advisory 2026-07-27 (see "Review gate" above). Free plan
+  50/mo cap, blown mid-review on #58 — that fail-open is why it no longer gates.
