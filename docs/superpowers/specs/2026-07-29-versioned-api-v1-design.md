@@ -1,8 +1,28 @@
 # Versioned API v1 — Design Spec
 
 **Date:** 2026-07-29
-**Status:** approved in brainstorming, not yet planned
+**Status:** approved in brainstorming, then **narrowed at planning time** — see below
 **Supersedes:** the three ad-hoc unversioned routes under `apps/web/src/app/api/`
+
+> **§4's twelve-route surface is NOT being built.** `docs/plans/phase-19-versioned-api-v1.md`
+> implements **three** routes — `/surahs`, `/search`, `/roots/{bw}/concordance` — the
+> only ones with a caller.
+>
+> **Why: D2 and D3 contradict each other.** D3 asks for a full read API; D2 says
+> `apps/mobile` bundles the corpus DB and works fully offline. An offline consumer
+> does not call a read API, so nine of the twelve routes would have shipped with no
+> consumer at all — while adding nine unauthenticated, un-rate-limited endpoints to
+> a homelab box whose mitigation (D6) is still unconfigured.
+>
+> Everything else here still holds and is still built: D6, D7, D9, D10, D11, the
+> architecture in §3, the validation rules in §6, and the migration in §9. The nine
+> dropped routes are additive under D7 — adding any of them later needs no version
+> bump and no v2. §4 is kept as the design record for when something calls them.
+>
+> Two response-shape claims below are also wrong, corrected in the plan: `/search`
+> cannot take `limit`/`offset` (its query returns an internally-capped composite),
+> and the concordance body *does* change (`entries` → `items`) — §9's "none" column
+> referred to params only.
 
 ---
 
