@@ -4,7 +4,7 @@ import type * as ExpoFont from 'expo-font';
 import type * as SQLite from 'expo-sqlite';
 import type * as ExpoSQLite from 'expo-sqlite';
 
-export const corpusDbAssetName = 'quran-m0.db';
+export const corpusDbAssetName = 'quran.db';
 export const corpusDbFileName = 'quran-corpus.db';
 
 export async function openCorpusDb(): Promise<SQLite.SQLiteDatabase> {
@@ -18,7 +18,7 @@ export async function openCorpusDb(): Promise<SQLite.SQLiteDatabase> {
   const info = await FileSystem.getInfoAsync(targetPath);
 
   if (!info.exists) {
-    const asset = Asset.fromModule(require('../../assets/db/quran-m0.db'));
+    const asset = Asset.fromModule(require('../../assets/db/quran.db'));
     await asset.downloadAsync();
     if (!asset.localUri) throw new Error('Bundled corpus DB asset did not resolve to a local URI');
     await FileSystem.copyAsync({ from: asset.localUri, to: targetPath });

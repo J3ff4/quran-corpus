@@ -10,6 +10,7 @@ Android-first native mobile app for the Quran Corpus experience, built with Reac
 - `packages/config` - shared TypeScript, lint, and formatting config.
 - `docs/PRD-android-first-mobile-app.md` - product requirements.
 - `docs/plans/phase-m0-mobile-technical-spike.md` - M0 implementation plan.
+- `docs/plans/phase-m1-real-offline-reader.md` - M1 implementation plan.
 
 ## Commands
 
@@ -22,6 +23,22 @@ pnpm build
 pnpm android
 ```
 
+## M1 Android Smoke Test
+
+1. Run `pnpm install`.
+2. Run `pnpm generate:m1-db` after `docs/data-sources-m1.md` records selected translators.
+3. Run `pnpm test`.
+4. Run `pnpm type-check`.
+5. Run `pnpm lint`.
+6. Run `pnpm build`.
+7. Start an Android emulator or connect a physical Android device.
+8. Run `pnpm android`.
+9. Turn off network and confirm Surahs opens and a surah reader displays Arabic plus the selected translation.
+10. Add a bookmark, close the app, reopen it, and confirm the bookmark remains.
+11. Open Settings, switch UI locale and content language, and confirm reader labels/content update separately.
+12. Turn network on, set `EXPO_PUBLIC_AUDIO_API_BASE_URL`, and confirm ayah audio requests use the thin endpoint.
+13. Turn network off again and confirm reader still works while audio is unavailable.
+
 ## Current Status
 
-M0 contains an Expo Android app scaffold with a bundled SQLite fixture DB, Hafs font loading, English/Uzbek/Russian translation switching, word detail interaction, and a thin audio endpoint contract for streamed ayah recitation.
+M1 is in progress on an isolated branch. M0 contains an Expo Android app scaffold with a bundled SQLite fixture DB, Hafs font loading, English/Uzbek/Russian translation switching, word detail interaction, and a thin audio endpoint contract for streamed ayah recitation. Android emulator/device smoke verification remains pending.
