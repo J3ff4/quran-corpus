@@ -15,14 +15,20 @@ not carried over from prior narrative.
 - PRs #1–57 MERGED. **#58 CLOSED unmerged** (payload split, see below). **#59 MERGED**
   (`0095c2c`, 2026-07-28 19:01Z — CodeRabbit gate). **#60 MERGED** (phase 17).
   **#61 MERGED** (phase 18, `6113fd3`). **#62 MERGED** (`97d78bb`, sort_order
-  invalidation). Current `main` tip `0095c2c`. Nothing open.
+  invalidation). Current `main` tip `7c5b322`. Nothing open.
   **Commit SHAs before 2026-07-27 are all dead** — history was rewritten, see purge.
 - **Phase 18 (930-root re-scrape) DONE + MERGED.** All six phase-17 carry items
   closed. **The 930-root crawl itself has been run** (see Phase 18 below) — nothing
   is pending there.
-- **#62 merged, but its triggers are not live yet.** `trg_roots_sort_order_*` are
-  installed by migrations — the web app must restart and run them. Until it does, a
-  scrape or `import-lane` run leaves stale ranks that look healthy.
+- **#62's triggers are LIVE as of 2026-07-29.** `trg_roots_sort_order_ai` / `_au`
+  installed by running `ScraperDatabase('~/quran-data/quran.db')` — schema.sql is all
+  `IF NOT EXISTS`, so applying it is idempotent and needs no web-app restart. Live DB
+  after: 1642 roots, 0 NULL ranks (installing a trigger does not fire it), integrity
+  ok. Backup `~/quran-data/quran.db.bak-pre-trg-20260729` (`VACUUM INTO`, 99M).
+  Firing verified on a throwaway copy, not live: a no-op respell
+  (`SET root_arabic = root_arabic`) leaves 0 NULLs — the `WHEN` clause holds, so an
+  idempotent 1642-root re-scrape keeps the cache; a real respell nulls all 1642; an
+  INSERT nulls every pre-existing rank.
 - **CodeRabbit is the gate as of #59.** Two lapse signatures learned the hard way,
   both now in CLAUDE.md §5: a quota-refused review posts a **green `success`** status
   reading `Review rate limited`, and a failed error-mode pre-merge check pins
