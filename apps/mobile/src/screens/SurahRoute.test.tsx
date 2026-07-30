@@ -126,8 +126,9 @@ describe('SurahRoute', () => {
   });
 
   it('clears stale mutation feedback after a later reading history write succeeds', async () => {
+    const readingWrite = deferred<void>();
     mocks.setBookmark.mockRejectedValue(new Error('bookmark write boom'));
-    mocks.recordReadingPosition.mockResolvedValue(undefined);
+    mocks.recordReadingPosition.mockReturnValue(readingWrite.promise);
     render(<SurahRoute />);
 
     await screen.findByText('reader-content');
@@ -135,8 +136,22 @@ describe('SurahRoute', () => {
     await waitFor(() => expect(screen.getByText('bookmark write boom')).toBeTruthy());
 
     fireEvent.click(screen.getByText('read ayah'));
+    await waitFor(() => expect(mocks.recordReadingPosition).toHaveBeenCalled());
+    expect(screen.queryByText('bookmark write boom')).toBeNull();
 
-    await waitFor(() => expect(screen.queryByText('bookmark write boom')).toBeNull());
+    readingWrite.resolve();
+    await waitFor(async () => {
+      await readingWrite.promise;
+    });
+    expect(screen.queryByText('bookmark write boom')).toBeNull();
     expect(screen.getByText('reader-content')).toBeTruthy();
   });
 });
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((settle) => {
+    resolve = settle;
+  });
+  return { promise, resolve };
+}

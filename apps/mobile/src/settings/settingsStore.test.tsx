@@ -103,9 +103,6 @@ describe('AppSettingsProvider', () => {
     openDeferred.resolve(flakyClient);
 
     await waitFor(() => expect(requireSettings(settings).uiLocale).toBe('uz'));
-    await waitFor(async () => {
-      await expect(getSetting(userClient, 'uiLocale')).resolves.toBe('ru');
-    });
 
     act(() => {
       requireSettings(settings).setAnalyticsEnabled(true);
@@ -113,6 +110,44 @@ describe('AppSettingsProvider', () => {
 
     await waitFor(async () => {
       await expect(getSetting(userClient, 'uiLocale')).resolves.toBe('uz');
+    });
+  });
+
+  it('serializes pending setting writes so older batches cannot overwrite newer values', async () => {
+    const userClient = requireSettingsClient();
+    const firstWrite = deferred<void>();
+    const firstWriteStarted = deferred<void>();
+    const firstWriteFinished = deferred<void>();
+    const delayedClient = delayFirstSettingWrite(userClient, 'uiLocale', {
+      release: firstWrite.promise,
+      started: firstWriteStarted.resolve,
+      finished: firstWriteFinished.resolve,
+    });
+    const openDeferred = deferred<MobileDataClient>();
+    mocks.openUserDb = () => openDeferred.promise as Promise<ReturnType<typeof createMemoryUserClient>>;
+
+    let settings: AppSettingsContextValue | null = null;
+    render(
+      <AppSettingsProvider>
+        <SettingsProbe onSettings={(nextSettings) => { settings = nextSettings; }} />
+      </AppSettingsProvider>,
+    );
+
+    act(() => {
+      requireSettings(settings).setUiLocale('uz');
+    });
+    openDeferred.resolve(delayedClient);
+    await firstWriteStarted.promise;
+
+    act(() => {
+      requireSettings(settings).setUiLocale('ru');
+    });
+
+    firstWrite.resolve();
+    await firstWriteFinished.promise;
+
+    await waitFor(async () => {
+      await expect(getSetting(userClient, 'uiLocale')).resolves.toBe('ru');
     });
   });
 });
@@ -139,6 +174,29 @@ function failFirstSettingWrite(client: MobileDataClient, keyToFail: string): Mob
       if (!failed && sql.startsWith('INSERT INTO settings') && args[0] === keyToFail) {
         failed = true;
         throw new Error('transient settings write failure');
+      }
+      return client.execute(statement);
+    },
+  };
+}
+
+function delayFirstSettingWrite(
+  client: MobileDataClient,
+  keyToDelay: string,
+  hooks: { release: Promise<void>; started: () => void; finished: () => void },
+): MobileDataClient {
+  let delayed = false;
+  return {
+    async execute(statement) {
+      const sql = typeof statement === 'string' ? statement : statement.sql;
+      const args = typeof statement === 'string' ? [] : (statement.args ?? []);
+      if (!delayed && sql.startsWith('INSERT INTO settings') && args[0] === keyToDelay) {
+        delayed = true;
+        hooks.started();
+        await hooks.release;
+        const result = await client.execute(statement);
+        hooks.finished();
+        return result;
       }
       return client.execute(statement);
     },

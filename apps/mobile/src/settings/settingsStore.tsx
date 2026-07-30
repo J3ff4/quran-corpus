@@ -73,6 +73,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [userClient, setUserClient] = useState<MobileDataClient | null>(null);
   const pendingSettingsRef = useRef<Partial<AppSettings>>({});
+  const pendingPersistenceRef = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
     let cancelled = false;
@@ -85,7 +86,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
         const pendingSettings = { ...pendingSettingsRef.current };
         setUserClient(client);
         setSettings({ ...persisted, ...pendingSettings });
-        void persistPendingSettings(client, pendingSettings);
+        schedulePendingSettingsPersistence(client);
       }
     }
 
@@ -101,7 +102,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     setSettings((current) => ({ ...current, [key]: value }));
     if (userClient) {
       queuePendingSetting(key, value);
-      void persistPendingSettings(userClient, { ...pendingSettingsRef.current });
+      schedulePendingSettingsPersistence(userClient);
       return;
     }
     queuePendingSetting(key, value);
@@ -111,6 +112,12 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     pendingSettingsRef.current = { ...pendingSettingsRef.current, [key]: value };
   }
 
+  function schedulePendingSettingsPersistence(client: MobileDataClient) {
+    pendingPersistenceRef.current = pendingPersistenceRef.current
+      .catch(() => undefined)
+      .then(() => persistPendingSettings(client, { ...pendingSettingsRef.current }));
+  }
+
   async function persistPendingSettings(client: MobileDataClient, pendingSettings: Partial<AppSettings>) {
     const entries = Object.entries(pendingSettings) as PendingSettingEntry[];
     const results = await Promise.allSettled(
@@ -118,14 +125,25 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     );
 
     const nextPending = { ...pendingSettingsRef.current };
+    const persistedKeys = new Set<keyof AppSettings>();
+    let hasNewerPendingSettings = false;
     for (let index = 0; index < results.length; index += 1) {
       const entry = entries[index];
       const result = results[index];
       if (!entry || result?.status !== 'fulfilled') continue;
       const [key, value] = entry;
+      persistedKeys.add(key);
       if (nextPending[key] === value) delete nextPending[key];
+      else hasNewerPendingSettings = true;
+    }
+    for (const key of Object.keys(nextPending) as Array<keyof AppSettings>) {
+      if (!persistedKeys.has(key)) {
+        hasNewerPendingSettings = true;
+        break;
+      }
     }
     pendingSettingsRef.current = nextPending;
+    if (hasNewerPendingSettings) schedulePendingSettingsPersistence(client);
   }
 
   const value = useMemo<AppSettingsContextValue>(
