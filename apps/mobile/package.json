@@ -19,7 +19,7 @@
     "@quran-corpus/mobile-data": "workspace:*",
     "expo": "~57.0.8",
     "expo-asset": "~57.0.7",
-    "expo-av": "^16.0.8",
+    "expo-audio": "~57.0.3",
     "expo-build-properties": "~57.0.7",
     "expo-constants": "~57.0.7",
     "expo-device": "~57.0.1",

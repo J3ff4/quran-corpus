@@ -1,5 +1,5 @@
-import { Link } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { Link, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
 import { openUserDb } from '@/data/userDb';
@@ -14,10 +14,12 @@ export default function BookmarksTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     let cancelled = false;
 
     async function loadBookmarks() {
+      setError(null);
+      setLoading(true);
       try {
         const userDb = await openUserDb();
         const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
@@ -34,7 +36,7 @@ export default function BookmarksTab() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, []));
 
   if (loading) {
     return (

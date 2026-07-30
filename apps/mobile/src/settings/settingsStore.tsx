@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 import { contentLanguages, uiLocales, type ContentLanguageCode, type UiLocaleCode } from '../i18n/languages';
 import { openUserDb } from '../data/userDb';
@@ -70,6 +70,7 @@ function settingValue(value: AppSettings[keyof AppSettings]): string {
 export function AppSettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [userClient, setUserClient] = useState<MobileDataClient | null>(null);
+  const pendingSettingsRef = useRef<Partial<AppSettings>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -79,8 +80,15 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       const client = createExpoSqliteClient(db as ExpoSqliteLike);
       const persisted = await loadPersistedAppSettings(client);
       if (!cancelled) {
+        const pendingSettings = pendingSettingsRef.current;
+        pendingSettingsRef.current = {};
         setUserClient(client);
-        setSettings(persisted);
+        setSettings({ ...persisted, ...pendingSettings });
+        void Promise.all(
+          Object.entries(pendingSettings).map(([key, value]) =>
+            saveSetting(client, key, settingValue(value as AppSettings[keyof AppSettings])),
+          ),
+        );
       }
     }
 
@@ -96,6 +104,8 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     setSettings((current) => ({ ...current, [key]: value }));
     if (userClient) {
       void saveSetting(userClient, key, settingValue(value));
+    } else {
+      pendingSettingsRef.current = { ...pendingSettingsRef.current, [key]: value };
     }
   }
 

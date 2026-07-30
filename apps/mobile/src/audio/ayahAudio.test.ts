@@ -1,15 +1,21 @@
-import { describe, expect, it, vi } from 'vitest';
-import { getAyahAudioUrl, playAyahAudioUrl } from './ayahAudio';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { expoAudioAyahAudioPlayer, getAyahAudioUrl, playAyahAudioUrl, useAyahAudioController } from './ayahAudio';
 
-vi.mock('expo-av', () => ({
-  Audio: {
-    Sound: {
-      createAsync: vi.fn(),
-    },
-  },
+const mocks = vi.hoisted(() => ({
+  createAudioPlayer: vi.fn(),
+}));
+
+vi.mock('expo-audio', () => ({
+  createAudioPlayer: mocks.createAudioPlayer,
 }));
 
 describe('getAyahAudioUrl', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+  });
+
   it('calls the thin endpoint with Abdul Rashid Sufi as default reciter', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -47,4 +53,109 @@ describe('getAyahAudioUrl', () => {
     ).resolves.toBe(handle);
     expect(player.playUrl).toHaveBeenCalledWith('https://audio.example/002001.mp3');
   });
+
+  it('starts fetched audio URLs with the Expo Audio player', async () => {
+    const nativePlayer = { play: vi.fn(), pause: vi.fn(), remove: vi.fn() };
+    mocks.createAudioPlayer.mockReturnValue(nativePlayer);
+
+    await expect(expoAudioAyahAudioPlayer.playUrl('https://audio.example/003001.mp3')).resolves.toEqual({
+      stopAsync: expect.any(Function),
+      unloadAsync: expect.any(Function),
+    });
+
+    expect(mocks.createAudioPlayer).toHaveBeenCalledWith('https://audio.example/003001.mp3');
+    expect(nativePlayer.play).toHaveBeenCalled();
+  });
+
+  it('unloads playback even when stopping rejects', async () => {
+    const handle = { stopAsync: vi.fn().mockRejectedValue(new Error('stop failed')), unloadAsync: vi.fn() };
+    const player = { playUrl: vi.fn().mockResolvedValue(handle) };
+    stubAudioFetch('https://audio.example/004001.mp3');
+    const { result } = renderHook(() => useAyahAudioController('https://api.example', 4, player));
+
+    await act(async () => {
+      await result.current.toggleAyah(1);
+    });
+    await act(async () => {
+      await result.current.toggleAyah(1);
+    });
+
+    expect(handle.stopAsync).toHaveBeenCalled();
+    expect(handle.unloadAsync).toHaveBeenCalled();
+    expect(result.current.playingAyah).toBeNull();
+  });
+
+  it('keeps the newest playback request active and unloads stale playback', async () => {
+    const firstHandle = { stopAsync: vi.fn(), unloadAsync: vi.fn() };
+    const secondHandle = { stopAsync: vi.fn(), unloadAsync: vi.fn() };
+    const firstPlayback = deferred<{ stopAsync: () => Promise<unknown>; unloadAsync: () => Promise<unknown> }>();
+    const secondPlayback = deferred<{ stopAsync: () => Promise<unknown>; unloadAsync: () => Promise<unknown> }>();
+    const player = {
+      playUrl: vi.fn()
+        .mockReturnValueOnce(firstPlayback.promise)
+        .mockReturnValueOnce(secondPlayback.promise),
+    };
+    stubAudioFetch('https://audio.example/file.mp3');
+    const { result } = renderHook(() => useAyahAudioController('https://api.example', 2, player));
+
+    let firstToggle = Promise.resolve();
+    let secondToggle = Promise.resolve();
+    await act(async () => {
+      firstToggle = result.current.toggleAyah(1);
+    });
+    await act(async () => {
+      secondToggle = result.current.toggleAyah(2);
+    });
+    await act(async () => {
+      secondPlayback.resolve(secondHandle);
+      await secondToggle;
+    });
+    await act(async () => {
+      firstPlayback.resolve(firstHandle);
+      await firstToggle;
+    });
+
+    expect(result.current.playingAyah).toBe(2);
+    expect(firstHandle.stopAsync).toHaveBeenCalled();
+    expect(firstHandle.unloadAsync).toHaveBeenCalled();
+    expect(secondHandle.unloadAsync).not.toHaveBeenCalled();
+  });
+
+  it('stops and unloads active playback on unmount', async () => {
+    const handle = { stopAsync: vi.fn(), unloadAsync: vi.fn() };
+    const player = { playUrl: vi.fn().mockResolvedValue(handle) };
+    stubAudioFetch('https://audio.example/005001.mp3');
+    const { result, unmount } = renderHook(() => useAyahAudioController('https://api.example', 5, player));
+
+    await act(async () => {
+      await result.current.toggleAyah(1);
+    });
+    unmount();
+
+    expect(handle.stopAsync).toHaveBeenCalled();
+    await waitFor(() => expect(handle.unloadAsync).toHaveBeenCalled());
+  });
 });
+
+function stubAudioFetch(url: string) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        url,
+        duration_ms: 5000,
+        source: 'qua',
+        attribution: 'Audio source',
+      }),
+    }),
+  );
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((settle) => {
+    resolve = settle;
+  });
+  return { promise, resolve };
+}

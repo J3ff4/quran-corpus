@@ -69,7 +69,11 @@ export default function SettingsTab() {
           ))}
         </View>
       </View>
-      <Pressable onPress={() => settings.setAnalyticsEnabled(!settings.analyticsEnabled)}>
+      <Pressable
+        accessibilityRole="switch"
+        accessibilityState={{ checked: settings.analyticsEnabled }}
+        onPress={() => settings.setAnalyticsEnabled(!settings.analyticsEnabled)}
+      >
         <Text style={{ color: settings.analyticsEnabled ? colors.accent : colors.muted }}>
           {t(uiLocale, settings.analyticsEnabled ? 'settings.analyticsOn' : 'settings.analyticsOff')}
         </Text>

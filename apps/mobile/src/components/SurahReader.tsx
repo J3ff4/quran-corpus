@@ -26,9 +26,12 @@ export function SurahReader({
   onToggleAudio,
   onReadingAyah,
 }: SurahReaderProps) {
+  const onReadingAyahRef = useRef(onReadingAyah);
+  onReadingAyahRef.current = onReadingAyah;
+
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     const firstVisibleAyah = viewableItems[0]?.item as SurahReaderData['ayahs'][number] | undefined;
-    if (firstVisibleAyah) onReadingAyah?.(firstVisibleAyah.ayah.ayah_number);
+    if (firstVisibleAyah) onReadingAyahRef.current?.(firstVisibleAyah.ayah.ayah_number);
   });
 
   return (
