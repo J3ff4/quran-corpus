@@ -30,7 +30,7 @@ export const expoAudioAyahAudioPlayer: AyahAudioPlayer = {
     player.play();
     return {
       stopAsync: async () => player.pause(),
-      unloadAsync: async () => player.remove(),
+      unloadAsync: async () => player.release(),
     };
   },
 };
@@ -99,7 +99,9 @@ export function useAyahAudioController(
       try {
         await stopPlayback(playback);
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : 'Unable to stop audio');
+        if (requestRef.current === requestId) {
+          setError(cause instanceof Error ? cause.message : 'Unable to stop audio');
+        }
       }
       return;
     }
@@ -109,7 +111,9 @@ export function useAyahAudioController(
       const previousPlayback = playbackRef.current;
       playbackRef.current = null;
       await stopPlayback(previousPlayback).catch((cause) => {
-        setError(cause instanceof Error ? cause.message : 'Unable to stop audio');
+        if (requestRef.current === requestId) {
+          setError(cause instanceof Error ? cause.message : 'Unable to stop audio');
+        }
       });
 
       const nextPlayback = await playAyahAudioUrl({ baseUrl, surah, ayah }, player);

@@ -67,6 +67,8 @@ function settingValue(value: AppSettings[keyof AppSettings]): string {
   return String(value);
 }
 
+type PendingSettingEntry = [keyof AppSettings, AppSettings[keyof AppSettings]];
+
 export function AppSettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [userClient, setUserClient] = useState<MobileDataClient | null>(null);
@@ -80,15 +82,10 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       const client = createExpoSqliteClient(db as ExpoSqliteLike);
       const persisted = await loadPersistedAppSettings(client);
       if (!cancelled) {
-        const pendingSettings = pendingSettingsRef.current;
-        pendingSettingsRef.current = {};
+        const pendingSettings = { ...pendingSettingsRef.current };
         setUserClient(client);
         setSettings({ ...persisted, ...pendingSettings });
-        void Promise.all(
-          Object.entries(pendingSettings).map(([key, value]) =>
-            saveSetting(client, key, settingValue(value as AppSettings[keyof AppSettings])),
-          ),
-        );
+        void persistPendingSettings(client, pendingSettings);
       }
     }
 
@@ -103,10 +100,32 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
   function updateSetting<TKey extends keyof AppSettings>(key: TKey, value: AppSettings[TKey]) {
     setSettings((current) => ({ ...current, [key]: value }));
     if (userClient) {
-      void saveSetting(userClient, key, settingValue(value));
-    } else {
-      pendingSettingsRef.current = { ...pendingSettingsRef.current, [key]: value };
+      queuePendingSetting(key, value);
+      void persistPendingSettings(userClient, { ...pendingSettingsRef.current });
+      return;
     }
+    queuePendingSetting(key, value);
+  }
+
+  function queuePendingSetting<TKey extends keyof AppSettings>(key: TKey, value: AppSettings[TKey]) {
+    pendingSettingsRef.current = { ...pendingSettingsRef.current, [key]: value };
+  }
+
+  async function persistPendingSettings(client: MobileDataClient, pendingSettings: Partial<AppSettings>) {
+    const entries = Object.entries(pendingSettings) as PendingSettingEntry[];
+    const results = await Promise.allSettled(
+      entries.map(([key, value]) => saveSetting(client, key, settingValue(value))),
+    );
+
+    const nextPending = { ...pendingSettingsRef.current };
+    for (let index = 0; index < results.length; index += 1) {
+      const entry = entries[index];
+      const result = results[index];
+      if (!entry || result?.status !== 'fulfilled') continue;
+      const [key, value] = entry;
+      if (nextPending[key] === value) delete nextPending[key];
+    }
+    pendingSettingsRef.current = nextPending;
   }
 
   const value = useMemo<AppSettingsContextValue>(

@@ -104,24 +104,39 @@ describe('SurahRoute', () => {
   });
 
   it('keeps the reader visible when bookmark persistence fails', async () => {
-    mocks.setBookmark.mockRejectedValue(new Error('Unable to update bookmark'));
+    mocks.setBookmark.mockRejectedValue(new Error('bookmark write boom'));
     render(<SurahRoute />);
 
     await screen.findByText('reader-content');
     fireEvent.click(screen.getByText('bookmark'));
 
-    await waitFor(() => expect(screen.getByText('Unable to update bookmark')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('bookmark write boom')).toBeTruthy());
     expect(screen.getByText('reader-content')).toBeTruthy();
   });
 
   it('keeps the reader visible when reading history persistence fails', async () => {
-    mocks.recordReadingPosition.mockRejectedValue(new Error('Unable to update reading history'));
+    mocks.recordReadingPosition.mockRejectedValue(new Error('reading position write boom'));
     render(<SurahRoute />);
 
     await screen.findByText('reader-content');
     fireEvent.click(screen.getByText('read ayah'));
 
-    await waitFor(() => expect(screen.getByText('Unable to update reading history')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('reading position write boom')).toBeTruthy());
+    expect(screen.getByText('reader-content')).toBeTruthy();
+  });
+
+  it('clears stale mutation feedback after a later reading history write succeeds', async () => {
+    mocks.setBookmark.mockRejectedValue(new Error('bookmark write boom'));
+    mocks.recordReadingPosition.mockResolvedValue(undefined);
+    render(<SurahRoute />);
+
+    await screen.findByText('reader-content');
+    fireEvent.click(screen.getByText('bookmark'));
+    await waitFor(() => expect(screen.getByText('bookmark write boom')).toBeTruthy());
+
+    fireEvent.click(screen.getByText('read ayah'));
+
+    await waitFor(() => expect(screen.queryByText('bookmark write boom')).toBeNull());
     expect(screen.getByText('reader-content')).toBeTruthy();
   });
 });

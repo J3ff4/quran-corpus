@@ -19,7 +19,7 @@ describe('createLatestReadingPositionRecorder', () => {
     expect(writes).toEqual([1]);
 
     firstWrite.resolve();
-    await waitForAsync(() => expect(writes).toEqual([1, 3]));
+    await vi.waitFor(() => expect(writes).toEqual([1, 3]));
   });
 });
 
@@ -29,18 +29,4 @@ function deferred<T>() {
     resolve = settle;
   });
   return { promise, resolve };
-}
-
-async function waitForAsync(assertion: () => void) {
-  let lastError: unknown;
-  for (let attempt = 0; attempt < 10; attempt += 1) {
-    try {
-      assertion();
-      return;
-    } catch (cause) {
-      lastError = cause;
-      await Promise.resolve();
-    }
-  }
-  throw lastError;
 }

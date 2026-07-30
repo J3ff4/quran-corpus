@@ -1,6 +1,7 @@
 import React from 'react';
 import { act, render, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { MobileDataClient } from '@quran-corpus/mobile-data';
 import { createMemoryUserClient } from '../data/userRepository.testHelpers';
 import { getSetting, saveSetting } from '../data/userRepository';
 import { AppSettingsProvider, useAppSettings, type AppSettingsContextValue } from './settingsStore';
@@ -81,6 +82,39 @@ describe('AppSettingsProvider', () => {
       await expect(getSetting(userClient, 'uiLocale')).resolves.toBe('uz');
     });
   });
+
+  it('retries pending pre-hydration settings after a transient save failure', async () => {
+    const userClient = requireSettingsClient();
+    await saveSetting(userClient, 'uiLocale', 'ru');
+    const flakyClient = failFirstSettingWrite(userClient, 'uiLocale');
+    const openDeferred = deferred<MobileDataClient>();
+    mocks.openUserDb = () => openDeferred.promise as Promise<ReturnType<typeof createMemoryUserClient>>;
+
+    let settings: AppSettingsContextValue | null = null;
+    render(
+      <AppSettingsProvider>
+        <SettingsProbe onSettings={(nextSettings) => { settings = nextSettings; }} />
+      </AppSettingsProvider>,
+    );
+
+    act(() => {
+      requireSettings(settings).setUiLocale('uz');
+    });
+    openDeferred.resolve(flakyClient);
+
+    await waitFor(() => expect(requireSettings(settings).uiLocale).toBe('uz'));
+    await waitFor(async () => {
+      await expect(getSetting(userClient, 'uiLocale')).resolves.toBe('ru');
+    });
+
+    act(() => {
+      requireSettings(settings).setAnalyticsEnabled(true);
+    });
+
+    await waitFor(async () => {
+      await expect(getSetting(userClient, 'uiLocale')).resolves.toBe('uz');
+    });
+  });
 });
 
 function requireSettingsClient() {
@@ -94,4 +128,19 @@ function deferred<T>() {
     resolve = settle;
   });
   return { promise, resolve };
+}
+
+function failFirstSettingWrite(client: MobileDataClient, keyToFail: string): MobileDataClient {
+  let failed = false;
+  return {
+    async execute(statement) {
+      const sql = typeof statement === 'string' ? statement : statement.sql;
+      const args = typeof statement === 'string' ? [] : (statement.args ?? []);
+      if (!failed && sql.startsWith('INSERT INTO settings') && args[0] === keyToFail) {
+        failed = true;
+        throw new Error('transient settings write failure');
+      }
+      return client.execute(statement);
+    },
+  };
 }

@@ -55,16 +55,20 @@ describe('getAyahAudioUrl', () => {
   });
 
   it('starts fetched audio URLs with the Expo Audio player', async () => {
-    const nativePlayer = { play: vi.fn(), pause: vi.fn(), remove: vi.fn() };
+    const nativePlayer = { play: vi.fn(), pause: vi.fn(), release: vi.fn(), remove: vi.fn() };
     mocks.createAudioPlayer.mockReturnValue(nativePlayer);
 
-    await expect(expoAudioAyahAudioPlayer.playUrl('https://audio.example/003001.mp3')).resolves.toEqual({
+    const playback = await expoAudioAyahAudioPlayer.playUrl('https://audio.example/003001.mp3');
+    expect(playback).toEqual({
       stopAsync: expect.any(Function),
       unloadAsync: expect.any(Function),
     });
+    await playback.unloadAsync();
 
     expect(mocks.createAudioPlayer).toHaveBeenCalledWith('https://audio.example/003001.mp3');
     expect(nativePlayer.play).toHaveBeenCalled();
+    expect(nativePlayer.release).toHaveBeenCalled();
+    expect(nativePlayer.remove).not.toHaveBeenCalled();
   });
 
   it('unloads playback even when stopping rejects', async () => {
@@ -135,6 +139,38 @@ describe('getAyahAudioUrl', () => {
     expect(handle.stopAsync).toHaveBeenCalled();
     await waitFor(() => expect(handle.unloadAsync).toHaveBeenCalled());
   });
+
+  it('ignores stale stop errors after a newer playback request succeeds', async () => {
+    const stopFailure = deferred<never>();
+    const firstHandle = { stopAsync: vi.fn().mockReturnValue(stopFailure.promise), unloadAsync: vi.fn() };
+    const secondHandle = { stopAsync: vi.fn(), unloadAsync: vi.fn() };
+    const player = {
+      playUrl: vi.fn()
+        .mockResolvedValueOnce(firstHandle)
+        .mockResolvedValueOnce(secondHandle),
+    };
+    stubAudioFetch('https://audio.example/file.mp3');
+    const { result } = renderHook(() => useAyahAudioController('https://api.example', 2, player));
+
+    await act(async () => {
+      await result.current.toggleAyah(1);
+    });
+
+    let stopToggle = Promise.resolve();
+    await act(async () => {
+      stopToggle = result.current.toggleAyah(1);
+    });
+    await act(async () => {
+      await result.current.toggleAyah(2);
+    });
+    await act(async () => {
+      stopFailure.reject(new Error('stale stop failed'));
+      await stopToggle;
+    });
+
+    expect(result.current.playingAyah).toBe(2);
+    expect(result.current.audioError).toBeNull();
+  });
 });
 
 function stubAudioFetch(url: string) {
@@ -154,8 +190,10 @@ function stubAudioFetch(url: string) {
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((settle) => {
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((settle, fail) => {
     resolve = settle;
+    reject = fail;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 }
