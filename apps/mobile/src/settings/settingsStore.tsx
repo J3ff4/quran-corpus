@@ -74,6 +74,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
   const [userClient, setUserClient] = useState<MobileDataClient | null>(null);
   const pendingSettingsRef = useRef<Partial<AppSettings>>({});
   const pendingPersistenceRef = useRef<Promise<void>>(Promise.resolve());
+  const pendingImmediatePersistenceRef = useRef(false);
   const persistenceRetryAttemptRef = useRef(0);
   const persistenceRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const persistenceSchedulerActiveRef = useRef(false);
@@ -136,9 +137,15 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       clearTimeout(persistenceRetryTimerRef.current);
       persistenceRetryTimerRef.current = null;
     }
+    if (pendingImmediatePersistenceRef.current) return;
+    pendingImmediatePersistenceRef.current = true;
     pendingPersistenceRef.current = pendingPersistenceRef.current
       .catch(() => undefined)
-      .then(() => persistPendingSettings(client, { ...pendingSettingsRef.current }));
+      .then(() => {
+        pendingImmediatePersistenceRef.current = false;
+        if (!persistenceSchedulerActiveRef.current) return;
+        return persistPendingSettings(client, { ...pendingSettingsRef.current });
+      });
   }
 
   async function persistPendingSettings(client: MobileDataClient, pendingSettings: Partial<AppSettings>) {
@@ -159,6 +166,12 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       const [key, value] = entry;
       if (result?.status !== 'fulfilled') {
         failedKeys.add(key);
+        if (
+          Object.prototype.hasOwnProperty.call(nextPending, key)
+          && nextPending[key] !== value
+        ) {
+          hasNewerPendingSettings = true;
+        }
         continue;
       }
       persistedKeys.add(key);
