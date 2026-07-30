@@ -6,6 +6,7 @@ import { useAyahAudioController } from '@/audio/ayahAudio';
 import { LanguageSelector } from '@/components/LanguageSelector';
 import { SurahReader } from '@/components/SurahReader';
 import { getSurahReader, type SurahReaderData } from '@/data/corpusRepository';
+import { createLatestReadingPositionRecorder } from '@/data/latestReadingPositionRecorder';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { openUserDb } from '@/data/userDb';
 import { getBookmarks, recordReadingPosition, setBookmark } from '@/data/userRepository';
@@ -29,6 +30,16 @@ export default function SurahRoute() {
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState<string | null>(null);
+  const readingRecorder = useMemo(() => {
+    if (!surahId) return null;
+    return createLatestReadingPositionRecorder(async (ayahNumber) => {
+      setMutationError(null);
+      const userDb = await openUserDb();
+      const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
+      await recordReadingPosition(userClient, surahId, ayahNumber);
+    }, setMutationError);
+  }, [surahId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,6 +53,7 @@ export default function SurahRoute() {
 
       setLoading(true);
       setError(null);
+      setMutationError(null);
 
       try {
         const [corpusDb, userDb] = await Promise.all([openCorpusDb(), openUserDb()]);
@@ -87,24 +99,13 @@ export default function SurahRoute() {
     });
 
     try {
+      setMutationError(null);
       const userDb = await openUserDb();
       const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
       await setBookmark(userClient, surahId, ayahNumber, nextBookmarked);
     } catch (cause) {
       setBookmarks(previousBookmarks);
-      setError(cause instanceof Error ? cause.message : 'Unable to update bookmark');
-    }
-  }
-
-  async function recordReadingAyah(ayahNumber: number) {
-    if (!surahId) return;
-
-    try {
-      const userDb = await openUserDb();
-      const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
-      await recordReadingPosition(userClient, surahId, ayahNumber);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to update reading history');
+      setMutationError(cause instanceof Error ? cause.message : 'Unable to update bookmark');
     }
   }
 
@@ -136,9 +137,10 @@ export default function SurahRoute() {
         onToggleBookmark={toggleBookmark}
         onToggleAudio={audio.toggleAyah}
         onReadingAyah={(ayahNumber) => {
-          void recordReadingAyah(ayahNumber);
+          readingRecorder?.record(ayahNumber);
         }}
       />
+      {mutationError ? <Text style={{ color: colors.danger, padding: 20 }}>{mutationError}</Text> : null}
       {audio.audioError ? <Text style={{ color: colors.danger, padding: 20 }}>{audio.audioError}</Text> : null}
     </View>
   );
