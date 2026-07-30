@@ -16,7 +16,8 @@
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "generate:m0-db": "tsx scripts/create-m0-fixture-db.ts"
+    "generate:m0-db": "tsx scripts/create-m0-fixture-db.ts",
+    "generate:m1-db": "tsx scripts/create-m1-reader-db.ts"
   },
   "dependencies": {
     "@quran-corpus/data": "workspace:*"

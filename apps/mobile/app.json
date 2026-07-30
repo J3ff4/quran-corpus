@@ -25,6 +25,12 @@
           }
         }
       ]
-    ]
+    ],
+    "extra": {
+      "audioApiBaseUrl": "",
+      "sentryDsn": "",
+      "posthogKey": "",
+      "posthogHost": ""
+    }
   }
 }

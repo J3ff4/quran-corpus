@@ -384,6 +384,8 @@ Decision: create fresh Android mobile mockups before implementation. They should
 
 ### Phase M0: Mobile Technical Spike
 
+Status: implementation complete; Android emulator/device smoke verification pending.
+
 - Create `apps/mobile` prototype.
 - Prove Android build.
 - Prove Arabic font rendering.
@@ -399,6 +401,8 @@ Exit criteria:
 - Clear recommendation on SQLite driver and DB packaging.
 
 ### Phase M1: Android Reader MVP
+
+Status: in progress.
 
 - Surah list.
 - Surah reader.
