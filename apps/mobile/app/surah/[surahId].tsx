@@ -34,6 +34,7 @@ export default function SurahRoute() {
   const readingRecorder = useMemo(() => {
     if (!surahId) return null;
     return createLatestReadingPositionRecorder(async (ayahNumber) => {
+      setMutationError(null);
       const userDb = await openUserDb();
       const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
       await recordReadingPosition(userClient, surahId, ayahNumber);

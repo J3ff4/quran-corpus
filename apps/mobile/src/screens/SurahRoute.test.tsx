@@ -104,24 +104,54 @@ describe('SurahRoute', () => {
   });
 
   it('keeps the reader visible when bookmark persistence fails', async () => {
-    mocks.setBookmark.mockRejectedValue(new Error('Unable to update bookmark'));
+    mocks.setBookmark.mockRejectedValue(new Error('bookmark write boom'));
     render(<SurahRoute />);
 
     await screen.findByText('reader-content');
     fireEvent.click(screen.getByText('bookmark'));
 
-    await waitFor(() => expect(screen.getByText('Unable to update bookmark')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('bookmark write boom')).toBeTruthy());
     expect(screen.getByText('reader-content')).toBeTruthy();
   });
 
   it('keeps the reader visible when reading history persistence fails', async () => {
-    mocks.recordReadingPosition.mockRejectedValue(new Error('Unable to update reading history'));
+    mocks.recordReadingPosition.mockRejectedValue(new Error('reading position write boom'));
     render(<SurahRoute />);
 
     await screen.findByText('reader-content');
     fireEvent.click(screen.getByText('read ayah'));
 
-    await waitFor(() => expect(screen.getByText('Unable to update reading history')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('reading position write boom')).toBeTruthy());
+    expect(screen.getByText('reader-content')).toBeTruthy();
+  });
+
+  it('clears stale mutation feedback after a later reading history write succeeds', async () => {
+    const readingWrite = deferred<void>();
+    mocks.setBookmark.mockRejectedValue(new Error('bookmark write boom'));
+    mocks.recordReadingPosition.mockReturnValue(readingWrite.promise);
+    render(<SurahRoute />);
+
+    await screen.findByText('reader-content');
+    fireEvent.click(screen.getByText('bookmark'));
+    await waitFor(() => expect(screen.getByText('bookmark write boom')).toBeTruthy());
+
+    fireEvent.click(screen.getByText('read ayah'));
+    await waitFor(() => expect(mocks.recordReadingPosition).toHaveBeenCalled());
+    expect(screen.queryByText('bookmark write boom')).toBeNull();
+
+    readingWrite.resolve();
+    await waitFor(async () => {
+      await readingWrite.promise;
+    });
+    expect(screen.queryByText('bookmark write boom')).toBeNull();
     expect(screen.getByText('reader-content')).toBeTruthy();
   });
 });
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((settle) => {
+    resolve = settle;
+  });
+  return { promise, resolve };
+}

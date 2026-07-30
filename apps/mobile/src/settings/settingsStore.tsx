@@ -67,12 +67,21 @@ function settingValue(value: AppSettings[keyof AppSettings]): string {
   return String(value);
 }
 
+type PendingSettingEntry = [keyof AppSettings, AppSettings[keyof AppSettings]];
+
 export function AppSettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [userClient, setUserClient] = useState<MobileDataClient | null>(null);
   const pendingSettingsRef = useRef<Partial<AppSettings>>({});
+  const pendingPersistenceRef = useRef<Promise<void>>(Promise.resolve());
+  const pendingImmediatePersistenceRef = useRef(false);
+  const persistenceRetryAttemptRef = useRef(0);
+  const persistenceRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryPendingSettingsRef = useRef<Partial<AppSettings> | null>(null);
+  const persistenceSchedulerActiveRef = useRef(false);
 
   useEffect(() => {
+    persistenceSchedulerActiveRef.current = true;
     let cancelled = false;
 
     async function hydrateSettings() {
@@ -80,15 +89,10 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       const client = createExpoSqliteClient(db as ExpoSqliteLike);
       const persisted = await loadPersistedAppSettings(client);
       if (!cancelled) {
-        const pendingSettings = pendingSettingsRef.current;
-        pendingSettingsRef.current = {};
+        const pendingSettings = { ...pendingSettingsRef.current };
         setUserClient(client);
         setSettings({ ...persisted, ...pendingSettings });
-        void Promise.all(
-          Object.entries(pendingSettings).map(([key, value]) =>
-            saveSetting(client, key, settingValue(value as AppSettings[keyof AppSettings])),
-          ),
-        );
+        schedulePendingSettingsPersistence(client);
       }
     }
 
@@ -97,15 +101,121 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     });
     return () => {
       cancelled = true;
+      persistenceSchedulerActiveRef.current = false;
+      if (persistenceRetryTimerRef.current) {
+        clearTimeout(persistenceRetryTimerRef.current);
+        persistenceRetryTimerRef.current = null;
+      }
+      retryPendingSettingsRef.current = null;
     };
   }, []);
 
   function updateSetting<TKey extends keyof AppSettings>(key: TKey, value: AppSettings[TKey]) {
     setSettings((current) => ({ ...current, [key]: value }));
     if (userClient) {
-      void saveSetting(userClient, key, settingValue(value));
-    } else {
-      pendingSettingsRef.current = { ...pendingSettingsRef.current, [key]: value };
+      queuePendingSetting(key, value);
+      schedulePendingSettingsPersistence(userClient);
+      return;
+    }
+    queuePendingSetting(key, value);
+  }
+
+  function queuePendingSetting<TKey extends keyof AppSettings>(key: TKey, value: AppSettings[TKey]) {
+    pendingSettingsRef.current = { ...pendingSettingsRef.current, [key]: value };
+  }
+
+  function hasSupersededRetryPendingSettings() {
+    const retryPendingSettings = retryPendingSettingsRef.current;
+    if (!retryPendingSettings) return true;
+    const entries = Object.entries(retryPendingSettings) as PendingSettingEntry[];
+    return entries.some(([key, value]) => (
+      !Object.prototype.hasOwnProperty.call(pendingSettingsRef.current, key)
+      || pendingSettingsRef.current[key] !== value
+    ));
+  }
+
+  function schedulePendingSettingsPersistence(client: MobileDataClient, delayMs = 0) {
+    if (!persistenceSchedulerActiveRef.current) return;
+    if (delayMs > 0) {
+      if (persistenceRetryTimerRef.current) clearTimeout(persistenceRetryTimerRef.current);
+      retryPendingSettingsRef.current = { ...pendingSettingsRef.current };
+      persistenceRetryTimerRef.current = setTimeout(() => {
+        persistenceRetryTimerRef.current = null;
+        retryPendingSettingsRef.current = null;
+        if (!persistenceSchedulerActiveRef.current) return;
+        schedulePendingSettingsPersistence(client);
+      }, delayMs);
+      return;
+    }
+    if (persistenceRetryTimerRef.current) {
+      if (!hasSupersededRetryPendingSettings()) return;
+      clearTimeout(persistenceRetryTimerRef.current);
+      persistenceRetryTimerRef.current = null;
+      retryPendingSettingsRef.current = null;
+    }
+    if (pendingImmediatePersistenceRef.current) return;
+    pendingImmediatePersistenceRef.current = true;
+    pendingPersistenceRef.current = pendingPersistenceRef.current
+      .catch(() => undefined)
+      .then(() => {
+        pendingImmediatePersistenceRef.current = false;
+        if (!persistenceSchedulerActiveRef.current) return;
+        return persistPendingSettings(client, { ...pendingSettingsRef.current });
+      });
+  }
+
+  async function persistPendingSettings(client: MobileDataClient, pendingSettings: Partial<AppSettings>) {
+    const entries = Object.entries(pendingSettings) as PendingSettingEntry[];
+    const results = await Promise.allSettled(
+      entries.map(([key, value]) => saveSetting(client, key, settingValue(value))),
+    );
+
+    const nextPending = { ...pendingSettingsRef.current };
+    const attemptedKeys = new Set(entries.map(([key]) => key));
+    const failedKeys = new Set<keyof AppSettings>();
+    const persistedKeys = new Set<keyof AppSettings>();
+    let hasNewerPendingSettings = false;
+    for (let index = 0; index < results.length; index += 1) {
+      const entry = entries[index];
+      const result = results[index];
+      if (!entry) continue;
+      const [key, value] = entry;
+      if (result?.status !== 'fulfilled') {
+        failedKeys.add(key);
+        if (
+          Object.prototype.hasOwnProperty.call(nextPending, key)
+          && nextPending[key] !== value
+        ) {
+          hasNewerPendingSettings = true;
+        }
+        continue;
+      }
+      persistedKeys.add(key);
+      if (nextPending[key] === value) delete nextPending[key];
+      else hasNewerPendingSettings = true;
+    }
+    let hasFailedWrite = false;
+    for (const key of Object.keys(nextPending) as Array<keyof AppSettings>) {
+      if (failedKeys.has(key)) {
+        hasFailedWrite = true;
+      } else if (!attemptedKeys.has(key) || !persistedKeys.has(key)) {
+        hasNewerPendingSettings = true;
+      }
+    }
+    pendingSettingsRef.current = nextPending;
+    if (Object.keys(nextPending).length === 0) {
+      persistenceRetryAttemptRef.current = 0;
+      retryPendingSettingsRef.current = null;
+      return;
+    }
+    if (hasNewerPendingSettings) {
+      schedulePendingSettingsPersistence(client);
+      return;
+    }
+    if (hasFailedWrite) {
+      const retryDelayMs = Math.min(1000 * 2 ** persistenceRetryAttemptRef.current, 30000);
+      persistenceRetryAttemptRef.current += 1;
+      schedulePendingSettingsPersistence(client, retryDelayMs);
     }
   }
 
