@@ -77,6 +77,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
   const pendingImmediatePersistenceRef = useRef(false);
   const persistenceRetryAttemptRef = useRef(0);
   const persistenceRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryPendingSettingsRef = useRef<Partial<AppSettings> | null>(null);
   const persistenceSchedulerActiveRef = useRef(false);
 
   useEffect(() => {
@@ -105,6 +106,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
         clearTimeout(persistenceRetryTimerRef.current);
         persistenceRetryTimerRef.current = null;
       }
+      retryPendingSettingsRef.current = null;
     };
   }, []);
 
@@ -122,20 +124,34 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     pendingSettingsRef.current = { ...pendingSettingsRef.current, [key]: value };
   }
 
+  function hasSupersededRetryPendingSettings() {
+    const retryPendingSettings = retryPendingSettingsRef.current;
+    if (!retryPendingSettings) return true;
+    const entries = Object.entries(retryPendingSettings) as PendingSettingEntry[];
+    return entries.some(([key, value]) => (
+      !Object.prototype.hasOwnProperty.call(pendingSettingsRef.current, key)
+      || pendingSettingsRef.current[key] !== value
+    ));
+  }
+
   function schedulePendingSettingsPersistence(client: MobileDataClient, delayMs = 0) {
     if (!persistenceSchedulerActiveRef.current) return;
     if (delayMs > 0) {
       if (persistenceRetryTimerRef.current) clearTimeout(persistenceRetryTimerRef.current);
+      retryPendingSettingsRef.current = { ...pendingSettingsRef.current };
       persistenceRetryTimerRef.current = setTimeout(() => {
         persistenceRetryTimerRef.current = null;
+        retryPendingSettingsRef.current = null;
         if (!persistenceSchedulerActiveRef.current) return;
         schedulePendingSettingsPersistence(client);
       }, delayMs);
       return;
     }
     if (persistenceRetryTimerRef.current) {
+      if (!hasSupersededRetryPendingSettings()) return;
       clearTimeout(persistenceRetryTimerRef.current);
       persistenceRetryTimerRef.current = null;
+      retryPendingSettingsRef.current = null;
     }
     if (pendingImmediatePersistenceRef.current) return;
     pendingImmediatePersistenceRef.current = true;
@@ -189,6 +205,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     pendingSettingsRef.current = nextPending;
     if (Object.keys(nextPending).length === 0) {
       persistenceRetryAttemptRef.current = 0;
+      retryPendingSettingsRef.current = null;
       return;
     }
     if (hasNewerPendingSettings) {
