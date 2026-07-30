@@ -192,6 +192,43 @@ describe('AppSettingsProvider', () => {
     });
     expect(flakyClient.settingWriteAttempts()).toBe(3);
   });
+
+  it('does not retry pending setting writes after unmount', async () => {
+    vi.useFakeTimers();
+    const userClient = requireSettingsClient();
+    const writeRelease = deferred<void>();
+    const firstWriteStarted = deferred<void>();
+    const rejectingClient = rejectFirstSettingWrite(userClient, 'uiLocale', {
+      release: writeRelease.promise,
+      started: firstWriteStarted.resolve,
+    });
+    const openDeferred = deferred<MobileDataClient>();
+    mocks.openUserDb = () => openDeferred.promise as Promise<ReturnType<typeof createMemoryUserClient>>;
+
+    let settings: AppSettingsContextValue | null = null;
+    const view = render(
+      <AppSettingsProvider>
+        <SettingsProbe onSettings={(nextSettings) => { settings = nextSettings; }} />
+      </AppSettingsProvider>,
+    );
+
+    act(() => {
+      requireSettings(settings).setUiLocale('uz');
+    });
+    openDeferred.resolve(rejectingClient);
+    await firstWriteStarted.promise;
+
+    view.unmount();
+    writeRelease.reject(new Error('settings write after unmount'));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(vi.getTimerCount()).toBe(0);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30000);
+    });
+    expect(rejectingClient.settingWriteAttempts()).toBe(1);
+  });
 });
 
 function requireSettingsClient() {
@@ -201,10 +238,12 @@ function requireSettingsClient() {
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((settle) => {
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((settle, fail) => {
     resolve = settle;
+    reject = fail;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 }
 
 function failFirstSettingWrite(client: MobileDataClient, keyToFail: string): MobileDataClient {
@@ -255,6 +294,29 @@ function delayFirstSettingWrite(
         const result = await client.execute(statement);
         hooks.finished();
         return result;
+      }
+      return client.execute(statement);
+    },
+  };
+}
+
+function rejectFirstSettingWrite(
+  client: MobileDataClient,
+  keyToReject: string,
+  hooks: { release: Promise<void>; started: () => void },
+): MobileDataClient & { settingWriteAttempts: () => number } {
+  let attempts = 0;
+  return {
+    settingWriteAttempts: () => attempts,
+    async execute(statement) {
+      const sql = typeof statement === 'string' ? statement : statement.sql;
+      const args = typeof statement === 'string' ? [] : (statement.args ?? []);
+      if (sql.startsWith('INSERT INTO settings') && args[0] === keyToReject) {
+        attempts += 1;
+        if (attempts === 1) {
+          hooks.started();
+          await hooks.release;
+        }
       }
       return client.execute(statement);
     },
