@@ -76,8 +76,10 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
   const pendingPersistenceRef = useRef<Promise<void>>(Promise.resolve());
   const persistenceRetryAttemptRef = useRef(0);
   const persistenceRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const persistenceSchedulerActiveRef = useRef(false);
 
   useEffect(() => {
+    persistenceSchedulerActiveRef.current = true;
     let cancelled = false;
 
     async function hydrateSettings() {
@@ -97,7 +99,11 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     });
     return () => {
       cancelled = true;
-      if (persistenceRetryTimerRef.current) clearTimeout(persistenceRetryTimerRef.current);
+      persistenceSchedulerActiveRef.current = false;
+      if (persistenceRetryTimerRef.current) {
+        clearTimeout(persistenceRetryTimerRef.current);
+        persistenceRetryTimerRef.current = null;
+      }
     };
   }, []);
 
@@ -116,10 +122,12 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
   }
 
   function schedulePendingSettingsPersistence(client: MobileDataClient, delayMs = 0) {
+    if (!persistenceSchedulerActiveRef.current) return;
     if (delayMs > 0) {
       if (persistenceRetryTimerRef.current) clearTimeout(persistenceRetryTimerRef.current);
       persistenceRetryTimerRef.current = setTimeout(() => {
         persistenceRetryTimerRef.current = null;
+        if (!persistenceSchedulerActiveRef.current) return;
         schedulePendingSettingsPersistence(client);
       }, delayMs);
       return;
