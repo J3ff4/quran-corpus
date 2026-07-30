@@ -5,7 +5,7 @@ import type * as SQLite from 'expo-sqlite';
 import type * as ExpoSQLite from 'expo-sqlite';
 
 export const corpusDbAssetName = 'quran.db';
-export const corpusDbFileName = 'quran-corpus.db';
+export const corpusDbFileName = 'quran-corpus-m1.db';
 
 export async function openCorpusDb(): Promise<SQLite.SQLiteDatabase> {
   const { Asset } = require('expo-asset') as typeof ExpoAsset;

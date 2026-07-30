@@ -1,4 +1,6 @@
 import { Pressable, Text, View } from 'react-native';
+import type { UiLocaleCode } from '@/i18n/languages';
+import { t } from '@/i18n/uiStrings';
 import { colors, typography } from '@/theme/tokens';
 
 export interface AyahCardProps {
@@ -7,6 +9,7 @@ export interface AyahCardProps {
   translationText: string | null;
   bookmarked: boolean;
   playing: boolean;
+  uiLocale: UiLocaleCode;
   audioDisabled?: boolean;
   onToggleBookmark: (ayahNumber: number) => void;
   onToggleAudio: (ayahNumber: number) => void;
@@ -18,6 +21,7 @@ export function AyahCard({
   translationText,
   bookmarked,
   playing,
+  uiLocale,
   audioDisabled = false,
   onToggleBookmark,
   onToggleAudio,
@@ -37,11 +41,13 @@ export function AyahCard({
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <Pressable accessibilityRole="button" onPress={() => onToggleBookmark(ayahNumber)}>
             <Text style={{ color: bookmarked ? colors.accent : colors.muted }}>
-              {bookmarked ? 'Remove bookmark' : 'Bookmark'}
+              {bookmarked ? t(uiLocale, 'reader.removeBookmark') : t(uiLocale, 'reader.bookmark')}
             </Text>
           </Pressable>
           <Pressable accessibilityRole="button" disabled={audioDisabled} onPress={() => onToggleAudio(ayahNumber)}>
-            <Text style={{ color: audioDisabled ? colors.muted : colors.accent }}>{playing ? 'Pause' : 'Play'}</Text>
+            <Text style={{ color: audioDisabled ? colors.muted : colors.accent }}>
+              {playing ? t(uiLocale, 'reader.pause') : t(uiLocale, 'reader.play')}
+            </Text>
           </Pressable>
         </View>
       </View>

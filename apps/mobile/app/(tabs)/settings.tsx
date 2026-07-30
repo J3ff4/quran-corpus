@@ -5,6 +5,12 @@ import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
 import { colors } from '@/theme/tokens';
 
+const themeLabelKeys = {
+  system: 'settings.themeSystem',
+  light: 'settings.themeLight',
+  dark: 'settings.themeDark',
+} as const;
+
 export default function SettingsTab() {
   const settings = useAppSettings();
   const { uiLocale } = settings;
@@ -16,7 +22,12 @@ export default function SettingsTab() {
         <Text style={{ color: colors.ink, fontWeight: '600' }}>{t(uiLocale, 'settings.language')}</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {uiLocales.map((locale) => (
-            <Pressable key={locale.code} onPress={() => settings.setUiLocale(locale.code)}>
+            <Pressable
+              key={locale.code}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: locale.code === settings.uiLocale }}
+              onPress={() => settings.setUiLocale(locale.code)}
+            >
               <Text style={{ color: locale.code === settings.uiLocale ? colors.accent : colors.muted }}>
                 {locale.nativeLabel}
               </Text>
@@ -28,7 +39,12 @@ export default function SettingsTab() {
         <Text style={{ color: colors.ink, fontWeight: '600' }}>{t(uiLocale, 'reader.translation')}</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {contentLanguages.map((language) => (
-            <Pressable key={language.code} onPress={() => settings.setContentLanguage(language.code)}>
+            <Pressable
+              key={language.code}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: language.code === settings.contentLanguage }}
+              onPress={() => settings.setContentLanguage(language.code)}
+            >
               <Text style={{ color: language.code === settings.contentLanguage ? colors.accent : colors.muted }}>
                 {language.nativeLabel}
               </Text>
@@ -40,15 +56,22 @@ export default function SettingsTab() {
         <Text style={{ color: colors.ink, fontWeight: '600' }}>{t(uiLocale, 'settings.theme')}</Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {(['system', 'light', 'dark'] as const).map((theme) => (
-            <Pressable key={theme} onPress={() => settings.setTheme(theme)}>
-              <Text style={{ color: theme === settings.theme ? colors.accent : colors.muted }}>{theme}</Text>
+            <Pressable
+              key={theme}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: theme === settings.theme }}
+              onPress={() => settings.setTheme(theme)}
+            >
+              <Text style={{ color: theme === settings.theme ? colors.accent : colors.muted }}>
+                {t(uiLocale, themeLabelKeys[theme])}
+              </Text>
             </Pressable>
           ))}
         </View>
       </View>
       <Pressable onPress={() => settings.setAnalyticsEnabled(!settings.analyticsEnabled)}>
         <Text style={{ color: settings.analyticsEnabled ? colors.accent : colors.muted }}>
-          Analytics: {settings.analyticsEnabled ? 'On' : 'Off'}
+          {t(uiLocale, settings.analyticsEnabled ? 'settings.analyticsOn' : 'settings.analyticsOff')}
         </Text>
       </Pressable>
       <Link href="/about" style={{ color: colors.accent }}>

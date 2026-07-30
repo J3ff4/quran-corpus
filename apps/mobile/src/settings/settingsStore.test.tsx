@@ -1,22 +1,21 @@
-import { act, create } from 'react-test-renderer';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import React from 'react';
+import { act, render, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createMemoryUserClient } from '../data/userRepository.testHelpers';
+import { getSetting, saveSetting } from '../data/userRepository';
 import { AppSettingsProvider, useAppSettings, type AppSettingsContextValue } from './settingsStore';
 
-(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+const mocks = vi.hoisted(() => ({
+  userClient: null as ReturnType<typeof createMemoryUserClient> | null,
+}));
 
-const originalConsoleError = console.error;
-let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+vi.mock('@quran-corpus/mobile-data', () => ({
+  createExpoSqliteClient: (db: unknown) => db,
+}));
 
-beforeEach(() => {
-  consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation((message?: unknown, ...args: unknown[]) => {
-    if (typeof message === 'string' && message.includes('react-test-renderer is deprecated')) return;
-    originalConsoleError(message, ...args);
-  });
-});
-
-afterEach(() => {
-  consoleErrorSpy.mockRestore();
-});
+vi.mock('../data/userDb', () => ({
+  openUserDb: async () => mocks.userClient,
+}));
 
 function SettingsProbe({ onSettings }: { onSettings: (settings: AppSettingsContextValue) => void }) {
   onSettings(useAppSettings());
@@ -29,31 +28,36 @@ function requireSettings(settings: AppSettingsContextValue | null): AppSettingsC
 }
 
 describe('AppSettingsProvider', () => {
-  it('provides M1 settings and updates them through useAppSettings', () => {
+  beforeEach(() => {
+    mocks.userClient = createMemoryUserClient();
+  });
+
+  it('hydrates persisted settings and writes setting changes through useAppSettings', async () => {
+    const userClient = requireSettingsClient();
+    await saveSetting(userClient, 'uiLocale', 'ru');
+    await saveSetting(userClient, 'contentLanguage', 'uz');
+
     let settings: AppSettingsContextValue | null = null;
+    render(
+      <AppSettingsProvider>
+        <SettingsProbe onSettings={(nextSettings) => { settings = nextSettings; }} />
+      </AppSettingsProvider>,
+    );
+
+    await waitFor(() => expect(requireSettings(settings).uiLocale).toBe('ru'));
+    expect(requireSettings(settings).contentLanguage).toBe('uz');
 
     act(() => {
-      create(
-        <AppSettingsProvider>
-          <SettingsProbe onSettings={(nextSettings) => { settings = nextSettings; }} />
-        </AppSettingsProvider>,
-      );
+      requireSettings(settings).setAnalyticsEnabled(true);
     });
 
-    let currentSettings = requireSettings(settings);
-    expect(currentSettings.uiLocale).toBe('en');
-    expect(currentSettings.contentLanguage).toBe('en');
-    expect(currentSettings.analyticsEnabled).toBe(false);
-
-    act(() => {
-      currentSettings.setUiLocale('ru');
-      currentSettings.setContentLanguage('uz');
-      currentSettings.setAnalyticsEnabled(true);
+    await waitFor(async () => {
+      await expect(getSetting(userClient, 'analyticsEnabled')).resolves.toBe('true');
     });
-
-    currentSettings = requireSettings(settings);
-    expect(currentSettings.uiLocale).toBe('ru');
-    expect(currentSettings.contentLanguage).toBe('uz');
-    expect(currentSettings.analyticsEnabled).toBe(true);
   });
 });
+
+function requireSettingsClient() {
+  if (!mocks.userClient) throw new Error('Settings test user client was not initialized');
+  return mocks.userClient;
+}

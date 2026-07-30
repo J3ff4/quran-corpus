@@ -1,14 +1,63 @@
-import { Text, View } from 'react-native';
+import { Link } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Text, View } from 'react-native';
+import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
+import { openUserDb } from '@/data/userDb';
+import { getBookmarks, type Bookmark } from '@/data/userRepository';
 import { useAppSettings } from '@/settings/settingsStore';
 import { t } from '@/i18n/uiStrings';
 import { colors } from '@/theme/tokens';
 
 export default function BookmarksTab() {
   const { uiLocale } = useAppSettings();
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadBookmarks() {
+      try {
+        const userDb = await openUserDb();
+        const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
+        const savedBookmarks = await getBookmarks(userClient);
+        if (!cancelled) setBookmarks(savedBookmarks);
+      } catch (cause) {
+        if (!cancelled) setError(cause instanceof Error ? cause.message : 'Unable to load bookmarks');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadBookmarks();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.paper }}>
+        <ActivityIndicator />
+      </View>
+    );
+  }
 
   return (
-    <View style={{ flex: 1, justifyContent: 'center', padding: 20, backgroundColor: colors.paper }}>
-      <Text style={{ color: colors.muted }}>{t(uiLocale, 'tabs.bookmarks')}</Text>
+    <View style={{ flex: 1, padding: 20, gap: 12, backgroundColor: colors.paper }}>
+      <Text style={{ color: colors.ink, fontSize: 20, fontWeight: '700' }}>{t(uiLocale, 'tabs.bookmarks')}</Text>
+      {error ? <Text style={{ color: colors.danger }}>{error}</Text> : null}
+      {!error && bookmarks.length === 0 ? <Text style={{ color: colors.muted }}>{t(uiLocale, 'bookmarks.empty')}</Text> : null}
+      {bookmarks.map((bookmark) => (
+        <Link
+          key={`${bookmark.surahId}:${bookmark.ayahNumber}`}
+          href={{ pathname: '/surah/[surahId]', params: { surahId: String(bookmark.surahId) } }}
+          style={{ color: colors.accent }}
+        >
+          {t(uiLocale, 'bookmarks.entryPrefix')} {bookmark.surahId}:{bookmark.ayahNumber}
+        </Link>
+      ))}
     </View>
   );
 }
