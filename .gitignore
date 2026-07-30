@@ -60,3 +60,13 @@ temp/
 
 # SDD workspace scratch (subagent-driven-development)
 .superpowers/
+
+# /browse (gstack) audit scratch
+.gstack/
+
+# Local data artifacts — DB, backups, logs, checkpoints, snapshots (CLAUDE.md §9/§11)
+quran-data/
+
+# Duplicate local copies of the repo (nested clone + zip download) — never version them
+quran-corpus-pwa/
+quran-corpus-pwa-main.zip
