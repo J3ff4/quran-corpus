@@ -1,6 +1,6 @@
 import React from 'react';
 import { act, render, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MobileDataClient } from '@quran-corpus/mobile-data';
 import { createMemoryUserClient } from '../data/userRepository.testHelpers';
 import { getSetting, saveSetting } from '../data/userRepository';
@@ -30,6 +30,10 @@ function requireSettings(settings: AppSettingsContextValue | null): AppSettingsC
 }
 
 describe('AppSettingsProvider', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     mocks.userClient = createMemoryUserClient();
     mocks.openUserDb = null;
@@ -150,6 +154,44 @@ describe('AppSettingsProvider', () => {
       await expect(getSetting(userClient, 'uiLocale')).resolves.toBe('ru');
     });
   });
+
+  it('backs off retrying persistent pending setting failures', async () => {
+    vi.useFakeTimers();
+    const userClient = requireSettingsClient();
+    const flakyClient = failSettingWrites(userClient, 'uiLocale', 2);
+    const openDeferred = deferred<MobileDataClient>();
+    mocks.openUserDb = () => openDeferred.promise as Promise<ReturnType<typeof createMemoryUserClient>>;
+
+    let settings: AppSettingsContextValue | null = null;
+    render(
+      <AppSettingsProvider>
+        <SettingsProbe onSettings={(nextSettings) => { settings = nextSettings; }} />
+      </AppSettingsProvider>,
+    );
+
+    act(() => {
+      requireSettings(settings).setUiLocale('uz');
+    });
+    openDeferred.resolve(flakyClient);
+
+    await vi.waitFor(() => expect(flakyClient.settingWriteAttempts()).toBe(1));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(flakyClient.settingWriteAttempts()).toBe(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    await vi.waitFor(() => expect(flakyClient.settingWriteAttempts()).toBe(2));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+    await vi.waitFor(async () => {
+      await expect(getSetting(userClient, 'uiLocale')).resolves.toBe('uz');
+    });
+    expect(flakyClient.settingWriteAttempts()).toBe(3);
+  });
 });
 
 function requireSettingsClient() {
@@ -174,6 +216,22 @@ function failFirstSettingWrite(client: MobileDataClient, keyToFail: string): Mob
       if (!failed && sql.startsWith('INSERT INTO settings') && args[0] === keyToFail) {
         failed = true;
         throw new Error('transient settings write failure');
+      }
+      return client.execute(statement);
+    },
+  };
+}
+
+function failSettingWrites(client: MobileDataClient, keyToFail: string, failures: number): MobileDataClient & { settingWriteAttempts: () => number } {
+  let attempts = 0;
+  return {
+    settingWriteAttempts: () => attempts,
+    async execute(statement) {
+      const sql = typeof statement === 'string' ? statement : statement.sql;
+      const args = typeof statement === 'string' ? [] : (statement.args ?? []);
+      if (sql.startsWith('INSERT INTO settings') && args[0] === keyToFail) {
+        attempts += 1;
+        if (attempts <= failures) throw new Error('persistent settings write failure');
       }
       return client.execute(statement);
     },

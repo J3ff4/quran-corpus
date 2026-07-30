@@ -74,6 +74,8 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
   const [userClient, setUserClient] = useState<MobileDataClient | null>(null);
   const pendingSettingsRef = useRef<Partial<AppSettings>>({});
   const pendingPersistenceRef = useRef<Promise<void>>(Promise.resolve());
+  const persistenceRetryAttemptRef = useRef(0);
+  const persistenceRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -95,6 +97,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     });
     return () => {
       cancelled = true;
+      if (persistenceRetryTimerRef.current) clearTimeout(persistenceRetryTimerRef.current);
     };
   }, []);
 
@@ -112,7 +115,19 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     pendingSettingsRef.current = { ...pendingSettingsRef.current, [key]: value };
   }
 
-  function schedulePendingSettingsPersistence(client: MobileDataClient) {
+  function schedulePendingSettingsPersistence(client: MobileDataClient, delayMs = 0) {
+    if (delayMs > 0) {
+      if (persistenceRetryTimerRef.current) clearTimeout(persistenceRetryTimerRef.current);
+      persistenceRetryTimerRef.current = setTimeout(() => {
+        persistenceRetryTimerRef.current = null;
+        schedulePendingSettingsPersistence(client);
+      }, delayMs);
+      return;
+    }
+    if (persistenceRetryTimerRef.current) {
+      clearTimeout(persistenceRetryTimerRef.current);
+      persistenceRetryTimerRef.current = null;
+    }
     pendingPersistenceRef.current = pendingPersistenceRef.current
       .catch(() => undefined)
       .then(() => persistPendingSettings(client, { ...pendingSettingsRef.current }));
@@ -125,25 +140,45 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     );
 
     const nextPending = { ...pendingSettingsRef.current };
+    const attemptedKeys = new Set(entries.map(([key]) => key));
+    const failedKeys = new Set<keyof AppSettings>();
     const persistedKeys = new Set<keyof AppSettings>();
     let hasNewerPendingSettings = false;
     for (let index = 0; index < results.length; index += 1) {
       const entry = entries[index];
       const result = results[index];
-      if (!entry || result?.status !== 'fulfilled') continue;
+      if (!entry) continue;
       const [key, value] = entry;
+      if (result?.status !== 'fulfilled') {
+        failedKeys.add(key);
+        continue;
+      }
       persistedKeys.add(key);
       if (nextPending[key] === value) delete nextPending[key];
       else hasNewerPendingSettings = true;
     }
+    let hasFailedWrite = false;
     for (const key of Object.keys(nextPending) as Array<keyof AppSettings>) {
-      if (!persistedKeys.has(key)) {
+      if (failedKeys.has(key)) {
+        hasFailedWrite = true;
+      } else if (!attemptedKeys.has(key) || !persistedKeys.has(key)) {
         hasNewerPendingSettings = true;
-        break;
       }
     }
     pendingSettingsRef.current = nextPending;
-    if (hasNewerPendingSettings) schedulePendingSettingsPersistence(client);
+    if (Object.keys(nextPending).length === 0) {
+      persistenceRetryAttemptRef.current = 0;
+      return;
+    }
+    if (hasNewerPendingSettings) {
+      schedulePendingSettingsPersistence(client);
+      return;
+    }
+    if (hasFailedWrite) {
+      const retryDelayMs = Math.min(1000 * 2 ** persistenceRetryAttemptRef.current, 30000);
+      persistenceRetryAttemptRef.current += 1;
+      schedulePendingSettingsPersistence(client, retryDelayMs);
+    }
   }
 
   const value = useMemo<AppSettingsContextValue>(
