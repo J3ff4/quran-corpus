@@ -6,7 +6,7 @@
 
 | Dataset | Source | License | Attribution | Code | Approved by | Approval date |
 | --- | --- | --- | --- | --- | --- | --- |
-| Arabic Quran text | Existing PWA importer: Tanzil Uthmani XML via `packages/scraper/scraper/sources/tanzil.py`; generated DB copied locally to `apps/mobile/assets/db/quran.db` | Needs release sign-off | Needs release sign-off | ar | Not approved | Not approved |
+| Arabic Quran text | Canonical local corpus DB: sibling workspace `../quran-data/quran.db`, generated from existing PWA importer data including Tanzil Uthmani XML via `packages/scraper/scraper/sources/tanzil.py`; copied to ignored mobile asset `apps/mobile/assets/db/quran.db` by `pnpm generate:m1-db` | Needs release sign-off | Needs release sign-off | ar | Not approved | Not approved |
 | English translation | Existing PWA DB: Saheeh International | Needs release sign-off | Needs release sign-off | en | Not approved | Not approved |
 | Uzbek translation | Existing PWA DB: Muhammad Sodik Muhammad Yusuf | Needs release sign-off | Needs release sign-off | uz | Not approved | Not approved |
 | Russian translation | Existing PWA DB: Abu Adel | Needs release sign-off | Needs release sign-off | ru | Not approved | Not approved |

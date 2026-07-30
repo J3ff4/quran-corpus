@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { access, copyFile, mkdir, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -37,8 +38,65 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
+async function fileSha256(path: string): Promise<string> {
+  return createHash('sha256').update(await readFile(path)).digest('hex');
+}
+
 function numberValue(value: unknown): number {
   return Number(value ?? 0);
+}
+
+async function primaryCheckoutRoot(repoRootPath: string): Promise<string> {
+  const gitPath = resolve(repoRootPath, '.git');
+
+  try {
+    const gitFile = await readFile(gitPath, 'utf8');
+    const match = gitFile.match(/^gitdir:\s*(.+)\s*$/m);
+    if (!match) return repoRootPath;
+
+    const gitDir = resolve(repoRootPath, match[1]);
+    const worktreeMarker = '/.git/worktrees/';
+    const markerIndex = gitDir.indexOf(worktreeMarker);
+    return markerIndex === -1 ? repoRootPath : gitDir.slice(0, markerIndex);
+  } catch {
+    return repoRootPath;
+  }
+}
+
+export async function resolveM1ReaderDbSource({
+  repoRoot: repoRootPath = repoRoot,
+  envSourceDbPath = process.env.QURAN_CORPUS_SOURCE_DB,
+}: {
+  repoRoot?: string;
+  envSourceDbPath?: string;
+} = {}): Promise<string> {
+  const primaryRoot = await primaryCheckoutRoot(repoRootPath);
+  const canonicalDbPath = resolve(primaryRoot, '../quran-data/quran.db');
+  if (await pathExists(canonicalDbPath)) return canonicalDbPath;
+  if (envSourceDbPath && (await pathExists(envSourceDbPath))) return envSourceDbPath;
+
+  throw new Error(
+    `Missing canonical Quran DB at ${canonicalDbPath}. Set QURAN_CORPUS_SOURCE_DB to a valid quran.db fallback.`,
+  );
+}
+
+export async function syncM1ReaderDbAsset({
+  sourceDbPath,
+  targetDbPath,
+}: {
+  sourceDbPath: string;
+  targetDbPath: string;
+}): Promise<{ copied: boolean; sourceSha256: string; targetSha256: string }> {
+  const sourceSha256 = await fileSha256(sourceDbPath);
+  const targetSha256 = (await pathExists(targetDbPath)) ? await fileSha256(targetDbPath) : '';
+
+  if (sourceSha256 !== targetSha256) {
+    await mkdir(dirname(targetDbPath), { recursive: true });
+    await copyFile(sourceDbPath, targetDbPath);
+    return { copied: true, sourceSha256, targetSha256: sourceSha256 };
+  }
+
+  return { copied: false, sourceSha256, targetSha256 };
 }
 
 export function parseM1TranslationSelection(approval: string): Record<keyof typeof selectedTranslators, string> {
@@ -152,15 +210,8 @@ export async function ensureM1ReaderDb() {
   const approval = await readFile(approvalPath, 'utf8');
   parseM1TranslationSelection(approval);
 
-  if (!(await pathExists(targetDbPath))) {
-    const sourceDbPath = process.env.QURAN_CORPUS_SOURCE_DB;
-    if (!sourceDbPath) {
-      throw new Error('Missing apps/mobile/assets/db/quran.db. Set QURAN_CORPUS_SOURCE_DB to copy the generated PWA corpus DB.');
-    }
-
-    await mkdir(dirname(targetDbPath), { recursive: true });
-    await copyFile(sourceDbPath, targetDbPath);
-  }
+  const sourceDbPath = await resolveM1ReaderDbSource();
+  await syncM1ReaderDbAsset({ sourceDbPath, targetDbPath });
 
   return validateM1ReaderDbContract(targetDbPath);
 }
