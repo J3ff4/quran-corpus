@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createAudioPlayer } from 'expo-audio';
 
 export interface AyahAudioParams {
   baseUrl: string;
@@ -13,6 +14,26 @@ export interface AyahAudioResponse {
   source: string;
   attribution: string;
 }
+
+interface PlaybackHandle {
+  stopAsync: () => Promise<unknown>;
+  unloadAsync: () => Promise<unknown>;
+}
+
+export interface AyahAudioPlayer {
+  playUrl: (url: string) => Promise<PlaybackHandle>;
+}
+
+export const expoAudioAyahAudioPlayer: AyahAudioPlayer = {
+  async playUrl(url: string) {
+    const player = createAudioPlayer(url);
+    player.play();
+    return {
+      stopAsync: async () => player.pause(),
+      unloadAsync: async () => player.release(),
+    };
+  },
+};
 
 export async function getAyahAudioUrl(
   params: AyahAudioParams,
@@ -29,24 +50,86 @@ export async function getAyahAudioUrl(
   return (await response.json()) as AyahAudioResponse;
 }
 
-export function useAyahAudioController(baseUrl: string | undefined, surah: number | null) {
+export async function playAyahAudioUrl(
+  params: AyahAudioParams,
+  player: AyahAudioPlayer,
+  fetchFn: typeof fetch = fetch,
+): Promise<PlaybackHandle> {
+  const audio = await getAyahAudioUrl(params, fetchFn);
+  return player.playUrl(audio.url);
+}
+
+async function stopPlayback(handle: PlaybackHandle | null) {
+  if (!handle) return;
+  try {
+    await handle.stopAsync();
+  } finally {
+    await handle.unloadAsync();
+  }
+}
+
+export function useAyahAudioController(
+  baseUrl: string | undefined,
+  surah: number | null,
+  player: AyahAudioPlayer = expoAudioAyahAudioPlayer,
+) {
   const [playingAyah, setPlayingAyah] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const playbackRef = useRef<PlaybackHandle | null>(null);
+  const requestRef = useRef(0);
+
+  useEffect(() => {
+    return () => {
+      requestRef.current += 1;
+      const playback = playbackRef.current;
+      playbackRef.current = null;
+      void stopPlayback(playback).catch(() => undefined);
+    };
+  }, []);
 
   async function toggleAyah(ayah: number) {
     if (!baseUrl || !surah) return;
+    const requestId = requestRef.current + 1;
+    requestRef.current = requestId;
+
     if (playingAyah === ayah) {
+      const playback = playbackRef.current;
+      playbackRef.current = null;
       setPlayingAyah(null);
+      try {
+        await stopPlayback(playback);
+      } catch (cause) {
+        if (requestRef.current === requestId) {
+          setError(cause instanceof Error ? cause.message : 'Unable to stop audio');
+        }
+      }
       return;
     }
 
     try {
       setError(null);
-      await getAyahAudioUrl({ baseUrl, surah, ayah });
+      const previousPlayback = playbackRef.current;
+      playbackRef.current = null;
+      await stopPlayback(previousPlayback).catch((cause) => {
+        if (requestRef.current === requestId) {
+          setError(cause instanceof Error ? cause.message : 'Unable to stop audio');
+        }
+      });
+
+      const nextPlayback = await playAyahAudioUrl({ baseUrl, surah, ayah }, player);
+      if (requestRef.current !== requestId) {
+        await stopPlayback(nextPlayback).catch(() => undefined);
+        return;
+      }
+
+      playbackRef.current = nextPlayback;
       setPlayingAyah(ayah);
     } catch (cause) {
-      setPlayingAyah(null);
-      setError(cause instanceof Error ? cause.message : 'Unable to load audio');
+      if (requestRef.current === requestId) {
+        playbackRef.current = null;
+        setPlayingAyah(null);
+        setError(cause instanceof Error ? cause.message : 'Unable to load audio');
+      }
     }
   }
 

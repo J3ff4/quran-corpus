@@ -19,6 +19,7 @@
     "@quran-corpus/mobile-data": "workspace:*",
     "expo": "~57.0.8",
     "expo-asset": "~57.0.7",
+    "expo-audio": "~57.0.3",
     "expo-build-properties": "~57.0.7",
     "expo-constants": "~57.0.7",
     "expo-device": "~57.0.1",
@@ -46,12 +47,12 @@
   },
   "devDependencies": {
     "@quran-corpus/config": "workspace:*",
+    "@testing-library/react": "^16.3.2",
     "@types/react": "~19.2.2",
-    "@types/react-test-renderer": "^19.1.0",
     "@typescript-eslint/eslint-plugin": "^8.61.0",
     "@typescript-eslint/parser": "^8.61.0",
     "eslint": "^9.0.0",
-    "react-test-renderer": "^19.2.3",
+    "jsdom": "^30.0.1",
     "typescript": "^5.5.0",
     "vitest": "^2.1.9"
   }

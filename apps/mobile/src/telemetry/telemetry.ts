@@ -13,10 +13,22 @@ interface TelemetryProviders {
   sentry: SentryLike | null;
 }
 
-const deniedPropertyKeys = new Set(['text', 'query', 'note', 'arabicText', 'translationText', 'rawInput']);
+const allowedPropertyKeys = new Set([
+  'surah',
+  'ayah',
+  'language',
+  'uiLocale',
+  'contentLanguage',
+  'theme',
+  'fontScale',
+  'analyticsEnabled',
+  'audioEnabled',
+  'screen',
+  'source',
+]);
 
 function sanitizeProperties(properties: TelemetryProperties = {}): TelemetryProperties {
-  return Object.fromEntries(Object.entries(properties).filter(([key]) => !deniedPropertyKeys.has(key)));
+  return Object.fromEntries(Object.entries(properties).filter(([key]) => allowedPropertyKeys.has(key)));
 }
 
 export function createTelemetry({ posthog, sentry }: TelemetryProviders) {

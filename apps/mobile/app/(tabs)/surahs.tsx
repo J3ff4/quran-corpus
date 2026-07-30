@@ -5,9 +5,11 @@ import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobil
 import { SurahList } from '@/components/SurahList';
 import { getSurahList, type SurahListItem } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
+import { useAppSettings } from '@/settings/settingsStore';
 import { colors } from '@/theme/tokens';
 
 export default function SurahsTab() {
+  const { uiLocale } = useAppSettings();
   const [surahs, setSurahs] = useState<SurahListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +58,7 @@ export default function SurahsTab() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.paper }}>
-      <SurahList surahs={surahs} onOpenSurah={openSurah} />
+      <SurahList surahs={surahs} uiLocale={uiLocale} onOpenSurah={openSurah} />
     </View>
   );
 }

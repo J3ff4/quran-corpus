@@ -33,12 +33,13 @@ pnpm android
 6. Run `pnpm lint`.
 7. Run `pnpm build`.
 8. Start an Android emulator or connect a physical Android device.
-9. Run `pnpm android`.
-10. Turn off network and confirm Surahs opens and a surah reader displays Arabic plus the selected translation.
-11. Add a bookmark, close the app, reopen it, and confirm the bookmark remains.
-12. Open Settings, switch UI locale and content language, and confirm reader labels/content update separately.
-13. Turn network on, set `EXPO_PUBLIC_AUDIO_API_BASE_URL`, and confirm ayah audio requests use the thin endpoint.
-14. Turn network off again and confirm reader still works while audio is unavailable.
+9. Set `EXPO_PUBLIC_AUDIO_API_BASE_URL` if testing audio.
+10. Run `pnpm android`.
+11. Turn off network and confirm Surahs opens and a surah reader displays Arabic plus the selected translation.
+12. Add a bookmark, close the app, reopen it, and confirm the bookmark remains.
+13. Open Settings, switch UI locale and content language, and confirm reader labels/content update separately.
+14. Turn network on and confirm ayah audio requests use the configured thin endpoint.
+15. Turn network off again and confirm reader still works while audio is unavailable.
 
 ## Current Status
 

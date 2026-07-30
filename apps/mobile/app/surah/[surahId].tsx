@@ -6,6 +6,7 @@ import { useAyahAudioController } from '@/audio/ayahAudio';
 import { LanguageSelector } from '@/components/LanguageSelector';
 import { SurahReader } from '@/components/SurahReader';
 import { getSurahReader, type SurahReaderData } from '@/data/corpusRepository';
+import { createLatestReadingPositionRecorder } from '@/data/latestReadingPositionRecorder';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { openUserDb } from '@/data/userDb';
 import { getBookmarks, recordReadingPosition, setBookmark } from '@/data/userRepository';
@@ -23,12 +24,22 @@ function parseSurahId(value: string | string[] | undefined): number | null {
 export default function SurahRoute() {
   const params = useLocalSearchParams<{ surahId: string }>();
   const surahId = useMemo(() => parseSurahId(params.surahId), [params.surahId]);
-  const { contentLanguage, setContentLanguage } = useAppSettings();
+  const { contentLanguage, setContentLanguage, uiLocale } = useAppSettings();
   const audio = useAyahAudioController(process.env.EXPO_PUBLIC_AUDIO_API_BASE_URL, surahId);
   const [reader, setReader] = useState<SurahReaderData | null>(null);
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState<string | null>(null);
+  const readingRecorder = useMemo(() => {
+    if (!surahId) return null;
+    return createLatestReadingPositionRecorder(async (ayahNumber) => {
+      setMutationError(null);
+      const userDb = await openUserDb();
+      const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
+      await recordReadingPosition(userClient, surahId, ayahNumber);
+    }, setMutationError);
+  }, [surahId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,6 +53,7 @@ export default function SurahRoute() {
 
       setLoading(true);
       setError(null);
+      setMutationError(null);
 
       try {
         const [corpusDb, userDb] = await Promise.all([openCorpusDb(), openUserDb()]);
@@ -51,10 +63,6 @@ export default function SurahRoute() {
           getSurahReader(corpusClient, surahId, contentLanguage),
           getBookmarks(userClient),
         ]);
-
-        if (data.ayahs[0]) {
-          await recordReadingPosition(userClient, surahId, data.ayahs[0].ayah.ayah_number);
-        }
 
         if (!cancelled) {
           setReader(data);
@@ -82,6 +90,7 @@ export default function SurahRoute() {
   async function toggleBookmark(ayahNumber: number) {
     if (!surahId) return;
     const nextBookmarked = !bookmarks.has(ayahNumber);
+    const previousBookmarks = new Set(bookmarks);
     setBookmarks((current) => {
       const next = new Set(current);
       if (nextBookmarked) next.add(ayahNumber);
@@ -89,9 +98,15 @@ export default function SurahRoute() {
       return next;
     });
 
-    const userDb = await openUserDb();
-    const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
-    await setBookmark(userClient, surahId, ayahNumber, nextBookmarked);
+    try {
+      setMutationError(null);
+      const userDb = await openUserDb();
+      const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
+      await setBookmark(userClient, surahId, ayahNumber, nextBookmarked);
+    } catch (cause) {
+      setBookmarks(previousBookmarks);
+      setMutationError(cause instanceof Error ? cause.message : 'Unable to update bookmark');
+    }
   }
 
   if (loading) {
@@ -118,9 +133,14 @@ export default function SurahRoute() {
         bookmarkedAyahs={bookmarks}
         playingAyah={audio.playingAyah}
         audioEnabled={audio.audioEnabled}
+        uiLocale={uiLocale}
         onToggleBookmark={toggleBookmark}
         onToggleAudio={audio.toggleAyah}
+        onReadingAyah={(ayahNumber) => {
+          readingRecorder?.record(ayahNumber);
+        }}
       />
+      {mutationError ? <Text style={{ color: colors.danger, padding: 20 }}>{mutationError}</Text> : null}
       {audio.audioError ? <Text style={{ color: colors.danger, padding: 20 }}>{audio.audioError}</Text> : null}
     </View>
   );

@@ -14,6 +14,7 @@ export function LanguageSelector({ value, onChange }: LanguageSelectorProps) {
         <Pressable
           key={item.code}
           accessibilityRole="button"
+          accessibilityState={{ selected: item.code === value }}
           onPress={() => onChange(item.code)}
           style={{
             minHeight: touchTargets.compact,
