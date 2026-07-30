@@ -229,6 +229,88 @@ describe('AppSettingsProvider', () => {
     });
     expect(rejectingClient.settingWriteAttempts()).toBe(1);
   });
+
+  it('does not run already queued setting writes after unmount', async () => {
+    const userClient = requireSettingsClient();
+    await saveSetting(userClient, 'uiLocale', 'ru');
+    const writeRelease = deferred<void>();
+    const firstWriteStarted = deferred<void>();
+    const delayedClient = delayFirstSettingWrite(userClient, 'uiLocale', {
+      release: writeRelease.promise,
+      started: firstWriteStarted.resolve,
+      finished: () => undefined,
+    });
+    const countingClient = countSettingWrites(delayedClient, 'uiLocale');
+    const openDeferred = deferred<MobileDataClient>();
+    mocks.openUserDb = () => openDeferred.promise as Promise<ReturnType<typeof createMemoryUserClient>>;
+
+    let settings: AppSettingsContextValue | null = null;
+    const view = render(
+      <AppSettingsProvider>
+        <SettingsProbe onSettings={(nextSettings) => { settings = nextSettings; }} />
+      </AppSettingsProvider>,
+    );
+
+    openDeferred.resolve(countingClient);
+    await waitFor(() => expect(requireSettings(settings).uiLocale).toBe('ru'));
+
+    act(() => {
+      requireSettings(settings).setUiLocale('uz');
+    });
+    await firstWriteStarted.promise;
+
+    act(() => {
+      requireSettings(settings).setUiLocale('en');
+    });
+    view.unmount();
+    writeRelease.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(countingClient.settingWriteAttempts()).toBe(1);
+  });
+
+  it('persists newer queued values immediately when an older write fails', async () => {
+    vi.useFakeTimers();
+    const userClient = requireSettingsClient();
+    const writeRelease = deferred<void>();
+    const firstWriteStarted = deferred<void>();
+    const flakyClient = rejectFirstSettingWrite(userClient, 'uiLocale', {
+      release: writeRelease.promise,
+      started: firstWriteStarted.resolve,
+    });
+    const openDeferred = deferred<MobileDataClient>();
+    mocks.openUserDb = () => openDeferred.promise as Promise<ReturnType<typeof createMemoryUserClient>>;
+
+    let settings: AppSettingsContextValue | null = null;
+    render(
+      <AppSettingsProvider>
+        <SettingsProbe onSettings={(nextSettings) => { settings = nextSettings; }} />
+      </AppSettingsProvider>,
+    );
+
+    act(() => {
+      requireSettings(settings).setUiLocale('uz');
+    });
+    openDeferred.resolve(flakyClient);
+    await firstWriteStarted.promise;
+
+    act(() => {
+      requireSettings(settings).setUiLocale('ru');
+    });
+    writeRelease.reject(new Error('stale settings write failed'));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    await vi.waitFor(async () => {
+      await expect(getSetting(userClient, 'uiLocale')).resolves.toBe('ru');
+    });
+    expect(flakyClient.settingWriteAttempts()).toBe(2);
+    expect(vi.getTimerCount()).toBe(0);
+  });
 });
 
 function requireSettingsClient() {
@@ -318,6 +400,22 @@ function rejectFirstSettingWrite(
           await hooks.release;
         }
       }
+      return client.execute(statement);
+    },
+  };
+}
+
+function countSettingWrites(
+  client: MobileDataClient,
+  keyToCount: string,
+): MobileDataClient & { settingWriteAttempts: () => number } {
+  let attempts = 0;
+  return {
+    settingWriteAttempts: () => attempts,
+    async execute(statement) {
+      const sql = typeof statement === 'string' ? statement : statement.sql;
+      const args = typeof statement === 'string' ? [] : (statement.args ?? []);
+      if (sql.startsWith('INSERT INTO settings') && args[0] === keyToCount) attempts += 1;
       return client.execute(statement);
     },
   };
