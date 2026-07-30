@@ -73,8 +73,15 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [userClient, setUserClient] = useState<MobileDataClient | null>(null);
   const pendingSettingsRef = useRef<Partial<AppSettings>>({});
+  const pendingPersistenceRef = useRef<Promise<void>>(Promise.resolve());
+  const pendingImmediatePersistenceRef = useRef(false);
+  const persistenceRetryAttemptRef = useRef(0);
+  const persistenceRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryPendingSettingsRef = useRef<Partial<AppSettings> | null>(null);
+  const persistenceSchedulerActiveRef = useRef(false);
 
   useEffect(() => {
+    persistenceSchedulerActiveRef.current = true;
     let cancelled = false;
 
     async function hydrateSettings() {
@@ -85,7 +92,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
         const pendingSettings = { ...pendingSettingsRef.current };
         setUserClient(client);
         setSettings({ ...persisted, ...pendingSettings });
-        void persistPendingSettings(client, pendingSettings);
+        schedulePendingSettingsPersistence(client);
       }
     }
 
@@ -94,6 +101,12 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     });
     return () => {
       cancelled = true;
+      persistenceSchedulerActiveRef.current = false;
+      if (persistenceRetryTimerRef.current) {
+        clearTimeout(persistenceRetryTimerRef.current);
+        persistenceRetryTimerRef.current = null;
+      }
+      retryPendingSettingsRef.current = null;
     };
   }, []);
 
@@ -101,7 +114,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     setSettings((current) => ({ ...current, [key]: value }));
     if (userClient) {
       queuePendingSetting(key, value);
-      void persistPendingSettings(userClient, { ...pendingSettingsRef.current });
+      schedulePendingSettingsPersistence(userClient);
       return;
     }
     queuePendingSetting(key, value);
@@ -111,6 +124,46 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     pendingSettingsRef.current = { ...pendingSettingsRef.current, [key]: value };
   }
 
+  function hasSupersededRetryPendingSettings() {
+    const retryPendingSettings = retryPendingSettingsRef.current;
+    if (!retryPendingSettings) return true;
+    const entries = Object.entries(retryPendingSettings) as PendingSettingEntry[];
+    return entries.some(([key, value]) => (
+      !Object.prototype.hasOwnProperty.call(pendingSettingsRef.current, key)
+      || pendingSettingsRef.current[key] !== value
+    ));
+  }
+
+  function schedulePendingSettingsPersistence(client: MobileDataClient, delayMs = 0) {
+    if (!persistenceSchedulerActiveRef.current) return;
+    if (delayMs > 0) {
+      if (persistenceRetryTimerRef.current) clearTimeout(persistenceRetryTimerRef.current);
+      retryPendingSettingsRef.current = { ...pendingSettingsRef.current };
+      persistenceRetryTimerRef.current = setTimeout(() => {
+        persistenceRetryTimerRef.current = null;
+        retryPendingSettingsRef.current = null;
+        if (!persistenceSchedulerActiveRef.current) return;
+        schedulePendingSettingsPersistence(client);
+      }, delayMs);
+      return;
+    }
+    if (persistenceRetryTimerRef.current) {
+      if (!hasSupersededRetryPendingSettings()) return;
+      clearTimeout(persistenceRetryTimerRef.current);
+      persistenceRetryTimerRef.current = null;
+      retryPendingSettingsRef.current = null;
+    }
+    if (pendingImmediatePersistenceRef.current) return;
+    pendingImmediatePersistenceRef.current = true;
+    pendingPersistenceRef.current = pendingPersistenceRef.current
+      .catch(() => undefined)
+      .then(() => {
+        pendingImmediatePersistenceRef.current = false;
+        if (!persistenceSchedulerActiveRef.current) return;
+        return persistPendingSettings(client, { ...pendingSettingsRef.current });
+      });
+  }
+
   async function persistPendingSettings(client: MobileDataClient, pendingSettings: Partial<AppSettings>) {
     const entries = Object.entries(pendingSettings) as PendingSettingEntry[];
     const results = await Promise.allSettled(
@@ -118,14 +171,52 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     );
 
     const nextPending = { ...pendingSettingsRef.current };
+    const attemptedKeys = new Set(entries.map(([key]) => key));
+    const failedKeys = new Set<keyof AppSettings>();
+    const persistedKeys = new Set<keyof AppSettings>();
+    let hasNewerPendingSettings = false;
     for (let index = 0; index < results.length; index += 1) {
       const entry = entries[index];
       const result = results[index];
-      if (!entry || result?.status !== 'fulfilled') continue;
+      if (!entry) continue;
       const [key, value] = entry;
+      if (result?.status !== 'fulfilled') {
+        failedKeys.add(key);
+        if (
+          Object.prototype.hasOwnProperty.call(nextPending, key)
+          && nextPending[key] !== value
+        ) {
+          hasNewerPendingSettings = true;
+        }
+        continue;
+      }
+      persistedKeys.add(key);
       if (nextPending[key] === value) delete nextPending[key];
+      else hasNewerPendingSettings = true;
+    }
+    let hasFailedWrite = false;
+    for (const key of Object.keys(nextPending) as Array<keyof AppSettings>) {
+      if (failedKeys.has(key)) {
+        hasFailedWrite = true;
+      } else if (!attemptedKeys.has(key) || !persistedKeys.has(key)) {
+        hasNewerPendingSettings = true;
+      }
     }
     pendingSettingsRef.current = nextPending;
+    if (Object.keys(nextPending).length === 0) {
+      persistenceRetryAttemptRef.current = 0;
+      retryPendingSettingsRef.current = null;
+      return;
+    }
+    if (hasNewerPendingSettings) {
+      schedulePendingSettingsPersistence(client);
+      return;
+    }
+    if (hasFailedWrite) {
+      const retryDelayMs = Math.min(1000 * 2 ** persistenceRetryAttemptRef.current, 30000);
+      persistenceRetryAttemptRef.current += 1;
+      schedulePendingSettingsPersistence(client, retryDelayMs);
+    }
   }
 
   const value = useMemo<AppSettingsContextValue>(
