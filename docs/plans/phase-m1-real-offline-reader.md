@@ -38,8 +38,8 @@ The PWA project already has the data import path and a generated local DB:
 - Arabic ayah text importer: `tanzil.py`, from Tanzil Uthmani XML.
 - Translation importers: `quranenc.py`, from QuranEnc flat JSON, and `qul.py`, from Tarteel AI Quranic Universal Library simple JSON.
 - Corpus morphology importer: `corpus_import.py`, from Quranic Arabic Corpus morphology text.
-- Generated local DB found during planning: `/home/claude/quran-data/quran.db`, size about 134 MB.
-- Local M1 development uses the existing ignored DB asset at `apps/mobile/assets/db/quran.db`, already copied from the generated PWA corpus DB.
+- Canonical local DB found during planning: sibling workspace `../quran-data/quran.db`, size about 134 MB.
+- Local M1 development copies the canonical DB to the ignored DB asset at `apps/mobile/assets/db/quran.db`; `pnpm generate:m1-db` overwrites the ignored asset if its checksum differs.
 - DB inspection on 2026-07-28 showed 114 surahs, 6,236 ayahs, 77,429 words, 43,652 translation rows, and languages `ar`, `en`, `uz`, `ru`.
 - Translation rows found in that DB:
   - English: Saheeh International, 6,236 rows.
@@ -86,7 +86,7 @@ Do not substitute a new public dataset to keep execution moving. Reuse the PWA i
   Generalize the fixture generator into a repeatable M1 DB build script, or keep it as M0 and add a new M1 script.
 
 - Create `packages/mobile-data/scripts/create-m1-reader-db.ts`
-  Validates the existing ignored `apps/mobile/assets/db/quran.db` copied from the PWA-generated corpus DB, or copies from `QURAN_CORPUS_SOURCE_DB` if the local asset is absent.
+  Copies the canonical sibling `../quran-data/quran.db` to the ignored `apps/mobile/assets/db/quran.db`, overwrites the ignored asset if its checksum differs, and validates the M1 contract. `QURAN_CORPUS_SOURCE_DB` is only a fallback if canonical is absent.
 
 - Create `packages/mobile-data/tests/m1-reader-db-contract.test.ts`
   Verifies M1 DB has all surahs, ayahs, translations for `en`, `uz`, `ru`, and reader-critical indexes.
@@ -205,7 +205,7 @@ Create `docs/data-sources-m1.md`:
 
 | Dataset | Source | License | Attribution | Code | Approved by | Approval date |
 | --- | --- | --- | --- | --- | --- | --- |
-| Arabic Quran text | Existing PWA importer: Tanzil Uthmani XML via `packages/scraper/scraper/sources/tanzil.py`; generated DB `/home/claude/quran-data/quran.db` | Needs release sign-off | Needs release sign-off | ar | Not approved | Not approved |
+| Arabic Quran text | Canonical local corpus DB: sibling workspace `../quran-data/quran.db`, generated from existing PWA importer data including Tanzil Uthmani XML via `packages/scraper/scraper/sources/tanzil.py` | Needs release sign-off | Needs release sign-off | ar | Not approved | Not approved |
 | English translation | Existing PWA DB: Saheeh International, likely QuranEnc/QUL import path | Needs release sign-off | Needs release sign-off | en | Not approved | Not approved |
 | Uzbek translation | Existing PWA DB: Muhammad Sodik Muhammad Yusuf | Needs release sign-off | Needs release sign-off | uz | Not approved | Not approved |
 | Russian translation | Existing PWA DB: Abu Adel | Needs release sign-off | Needs release sign-off | ru | Not approved | Not approved |
@@ -251,8 +251,8 @@ git commit -m "docs: record M1 source approval gates"
 - Modify: `package.json`
 
 **Interfaces:**
-- Consumes: existing ignored local DB `apps/mobile/assets/db/quran.db`, optional fallback `QURAN_CORPUS_SOURCE_DB`, and selected M1 translators named in `docs/data-sources-m1.md`.
-- Produces/validates: `apps/mobile/assets/db/quran.db` with complete reader data for all 114 surahs, 6,236 ayahs, and at least one complete translation set for each of `en`, `uz`, and `ru`. Later reader tasks must filter to the selected M1 translator per language.
+- Consumes: canonical sibling DB `../quran-data/quran.db`, optional fallback `QURAN_CORPUS_SOURCE_DB` only if canonical is absent, and selected M1 translators named in `docs/data-sources-m1.md`.
+- Produces/validates: ignored mobile asset `apps/mobile/assets/db/quran.db` copied from canonical, overwritten when checksums differ, with complete reader data for all 114 surahs, 6,236 ayahs, and at least one complete translation set for each of `en`, `uz`, and `ru`. Later reader tasks must filter to the selected M1 translator per language.
 
 - [ ] **Step 1: Write the failing DB contract test**
 
@@ -327,12 +327,12 @@ Modify root `package.json` scripts:
 Create `packages/mobile-data/scripts/create-m1-reader-db.ts`:
 
 ```ts
+import { createHash } from 'node:crypto';
 import { access, copyFile, mkdir, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { createDatabase } from '../../data/src/db';
 
 const repoRoot = resolve('../..');
-const sourceDbPath = process.env.QURAN_CORPUS_SOURCE_DB;
 const targetDbPath = resolve(repoRoot, 'apps/mobile/assets/db/quran.db');
 
 const selectedTranslators = {
@@ -371,19 +371,43 @@ async function validateM1ReaderDbContract(dbPath: string) {
   }
 }
 
+async function resolveM1ReaderDbSource() {
+  const canonicalDbPath = resolve(repoRoot, '../quran-data/quran.db');
+  try {
+    await access(canonicalDbPath);
+    return canonicalDbPath;
+  } catch {
+    const fallback = process.env.QURAN_CORPUS_SOURCE_DB;
+    if (!fallback) throw new Error(`Missing canonical Quran DB at ${canonicalDbPath}`);
+    await access(fallback);
+    return fallback;
+  }
+}
+
+async function sha256(path: string) {
+  return createHash('sha256').update(await readFile(path)).digest('hex');
+}
+
+async function syncM1ReaderDbAsset({ sourceDbPath, targetDbPath }: { sourceDbPath: string; targetDbPath: string }) {
+  const sourceSha = await sha256(sourceDbPath);
+  let targetSha = '';
+  try {
+    targetSha = await sha256(targetDbPath);
+  } catch {
+    // Target does not exist yet.
+  }
+  if (sourceSha !== targetSha) {
+    await mkdir(dirname(targetDbPath), { recursive: true });
+    await copyFile(sourceDbPath, targetDbPath);
+  }
+}
+
 async function main() {
   const approval = await readFile(resolve(repoRoot, 'docs/data-sources-m1.md'), 'utf8');
   parseM1TranslationSelection(approval);
 
-  try {
-    await access(targetDbPath);
-  } catch {
-    if (!sourceDbPath) {
-      throw new Error('Missing apps/mobile/assets/db/quran.db. Set QURAN_CORPUS_SOURCE_DB to copy the generated PWA corpus DB.');
-    }
-    await mkdir(dirname(targetDbPath), { recursive: true });
-    await copyFile(sourceDbPath, targetDbPath);
-  }
+  const sourceDbPath = await resolveM1ReaderDbSource();
+  await syncM1ReaderDbAsset({ sourceDbPath, targetDbPath });
 
   await validateM1ReaderDbContract(targetDbPath);
 }
@@ -400,7 +424,7 @@ Run: `pnpm generate:m1-db`
 
 Expected if translator selection is missing, duplicated, or does not match exactly one `en`, `uz`, and `ru` selected translator row: FAIL with `M1 translation selection is incomplete`.
 
-Expected after translator selection: reuses existing `apps/mobile/assets/db/quran.db`, or creates it from `QURAN_CORPUS_SOURCE_DB` if absent.
+Expected after translator selection: copies canonical `../quran-data/quran.db` to `apps/mobile/assets/db/quran.db`, overwriting the ignored mobile asset when checksums differ, then validates the contract. If canonical is absent, `QURAN_CORPUS_SOURCE_DB` may point to a valid fallback DB.
 
 - [ ] **Step 6: Commit**
 

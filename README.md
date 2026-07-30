@@ -26,18 +26,19 @@ pnpm android
 ## M1 Android Smoke Test
 
 1. Run `pnpm install`.
-2. Run `pnpm generate:m1-db` after `docs/data-sources-m1.md` records selected translators.
-3. Run `pnpm test`.
-4. Run `pnpm type-check`.
-5. Run `pnpm lint`.
-6. Run `pnpm build`.
-7. Start an Android emulator or connect a physical Android device.
-8. Run `pnpm android`.
-9. Turn off network and confirm Surahs opens and a surah reader displays Arabic plus the selected translation.
-10. Add a bookmark, close the app, reopen it, and confirm the bookmark remains.
-11. Open Settings, switch UI locale and content language, and confirm reader labels/content update separately.
-12. Turn network on, set `EXPO_PUBLIC_AUDIO_API_BASE_URL`, and confirm ayah audio requests use the thin endpoint.
-13. Turn network off again and confirm reader still works while audio is unavailable.
+2. Confirm the canonical sibling DB exists at `../quran-data/quran.db`.
+3. Run `pnpm generate:m1-db` after `docs/data-sources-m1.md` records selected translators. This copies canonical `../quran-data/quran.db` to the ignored mobile asset and overwrites any differing local asset.
+4. Run `pnpm test`.
+5. Run `pnpm type-check`.
+6. Run `pnpm lint`.
+7. Run `pnpm build`.
+8. Start an Android emulator or connect a physical Android device.
+9. Run `pnpm android`.
+10. Turn off network and confirm Surahs opens and a surah reader displays Arabic plus the selected translation.
+11. Add a bookmark, close the app, reopen it, and confirm the bookmark remains.
+12. Open Settings, switch UI locale and content language, and confirm reader labels/content update separately.
+13. Turn network on, set `EXPO_PUBLIC_AUDIO_API_BASE_URL`, and confirm ayah audio requests use the thin endpoint.
+14. Turn network off again and confirm reader still works while audio is unavailable.
 
 ## Current Status
 
