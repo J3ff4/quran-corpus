@@ -81,8 +81,8 @@ describe('AppSettingsProvider', () => {
     });
     openDeferred.resolve(userClient);
 
-    await waitFor(() => expect(requireSettings(settings).uiLocale).toBe('uz'));
-    await waitFor(async () => {
+    await vi.waitFor(() => expect(requireSettings(settings).uiLocale).toBe('uz'));
+    await vi.waitFor(async () => {
       await expect(getSetting(userClient, 'uiLocale')).resolves.toBe('uz');
     });
   });
@@ -112,6 +112,7 @@ describe('AppSettingsProvider', () => {
       requireSettings(settings).setAnalyticsEnabled(true);
     });
 
+    await new Promise((resolve) => setTimeout(resolve, 1100));
     await waitFor(async () => {
       await expect(getSetting(userClient, 'uiLocale')).resolves.toBe('uz');
     });
@@ -310,6 +311,47 @@ describe('AppSettingsProvider', () => {
     });
     expect(flakyClient.settingWriteAttempts()).toBe(2);
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('does not bypass retry backoff for unrelated setting changes', async () => {
+    vi.useFakeTimers();
+    const userClient = requireSettingsClient();
+    const flakyClient = failSettingWrites(userClient, 'uiLocale', 1);
+    const openDeferred = deferred<MobileDataClient>();
+    mocks.openUserDb = () => openDeferred.promise as Promise<ReturnType<typeof createMemoryUserClient>>;
+
+    let settings: AppSettingsContextValue | null = null;
+    render(
+      <AppSettingsProvider>
+        <SettingsProbe onSettings={(nextSettings) => { settings = nextSettings; }} />
+      </AppSettingsProvider>,
+    );
+
+    act(() => {
+      requireSettings(settings).setUiLocale('uz');
+    });
+    openDeferred.resolve(flakyClient);
+
+    await vi.waitFor(() => expect(flakyClient.settingWriteAttempts()).toBe(1));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    act(() => {
+      requireSettings(settings).setTheme('dark');
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(flakyClient.settingWriteAttempts()).toBe(1);
+    await expect(getSetting(userClient, 'theme')).resolves.toBeNull();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    await vi.waitFor(async () => {
+      await expect(getSetting(userClient, 'uiLocale')).resolves.toBe('uz');
+      await expect(getSetting(userClient, 'theme')).resolves.toBe('dark');
+    });
+    expect(flakyClient.settingWriteAttempts()).toBe(2);
   });
 });
 
