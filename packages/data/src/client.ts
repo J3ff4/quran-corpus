@@ -5,6 +5,7 @@
 // here is pure (no DB, no node built-ins). Keep it that way — tests/client-entry
 // guards the module graph.
 export { EMPTY_SEARCH_RESULT } from './constants.js';
+export { CONCORDANCE_PAGE_SIZE } from './queries/concordance.js';
 export {
   buckwalterToArabic,
   compareRootsArabic,

@@ -38,7 +38,26 @@ export {
   backfillRootSortOrder,
   backfillRootSortOrderIfStale,
 } from './queries/roots.js';
+export type { ConcordancePageOpts } from './queries/roots.js';
+export {
+  getLemmaEntry,
+  getLemmaConcordancePage,
+  countLemmaConcordance,
+} from './queries/lemma.js';
+export {
+  CONCORDANCE_PAGE_SIZE,
+  CONCORDANCE_MAX_LIMIT,
+  parseConcordancePaging,
+  assertPagingBounds,
+} from './queries/concordance.js';
 export { buckwalterToArabic, compareRootsArabic, rootFirstLetter, ARABIC_ALPHABET_ORDER } from './text/arabic.js';
+export {
+  isBuckwalter,
+  isLemmaBuckwalter,
+  isRootBuckwalter,
+  LEMMA_BUCKWALTER_MAX,
+  ROOT_BUCKWALTER_MAX,
+} from './text/buckwalter.js';
 export { trimConcordanceVerse } from './text/concordanceTrim.js';
 export { isSajdahAyah } from './text/sajdah.js';
 export { decodeSegment, posLabelEn } from './morphology/decode.js';
@@ -63,6 +82,7 @@ export type {
   DecodedFeature,
   LemmaFrequencyEntry,
   VerbConcordanceEntry,
+  LemmaEntry,
   VerseRef,
   VerseHit,
   JumpVerse,

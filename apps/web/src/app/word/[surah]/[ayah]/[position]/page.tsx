@@ -8,6 +8,7 @@ import {
 import { getDatabase } from '../../../../../lib/db';
 import { WordDetailView } from '../../../../../components/morphology/WordDetailView';
 import { parseWordParams } from './params';
+import { rootPath } from '../../../../../lib/routes';
 
 interface PageProps {
   params: Promise<{ surah: string; ayah: string; position: string }>;
@@ -24,7 +25,7 @@ export default async function WordPage({ params }: PageProps) {
   const detail = await getWordDetail(db, word.id);
   if (!detail) notFound();
 
-  const rootHref = word.root_buckwalter ? `/dictionary/${word.root_buckwalter}` : undefined;
+  const rootHref = word.root_buckwalter ? rootPath(word.root_buckwalter) : undefined;
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">

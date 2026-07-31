@@ -1,12 +1,22 @@
 // @vitest-environment node
 import { describe, it, expect, vi } from 'vitest';
+import type { getRootConcordancePage as GetRootConcordancePage, countRootConcordance as CountRootConcordance } from '@quran-corpus/data';
 
-// Typed with the real call signatures (db, bw, opts?) so `.mock.calls[n][2]`
-// type-checks below -- an untyped `vi.fn(async () => [])` infers a 0-arg
-// mock and TS rejects indexing a 3rd call argument.
-const getRootConcordancePage = vi.fn(async (_db: unknown, _bw: string, _opts?: unknown) => []);
-const countRootConcordance = vi.fn(async (_db: unknown, _bw: string, _formIds?: number[]) => 0);
-vi.mock('@quran-corpus/data', () => ({ getRootConcordancePage, countRootConcordance }));
+// Hoisted so the vi.mock factory (itself hoisted above module-body consts) can
+// reference these without hitting the temporal dead zone. Typed from the REAL
+// exported signatures (via vi.fn<typeof fn>) so a change to either query's
+// args or return shape breaks this test instead of silently compiling -- and
+// so `.mock.calls[n][2]` still type-checks below.
+const { getRootConcordancePage, countRootConcordance } = vi.hoisted(() => ({
+  getRootConcordancePage: vi.fn<typeof GetRootConcordancePage>(async () => []),
+  countRootConcordance: vi.fn<typeof CountRootConcordance>(async () => 0),
+}));
+// Keep the real isRootBuckwalter (the route validates with it); stub only the
+// two DB query fns.
+vi.mock('@quran-corpus/data', async (importActual) => {
+  const actual = await importActual<typeof import('@quran-corpus/data')>();
+  return { ...actual, getRootConcordancePage, countRootConcordance };
+});
 vi.mock('../lib/db', () => ({ getDatabase: vi.fn(async () => ({})) }));
 
 const { GET } = await import('../app/api/roots/[root]/concordance/route');
@@ -64,5 +74,22 @@ describe('GET /api/roots/[root]/concordance', () => {
     expect(res.status).toBe(400);
     // Never reaches the DB layer with a silently-scoped-down filter.
     expect(getRootConcordancePage.mock.calls.length).toBe(callsBefore);
+  });
+
+  // Pin the root endpoint's accepted charset. The validator is now shared with
+  // the lemma route (isRootBuckwalter), so this guards against a future
+  // lemma-charset edit silently changing what the root endpoint accepts.
+  it('accepts a valid root buckwalter and rejects junk', async () => {
+    const ok = await GET(req('http://x/api/roots/ktb/concordance'), {
+      params: Promise.resolve({ root: 'ktb' }),
+    });
+    expect(ok.status).toBe(200);
+
+    for (const junk of ['  ', 'has space', 'a'.repeat(25)]) {
+      const res = await GET(req(`http://x/api/roots/${encodeURIComponent(junk)}/concordance`), {
+        params: Promise.resolve({ root: junk }),
+      });
+      expect(res.status).toBe(400);
+    }
   });
 });

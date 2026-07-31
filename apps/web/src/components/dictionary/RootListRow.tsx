@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { Root } from '@quran-corpus/data';
+import { rootPath } from '../../lib/routes';
 
 interface RootListRowProps {
   root: Root;
@@ -20,7 +21,7 @@ interface RootListRowProps {
 export function RootListRow({ root }: RootListRowProps) {
   return (
     <Link
-      href={`/dictionary/${root.root_buckwalter}`}
+      href={rootPath(root.root_buckwalter)}
       className="flex items-center justify-between gap-4 rounded-lg px-4 py-3 transition-colors hover:bg-paper-200 dark:hover:bg-night-100 [content-visibility:auto] [contain-intrinsic-size:auto_56px]"
     >
       <span className="flex items-baseline gap-3">

@@ -293,4 +293,29 @@ describe('ConcordanceList', () => {
     expect(screen.getByText('2:2:2')).toBeInTheDocument();
     expect(screen.queryByText('2:1:2')).toBeNull();
   });
+
+  it('fetches the provided endpoint on load-more', async () => {
+    // Brief's literal fixture used initialEntries=[] with total=40, but zero
+    // entries trips the component's early "No occurrences." return before the
+    // Load-more button ever renders (see the first test in this file) --
+    // getByRole('button', ...) would fail to find it regardless of endpoint
+    // wiring. Seeded with 20 initial entries instead, matching every other
+    // Load-more test in this file, so the button is actually present; intent
+    // (assert the endpoint URL is fetched) is unchanged.
+    const initial = Array.from({ length: 20 }, (_, i) => entry(1000 + i, i + 1));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ entries: [], total: 40 }) });
+    vi.stubGlobal('fetch', fetchMock);
+    render(
+      <ConcordanceList initialEntries={initial} total={40} endpoint="/api/lemma/qaAla/concordance" />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /load more/i }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/lemma/qaAla/concordance?offset=20&limit=20',
+        { signal: expect.any(AbortSignal) },
+      ),
+    );
+  });
 });

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { TypingText } from '../ui/TypingText';
 import type { SearchResult, JumpVerse, VerseHit } from '@quran-corpus/data';
+import { rootPath } from '../../lib/routes';
 
 // Snippet matches are wrapped by FTS5 in STX (code 2) / ETX (code 3) sentinel
 // bytes. Split on those bytes and wrap odd segments in <mark> as text nodes
@@ -114,7 +115,7 @@ export function SearchResults({
             {roots.map((r) => (
               <li key={r.id}>
                 <Link
-                  href={`/dictionary/${r.root_buckwalter}`}
+                  href={rootPath(r.root_buckwalter)}
                   onClick={onNavigate}
                   className="rounded-full bg-paper-200 px-3 py-1 text-sm dark:bg-night-100"
                 >

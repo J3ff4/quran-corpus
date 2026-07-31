@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { RootEntry as RootEntryT, ConcordanceEntry } from '@quran-corpus/data';
 import { ConcordanceSection } from './ConcordanceSection';
+import { rootPath } from '../../lib/routes';
 
 interface RootEntryProps {
   entry: RootEntryT;
@@ -49,7 +50,7 @@ export function RootEntry({ entry, initialConcordance, total, prevBw, nextBw }: 
         <nav aria-label="Adjacent roots" className="mt-4 flex items-center justify-between">
           {prevBw ? (
             <Link
-              href={`/dictionary/${encodeURIComponent(prevBw)}`}
+              href={rootPath(prevBw)}
               aria-label="Previous root"
               className="rounded-lg border border-paper-300 px-3 py-1.5 text-sm text-paper-700 transition-colors hover:bg-paper-200 dark:border-night-100 dark:text-paper-300 dark:hover:bg-night-100"
             >
@@ -66,7 +67,7 @@ export function RootEntry({ entry, initialConcordance, total, prevBw, nextBw }: 
           )}
           {nextBw ? (
             <Link
-              href={`/dictionary/${encodeURIComponent(nextBw)}`}
+              href={rootPath(nextBw)}
               aria-label="Next root"
               className="rounded-lg border border-paper-300 px-3 py-1.5 text-sm text-paper-700 transition-colors hover:bg-paper-200 dark:border-night-100 dark:text-paper-300 dark:hover:bg-night-100"
             >

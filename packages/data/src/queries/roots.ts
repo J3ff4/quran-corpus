@@ -5,11 +5,11 @@ import type {
   RootDefinition,
   RootEntry,
   ConcordanceEntry,
-  VerseWord,
   RootSearchItem,
 } from '../types.js';
 import { compareRootsArabic, foldRootArabic, foldRootArabicSql } from '../text/arabic.js';
 import { stripQuranicAnnotations } from '../text/normalize.js';
+import { assertPagingBounds, buildVerseWordsByAyah } from './concordance.js';
 
 function rowToRoot(r: Row): Root {
   return {
@@ -316,6 +316,7 @@ export async function getRootConcordancePage(
   opts: ConcordancePageOpts = {},
 ): Promise<ConcordanceEntry[]> {
   const { limit, offset = 0, lang = 'en', batchSize = 500, formIds } = opts;
+  assertPagingBounds(limit, offset);
   const args: (string | number)[] = [bw, bw, lang];
   let filterClause = '';
   if (formIds && formIds.length > 0) {
@@ -361,35 +362,7 @@ export async function getRootConcordancePage(
   if (matched.rows.length === 0) return [];
 
   const ayahIds = [...new Set(matched.rows.map((r) => r['ayah_id'] as number))];
-  // Batch the IN clause: a hot root (الله ~1879 ayahs) would otherwise emit
-  // more binds than SQLite's SQLITE_LIMIT_VARIABLE_NUMBER (999 pre-3.32).
-  const wordsByAyah = new Map<number, VerseWord[]>();
-  for (let i = 0; i < ayahIds.length; i += batchSize) {
-    const chunk = ayahIds.slice(i, i + batchSize);
-    const placeholders = chunk.map(() => '?').join(',');
-    const sib = await db.execute({
-      sql: `SELECT w.ayah_id, w.id, w.position, w.text_arabic,
-                   EXISTS (SELECT 1 FROM word_segments s
-                           WHERE s.word_id = w.id
-                             AND s.segment_index = (SELECT MIN(segment_index) FROM word_segments WHERE word_id = w.id)
-                             AND s.pos_tag IN ('SUB','REM')) AS starts_clause
-            FROM words w
-            WHERE w.ayah_id IN (${placeholders})
-            ORDER BY w.ayah_id, w.position`,
-      args: chunk,
-    });
-    for (const r of sib.rows) {
-      const aid = r['ayah_id'] as number;
-      const list = wordsByAyah.get(aid) ?? [];
-      list.push({
-        id: r['id'] as number,
-        position: r['position'] as number,
-        text_arabic: stripQuranicAnnotations(r['text_arabic'] as string),
-        starts_clause: (r['starts_clause'] as number) === 1,
-      });
-      wordsByAyah.set(aid, list);
-    }
-  }
+  const wordsByAyah = await buildVerseWordsByAyah(db, ayahIds, batchSize);
 
   return matched.rows.map((r) => ({
     surah_id: r['surah_id'] as number,

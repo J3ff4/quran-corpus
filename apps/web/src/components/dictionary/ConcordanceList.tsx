@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { ConcordanceEntry, RootForm } from '@quran-corpus/data';
-import { trimConcordanceVerse } from '@quran-corpus/data/client';
+import { trimConcordanceVerse, CONCORDANCE_PAGE_SIZE } from '@quran-corpus/data/client';
 import { TypingText } from '../ui/TypingText';
 import { verseRef, concordanceHref } from '../../lib/concordance';
 import { categorizeFormLabel, formCategoryColor } from '../../lib/formCategoryColor';
+import { rootConcordanceEndpoint } from '../../lib/routes';
 
-const PAGE = 20;
+const PAGE = CONCORDANCE_PAGE_SIZE;
 
 const wash =
   'rounded-md bg-accent-100 px-1 font-semibold text-accent-700 dark:bg-accent-900/40 dark:text-accent-300';
@@ -64,22 +65,47 @@ function FormTag({ formId, forms }: { formId: number | null; forms: RootForm[] |
   );
 }
 
-interface ConcordanceListProps {
+/** Exactly one paging target, enforced by the type: a root page passes
+ *  `rootBw` and gets the root URL built for it, a lemma page passes its own
+ *  `endpoint`. The `?: never` arms make "both" and "neither" compile errors,
+ *  so there is no runtime state where the component cannot page.
+ *
+ *  Form filtering rides on the `rootBw` arm because only the root endpoint
+ *  implements `?forms=`. Passed alongside `endpoint`, `buildUrl` would append
+ *  `&forms=…` to `/api/lemma/<bw>/concordance`, which ignores it — returning an
+ *  UNFILTERED page and total that the chips would render as though filtered.
+ *  Same silent-ignore hazard `LemmaConcordanceOpts = Omit<…,'formIds'>` makes a
+ *  compile error in the data layer; this is the UI-side equivalent. */
+type ConcordancePagingTarget =
+  | {
+      /** Buckwalter root — keys the paging API. */
+      rootBw: string;
+      endpoint?: never;
+      /** The root's derived forms, for looking up each entry's form_id -> tag.
+       *  Omit to render with no tags (e.g. a root with no forms). */
+      forms?: RootForm[];
+      /** root_forms.id values to narrow to. Empty/omitted = no filter (unchanged
+       *  default behavior, uses initialEntries/total as-is). Changing this value
+       *  (a new array reference with different contents) triggers a fresh
+       *  offset-0 fetch -- the parent (ConcordanceSection) owns this state. */
+      selectedFormIds?: number[];
+    }
+  | {
+      /** Explicit paging endpoint base (e.g. `/api/lemma/qaAla/concordance`). */
+      endpoint: string;
+      rootBw?: never;
+      forms?: never;
+      selectedFormIds?: never;
+    };
+
+interface ConcordanceListBaseProps {
   /** First page, server-rendered. */
   initialEntries: ConcordanceEntry[];
   /** Total occurrences across the whole concordance (from countRootConcordance). */
   total: number;
-  /** Buckwalter root — keys the paging API. */
-  rootBw: string;
-  /** The root's derived forms, for looking up each entry's form_id -> tag.
-   *  Omit to render with no tags (e.g. a root with no forms). */
-  forms?: RootForm[];
-  /** root_forms.id values to narrow to. Empty/omitted = no filter (unchanged
-   *  default behavior, uses initialEntries/total as-is). Changing this value
-   *  (a new array reference with different contents) triggers a fresh
-   *  offset-0 fetch -- the parent (ConcordanceSection) owns this state. */
-  selectedFormIds?: number[];
 }
+
+type ConcordanceListProps = ConcordanceListBaseProps & ConcordancePagingTarget;
 
 /** Occurrence list: verse-ref link, matched form/translit/gloss, and the verse
  * rebuilt word-by-word with the matched word washed. Big roots page in from
@@ -91,6 +117,7 @@ export function ConcordanceList({
   initialEntries,
   total,
   rootBw,
+  endpoint,
   forms,
   selectedFormIds = [],
 }: ConcordanceListProps) {
@@ -106,8 +133,11 @@ export function ConcordanceList({
   useEffect(() => () => abortRef.current?.abort(), []);
 
   function buildUrl(offset: number, formIds: number[]): string {
-    const base = `/api/roots/${encodeURIComponent(rootBw)}/concordance?offset=${offset}&limit=${PAGE}`;
-    return formIds.length > 0 ? `${base}&forms=${formIds.join(',')}` : base;
+    // Non-null: ConcordancePagingTarget guarantees `rootBw` whenever
+    // `endpoint` is absent, but destructuring the union drops that correlation.
+    const base = endpoint ?? rootConcordanceEndpoint(rootBw!);
+    const withPaging = `${base}?offset=${offset}&limit=${PAGE}`;
+    return formIds.length > 0 ? `${withPaging}&forms=${formIds.join(',')}` : withPaging;
   }
 
   async function fetchPage(offset: number, formIds: number[], replace: boolean) {

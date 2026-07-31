@@ -168,8 +168,20 @@ export interface LemmaFrequencyEntry {
 
 export interface VerbConcordanceEntry {
   lemma: string | null;
+  lemma_buckwalter: string | null;
   form_arabic: string;
   count: number;
+}
+
+export interface LemmaEntry {
+  lemma: string;
+  lemma_buckwalter: string;
+  transliteration: string | null;
+  pos_tag: string | null;
+  root_buckwalter: string | null;
+  count: number;
+  top_gloss: string | null;
+  root_definition: string | null;
 }
 
 export interface VerseHit {

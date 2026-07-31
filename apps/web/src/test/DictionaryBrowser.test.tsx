@@ -79,7 +79,10 @@ describe('DictionaryBrowser', () => {
     render(<DictionaryBrowser roots={roots} counts={counts} />);
     fireEvent.click(screen.getByRole('button', { name: /by frequency/i }));
     const hrefs = rowsOrder().map((l) => l.getAttribute('href'));
-    expect(hrefs).toEqual(['/dictionary/ktb', '/dictionary/smw', '/dictionary/$Am']);
+    // `$Am` -> `%24Am`: root links now go through the shared rootPath(), which
+    // always encodes. 97 of 1642 roots contain `$`. This assertion previously
+    // pinned the raw interpolation these rows used to do.
+    expect(hrefs).toEqual(['/dictionary/ktb', '/dictionary/smw', '/dictionary/%24Am']);
   });
 
   it('letter filter narrows to that letter’s roots', () => {
