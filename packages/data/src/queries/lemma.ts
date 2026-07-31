@@ -2,7 +2,9 @@ import type { Client } from '@libsql/client';
 import type { ConcordanceEntry, LemmaEntry } from '../types.js';
 import type { ConcordancePageOpts } from './roots.js';
 import { stripQuranicAnnotations } from '../text/normalize.js';
+import { cleanGlossList } from '../text/gloss.js';
 import { buckwalterToArabic } from '../text/arabic.js';
+import { posLabelEn } from '../morphology/decode.js';
 import { assertPagingBounds, buildVerseWordsByAyah } from './concordance.js';
 
 /** Paging options for a lemma concordance. Deliberately excludes `formIds`
@@ -10,8 +12,13 @@ import { assertPagingBounds, buildVerseWordsByAyah } from './concordance.js';
  *  the query would silently ignore -- it is a compile error instead. */
 export type LemmaConcordanceOpts = Omit<ConcordancePageOpts, 'formIds'>;
 
-/** Representative row + occurrence count + top gloss + root definition for a
- *  lemma.
+/** How many "Translated as" gloss chips the lemma page shows. Five covers the
+ *  common senses of a polysemous particle without turning the header into a
+ *  wall -- مَا's top five are "what", "And not", "and what", "of what", "Not". */
+export const LEMMA_GLOSS_LIMIT = 5;
+
+/** Representative row + occurrence count + gloss chips + sense breakdown +
+ *  root definition for a lemma.
  *
  *  Only `lemma` and `root_buckwalter` are genuinely constant per
  *  `lemma_buckwalter` (verified live: 0 lemmas with >1 surface form, 0 with >1
@@ -23,10 +30,11 @@ export type LemmaConcordanceOpts = Omit<ConcordancePageOpts, 'formIds'>;
  *  which rendered مَا with the transliteration `bimā` -- a form that still has
  *  its bi- prefix attached -- and the pick could flip on any re-import.
  *
- *  They are now the most frequent (transliteration, pos_tag) **pair**, taken
- *  together rather than as each column's own mode so the two can never come
- *  from different occurrences. That makes the value *stable*, and often the
- *  citation form (`min`/P, `mā`/REL, `qāla`/V, `kāna`/V, `fī`/P, `inna`/ACC).
+ *  `transliteration` is now the most frequent (transliteration, pos_tag)
+ *  **pair**, taken together rather than as each column's own mode so the two
+ *  can never come from different occurrences. That makes the value *stable*,
+ *  and often the citation form (`min`/P, `mā`/REL, `qāla`/V, `kāna`/V, `fī`/P,
+ *  `inna`/ACC).
  *
  *  ponytail: mode is a heuristic, not a lemma dictionary, and it does NOT
  *  always reach the citation form. Of the eight most frequent lemmas, two miss:
@@ -35,7 +43,12 @@ export type LemmaConcordanceOpts = Omit<ConcordancePageOpts, 'formIds'>;
  *  likewise. So this trades an *arbitrary* wrong form for a *predictable* one,
  *  which is the part that matters for a URL-addressable page -- it does not
  *  claim to be right. Upgrade path is a real citation-form column on a lemma
- *  table, which the corpus does not currently give us. */
+ *  table, which the corpus does not currently give us.
+ *
+ *  **POS is no longer collapsed to that pair's tag.** Reporting only the modal
+ *  tag stated "Relative pronoun" for مَا, which is wrong for 911 of its 2177
+ *  occurrences (NEG 704, INTG 92, SUB 79, COND 23, SUP 13). `senses` returns
+ *  the full breakdown and the header renders all of it. */
 export async function getLemmaEntry(
   db: Client,
   lemmaBw: string,
@@ -67,16 +80,36 @@ export async function getLemmaEntry(
 
   const rootBw = (row['root_buckwalter'] as string | null) ?? null;
 
-  const [glossRes, defRes] = await Promise.all([
+  const [glossRes, sensesRes, defRes] = await Promise.all([
     db.execute({
+      // Over-fetch: cleanGlossList collapses case/punctuation variants
+      // ("what" / "What" / "what,") that are distinct rows here, so asking for
+      // exactly LEMMA_GLOSS_LIMIT would return fewer chips than that after
+      // de-duplication. 4x is comfortably past the worst observed collapse
+      // ratio and still one small indexed scan.
       sql: `SELECT g.gloss_text
             FROM words w
             JOIN word_glosses g ON g.word_id = w.id
             WHERE w.lemma_buckwalter = ? AND g.language_code = ?
             GROUP BY g.gloss_text
             ORDER BY COUNT(*) DESC, g.gloss_text
-            LIMIT 1`,
-      args: [lemmaBw, lang],
+            LIMIT ?`,
+      args: [lemmaBw, lang, LEMMA_GLOSS_LIMIT * 4],
+    }),
+    db.execute({
+      // Tie-broken on pos_tag so equal-count senses keep a stable order across
+      // query plans (same reason the modal-pair query tie-breaks).
+      //
+      // `<> ''` as well as `IS NOT NULL`: the column is nullable and untyped
+      // beyond that, and an empty tag renders as a bordered chip holding a
+      // colour dot, no label and a bare count. No such row exists today, so
+      // this is a guard, not a fix.
+      sql: `SELECT pos_tag, COUNT(*) AS n
+            FROM words
+            WHERE lemma_buckwalter = ? AND pos_tag IS NOT NULL AND pos_tag <> ''
+            GROUP BY pos_tag
+            ORDER BY n DESC, pos_tag`,
+      args: [lemmaBw],
     }),
     rootBw
       ? db.execute({
@@ -106,10 +139,26 @@ export async function getLemmaEntry(
     lemma: (row['lemma'] as string | null) ?? buckwalterToArabic(lemmaBw),
     lemma_buckwalter: lemmaBw,
     transliteration: (formRow?.['transliteration'] as string | null) ?? null,
-    pos_tag: (formRow?.['pos_tag'] as string | null) ?? null,
     root_buckwalter: rootBw,
     count: row['count'] as number,
-    top_gloss: (glossRes.rows[0]?.['gloss_text'] as string | null) ?? null,
+    senses: sensesRes.rows.map((r) => {
+      const tag = r['pos_tag'] as string;
+      return {
+        pos_tag: tag,
+        // posLabelEn already falls back to the raw tag for one it has no
+        // English label for; it returns null only for a falsy tag, which the
+        // WHERE clause above now excludes. So `?? tag` is unreachable in
+        // practice and exists to satisfy the `string | null` return type
+        // without a non-null assertion -- an assertion would type a null as
+        // `string` and render a bare count with no label at all.
+        pos_label: posLabelEn(tag) ?? tag,
+        count: r['n'] as number,
+      };
+    }),
+    top_glosses: cleanGlossList(
+      glossRes.rows.map((r) => r['gloss_text'] as string),
+      LEMMA_GLOSS_LIMIT,
+    ),
     root_definition: (defRes?.rows[0]?.['definition'] as string | null) ?? null,
   };
 }

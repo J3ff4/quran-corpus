@@ -173,14 +173,30 @@ export interface VerbConcordanceEntry {
   count: number;
 }
 
+/** One grammatical sense a lemma is tagged with, and how often. A lemma is not
+ *  necessarily one part of speech: مَا is tagged six ways (relative 1266,
+ *  negative 704, interrogative 92, subordinating 79, conditional 23,
+ *  superlative 13), so naming only the commonest misdescribes 42% of its
+ *  occurrences. */
+export interface LemmaSense {
+  pos_tag: string;
+  /** Human label via posLabelEn; falls back to the raw tag. */
+  pos_label: string;
+  count: number;
+}
+
 export interface LemmaEntry {
   lemma: string;
   lemma_buckwalter: string;
   transliteration: string | null;
-  pos_tag: string | null;
   root_buckwalter: string | null;
   count: number;
-  top_gloss: string | null;
+  /** Every POS this lemma is tagged with, most frequent first. Length >1 means
+   *  the header must show the breakdown rather than a single label. */
+  senses: LemmaSense[];
+  /** Most frequent word-by-word glosses, cleaned and de-duplicated, commonest
+   *  first. Contextual translations, NOT definitions -- see text/gloss.ts. */
+  top_glosses: string[];
   root_definition: string | null;
 }
 

@@ -12,32 +12,159 @@ vi.mock('../components/dictionary/ConcordanceList', () => ({
   ConcordanceList: () => <div data-testid="concordance" />,
 }));
 
-const base = { lemma: 'قَالَ', lemma_buckwalter: 'qaAla', transliteration: 'qala', pos_tag: 'V', count: 2 };
+const base = {
+  lemma: 'قَالَ',
+  lemma_buckwalter: 'qaAla',
+  transliteration: 'qala',
+  senses: [{ pos_tag: 'V', pos_label: 'Verb', count: 2 }],
+  count: 2,
+};
 
 describe('LemmaEntry', () => {
-  it('rooted lemma shows gloss + root definition + up-link', () => {
-    render(<LemmaEntry entry={{ ...base, root_buckwalter: 'qwl', top_gloss: 'said', root_definition: 'to say' }} initialConcordance={[]} total={2} />);
+  it('rooted lemma shows gloss chips + root definition + up-link', () => {
+    render(
+      <LemmaEntry
+        entry={{ ...base, root_buckwalter: 'qwl', top_glosses: ['said'], root_definition: 'to say' }}
+        initialConcordance={[]}
+        total={2}
+      />,
+    );
     expect(screen.getByText('said')).toBeInTheDocument();
     expect(screen.getByText(/to say/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /root/i })).toHaveAttribute('href', '/dictionary/qwl');
   });
 
   it('rootless lemma: no definition block, no root link', () => {
-    render(<LemmaEntry entry={{ ...base, lemma: 'مِن', lemma_buckwalter: 'min', pos_tag: 'P', count: 1, root_buckwalter: null, top_gloss: 'from', root_definition: null }} initialConcordance={[]} total={1} />);
+    render(
+      <LemmaEntry
+        entry={{
+          ...base,
+          lemma: 'مِن',
+          lemma_buckwalter: 'min',
+          senses: [{ pos_tag: 'P', pos_label: 'Preposition', count: 1 }],
+          count: 1,
+          root_buckwalter: null,
+          top_glosses: ['from'],
+          root_definition: null,
+        }}
+        initialConcordance={[]}
+        total={1}
+      />,
+    );
     expect(screen.queryByRole('link', { name: /root/i })).toBeNull();
     expect(screen.getByText('from')).toBeInTheDocument();
   });
 
-  it('null gloss: no meaning block, still renders', () => {
-    render(<LemmaEntry entry={{ ...base, root_buckwalter: 'qwl', top_gloss: null, root_definition: 'to say' }} initialConcordance={[]} total={2} />);
+  it('no glosses: no "Translated as" block, still renders', () => {
+    render(
+      <LemmaEntry
+        entry={{ ...base, root_buckwalter: 'qwl', top_glosses: [], root_definition: 'to say' }}
+        initialConcordance={[]}
+        total={2}
+      />,
+    );
     expect(screen.getByText('قَالَ')).toBeInTheDocument();
+    expect(screen.queryByText(/Translated as/i)).toBeNull();
   });
 
-  it('rooted lemma with null root_definition: shows the View-root link but no empty "Definition of root" label', () => {
-    render(<LemmaEntry entry={{ ...base, root_buckwalter: 'qwl', top_gloss: 'said', root_definition: null }} initialConcordance={[]} total={2} />);
+  it('several glosses render as separate chips, order preserved', () => {
+    render(
+      <LemmaEntry
+        entry={{
+          ...base,
+          root_buckwalter: 'Drb',
+          top_glosses: ['sets forth', 'strike', 'presents'],
+          root_definition: 'to strike',
+        }}
+        initialConcordance={[]}
+        total={3}
+      />,
+    );
+    const chips = screen.getAllByRole('listitem').map((li) => li.textContent);
+    expect(chips).toEqual(['sets forth', 'strike', 'presents']);
+    // Labelled as translations, never as the lemma's definition -- these are
+    // contextual word-by-word glosses.
+    expect(screen.getByText(/Translated as/i)).toBeInTheDocument();
+  });
+
+  it('single-sense lemma shows a bare POS label with no count', () => {
+    render(
+      <LemmaEntry
+        entry={{ ...base, root_buckwalter: 'qwl', top_glosses: ['said'], root_definition: 'to say' }}
+        initialConcordance={[]}
+        total={2}
+      />,
+    );
+    // The count belongs to the "occurs N times" line, not the sense. A bare
+    // getByText('Verb') would still pass if the label rendered "Verb 2", so
+    // assert the sense element's whole text.
+    expect(screen.getByText('Verb').textContent).toBe('Verb');
+    expect(screen.getByText(/occurs 2 times/)).toBeInTheDocument();
+  });
+
+  it('lemma with no senses omits the breakdown instead of rendering an empty slot', () => {
+    // `senses` comes from a GROUP BY over `words.pos_tag`; a lemma whose rows
+    // are all untagged yields none. The header must still read cleanly rather
+    // than showing a stray separator or an empty label.
+    render(
+      <LemmaEntry
+        entry={{
+          ...base,
+          senses: [],
+          root_buckwalter: 'qwl',
+          top_glosses: ['said'],
+          root_definition: 'to say',
+        }}
+        initialConcordance={[]}
+        total={2}
+      />,
+    );
+    expect(screen.queryByText('Verb')).toBeNull();
+    expect(screen.getByText(/occurs 2 times/)).toBeInTheDocument();
+    expect(screen.getByText('qala')).toBeInTheDocument();
+  });
+
+  it('multi-sense lemma names every sense with its count, not just the commonest', () => {
+    // مَا is the regression case: labelling it flatly "Relative pronoun" is
+    // wrong for 911 of its 2177 occurrences.
+    render(
+      <LemmaEntry
+        entry={{
+          ...base,
+          lemma: 'مَا',
+          lemma_buckwalter: 'maA',
+          senses: [
+            { pos_tag: 'REL', pos_label: 'Relative pronoun', count: 1266 },
+            { pos_tag: 'NEG', pos_label: 'Negative particle', count: 704 },
+            { pos_tag: 'INTG', pos_label: 'Interrogative', count: 92 },
+          ],
+          count: 2062,
+          root_buckwalter: null,
+          top_glosses: ['what', 'And not'],
+          root_definition: null,
+        }}
+        initialConcordance={[]}
+        total={2062}
+      />,
+    );
+    expect(screen.getByText('Relative pronoun')).toBeInTheDocument();
+    expect(screen.getByText('Negative particle')).toBeInTheDocument();
+    expect(screen.getByText('Interrogative')).toBeInTheDocument();
+    expect(screen.getByText('1266')).toBeInTheDocument();
+    expect(screen.getByText('704')).toBeInTheDocument();
+  });
+
+  it('rooted lemma with no root_definition: says so instead of rendering a blank box', () => {
+    render(
+      <LemmaEntry
+        entry={{ ...base, root_buckwalter: 'qwl', top_glosses: ['said'], root_definition: null }}
+        initialConcordance={[]}
+        total={2}
+      />,
+    );
     // Up-link still present (navigating to the root page is always useful)...
     expect(screen.getByRole('link', { name: /root/i })).toHaveAttribute('href', '/dictionary/qwl');
-    // ...but no titled-yet-empty definition box.
-    expect(screen.queryByText(/Definition of root/i)).toBeNull();
+    // ...and the gap is named rather than left silent.
+    expect(screen.getByText(/No lexicon entry for this root/i)).toBeInTheDocument();
   });
 });

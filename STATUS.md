@@ -12,6 +12,109 @@ Updated: 2026-07-31
 ## Now
 All work below confirmed via `gh pr list --state all` + `git merge-base --is-ancestor`,
 not carried over from prior narrative.
+- **IN REVIEW (2026-07-31): dictionary UI truth pass — PR #64, branch
+  `feat/dictionary-truth-pass`, head `0bf4d0a`.** Four fixes on the lemma/root
+  pages, from screenshots. Pushed, **not merged**. §4 step 3 (`/code-review`)
+  run three times: 5 findings, 5 findings, then 6 — all fixed, plus two the
+  third round missed (a `paper-600` chip that fails AA on `bg-paper-100`, and a
+  2.20:1 caption this branch still carried after the header branch had already
+  fixed it). §5 CodeRabbit reviewed `b9159a5` and returned CHANGES_REQUESTED:
+  14 inline findings plus a failed `New Logic Ships With Tests` pre-merge
+  check, all addressed. **Latest: CodeRabbit reviewed head `0bf4d0a`
+  2026-07-31 15:59Z, still CHANGES_REQUESTED — one Minor finding, on this
+  file's own staleness.** The commit status is a green `Review completed`; the
+  review verdict is the gate, not the status colour (§5). **Verify against
+  `gh pr view 64` before acting on any of this** (§14).
+- **NOT ON ANY PR (2026-07-31): the entry-header redesign.** Branch
+  `feat/dictionary-entry-header` is `feat/dictionary-truth-pass` plus
+  exactly one commit on top of this branch's head, `feat(web/dictionary): share
+  one colour-coded header across entry pages`. No SHA is recorded for it on
+  purpose: it rebases every time this branch moves, so any SHA written here is
+  stale by the next push. Resolve it with
+  `git log --oneline feat/dictionary-truth-pass..feat/dictionary-entry-header`.
+  It adds the shared `EntryHeader`, both rewritten entry headers, and both
+  `loading.tsx` skeletons. Pushed to origin; **no PR opened, so §5 has never
+  seen this commit.** #64's review state does not cover it. Opening the PR is
+  the user's call, not the agent's.
+  - **Lemma "meaning" line was a contextual gloss posing as a definition.**
+    `top_gloss` = most frequent word-by-word gloss; those are per-verse
+    translations, so they carry subjects, prefixes, pronoun suffixes and quote
+    marks. `Daraba` read **"Allah sets forth"**. Audited all 4833 lemmas: **63.4%
+    of top glosses defective** (40.4% 3+ words, 28.7% parenthetical scaffolding,
+    16.2% leading conjunction, 15.0% pronoun-suffixed, 5.3% stray quote).
+    Fix: `top_gloss` → `top_glosses: string[]`, rendered as chips under
+    **"Translated as"** + a "not dictionary definitions" note. New
+    `packages/data/src/text/gloss.ts` cleans edge quotes/punctuation and drops a
+    leading wa-/fa- conjunction (guarded: a bare "and" survives, for wa- lemmas).
+  - **مَا header lied.** Tagged 6 ways (REL 1266, NEG 704, INTG 92, SUB 79, COND 23,
+    SUP 13) but labelled flatly "Relative pronoun" — wrong for 911 of 2177
+    occurrences. `LemmaEntry.pos_tag` → `senses: LemmaSense[]`, header renders all
+    with counts. **No concordance filtering** (chosen: header-only, no API change).
+  - **Long definitions collapse.** New `apps/web/src/components/ui/ClampedText.tsx`:
+    8-line clamp + fade mask + Show more/less, on both the root Lane box and the
+    lemma root-definition box. Lane defs run to 1479 chars (p50 124, p90 401).
+    Clamp is server-rendered CSS (no flash); only the toggle is client-measured.
+  - **بعث had no lexicon entry** → now an explicit "No lexicon entry for this root
+    yet" card instead of silence. **256 of 1642 roots affected; all upstream gaps**
+    (141 root codes absent from `qurandev/roots`, 102 present-but-empty, 13 pure
+    Lane apparatus). `clean_meaning()` is CORRECT — do not "fix" it.
+  - **`/code-review` round 1 — 5 findings, all fixed.** (1) HIGH: under
+    `prefers-reduced-motion` (`transition: none`) no `transitionend` fires, so the
+    px ceiling measured at click time stayed pinned forever and a later reflow
+    cropped the tail unreachably → timeout fallback releases it. (2) collapse never
+    animated (`none` is not an interpolable length) → stop measuring a start height
+    it cannot use; comment now says what actually happens. (3) with JS off the
+    server-rendered clamp was permanent and unopenable → `<noscript>` override.
+    (4) `posLabelEn(tag)!` laundered a null → `?? tag`. (5) `RootEntry.test.tsx`
+    still asserted the old "omits definition block" behaviour → now covers the
+    empty state. Findings 1–3 all traced to one cause: `animatingTo` had exactly
+    one release path.
+  - **CodeRabbit round 1 (§5) — 14 findings + 1 failed pre-merge check, all
+    addressed.** Sharpest: while collapsed, `max-height` pins the box, so a
+    late font swap changes content height *without* firing the ResizeObserver —
+    text that fit in the fallback face and overflows in the real one would be
+    cropped with no toggle. Re-measure on `document.fonts.ready` (the same
+    lesson as the #57 mount-scroll bug). Also: empty-state contrast failed WCAG
+    AA (paper-400 at 2.20:1 on `bg-paper-50`, dark paper-600 at 3.54:1 — §8
+    requires 4.5:1); identical failing tokens in `LemmaEntry`'s sense counts,
+    which CodeRabbit did not flag, fixed too. The `noscript` fallback moved to
+    the root layout (was emitted per instance). Plan fixes: test fixtures were
+    trimmed *real* scraped HTML, which §9 forbids committing — now synthetic
+    inline markup; live-DB `cp` → `VACUUM INTO`; decision option (c) now states
+    the query contract it silently depended on.
+  - **CodeRabbit round 2 — 6 findings, all addressed.** Note the gate signature:
+    the commit status went **green `success` / "Review completed"** while the
+    review object was `CHANGES_REQUESTED`. Green status is not a pass (§5) —
+    read the review, not the check colour. Substantive one: `ClampedText`'s
+    measure effect omitted `children` from its deps, so swapping the content of
+    a *mounted* instance kept the mount-time verdict. Not reachable today (the
+    dictionary routes key on the param, definitions key on their id) but it is
+    the component's contract, so the dep was added rather than only tested;
+    confirmed the new test fails without it. CodeRabbit filed this as a trivial
+    "add a test" nitpick. Rest were the phase-20 plan contradicting itself: the
+    file table still ordered three trimmed real-snapshot fixtures the Global
+    Constraints forbid, and "no changes to `packages/data`" contradicted option
+    (c)'s own requirement — both now conditional/forbidden explicitly. Plus a
+    TSV delimiter guard and a `--only-missing` race (root set is chosen at TSV
+    generation, import commits later) now covered by a post-condition query.
+  - Gates are **local, 2026-07-31** (no CI configured), and measured per
+    branch — the two numbers are not interchangeable:
+    - **PR #64 head `0bf4d0a`: 236 data + 442 web tests pass**, lint clean,
+      type-check clean. This is the only figure that verifies the PR.
+    - `feat/dictionary-entry-header` (superset, see above): 236 + 448. The
+      extra 6 cover `EntryHeader`, which is not in #64 — so quoting 684 as
+      #64's result overstates it by six tests of unrelated code.
+
+    Verified visually at 412px on the live dev server, not just by test.
+- **`docs/plans/phase-20-root-definition-coverage.md` WRITTEN, not started.** Fills
+  155 of those 256 roots from the **snapshots phase 18 already archived — zero
+  network requests**. corpus root pages carry a per-form lexical gloss the
+  dictionary parser never read (`Drb` → "to strike, to set forth", `Zlm` → "to
+  oppress, to wrong"). Measured: 965/1642 roots yield a gloss; 155 of the def-less
+  256; **101 stay empty** (noun-only roots print a bare `Noun` header with no gloss
+  — upstream absence, do not widen the regex). **Task 4 is BLOCKED on a user
+  decision**: `corpus-forms` sorts before `qurandev-lane`, so importing it would
+  silently promote it to "the" definition on 810 pages that are currently fine.
 - PRs #1–57 MERGED. **#58 CLOSED unmerged** (payload split, see below). **#59 MERGED**
   (`0095c2c`, 2026-07-28 19:01Z — CodeRabbit gate). **#60 MERGED** (phase 17).
   **#61 MERGED** (phase 18, `6113fd3`). **#62 MERGED** (`97d78bb`, sort_order

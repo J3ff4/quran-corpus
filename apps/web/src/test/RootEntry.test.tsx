@@ -58,9 +58,12 @@ describe('RootEntry', () => {
     render(<RootEntry entry={entry} initialConcordance={concordance} total={0} prevBw={null} nextBw={null} />);
     expect(screen.getByText('Noun')).toBeInTheDocument();
   });
-  it('omits definition block when none', () => {
+  it('says so explicitly when the root has no lexicon entry', () => {
+    // 256 of 1642 roots have no definition (upstream gaps in qurandev/roots).
+    // Rendering nothing at all read as a broken page rather than a known gap.
     render(<RootEntry entry={{ ...entry, definitions: [] }} initialConcordance={concordance} total={0} prevBw={null} nextBw={null} />);
     expect(screen.queryByText(/To write/)).toBeNull();
+    expect(screen.getByText(/No lexicon entry for this root yet/i)).toBeInTheDocument();
   });
   it('shows 3 letter pills and singular "1 time", no Buckwalter', () => {
     const entry = {

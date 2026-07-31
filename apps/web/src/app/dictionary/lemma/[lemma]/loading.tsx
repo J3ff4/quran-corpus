@@ -1,13 +1,13 @@
 import { Skeleton } from '../../../../components/ui/Skeleton';
 
 /** Placeholder for a lemma entry while it streams: header + meta line, the
- * quick-meaning line, the root-definition card, and a few concordance rows.
- * Mirrors LemmaEntry's layout so the swap to real content doesn't shift.
+ * "Translated as" chip row, the root-definition card, and a few concordance
+ * rows. Mirrors LemmaEntry's layout so the swap to real content doesn't shift.
  *
  * The page is `force-dynamic` and runs several sequential DB round-trips
- * (entry, modal form, gloss, root definition, first concordance page), so
- * without this the tap on a frequency row sits on the old screen with no
- * feedback. The root page has had the same treatment since it shipped.
+ * (entry, modal form, glosses, senses, root definition, first concordance
+ * page), so without this the tap on a frequency row sits on the old screen with
+ * no feedback. The root page has had the same treatment since it shipped.
  *
  * The root-definition card is drawn unconditionally even though 175 rootless
  * lemmas render no card at all -- the skeleton cannot know which it is, and a
@@ -24,7 +24,12 @@ export default function LemmaLoading() {
           <Skeleton className="h-4 w-24" />
         </div>
       </header>
-      <Skeleton className="mb-6 h-5 w-48" />
+      <Skeleton className="mb-2 h-3 w-24" />
+      <div className="mb-6 flex gap-1.5">
+        <Skeleton className="h-7 w-16 rounded-full" />
+        <Skeleton className="h-7 w-20 rounded-full" />
+        <Skeleton className="h-7 w-14 rounded-full" />
+      </div>
       <Skeleton className="mb-8 h-20 w-full" />
       <Skeleton className="mb-2 h-4 w-32" />
       <div className="space-y-4">

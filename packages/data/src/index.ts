@@ -39,11 +39,11 @@ export {
   backfillRootSortOrderIfStale,
 } from './queries/roots.js';
 export type { ConcordancePageOpts } from './queries/roots.js';
-export {
-  getLemmaEntry,
-  getLemmaConcordancePage,
-  countLemmaConcordance,
-} from './queries/lemma.js';
+export { getLemmaEntry, getLemmaConcordancePage, countLemmaConcordance } from './queries/lemma.js';
+// LEMMA_GLOSS_LIMIT, cleanGloss and cleanGlossList are deliberately NOT
+// exported: getLemmaEntry already applies them, so nothing outside this package
+// has a use for them, and the tests import the source module directly. Public
+// surface with no caller is surface that has to keep working forever.
 export {
   CONCORDANCE_PAGE_SIZE,
   CONCORDANCE_MAX_LIMIT,
@@ -83,6 +83,7 @@ export type {
   LemmaFrequencyEntry,
   VerbConcordanceEntry,
   LemmaEntry,
+  LemmaSense,
   VerseRef,
   VerseHit,
   JumpVerse,

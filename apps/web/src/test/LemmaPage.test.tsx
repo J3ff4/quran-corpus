@@ -46,10 +46,10 @@ const entry = {
   lemma: 'قَالَ',
   lemma_buckwalter: 'qaAla',
   transliteration: 'qala',
-  pos_tag: 'V',
+  senses: [{ pos_tag: 'V', pos_label: 'Verb', count: 2 }],
   count: 2,
   root_buckwalter: 'qwl',
-  top_gloss: 'said',
+  top_glosses: ['said'],
   root_definition: 'to say',
 };
 

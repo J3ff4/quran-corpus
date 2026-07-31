@@ -45,16 +45,44 @@ describe('lemma queries', () => {
   let db: Client;
   beforeEach(async () => { db = createDatabase('file::memory:'); await runMigrations(db); await seed(db); });
 
-  it('getLemmaEntry: rooted lemma has count, deterministic top_gloss, root_definition', async () => {
+  it('getLemmaEntry: rooted lemma has count, frequency-ordered glosses, root_definition', async () => {
     const e = await getLemmaEntry(db, 'qaAla');
     expect(e).not.toBeNull();
     expect(e!.count).toBe(3);
     expect(e!.root_buckwalter).toBe('qwl');
     expect(e!.root_definition).toBe('to say');
-    // `said` occurs 2x, `He said,` 1x -> most-frequent is unambiguously `said`.
-    expect(e!.top_gloss).toBe('said');
-    expect(e!.pos_tag).toBe('V');
+    // `said` occurs 2x, `He said,` 1x -> most-frequent leads, and the trailing
+    // comma the corpus carried over from the verse is cleaned off the second.
+    expect(e!.top_glosses).toEqual(['said', 'He said']);
     expect(e!.lemma).toBe('قَالَ');
+  });
+
+  it('getLemmaEntry: senses list every POS with counts, most frequent first', async () => {
+    // A lemma is not necessarily one part of speech. Reporting only the modal
+    // tag stated "Relative pronoun" for مَا, which is wrong for 911 of its 2177
+    // occurrences. Seed: (qala,V) x2 and (yaqūlu,N) x1 on the same lemma.
+    const e = await getLemmaEntry(db, 'qaAla');
+    expect(e!.senses).toEqual([
+      { pos_tag: 'V', pos_label: 'Verb', count: 2 },
+      { pos_tag: 'N', pos_label: 'Noun', count: 1 },
+    ]);
+  });
+
+  it('getLemmaEntry: an unknown POS tag keeps the raw tag, an empty one is dropped', async () => {
+    // Two different fallbacks, asserted together because the same row set
+    // exercises both. `ZZZ` has no English label, so posLabelEn hands back the
+    // tag itself and the chip reads "ZZZ 1" -- ugly but truthful.
+    //
+    // The empty tag is excluded by the query instead, because there is no
+    // truthful chip to render for it: no label, and a coloured dot plus a bare
+    // count reads as a sense the lemma does not have. Dropping the row is the
+    // honest option, and the count line above the chips is unaffected (it is
+    // its own COUNT(*), not a sum of these).
+    await db.execute(`INSERT INTO words (id,ayah_id,position,text_arabic,transliteration,root,lemma,root_buckwalter,lemma_buckwalter,pos_tag) VALUES
+      (106,12,2,'س','sin',NULL,'سٌ',NULL,'sino','ZZZ'),
+      (107,12,3,'ش','shin',NULL,'شٌ',NULL,'sino','')`);
+    const e = await getLemmaEntry(db, 'sino');
+    expect(e!.senses).toEqual([{ pos_tag: 'ZZZ', pos_label: 'ZZZ', count: 1 }]);
   });
 
   it('getLemmaEntry: null surface lemma falls back to the transliterated key', async () => {
@@ -74,22 +102,21 @@ describe('lemma queries', () => {
     expect(e!.root_definition).toBe('to say');
   });
 
-  it('getLemmaEntry: transliteration/pos_tag come from the most frequent pair', async () => {
-    // Not constant per lemma -- they describe the occurrence. Live corpus: 2349
-    // of 4832 lemmas carry >1 transliteration. Reading them as bare columns
+  it('getLemmaEntry: transliteration comes from the most frequent (translit, pos) pair', async () => {
+    // Not constant per lemma -- it describes the occurrence. Live corpus: 2349
+    // of 4832 lemmas carry >1 transliteration. Read as a bare column it
     // rendered مَا as `bimā` (prefix still attached) and could flip per import.
+    // Taken as a PAIR: the majority pair is (qala,V), so the minority row's
+    // `yaqūlu` must not leak through even though it is first in table order.
     const e = await getLemmaEntry(db, 'qaAla');
     expect(e!.transliteration).toBe('qala');
-    // Taken as a PAIR: the majority pair is (qala,V), so the minority row's `N`
-    // must not leak through even though it is the first row in table order.
-    expect(e!.pos_tag).toBe('V');
   });
 
   it('getLemmaEntry: lang parameter switches the gloss language', async () => {
     const en = await getLemmaEntry(db, 'qaAla', 'en');
     const uz = await getLemmaEntry(db, 'qaAla', 'uz');
-    expect(en!.top_gloss).toBe('said');
-    expect(uz!.top_gloss).toBe('dedi');
+    expect(en!.top_glosses[0]).toBe('said');
+    expect(uz!.top_glosses[0]).toBe('dedi');
   });
 
   it('getLemmaEntry: rootless lemma -> null root + null definition', async () => {

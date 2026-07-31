@@ -24,6 +24,12 @@
   --form-noun: #2469c0;
   --form-adjective: #b2790f;
   --form-other: #555;
+
+  /* The built-in CSS easings are too weak to read as intentional. Strong
+     ease-out for anything entering or expanding -- it moves immediately, which
+     is the moment the user is watching. Never ease-in for UI: the delayed
+     start makes the same duration *feel* slower. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 /* App dark mode is class-driven (darkMode: 'class' in the shared preset);
@@ -75,9 +81,35 @@ html {
   animation: typing-char-in 80ms ease-out forwards;
 }
 
+/* Long-definition disclosure (ClampedText). max-height is the one animatable
+   property here: revealing clipped text is a size change, so there is no
+   transform/opacity equivalent, and the grid-template-rows trick only goes
+   0fr->1fr (we open from a visible 8-line clamp, not from nothing). Confined
+   to a single text box on an occasional tap, which is where that cost is
+   acceptable. */
+.clamp-box {
+  transition: max-height 240ms var(--ease-out);
+}
+
+.clamp-toggle {
+  transition: transform 160ms var(--ease-out);
+}
+
+/* Press feedback: the toggle should feel like it heard the tap. */
+.clamp-toggle:active {
+  transform: scale(0.97);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .typing-char {
     opacity: 1;
     animation: none;
+  }
+
+  /* Reduced motion is fewer and gentler, not none: the disclosure still works,
+     it just snaps instead of sliding. */
+  .clamp-box,
+  .clamp-toggle {
+    transition: none;
   }
 }
