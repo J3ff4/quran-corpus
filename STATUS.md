@@ -7,7 +7,7 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-07-30
+Updated: 2026-07-31
 
 ## Now
 All work below confirmed via `gh pr list --state all` + `git merge-base --is-ancestor`,
@@ -15,16 +15,19 @@ not carried over from prior narrative.
 - PRs #1–57 MERGED. **#58 CLOSED unmerged** (payload split, see below). **#59 MERGED**
   (`0095c2c`, 2026-07-28 19:01Z — CodeRabbit gate). **#60 MERGED** (phase 17).
   **#61 MERGED** (phase 18, `6113fd3`). **#62 MERGED** (`97d78bb`, sort_order
-  invalidation). Current `main` tip `7c5b322`. Nothing open.
+  invalidation). **#63 MERGED** (`7b86214`, 2026-07-31 03:24Z — lemma pages,
+  squashed, **§5 gate overridden**, see below). Current `main` tip `7b86214`.
+  Nothing open.
   **Commit SHAs before 2026-07-27 are all dead** — history was rewritten, see purge.
 - **Phase 18 (930-root re-scrape) DONE + MERGED.** All six phase-17 carry items
   closed. **The 930-root crawl itself has been run** (see Phase 18 below) — nothing
   is pending there.
-- **PR #63 (lemma pages + clickable frequency) OPEN, BLOCKED on CodeRabbit
-  rate limit** as of 2026-07-30. Branch `feat/lemma-pages`, head `4b26c90`,
-  14 commits off `main`. SDD-built (7 tasks, final opus review VERDICT ship,
-  0 Critical/Important) + 4 local `/code-review` passes + CodeRabbit round.
-  See its own section below. Not merged — gate not cleared.
+- **PR #63 (lemma pages + clickable frequency) MERGED 2026-07-31 with the §5 gate
+  UNRUN.** Owner's explicit call after the conflict was surfaced. CodeRabbit never
+  reviewed head `bc5425f` — quota dead ~3h, status `success | Review rate limited`.
+  **This is the only override in the repo's history; do not cite it as precedent.**
+  Reason + evidence are in the merge commit body (`git show 7b86214`). See its own
+  section below.
 - **#62's triggers are LIVE as of 2026-07-29.** `trg_roots_sort_order_ai` / `_au`
   installed by running `ScraperDatabase('~/quran-data/quran.db')` — schema.sql is all
   `IF NOT EXISTS`, so applying it is idempotent and needs no web-app restart. Live DB
@@ -244,9 +247,10 @@ Test-only gotcha worth keeping: libsql opens `file::memory:` **per
 connection**, so anything touching a transaction needs a file-backed temp
 DB or the transaction sees an empty database.
 
-### PR #63 — lemma pages + clickable frequency, OPEN, BLOCKED on rate limit
+### PR #63 — lemma pages + clickable frequency, MERGED `7b86214` (§5 OVERRIDDEN)
 
-Branch `feat/lemma-pages` off `main`. 14 commits, head `4b26c90`. Makes
+Branch `feat/lemma-pages` (deleted), squashed onto `main` 2026-07-31 03:24Z from
+head `bc5425f`. 17 commits. Makes
 `/dictionary/lemma-frequency` + `/dictionary/verb-concordance` rows clickable
 → new per-lemma page `/dictionary/lemma/[lemma_buckwalter]` (header, top gloss,
 root's Lane's Lexicon def with up-link — omitted for 175 rootless lemmas,
@@ -269,26 +273,28 @@ real validator runs. Other passes: DRY'd the verse-rebuild into
 one shared `CONCORDANCE_PAGE_SIZE`, whole-row links, deterministic root-def
 (`ORDER BY rd.source LIMIT 1`, matches root page), dropped a redundant count.
 
-**CodeRabbit round:** 6 inline findings on `72decc6`/`08ea720`, all ✅ addressed.
-`08ea720` = the fix commit; `4b26c90` = last Trivial (typed the root-route mocks
-from the real query signatures, `vi.fn<typeof fn>` + `vi.hoisted` for the TDZ).
+**CodeRabbit rounds:** 9 rounds ground down, findings 9→7→6→1→4→0. Fix commits
+`08ea720` `4b26c90` `5cd2a03` `9d34fab` `bc5425f`. Last three closed pre-merge
+check *New Logic Ships With Tests*, which **re-targets every round** — title check
+→ `buildVerseWordsByAyah`'s untested batchSize guard → `LemmaPage` having no page
+test. `bc5425f` added `apps/web/src/test/LemmaPage.test.tsx` for the third.
 
-🔴 **GATE NOT CLEARED — CodeRabbit rate-limited** (verified 2026-07-30 via API):
-latest review is **CHANGES_REQUESTED @ `08ea720`** (06:26Z); **no review exists
-for head `4b26c90`**. Walkthrough (06:11Z push) reads *"Review limit reached —
-Next review available in: 28 minutes."* Per CLAUDE.md §5 a rate-limited review
-is **blocked, never passed** — indistinguishable from a pass unless the body is
-read, which it was. `mergeable_state: clean` and any green commit-status are the
-misleading signals §5 warns about; the **review decision** governs and it is
-stale-CHANGES_REQUESTED.
-**To clear (the 3-step dance from #62):** wait for quota → comment
-`@coderabbitai full review` so it submits a **superseding APPROVED for
-`4b26c90`** (GitHub pins `reviewDecision` to the last *submitted* review; a clean
-incremental pass submits none and won't move it) → confirm APPROVED on the head
-SHA → merge. No code changes pending.
-Local gate on `4b26c90` fully green: type-check data+web clean, lint clean,
-**data 198/198, web 414/414** (`roots.test.ts` file-level EPERM = pre-existing
-Windows afterAll teardown, not a test failure).
+🔴 **MERGED WITH §5 UNRUN — the repo's only gate override.**
+CodeRabbit **never reviewed head `bc5425f`**. Quota died for ~3h; the commit
+status read `success | Review rate limited` @ 2026-07-31T00:03:28Z, which §5
+defines as **blocked, never passed**. `reviewDecision` was CHANGES_REQUESTED,
+held by a *New Logic Ships With Tests* failure evaluated against the **previous**
+head `9d34fab` — its stated reason (LemmaPage untested) is what `bc5425f` fixed.
+Believed stale, never re-evaluated by the bot. 90 polls over 3h + one
+`@coderabbitai full review` re-request all returned rate-limited.
+Merged on the owner's explicit instruction after the conflict was surfaced.
+§5 says the author may never override; `mergeState=CLEAN` did not stop it because
+branch protection needs a public repo. Full reasoning in `git show 7b86214`.
+**What did run:** 7/8 pre-merge checks passing, 0 unresolved threads, local gate
+green on `bc5425f` and re-verified on `main` after merge — **data 213/213,
+web 423/423**, `tsc --noEmit` + eslint clean.
+**Carry-forward:** re-request a CodeRabbit review against `main` once quota lifts;
+anything it finds ships as a follow-up PR.
 
 ### GOING PUBLIC — in progress, BLOCKED (2026-07-27)
 Decision: repo goes public, review bot switches Greptile → CodeRabbit.
@@ -713,10 +719,10 @@ Re-queried directly 2026-07-22 (do not trust older counts in this file's history
 8. Phase 18's deferred cosmetic minors, still open: `_ONE_FORM_HTML` duplicated
    across `test_dictionary_scrape.py` / `test_replay.py`, local re-imports in
    `test_lane.py`.
-9. **PR #63 (lemma pages) — clear the CodeRabbit gate + merge.** Blocked only on
-   the rate limit (all findings addressed). Steps: wait for quota →
-   `@coderabbitai full review` → confirm APPROVED on head `4b26c90` → merge.
-   See the #63 section above. No code work left.
+9. **#63's unrun review — re-request CodeRabbit against `main` once quota lifts.**
+   #63 merged 2026-07-31 with §5 overridden; the diff has still never been read by
+   the bot. Not blocking anything, but it is an open debt: run it, and ship any
+   finding as a follow-up PR. See the #63 section above.
 
 ## Notes
 - Uzbek edition = Cyrillic (uz.sodik). Latin variant not done.
