@@ -226,12 +226,35 @@ export async function getRootForms(db: Client, rootId: number): Promise<RootForm
   return res.rows.map(rowToForm);
 }
 
+/** Preference order for a root's definition sources, best first.
+ *
+ *  Lane is the full classical lexicon entry; `corpus-forms` is the short gloss
+ *  strip harvested from corpus.quran.com to cover roots Lane has nothing for
+ *  (phase 20), so it must never outrank a real Lane entry. Plain
+ *  `ORDER BY source` used to do the right thing only by alphabetical accident,
+ *  and phase 20 broke the accident: `'corpus-forms' < 'lane' < 'qurandev-lane'`
+ *  puts the fallback first. The root page shows every source so it only
+ *  reorders there, but the lemma page takes `LIMIT 1` off this same order —
+ *  there, the accident silently picks the weaker definition.
+ *
+ *  Shared so the two pages cannot disagree about which definition is "the"
+ *  definition for a root.
+ */
+export const DEFINITION_SOURCE_RANK = `CASE rd.source
+       WHEN 'lane' THEN 0
+       WHEN 'qurandev-lane' THEN 0
+       WHEN 'corpus-forms' THEN 1
+       ELSE 2
+     END, rd.source`;
+
 export async function getRootDefinitions(
   db: Client,
   rootId: number,
 ): Promise<RootDefinition[]> {
   const res = await db.execute({
-    sql: 'SELECT * FROM root_definitions WHERE root_id = ? ORDER BY source',
+    sql: `SELECT rd.* FROM root_definitions rd
+          WHERE rd.root_id = ?
+          ORDER BY ${DEFINITION_SOURCE_RANK}`,
     args: [rootId],
   });
   return res.rows.map(rowToDefinition);

@@ -13,10 +13,8 @@ from pathlib import Path
 from .buckwalter import buckwalter_to_arabic
 from .db import ScraperDatabase
 from .models import RootFormModel, RootModel
-from .snapshots import iter_snapshot_paths, read_snapshot
+from .snapshots import iter_root_snapshot_paths, read_snapshot
 from .sources.corpus_dictionary import parse_root_page
-
-_PREFIX = "root_"
 
 
 def replay_root_snapshots(
@@ -31,10 +29,7 @@ def replay_root_snapshots(
     updated = 0
     unparseable = 0
     unreadable = 0
-    for key, path in iter_snapshot_paths(root_dir):
-        if not key.startswith(_PREFIX):
-            continue
-        bw = key[len(_PREFIX):]
+    for bw, path in iter_root_snapshot_paths(root_dir):
         try:
             html = read_snapshot(path)
         except (OSError, EOFError, zlib.error, UnicodeDecodeError):

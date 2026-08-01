@@ -1,6 +1,7 @@
 import type { Client } from '@libsql/client';
 import type { ConcordanceEntry, LemmaEntry } from '../types.js';
 import type { ConcordancePageOpts } from './roots.js';
+import { DEFINITION_SOURCE_RANK } from './roots.js';
 import { stripQuranicAnnotations } from '../text/normalize.js';
 import { cleanGlossList } from '../text/gloss.js';
 import { buckwalterToArabic } from '../text/arabic.js';
@@ -113,16 +114,17 @@ export async function getLemmaEntry(
     }),
     rootBw
       ? db.execute({
-          // ORDER BY source matches getRootDefinitions (roots.ts) so a root
-          // with multiple definition sources shows the SAME first definition
-          // here as on /dictionary/[root]; without it LIMIT 1 is
-          // nondeterministic and the two pages can disagree (or flip per
-          // request).
-          sql: `SELECT rd.definition
+          // Shares getRootDefinitions' ordering (roots.ts) so a root with
+          // several definition sources shows the SAME first definition here as
+          // on /dictionary/[root]; without it LIMIT 1 is nondeterministic and
+          // the two pages can disagree (or flip per request). `source` comes
+          // back with it because this page has to credit whatever it renders
+          // (§11) and only the row itself knows which source won.
+          sql: `SELECT rd.definition, rd.source
                 FROM roots r
                 JOIN root_definitions rd ON rd.root_id = r.id
                 WHERE r.root_buckwalter = ?
-                ORDER BY rd.source
+                ORDER BY ${DEFINITION_SOURCE_RANK}
                 LIMIT 1`,
           args: [rootBw],
         })
@@ -160,6 +162,7 @@ export async function getLemmaEntry(
       LEMMA_GLOSS_LIMIT,
     ),
     root_definition: (defRes?.rows[0]?.['definition'] as string | null) ?? null,
+    root_definition_source: (defRes?.rows[0]?.['source'] as string | null) ?? null,
   };
 }
 

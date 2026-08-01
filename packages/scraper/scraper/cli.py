@@ -3,6 +3,7 @@ import click
 from .checkpoint import Checkpoint
 from .db import ScraperDatabase
 from .seed import seed_database
+from .snapshots import ROOT_PREFIX
 
 
 @click.group()
@@ -123,7 +124,7 @@ def rescrape_formless_roots_cmd(
 
         ckpt = Checkpoint(checkpoint)
         for bw in targets:
-            ckpt.clear(f"root_{bw}")
+            ckpt.clear(f"{ROOT_PREFIX}{bw}")
 
         click.echo(f"re-scraping {len(targets)} formless roots...")
         count = scrape_dictionary(

@@ -13,6 +13,8 @@ vi.mock('../components/dictionary/ConcordanceList', () => ({
 }));
 
 const base = {
+  /** Which source won for this lemma's root definition; null until one does. */
+  root_definition_source: null,
   lemma: 'قَالَ',
   lemma_buckwalter: 'qaAla',
   transliteration: 'qala',
@@ -162,10 +164,52 @@ describe('LemmaEntry', () => {
         total={2}
       />,
     );
+
     // Up-link still present (navigating to the root page is always useful)...
     expect(screen.getByRole('link', { name: /root/i })).toHaveAttribute('href', '/dictionary/qwl');
     // ...and the gap is named rather than left silent.
     expect(screen.getByText(/No lexicon entry for this root/i)).toBeInTheDocument();
+  });
+
+  it('credits the source of the root definition it renders', () => {
+    // The definition text is third-party and licensed (§11). Phase 20 put
+    // GPL corpus glosses on 155 roots, and this page rendered them with no
+    // credit at all while the root page credited the same text.
+    render(
+      <LemmaEntry
+        entry={{
+          ...base,
+          root_buckwalter: 'qwl',
+          top_glosses: ['said'],
+          root_definition: 'to say',
+          root_definition_source: 'corpus-forms',
+        }}
+        initialConcordance={[]}
+        total={2}
+      />,
+    );
+    expect(screen.getByText('Quranic Arabic Corpus')).toBeInTheDocument();
+    expect(screen.queryByText(/corpus-forms/)).toBeNull();
+  });
+
+  it('falls back to the raw tag for an unknown source rather than crediting nobody', () => {
+    // Ugly on purpose. The alternative is licensed definition text rendered
+    // with no attribution at all (§11), and nothing anywhere saying so -- an
+    // import that forgets its SOURCE_LABELS entry has to be visible.
+    render(
+      <LemmaEntry
+        entry={{
+          ...base,
+          root_buckwalter: 'qwl',
+          top_glosses: ['said'],
+          root_definition: 'to say',
+          root_definition_source: 'not-a-known-source',
+        }}
+        initialConcordance={[]}
+        total={2}
+      />,
+    );
+    expect(screen.getByText('not-a-known-source')).toBeInTheDocument();
   });
 
   it('colour-codes each sense chip with the reader’s own posColor bucket', () => {

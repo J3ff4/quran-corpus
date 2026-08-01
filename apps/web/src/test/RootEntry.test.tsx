@@ -54,6 +54,21 @@ describe('RootEntry', () => {
     expect(screen.getByText("Lane's Lexicon")).toBeInTheDocument();
     expect(screen.queryByText(/qurandev-lane/)).toBeNull();
   });
+  it('labels the corpus-forms source with the name credited on /about', () => {
+    // Phase 20 fills 155 roots from corpus.quran.com's per-form glosses. The
+    // label map's fallback prints the raw tag, so without an entry these all
+    // credited themselves as the literal string "corpus-forms" -- a DB
+    // identifier shown to readers, and the wrong attribution under §11.
+    const cf = {
+      ...entry,
+      definitions: [
+        { id: 1, root_id: 1, source: 'corpus-forms', definition: 'to write, to prescribe' },
+      ],
+    };
+    render(<RootEntry entry={cf} initialConcordance={concordance} total={0} prevBw={null} nextBw={null} />);
+    expect(screen.getByText('Quranic Arabic Corpus')).toBeInTheDocument();
+    expect(screen.queryByText(/corpus-forms/)).toBeNull();
+  });
   it('renders form groups', () => {
     render(<RootEntry entry={entry} initialConcordance={concordance} total={0} prevBw={null} nextBw={null} />);
     expect(screen.getByText('Noun')).toBeInTheDocument();

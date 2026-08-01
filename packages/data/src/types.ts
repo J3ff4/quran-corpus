@@ -198,6 +198,10 @@ export interface LemmaEntry {
    *  first. Contextual translations, NOT definitions -- see text/gloss.ts. */
   top_glosses: string[];
   root_definition: string | null;
+  /** `root_definitions.source` of the definition above; null when there is
+   *  none. Carried so the page can credit it — the text is third-party and
+   *  licensed (§11), and which source won depends on what the root has. */
+  root_definition_source: string | null;
 }
 
 export interface VerseHit {

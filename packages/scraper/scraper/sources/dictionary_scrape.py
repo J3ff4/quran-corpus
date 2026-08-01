@@ -17,7 +17,7 @@ from ..checkpoint import Checkpoint
 from ..db import ScraperDatabase
 from ..http_retry import get_with_retry
 from ..models import ConceptTagModel, RootFormModel, RootModel
-from ..snapshots import has_snapshot, save_snapshot
+from ..snapshots import ROOT_PREFIX, has_snapshot, save_snapshot
 from .corpus_dictionary import parse_root_page
 from .corpus_word_detail import parse_word_detail
 
@@ -53,7 +53,7 @@ def scrape_dictionary(
     roots = roots if roots is not None else db.get_distinct_roots()
     with client_factory() as client:
         for bw in roots:
-            key = f"root_{bw}"
+            key = f"{ROOT_PREFIX}{bw}"
             # Two completeness conditions, not one. The checkpoint says the DB
             # row is written; the archive says the raw HTML is kept (§11).
             # Requiring both lets --snapshot-dir back-fill an already-scraped

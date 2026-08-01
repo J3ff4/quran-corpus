@@ -5,6 +5,7 @@ import { EntryHeader } from './EntryHeader';
 import { ClampedText } from '../ui/ClampedText';
 import { posColor } from '../../lib/posColor';
 import { rootPath, lemmaConcordanceEndpoint } from '../../lib/routes';
+import { definitionSourceLabel } from '../../lib/definitionSources';
 
 interface LemmaEntryProps {
   entry: LemmaEntryT;
@@ -83,6 +84,7 @@ function Senses({ senses }: { senses: LemmaSense[] }) {
  * are `'use client'` but that's fine as children.
  */
 export function LemmaEntry({ entry, initialConcordance, total }: LemmaEntryProps) {
+  const sourceLabel = definitionSourceLabel(entry.root_definition_source);
   return (
     <article>
       <EntryHeader
@@ -143,16 +145,28 @@ export function LemmaEntry({ entry, initialConcordance, total }: LemmaEntryProps
               Definition of root
             </p>
             {entry.root_definition ? (
-              <ClampedText
-                label="root definition"
-                className="break-words text-sm leading-relaxed text-paper-800 dark:text-paper-200"
-              >
-                {entry.root_definition}
-              </ClampedText>
+              <>
+                <ClampedText
+                  label="root definition"
+                  className="break-words text-sm leading-relaxed text-paper-800 dark:text-paper-200"
+                >
+                  {entry.root_definition}
+                </ClampedText>
+                {/* Same text as the root page, so it carries the same credit
+                    (§11). Which source wins depends on the root — Lane where
+                    it has an entry, the corpus form glosses where it does
+                    not — so the label has to come from the row, not a
+                    constant. Same card-interior tokens as the heading above,
+                    for the same contrast reason. */}
+                {sourceLabel && (
+                  <p className="mt-1 text-xs text-paper-700 dark:text-paper-400">{sourceLabel}</p>
+                )}
+              </>
             ) : (
               /* Say the entry is missing rather than rendering an unexplained
-                 gap: 256 of 1642 roots have no lexicon definition, all of them
-                 upstream gaps in qurandev/roots. Silence here reads as a bug.
+                 gap: 101 of 1642 roots have no definition from either source
+                 (256 before phase 20 imported the corpus form glosses), all of
+                 them upstream absences. Silence here reads as a bug.
 
                  Same tokens as RootEntry's copy of this message (paper-700/300
                  = 6.78:1 / 8.74:1 on the card), which is both the DRY answer

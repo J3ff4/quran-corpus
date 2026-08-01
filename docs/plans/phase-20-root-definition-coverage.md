@@ -489,7 +489,8 @@ print(f"snapshot roots not in DB: {unknown}  (expect 0)")
 PY
 ```
 
-Expected: `256 / 965 / 155 / 0`.
+Expected: `256 / 965 / 155 / 0`. (Historical — the shipped parser reads **969**
+for the middle value; see "Parser: replaced, not followed".)
 
 **Gate:** if any number differs by more than ±5, STOP and report. The DB
 changed under the plan; do not import against unverified numbers.
@@ -614,6 +615,11 @@ Expected: FAIL, `ImportError: cannot import name 'build_rows'`
 
 - [ ] **Step 3: Implement `build_rows` + CLI**
 
+> **Superseded by the shipped tool — see "Guards shipped beyond the plan"
+> below.** The sketch here has one guard; the shipped `build_rows` has five,
+> and a fourth parameter (`must_yield`) that a re-run must not drop. Read the
+> As-Built section before reusing this block.
+
 ```python
 def build_rows(
     snapshot_dir: Path,
@@ -662,6 +668,8 @@ def _main() -> None:
     ap.add_argument("--snapshots", required=True, type=Path)
     ap.add_argument("--db", required=True, type=Path)
     ap.add_argument("--out", required=True, type=Path)
+    # NOT SHIPPED. The polarity is inverted in the real CLI: def-less-only is
+    # the default and `--all` is the opt-in, so there is no flag to forget.
     ap.add_argument(
         "--only-missing",
         action="store_true",
@@ -697,7 +705,7 @@ if __name__ == "__main__":
 - [ ] **Step 4: Run tests, verify they pass**
 
 Run: `cd packages/scraper && uv run pytest tests/test_prepare_corpus_form_glosses.py -v`
-Expected: 6 passed
+Expected: 6 passed (shipped: 32 — the guards above and the CLI tests)
 
 - [ ] **Step 5: Commit**
 
@@ -719,7 +727,7 @@ emitter must reject rather than escape those.
 **Rollback:** delete the tool and its test, and the generated TSV. Still no DB
 writes at this point — the TSV is an artifact, not an import.
 **Acceptance:** `uv run pytest tests/test_prepare_corpus_form_glosses.py -v` →
-6 passed; `build_rows` drops unknown roots and gloss-less roots with the counts
+6 passed (shipped: 32); `build_rows` drops unknown roots and gloss-less roots with the counts
 surfacing in `stats`; the CLI writes `root_buckwalter<TAB>definition` with one
 row per kept root and no row containing a literal tab or newline; the TSV is
 untracked.
@@ -728,8 +736,10 @@ untracked.
 
 ### Task 4: Import against a DB copy, verify, then import live
 
-**BLOCKED** until the "Decision required" section above is answered. `--only-missing`
-implements option (b); dropping the flag implements option (a).
+**RESOLVED** — the "Decision required" section above was answered with option
+(b), which shipped as the tool's default; `--all` is the opt-in that implements
+option (a). The planned `--only-missing` flag does not exist — see "Decision
+taken" below.
 
 **Files:**
 - Modify: `STATUS.md`
@@ -755,9 +765,8 @@ sqlite3 ~/quran-data/quran.db "VACUUM INTO '/tmp/phase20-test.db'"
 cd packages/scraper && python3 tools/prepare_corpus_form_glosses.py \
   --snapshots ~/quran-data/.snapshots/roots \
   --db /tmp/phase20-test.db \
-  --out /tmp/phase20.tsv \
-  --only-missing          # omit iff decision (a) was chosen
-wc -l /tmp/phase20.tsv    # expect 155 for (b), 965 for (a)
+  --out /tmp/phase20.tsv    # (b) is the default; pass `--all` for (a)
+wc -l /tmp/phase20.tsv      # expect 155 for (b), 969 for (a)
 ```
 
 - [ ] **Step 3: Import into the copy using the EXISTING command**
@@ -808,7 +817,8 @@ prove it held rather than assume it. Do not rely on the gap being short.
 # Nothing else may write ~/quran-data/quran.db between these two commands.
 cd packages/scraper && python3 tools/prepare_corpus_form_glosses.py \
   --snapshots ~/quran-data/.snapshots/roots \
-  --db ~/quran-data/quran.db --out /tmp/phase20-live.tsv --only-missing
+  --db ~/quran-data/quran.db --out /tmp/phase20-live.tsv
+  # definition-less-only is the DEFAULT; `--all` is the opt-in. See As-Built.
 uv run scraper import-lane /tmp/phase20-live.tsv \
   --db ~/quran-data/quran.db --source corpus-forms
 ```
@@ -898,9 +908,131 @@ the option chosen.
 
 - [ ] `parse_form_glosses` is pure, network-free, and returns `[]` for noun-only roots.
 - [ ] All scraper tests pass: `cd packages/scraper && uv run pytest`.
-- [ ] Live spike reproduces 256 / 965 / 155 / 0 within ±5.
+- [ ] Live spike reproduces 256 / 965 / 155 / 0 within ±5. **The 965 is
+  historical** — measured with the planned regex, which dropped 4 roots whose
+  gloss contains `(`. The shipped parser reads **969**; the other three values
+  are unchanged. See "Parser: replaced, not followed".
 - [ ] After import, roots with no definition drops 256 → 101.
 - [ ] `SELECT COUNT(*) FROM roots` is still 1642 — no root created.
 - [ ] `/dictionary/bEv` shows a definition; `/dictionary/Ahl` still shows the empty state.
 - [ ] Zero network requests made in the whole phase.
-- [ ] No changes under `packages/data/` or `apps/web/`.
+- [ ] ~~No changes under `packages/data/` or `apps/web/`.~~ **Superseded** —
+  adding a second definition source made web changes necessary, not optional;
+  see "Web changes" below. Replaced by three testable criteria:
+  - [ ] Where a root has both a Lane and a `corpus-forms` definition, the lemma
+        page shows Lane's — an explicit rank, never `ORDER BY rd.source`
+        (`packages/data/tests/lemma.test.ts`).
+  - [ ] Every rendered definition carries a source credit by name, on both the
+        root and lemma pages, and an unmapped tag renders as itself rather than
+        as nothing (`apps/web/src/test/definitionSources.test.ts`).
+  - [ ] A root with no definition from either source renders the empty state,
+        not a blank card (`RootEntry.test.tsx`, `LemmaEntry.test.tsx`).
+
+## As-Built (2026-07-31)
+
+Plan was written before the markup was read. Recorded here because §14 says
+`STATUS.md` is not where decisions live, and because the deviations are the
+part a later reader needs.
+
+### Decision taken
+
+Option **(b)**: fill only the definition-less roots, leave Lane-covered roots
+untouched. The blocking decision above is resolved.
+
+Shipped with the polarity inverted from the plan: definition-less-only is the
+**default** and `--all` is the explicit opt-in, so there is no `--only-missing`
+flag to forget. The plan's opt-in flag made the rejected option the one you get
+by forgetting a flag — and it fails quietly, since `import-lane` upserts on
+`(root_id, source)` and would just add a second card to ~814 covered roots.
+
+### Parser: replaced, not followed
+
+Plan's Task 2 guessed `<p><b>Verb (form I)</b> - gloss</p>` and a regex over
+it. Real markup is `<h4 class="dxe">Verb (form I) -gloss</h4>` — different
+element, and no space after the dash. Checked against all 4657 headers in the
+1642 archived snapshots, the planned regex also carried two false assumptions:
+
+| Assumption | Reality |
+|---|---|
+| Gloss never contains `(` | 5 do (`to come (time)`, `to break (oath)`) — dropped whole |
+| A verb-shaped POS allowlist is enough | Misses `Nominal`, `Time adverb`, `Form of address`; `Noun` alone carries 55 glosses |
+
+Shipped parser keys on the element and splits on the first `" -"` (verified:
+not one header contains a second). No POS list to keep in sync. Both defects
+have regression tests.
+
+**This changed nothing for option (b)**: all 155 imported definitions are
+byte-identical either way — the 4-root gap falls entirely inside Lane-covered
+roots that (b) never touches. It would have mattered under (a).
+
+Plan's "965 of 1642" is **969**; the four are exactly that gap.
+
+### Guards shipped beyond the plan
+
+The plan's `build_rows` sketch asserts one thing (no TSV delimiter). The
+shipped one raises on five, because this tool feeds an importer and a short
+TSV is worse than a stopped run — each was reachable, and three were hit for
+real while running it:
+
+| Raises when | Why it is not paranoia |
+|---|---|
+| The snapshot dir holds no `root_*` file | The archive is nested (`.snapshots/roots`); pointing one level too high wrote an empty TSV and printed success |
+| `valid_roots` is empty | A wrong `--db` sends every snapshot to `unknown_root`, so `total` is non-zero and the guard above never fires |
+| `only_roots` is empty | Same failure from the other side: nothing left to fill |
+| Nothing was kept | The default re-run case — after an import only the 101 gloss-less roots remain |
+| A definition holds a tab/newline | `import-lane` splits on the first tab, so one root's text lands on another |
+
+The signature therefore carries a **fourth parameter the plan does not
+mention**, and a re-run must not drop it:
+
+```python
+def build_rows(
+    snapshot_dir: Path,
+    valid_roots: set[str],
+    only_roots: set[str] | None = None,
+    must_yield: set[str] | None = None,   # roots this run is REGENERATING
+) -> tuple[list[tuple[str, str]], dict[str, int]]:
+```
+
+`must_yield` raises unless every named root reaches the output.
+`import_lane_definitions` upserts on `(root_id, source)` and **has no delete**,
+so a root that stops yielding a gloss keeps its stale definition live on
+`/dictionary/<root>` while the run reports success. `main` derives the set as
+`load_defless_roots(db, refresh) - load_defless_roots(db)` — the `--refresh`
+widening *is* that difference, so the derivation cannot drift from it.
+
+The test is what reached the output, not what took the empty-gloss branch: a
+root only takes that branch if its snapshot still exists and it passes
+`valid_roots`, and `must_yield` comes from the DB while the archive is an
+independent untracked directory. Keying on the branch left a missing snapshot
+stranding the definition silently (CodeRabbit, PR #68).
+
+### Web changes — the plan said there would be none
+
+Acceptance criterion "No changes under `packages/data/` or `apps/web/`" is
+**not met**, deliberately. Adding a second definition source broke two things
+the single-source world hid:
+
+- `RootEntry` printed the raw DB tag `corpus-forms` at readers as attribution.
+  §11 wants the name /about credits. Now a shared lookup
+  (`apps/web/src/lib/definitionSources.ts`) used by both entry pages.
+- The lemma page rendered `root_definition` with **no credit at all**, and
+  `ORDER BY rd.source LIMIT 1` let `'corpus-forms'` outrank `'qurandev-lane'`
+  alphabetically — so where a root had both, the weaker fallback gloss would
+  become the headline. Ordering is now an explicit rank
+  (`DEFINITION_SOURCE_RANK`, `packages/data/src/queries/roots.ts`) shared by
+  both queries, and the lemma query returns its source.
+
+### Results
+
+```
+corpus-forms 155 + qurandev-lane 1386
+roots with no definition: 256 -> 101   (101 are genuinely gloss-less upstream)
+occurrences newly covered: 5545
+roots with >1 source: 0                (post-condition: option (b) held)
+total roots: 1642                      (none created)
+backup: ~/quran-data/quran.db.bak-phase20 (VACUUM INTO, not cp)
+        ^ the INITIAL import. The later re-import that corrected the 7
+          pre-dedup definitions took its own:
+          ~/quran-data/quran.db.bak-phase20-refresh-20260801
+```

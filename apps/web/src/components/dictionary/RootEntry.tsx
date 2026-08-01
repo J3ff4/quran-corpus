@@ -4,6 +4,7 @@ import { ConcordanceSection } from './ConcordanceSection';
 import { EntryHeader } from './EntryHeader';
 import { ClampedText } from '../ui/ClampedText';
 import { rootPath } from '../../lib/routes';
+import { definitionSourceLabel } from '../../lib/definitionSources';
 
 interface RootEntryProps {
   entry: RootEntryT;
@@ -15,9 +16,6 @@ interface RootEntryProps {
   prevBw: string | null;
   nextBw: string | null;
 }
-
-const sourceLabel = (source: string): string =>
-  source === 'lane' || source === 'qurandev-lane' ? "Lane's Lexicon" : source;
 
 /**
  * Full root entry: header, Lane's definition (or an explicit "no entry" note),
@@ -82,7 +80,16 @@ export function RootEntry({ entry, initialConcordance, total, prevBw, nextBw }: 
 
       <section className="mb-8 space-y-3">
         {definitions.length > 0 ? (
-          definitions.map((d) => (
+          definitions.map((d) => {
+            /* An unmapped tag prints as itself, on purpose -- see
+               definitionSources for why a visible wrong-looking credit beats a
+               silently uncredited one. So a new source needs its SOURCE_LABELS
+               entry; nothing here swallows the omission. Null only when the row
+               carries no source at all, which the NOT NULL column makes
+               unreachable in practice; the clamp toggle then falls back to the
+               generic label. */
+            const label = definitionSourceLabel(d.source);
+            return (
             <div
               key={d.id}
               className="rounded-lg border border-paper-200 bg-paper-100 px-4 py-3 dark:border-night-100 dark:bg-night-50"
@@ -95,7 +102,7 @@ export function RootEntry({ entry, initialConcordance, total, prevBw, nextBw }: 
                   several toggles, and a screen reader listing them cannot tell
                   three identical "Show more lexicon definition" apart. */}
               <ClampedText
-                label={`${sourceLabel(d.source)} definition`}
+                label={label ? `${label} definition` : 'root definition'}
                 className="break-words text-sm leading-relaxed text-paper-800 dark:text-paper-200"
               >
                 {d.definition}
@@ -104,16 +111,18 @@ export function RootEntry({ entry, initialConcordance, total, prevBw, nextBw }: 
                   dark:bg-night-50, not the page: paper-700 6.78:1 and
                   paper-400 6.16:1. paper-500 sat at 2.85:1 light / 4.40:1
                   dark, both under the 4.5:1 WCAG AA floor §8 sets. */}
-              <p className="mt-2 text-xs text-paper-700 dark:text-paper-400">
-                {sourceLabel(d.source)}
-              </p>
+              {label && (
+                <p className="mt-2 text-xs text-paper-700 dark:text-paper-400">{label}</p>
+              )}
             </div>
-          ))
+            );
+          })
         ) : (
-          /* An unexplained gap reads as a broken page. 256 of 1642 roots have
-             no definition — 141 whose root code is absent from qurandev/roots
-             and 115 present but carrying no English gloss upstream (بعث among
-             them) — so this is a data gap worth naming, not a rendering bug. */
+          /* An unexplained gap reads as a broken page. 101 of 1642 roots have
+             no definition from either source — down from 256 before phase 20
+             imported the corpus form glosses — and they are noun-only roots the
+             corpus prints a bare `Noun` header for, with no gloss anywhere on
+             the page. Upstream absence, not a rendering bug or a parser miss. */
           <div className="rounded-lg border border-dashed border-paper-200 px-4 py-3 dark:border-night-100">
             {/* Contrast measured against the page backgrounds (bg-paper-50 /
                 dark:bg-night-300): paper-700 7.34:1 and paper-300 10.81:1 for
@@ -126,7 +135,8 @@ export function RootEntry({ entry, initialConcordance, total, prevBw, nextBw }: 
               No lexicon entry for this root yet.
             </p>
             <p className="mt-1 text-xs text-paper-600 dark:text-paper-400">
-              Lane&rsquo;s Lexicon has no meaning recorded for these letters in our source.
+              Neither Lane&rsquo;s Lexicon nor the corpus records a meaning for these
+              letters.
             </p>
           </div>
         )}

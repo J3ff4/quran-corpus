@@ -206,6 +206,190 @@ Evidence differs per claim; none of it is carried over from prior narrative.
   — upstream absence, do not widen the regex). **Task 4 is BLOCKED on a user
   decision**: `corpus-forms` sorts before `qurandev-lane`, so importing it would
   silently promote it to "the" definition on 810 pages that are currently fine.
+- **PHASE 20 DONE, live DB written, NOT ON A PR (2026-07-31).** Branch
+  `feat/phase-20-root-definition-coverage`, off `main`. Option **(b)** chosen by
+  the user: fill only the definition-less roots, leave Lane-covered ones alone.
+  Zero network requests — parsed from the phase 18 snapshots.
+  - **Live DB already imported.** `root_definitions` now holds
+    `corpus-forms` 155 + `qurandev-lane` 1386. Roots with no definition went
+    **256 → 101**, covering **5545 occurrences**. The 101 remaining are
+    noun/particle roots the corpus publishes no gloss for (أيي، بعض، دون، كيف،
+    عين) — upstream absence, they keep the empty state. Backup:
+    `~/quran-data/quran.db.bak-phase20` (`VACUUM INTO`, not `cp`).
+  - Post-condition **passed**: 0 roots hold `corpus-forms` alongside any other
+    source, which is the machine-checkable proof option (b) held and the
+    generate→import race did not fire. 1642 roots, none created.
+  - **The plan's parser was wrong and was not used.** It keyed on an allowlist
+    of POS labels over flattened text, terminating the gloss at the first `(`.
+    Both assumptions are false against the archive: 7 headers use labels absent
+    from the list (`Nominal`, `Time adverb`, `Form of address`) and 5 glosses
+    contain parentheses (`to come (time)`, `to break (oath)`). Shipped parser
+    keys on the `h4.dxe` element instead — repo convention, and no second list
+    to keep in sync. Both defects have regression tests. This is why the plan
+    said 965 roots and the truth is 969.
+  - **§4 step 3 (`/code-review`) RAN 2026-07-31** and returned 6 findings, all
+    real, all fixed in one follow-up commit. It re-verified every figure above
+    against the live DB and the archive independently. What it caught:
+    - The tool re-implemented snapshot filename decoding instead of using
+      `scraper/snapshots.py` (§3 DRY). That fork dropped
+      `iter_snapshot_paths`' duplicate-key handling: one root can own both a
+      legacy and a canonical filename, and `%` sorts before `A`, so a
+      name-sorted walk yields the **stale** copy last and lets it win the
+      upsert. 0 such pairs in today's archive — latent, not live.
+    - `--only-missing` was opt-in, so the **default run was option (a)**, the
+      one the user rejected. Inverted: `--all` is now the explicit flag.
+    - The lemma page rendered `root_definition` with **no credit at all**
+      (§11), and `ORDER BY rd.source LIMIT 1` let `'corpus-forms'` outrank
+      `'qurandev-lane'` alphabetically. Ordering is now an explicit shared
+      rank; the label map moved to `apps/web/src/lib/definitionSources.ts`,
+      which prints an unmapped tag as itself — a visible wrong-looking credit
+      is what gets a forgotten `SOURCE_LABELS` entry noticed, where rendering
+      nothing ships licensed text uncredited and says so nowhere (§11).
+    - `get_text(strip=True)` would silently drop every gloss on a page if the
+      corpus ever wrapped a header side in a tag — the `" -"` separator loses
+      its space. Now `get_text(" ", strip=True)`.
+    - No `docs/plans/phase-20-*.md` on this branch (§6). Added, with an
+      **As-Built** section recording the deviations below. **It also exists on
+      `feat/dictionary-truth-pass`**, whose copy lacks that section — whichever
+      lands second resolves by keeping the superset.
+    - Also added: `build_rows` raises on an empty archive. The snapshot dir is
+      nested (`.snapshots/roots`), and pointing one level high wrote an empty
+      TSV and printed success. Hit for real while verifying the fix.
+  - The **byte-identical** claim was wrong when written, and is true now.
+    What was verified was the *refactor* — same output before and after — but
+    the live rows had been imported before the per-sense de-duplication landed,
+    so 7 of the 155 still read `to turn away, to avert, to hinder; to hinder`.
+    Regenerated and re-imported 2026-08-01: 0 of 155 now differ from what the
+    generator produces (`A*n`, `Ax*`, `Sdd`, `Srf`, `Zhr`, `bdA`, `bgy` were
+    the seven). Post-conditions re-checked after the write — `corpus-forms`
+    155, `qurandev-lane` 1386, 0 roots holding both, 1642 roots, 101 still
+    definition-less. Backup before the write:
+    `~/quran-data/quran.db.bak-phase20-refresh-20260801` (`VACUUM INTO`).
+  - Also re-rendered live: `/dictionary/lemma/hadaY` credits "Quranic Arabic
+    Corpus", `/dictionary/lemma/Hamod` credits "Lane's Lexicon", no raw tag
+    visible on either.
+  - **Rebased onto `a08b7f9` (post-#67 `main`) 2026-08-01**, backup ref
+    `backup/phase-20-prerebase`. Five files conflicted. The plan file was an
+    **add/add**: #64 had already landed a revised copy on `main`, so the
+    resolution keeps `main`'s text plus this branch's `As-Built` section.
+    `LemmaEntry`/`RootEntry` were rewritten twice under the branch (#64, #67);
+    resolution keeps `main`'s structure — `ClampedText`, the explicit empty
+    state, and the AA-safe card tokens — and grafts phase 20's credit line and
+    shared `definitionSourceLabel` onto it. The branch would otherwise have
+    reintroduced `text-paper-500` on card interiors (2.85:1 light, 4.40:1 dark,
+    both under AA).
+  - Three findings from the pre-rebase review, all fixed 2026-08-01:
+    - **The live-DB mismatch above** (was the highest-severity one).
+    - `prepare_corpus_form_glosses.py` was **not safe to re-run**, which is
+      also what made the above hard to fix: the rows a first import writes are
+      exactly what the default filter then excludes. New `--refresh SOURCE`
+      re-admits roots whose *only* definitions came from that source (never
+      ones also holding another, which would be the option-(a) promotion), and
+      `build_rows` now raises when it keeps nothing rather than overwriting a
+      good TSV with an empty one and printing success.
+    - `definitionSourceLabel` used a plain index lookup, so
+      `SOURCE_LABELS['constructor']` resolved up the prototype chain to a
+      function — truthy, so `??` never fired — typed `string`, and React throws
+      when handed one as a child. `source` is a DB column, so those keys are
+      reachable input. Now a `Map`, which has no prototype keys to shadow —
+      `Object.hasOwn` was the first fix and tripped `noUncheckedIndexedAccess`,
+      needing a second lookup to satisfy it. Test fails against the old
+      expression.
+  - Folded in while here: **three `node_modules` symlinks were tracked in
+    git**, each pointing at its own absolute path. `.gitignore` said
+    `node_modules/`, and the trailing slash matches directories only, so
+    symlinks slipped past. A fresh clone got a symlink loop where the install
+    should be — `pnpm -r type-check` dies with `ELOOP`. Untracked, and the
+    pattern lost its slash.
+  - **Second `/code-review` round** (post-rebase, 2026-08-01) — 5 findings, all
+    fixed. One real gap plus four places where prose had drifted from the code:
+    - **`--refresh` could strand a definition.** A root that once yielded a
+      gloss and now parses to none was dropped at `no_gloss` and left out of
+      the TSV; `import_lane_definitions` only upserts, so the stale text stayed
+      live while the run printed success. `build_rows` takes `must_yield` and
+      raises, naming the roots. Not hypothetical — tightening the parser is
+      exactly what the per-sense de-duplication did. Verified against the real
+      archive: 155 kept, guard does not trip, because all 101 gloss-less roots
+      are definition-less and so outside the regenerated set. (First cut of
+      this guard was itself incomplete — see the CodeRabbit round below.)
+    - `RootEntry`'s comment claimed an unmapped tag renders as nothing. It
+      renders as itself, by design — the comment said the opposite of the code
+      and would have talked a maintainer out of adding a `SOURCE_LABELS` entry.
+    - Both empty-state comments still cited **256 of 1642** and named بعث as
+      uncovered; this branch's own import made it 101, and بعث now shows a
+      corpus gloss. Both corrected, with the cause (noun-only roots).
+    - The empty-state copy read "Lane's Lexicon has no meaning recorded",
+      naming one of the two sources the page now draws on.
+    - The two `STATUS.md` lines corrected above — both authored in this PR and
+      already wrong (§14).
+  - **§5 gate: PR #68 opened 2026-08-01, CodeRabbit's first look at this
+    branch.** Verdict `CHANGES_REQUESTED`, 7 findings, plus a failed
+    `mode: error` pre-merge check ("New Logic Ships With Tests") that carried
+    no comment and lived only in the collapsed `<details>` of the walkthrough —
+    the §5 signature, read rather than guessed at this time. All addressed:
+    - **The `must_yield` guard was blind to the case it existed for** (Major,
+      and correct). `lost` was appended from inside the `if not definition`
+      branch, so a root was only checked if the archive still held its snapshot
+      *and* it passed `valid_roots`. `must_yield` is derived from the DB while
+      the archive is an independent untracked directory: the two diverge with
+      no error, and a regenerating root whose snapshot went missing was never
+      visited, so the run succeeded with the stale definition still live. Now a
+      `fulfilled` set differenced against `must_yield` — the test is what
+      reached the output, not what took one branch. Two tests added for the
+      routes the old guard missed (no snapshot; not a DB root).
+    - **`main` had no tests at all** — the failed error check. Flag conflict,
+      default/`--all`/`--refresh` selection, the `regenerating` derivation and
+      TSV writing were only exercised through helpers. Five CLI tests added,
+      driving the real `argparse` through `sys.argv` (the wiring is the thing
+      under test, so a `main(argv)` refactor would have tested the wrong
+      object).
+    - Plan doc: `--only-missing` marked NOT SHIPPED at both sites, Task 4
+      `BLOCKED` → `RESOLVED`, `--all` row count 965 → 969, stale `6 passed`
+      annotated, and the acceptance criterion forbidding `packages/data` /
+      `apps/web` changes struck through and replaced with three testable ones
+      naming the tests that check them. New "Guards shipped beyond the plan"
+      section records the five raises and the `must_yield` contract, so a later
+      re-run cannot reinstate the plan's one-guard sketch.
+    - Test DDL was duplicated across two setups; the second now calls
+      `_defs_db`, moved above its first user. Ruff S608 on that helper carries
+      a `# noqa` with the justification §4 requires (test-local literal, throw-
+      away `tmp_path` DB, no external input). **The directive sits on the first
+      SQL string, not on `con.executescript(`** — ruff anchors S608 to the
+      start of the concatenated SQL, so on the call line it is silently inert.
+      Third round caught it; verified by deleting the directive and watching
+      the finding not change.
+    - Not fixed: docstring coverage 28.57% vs an 80% threshold. Warning, not
+      error; the missing docstrings are one-line test helpers where a docstring
+      would restate the name.
+    Gates re-run after the fixes, **all local — this repo has no GitHub
+    Actions workflow, so the only thing GitHub reports on a commit is the
+    `CodeRabbit` status**:
+
+    | Command | Result |
+    |---|---|
+    | `packages/scraper$ .venv/bin/python -m pytest -q` | 302 passed |
+    | `pnpm -r test` (vitest) | 467 web / 80 files, 243 data / 21 files |
+    | `pnpm -r type-check` (`tsc --noEmit`) | clean |
+    | `pnpm -r lint` (eslint, `apps/web` only) | clean |
+    | `packages/scraper$ .venv/bin/python -m ruff check .` | **12 errors** |
+
+    Ruff is **not** part of `pnpm -r lint` — that task is eslint over
+    `apps/web/src`, so "lint clean" and "ruff has 12 errors" describe different
+    tools and do not contradict. All 12 pre-exist on `main` (E501 + I001 in
+    `cli.py`, `replay.py`, `sources/`), in files this branch does not touch,
+    and are not addressed here.
+
+    **The count was wrong twice in this PR — 14, then "14 = baseline".** Both
+    came from comparing against a remembered number instead of measuring. The
+    real baseline is 12, and the branch was carrying two of its own: the S608
+    below, and an 89-char test name. Diffing HEAD against the `main` worktree
+    is what settled it; a clean `git stash` on a committed tree compares
+    nothing and reports "Already up to date", which is what hid it the first
+    time. Both are now fixed, and the finding sets are identical modulo
+    line-number shifts in `cli.py`.
+  - Unrelated pre-existing bug confirmed while verifying: `/dictionary/$hw`
+    and lemma routes with non-alphanumeric Buckwalter 404 on `main`. That is
+    what the unmerged `fix/dictionary-identifier-decoding` branch fixes.
 - PRs #1–57 MERGED. **#58 CLOSED unmerged** (payload split, see below). **#59 MERGED**
   (`0095c2c`, 2026-07-28 19:01Z — CodeRabbit gate). **#60 MERGED** (phase 17).
   **#61 MERGED** (phase 18, `6113fd3`). **#62 MERGED** (`97d78bb`, sort_order

@@ -102,6 +102,27 @@ describe('lemma queries', () => {
     expect(e!.root_definition).toBe('to say');
   });
 
+  it('getLemmaEntry: a Lane entry outranks a corpus form-gloss for the same root', async () => {
+    // 'corpus-forms' sorts BEFORE 'qurandev-lane' alphabetically, so plain
+    // ORDER BY source hands the headline to the short fallback gloss. The
+    // corpus glosses exist to cover roots Lane has nothing for (phase 20);
+    // where both exist, Lane's full entry is the better definition.
+    await db.execute('DELETE FROM root_definitions WHERE root_id = 5');
+    await db.execute(
+      "INSERT INTO root_definitions (root_id,source,definition) VALUES (5,'corpus-forms','to say, to speak'),(5,'qurandev-lane','LANE: to utter, to say')",
+    );
+    const e = await getLemmaEntry(db, 'qaAla');
+    expect(e!.root_definition).toBe('LANE: to utter, to say');
+    expect(e!.root_definition_source).toBe('qurandev-lane');
+  });
+
+  it('getLemmaEntry: reports the source of the definition it returns', async () => {
+    // The page has to credit the text it renders (§11), and which source wins
+    // varies per root, so the source travels with the definition.
+    const e = await getLemmaEntry(db, 'qaAla');
+    expect(e!.root_definition_source).toBe('lane');
+  });
+
   it('getLemmaEntry: transliteration comes from the most frequent (translit, pos) pair', async () => {
     // Not constant per lemma -- it describes the occurrence. Live corpus: 2349
     // of 4832 lemmas carry >1 transliteration. Read as a bare column it

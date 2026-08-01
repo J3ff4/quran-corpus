@@ -51,6 +51,7 @@ const entry = {
   root_buckwalter: 'qwl',
   top_glosses: ['said'],
   root_definition: 'to say',
+  root_definition_source: 'qurandev-lane',
 };
 
 const page = (lemma: string) => LemmaPage({ params: Promise.resolve({ lemma }) });

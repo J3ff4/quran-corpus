@@ -19,6 +19,12 @@ from urllib.parse import unquote
 # one file and silently lose the rest of the archive.
 _SAFE = frozenset(string.ascii_lowercase + string.digits + "-_.")
 
+# Key namespace for root pages. One archive holds several page types, so both
+# the writers (dictionary_scrape, the checkpoint it shares keys with) and the
+# readers (replay, prepare_corpus_form_glosses) have to agree on this string;
+# it lives here because this module owns the key<->filename mapping.
+ROOT_PREFIX = "root_"
+
 
 def _encode_key(key: str) -> str:
     """Percent-encode ``key`` into a case-insensitively unique filename.
@@ -91,6 +97,20 @@ def iter_snapshot_paths(root_dir: str | Path) -> Iterator[tuple[str, Path]]:
     for key, paths in sorted(_scan(root_dir).items()):
         canonical = f"{_encode_key(key)}.html.gz"
         yield key, next((p for p in paths if p.name == canonical), paths[0])
+
+
+def iter_root_snapshot_paths(root_dir: str | Path) -> Iterator[tuple[str, Path]]:
+    """Yield ``(root_buckwalter, path)`` for the root pages in the archive.
+
+    One archive holds several page types (``root_*``, ``word_*``, ``ayah_*``),
+    so every root-page consumer needs the same prefix filter and the same
+    strip. That belongs here with the rest of the key convention rather than
+    copied into each caller (§3): a reader that forks it can drift from the
+    writer that produced the keys.
+    """
+    for key, path in iter_snapshot_paths(root_dir):
+        if key.startswith(ROOT_PREFIX):
+            yield key[len(ROOT_PREFIX) :], path
 
 
 def iter_snapshots(root_dir: str | Path) -> Iterator[tuple[str, str]]:

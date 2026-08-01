@@ -1,5 +1,10 @@
 # Dependencies
-node_modules/
+# No trailing slash: `node_modules/` matches directories only, so three
+# self-referencing symlinks named node_modules slipped past it and were
+# committed. Anyone cloning got a symlink loop where their install should be
+# (`pnpm -r type-check` died with ELOOP), because git restores the link and
+# pnpm then writes through it.
+node_modules
 .pnpm-store/
 
 # Build outputs

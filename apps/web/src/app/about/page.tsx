@@ -24,7 +24,8 @@ const sources: Source[] = [
   {
     name: 'Quranic Arabic Corpus',
     href: 'https://corpus.quran.com',
-    provides: 'Word-by-word morphology, part-of-speech tags, roots and lemmas.',
+    provides:
+      'Word-by-word morphology, part-of-speech tags, roots and lemmas, and the per-form lexical glosses shown as root definitions where Lane has no entry.',
     license: 'GNU General Public License',
     note: 'Annotation © Kais Dukes, Language Research Group, University of Leeds. Used with the source clearly indicated and linked, as the license requires.',
   },
