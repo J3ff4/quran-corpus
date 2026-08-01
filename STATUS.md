@@ -33,6 +33,74 @@ Evidence differs per claim; none of it is carried over from prior narrative.
   trust it. Never infer these from GitHub metadata, which does not carry them.
 - "Nothing open" means no **open GitHub PR**, per `gh pr list --state open`. It
   says nothing about unmerged local branches, which are listed separately.
+- **MERGED 2026-08-01 21:40Z: segment POS colour-coding on the word page —
+  PR #70, squashed to `26521eb`** (branch `feat/segment-pos-colors`, reviewed
+  head `2b7bf81`, deleted local + remote — `git ls-remote --heads origin`
+  returns no matching ref). Seven commits. Four decisions fixed the scope up
+  front: reuse `posColor` as-is (no new tokens, REL/REM/CONJ stay in the grey
+  `other` bucket), coloured text with no fill, Arabic label stays neutral,
+  colours only with no layout change. Plus a one-line `InfoPopover` glyph
+  shrink to 14px.
+  - **§5 passed on its own merits, no override.** `APPROVED` 21:17:34Z with
+    `commit_id` = `2b7bf81` = the head that merged, after a
+    `CHANGES_REQUESTED` at 21:11:48Z on `fa7d938`. Commit status description
+    reads `Review completed`, not `Review rate limited` — read, not inferred
+    from the colour. Pre-merge table 8 passed / 1 warning; the ❌ is
+    `Docstring Coverage` 33.33% vs 80.00%, **`mode: warning`, does not block**.
+  - **The docstring warning does not respond to per-PR work, and a commit body
+    on this branch wrongly claimed it did.** `2b7bf81` added headers to the
+    three components in the diff that had none and asserted that cleared it;
+    the figure stayed 33.33% on the new head. The check measures the codebase,
+    not the diff — `.coderabbit.yaml:51-63` already records ~25% in
+    `packages/data` and ~44% in `apps/web`, which is why it is `warning` and
+    not `error`. Corrected in a PR comment rather than a force-push, which
+    would have dropped the approval. Same shape as #69's 50.00%: adding
+    docstrings did not move that one either. **Treat this check as
+    non-actionable per-PR** until a dedicated coverage pass runs.
+  - CodeRabbit's one finding: the DET test asserted
+    `not.toContain('bg-paper-200')`, which is only the shade `chip` uses today
+    — a later `bg-paper-100` or any `dark:bg-*` would restore the forbidden
+    filled label and still pass. Now `/\bbg-paper-\d+\b/`; the leading `\b`
+    matches after a variant's `:`. Verified the assertion bites by temporarily
+    swapping the label's `dark:text-paper-400` for `dark:bg-paper-100` — new
+    assertion fails, old one passed.
+  - **§4 step 3 (`/code-review`) ran five rounds.** The palette turned out to
+    have been calibrated against the page background rather than its worst call
+    site: small label text on a 16% tint **of its own hue** (`SegmentPills`).
+    Same-hue tint pulls the background toward the text and costs ~20% of the
+    ratio, so page-background figures flatter every token by roughly a whole AA
+    grade. All `--pos-*`/`--form-*` light tokens re-measured against that case;
+    `globals.css` now carries both numbers inline as `(page / tint)`.
+  - **Knock-on, and the part that took three commits to get right:** the tint is
+    transparent, so anything painted *behind* a pill composites into that
+    pill's own contrast. A `paper-100` fill on cell hover dropped every pill
+    label ~4.6:1 → ~4.3:1, in the exact interaction used to pick a word. Both
+    `wbw` hover states moved from fill to border/ring, which sit outside the
+    pills. Then `8677110` left an un-varianted `hover:border-paper-600` beside
+    `dark:border-night-100`: Tailwind emits `.dark\:…:is(.dark *)` **after**
+    `.hover\:…:hover`, `:is(.dark *)` scores as one class, so the two tie at
+    (0,2,0) and the resting dark border wins on source order — **dark hover
+    applied nothing at all**. Fixed in `3a63cd9` with an explicit
+    `dark:hover:`. The class list looks correct, types check, lint passes, and
+    no test asserts hover classes; it is only visible in the generated CSS or a
+    live computed style, which is how it survived two commits.
+  - Colour choice: the indicator is one token in both themes, so it must clear
+    the 3:1 non-text floor against `paper-50` **and** `night-300`. Only
+    `paper-500` (3.08 / 5.44) and `paper-600` (4.73 / 3.54) do; `paper-600`
+    wins on the stronger worse side. An earlier comment claimed it was the
+    only step that clears both — false, corrected in `fa7d938`.
+  - Gates (local, 2026-08-01): `tsc --noEmit` clean, `next lint` clean,
+    **476 tests / 81 files** green (2 new, both `SegmentCard`).
+  - **Carried forward, deliberately not in this PR:**
+    - `text-paper-500` is under AA at **54 uses across 29 components** — 3.08:1
+      on the page, 2.57–2.61:1 inside a selected `FormFilterChips` chip once
+      the tint is behind it. This PR nudged one case the wrong way by a hair
+      (`--form-adjective` 2.70 → 2.61). It is a neutral-token fix, not a
+      palette one. Documented in `globals.css`.
+    - **Three pre-existing dead dark hovers**, same cascade fault as `8677110`,
+      found by sweeping every `className` for `hover:<prop>` + `dark:<prop>`
+      with no `dark:hover:<prop>`: `WordPopover.tsx:48`, `WordPopover.tsx:73`,
+      `WordDetailView.tsx:67`.
 - **MERGED 2026-08-01 13:39Z: gloss caveat behind an info icon + inline clamp
   toggle — PR #69, squashed to `4ace0df`** (branch
   `feat/dictionary-note-and-clamp-polish`, reviewed head `ae0938b`, deleted
@@ -1069,6 +1137,18 @@ Re-queried directly 2026-07-22 (do not trust older counts in this file's history
   78% per an older note in this file — finished since.)
 
 ## Housekeeping
+- **2026-08-01: still zero branches and one worktree after #70 merged**, but
+  `gh pr merge --squash --delete-branch` failed *differently* this time and the
+  failure is worth knowing. The remote deletion succeeded before the local half
+  ran; the local half aborted on `fatal: Not possible to fast-forward` because
+  local `main` carried an unpushed `docs(status)` commit. `gh` had already
+  switched the checkout to that stale `main`, so **the working tree briefly read
+  as pre-PR** — files showing old content after a merge is this, not data loss.
+  Recovery: `git rebase origin/main` (which dropped the local commit as "patch
+  contents already upstream" — the same STATUS.md text had landed via another
+  route), then `git remote prune origin` for the stale tracking ref. Verify with
+  `git ls-remote --heads origin` and by grepping the merged content, never from
+  the PR timeline.
 - **2026-08-01: back to zero branches and one worktree, after #68 merged.**
   Deleted local `feat/phase-20-root-definition-coverage` (+ its remote ref —
   `gh pr merge --delete-branch` did the remote but failed local cleanup, the
@@ -1193,6 +1273,22 @@ Re-queried directly 2026-07-22 (do not trust older counts in this file's history
     needs its own phase plan (§6).** Reported from a phone: on `/dictionary/SlH`
     the "Active participle ṣāliḥ 65" chip is green but every one of those 65
     concordance rows carries a blue "ṣāliḥ" tag.
+
+11. **`text-paper-500` is under AA at 54 uses across 29 components** — 3.08:1 on
+    the page, 2.57–2.61:1 on a tinted chip interior. Measured 2026-08-01 during
+    #70, which documented it in `globals.css` rather than fixing it: it is a
+    neutral-token sweep across the app, not a palette change, and wants its own
+    change so the diff is reviewable. Pick the replacement per background — see
+    the `paper-*` contrast table; the AA-safe token differs on the page vs. on a
+    card vs. behind a 12–16% tint.
+
+12. **Three dead dark hovers**, all pre-existing: `WordPopover.tsx:48`,
+    `WordPopover.tsx:73`, `WordDetailView.tsx:67`. Each pairs `hover:<prop>`
+    with `dark:<prop>` and no `dark:hover:<prop>`, so Tailwind's variant order
+    lets the resting dark rule win and the dark hover does nothing — the exact
+    bug #70 fixed in `WbwWordCell` (`3a63cd9`). Found by sweeping every
+    `className` in `src/**/*.tsx`; that sweep is the way to confirm the list is
+    still complete before fixing.
 
     Cause: the corpus disambiguates homograph lemmas with a trailing numeral,
     and only the morphology file carries it — `word_segments.lemma` is `صَٰلِح2`
