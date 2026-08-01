@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { RootForm, ConcordanceEntry } from '@quran-corpus/data';
+import type { RootForm, ConcordanceEntry } from '@quran-corpus/data/client';
 import { FormFilterChips } from './FormFilterChips';
 import { ConcordanceList } from './ConcordanceList';
 

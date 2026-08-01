@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import type { ConcordanceEntry, RootForm } from '@quran-corpus/data';
+import type { ConcordanceEntry, RootForm } from '@quran-corpus/data/client';
 import { trimConcordanceVerse, CONCORDANCE_PAGE_SIZE } from '@quran-corpus/data/client';
 import { TypingText } from '../ui/TypingText';
 import { verseRef, concordanceHref } from '../../lib/concordance';

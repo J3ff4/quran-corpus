@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { TypingText } from '../ui/TypingText';
-import type { SearchResult, JumpVerse, VerseHit } from '@quran-corpus/data';
+import type { SearchResult, JumpVerse, VerseHit } from '@quran-corpus/data/client';
 import { rootPath } from '../../lib/routes';
 
 // Snippet matches are wrapped by FTS5 in STX (code 2) / ETX (code 3) sentinel

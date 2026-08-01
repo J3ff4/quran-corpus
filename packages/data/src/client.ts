@@ -18,7 +18,10 @@ export type { TrimmedVerse } from './text/concordanceTrim.js';
 export { isSajdahAyah } from './text/sajdah.js';
 export { decodeSegment, posLabelEn } from './morphology/decode.js';
 
-// Types are erased at build time (no runtime import), but re-exporting the ones
-// client components use lets them source both value and type from one path.
-export type { SearchResult, RootSearchItem, ConcordanceEntry } from './types.js';
-export type { DecodedSegment } from './types.js';
+// All of them, not a curated subset. `types.ts` is a pure declaration file with
+// no imports of its own, and `export type *` emits no runtime import at all — so
+// unlike the values above, widening this cannot pull anything into the bundle.
+// Curating it only meant a client component needing one more type had to reach
+// for the barrel instead, which is the exact mistake this entry point exists to
+// prevent.
+export type * from './types.js';

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Ayah } from '@quran-corpus/data';
+import type { Ayah } from '@quran-corpus/data/client';
 
 function buildAudioUrl(ayah: Ayah): string {
   if (ayah.audio_url) return ayah.audio_url;

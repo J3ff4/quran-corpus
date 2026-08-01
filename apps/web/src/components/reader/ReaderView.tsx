@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { Ayah, Word, Translation } from '@quran-corpus/data';
+import type { Ayah, Word, Translation } from '@quran-corpus/data/client';
 import { AyahView } from './AyahView';
 import { Bismillah } from './ornaments/Bismillah';
 import { WordPopover } from './WordPopover';

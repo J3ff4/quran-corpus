@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
-import type { Word } from '@quran-corpus/data';
+import type { Word } from '@quran-corpus/data/client';
 import { MorphologySummary } from '../morphology/MorphologySummary';
 
 interface WordPopoverProps {

@@ -1,6 +1,6 @@
 'use client';
 
-import type { Ayah } from '@quran-corpus/data';
+import type { Ayah } from '@quran-corpus/data/client';
 
 interface AyahAudioButtonProps {
   ayah: Ayah;
