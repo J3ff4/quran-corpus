@@ -75,7 +75,11 @@ Evidence differs per claim; none of it is carried over from prior narrative.
   commit that fixed it; PR merged at 17:41Z. The commit status was a green
   `Review completed`; the review verdict is the gate, not the status colour (§5). **Verify against
   `gh pr view 64` before acting on any of this** (§14).
-- **OPEN: PR #67, the entry-header redesign.** Branch
+- **MERGED: PR #67, the entry-header redesign.** Squashed to `a08b7f9` on `main`
+  2026-08-01 04:02Z (`gh pr view 67 --json mergedAt,mergeCommit`); remote branch
+  deleted. **Merged with the §5 gate outstanding, on the owner's explicit
+  instruction** — see the round-4 note below. Second override on record after
+  #63; the merge commit body carries the same account. Branch was
   `feat/dictionary-entry-header`, based on `19ebfc0` — the shared `EntryHeader`,
   both rewritten entry headers, both `loading.tsx` skeletons. §4 step 3
   (`/code-review`) run once: findings fixed in `32ca182` (skeletons + card meta
@@ -100,8 +104,15 @@ Evidence differs per claim; none of it is carried over from prior narrative.
   optional branches had no test. That failure carries no inline comment and
   lives only in the walkthrough's collapsed table, exactly the §5 signature.
   Four tests added to `loadingSkeletons.test.tsx`; the empty-slot one was
-  verified to fail against an unguarded children row. Re-review pending;
-  **not merged**.
+  verified to fail against an unguarded children row. Round 4 on `8956cdf` never
+  ran: the commit status read **`success | Review rate limited`**, the §5
+  fail-open signature — a green status that is not a pass, so that head carries
+  no verdict and the round-3 ❌ still shown in the walkthrough is stale, raised
+  before the tests that answer it. `reviewDecision` was still
+  `CHANGES_REQUESTED` at merge, since a clean round submits no APPROVED review
+  to clear it. **Open debt: the only never-reviewed change is `eb65659` +
+  `8956cdf`** — the four `EntryHeaderSkeleton` tests and this file's SHA
+  de-reference. Everything earlier on the branch was reviewed and answered.
   The rebase off the squashed #64 base is **done** — it was
   `git rebase --onto origin/main 5d8b220 feat/dictionary-entry-header`, replayed
   clean. Recorded because the form matters: replaying from `origin/main..`
@@ -205,9 +216,11 @@ Evidence differs per claim; none of it is carried over from prior narrative.
   onto `@quran-corpus/data/client`, plus the guard test that keeps them there).
   **#65 MERGED** (`19ebfc0`, 2026-08-01 01:24Z, squashed — percent-encoded
   dictionary params; APPROVED at `5daee92` after two rounds, no override).
-  Current `origin/main` tip `19ebfc0`; a local `main` last fetched before that
+  **#67 MERGED** (`a08b7f9`, 2026-08-01 04:02Z, squashed — entry-header
+  redesign, **§5 gate overridden**, see above).
+  Current `origin/main` tip `a08b7f9`; a local `main` last fetched before that
   still reads an older SHA, so check the remote ref, not the local one.
-  **#67 open** (entry-header redesign, above). Nothing else.
+  Nothing open.
   **Commit SHAs before 2026-07-27 are all dead** — history was rewritten, see purge.
 - **Phase 18 (930-root re-scrape) DONE + MERGED.** All six phase-17 carry items
   closed. **The 930-root crawl itself has been run** (see Phase 18 below) — nothing
