@@ -77,7 +77,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script src="/theme-init.js" />
         {/* ClampedText's clamp ships in the server-rendered markup, but its
             toggle needs hydration to measure. With JS off there is no button,
-            so the crop would be permanent — a definition cut at eight lines
+            so the crop would be permanent — a definition cut at six lines
             with no fade, no scrollbar and no way to open it. Release the
             ceiling instead: an over-long definition beats an unreachable one.
             `!important` because the clamp is an inline style. Emitted once

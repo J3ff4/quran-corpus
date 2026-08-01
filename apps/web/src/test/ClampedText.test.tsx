@@ -45,6 +45,30 @@ describe('ClampedText', () => {
     expect(screen.getByRole('button', { name: /show more/i })).toBeInTheDocument();
   });
 
+  it('renders the footer whether or not the text overflows', () => {
+    // The footer carries the source credit (§11), so it may not depend on the
+    // clamp: a short Lane entry that fits in six lines still has to say it came
+    // from Lane. This is the case that made it a prop rather than a sibling of
+    // the toggle inside the caller.
+    stubHeights(100, 100);
+    const { rerender } = render(
+      <ClampedText label="root definition" footer={<span>Lane&apos;s Lexicon</span>}>
+        short
+      </ClampedText>,
+    );
+    expect(screen.getByText("Lane's Lexicon")).toBeInTheDocument();
+    expect(screen.queryByRole('button')).toBeNull();
+
+    stubHeights(500, 200);
+    rerender(
+      <ClampedText label="root definition" footer={<span>Lane&apos;s Lexicon</span>}>
+        long…
+      </ClampedText>,
+    );
+    expect(screen.getByText("Lane's Lexicon")).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /show more/i })).toBeInTheDocument();
+  });
+
   it('toggle flips the label and aria-expanded', () => {
     stubHeights(500, 200);
     render(<ClampedText label="root definition">long…</ClampedText>);
@@ -83,6 +107,8 @@ describe('ClampedText', () => {
       </ClampedText>,
     );
     const box = container.querySelector('.clamp-box') as HTMLElement;
+    // An explicit `lines`, deliberately not the 6-line default, so this asserts
+    // the prop is honoured rather than re-asserting the default two tests below.
     expect(box.style.maxHeight).toBe('13em'); // 8 * 1.625
     expect(box.style.overflow).toBe('hidden');
   });
@@ -179,7 +205,7 @@ describe('ClampedText', () => {
     // Closing from the settled state has no length to animate *from*, so it
     // snaps -- and must not re-pin a px height that nothing would release.
     fireEvent.click(screen.getByRole('button'));
-    expect(box.style.maxHeight).toBe('13em');
+    expect(box.style.maxHeight).toBe('9.75em'); // the 6-line default
     expect(box.style.overflow).toBe('hidden');
   });
 
@@ -197,7 +223,7 @@ describe('ClampedText', () => {
     // permanently. `auto` keeps it reachable in every one of those states; the
     // measured client flips it to `hidden` and puts the real toggle up.
     const html = renderToStaticMarkup(<ClampedText label="root definition">long…</ClampedText>);
-    expect(html).toContain('max-height:13em');
+    expect(html).toContain('max-height:9.75em');
     expect(html).toContain('overflow:auto');
     expect(html).not.toContain('overflow:hidden');
   });
@@ -265,7 +291,7 @@ describe('ClampedText', () => {
       render(<ClampedText label="root definition">long…</ClampedText>);
       expect(screen.queryByRole('button')).toBeNull();
 
-      // Real face swaps in and the text now runs past eight lines.
+      // Real face swaps in and the text now runs past the clamp.
       stubHeights(500, 100);
       await act(async () => {
         resolveFonts();

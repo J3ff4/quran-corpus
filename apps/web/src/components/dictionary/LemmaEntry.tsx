@@ -3,6 +3,7 @@ import type { LemmaEntry as LemmaEntryT, ConcordanceEntry, LemmaSense } from '@q
 import { ConcordanceList } from './ConcordanceList';
 import { EntryHeader } from './EntryHeader';
 import { ClampedText } from '../ui/ClampedText';
+import { InfoPopover } from '../ui/InfoPopover';
 import { posColor } from '../../lib/posColor';
 import { rootPath, lemmaConcordanceEndpoint } from '../../lib/routes';
 import { definitionSourceLabel } from '../../lib/definitionSources';
@@ -103,14 +104,28 @@ export function LemmaEntry({ entry, initialConcordance, total }: LemmaEntryProps
               frequent one for ضرب is "Allah sets forth", which is a clause,
               not a definition. Showing the set makes the range legible instead
               of asserting one contextual phrase as the lemma's meaning. */}
-          {/* On the page background, so paper-600/400 (4.73:1 / 7.62:1). The
-              heading has to be readable for the caption below to do its job:
-              if "Translated as" is illegible the chips read as definitions,
-              which is the exact misreading this section exists to prevent.
-              paper-500 was 3.08:1 and failed. */}
-          <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-paper-600 dark:text-paper-400">
-            Translated as
-          </h2>
+          {/* The caveat used to sit under the chips as permanent body text. It
+              is the same sentence on all 3,382 lemma pages, so after the first
+              read it is noise the reader scrolls past on every visit — and it
+              pushed the concordance, which is what they came for, further down
+              each time. Behind the icon it is one tap away for the first read
+              and costs nothing after. `items-center` pairs the icon with the
+              heading's cap-height rather than its box.
+
+              That makes the heading the only framing shown by default, so its
+              contrast matters more, not less: if "Translated as" is illegible
+              the chips read as definitions, which is the exact misreading this
+              section exists to prevent. On the page background, so paper-600/400
+              (4.73:1 / 7.62:1); paper-500 was 3.08:1 and failed. */}
+          <div className="mb-2 flex flex-wrap items-center gap-1">
+            <h2 className="text-xs font-medium uppercase tracking-wide text-paper-600 dark:text-paper-400">
+              Translated as
+            </h2>
+            <InfoPopover label="About these translations">
+              From word-by-word translations, ordered by frequency — not dictionary
+              definitions.
+            </InfoPopover>
+          </div>
           <ul className="flex flex-wrap gap-1.5">
             {entry.top_glosses.map((g) => (
               <li
@@ -121,13 +136,6 @@ export function LemmaEntry({ entry, initialConcordance, total }: LemmaEntryProps
               </li>
             ))}
           </ul>
-          {/* paper-600/400, not paper-400/600: the latter measures 2.20:1 on
-              bg-paper-50 and 3.54:1 on night-300, both under the 4.5:1 AA
-              floor. This caption is the whole reason the chips above are not
-              read as definitions, so it has to be legible. */}
-          <p className="mt-2 text-xs text-paper-600 dark:text-paper-400">
-            From word-by-word translations, ordered by frequency — not dictionary definitions.
-          </p>
         </section>
       )}
 
@@ -145,23 +153,26 @@ export function LemmaEntry({ entry, initialConcordance, total }: LemmaEntryProps
               Definition of root
             </p>
             {entry.root_definition ? (
-              <>
-                <ClampedText
-                  label="root definition"
-                  className="break-words text-sm leading-relaxed text-paper-800 dark:text-paper-200"
-                >
-                  {entry.root_definition}
-                </ClampedText>
-                {/* Same text as the root page, so it carries the same credit
-                    (§11). Which source wins depends on the root — Lane where
-                    it has an entry, the corpus form glosses where it does
-                    not — so the label has to come from the row, not a
-                    constant. Same card-interior tokens as the heading above,
-                    for the same contrast reason. */}
-                {sourceLabel && (
-                  <p className="mt-1 text-xs text-paper-700 dark:text-paper-400">{sourceLabel}</p>
-                )}
-              </>
+              /* Same text as the root page, so it carries the same credit
+                 (§11) in the same place — `footer`, sharing the toggle's row.
+                 Which source wins depends on the root — Lane where it has an
+                 entry, the corpus form glosses where it does not — so the
+                 label has to come from the row, not a constant. Same
+                 card-interior tokens as the heading above, for the same
+                 contrast reason. */
+              <ClampedText
+                label="root definition"
+                className="break-words text-sm leading-relaxed text-paper-800 dark:text-paper-200"
+                footer={
+                  sourceLabel && (
+                    <span className="text-xs text-paper-700 dark:text-paper-400">
+                      {sourceLabel}
+                    </span>
+                  )
+                }
+              >
+                {entry.root_definition}
+              </ClampedText>
             ) : (
               /* Say the entry is missing rather than rendering an unexplained
                  gap: 101 of 1642 roots have no definition from either source

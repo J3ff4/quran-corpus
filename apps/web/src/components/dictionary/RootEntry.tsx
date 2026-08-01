@@ -96,24 +96,27 @@ export function RootEntry({ entry, initialConcordance, total, prevBw, nextBw }: 
             >
               {/* Lane entries run to 1479 characters — a tenth of them past
                   400 — which buried the concordance below several screens of
-                  comma-separated senses. Clamped to 8 lines with the rest one
-                  tap away. */}
+                  comma-separated senses. Clamped with the rest one tap away. */}
               {/* Named per source: a root with several definitions renders
                   several toggles, and a screen reader listing them cannot tell
                   three identical "Show more lexicon definition" apart. */}
+              {/* The credit rides in `footer` so it shares the toggle's row
+                  instead of stacking under it. Card interior, so contrast is
+                  measured against bg-paper-100 / dark:bg-night-50, not the
+                  page: paper-700 6.78:1 and paper-400 6.16:1. paper-500 sat at
+                  2.85:1 light / 4.40:1 dark, both under the 4.5:1 WCAG AA floor
+                  §8 sets. */}
               <ClampedText
                 label={label ? `${label} definition` : 'root definition'}
                 className="break-words text-sm leading-relaxed text-paper-800 dark:text-paper-200"
+                footer={
+                  label && (
+                    <span className="text-xs text-paper-700 dark:text-paper-400">{label}</span>
+                  )
+                }
               >
                 {d.definition}
               </ClampedText>
-              {/* Card interior, so contrast is measured against bg-paper-100 /
-                  dark:bg-night-50, not the page: paper-700 6.78:1 and
-                  paper-400 6.16:1. paper-500 sat at 2.85:1 light / 4.40:1
-                  dark, both under the 4.5:1 WCAG AA floor §8 sets. */}
-              {label && (
-                <p className="mt-2 text-xs text-paper-700 dark:text-paper-400">{label}</p>
-              )}
             </div>
             );
           })

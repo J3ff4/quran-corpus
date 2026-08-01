@@ -6,6 +6,11 @@ interface ClampedTextProps {
   children: React.ReactNode;
   /** Lines shown while collapsed. */
   lines?: number;
+  /** Rendered on the left of the toggle's row, e.g. the source credit. Shares
+   *  the row so the credit and the toggle cost one line between them instead of
+   *  one each, and the toggle is pushed to the trailing edge where a thumb
+   *  already is. Rendered whether or not the text overflows. */
+  footer?: React.ReactNode;
   /** Line height the clamp height is computed from; must match the rendered
    *  text's leading (Tailwind `leading-relaxed` = 1.625). */
   lineHeight?: number;
@@ -30,10 +35,11 @@ interface ClampedTextProps {
  */
 export function ClampedText({
   children,
-  lines = 8,
+  lines = 6,
   lineHeight = 1.625,
   label,
   className,
+  footer,
 }: ClampedTextProps) {
   const [expanded, setExpanded] = useState(false);
   const [overflows, setOverflows] = useState(false);
@@ -180,25 +186,41 @@ export function ClampedText({
       >
         {children}
       </div>
-      {/* `block`, not the browser default inline-block: on the lemma page a
-          "View root" link follows this button inside the same box, and inline
-          the two ran together as "Show more ▾View root". */}
-      {overflows && (
-        /* `block` for the line break (otherwise it runs into "View root"),
-           `w-fit` so the box is the width of the label: the :active
-           scale(0.97) on a full-width block pulls the left-aligned text
-           inward from the card edge instead of reading as a press. */
-        <button
-          type="button"
-          onClick={toggle}
-          aria-expanded={expanded}
-          aria-controls={id}
-          className="clamp-toggle mt-2 block w-fit text-xs text-accent-700 underline-offset-2 hover:underline dark:text-accent-300"
-        >
-          {expanded ? 'Show less' : 'Show more'}
-          <span aria-hidden="true"> {expanded ? '▴' : '▾'}</span>
-          <span className="sr-only"> {label}</span>
-        </button>
+      {/* A row, not two stacked blocks: the credit sits at the leading edge and
+          the toggle at the trailing one, so together they cost the single line
+          the toggle used to cost alone. `justify-between` with an always-present
+          left cell, so the toggle lands in the same place whether or not there
+          is a footer to balance it against — otherwise a footerless card would
+          put "Show more" on the left and a credited one on the right.
+
+          The row itself is `block`-level, which is what keeps a following
+          sibling (the lemma page's "View root" link) off this line; inline, the
+          two ran together as "Show more ▾View root".
+
+          `items-baseline` so the credit and the toggle sit on one text baseline
+          despite the toggle's larger tap target. `flex-wrap` + `gap` for the
+          narrow case: a long credit and the toggle wrap to two lines rather
+          than squeezing each other. */}
+      {(footer || overflows) && (
+        <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <span>{footer}</span>
+          {overflows && (
+            /* `shrink-0` so the toggle keeps its full label when the footer is
+               long; the :active scale(0.97) reads as a press because the box is
+               the width of the label rather than of the card. */
+            <button
+              type="button"
+              onClick={toggle}
+              aria-expanded={expanded}
+              aria-controls={id}
+              className="clamp-toggle shrink-0 text-xs text-accent-700 underline-offset-2 hover:underline dark:text-accent-300"
+            >
+              {expanded ? 'Show less' : 'Show more'}
+              <span aria-hidden="true"> {expanded ? '▴' : '▾'}</span>
+              <span className="sr-only"> {label}</span>
+            </button>
+          )}
+        </div>
       )}
     </>
   );

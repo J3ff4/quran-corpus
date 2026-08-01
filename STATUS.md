@@ -197,7 +197,9 @@ Evidence differs per claim; none of it is carried over from prior narrative.
       #64's result overstates it by six tests of unrelated code.
 
     Verified visually at 412px on the live dev server, not just by test.
-- **`docs/plans/phase-20-root-definition-coverage.md` WRITTEN, not started.** Fills
+- **`docs/plans/phase-20-root-definition-coverage.md` — SHIPPED, see the entry
+  below.** Kept for the measured starting state; its Task 4 "BLOCKED" and the
+  965 count are **historical** and annotated as such in the file itself. Fills
   155 of those 256 roots from the **snapshots phase 18 already archived — zero
   network requests**. corpus root pages carry a per-form lexical gloss the
   dictionary parser never read (`Drb` → "to strike, to set forth", `Zlm` → "to
@@ -206,10 +208,15 @@ Evidence differs per claim; none of it is carried over from prior narrative.
   — upstream absence, do not widen the regex). **Task 4 is BLOCKED on a user
   decision**: `corpus-forms` sorts before `qurandev-lane`, so importing it would
   silently promote it to "the" definition on 810 pages that are currently fine.
-- **PHASE 20 DONE, live DB written, NOT ON A PR (2026-07-31).** Branch
-  `feat/phase-20-root-definition-coverage`, off `main`. Option **(b)** chosen by
-  the user: fill only the definition-less roots, leave Lane-covered ones alone.
-  Zero network requests — parsed from the phase 18 snapshots.
+- **MERGED 2026-08-01 07:00Z: phase 20 root definitions — PR #68, squashed to
+  `e8d8f23`** (branch `feat/phase-20-root-definition-coverage`, reviewed head
+  `c37a37a`, deleted local + remote). **First branch in this repo to actually
+  pass the §5 gate rather than override it** — `APPROVED`, commit_id equal to
+  the head, status description `Review approved` (read, not inferred from the
+  colour), pre-merge table 8 passed / 1 warning. Four review rounds, 12
+  findings, no override checkbox ticked. Option **(b)** as chosen by the user:
+  fill only the definition-less roots, leave Lane-covered ones alone. Zero
+  network requests — parsed from the phase 18 snapshots.
   - **Live DB already imported.** `root_definitions` now holds
     `corpus-forms` 155 + `qurandev-lane` 1386. Roots with no definition went
     **256 → 101**, covering **5545 occurrences**. The 101 remaining are
@@ -322,7 +329,15 @@ Evidence differs per claim; none of it is carried over from prior narrative.
       naming one of the two sources the page now draws on.
     - The two `STATUS.md` lines corrected above — both authored in this PR and
       already wrong (§14).
-  - **§5 gate: PR #68 opened 2026-08-01, CodeRabbit's first look at this
+  - **§5 gate: PASSED on round 4** — `APPROVED` at 06:54:22Z against
+    `c37a37a`, the exact head merged. Rounds 1–3 below; round 4 raised nothing
+    and cleared the `New Logic Ships With Tests` error check that had held the
+    PR through all three. Remaining: docstring coverage 27.59% vs an 80%
+    threshold, **warning mode, non-blocking** — left deliberately, the
+    functions pulling it down are one-line test helpers where a docstring
+    restates the name. Reasoning is on the PR, not just here (§5: replying
+    teaches it, a silent dismissal does not).
+  - **Round 1: PR #68 opened 2026-08-01, CodeRabbit's first look at this
     branch.** Verdict `CHANGES_REQUESTED`, 7 findings, plus a failed
     `mode: error` pre-merge check ("New Logic Ships With Tests") that carried
     no comment and lived only in the collapsed `<details>` of the walkthrough —
@@ -1020,6 +1035,36 @@ Re-queried directly 2026-07-22 (do not trust older counts in this file's history
   78% per an older note in this file — finished since.)
 
 ## Housekeeping
+- **2026-08-01: back to zero branches and one worktree, after #68 merged.**
+  Deleted local `feat/phase-20-root-definition-coverage` (+ its remote ref —
+  `gh pr merge --delete-branch` did the remote but failed local cleanup, the
+  known worktree gotcha), `feat/dictionary-entry-header`, and
+  `backup/phase-20-prerebase`. Removed the `qcp-header` worktree and the
+  `qcp-fix` directory (25 files, all `.next` build output, no git, orphaned
+  from an aborted run — a stale `next-server` was still serving it from a
+  deleted cwd).
+  Verified per branch before deleting, since squash merges make `--merged`
+  lie: `feat/phase-20…` diffed **zero** against `main`;
+  `feat/dictionary-entry-header`'s 61 apparently-unique lines were all *older*
+  text (pre-#67 STATUS.md, the pre-phase-20 `RootEntry`, the `--only-missing`
+  plan, and the `node_modules` symlinks `61ecf51` untracked); and
+  `backup/phase-20-prerebase`'s skeleton loaders, `buckwalter.ts` and route
+  guards are all on `main` in *newer* form — `main` validates via
+  `bw === null` (the #65 decode fix), the backup carried the older
+  `isRootBuckwalter` guard.
+- **Gotcha from `61ecf51`: the first checkout after it deletes your root
+  `node_modules`.** The three self-symlinks were *tracked*, so a branch switch
+  onto a commit that no longer has them removes the working-tree entries — and
+  `apps/web/node_modules/*` are pnpm links into `<repo>/node_modules/.pnpm`,
+  so every one of them dangles. Symptom is `next dev` dying with
+  `Cannot find module .../apps/web/node_modules/next/dist/bin/next` while
+  `apps/web/node_modules` still looks present. Fix is one `pnpm install`
+  (1.2s — the store is intact, only the links are gone). One-time, per
+  checkout that crosses `61ecf51`.
+- **`.claude/settings.json` is now tracked**, swept into #68's squash by a
+  `git add -A`. Contents are innocuous (`enabledPlugins: firecrawl`), but it
+  is a personal tool setting that landed in a scraper PR. Untrack + ignore if
+  that is not wanted; flagged to the user 2026-08-01, no decision yet.
 - ~~Untracked scratch: this file, the phase-12 plan, `.superpowers/`~~ — **two of
   the three were wrong, corrected 2026-07-28.** `git status` says: **STATUS.md is
   tracked and in `main`** (last written by `6113fd3`), and **`.superpowers/` is
@@ -1110,6 +1155,36 @@ Re-queried directly 2026-07-22 (do not trust older counts in this file's history
    #63 merged 2026-07-31 with §5 overridden; the diff has still never been read by
    the bot. Not blocking anything, but it is an open debt: run it, and ship any
    finding as a follow-up PR. See the #63 section above.
+10. **Homograph forms mis-tag the concordance — DEFERRED by the user 2026-08-01,
+    needs its own phase plan (§6).** Reported from a phone: on `/dictionary/SlH`
+    the "Active participle ṣāliḥ 65" chip is green but every one of those 65
+    concordance rows carries a blue "ṣāliḥ" tag.
+
+    Cause: the corpus disambiguates homograph lemmas with a trailing numeral,
+    and only the morphology file carries it — `word_segments.lemma` is `صَٰلِح2`
+    for the 9 Ṣāliḥ-the-prophet occurrences, while the root page prints a plain
+    `<span class="at">صَٰلِح</span>` for both forms (checked the phase 18
+    snapshot: no numeral, no lemma link, so it is NOT recoverable by re-parsing).
+    So `root_forms` holds two rows with identical `form_arabic`, and
+    `getRootConcordancePage`'s `MIN(rf.id)` tie-break (`roots.ts:373`) hands all
+    65 active participles the proper noun's id.
+
+    Second symptom, unreported: `صَٰلِح2` matches no form row at all, so tapping
+    the "Proper noun 9" chip filters to **zero** results and those 9 occurrences
+    render untagged.
+
+    Blast radius — 8 roots, every `(root_id, form_arabic)` group with more than
+    one row and disagreeing labels: `SlH`, `mlk` (Proper noun / Active
+    participle), `jhl`, `bEl` (Noun / Proper noun), `HSy`, `wfy` (verb /
+    nominal), `Hyv` (Nominal / Conditional particle), `ESf` (Noun / Verbal noun).
+
+    Fix shape when it is picked up: materialize `root_forms.lemma_key` and join
+    on it exactly, dropping the MIN. Segment `pos_tag` resolves 7 of the 8 but
+    **not `ESf`** — both `عَصْف` and `عَصْف2` are tagged `N`, so only the
+    occurrence counts separate them. Counts are unique inside all 8 groups
+    (verified), which makes them the resolver's primary key with `pos_tag` as
+    the cross-check. Schema change + migration + backfill + a live-DB write, so
+    §12 and §6 both apply.
 
 ## Notes
 - Uzbek edition = Cyrillic (uz.sodik). Latin variant not done.
