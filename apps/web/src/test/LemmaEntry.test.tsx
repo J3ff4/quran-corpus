@@ -167,4 +167,52 @@ describe('LemmaEntry', () => {
     // ...and the gap is named rather than left silent.
     expect(screen.getByText(/No lexicon entry for this root/i)).toBeInTheDocument();
   });
+
+  it('colour-codes each sense chip with the reader’s own posColor bucket', () => {
+    // Same five --pos-* variables the word-by-word view uses, so a verb is the
+    // same red in both places. Asserting the variable name rather than a hex
+    // keeps this test honest if the palette is re-tuned.
+    render(
+      <LemmaEntry
+        entry={{
+          ...base,
+          senses: [
+            { pos_tag: 'V', pos_label: 'Verb', count: 2 },
+            { pos_tag: 'N', pos_label: 'Noun', count: 1 },
+          ],
+          root_buckwalter: null,
+          top_glosses: [],
+          root_definition: null,
+        }}
+        initialConcordance={[]}
+        total={3}
+      />,
+    );
+    const dotOf = (label: string) =>
+      screen.getByText(label).parentElement?.querySelector('span[aria-hidden="true"]');
+    expect(dotOf('Verb')).toHaveStyle({ backgroundColor: 'var(--pos-verb)' });
+    expect(dotOf('Noun')).toHaveStyle({ backgroundColor: 'var(--pos-noun)' });
+  });
+
+  it('renders no dot for a POS posColor deliberately leaves uncoloured', () => {
+    // posColor returns null for DET on purpose -- corpus.quran.com does not
+    // treat an assimilated determiner as its own category. A chip must then
+    // show no dot at all rather than fall back to --pos-other, which would
+    // assert a bucket the reader never assigns.
+    render(
+      <LemmaEntry
+        entry={{
+          ...base,
+          senses: [{ pos_tag: 'DET', pos_label: 'Determiner', count: 2 }],
+          root_buckwalter: null,
+          top_glosses: [],
+          root_definition: null,
+        }}
+        initialConcordance={[]}
+        total={2}
+      />,
+    );
+    const chip = screen.getByText('Determiner').parentElement;
+    expect(chip?.querySelector('span[aria-hidden="true"]')).toBeNull();
+  });
 });

@@ -1,3 +1,4 @@
+import { EntryHeaderSkeleton } from '../../../../components/dictionary/EntryHeaderSkeleton';
 import { Skeleton } from '../../../../components/ui/Skeleton';
 
 /** Placeholder for a lemma entry while it streams: header + meta line, the
@@ -16,14 +17,16 @@ export default function LemmaLoading() {
   return (
     <main role="status" aria-busy="true" className="mx-auto max-w-2xl px-4 py-8">
       <span className="sr-only">Loading lemma…</span>
-      <header className="mb-6">
-        <Skeleton className="h-10 w-40" />
-        <div className="mt-2 flex items-center gap-2">
-          <Skeleton className="h-4 w-16" />
-          <Skeleton className="h-4 w-8" />
-          <Skeleton className="h-4 w-24" />
-        </div>
-      </header>
+      {/* One sense chip, because loading.tsx gets no params and 4528 of 4832
+          lemmas have exactly one sense. A single sense still renders its chip
+          -- Senses drops the *count* inside the chip at that cardinality, not
+          the chip itself -- so one bar is the right majority shape. The other
+          304 grow the row on swap; centred, that reads as the row widening
+          rather than the column moving. Same trade as the root-definition card
+          below: draw the majority shape or nothing at all. */}
+      <EntryHeaderSkeleton transliteration>
+        <Skeleton className="h-7 w-24 rounded-full" />
+      </EntryHeaderSkeleton>
       <Skeleton className="mb-2 h-3 w-24" />
       <div className="mb-6 flex gap-1.5">
         <Skeleton className="h-7 w-16 rounded-full" />

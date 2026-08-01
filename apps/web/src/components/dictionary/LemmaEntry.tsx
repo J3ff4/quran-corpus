@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import type { LemmaEntry as LemmaEntryT, ConcordanceEntry, LemmaSense } from '@quran-corpus/data';
 import { ConcordanceList } from './ConcordanceList';
+import { EntryHeader } from './EntryHeader';
 import { ClampedText } from '../ui/ClampedText';
+import { posColor } from '../../lib/posColor';
 import { rootPath, lemmaConcordanceEndpoint } from '../../lib/routes';
 
 interface LemmaEntryProps {
@@ -15,31 +17,62 @@ interface LemmaEntryProps {
 /**
  * The lemma's grammatical senses.
  *
- * A lemma with one sense reads as a plain label ("Verb"). A lemma with several
- * gets each one with its own count, because naming only the commonest is a
- * false statement about the rest: مَا was labelled flatly "Relative pronoun"
- * while 911 of its 2177 occurrences are negative, interrogative, subordinating,
- * conditional or superlative. The counts are the honest version and they also
- * tell the reader why the concordance below is so mixed.
+ * One chip per sense. A lemma with one sense reads as a plain label ("Verb").
+ * A lemma with several gets each one with its own count, because naming only
+ * the commonest is a false statement about the rest: مَا was labelled flatly
+ * "Relative pronoun" while 911 of its 2177 occurrences are negative,
+ * interrogative, subordinating, conditional or superlative. The counts are the
+ * honest version and they also tell the reader why the concordance below is so
+ * mixed.
  */
 function Senses({ senses }: { senses: LemmaSense[] }) {
-  if (senses.length === 0) return null;
-  if (senses.length === 1) return <span>{senses[0]!.pos_label}</span>;
   return (
-    <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-      {senses.map((s) => (
-        <span key={s.pos_tag} className="whitespace-nowrap">
-          {s.pos_label}{' '}
-          {/* These counts sit on the PAGE background (bg-paper-50), where
-              paper-600 measures 4.73:1 and clears the 4.5:1 WCAG AA floor §8
-              sets; paper-400 would be 2.20:1 and dark paper-600 3.54:1, both
-              failing. Contrast is a function of the background, so this pair
-              is only correct while these stay on the page — moved onto a
-              paper-100 card, paper-600 drops to 4.38:1 and fails. */}
-          <span className="tabular-nums text-paper-600 dark:text-paper-400">{s.count}</span>
-        </span>
-      ))}
-    </span>
+    <>
+      {senses.map((s) => {
+        const color = posColor(s.pos_tag);
+        return (
+          <span
+            key={s.pos_tag}
+            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-paper-200 bg-paper-100 px-2.5 py-1 text-sm dark:border-night-100 dark:bg-night-50"
+          >
+            {/* The colour rides on a dot, not on the label text, for two
+                reasons. --pos-prep (#0f8a6a) measures 4.07:1 against
+                bg-paper-50 and 3.59:1 once tinted — under the 4.5:1 AA floor
+                for text, but comfortably over the 3:1 floor a non-text
+                indicator answers to. And FormFilterChips already establishes
+                that meaning here never rides on colour alone: the label
+                carries it, the dot only reinforces.
+
+                posColor is the reader's own function, unchanged (§3) — same
+                five buckets, same --pos-* variables, so a verb is the same
+                red here as in the word-by-word view. It returns null for DET,
+                which renders no dot rather than an arbitrary colour. */}
+            {color && (
+              <span
+                aria-hidden="true"
+                className="h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{ backgroundColor: color }}
+              />
+            )}
+            <span className="font-medium text-paper-800 dark:text-paper-200">{s.pos_label}</span>
+            {/* Count only when there is more than one sense: with a single
+                sense it duplicates the "occurs N times" line directly below.
+
+                Contrast is measured against the CHIP's background, not the
+                page's — bg-paper-100 / dark:bg-night-50, set two lines above.
+                Moving these counts onto a chip changed the right token:
+                paper-600 clears AA on the page (4.73:1 on bg-paper-50) but
+                not on the chip (4.38:1 on bg-paper-100), where paper-700
+                gives 6.78:1. The dark side is the mirror image — paper-400 is
+                6.16:1 on night-50, paper-700 would be 1.84:1 — so the pair is
+                deliberately asymmetric rather than one shade flipped. */}
+            {senses.length > 1 && (
+              <span className="tabular-nums text-paper-700 dark:text-paper-400">{s.count}</span>
+            )}
+          </span>
+        );
+      })}
+    </>
   );
 }
 
@@ -52,18 +85,13 @@ function Senses({ senses }: { senses: LemmaSense[] }) {
 export function LemmaEntry({ entry, initialConcordance, total }: LemmaEntryProps) {
   return (
     <article>
-      <header className="mb-6">
-        <h1 dir="rtl" className="font-arabic text-4xl text-paper-900 dark:text-paper-100">
-          {entry.lemma}
-        </h1>
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-paper-500">
-          {entry.transliteration && <span>{entry.transliteration}</span>}
-          <Senses senses={entry.senses} />
-          <span>
-            occurs {entry.count} time{entry.count === 1 ? '' : 's'}
-          </span>
-        </div>
-      </header>
+      <EntryHeader
+        arabic={entry.lemma}
+        transliteration={entry.transliteration}
+        count={entry.count}
+      >
+        {entry.senses.length > 0 && <Senses senses={entry.senses} />}
+      </EntryHeader>
 
       {entry.top_glosses.length > 0 && (
         <section className="mb-6">

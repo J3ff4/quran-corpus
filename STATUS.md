@@ -7,14 +7,35 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-07-31
+Updated: 2026-08-01
 
 ## Now
-All work below confirmed via `gh pr list --state all` + `git merge-base --is-ancestor`,
-not carried over from prior narrative.
-- **IN REVIEW (2026-08-01): percent-encoded dictionary params — PR #65 OPEN,
-  branch `fix/dictionary-identifier-decoding`, head `0d6a327`, two commits on
-  top of `origin/main` (`5ce6fdf`).** `/dictionary/lemma/[lemma]` and `/dictionary/[root]` were
+Evidence differs per claim; none of it is carried over from prior narrative.
+- Merge state, merge SHAs, timestamps, open/closed: `gh pr list --state all` and
+  `gh pr view <n> --json mergedAt,mergeCommit`, cross-checked with
+  `git merge-base --is-ancestor`.
+- Review rounds, verdicts, the reviewed head SHA: `gh api
+  repos/.../pulls/<n>/reviews` (`state` + `commit_id`), plus
+  `/commits/<sha>/status` for the run itself — where the *description* is read,
+  not the colour (§5).
+- **Pre-merge check results are not GitHub check runs.** `/commits/<sha>/status`
+  returns one `CodeRabbit` context and nothing else, so it can neither confirm
+  nor deny them. They live only in the check table inside CodeRabbit's
+  walkthrough comment (`gh api repos/.../issues/<n>/comments`), which is
+  editable and re-targeted every round — a snapshot of what it said at a named
+  SHA, not an immutable artifact. Quote it as such.
+- Branch deletion: `git ls-remote --heads origin` — absence of the ref, not the
+  PR timeline.
+- Gate results (type-check, lint, test counts): **local runs only.** This repo
+  has no CI workflow, so no immutable record of them exists anywhere — not in
+  the commit status, not in check runs. A gate line here is a transcript
+  claim tied to a SHA and a date, and that is its ceiling; re-run rather than
+  trust it. Never infer these from GitHub metadata, which does not carry them.
+- "Nothing open" means no **open GitHub PR**, per `gh pr list --state open`. It
+  says nothing about unmerged local branches, which are listed separately.
+- **MERGED 2026-08-01 01:24Z: percent-encoded dictionary params — PR #65,
+  squashed to `19ebfc0`** (branch `fix/dictionary-identifier-decoding`, reviewed
+  head `5daee92`, deleted). `/dictionary/lemma/[lemma]` and `/dictionary/[root]` were
   validating the **raw** path segment: Next hands the page the segment
   un-decoded, and `{ > < | $` all survive URL normalization percent-encoded, so
   every identifier containing one 404'd — **1669 of 4832 lemmas, 97 of 1642
@@ -22,12 +43,15 @@ not carried over from prior narrative.
   (decode-then-validate, the rule the concordance routes already enforced); the
   route handlers keep validating raw, since Next decodes query strings but not
   path segments. `%` is outside the Buckwalter charset, which is what makes the
-  single decode provably non-aliasing. **§5 has reviewed it.** First round
-  (head `e49e67a`) generated no findings but failed the `Client Bundle Stays
-  Clean` pre-merge check on seven pre-existing `'use client'` files this PR
-  never touched — fixed separately in #66 and merged, then this branch was
-  rebased onto `5ce6fdf` so the check passes here. Rebase replayed clean; the
-  two SHAs before it (`8febee3`, `e49e67a`) are dead.
+  single decode provably non-aliasing. **§5 passed on its own merits, no
+  override.** Three rounds: `e49e67a` generated no findings but failed the
+  `Client Bundle Stays Clean` pre-merge check on seven pre-existing `'use
+  client'` files the PR never touched (fixed separately in #66, then rebased);
+  `0d6a327` cleared that check and returned CHANGES_REQUESTED on this file's own
+  drift; `5daee92` APPROVED. The dead SHAs `8febee3` and `e49e67a` predate the
+  rebase. **Both failing rounds were pre-merge checks or ledger drift, never the
+  code** — and the first one was invisible in the commit status, which read a
+  green `Review completed` throughout (§5).
   §4 step 3 (`/code-review`) run once: 3 Low findings, all fixed —
   a `ClampedText` re-open inheriting the previous open's release timer (React
   bails on the equal measured height, so the effect never re-armed; state is
@@ -51,23 +75,45 @@ not carried over from prior narrative.
   commit that fixed it; PR merged at 17:41Z. The commit status was a green
   `Review completed`; the review verdict is the gate, not the status colour (§5). **Verify against
   `gh pr view 64` before acting on any of this** (§14).
-- **NOT ON ANY PR (2026-07-31): the entry-header redesign.** Branch
-  `feat/dictionary-entry-header` is `feat/dictionary-truth-pass` plus
-  exactly one commit on top of this branch's head, `feat(web/dictionary): share
-  one colour-coded header across entry pages`. No SHA is recorded for it on
-  purpose: it rebases every time this branch moves, so any SHA written here is
-  stale by the next push. Resolve it with
-  `git log --oneline feat/dictionary-truth-pass..feat/dictionary-entry-header`.
-  It adds the shared `EntryHeader`, both rewritten entry headers, and both
-  `loading.tsx` skeletons. Pushed to origin; **no PR opened, so §5 has never
-  seen this commit.** #64's review state does not cover it. Opening the PR is
-  the user's call, not the agent's. **#64 merged as a squash, so this branch's
-  base no longer exists in `main`'s history** — it needs a rebase onto
-  `origin/main` (`5ce6fdf`) before it can be opened, and the range command above
-  still resolves it in the meantime (see squash-merge-hides-branch-state). The
-  rebase is `git rebase --onto origin/main 5d8b220 feat/dictionary-entry-header`
-  — replaying from `origin/main..` instead would re-apply all 16 truth-pass
-  commits already squashed into `main`.
+- **OPEN: PR #67, the entry-header redesign.** Branch
+  `feat/dictionary-entry-header`, based on `19ebfc0` — the shared `EntryHeader`,
+  both rewritten entry headers, both `loading.tsx` skeletons. §4 step 3
+  (`/code-review`) run once: findings fixed in `32ca182` (skeletons + card meta
+  aligned to the real header). §5 CodeRabbit reviewed `32ca182`
+  2026-08-01 02:15Z: **CHANGES_REQUESTED with 3 inline findings**
+  (`reviews[].state` at `commit_id` `32ca182`; the commit status read
+  `success | Review completed` — the verdict is the gate, not the colour). Its
+  walkthrough comment showed 9 pre-merge checks passing at that SHA; that table
+  is a comment, re-targeted each round, so it is quoted as a snapshot and not as
+  a check run — no check run exists to confirm it.
+  Two findings fixed in `9477296`: the duplicated header skeleton is now
+  `EntryHeaderSkeleton` beside `EntryHeader` (§3), and this file's evidence
+  block above now names a source per claim. One rejected as a false positive and
+  replied to on the PR: it read "single-sense lemmas suppress the chip", but
+  `Senses` drops the *count inside* the chip at that cardinality, never the chip
+  — so the skeleton's one chip is the right majority shape for 4528 of 4832
+  lemmas. **CodeRabbit withdrew that finding on the reply** and recorded it as a
+  learning. Round 2 on `9477296` returned CHANGES_REQUESTED with one Minor
+  finding, this block's own evidence claims — which is what the wording above
+  now answers. Round 3 on `c7ae10f` raised no finding but failed the
+  `New Logic Ships With Tests` pre-merge check — `EntryHeaderSkeleton`'s two
+  optional branches had no test. That failure carries no inline comment and
+  lives only in the walkthrough's collapsed table, exactly the §5 signature.
+  Four tests added to `loadingSkeletons.test.tsx`; the empty-slot one was
+  verified to fail against an unguarded children row. Re-review pending;
+  **not merged**.
+  The rebase off the squashed #64 base is **done** — it was
+  `git rebase --onto origin/main 5d8b220 feat/dictionary-entry-header`, replayed
+  clean. Recorded because the form matters: replaying from `origin/main..`
+  instead would have re-applied all 16 truth-pass commits already squashed into
+  `main` (see squash-merge-hides-branch-state). A SHA is now safe to write down
+  precisely because the branch no longer trails a moving base.
+  Gates re-run per round, and each commit body records its own result rather
+  than a SHA written here — a line naming its own commit cannot survive an
+  amend. Latest local run, 2026-08-01: `pnpm -r type-check` clean,
+  `pnpm -r lint` clean, **700 tests** (459 web + 241 data). Local is the
+  only place these ever ran — no CI, so nothing on GitHub corroborates them;
+  re-run before relying on the numbers.
   - **Lemma "meaning" line was a contextual gloss posing as a definition.**
     `top_gloss` = most frequent word-by-word gloss; those are per-verse
     translations, so they carry subjects, prefixes, pronoun suffixes and quote
@@ -157,9 +203,11 @@ not carried over from prior narrative.
   2026-07-31 17:41Z, squashed — dictionary truth pass). **#66 MERGED**
   (`5ce6fdf`, 2026-08-01 01:12Z, squashed — client-component type imports moved
   onto `@quran-corpus/data/client`, plus the guard test that keeps them there).
-  Current `origin/main` tip `5ce6fdf`; a local `main` last fetched before that
+  **#65 MERGED** (`19ebfc0`, 2026-08-01 01:24Z, squashed — percent-encoded
+  dictionary params; APPROVED at `5daee92` after two rounds, no override).
+  Current `origin/main` tip `19ebfc0`; a local `main` last fetched before that
   still reads an older SHA, so check the remote ref, not the local one.
-  **#65 is open** — see Now.
+  **#67 open** (entry-header redesign, above). Nothing else.
   **Commit SHAs before 2026-07-27 are all dead** — history was rewritten, see purge.
 - **Phase 18 (930-root re-scrape) DONE + MERGED.** All six phase-17 carry items
   closed. **The 930-root crawl itself has been run** (see Phase 18 below) — nothing

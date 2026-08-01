@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { RootEntry as RootEntryT, ConcordanceEntry } from '@quran-corpus/data';
 import { ConcordanceSection } from './ConcordanceSection';
+import { EntryHeader } from './EntryHeader';
 import { ClampedText } from '../ui/ClampedText';
 import { rootPath } from '../../lib/routes';
 
@@ -26,65 +27,58 @@ export function RootEntry({ entry, initialConcordance, total, prevBw, nextBw }: 
   const { root, forms, definitions } = entry;
   return (
     <article>
-      <header className="mb-6">
-        <h1
-          dir="rtl"
-          className="font-arabic text-4xl text-paper-900 dark:text-paper-100"
-        >
-          {root.root_arabic}
-        </h1>
-        <div className="mt-2 flex items-center gap-2">
-          <span dir="rtl" className="flex gap-1.5">
-            {Array.from(root.root_arabic.replace(/\s+/g, '')).map((letter, i) => (
-              <span
-                key={i}
-                className="font-arabic rounded-md bg-paper-200 px-2.5 py-1 text-lg text-paper-800 dark:bg-night-100 dark:text-paper-200"
-              >
-                {letter}
-              </span>
-            ))}
-          </span>
-          <span className="text-sm text-paper-500">
-            occurs {root.occurrence_count} time{root.occurrence_count === 1 ? '' : 's'}
-          </span>
-        </div>
-        <nav aria-label="Adjacent roots" className="mt-4 flex items-center justify-between">
-          {prevBw ? (
-            <Link
-              href={rootPath(prevBw)}
-              aria-label="Previous root"
-              className="rounded-lg border border-paper-300 px-3 py-1.5 text-sm text-paper-700 transition-colors hover:bg-paper-200 dark:border-night-100 dark:text-paper-300 dark:hover:bg-night-100"
-            >
-              ← Previous
-            </Link>
-          ) : (
+      {/* Roots have no transliteration column; the letter pills already spell
+          the consonants out, so they take the slot the lemma page gives to a
+          Latin reading. */}
+      <EntryHeader arabic={root.root_arabic} count={root.occurrence_count}>
+        <span dir="rtl" className="flex gap-1.5">
+          {Array.from(root.root_arabic.replace(/\s+/g, '')).map((letter, i) => (
             <span
-              aria-label="Previous root"
-              aria-disabled="true"
-              className="rounded-lg border border-paper-200 px-3 py-1.5 text-sm text-paper-300 dark:border-night-50 dark:text-paper-600"
+              key={i}
+              className="font-arabic rounded-md bg-paper-200 px-2.5 py-1 text-lg text-paper-800 dark:bg-night-100 dark:text-paper-200"
             >
-              ← Previous
+              {letter}
             </span>
-          )}
-          {nextBw ? (
-            <Link
-              href={rootPath(nextBw)}
-              aria-label="Next root"
-              className="rounded-lg border border-paper-300 px-3 py-1.5 text-sm text-paper-700 transition-colors hover:bg-paper-200 dark:border-night-100 dark:text-paper-300 dark:hover:bg-night-100"
-            >
-              Next →
-            </Link>
-          ) : (
-            <span
-              aria-label="Next root"
-              aria-disabled="true"
-              className="rounded-lg border border-paper-200 px-3 py-1.5 text-sm text-paper-300 dark:border-night-50 dark:text-paper-600"
-            >
-              Next →
-            </span>
-          )}
-        </nav>
-      </header>
+          ))}
+        </span>
+      </EntryHeader>
+
+      <nav aria-label="Adjacent roots" className="mb-6 flex items-center justify-between">
+        {prevBw ? (
+          <Link
+            href={rootPath(prevBw)}
+            aria-label="Previous root"
+            className="rounded-lg border border-paper-300 px-3 py-1.5 text-sm text-paper-700 transition-colors hover:bg-paper-200 dark:border-night-100 dark:text-paper-300 dark:hover:bg-night-100"
+          >
+            ← Previous
+          </Link>
+        ) : (
+          <span
+            aria-label="Previous root"
+            aria-disabled="true"
+            className="rounded-lg border border-paper-200 px-3 py-1.5 text-sm text-paper-300 dark:border-night-50 dark:text-paper-600"
+          >
+            ← Previous
+          </span>
+        )}
+        {nextBw ? (
+          <Link
+            href={rootPath(nextBw)}
+            aria-label="Next root"
+            className="rounded-lg border border-paper-300 px-3 py-1.5 text-sm text-paper-700 transition-colors hover:bg-paper-200 dark:border-night-100 dark:text-paper-300 dark:hover:bg-night-100"
+          >
+            Next →
+          </Link>
+        ) : (
+          <span
+            aria-label="Next root"
+            aria-disabled="true"
+            className="rounded-lg border border-paper-200 px-3 py-1.5 text-sm text-paper-300 dark:border-night-50 dark:text-paper-600"
+          >
+            Next →
+          </span>
+        )}
+      </nav>
 
       <section className="mb-8 space-y-3">
         {definitions.length > 0 ? (
@@ -106,7 +100,13 @@ export function RootEntry({ entry, initialConcordance, total, prevBw, nextBw }: 
               >
                 {d.definition}
               </ClampedText>
-              <p className="mt-2 text-xs text-paper-500">{sourceLabel(d.source)}</p>
+              {/* Card interior, so contrast is measured against bg-paper-100 /
+                  dark:bg-night-50, not the page: paper-700 6.78:1 and
+                  paper-400 6.16:1. paper-500 sat at 2.85:1 light / 4.40:1
+                  dark, both under the 4.5:1 WCAG AA floor §8 sets. */}
+              <p className="mt-2 text-xs text-paper-700 dark:text-paper-400">
+                {sourceLabel(d.source)}
+              </p>
             </div>
           ))
         ) : (
