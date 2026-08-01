@@ -6,7 +6,7 @@ import {
   getRootConcordancePage,
   countRootConcordance,
   getRootNeighbors,
-  isRootBuckwalter,
+  parseRootParam,
   CONCORDANCE_PAGE_SIZE,
 } from '@quran-corpus/data';
 import { getDatabase } from '../../../lib/db';
@@ -19,12 +19,12 @@ interface PageProps {
 }
 
 export default async function RootPage({ params }: PageProps) {
-  const { root: bw } = await params;
   // Same rule the concordance API enforces, for the same reason the lemma page
   // states: SSR must not accept an identifier the client-side Load-more then
-  // 400s on. Harmless on today's data (every root token is within the charset),
-  // but the asymmetry is exactly what the shared validator exists to prevent.
-  if (!isRootBuckwalter(bw)) notFound();
+  // 400s on. Not harmless on today's data -- 97 of 1642 roots contain a
+  // character URL normalization leaves percent-encoded.
+  const bw = parseRootParam((await params).root);
+  if (bw === null) notFound();
   const db = await getDatabase();
   const entry = await getRootEntry(db, bw);
   if (!entry) notFound();

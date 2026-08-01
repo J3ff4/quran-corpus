@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import {
   getLemmaEntry,
   getLemmaConcordancePage,
-  isLemmaBuckwalter,
+  parseLemmaParam,
   CONCORDANCE_PAGE_SIZE,
 } from '@quran-corpus/data';
 import { getDatabase } from '../../../../lib/db';
@@ -15,13 +15,11 @@ interface PageProps {
 }
 
 export default async function LemmaPage({ params }: PageProps) {
-  const { lemma: bw } = await params;
-  // Validate before touching the DB, using the same rule the concordance API
-  // enforces -- otherwise SSR would accept an identifier the client-side
-  // Load-more then 400s on (the accepts/rejects asymmetry). The App Router has
-  // already percent-decoded the segment; decoding it again here would alias
-  // `qa%2541la` onto `qaAla`, and `%` is outside the charset this rejects.
-  if (!isLemmaBuckwalter(bw)) notFound();
+  // Decode + validate before touching the DB, using the same rule the
+  // concordance API enforces -- otherwise SSR would accept an identifier the
+  // client-side Load-more then 400s on (the accepts/rejects asymmetry).
+  const bw = parseLemmaParam((await params).lemma);
+  if (bw === null) notFound();
   const db = await getDatabase();
   const entry = await getLemmaEntry(db, bw);
   if (!entry) notFound();

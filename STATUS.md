@@ -12,18 +12,44 @@ Updated: 2026-07-31
 ## Now
 All work below confirmed via `gh pr list --state all` + `git merge-base --is-ancestor`,
 not carried over from prior narrative.
-- **IN REVIEW (2026-07-31): dictionary UI truth pass — PR #64, branch
-  `feat/dictionary-truth-pass`, head `0bf4d0a`.** Four fixes on the lemma/root
-  pages, from screenshots. Pushed, **not merged**. §4 step 3 (`/code-review`)
+- **IN REVIEW (2026-08-01): percent-encoded dictionary params — PR #65 OPEN,
+  branch `fix/dictionary-identifier-decoding`, head `0d6a327`, two commits on
+  top of `origin/main` (`5ce6fdf`).** `/dictionary/lemma/[lemma]` and `/dictionary/[root]` were
+  validating the **raw** path segment: Next hands the page the segment
+  un-decoded, and `{ > < | $` all survive URL normalization percent-encoded, so
+  every identifier containing one 404'd — **1669 of 4832 lemmas, 97 of 1642
+  roots**. Both pages now go through `parseLemmaParam`/`parseRootParam`
+  (decode-then-validate, the rule the concordance routes already enforced); the
+  route handlers keep validating raw, since Next decodes query strings but not
+  path segments. `%` is outside the Buckwalter charset, which is what makes the
+  single decode provably non-aliasing. **§5 has reviewed it.** First round
+  (head `e49e67a`) generated no findings but failed the `Client Bundle Stays
+  Clean` pre-merge check on seven pre-existing `'use client'` files this PR
+  never touched — fixed separately in #66 and merged, then this branch was
+  rebased onto `5ce6fdf` so the check passes here. Rebase replayed clean; the
+  two SHAs before it (`8febee3`, `e49e67a`) are dead.
+  §4 step 3 (`/code-review`) run once: 3 Low findings, all fixed —
+  a `ClampedText` re-open inheriting the previous open's release timer (React
+  bails on the equal measured height, so the effect never re-armed; state is
+  now boxed so every open is a fresh identity), **no page-level test for this
+  branch's own headline fix** (the parser was unit-tested but not the wiring —
+  reverting `page.tsx` left all 683 green; now `LemmaPage.test.tsx` +
+  new `RootPage.test.tsx` assert the decoded value reaches the query, and all
+  three new tests were verified to fail against the un-fixed code), and this
+  block's own staleness.
+- **MERGED 2026-07-31 17:41Z: dictionary UI truth pass — PR #64, squashed to
+  `f44d296`** (branch `feat/dictionary-truth-pass`, reviewed head `5d8b220`).
+  Four fixes on the lemma/root pages, from screenshots. §4 step 3 (`/code-review`)
   run three times: 5 findings, 5 findings, then 6 — all fixed, plus two the
   third round missed (a `paper-600` chip that fails AA on `bg-paper-100`, and a
   2.20:1 caption this branch still carried after the header branch had already
   fixed it). §5 CodeRabbit reviewed `b9159a5` and returned CHANGES_REQUESTED:
   14 inline findings plus a failed `New Logic Ships With Tests` pre-merge
-  check, all addressed. **Latest: CodeRabbit reviewed head `0bf4d0a`
-  2026-07-31 15:59Z, still CHANGES_REQUESTED — one Minor finding, on this
-  file's own staleness.** The commit status is a green `Review completed`; the
-  review verdict is the gate, not the status colour (§5). **Verify against
+  check, all addressed. CodeRabbit reviewed head `0bf4d0a` 2026-07-31 15:59Z
+  with one Minor finding — this file's own staleness — and that round was still
+  CHANGES_REQUESTED. Final round: **APPROVED at head `5d8b220`** 17:40:31Z, the
+  commit that fixed it; PR merged at 17:41Z. The commit status was a green
+  `Review completed`; the review verdict is the gate, not the status colour (§5). **Verify against
   `gh pr view 64` before acting on any of this** (§14).
 - **NOT ON ANY PR (2026-07-31): the entry-header redesign.** Branch
   `feat/dictionary-entry-header` is `feat/dictionary-truth-pass` plus
@@ -35,7 +61,13 @@ not carried over from prior narrative.
   It adds the shared `EntryHeader`, both rewritten entry headers, and both
   `loading.tsx` skeletons. Pushed to origin; **no PR opened, so §5 has never
   seen this commit.** #64's review state does not cover it. Opening the PR is
-  the user's call, not the agent's.
+  the user's call, not the agent's. **#64 merged as a squash, so this branch's
+  base no longer exists in `main`'s history** — it needs a rebase onto
+  `origin/main` (`5ce6fdf`) before it can be opened, and the range command above
+  still resolves it in the meantime (see squash-merge-hides-branch-state). The
+  rebase is `git rebase --onto origin/main 5d8b220 feat/dictionary-entry-header`
+  — replaying from `origin/main..` instead would re-apply all 16 truth-pass
+  commits already squashed into `main`.
   - **Lemma "meaning" line was a contextual gloss posing as a definition.**
     `top_gloss` = most frequent word-by-word gloss; those are per-verse
     translations, so they carry subjects, prefixes, pronoun suffixes and quote
@@ -99,8 +131,10 @@ not carried over from prior narrative.
     generation, import commits later) now covered by a post-condition query.
   - Gates are **local, 2026-07-31** (no CI configured), and measured per
     branch — the two numbers are not interchangeable:
-    - **PR #64 head `0bf4d0a`: 236 data + 442 web tests pass**, lint clean,
-      type-check clean. This is the only figure that verifies the PR.
+    - **PR #64 at `0bf4d0a`: 236 data + 442 web tests pass**, lint clean,
+      type-check clean. This is the only figure that verifies the PR. Measured
+      one commit below the merged head `5d8b220`, which is `STATUS.md`-only
+      (`git diff --stat 0bf4d0a 5d8b220`), so the numbers carry.
     - `feat/dictionary-entry-header` (superset, see above): 236 + 448. The
       extra 6 cover `EntryHeader`, which is not in #64 — so quoting 684 as
       #64's result overstates it by six tests of unrelated code.
@@ -119,8 +153,13 @@ not carried over from prior narrative.
   (`0095c2c`, 2026-07-28 19:01Z — CodeRabbit gate). **#60 MERGED** (phase 17).
   **#61 MERGED** (phase 18, `6113fd3`). **#62 MERGED** (`97d78bb`, sort_order
   invalidation). **#63 MERGED** (`7b86214`, 2026-07-31 03:24Z — lemma pages,
-  squashed, **§5 gate overridden**, see below). Current `main` tip `7b86214`.
-  Nothing open.
+  squashed, **§5 gate overridden**, see below). **#64 MERGED** (`f44d296`,
+  2026-07-31 17:41Z, squashed — dictionary truth pass). **#66 MERGED**
+  (`5ce6fdf`, 2026-08-01 01:12Z, squashed — client-component type imports moved
+  onto `@quran-corpus/data/client`, plus the guard test that keeps them there).
+  Current `origin/main` tip `5ce6fdf`; a local `main` last fetched before that
+  still reads an older SHA, so check the remote ref, not the local one.
+  **#65 is open** — see Now.
   **Commit SHAs before 2026-07-27 are all dead** — history was rewritten, see purge.
 - **Phase 18 (930-root re-scrape) DONE + MERGED.** All six phase-17 carry items
   closed. **The 930-root crawl itself has been run** (see Phase 18 below) — nothing

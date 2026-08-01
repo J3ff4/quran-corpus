@@ -136,6 +136,37 @@ describe('ClampedText', () => {
     }
   });
 
+  it('a re-open arms its own release timer instead of inheriting the last one', () => {
+    // Regression: the release timeout keys on the measured height, and a
+    // re-open measures the same number, so React bailed on the equal value and
+    // the effect never re-ran. The timer from the FIRST open then fired part
+    // way into the second one, dropping max-height from px to none mid-flight
+    // and snapping the box open.
+    vi.useFakeTimers();
+    try {
+      stubHeights(500, 200);
+      const { container } = render(<ClampedText label="root definition">long…</ClampedText>);
+      const box = container.querySelector('.clamp-box') as HTMLElement;
+
+      fireEvent.click(screen.getByRole('button')); // open at t=0
+      act(() => void vi.advanceTimersByTime(100));
+      fireEvent.click(screen.getByRole('button')); // close at t=100
+      act(() => void vi.advanceTimersByTime(350));
+      fireEvent.click(screen.getByRole('button')); // re-open at t=450
+
+      // t=500: the first open's timer would have fired here, 50ms into the
+      // second open's 240ms transition.
+      act(() => void vi.advanceTimersByTime(50));
+      expect(box.style.maxHeight).toBe('500px');
+
+      // t=950: this open's own timer, 500ms after its own click.
+      act(() => void vi.advanceTimersByTime(450));
+      expect(box.style.maxHeight).toBe('');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('collapsing from rest returns to the clamp with no stale px ceiling', () => {
     stubHeights(500, 200);
     const { container } = render(<ClampedText label="root definition">long…</ClampedText>);

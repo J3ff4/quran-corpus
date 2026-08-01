@@ -42,7 +42,12 @@ export function ClampedText({
   // state must be intrinsic — a definition is up to 1479 characters and any
   // fixed ceiling we guessed could crop one. So: animate to a measured px, then
   // release to `undefined` and let the box size to its content.
-  const [animatingTo, setAnimatingTo] = useState<number | null>(null);
+  // Boxed, not a bare number: a re-open usually measures the *same* height as
+  // the previous one, and React bails on an equal value — the release effect
+  // below would not re-run and the second open would inherit the first open's
+  // already-running timer, dropping the ceiling mid-transition. A fresh object
+  // every open is never equal, so every open arms its own timer.
+  const [animatingTo, setAnimatingTo] = useState<{ px: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const id = useId();
 
@@ -130,7 +135,7 @@ export function ClampedText({
     // height it cannot use would only create a ceiling that must be unpinned
     // again. Closing *mid-open* still animates: `animatingTo` is already a px
     // value then, and px → the clamp interpolates fine.
-    if (!expanded) setAnimatingTo(el.scrollHeight);
+    if (!expanded) setAnimatingTo({ px: el.scrollHeight });
     setExpanded((v) => !v);
   }
 
@@ -140,7 +145,7 @@ export function ClampedText({
   // While animating, both states are a concrete px height so the transition has
   // two lengths to interpolate between.
   let maxHeight: string | undefined;
-  if (animatingTo !== null) maxHeight = expanded ? `${animatingTo}px` : collapsedHeight;
+  if (animatingTo !== null) maxHeight = expanded ? `${animatingTo.px}px` : collapsedHeight;
   else if (!expanded) maxHeight = collapsedHeight;
 
   return (

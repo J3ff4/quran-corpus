@@ -50,3 +50,58 @@ export function isLemmaBuckwalter(s: string): boolean {
 export function isRootBuckwalter(s: string): boolean {
   return isBuckwalter(s, ROOT_BUCKWALTER_MAX);
 }
+
+/**
+ * Resolve a URL path segment to a Buckwalter identifier, or null if it is not
+ * one. Decode and validation are fused because every call site that did them
+ * separately got it wrong, in one of two opposite directions.
+ *
+ * **Why a segment may still be encoded.** URL normalization decodes only the
+ * *unreserved* set (RFC 3986: ALPHA DIGIT `- . _ ~`); everything else survives
+ * as `%XX`. Much of the Buckwalter charset is reserved or unsafe — `{ } < > ^ #
+ * @ [ ] , & $` and the backtick — and `%` is itself outside the charset, so a
+ * validator applied to a still-encoded segment rejects the whole identifier.
+ * That was a live 404 on 1669 of 4832 lemma pages (35%, covering 40% of all word
+ * occurrences) and 97 of 1642 root pages, including ٱللَّه, إِنّ and ٱلَّذِى — the three
+ * most frequent lemmas in the corpus. `encodeURIComponent` at the link site
+ * (`apps/web/src/lib/routes.ts`) was always right; nothing undid it.
+ *
+ * **For page params only.** Next hands Server Component pages a raw segment but
+ * Route Handlers an already-decoded one — measured, not assumed:
+ * `/dictionary/lemma/%7Bll~ah` reaches the page as `%7Bll~ah`, while
+ * `/api/lemma/qa%2541la` reaches the handler as `qa%41la`. So the two route
+ * kinds need different treatment, and the handlers were never broken. **Route
+ * handlers must keep calling `isLemmaBuckwalter`/`isRootBuckwalter` directly**:
+ * decoding there would turn `qa%2541la` into `qaAla` and serve a real page under
+ * a non-canonical, separately-cached URL.
+ *
+ * Double-encoding is refused without any extra machinery — `qa%2541la` decodes
+ * to `qa%41la`, which still holds a `%` and so fails the charset check. That is
+ * also why one decode is the right number: `%` cannot appear in a valid
+ * identifier, so there is never a second layer worth peeling.
+ */
+function parseIdentifierParam(raw: string, isValid: (s: string) => boolean): string | null {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    // Malformed escape (`%zz`, a truncated `%E0%A4%A`). An uncaught URIError in
+    // a server component is a 500 where the honest answer is 404.
+    return null;
+  }
+  return isValid(decoded) ? decoded : null;
+}
+
+/**
+ * Resolve a `lemma_buckwalter` **page** path segment, or null if it is
+ * malformed, out of charset, or double-encoded. See the note above: route
+ * handlers use `isLemmaBuckwalter` instead.
+ */
+export function parseLemmaParam(raw: string): string | null {
+  return parseIdentifierParam(raw, isLemmaBuckwalter);
+}
+
+/** As `parseLemmaParam`, for a `root_buckwalter` page path segment. */
+export function parseRootParam(raw: string): string | null {
+  return parseIdentifierParam(raw, isRootBuckwalter);
+}

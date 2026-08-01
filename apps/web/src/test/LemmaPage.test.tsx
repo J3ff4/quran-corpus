@@ -28,9 +28,9 @@ const getDatabase = vi.fn(async () => ({}) as never);
 vi.mock('../lib/db', () => ({ getDatabase: () => getDatabase() }));
 
 vi.mock('@quran-corpus/data', async (importOriginal) => {
-  // isLemmaBuckwalter stays REAL: the point of the first branch is that the
-  // page rejects exactly what the concordance API rejects, and a stubbed
-  // validator would assert that agreement into existence.
+  // parseLemmaParam stays REAL: the point of the first branch is that the page
+  // decodes and rejects exactly what the concordance API does, and a stubbed
+  // parser would assert that agreement into existence.
   const actual = await importOriginal<typeof import('@quran-corpus/data')>();
   return {
     ...actual,
@@ -67,6 +67,19 @@ describe('LemmaPage', () => {
     expect(screen.getByText('قَالَ')).toBeInTheDocument();
     expect(screen.getByTestId('concordance')).toBeInTheDocument();
     expect(getLemmaConcordancePage).toHaveBeenCalledWith(expect.anything(), 'qaAla', {
+      limit: CONCORDANCE_PAGE_SIZE,
+      offset: 0,
+    });
+  });
+
+  it('decodes the percent-encoded path segment before the lookup', async () => {
+    // Next hands the page the *raw* segment, and `{` `>` `<` `|` `$` all
+    // survive URL normalization percent-encoded -- 1669 of 4832 lemmas contain
+    // one. Validating without decoding first 404s every one of them, and every
+    // unit test of the parser still passes, so the assertion has to be here.
+    render(await page('%7Bll~ah'));
+    expect(getLemmaEntry).toHaveBeenCalledWith(expect.anything(), '{ll~ah');
+    expect(getLemmaConcordancePage).toHaveBeenCalledWith(expect.anything(), '{ll~ah', {
       limit: CONCORDANCE_PAGE_SIZE,
       offset: 0,
     });

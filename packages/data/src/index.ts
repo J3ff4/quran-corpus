@@ -55,6 +55,8 @@ export {
   isBuckwalter,
   isLemmaBuckwalter,
   isRootBuckwalter,
+  parseLemmaParam,
+  parseRootParam,
   LEMMA_BUCKWALTER_MAX,
   ROOT_BUCKWALTER_MAX,
 } from './text/buckwalter.js';
