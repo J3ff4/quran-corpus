@@ -37,13 +37,17 @@ function Senses({ senses }: { senses: LemmaSense[] }) {
             key={s.pos_tag}
             className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-paper-200 bg-paper-100 px-2.5 py-1 text-sm dark:border-night-100 dark:bg-night-50"
           >
-            {/* The colour rides on a dot, not on the label text, for two
-                reasons. --pos-prep (#0f8a6a) measures 4.07:1 against
-                bg-paper-50 and 3.59:1 once tinted — under the 4.5:1 AA floor
-                for text, but comfortably over the 3:1 floor a non-text
-                indicator answers to. And FormFilterChips already establishes
-                that meaning here never rides on colour alone: the label
-                carries it, the dot only reinforces.
+            {/* The colour rides on a dot, not on the label text. That started
+                as a contrast constraint — --pos-prep was #0f8a6a, which
+                measured 4.07:1 on the page and failed the 4.5:1 AA text floor
+                while clearing the 3:1 one a non-text indicator answers to.
+                The palette has since been darkened for the label-text call
+                sites, so it is no longer a constraint: every --pos-* token now
+                measures 5.35:1 or better as text on this chip's bg-paper-100.
+                The dot stays as a choice — these chips run in a dense row and
+                a repeated tint reads as noise at that size. Meaning never
+                rides on colour alone either way: the label carries it, the dot
+                only reinforces.
 
                 posColor is the reader's own function, unchanged (§3) — same
                 five buckets, same --pos-* variables, so a verb is the same

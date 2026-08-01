@@ -5,6 +5,10 @@ import { SegmentPills } from '../morphology/SegmentPills';
 import { posColor } from '../../lib/posColor';
 import type { WbwCell } from './types';
 
+/** One word as a table row — the wide counterpart to WbwWordCell. The extra
+ *  width buys a third column the grid has no room for: every segment's POS
+ *  spelled out and colour-coded, plus the Arabic grammar note. Falls back to
+ *  the word-level pos_tag when any segment is missing one. */
 export function WbwWordRow({
   cell,
   pageLang,
@@ -47,7 +51,14 @@ export function WbwWordRow({
       <td className="px-3 py-3 text-center">
         <Link
           href={`/word/${surahId}/${ayahNumber}/${position}`}
-          className="inline-flex flex-col items-center gap-1 hover:opacity-80"
+          /* Same reason as WbwWordCell: the `hover:opacity-80` this replaces
+             faded the POS pills' text and their own tinted background
+             together, which is the worst case of the two (~3.2:1). A ring
+             changes nothing inside the link, and paper-600 clears the 3:1
+             non-text floor against both page colours -- see the note there
+             for why that one step and not paper-500. Deliberately not themed:
+             a `dark:ring-*` would sort after this rule and cancel it. */
+          className="inline-flex flex-col items-center gap-1 rounded-lg transition-shadow hover:ring-2 hover:ring-paper-600"
         >
           <SegmentPills segments={segments} fallbackWord={arabic} />
         </Link>

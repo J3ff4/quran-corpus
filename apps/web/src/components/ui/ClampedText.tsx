@@ -80,7 +80,7 @@ export function ClampedText({
     // with `display: swap` -- and the swap re-wraps the text. The observer
     // below does NOT catch that: while collapsed the box height is pinned by
     // `max-height`, so a content-only height change never alters the observed
-    // box and no callback fires. If the fallback face fit in eight lines and
+    // box and no callback fires. If the fallback face fit inside the clamp and
     // the real one does not, the reader is left with a definition cropped by
     // `overflow: hidden`, no fade, no scrollbar and no toggle -- the exact
     // state the noscript escape hatch exists to prevent. So re-measure once

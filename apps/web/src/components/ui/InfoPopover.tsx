@@ -64,15 +64,15 @@ export function InfoPopover({ label, children }: InfoPopoverProps) {
         aria-expanded={open}
         aria-controls={id}
         aria-label={label}
-        /* h-4/w-4 is the visible glyph; the negative-margin padding grows the
-           hit area to 44px without moving the heading it sits beside — the
+        /* h-3.5/w-3.5 is the visible glyph; the negative-margin padding grows
+           the hit area to 44px without moving the heading it sits beside — the
            glyph is small by design but the tap target may not be (WCAG 2.5.8,
            §8's AA floor). */
         className="relative -m-3 inline-flex h-11 w-11 items-center justify-center text-paper-600 transition-colors hover:text-paper-800 dark:text-paper-400 dark:hover:text-paper-200"
       >
         <span
           aria-hidden="true"
-          className="flex h-4 w-4 items-center justify-center rounded-full border border-current text-[10px] font-semibold leading-none"
+          className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-current text-[9px] font-semibold leading-none"
         >
           i
         </span>

@@ -33,6 +33,40 @@ Evidence differs per claim; none of it is carried over from prior narrative.
   trust it. Never infer these from GitHub metadata, which does not carry them.
 - "Nothing open" means no **open GitHub PR**, per `gh pr list --state open`. It
   says nothing about unmerged local branches, which are listed separately.
+- **MERGED 2026-08-01 13:39Z: gloss caveat behind an info icon + inline clamp
+  toggle — PR #69, squashed to `4ace0df`** (branch
+  `feat/dictionary-note-and-clamp-polish`, reviewed head `ae0938b`, deleted
+  local + remote). Three of the user's screenshot notes; the third (homograph
+  concordance mis-tag) was **deferred by the user** and is Queue item 10 below,
+  not fixed here. Shipped: the "from word-by-word translations…" caveat moved
+  off the page into a new `InfoPopover` (tap/click, not hover — mobile-first,
+  §8), and `ClampedText`'s toggle moved inline to the right of the lexicon at
+  6 lines instead of 8.
+  - **§5 passed on its own merits, no override.** `APPROVED` 11:30:05Z with
+    `commit_id` = `ae0938b` = the head that merged, zero unresolved
+    non-outdated review threads, pre-merge table 8 passed / 1 warning. The one
+    ❌ is `Docstring Coverage` 50.00% vs an 80.00% threshold — **`mode: warning`,
+    which does not block**. Adding a docstring to `renderOne` did **not** move
+    the number (walkthrough re-edited 11:30:14Z, after the approval, still
+    50.00%); the uncounted functions are the nested closures `onKey`/`onClick`
+    (InfoPopover.tsx) and `measure`/`toggle` (ClampedText.tsx), documented in
+    prose above them rather than in doc comments. Left as-is, deliberately.
+  - **§4 step 3 (`/code-review`) RAN** and returned 5 findings, all fixed in
+    `ebda911` with the reasoning in the commit body. The one that mattered:
+    dismissing on `pointerdown` **swallowed the first tap** on anything under
+    the note. The panel is in the flow, so closing it shifts the content below
+    up ~30px *between* a tap's down and up; the finger lifts over a different
+    element and the browser dispatches the click to the nearest common
+    ancestor. Now on `click`, where the layout is stable for the whole gesture.
+    Verified end-to-end in a 393×850 headless Chromium run — "View root"
+    navigated on the first tap. Regression test asserts the panel survives a
+    `pointerDown`.
+  - CodeRabbit's own finding: the panel rendered as `<p>` while its slot is
+    typed `React.ReactNode`, so a block-level child would make the browser
+    auto-close the tag and split the DOM — detaching content from `panelRef`
+    and silently breaking outside-click containment. Now a `<div>` (`ae0938b`).
+  - Gates (local, 2026-08-01): `tsc --noEmit` clean, `eslint` clean on touched
+    files, **474 tests / 81 files** green (7 new).
 - **MERGED 2026-08-01 01:24Z: percent-encoded dictionary params — PR #65,
   squashed to `19ebfc0`** (branch `fix/dictionary-identifier-decoding`, reviewed
   head `5daee92`, deleted). `/dictionary/lemma/[lemma]` and `/dictionary/[root]` were

@@ -6,24 +6,51 @@
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-arabic: var(--font-kfgqpc), 'Amiri', 'Noto Naskh Arabic', serif;
 
-  /* POS morphology color-coding (WCAG-AA on paper light background). */
-  --pos-noun: #2469c0;
-  --pos-verb: #b23b2e;
-  --pos-prep: #0f8a6a;
-  --pos-pron: #8a5a0f;
-  --pos-other: #555;
+  /* POS morphology color-coding. One palette that passes the tightest floor
+     beats per-call-site rules, so every token is measured against its WORST
+     use rather than the page: small label text sitting on a tint of *its own
+     hue*, which is the pill in SegmentPills (16%). Same-hue tint pulls the
+     background toward the text and costs ~20% of the ratio, so page-background
+     numbers flatter these tokens by a whole AA grade -- the two figures below
+     are (on the page / on that 16% tint), and it is the second that has to
+     clear 4.5:1. The other uses are looser: large Arabic glyphs and dots both
+     sit at the 3:1 non-text floor.
 
-  /* Dictionary derived-form category color-coding (WCAG-AA on paper light
-     background). Separate taxonomy from --pos-* (dictionary derived forms,
-     not sentence-position POS tags) -- verb/noun/other reuse the same hex as
-     their --pos-* counterpart for semantic consistency, the rest are new. */
-  --form-verb: #b23b2e;
-  --form-verbal-noun: #6b4fa0;
-  --form-active-participle: #1f8a6a;
-  --form-passive-participle: #a0527a;
-  --form-noun: #2469c0;
-  --form-adjective: #b2790f;
-  --form-other: #555;
+     The tint is transparent, so anything painted behind a pill composites into
+     that pill's own contrast and eats the margin below. Hover and selected
+     states around these pills therefore change the border or ring, never the
+     fill -- see WbwWordCell / WbwWordRow. */
+  --pos-noun: #2161b2; /* 5.79 / 4.60:1 */
+  --pos-verb: #ab392c; /* 5.90 / 4.61:1 */
+  --pos-prep: #0c6e55; /* 5.86 / 4.65:1 */
+  --pos-pron: #86580f; /* 5.79 / 4.61:1 */
+  --pos-other: #555; /* 7.02 / 5.55:1 */
+
+  /* Dictionary derived-form category color-coding. Separate taxonomy from
+     --pos-* (dictionary derived forms, not sentence-position POS tags) --
+     verb/noun/other reuse the same hex as their --pos-* counterpart for
+     semantic consistency, the rest are new.
+
+     Measured the same way and against the same worst case, but note what
+     "measured" covers: the COLOURED label only. FormFilterChips paints that
+     label over a 12% tint of the same token once its chip is selected, and
+     ConcordanceList's FormTag over a 16% one; a user creates that state by
+     tapping, so it is not an edge case, and the ratios above are for those.
+
+     The same selected chip also renders form_translit and occurrence_count in
+     text-paper-500, and those are NOT clear: 3.08:1 unselected, 2.57-2.61:1
+     once the tint is painted behind them. That is the app-wide text-paper-500
+     debt (54 uses across 29 components at the time of writing), not something
+     these tokens introduce -- but darkening --form-adjective from #b2790f moved that one
+     chip 2.70 -> 2.61, i.e. the wrong way by a hair. Fixing it means changing
+     the neutral token at those call sites, not the palette here. */
+  --form-verb: #ab392c; /* 5.90 / 4.61:1 */
+  --form-verbal-noun: #6b4fa0; /* 6.09 / 4.84:1 */
+  --form-active-participle: #186e55; /* 5.82 / 4.63:1 */
+  --form-passive-participle: #914a6f; /* 5.80 / 4.62:1 */
+  --form-noun: #2161b2; /* 5.79 / 4.60:1 */
+  --form-adjective: #84590b; /* 5.79 / 4.64:1 */
+  --form-other: #555; /* 7.02 / 5.55:1 */
 
   /* The built-in CSS easings are too weak to read as intentional. Strong
      ease-out for anything entering or expanding -- it moves immediately, which
@@ -84,7 +111,7 @@ html {
 /* Long-definition disclosure (ClampedText). max-height is the one animatable
    property here: revealing clipped text is a size change, so there is no
    transform/opacity equivalent, and the grid-template-rows trick only goes
-   0fr->1fr (we open from a visible 8-line clamp, not from nothing). Confined
+   0fr->1fr (we open from a visible 6-line clamp, not from nothing). Confined
    to a single text box on an occasional tap, which is where that cost is
    acceptable. */
 .clamp-box {
