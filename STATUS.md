@@ -1274,22 +1274,6 @@ Re-queried directly 2026-07-22 (do not trust older counts in this file's history
     the "Active participle ṣāliḥ 65" chip is green but every one of those 65
     concordance rows carries a blue "ṣāliḥ" tag.
 
-11. **`text-paper-500` is under AA at 54 uses across 29 components** — 3.08:1 on
-    the page, 2.57–2.61:1 on a tinted chip interior. Measured 2026-08-01 during
-    #70, which documented it in `globals.css` rather than fixing it: it is a
-    neutral-token sweep across the app, not a palette change, and wants its own
-    change so the diff is reviewable. Pick the replacement per background — see
-    the `paper-*` contrast table; the AA-safe token differs on the page vs. on a
-    card vs. behind a 12–16% tint.
-
-12. **Three dead dark hovers**, all pre-existing: `WordPopover.tsx:48`,
-    `WordPopover.tsx:73`, `WordDetailView.tsx:67`. Each pairs `hover:<prop>`
-    with `dark:<prop>` and no `dark:hover:<prop>`, so Tailwind's variant order
-    lets the resting dark rule win and the dark hover does nothing — the exact
-    bug #70 fixed in `WbwWordCell` (`3a63cd9`). Found by sweeping every
-    `className` in `src/**/*.tsx`; that sweep is the way to confirm the list is
-    still complete before fixing.
-
     Cause: the corpus disambiguates homograph lemmas with a trailing numeral,
     and only the morphology file carries it — `word_segments.lemma` is `صَٰلِح2`
     for the 9 Ṣāliḥ-the-prophet occurrences, while the root page prints a plain
@@ -1315,6 +1299,38 @@ Re-queried directly 2026-07-22 (do not trust older counts in this file's history
     (verified), which makes them the resolver's primary key with `pos_tag` as
     the cross-check. Schema change + migration + backfill + a live-DB write, so
     §12 and §6 both apply.
+
+11. **`text-paper-500` is under AA at 54 uses across 29 components** — 3.08:1 on
+    the page, 2.57–2.61:1 on a tinted chip interior. Measured 2026-08-01 during
+    #70, which documented it in `globals.css` rather than fixing it: it is a
+    neutral-token sweep across the app, not a palette change, and wants its own
+    change so the diff is reviewable. Pick the replacement per background — see
+    the `paper-*` contrast table; the AA-safe token differs on the page vs. on a
+    card vs. behind a 12–16% tint.
+
+12. **Three dead dark hovers**, all pre-existing: `WordPopover.tsx:48`,
+    `WordPopover.tsx:73`, `WordDetailView.tsx:67`. Each pairs `hover:<prop>`
+    with `dark:<prop>` and no `dark:hover:<prop>`, so Tailwind's variant order
+    lets the resting dark rule win and the dark hover does nothing — the exact
+    bug #70 fixed in `WbwWordCell` (`3a63cd9`). Found by sweeping every
+    `className` in `src/**/*.tsx`; that sweep is the way to confirm the list is
+    still complete before fixing.
+
+    **Re-verified 2026-08-02, all three still live**, exact resting/hover pairs:
+
+    | File:line | Resting dark | Hover (light-only today) |
+    | --- | --- | --- |
+    | `reader/WordPopover.tsx:48` (close button) | `dark:bg-night-100` | `hover:bg-paper-300` |
+    | `reader/WordPopover.tsx:73` (full-analysis link) | `dark:bg-paper-100` | `hover:bg-paper-700` |
+    | `morphology/WordDetailView.tsx:67` (same link, page version) | `dark:bg-paper-100` | `hover:bg-paper-700` |
+
+    Note `:73` / `:67` are an inverted button — `bg-paper-900` in light,
+    `bg-paper-100` in dark — so the dark hover step must go *darker* toward
+    `paper-200/300`, not reuse `paper-700`. Deferred by the user 2026-08-02:
+    fix wants a PC to verify, since the only proof is the computed style after
+    a real hover in dark mode (the class list looks correct while broken, and
+    no test asserts hover classes). Three `dark:hover:bg-*` additions, one
+    commit, no schema or data impact.
 
 ## Notes
 - Uzbek edition = Cyrillic (uz.sodik). Latin variant not done.
