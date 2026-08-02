@@ -215,3 +215,29 @@ Stop and ask rather than guess on: schema changes, adding a dependency, anything
 
 - Before acting on anything `STATUS.md` claims — a task pending, a fix unmerged, a job running — verify against ground truth: `git log --oneline`, `git merge-base --is-ancestor <commit> main`, `gh pr list --state all`. Never trust the narrative alone across a session boundary.
 - Update `STATUS.md` at natural checkpoints (phase done, PR merged, job finishes) so the drift stays small — but still re-verify before relying on it, since the next session may not be the one that updates it.
+
+-----
+
+## 15. Agent Skills Configuration
+
+Machine-readable config for the installed engineering skills, under `docs/agents/`.
+These files tell a skill *where* things live; they do not grant it authority. §4 and
+§5 still govern review — in particular, `mattpocock-skills:code-review` is an
+additional reader, **not** a substitute for §4 step 3 (`/code-review`) or the §5
+CodeRabbit gate.
+
+### Issue tracker
+
+GitHub Issues on `J3ff4/quran-corpus-pwa`, via the `gh` CLI. See
+`docs/agents/issue-tracker.md`. Note that opening a *PR* remains the user's call
+(never `gh pr create` unprompted); that restriction does not extend to issues.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` + `docs/adr/` at the repo root, both created lazily by
+`/domain-modeling` when a term or decision actually needs recording. Neither exists
+yet, and their absence is not a gap to fill. §2 remains the authority on package
+boundaries; `CONTEXT.md` covers domain vocabulary only. See `docs/agents/domain.md`.
+
+Triage labels are intentionally unconfigured — the `triage` skill is not registered
+here. Re-run `/mattpocock-skills:setup-matt-pocock-skills` if that changes.
