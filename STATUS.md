@@ -7,7 +7,7 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-08-01
+Updated: 2026-08-02
 
 ## Now
 Evidence differs per claim; none of it is carried over from prior narrative.
@@ -1116,9 +1116,66 @@ Re-queried directly 2026-07-22 (do not trust older counts in this file's history
   so any scrape or `import-lane` run before #62 lands leaves stale ranks that
   *look* healthy. Every root is snapshotted (1642 `.html.gz` in
   `~/quran-data/.snapshots/roots/`), so no parser fix needs the network again.
-- `root_definitions`: 1386 rows (qurandev/roots → Lane's Lexicon import). Done.
+- `root_definitions`: **1758 rows as of 2026-08-02** — `qurandev-lane` 1386,
+  `perseus-lane` 217 (phase 21), `corpus-forms` 155 (phase 20). Roots with no
+  definition at all: 101 → **18**. Re-query before trusting; these are live counts.
   "/"-spacing normalized 2026-07-23 (#46, 633/1386 rows changed) so unspaced
   "word/word/word" runs wrap instead of overflowing the card.
+- Phase 21 (2026-08-02, branch `feat/phase-21-perseus-lane-gap-fill`, **not yet
+  merged, PR #71 open**): filled 217 of the 256 Lane-less roots from the Perseus TEI of
+  Lane's Lexicon, deterministic extraction, no LLM. 14 roots Lane genuinely lacks
+  are left to the empty-state card; **25** were dropped across two human gates as
+  correct Lane extractions of a **form-I sense the Quran does not use** (بعض →
+  "the gnats bit him", صلو → "struck the small of the back", فئة → "I split his
+  head"). That failure mode is the phase's real limit — `key_candidates` matched
+  correctly in all 38 non-direct cases. The rejects are checked in at
+  `packages/scraper/tools/lane_rejects.txt` and subtracted from the target list,
+  because `import-lane` upserts and a re-run would otherwise reinstate them.
+  Five writes, five backups: `quran.db.bak-phase21` (213 rows),
+  `quran.db.bak-phase21b` (the 863ec2f refresh — 213 re-derived at the raised
+  1500-char cap, plus g$w Sgw gTw THw), `quran.db.bak-phase21c` (the da8d708
+  refresh — 106 of 217 rows re-derived with the seam/dangling-tail/bracket
+  fixes), `quran.db.bak-phase21d` (the 4c15092 refresh — 32 more rows, the
+  second `/code-review` pass), and `quran.db.bak-phase21e` (the 53d68d9 refresh
+  — 52 more rows from the third pass: a bracket half in `between` was defeating
+  the connective test and seaming mid-clause, so أتى read "He; it; came;" for
+  "He [or it] came", and spaced `<itype>` values (`Q. 1`, `R. Q. 1`, 846 of
+  14238) were parsing as form 0 and outranking the blocks tried first).
+  Live rows match the 53d68d9 extractor exactly.
+  A fourth `/code-review` pass found three more, all latent: a root's own
+  `<div2>` losing to a joined `X and Y` heading (Hyw, jr*q — neither a corpus
+  root), a seam thrown away with the roman prose in front of a dropped apparatus
+  run (0 of the 231 targets), and `perseus-lane` tied with `qurandev-lane` in
+  `DEFINITION_SOURCE_RANK` so the `rd.source` tie-break picked the
+  machine-extracted gloss alphabetically (no root holds both today). Fixed; the
+  re-derived TSV is byte-identical to the imported one, so **no sixth write**.
+  PR **#71**. CodeRabbit's first pass requested changes: the `mode: error`
+  **New Logic Ships With Tests** check failed on `fetch-lane-tei` and
+  `prepare_lane_glosses`'s argparse having no CLI test — the same gap phase 20
+  hit on the sibling tool. Fixed with 5 tests, plus three real code findings:
+  the §11 rate limit was missing from `download_volumes` (36 GETs back to back;
+  `get_with_retry` only spaces out *failures*), `part.rename` → `part.replace`
+  so `--force` does not raise on Windows, and `RAW_BASE` pinned from `master` to
+  commit `f3c19fb` — all 36 local volumes hash-match that tree, so the 217 rows
+  stand and no re-derive is owed. Ten further findings were CodeRabbit reading
+  the *plan document's* code sketches as live code; answered on the PR.
+  Rollback: `DELETE FROM root_definitions WHERE source='perseus-lane'`.
+  Vendored TEI volumes live outside the repo at `~/quran-data/refdata/lane-tei`.
+  **Open debt:** the `―` cut does **not** bound a gloss to one sense — Lane
+  also separates senses inside one sub-sense with roman prose, so one segment
+  can hold a dozen italic runs. 64 rows exceed 300 chars and 25 exceed 600
+  (بتر, 1336), some carrying proverb and verse translations. No cap value cuts
+  cleanly; the fix is to collect fewer senses. Re-run with
+  `prepare_lane_glosses --refresh` when that lands.
+  **Also open:** 2 rows (أخذ, طلل) still carry a function word in front of a
+  semicolon Lane wrote himself ("he took hold of;") — trimming those means
+  rewriting his punctuation, not the extractor's, so they are left alone.
+  **Accepted, not open:** a bracket-only gap between two italic runs now fuses
+  them bare, so بين reads "It a thing became separated" for "It (a thing) became
+  separated". 40 of those 52 rows fuse this way and the rest read cleanly ("He
+  sold it: and he bought it:"); keeping the bracket would mean threading its
+  state through the join, against the extractor's standing rule that a
+  straddling bracket is noise.
 - `words.pos_tag`: fixed 2026-07-23 (#46) — was first-segment POS (often a prefix)
   for 19,797/77,429 words; backfilled from word_segments.stem. 485 words (genuine
   double-stem compounds, e.g. مِمَّا) keep a deterministic first-stem pick, not a bug.

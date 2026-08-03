@@ -12,7 +12,24 @@ describe('About page', () => {
   it("credits corpus.quran.com and Lane's Lexicon", () => {
     render(<About />);
     expect(screen.getByText(/corpus\.quran\.com/i)).toBeInTheDocument();
-    expect(screen.getByText(/Lane's Lexicon/i)).toBeInTheDocument();
+    // Anchored to the source-name link, not any text node containing the
+    // substring: the Perseus entry's prose also says "Lane's Lexicon", so a
+    // plain getByText/getAllByText here would still pass with the Lane
+    // source object deleted entirely -- a licence breach this test exists
+    // to catch.
+    expect(screen.getByRole('link', { name: "Lane's Lexicon" })).toBeInTheDocument();
+  });
+
+  it('credits the Perseus Digital Library and its required availability sentence', () => {
+    render(<About />);
+    expect(
+      screen.getByRole('link', { name: 'Perseus Digital Library' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Text provided by Perseus Digital Library, with funding from The U\.S\. Department of Education and The Max Planck Society\./,
+      ),
+    ).toBeInTheDocument();
   });
 
   it('credits machine-assisted Uzbek glosses (NLLB)', () => {

@@ -24,6 +24,10 @@ describe('definitionSourceLabel', () => {
     expect(definitionSourceLabel('not-a-source')).toBe('not-a-source');
   });
 
+  it('credits perseus-lane as Lane, not as the raw tag', () => {
+    expect(definitionSourceLabel('perseus-lane')).toBe("Lane's Lexicon");
+  });
+
   it('does not resolve prototype keys to inherited members', () => {
     // Against an object literal these return Object.prototype's function --
     // truthy, so `??` never fires -- typed as `string`. React throws when

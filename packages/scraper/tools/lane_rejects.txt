@@ -1,0 +1,39 @@
+# Roots whose Perseus-Lane extraction was rejected at the phase-21 human gate
+# (2026-08-02), one per line as `buckwalter<TAB>reason`. Read by
+# prepare_lane_glosses and subtracted from the target list.
+#
+# These are NOT extractor bugs. The extractor correctly takes Lane's leading
+# form-I sense, which for these roots is not the sense the Quran uses -- Lane
+# opens صلو on striking the small of the back, not on prayer. Re-running the
+# pipeline would re-derive the same wrong text, and `import-lane` upserts, so
+# without this list a later re-run silently reinstates every one of them.
+#
+# To retire an entry: fix the extractor to prefer the Quranic sense (an
+# <itype>-aware rule is the open idea), confirm the new gloss by hand, delete
+# the line.
+bED	"The gnats, or musquitoes, bit him" -- not بعض "some"
+Slw	"I struck the small of the back" -- prayer sense is form II
+bEv	form-I sense, not بعث "raise up / send"
+Eyn	"hitting, or hurting, in the eye" -- not عين "eye, spring"
+bHr	"He slit; cut, or divided lengthwise" -- not بحر "sea"
+Swr	form-I sense, not صور "form, shape"
+frD	form-I sense, not فرض "ordain, apportion"
+HrS	form-I sense, not حرص "covet, be eager"
+nSy	"a species of thistle" -- not نصي
+hzm	"purring, sound of the throat" -- not هزم "rout"
+ETw	form-I sense, not عتو "insolence"
+Zfr	form-I sense, not ظفر "prevail"
+SwE	form-I sense, not صوع
+klw	form-I sense, not كلو
+Ebv	form-I sense, not عبث "trifle"
+EDw	"He enchanted" -- not عضو "limb, portion"
+qSm	form-I sense, not قصم
+hyt	form-I sense, not هيت
+hjE	form-I sense, not هجع
+nsA	form-I sense, not نسأ "defer, postpone"
+# Second gate, 2026-08-02: roots recovered by the joined-heading index fix.
+fAy	"I split, or clave, his head" -- not فئة "party, band"
+DHw	"The road appeared" -- not ضحى "forenoon"
+Hfw	"He walked barefoot" -- not حفي / يحفكم
+fDw	"wide, or spacious" -- not أفضى 4:21 "went in unto"
+gvw	right sense for غثاء, garbled English: "full of had in a abundance of"

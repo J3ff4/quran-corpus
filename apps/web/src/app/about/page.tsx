@@ -44,6 +44,14 @@ const sources: Source[] = [
     note: "An Arabic-English Lexicon by Edward William Lane (1863), long in the public domain, compiled per Quranic root by the qurandev/roots project; surfaced per-root alongside the corpus's derived forms.",
   },
   {
+    name: 'Perseus Digital Library',
+    href: 'https://www.perseus.tufts.edu/hopper/',
+    provides:
+      "The TEI text of Lane's Lexicon behind root definitions that the qurandev/roots compilation does not cover.",
+    license: 'Free redistribution with attribution',
+    note: 'Text provided by Perseus Digital Library, with funding from The U.S. Department of Education and The Max Planck Society. Lane’s 1863 lexicon is itself public domain; Perseus’s terms require this credit, that their availability statement stay intact, and that modifications be offered back.',
+  },
+  {
     name: 'NLLB-200 (Meta AI)',
     href: 'https://huggingface.co/facebook/nllb-200-distilled-600M',
     provides: 'Uzbek word-by-word glosses, machine-translated from the English glosses.',

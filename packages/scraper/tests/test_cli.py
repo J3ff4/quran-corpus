@@ -328,3 +328,27 @@ def test_migrate_snapshot_names_warns_about_duplicate_keys(runner, tmp_path):
     assert result.exit_code == 0
     assert "0 renamed" in result.output
     assert "warning: root_lHn archived under 2 names" in result.output
+
+
+def test_fetch_lane_tei_reports_the_volumes_and_honours_force(runner, tmp_path):
+    # The command's own wiring -- --dest, --force, and the size roll-up -- had no
+    # test; only download_volumes did. A --force that never reached the function
+    # would leave a stale mirror in place and report success.
+    dest = tmp_path / "lane-tei"
+
+    def fake_download(path, *, force=False, **kw):
+        path.mkdir(parents=True, exist_ok=True)
+        (path / "_S0.xml").write_bytes(b"x" * (3 * 1024 * 1024))
+        fake_download.forced = force
+        return [path / "_S0.xml"]
+
+    with patch("scraper.sources.lane_tei.download_volumes", fake_download):
+        result = runner.invoke(main, ["fetch-lane-tei", "--dest", str(dest)])
+        assert result.exit_code == 0
+        assert f"Lane TEI: 1 volumes, 3 MB -> {dest}" in result.output
+        assert fake_download.forced is False
+
+        forced = runner.invoke(main, ["fetch-lane-tei", "--dest", str(dest), "--force"])
+        assert forced.exit_code == 0
+        assert f"Lane TEI: 1 volumes, 3 MB -> {dest}" in forced.output
+        assert fake_download.forced is True

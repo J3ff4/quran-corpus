@@ -19,6 +19,7 @@ import {
   getRootNeighbors,
   backfillRootSortOrder,
   backfillRootSortOrderIfStale,
+  getRootDefinitions,
 } from '../src/queries/roots.js';
 
 let db: Client;
@@ -626,6 +627,38 @@ describe('roots queries', () => {
     const c = await getRootConcordancePage(db, 'clx2');
     const vw = c[0]!.verse_words;
     expect(vw.find((w) => w.text_arabic === 'y')!.starts_clause).toBe(false);
+  });
+
+  it('ranks a perseus-lane definition above a corpus-forms fallback', async () => {
+    const local = newFileDb();
+    await runMigrations(local);
+    await local.execute(
+      `INSERT INTO roots (id,root_buckwalter,root_arabic,occurrence_count)
+       VALUES (1,'SlH','ص ل ح',180)`,
+    );
+    await local.execute(
+      `INSERT INTO root_definitions (root_id,source,definition) VALUES
+       (1,'corpus-forms','to be good'),(1,'perseus-lane','It was, or became, good')`,
+    );
+    const defs = await getRootDefinitions(local, 1);
+    expect(defs[0]!.source).toBe('perseus-lane');
+  });
+
+  it('ranks a curated qurandev-lane definition above a machine-extracted perseus one', async () => {
+    // Tied at 0 these sorted by `rd.source`, so 'perseus-lane' won on the letter
+    // p — and the lemma page takes LIMIT 1 off this order.
+    const local = newFileDb();
+    await runMigrations(local);
+    await local.execute(
+      `INSERT INTO roots (id,root_buckwalter,root_arabic,occurrence_count)
+       VALUES (1,'SlH','ص ل ح',180)`,
+    );
+    await local.execute(
+      `INSERT INTO root_definitions (root_id,source,definition) VALUES
+       (1,'perseus-lane','It was, or became, good'),(1,'qurandev-lane','to be righteous')`,
+    );
+    const defs = await getRootDefinitions(local, 1);
+    expect(defs.map((d) => d.source)).toEqual(['qurandev-lane', 'perseus-lane']);
   });
 });
 

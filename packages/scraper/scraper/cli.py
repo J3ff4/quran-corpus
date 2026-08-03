@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import click
 
 from .checkpoint import Checkpoint
@@ -276,8 +278,6 @@ def import_corpus(txt_path: str, db: str) -> None:
     https://corpus.quran.com/download/ first. Ayah text must already be
     imported (run import-tanzil) so word Arabic text can be derived.
     """
-    from pathlib import Path
-
     from .sources.corpus_import import import_corpus_morphology
 
     database = ScraperDatabase(db)
@@ -298,8 +298,6 @@ def import_corpus(txt_path: str, db: str) -> None:
 )
 def import_lane(tsv_path: str, db: str, source: str) -> None:
     """Import Lane's Lexicon root definitions from a TSV (root<TAB>definition)."""
-    from pathlib import Path
-
     from .sources.lane import import_lane_definitions
 
     database = ScraperDatabase(db)
@@ -315,7 +313,6 @@ def import_lane(tsv_path: str, db: str, source: str) -> None:
 def validate_cmd(gpl_txt_path: str, db: str, limit: int) -> None:
     """Cross-check DB annotations against the GPL morphology file (exit 1 if any)."""
     import sys
-    from pathlib import Path
 
     from .validate import validate_against_gpl
 
@@ -339,8 +336,6 @@ def validate_cmd(gpl_txt_path: str, db: str, limit: int) -> None:
 @click.option("--db", default="quran.db", show_default=True)
 def import_tanzil(xml_path: str, db: str) -> None:
     """Import a Tanzil XML file into the database (runs seed first)."""
-    from pathlib import Path
-
     from .sources.tanzil import import_tanzil_text
 
     database = ScraperDatabase(db)
@@ -405,8 +400,6 @@ def import_quranenc(
     json_path: str, language_code: str, translator: str, db: str
 ) -> None:
     """Import a QuranEnc JSON translation file into the database (runs seed first)."""
-    from pathlib import Path
-
     from .sources.quranenc import import_quranenc_translation
 
     database = ScraperDatabase(db)
@@ -423,8 +416,6 @@ def import_quranenc(
 @click.option("--db", default="quran.db", show_default=True)
 def import_qul(json_path: str, language_code: str, translator: str, db: str) -> None:
     """Import a QUL (Tarteel AI) "simple" JSON translation file (runs seed first)."""
-    from pathlib import Path
-
     from .sources.qul import import_qul_translation
 
     database = ScraperDatabase(db)
@@ -479,6 +470,23 @@ def glosses_import_cmd(path: str, db: str) -> None:
     n = import_reviewed(database, entries)
     database.close()
     click.echo(f"glosses-import: {n} uz rows reviewed.")
+
+
+@main.command("fetch-lane-tei")
+@click.option(
+    "--dest",
+    default=str(Path.home() / "quran-data" / "refdata" / "lane-tei"),
+    show_default=True,
+    help="Where the TEI volumes land. Outside the repo: 67 MB, third-party (§9).",
+)
+@click.option("--force", is_flag=True, help="Re-download volumes already present.")
+def fetch_lane_tei(dest: str, force: bool) -> None:
+    """Download Perseus's 36 Lane TEI volumes."""
+    from .sources.lane_tei import download_volumes
+
+    paths = download_volumes(Path(dest), force=force)
+    total = sum(p.stat().st_size for p in paths)
+    click.echo(f"Lane TEI: {len(paths)} volumes, {total // 1024 // 1024} MB -> {dest}")
 
 
 if __name__ == "__main__":

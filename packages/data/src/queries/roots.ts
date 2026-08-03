@@ -237,14 +237,24 @@ export async function getRootForms(db: Client, rootId: number): Promise<RootForm
  *  reorders there, but the lemma page takes `LIMIT 1` off this same order —
  *  there, the accident silently picks the weaker definition.
  *
+ *  `perseus-lane` is Lane too, but machine-extracted from the TEI rather than
+ *  curated, and phase 21's own `lane_rejects.txt` records that its leading sense
+ *  is sometimes one the Quran never uses. So it sits below the curated Lane
+ *  sources and above the `corpus-forms` strip. Leaving it tied at 0 would have
+ *  let the `rd.source` tie-break decide alphabetically — `perseus-lane` beats
+ *  `qurandev-lane` — which is the same accident the rest of this comment exists
+ *  to have removed. No root carries both today; the ordering is what stops the
+ *  first one that does from silently rendering the weaker gloss.
+ *
  *  Shared so the two pages cannot disagree about which definition is "the"
  *  definition for a root.
  */
 export const DEFINITION_SOURCE_RANK = `CASE rd.source
        WHEN 'lane' THEN 0
        WHEN 'qurandev-lane' THEN 0
-       WHEN 'corpus-forms' THEN 1
-       ELSE 2
+       WHEN 'perseus-lane' THEN 1
+       WHEN 'corpus-forms' THEN 2
+       ELSE 3
      END, rd.source`;
 
 export async function getRootDefinitions(
