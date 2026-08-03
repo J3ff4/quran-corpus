@@ -1121,8 +1121,8 @@ Re-queried directly 2026-07-22 (do not trust older counts in this file's history
   definition at all: 101 → **18**. Re-query before trusting; these are live counts.
   "/"-spacing normalized 2026-07-23 (#46, 633/1386 rows changed) so unspaced
   "word/word/word" runs wrap instead of overflowing the card.
-- Phase 21 (2026-08-02, branch `feat/phase-21-perseus-lane-gap-fill`, **not yet
-  merged, PR #71 open**): filled 217 of the 256 Lane-less roots from the Perseus TEI of
+- Phase 21 (2026-08-02, **MERGED** 2026-08-03 — PR #71 squashed to `fbe0f6c`,
+  branch deleted): filled 217 of the 256 Lane-less roots from the Perseus TEI of
   Lane's Lexicon, deterministic extraction, no LLM. 14 roots Lane genuinely lacks
   are left to the empty-state card; **25** were dropped across two human gates as
   correct Lane extractions of a **form-I sense the Quran does not use** (بعض →
@@ -1157,8 +1157,20 @@ Re-queried directly 2026-07-22 (do not trust older counts in this file's history
   `get_with_retry` only spaces out *failures*), `part.rename` → `part.replace`
   so `--force` does not raise on Windows, and `RAW_BASE` pinned from `master` to
   commit `f3c19fb` — all 36 local volumes hash-match that tree, so the 217 rows
-  stand and no re-derive is owed. Ten further findings were CodeRabbit reading
-  the *plan document's* code sketches as live code; answered on the PR.
+  stand and no re-derive is owed. Seven rounds ran in all — **29 findings, 11
+  withdrawn** once shown the code, 18 fixed — ending in an explicit
+  `APPROVED` review on `551fb1c` with 8/8 `mode: error` pre-merge checks
+  passing (Docstring Coverage stayed a `mode: warning` ❌, non-actionable as on
+  #69/#70). Later rounds also caught `isdigit` → `isdecimal` on the `<itype>`
+  parse (latent, 0 of 14238), `set -euo pipefail` plus an atomic rename in the
+  import runbook, and **two vacuous assertions** — a `tmp_path` that already
+  existed so the guard test proved nothing, and a reject-list check against
+  `out.tsv` where a quarantined root can never appear. Both now mutation-checked.
+  The plan's own dry-run expectations were stale by the end (`233 of 256`
+  predates the joined-heading recovery and the reject list) and were
+  re-measured, not recomputed.
+  Quota is the real cost here: ~30 min between allowed reviews, and a refusal
+  posts a **green** `Review rate limited` status — never read that as a pass.
   Rollback: `DELETE FROM root_definitions WHERE source='perseus-lane'`.
   Vendored TEI volumes live outside the repo at `~/quran-data/refdata/lane-tei`.
   **Open debt:** the `―` cut does **not** bound a gloss to one sense — Lane
