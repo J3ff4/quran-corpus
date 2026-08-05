@@ -1,0 +1,5 @@
+# Roots where Salmoné's selected sense is not the sense the Quran uses.
+# One root per line, TAB, the reason. Read by load_salmone_targets, which
+# subtracts them from the target list -- `import-lane` upserts, so without this
+# a re-run silently reinstates every gloss the Task 7 gate rejected.
+# Populated by Task 7. Empty until then.

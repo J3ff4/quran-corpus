@@ -25,7 +25,7 @@ const sources: Source[] = [
     name: 'Quranic Arabic Corpus',
     href: 'https://corpus.quran.com',
     provides:
-      'Word-by-word morphology, part-of-speech tags, roots and lemmas, and the per-form lexical glosses shown as root definitions where Lane has no entry.',
+      'Word-by-word morphology, part-of-speech tags, roots and lemmas, and the per-form lexical glosses shown as root definitions where Lane has no curated entry — leading the machine-extracted Lane text where both exist.',
     license: 'GNU General Public License',
     note: 'Annotation © Kais Dukes, Language Research Group, University of Leeds. Used with the source clearly indicated and linked, as the license requires.',
   },
@@ -47,9 +47,17 @@ const sources: Source[] = [
     name: 'Perseus Digital Library',
     href: 'https://www.perseus.tufts.edu/hopper/',
     provides:
-      "The TEI text of Lane's Lexicon behind root definitions that the qurandev/roots compilation does not cover.",
+      "The TEI text of Lane's Lexicon and of Salmoné's Arabic-English Dictionary behind root definitions that the qurandev/roots compilation does not cover.",
     license: 'Free redistribution with attribution',
     note: 'Text provided by Perseus Digital Library, with funding from The U.S. Department of Education and The Max Planck Society. Lane’s 1863 lexicon is itself public domain; Perseus’s terms require this credit, that their availability statement stay intact, and that modifications be offered back.',
+  },
+  {
+    name: "An Advanced Learner's Arabic-English Dictionary (Salmoné)",
+    href: 'https://www.perseus.tufts.edu/hopper/',
+    provides:
+      'Root definitions selected for the form the Quran uses, filling roots that Lane has nothing for.',
+    license: 'Public domain (text); CC BY-SA 3.0 US (Perseus digitisation)',
+    note: 'H. Anthony Salmoné, Beirut: Librairie du Liban, 1889. Text provided by the Perseus Digital Library, digitised with National Science Foundation funding. The 1889 work is public domain by age; Perseus’s markup is CC BY-SA 3.0 US and this credit is its condition.',
   },
   {
     name: 'NLLB-200 (Meta AI)',

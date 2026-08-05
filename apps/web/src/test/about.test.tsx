@@ -32,6 +32,21 @@ describe('About page', () => {
     ).toBeInTheDocument();
   });
 
+  it('credits Salmoné and both Perseus-supplied works', () => {
+    render(<About />);
+    // href, not just the name: a credit pointing at the wrong host is an
+    // attribution failure the accessible name alone would never catch.
+    expect(
+      screen.getByRole('link', {
+        name: "An Advanced Learner's Arabic-English Dictionary (Salmoné)",
+      }),
+    ).toHaveAttribute('href', 'https://www.perseus.tufts.edu/hopper/');
+    expect(screen.getByText(/Librairie du Liban, 1889/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Lane's Lexicon and of Salmoné's Arabic-English Dictionary/),
+    ).toBeInTheDocument();
+  });
+
   it('credits machine-assisted Uzbek glosses (NLLB)', () => {
     render(<About />);
     expect(screen.getAllByText(/NLLB/i).length).toBeGreaterThan(0);

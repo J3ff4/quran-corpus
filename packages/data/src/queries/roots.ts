@@ -238,23 +238,42 @@ export async function getRootForms(db: Client, rootId: number): Promise<RootForm
  *  there, the accident silently picks the weaker definition.
  *
  *  `perseus-lane` is Lane too, but machine-extracted from the TEI rather than
- *  curated, and phase 21's own `lane_rejects.txt` records that its leading sense
- *  is sometimes one the Quran never uses. So it sits below the curated Lane
- *  sources and above the `corpus-forms` strip. Leaving it tied at 0 would have
- *  let the `rd.source` tie-break decide alphabetically — `perseus-lane` beats
- *  `qurandev-lane` — which is the same accident the rest of this comment exists
- *  to have removed. No root carries both today; the ordering is what stops the
- *  first one that does from silently rendering the weaker gloss.
+ *  curated, and it ranks *below* the `corpus-forms` strip rather than above it.
+ *  That inverts what phase 21 assumed. The extractor takes Lane's leading form-I
+ *  block, which is a past-tense verb sense written as a full English sentence —
+ *  and the Quran's use of the root is frequently a noun, so the two do not meet:
+ *  بين renders "It a thing became separated, severed, disunited, or cut off" for
+ *  a root the Quran uses to mean "make clear" — which is what its `corpus-forms`
+ *  gloss says. 175 of the 217 imported rows open with He/It/She/They, and
+ *  `lane_rejects.txt` only ever quarantined the 25 worst. Until the
+ *  sense selection is fixed at the source, the one-line `corpus-forms` gloss is
+ *  the better lead for the 134 roots that carry both; the Lane text still
+ *  renders, second. Curated Lane keeps rank 0 — this demotes the machine
+ *  extraction, not Lane.
+ *
+ *  Leaving `perseus-lane` tied at 0 would have let the `rd.source` tie-break
+ *  decide alphabetically — `perseus-lane` beats `qurandev-lane` — which is the
+ *  same accident the rest of this comment exists to have removed. No root
+ *  carries both today; the ordering is what stops the first one that does from
+ *  silently rendering the weaker gloss.
+ *
+ *  `salmone` (Salmoné's Arabic-English Dictionary, 1889) sits below curated
+ *  Lane — a learner's dictionary against the standard classical lexicon — but
+ *  above both `corpus-forms` and `perseus-lane`, because its sense is picked
+ *  per root for the form the corpus actually uses, unlike `perseus-lane`'s
+ *  fixed leading form-I verb sense.
  *
  *  Shared so the two pages cannot disagree about which definition is "the"
- *  definition for a root.
+ *  definition for a root — the lemma page takes `LIMIT 1` off this same order,
+ *  so a rank change here changes which single gloss it shows.
  */
 export const DEFINITION_SOURCE_RANK = `CASE rd.source
        WHEN 'lane' THEN 0
        WHEN 'qurandev-lane' THEN 0
-       WHEN 'perseus-lane' THEN 1
+       WHEN 'salmone' THEN 1
        WHEN 'corpus-forms' THEN 2
-       ELSE 3
+       WHEN 'perseus-lane' THEN 3
+       ELSE 4
      END, rd.source`;
 
 export async function getRootDefinitions(

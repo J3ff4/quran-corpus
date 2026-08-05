@@ -489,5 +489,22 @@ def fetch_lane_tei(dest: str, force: bool) -> None:
     click.echo(f"Lane TEI: {len(paths)} volumes, {total // 1024 // 1024} MB -> {dest}")
 
 
+@main.command("fetch-salmone")
+@click.option(
+    "--dest",
+    default=str(Path.home() / "quran-data" / "refdata" / "salmone"),
+    show_default=True,
+    help="Where salmone.xml lands. Outside the repo: 28.9 MB, third-party (§9).",
+)
+@click.option("--force", is_flag=True, help="Re-download even if already present.")
+def fetch_salmone(dest: str, force: bool) -> None:
+    """Download Perseus's Salmoné Arabic-English Dictionary XML."""
+    from .sources.salmone import download_salmone
+
+    path = download_salmone(Path(dest), force=force)
+    size = path.stat().st_size
+    click.echo(f"Salmone: {path.name}, {size} bytes -> {dest}")
+
+
 if __name__ == "__main__":
     main()

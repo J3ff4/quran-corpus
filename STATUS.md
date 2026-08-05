@@ -7,7 +7,7 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-08-02
+Updated: 2026-08-04
 
 ## Now
 Evidence differs per claim; none of it is carried over from prior narrative.
@@ -33,6 +33,315 @@ Evidence differs per claim; none of it is carried over from prior narrative.
   trust it. Never infer these from GitHub metadata, which does not carry them.
 - "Nothing open" means no **open GitHub PR**, per `gh pr list --state open`. It
   says nothing about unmerged local branches, which are listed separately.
+- **IN REVIEW 2026-08-04: `perseus-lane` demoted below `corpus-forms` in
+  `DEFINITION_SOURCE_RANK`** — **PR #72 open**, branch
+  `fix/demote-perseus-lane-below-corpus-forms`. Phase 21's
+  extractor takes Lane's leading form-I block — a past-tense verb sense — and
+  **175 of the 217** imported rows open with He/It/She/They (re-measured against
+  the live DB; the first draft of the comment said 179, which does not
+  reproduce). The Quran often uses those roots nominally, so بين ships as "It a
+  thing became separated, severed, disunited, or cut off" where its
+  `corpus-forms` gloss says "to make clear". **134 roots carry both sources** and
+  are fixed by the rank swap; the remaining **83 perseus-only + 18 with no
+  definition = the 101 targets of phase 22** — صبع ("He pointed at him … with his
+  finger") is one of those 83 and is *not* fixed here. Curated `lane` /
+  `qurandev-lane` stay at rank 0. The `/about` corpus credit was reworded in the
+  same change: it claimed the corpus glosses show "where Lane has no entry",
+  false for the 134 once they lead (§11). `/code-review` ran and found 4 issues —
+  all four fixed, the ranking test now carries a third `qurandev-lane` row so its
+  expected order disagrees with plain alphabetical (mutation-checked: deleting
+  the `CASE` fails 3 tests). Gates local, 2026-08-04: lint ✓, type-check ✓,
+  478 web tests + 57 data tests ✓.
+  - **§5 CodeRabbit: `CHANGES_REQUESTED` on `e38c936`**, 06:43:15Z. Pre-merge
+    table read, not inferred — **9/9 passed**, so no `mode: error` check is
+    hiding in the walkthrough; the verdict comes purely from 8 inline findings.
+    **All 8 are on `docs/plans/phase-22-…md` and `STATUS.md`; zero on the code
+    change** (`roots.ts`, `roots.test.ts`, `about/page.tsx` drew none). Three
+    Major: an order-dependent `<div2>` regex that fails by matching nothing, a
+    completeness gate that only rejects an *empty* index (truncation is this
+    source's normal failure), and a Step 7 smoke check ordering by `d.source`
+    (alphabetical) which cannot prove which gloss leads. All 8 addressed in the
+    fourth commit. **Note: CodeRabbit's ESLint tool errored** (`/tsconfig.json`
+    missing at repo root), so its lint-based pass did not run on this PR —
+    narrows coverage, not a failure signature.
+  - **Four rounds, 15 findings, all addressed — "addressed", not "fixed": a
+    commit that answers a finding is not the same as a re-review confirming the
+    head is clean, and this PR has now proved that twice.** `e38c936` → 8; `c9d5d9b` → 2 more
+    (the coverage table's `211 / 217` is the whole perseus cohort, not the 101
+    import targets — now spelled out as `96 / 101 = 81 / 83 + 15 / 18`,
+    re-measured; and the `18 → 3` empty-root criterion counted definitions
+    without checking `source='salmone'`, which a partial import satisfies);
+    `01d746d` → 1 more (a hard-coded `/home/claude/...` in a mutation-check,
+    now `git rev-parse --show-toplevel`); `0d1cee1` → 4 more, of which 3 taken
+    and 1 answered as a false positive (see below).
+  - **Round 4 on `0d1cee1`, 10:25:30Z, `CHANGES_REQUESTED` again.** Taken: the
+    mutation-check backup now uses `mktemp` + an `EXIT` trap instead of a fixed
+    `/tmp` path (a Task 3 implementer was killed by an API session limit between
+    flip and restore that same morning and left the mutation in the tree — the
+    finding described a hazard that had already fired); Task 3's Step 4 said
+    "5 tests" for a block holding 8; and this ledger's "all fixed" became
+    "addressed". **Answered, not taken:** the Major on plan line 16 asked the
+    plan to *reference* CLAUDE.md §4 rather than duplicate the six-step loop —
+    line 16 already is a one-line reference by section number (`CLAUDE.md §4:
+    every task runs the 6-step loop`), and duplicates none of the six steps.
+    Replied to the bot with that reading rather than dismissing it silently.
+  - **Execution found a plan defect no reviewer had:** the Task 4 code block's
+    `_IRREGULAR_PAST` omitted `stung`, so the plan's own Step 3 implementation
+    failed the plan's own Step 1 test (`is_verb_sense("Stung ( mosquito ).")`).
+    Caught by the Task 4 implementer running the literal brief code. Fixed in
+    the plan text, not only in the implementation, so the two do not diverge.
+  - **The commit status went green — `success`, description `Review completed` —
+    while the review object was still `CHANGES_REQUESTED`.** Not the rate-limit
+    signature (that reads `Review rate limited`); the review genuinely ran and
+    genuinely wanted changes. Third distinct way this gate looks passed when it
+    is not: read the review verdict, not just the status.
+  - **§5 PASSED 2026-08-04 10:34:49Z on head `7cb176d`** — `APPROVED` review
+    object with an empty body, pre-merge table read at **9/9 passed**, status
+    description `Review completed` (not `Review rate limited`). Verified as
+    three separate reads — review state, check table, status description —
+    because this PR produced all three of the gate's known fail-open
+    signatures. No unresolved findings. **Not merged: that is the user's
+    call and has not been given.**
+- **IN PROGRESS 2026-08-04: phase 22, Salmoné form-keyed glosses** — branch
+  `feat/phase-22-salmone-glosses`, pushed 2026-08-04. **PR #73, DRAFT, base
+  `main`.** Draft on purpose: Task 7's gate is uncleared and Task 8 does not
+  exist, so nothing here is mergeable. `.coderabbit.yaml` sets `drafts: true`,
+  so the §5 gate still reviews a draft — **§5 has NOT passed on this branch
+  yet.**
+  - **NEW §5 FAIL-OPEN SIGNATURE, found here 2026-08-04 — a stacked PR is
+    skipped entirely, with a green status.** #73 was first opened against #72's
+    branch (`fix/demote-perseus-lane-below-corpus-forms`) so the diff would show
+    phase 22 only. CodeRabbit posted state `success`, description
+    **`Review skipped: reviews are disabled for this base branch`**, zero
+    check-runs, zero review objects — and never reviewed. `.coderabbit.yaml`
+    sets no `base_branches`, so the default applies: only PRs targeting the
+    *default* branch are reviewed. Held for 7 polls over 3½ min; it never
+    starts. Fixed by retargeting to `main`
+    (`gh api -X PATCH .../pulls/73 -f base=main`; `gh pr edit --base` fails on
+    an unrelated Projects-classic GraphQL deprecation). Adding `base_branches`
+    to `.coderabbit.yaml` was **rejected as barred by §5** — a gate change may
+    never ride with the work that benefits from it. Cost: #72's seven
+    already-gated plan commits re-entered the diff, 8 → 18 commits.
+    **§5 documents only two fail-open signatures and should gain this third
+    one — proposed as its own change, deliberately not in this PR.**
+  Run under subagent-driven development, fresh implementer +
+  independent task review per task. Tasks 1-6 complete and reviewed:
+  `ca27a32` skeleton keys, `bfd5b3d` gloss extraction, `9f6df7b` the Salmoné
+  source module, `6581955` POS-filtered sense selection, `7aa0e18` + `77963af`
+  the review-TSV prep tool, `36db197` the `fetch-salmone` CLI command. 432
+  scraper tests pass; ruff clean on every file phase 22 touched; mypy at its
+  2-error pre-existing baseline.
+  - **§4 step 3 `/code-review` ran 2026-08-04 on the whole branch** — the one
+    loop step phase 22 had skipped until then. 5 findings (4 Medium, 1 Low),
+    all re-measured against the real `salmone.xml` before any fix was
+    dispatched, all fixed in `bdf2019`: (1) `entry_senses` never called
+    `html.unescape`, so 119 entries — **4 of the 101 live target rows** —
+    carried `&amp;c.` through to the root card; (2) `_LEADING_GRAM` cut only
+    the first of Salmoné's stacked government notes (13 entries); (3)
+    `build_index` keyed spaced headings verbatim, leaving 16 lead tokens
+    unreachable — `lookup("wqY")` missed though وقي is one of the commonest
+    Quranic roots; (4) the cross-reference filter ran only on the
+    `prefer_nominal` branch, so a verb-dominant root could be glossed with a
+    bare "see supra." pointer (106 entries); (5) an unreachable
+    `member is None` guard in `download_salmone`. **`EXPECTED_ROOTS`
+    re-measured 6351 → 6365** — it is the truncation gate, so it was
+    re-derived with `build_index(expected=None)`, not adjusted by hand.
+    Findings 2-4 changed **no** row in this phase's target set; only finding 1
+    did. Bucket counts are unchanged after the fix (40 kept / 51 unmatched /
+    10 not in Salmoné), so the gate's review set is the same size — but the
+    TSVs were regenerated and the 4 entity rows are now clean.
+  - **§5 CodeRabbit gate, round 1 on `58c01e9` (2026-08-04 17:06Z):**
+    `CHANGES_REQUESTED`, status `success | Review completed` — a real review,
+    the skip cleared by the retarget. 1 Major + 1 nitpick, both fixed in
+    `2dbee46`. The Major: `build_rows`' TSV-delimiter guard covered `key` and
+    `gloss` but not `bw`, which is column one of both files. The nitpick asked
+    the plan's constraints block to point at CLAUDE.md §4 rather than restate
+    it — taken, but **not** with the bot's verbatim text, which drops "step 3
+    is user-triggered"; that is exactly what went unnoticed on this phase, so
+    the line keeps it, and the thread carries the reasoning.
+    **Pre-merge checks were ✅ 4 / ❌ 5, and 4 of the failures were
+    `❓ Inconclusive — "Repository clone failed"`** (No Secrets Or Credentials,
+    No Duplicated Data Logic, Client Bundle Stays Clean, New Logic Ships With
+    Tests). Inconclusive is not a pass: the four substantive checks never ran
+    with code access. Re-requested citing that explicitly.
+  - **§5 round 2 on `2dbee46` (2026-08-04 17:20Z):** `CHANGES_REQUESTED`
+    again — **but the four inconclusive checks re-ran and passed, so the table
+    is now ✅ 8 / ❌ 1**, the one failure being the codebase-wide
+    `Docstring Coverage` warning that no per-PR change moves. 3 Major +
+    1 Minor, all fixed in this commit:
+    (1) the round-1 `bw` guard sat *after* `lookup`/`select_sense`, so both
+    early exits still put an unvalidated root into `quarantined` → the review
+    TSV — moved to the first statement in the loop, with a test per exit;
+    (2) `download_salmone` gave every writer the same `salmone.xml.part`, so
+    two `--force` runs could publish a half-written file under the final name
+    — now `tempfile.mkstemp` per call, cleaned up on failure;
+    (3) `build_index` validated the source on key **count** alone, which is
+    the "never verify by row count" rule this repo already carries — added
+    `ANCHORS`, four roots whose entry text must still contain a literal
+    excerpt, verified against the pinned artefact (real file: 6365 keys, all
+    four anchors hold);
+    (4) this ledger's `Updated:` date and PR state were stale.
+    Each new guard was checked non-vacuous by reverting it and watching the
+    test fail. 436 scraper tests pass (was 433).
+  - **§5 GATE PASSED on `7f880ed` (2026-08-04 17:36:47Z).** `APPROVED` review
+    object carrying `commit_id=7f880ed`, 6/6 threads resolved, pre-merge checks
+    **✅ 8 / ❌ 1** — the one failure the codebase-wide `Docstring Coverage`
+    warning that no per-PR change moves. CodeRabbit re-read the code rather
+    than the replies: its last thread reply shows it running `git show 7f880ed`
+    and `rg` over `download_salmone` before confirming, and each of the four
+    findings got an explicit `<review_comment_addressed>`.
+  - **FOURTH §5 FAIL-OPEN SIGNATURE — inverted this time: a green
+    `Review rate limited` status sat on an APPROVED head.** Pushing `7f880ed`
+    auto-triggered the incremental review, which approved at 17:36:47. The
+    `@coderabbitai full review` comment posted **8 seconds later** was a
+    redundant *second* request; it was refused for quota, and the refusal
+    overwrote the commit status. So the status description read the signature
+    for "never ran" while the review had in fact just passed. Reading the
+    status alone would have called a genuine pass a lapse — the exact inverse
+    of the known signature. **Lesson: a push already triggers a review; only
+    re-request when the head has no review object.** Disambiguate on
+    `reviews[].commit_id` plus `<review_comment_addressed>` replies, never on
+    the status alone.
+  - **Task 8 code half done, `d70e02b` + `54b02b3` + `63c0c72`.** Rank, label
+    and credit only: `DEFINITION_SOURCE_RANK` gains `WHEN 'salmone' THEN 1`
+    (curated Lane 0 stays above; `corpus-forms` and `perseus-lane` drop to 2/3),
+    the source-label map gains the Salmoné name, and the About page gains its
+    credit while the Perseus entry now names both works it supplies. **Steps 6-8
+    — the live-DB import, the alignment verification and the browser smoke —
+    were NOT run:** they need Task 7's sign-off and explicit permission to write
+    `~/quran-data/quran.db`. Nothing was imported; the DB was not opened.
+  - The task review caught a vacuous test **that my own task brief specified**:
+    "keeps curated Lane above Salmoné" passed with `WHEN 'salmone' THEN 1`
+    deleted, because curated Lane is rank 0 and an unmapped source falls to the
+    `ELSE` arm, so the assertion held either way. `54b02b3` adds `corpus-forms`
+    to pin the lower edge, and both new cases now fail with the branch removed.
+    A brief that dictates test code can hand the implementer a vacuous
+    assertion; mutation-check the brief's tests, not just the written ones.
+  - **§5 round on `54b02b3`: CHANGES_REQUESTED, 3 findings + 1 failing
+    `mode: error` pre-merge check** (`New Logic Ships With Tests` —
+    `prepare_salmone_glosses.main()` had no test at all; helpers were covered,
+    the wiring between them was not). All addressed in `63c0c72`:
+    - Fixed: an integration test runs `main()` over a synthetic XML + SQLite
+      pair and asserts both TSVs and the printed summary.
+    - Fixed: `MAX_MEMBER_BYTES` (64 MiB) rejects an oversized *declared* member
+      size before extraction. A tar header states its member's size and
+      `extractfile().read()` believes it, so a small archive can name a huge
+      member — that is the real bomb, and it is now refused unread.
+    - Fixed: the About-page test asserts the credit link's `href`, not only its
+      accessible name.
+    - **Declined, with reasoning posted to the bot:** bounded *streaming* of the
+      compressed response. It means rewriting the shared
+      `http_retry.get_with_retry` that every scraper calls, for a one-shot
+      operator CLI against a timestamp-pinned URL; `tarfile` needs a seekable
+      object so the bytes are buffered by design; §12 says shared-logic changes
+      are raised, not smuggled into a feature PR. **DEBT, tracked here.**
+    - Declined: deferring the Salmoné About credit until the import runs. The
+      import is Steps 6-8 of this same task in this same branch and the PR is a
+      draft until it lands, so the credit is never live without the data —
+      whereas splitting it risks the worse failure of shipping the text
+      uncredited, which is the actual §11 breach.
+  - **§5 round on `63c0c72`: CHANGES_REQUESTED, 2 Minor.** The blocking
+    `New Logic Ships With Tests` check cleared; the table is now ✅ 8 / ⚠️ 1,
+    the one warning the codebase-wide docstring percentage no per-PR change
+    moves. Fixed in `1ed4eb0`: the `main()` test now asserts the *unmatched*
+    count the summary prints — the one figure in that line recomputed from the
+    review rows instead of carried in `stats`, so the only one that can drift
+    from the file the test already checks. **Declined:** a `robots.txt` check
+    and 1-2 s pacing before the Wayback fetch. §11's rate limit binds crawls;
+    this module issues at most one request per call for one archived file, an
+    ordinary run short-circuits on the file already being on disk, and only
+    `force=True` re-fetches — an operator re-running the command by hand, not
+    an automated sequence. Recorded in the module docstring so the next reader
+    does not re-derive it.
+  - **§5 gate PASSED on `7d5c157`.** Verified on all four signals, because this
+    PR has now produced every known fail-open signature: an `APPROVED` review
+    object whose `commit_id` is the head, 11/11 threads resolved, a status
+    *description* reading `Review approved` (not the green `Review rate
+    limited`), and a pre-merge table ✅ 8 / ⚠️ 1 whose walkthrough `updated_at`
+    is from the same round. Five rounds: 3 findings + a blocking check → 2
+    Minor → 2 prose accuracy → clean.
+  - **§4 step 3 `/code-review` (2026-08-04): 5 findings, all confirmed against
+    the live DB, all fixed.** The first independent read of the *output*, not
+    the diff — and the three material findings were all in sense selection,
+    the thing the phase exists to get right. CodeRabbit had passed the same
+    code five times; it reviews diffs, and none of these are visible in one.
+    1. **Ties were invisible and frequently wrong.** Two `entryFree` keys that
+       share a consonant skeleton are credited the *same* corpus count, so the
+       frequency signal contributed nothing and Salmoné's document order
+       decided — for exactly the noun-vs-noun collisions the ranking was built
+       to resolve. 16 of the 91 glossed rows sat on such a tie, and they were
+       written as status `kept`, so the gate below deprioritised precisely the
+       rows that were wrong. Fixed with two finer comparisons before document
+       order gets it: `fold` (hamza seats only — matches a corpus form spelt
+       exactly as Salmoné keys it) then `vowelled` (short vowels kept, minus
+       the marks the two sources disagree on and the final case inflection).
+       Both are strictly narrower than `skeleton`, so they can only split a tie
+       it left, never create one. 16 → 3, and the surviving 3 now carry a `tie`
+       status of their own into the review TSV.
+    2. **Invariant English past tenses defeated the nominal filter.** `hit`,
+       `slit`, `shut`, `beat`, `built`, `rent`, `shed`, `rose`, `hurt`,
+       `brought`, `fought` are spelt like their infinitives, so they end in
+       neither `-ed` nor anything `_IRREGULAR_PAST` held. بحر was glossed
+       "Slit, ripped open." with `baHor` "Sea." sitting in the same entry, on a
+       root the corpus uses nominally in all 42 occurrences — the phase-21
+       failure reproduced by the new code. The 11 added words were measured
+       against the 101 targets, not guessed.
+    3. **Sun-letter shadda blocked matching.** `skeleton` keeps shadda to
+       separate Form I from Form II, but the corpus's `form_buckwalter` also
+       carries the assimilated definite article's gemination, which is the
+       surrounding sentence, not the word. الطور is spelt `T~uwra`, skeletons
+       to `T~wr`, and matched nothing. Form II geminates the *middle* radical,
+       so a shadda in first position is never gemination and can be dropped
+       unambiguously — 61 occurrences recovered across 28 of the 101 targets.
+    4. `-ed` is a heuristic and بغض's own gloss is "Hatred." — the one right
+       answer for a nominal root, filtered out as a verb. `_NOT_PAST` guards it.
+    5. `assert "2.0 KB" in out or "2048" in out` — the command prints raw
+       bytes, so the first arm can never be true and the `or` pins neither.
+       Replaced with the whole expected line.
+
+    **Net, measured end to end against the live DB:** still 91 glossed of 101, but
+    verb-lead glosses 12 → 7, unmatched 51 → 48, ties 16 → 3, and every named
+    wrong pick corrected — كيف "Enjoyment." → "How? In what way?", بحر → "Sea.",
+    طور "A time; once." → "Mountain.", مصر "Remains of milk." → "Town, city.",
+    قطر → "Copper; brass; molten iron." (18:96), عضد → "Help, support, aid"
+    (18:51), بضع → "Any small number ( under ten )". Every new assertion was
+    mutation-checked: nine reverts, nine matching failures, including one that
+    drops each tie rung separately so neither test passes on the other's rung.
+  - **Task 7 is a blocking human gate and is where the phase now sits.** The
+    TSV is regenerated on the fixed selector — **91 glossed of 101 targets** (10
+    not in Salmoné, 0 with no sense, **48 `unmatched` and 4 `tie`**).
+    `unmatched` means Salmoné's leading sense was taken with no corpus form
+    behind it: the exact failure mode that made the phase-21 Lane import wrong.
+    `tie` means the corpus scored two senses equally and document order broke
+    it — deterministic, and still a pick no evidence supports, so it needs a
+    human read. Both are priority queues; read all
+    52 before the `kept` rows. The plan's Task 7 Step 2 carries an amendment
+    noting كيف no longer needs rejecting. Nothing is imported until the
+    rejections are recorded in `tools/salmone_rejects.txt` and signed off.
+  - **DEBT, user ruling 2026-08-04 — 7 recoverable roots deliberately left
+    empty.** 7 of the 10 "not in Salmoné" roots *are* in Salmoné under a
+    different final-radical spelling: the corpus root ends `A`/`w` where
+    Salmoné keys a hamza seat `'` or a `y`. Confirmed present: `HmA`→`Hm'`/
+    `Hmy`/`Hmw`, `nsA`→`ns'`/`nsy`/`nsw`, `jzA`→`jz'`/`jzy`, `klw`→`kl'`/
+    `kly`, `hnA`→`hn'`, `dmw`→`dmy`, `fAy`→`fy`. Genuinely absent, no entry to
+    find: `Ayy`, `Hyv`, `trq` (أيّ / حيث / ترق — particles and a rare root).
+    Same defect class as the alef-madda lemma mismatch fixed in PR #50, and it
+    is a **lookup-key** normalization, not the sense-selection widening that
+    Task 7 forbids. Normalizing would take the phase from 91 to ~98 of 101.
+    Ruled out of phase 22 to keep the gate to one review pass; fix it in its
+    own change with its own review.
+  - **DEBT: 3 glosses open on a verbal-noun apparatus** — `wTn`, `why`, `wq*`
+    come through as `( n. ac. waTon 1 ) [ Bi ], Lived, dwelt, …`. Same family
+    as the bracketed government notes finding 2 fixed, but parenthesised, so
+    `_LEADING_GRAM` does not reach it. Pre-existing, not introduced by the
+    fix round; all 3 land in the `unmatched` bucket the gate reads row by row,
+    so Task 7 can simply reject them. Not widened in code because a leading
+    parenthetical is not always apparatus (`Onion, ( allium cepa ).`), and
+    widening the extractor mid-gate is what Task 7 explicitly forbids.
+  - **DEBT: `tools/prepare_lane_glosses.py`'s `review_rows` has the same
+    unchecked-`via_key` TSV-delimiter gap** that Task 5 closed in the Salmoné
+    tool (`77963af`). Pre-existing, same defect class, left alone to keep
+    phase 22 scoped.
 - **MERGED 2026-08-01 21:40Z: segment POS colour-coding on the word page —
   PR #70, squashed to `26521eb`** (branch `feat/segment-pos-colors`, reviewed
   head `2b7bf81`, deleted local + remote — `git ls-remote --heads origin`

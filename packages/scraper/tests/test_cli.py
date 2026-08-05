@@ -126,9 +126,12 @@ def test_rescrape_formless_roots_no_op_on_clean_db(runner, tmp_path):
         main,
         [
             "rescrape-formless-roots",
-            "--db", db,
-            "--checkpoint", str(tmp_path / "c.json"),
-            "--snapshot-dir", str(tmp_path / "snaps"),
+            "--db",
+            db,
+            "--checkpoint",
+            str(tmp_path / "c.json"),
+            "--snapshot-dir",
+            str(tmp_path / "snaps"),
         ],
     )
     assert result.exit_code == 0
@@ -171,9 +174,12 @@ def test_rescrape_formless_roots_targets_only_formless(runner, tmp_path):
             main,
             [
                 "rescrape-formless-roots",
-                "--db", db,
-                "--checkpoint", str(ckpt_path),
-                "--snapshot-dir", snap_dir,
+                "--db",
+                db,
+                "--checkpoint",
+                str(ckpt_path),
+                "--snapshot-dir",
+                snap_dir,
             ],
         )
 
@@ -281,7 +287,7 @@ def test_reparse_snapshots_reads_the_archive(runner, tmp_path):
     from scraper.snapshots import save_snapshot
 
     html = (
-        '<html><body>The triliteral root hamza rā ḍād '
+        "<html><body>The triliteral root hamza rā ḍād "
         '(<span class="at">أ ر ض</span>) occurs 461 times in the Quran as the '
         'noun <i class="ab">arḍ</i> (<span class="at">أَرْض</span>).</body></html>'
     )
@@ -297,15 +303,16 @@ def test_reparse_snapshots_reads_the_archive(runner, tmp_path):
     assert result.exit_code == 0
     assert "1 roots updated, 0 unparseable" in result.output
     conn = sqlite3.connect(db)
-    assert conn.execute(
-        "SELECT root_arabic FROM roots WHERE root_buckwalter='ArD'"
-    ).fetchone()[0] == "أرض"
+    assert (
+        conn.execute(
+            "SELECT root_arabic FROM roots WHERE root_buckwalter='ArD'"
+        ).fetchone()[0]
+        == "أرض"
+    )
     conn.close()
 
 
-@pytest.mark.parametrize(
-    "cmd", ["reparse-snapshots", "migrate-snapshot-names"]
-)
+@pytest.mark.parametrize("cmd", ["reparse-snapshots", "migrate-snapshot-names"])
 def test_snapshot_commands_reject_a_missing_archive(runner, cmd):
     # Path.glob on a nonexistent directory yields nothing without raising, so
     # a typo'd --snapshot-dir used to print "0 roots updated" and exit 0 --
@@ -352,3 +359,27 @@ def test_fetch_lane_tei_reports_the_volumes_and_honours_force(runner, tmp_path):
         assert forced.exit_code == 0
         assert f"Lane TEI: 1 volumes, 3 MB -> {dest}" in forced.output
         assert fake_download.forced is True
+
+
+def test_fetch_salmone_reports_the_file_and_honours_force(tmp_path, monkeypatch):
+    calls = []
+
+    def _fake(dest, *, force=False):
+        calls.append(force)
+        out = dest / "salmone.xml"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(b"x" * 2048)
+        return out
+
+    monkeypatch.setattr("scraper.sources.salmone.download_salmone", _fake)
+    result = CliRunner().invoke(main, ["fetch-salmone", "--dest", str(tmp_path)])
+    assert result.exit_code == 0
+    # The whole line, not a substring `or` of two spellings: the command prints
+    # raw bytes, so an alternative arm for a human-readable size can never be
+    # true and quietly turns the assertion into "one of these, we don't mind
+    # which" -- which pins neither.
+    assert f"Salmone: salmone.xml, 2048 bytes -> {tmp_path}" in result.output
+    result = CliRunner().invoke(
+        main, ["fetch-salmone", "--dest", str(tmp_path), "--force"]
+    )
+    assert result.exit_code == 0 and calls == [False, True]

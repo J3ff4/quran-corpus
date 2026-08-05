@@ -629,7 +629,12 @@ describe('roots queries', () => {
     expect(vw.find((w) => w.text_arabic === 'y')!.starts_clause).toBe(false);
   });
 
-  it('ranks a perseus-lane definition above a corpus-forms fallback', async () => {
+  it('ranks a corpus-forms gloss above the machine-extracted perseus-lane text', async () => {
+    // perseus-lane opens on Lane's leading form-I verb sense, which for 175 of
+    // its 217 rows is not the sense the Quran uses. The one-line corpus-forms
+    // gloss leads until that selection is fixed; the Lane text still renders.
+    // Curated qurandev-lane is in the fixture so the expected order disagrees
+    // with plain alphabetical — otherwise dropping the CASE entirely still passes.
     const local = newFileDb();
     await runMigrations(local);
     await local.execute(
@@ -638,10 +643,32 @@ describe('roots queries', () => {
     );
     await local.execute(
       `INSERT INTO root_definitions (root_id,source,definition) VALUES
-       (1,'corpus-forms','to be good'),(1,'perseus-lane','It was, or became, good')`,
+       (1,'corpus-forms','to be good'),(1,'perseus-lane','It was, or became, good'),
+       (1,'qurandev-lane','to be righteous')`,
     );
     const defs = await getRootDefinitions(local, 1);
-    expect(defs[0]!.source).toBe('perseus-lane');
+    expect(defs.map((d) => d.source)).toEqual([
+      'qurandev-lane',
+      'corpus-forms',
+      'perseus-lane',
+    ]);
+  });
+
+  it('keeps a curated Lane entry above the corpus-forms fallback', async () => {
+    // Demoting perseus-lane must not drag curated Lane down with it: the strip
+    // exists to cover roots Lane has nothing for, never to outrank a real entry.
+    const local = newFileDb();
+    await runMigrations(local);
+    await local.execute(
+      `INSERT INTO roots (id,root_buckwalter,root_arabic,occurrence_count)
+       VALUES (1,'SlH','ص ل ح',180)`,
+    );
+    await local.execute(
+      `INSERT INTO root_definitions (root_id,source,definition) VALUES
+       (1,'corpus-forms','to be good'),(1,'qurandev-lane','to be righteous')`,
+    );
+    const defs = await getRootDefinitions(local, 1);
+    expect(defs.map((d) => d.source)).toEqual(['qurandev-lane', 'corpus-forms']);
   });
 
   it('ranks a curated qurandev-lane definition above a machine-extracted perseus one', async () => {
@@ -659,6 +686,51 @@ describe('roots queries', () => {
     );
     const defs = await getRootDefinitions(local, 1);
     expect(defs.map((d) => d.source)).toEqual(['qurandev-lane', 'perseus-lane']);
+  });
+
+  it('ranks a Salmoné gloss above both the corpus strip and perseus-lane', async () => {
+    // Salmoné is a dictionary entry selected for the form the Quran uses; the
+    // other two are a scraped form-strip and Lane's leading form-I verb sense.
+    const local = newFileDb();
+    await runMigrations(local);
+    await local.execute(
+      `INSERT INTO roots (id,root_buckwalter,root_arabic,occurrence_count)
+       VALUES (1,'SbE','ص ب ع',2)`,
+    );
+    await local.execute(
+      `INSERT INTO root_definitions (root_id,source,definition) VALUES
+       (1,'perseus-lane','He pointed at him with his finger'),
+       (1,'corpus-forms','finger'),(1,'salmone','Finger; digit.')`,
+    );
+    const defs = await getRootDefinitions(local, 1);
+    expect(defs.map((d) => d.source)).toEqual([
+      'salmone',
+      'corpus-forms',
+      'perseus-lane',
+    ]);
+  });
+
+  it('keeps curated Lane above Salmoné, and Salmoné above the rest', async () => {
+    // corpus-forms is in here to pin the lower edge too: curated Lane outranks
+    // an unmapped source by the ELSE arm alone, so asserting only the Lane
+    // side would still pass with the salmone branch deleted.
+    const local = newFileDb();
+    await runMigrations(local);
+    await local.execute(
+      `INSERT INTO roots (id,root_buckwalter,root_arabic,occurrence_count)
+       VALUES (1,'SbE','ص ب ع',2)`,
+    );
+    await local.execute(
+      `INSERT INTO root_definitions (root_id,source,definition) VALUES
+       (1,'salmone','Finger; digit.'),(1,'qurandev-lane','the finger'),
+       (1,'corpus-forms','finger')`,
+    );
+    const defs = await getRootDefinitions(local, 1);
+    expect(defs.map((d) => d.source)).toEqual([
+      'qurandev-lane',
+      'salmone',
+      'corpus-forms',
+    ]);
   });
 });
 

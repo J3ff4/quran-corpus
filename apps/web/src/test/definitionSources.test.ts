@@ -28,6 +28,12 @@ describe('definitionSourceLabel', () => {
     expect(definitionSourceLabel('perseus-lane')).toBe("Lane's Lexicon");
   });
 
+  it('names the Salmoné dictionary', () => {
+    expect(definitionSourceLabel('salmone')).toBe(
+      "Salmoné's Arabic-English Dictionary",
+    );
+  });
+
   it('does not resolve prototype keys to inherited members', () => {
     // Against an object literal these return Object.prototype's function --
     // truthy, so `??` never fires -- typed as `string`. React throws when
