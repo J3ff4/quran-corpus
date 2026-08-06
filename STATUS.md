@@ -7,7 +7,7 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-08-04
+Updated: 2026-08-06
 
 ## Now
 Evidence differs per claim; none of it is carried over from prior narrative.
@@ -33,9 +33,36 @@ Evidence differs per claim; none of it is carried over from prior narrative.
   trust it. Never infer these from GitHub metadata, which does not carry them.
 - "Nothing open" means no **open GitHub PR**, per `gh pr list --state open`. It
   says nothing about unmerged local branches, which are listed separately.
-- **IN REVIEW 2026-08-04: `perseus-lane` demoted below `corpus-forms` in
-  `DEFINITION_SOURCE_RANK`** — **PR #72 open**, branch
-  `fix/demote-perseus-lane-below-corpus-forms`. Phase 21's
+- **MERGED 2026-08-06 06:46Z: phase 23, Hans Wehr top glosses** — **PR #74
+  squashed to `4c77d00`** (`gh pr view 74 --json mergedAt,mergeCommit`), branch
+  `feat/phase-23-hanswehr-glosses` deleted local + remote
+  (`git ls-remote --heads origin` no ref). HW = concise root gloss at **rank 0**
+  (renders above Lane, which stays as the full collapsible); Salmoné not removed,
+  kept below. Extractor `packages/scraper/scraper/hanswehr_gloss.py`, source
+  module `.../sources/hanswehr.py`, prep tool
+  `tools/prepare_hanswehr_glosses.py`, `/about` credit added, `roots.ts` rank
+  CASE now HW-first. §5 CodeRabbit: 3 rounds on the branch (6 findings R1, 1 R2,
+  clean R3), **all doc/test-quality — zero shipped-code changes**; gate cleared
+  on head `6ba14a2`, all 7 threads resolved. `reviewDecision` showed the sticky
+  `CHANGES_REQUESTED` artifact (CodeRabbit never posts APPROVE); **not
+  self-dismissed** (§5) — merge was owner-instructed with the gate satisfied.
+  Gates local: lint ✓, type-check ✓, 44 data tests + 10 HW-prep tests ✓; ruff +
+  mypy clean.
+  - **LIVE IMPORT done 2026-08-06** (outside git; `~/quran-data/quran.db`):
+    `import-lane hw.tsv --source hanswehr` → **1476** rows, rank 0. Verified by
+    count == TSV, root↔gloss alignment spot-check, and source order
+    `[hanswehr, qurandev-lane]` (not row count alone, per §10 alignment rule).
+    Backup `~/quran-data/quran.db.bak-phase23`. Lexicon gap **256 → 24** roots
+    (HW rescued 232); the 24 truly-empty dumped to `~/quran-data/hw_gap_24.tsv`
+    (10 fully blank incl. common `Eyn`/`kyf`/`rDw`/`Slw`, 14 with corpus-forms
+    fallback) — weak/geminate/hamzated roots HW keys differently, rescuable later
+    out of scope. `tools/hanswehr_rejects.txt` shipped **empty** (user gave no
+    rejects; import-lane UPSERTS, so a re-run reinstates any gloss not listed).
+- **MERGED 2026-08-05 05:29Z: `perseus-lane` demoted below `corpus-forms` in
+  `DEFINITION_SOURCE_RANK`** — **PR #72 squashed to `428ba69`** (`gh pr view 72
+  --json mergedAt,mergeCommit`), branch
+  `fix/demote-perseus-lane-below-corpus-forms` deleted local + remote
+  (`git ls-remote --heads origin` returns no ref), pr72 worktree removed. Phase 21's
   extractor takes Lane's leading form-I block — a past-tense verb sense — and
   **175 of the 217** imported rows open with He/It/She/They (re-measured against
   the live DB; the first draft of the comment said 179, which does not
@@ -100,8 +127,15 @@ Evidence differs per claim; none of it is carried over from prior narrative.
     description `Review completed` (not `Review rate limited`). Verified as
     three separate reads — review state, check table, status description —
     because this PR produced all three of the gate's known fail-open
-    signatures. No unresolved findings. **Not merged: that is the user's
-    call and has not been given.**
+    signatures. No unresolved findings.
+  - **MERGED 2026-08-05 on user instruction.** #73 landed first, so #72 hit a
+    merge conflict with `main` — resolved manually in `aa58e96` (5 files:
+    `roots.ts` CASE now salmone-aware, `roots.test.ts` union of both test sets,
+    `about/page.tsx` both attributions, `STATUS.md`/plan took main). §5 on the
+    merge head `aa58e96` returned "No files to review" on a forced
+    `@coderabbitai full review` — the legitimate clean-merge signal, since every
+    merged line traces to an already-approved parent (#72 head `7cb176d` +
+    #73). Squash `428ba69`.
 - **IN PROGRESS 2026-08-04: phase 22, Salmoné form-keyed glosses** — branch
   `feat/phase-22-salmone-glosses`, pushed 2026-08-04. **PR #73, DRAFT, base
   `main`.** Draft on purpose: Task 7's gate is uncleared and Task 8 does not
