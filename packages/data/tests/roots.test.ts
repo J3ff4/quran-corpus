@@ -710,6 +710,31 @@ describe('roots queries', () => {
     ]);
   });
 
+  it('ranks Hans Wehr above curated Lane and everything below it', async () => {
+    // Hans Wehr is the concise modern gloss; it must lead even a real Lane
+    // entry, which still renders second, not replaced.
+    const local = newFileDb();
+    await runMigrations(local);
+    await local.execute(
+      `INSERT INTO roots (id,root_buckwalter,root_arabic,occurrence_count)
+       VALUES (1,'ktb','ك ت ب',319)`,
+    );
+    await local.execute(
+      `INSERT INTO root_definitions (root_id,source,definition) VALUES
+       (1,'lane','to write'),(1,'qurandev-lane','to write'),
+       (1,'salmone','To write.'),
+       (1,'corpus-forms','write'),(1,'hanswehr','to write, pen, draft')`,
+    );
+    const defs = await getRootDefinitions(local, 1);
+    expect(defs.map((d) => d.source)).toEqual([
+      'hanswehr',
+      'lane',
+      'qurandev-lane',
+      'salmone',
+      'corpus-forms',
+    ]);
+  });
+
   it('keeps curated Lane above Salmoné, and Salmoné above the rest', async () => {
     // corpus-forms is in here to pin the lower edge too: curated Lane outranks
     // an unmapped source by the ELSE arm alone, so asserting only the Lane

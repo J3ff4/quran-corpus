@@ -263,17 +263,25 @@ export async function getRootForms(db: Client, rootId: number): Promise<RootForm
  *  per root for the form the corpus actually uses, unlike `perseus-lane`'s
  *  fixed leading form-I verb sense.
  *
+ *  `hanswehr` (Hans Wehr's Dictionary of Modern Written Arabic) ranks above
+ *  everything, including curated Lane: it is the concise modern gloss meant
+ *  to be read first. Lane's full classical entry still renders below it on
+ *  the root page, and remains the lemma page's `LIMIT 1` fallback for the
+ *  roots Hans Wehr doesn't cover — this only changes what leads, not what a
+ *  root has.
+ *
  *  Shared so the two pages cannot disagree about which definition is "the"
  *  definition for a root — the lemma page takes `LIMIT 1` off this same order,
  *  so a rank change here changes which single gloss it shows.
  */
 export const DEFINITION_SOURCE_RANK = `CASE rd.source
-       WHEN 'lane' THEN 0
-       WHEN 'qurandev-lane' THEN 0
-       WHEN 'salmone' THEN 1
-       WHEN 'corpus-forms' THEN 2
-       WHEN 'perseus-lane' THEN 3
-       ELSE 4
+       WHEN 'hanswehr' THEN 0
+       WHEN 'lane' THEN 1
+       WHEN 'qurandev-lane' THEN 1
+       WHEN 'salmone' THEN 2
+       WHEN 'corpus-forms' THEN 3
+       WHEN 'perseus-lane' THEN 4
+       ELSE 5
      END, rd.source`;
 
 export async function getRootDefinitions(

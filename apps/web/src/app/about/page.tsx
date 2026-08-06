@@ -60,6 +60,14 @@ const sources: Source[] = [
     note: 'H. Anthony Salmoné, Beirut: Librairie du Liban, 1889. Text provided by the Perseus Digital Library, digitised with National Science Foundation funding. The 1889 work is public domain by age; Perseus’s markup is CC BY-SA 3.0 US and this credit is its condition.',
   },
   {
+    name: 'Hans Wehr Dictionary of Modern Written Arabic (Cowan ed.)',
+    href: 'https://www.harrassowitz-verlag.de',
+    provides:
+      "The concise modern gloss shown first for each root, with Lane's fuller classical entry rendered collapsible below it.",
+    license: '© Harrassowitz Verlag / Spoken Language Services — used with attribution',
+    note: 'J. Milton Cowan, ed., 4th edition. Unlike Lane and Salmoné, this dictionary remains under active copyright; its gloss is shown with attribution to the rights holders, not as public domain text.',
+  },
+  {
     name: 'NLLB-200 (Meta AI)',
     href: 'https://huggingface.co/facebook/nllb-200-distilled-600M',
     provides: 'Uzbek word-by-word glosses, machine-translated from the English glosses.',

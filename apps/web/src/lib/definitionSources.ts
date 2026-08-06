@@ -17,6 +17,7 @@ const SOURCE_LABELS = new Map<string, string>([
   ['perseus-lane', "Lane's Lexicon"],
   ['corpus-forms', 'Quranic Arabic Corpus'],
   ['salmone', "Salmoné's Arabic-English Dictionary"],
+  ['hanswehr', 'Hans Wehr Dictionary of Modern Written Arabic'],
 ]);
 
 /**

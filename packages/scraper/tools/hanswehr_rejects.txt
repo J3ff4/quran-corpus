@@ -1,0 +1,1 @@
+# One root per line: root<TAB>reason. Subtracted from targets by load_hanswehr_targets. import-lane UPSERTS, so a re-run reinstates any gloss not listed here. Populated by the Task 6 human gate. Empty until then.
