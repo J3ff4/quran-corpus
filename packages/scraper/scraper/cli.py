@@ -2,6 +2,7 @@ from pathlib import Path
 
 import click
 
+from . import source_header
 from .checkpoint import Checkpoint
 from .db import ScraperDatabase
 from .seed import seed_database
@@ -11,6 +12,23 @@ from .snapshots import ROOT_PREFIX
 @click.group()
 def main() -> None:
     """Quran corpus scraper and data importer."""
+
+
+def _check_headers(primary: Path, source: str, pair: str | None) -> None:
+    """Both header guards, with their message delivered as a message.
+
+    `check`/`check_pair` raise `ValueError`, which click does not translate:
+    the operator of the one command that deletes rows would see a traceback
+    with the explanation buried in it. These guards exist to be *read* -- they
+    name which dictionary is about to be deleted and installed in whose place
+    -- so the failure exits 1 with `Error: <message>` like any other misuse.
+    """
+    try:
+        source_header.check(primary, source)
+        if pair:
+            source_header.check_pair(primary, Path(pair))
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
 
 
 # Shared --rate-limit for every command that hits corpus.quran.com.
@@ -290,20 +308,114 @@ def import_corpus(txt_path: str, db: str) -> None:
 @main.command("import-lane")
 @click.argument("tsv_path")
 @click.option("--db", default="quran.db", show_default=True)
+# No default. It used to be "lane", a tag no row has ever carried -- the live
+# four are corpus-forms, hanswehr, perseus-lane and qurandev-lane -- so an
+# omitted flag wrote an orphan nothing reads. That is worst in the pair this
+# command belongs to: `prepare_*` emits a prune list scoped to *its* source and
+# `prune-definitions --source` requires the tag, so a forgotten flag here
+# deletes a dictionary's live rows and reinstalls them under a name no query
+# joins on. Pairing the two is the whole point of the prune list; make the
+# operator name the source on both halves.
 @click.option(
     "--source",
-    default="lane",
-    show_default=True,
-    help="root_definitions.source tag (e.g. qurandev-lane)",
+    required=True,
+    help="root_definitions.source tag (e.g. qurandev-lane, hanswehr)",
 )
-def import_lane(tsv_path: str, db: str, source: str) -> None:
+# The tag pairs the two *sources*; this pairs the two *runs*. Optional because
+# the other three prepare tools stamp nothing and their TSVs still import.
+@click.option(
+    "--pair",
+    type=click.Path(exists=True),
+    help="the prune list from the same prepare run; refuses a different run",
+)
+def import_lane(tsv_path: str, db: str, source: str, pair: str | None) -> None:
     """Import Lane's Lexicon root definitions from a TSV (root<TAB>definition)."""
     from .sources.lane import import_lane_definitions
 
+    # Before the DB is opened: a required flag stops --source being forgotten,
+    # not the import naming a different one from the prune that preceded it.
+    _check_headers(Path(tsv_path), source, pair)
     database = ScraperDatabase(db)
     count = import_lane_definitions(Path(tsv_path), database, source=source)
     database.close()
     click.echo(f"Lane import complete: {count} definitions (source={source}).")
+
+
+@main.command("prune-definitions")
+@click.option("--db", default="quran.db", show_default=True)
+@click.option(
+    "--source", required=True, help="root_definitions.source tag to delete from"
+)
+@click.option(
+    "--roots",
+    required=True,
+    type=click.Path(exists=True),
+    help="Buckwalter roots, one per line; a row carrying a TAB and a gloss is "
+    "a replacement and is skipped.",
+)
+@click.option(
+    "--pair",
+    type=click.Path(exists=True),
+    help="the gloss TSV from the same prepare run; refuses a different run",
+)
+def prune_definitions(db: str, source: str, roots: str, pair: str | None) -> None:
+    """Delete one source's definitions for the listed roots.
+
+    The delete path `import-lane` lacks: it upserts and never removes, so a
+    root the human override gate drops would keep its old gloss forever.
+
+    Intended input is the generated list from `prepare_hanswehr_glosses
+    --prune-out`: one bare root per line, every root holding a row at this
+    source that the paired run did not re-produce. Prune it, import that run's
+    `--out`, and the source holds exactly what the run produced.
+
+    A `root<TAB>gloss` line is tolerated and *skipped* as a replacement, so
+    pointing this at a hand-written overrides file cannot install five corrected
+    glosses with `import-lane` and immediately delete them again. That is a
+    safety net, not the path: an overrides file names only the roots a human
+    chose, and the roots quarantined by the run keep their stale gloss.
+
+    Note the asymmetry with `prepare_hanswehr_glosses.load_overrides`, which
+    *raises* on a line with no tab. Deliberate: there a missing keystroke would
+    turn a replacement into a drop, while here a bare root is the documented
+    input and the file is machine-written.
+
+    `--source` has no default on purpose -- this is the one destructive
+    command here, and a wrong tag deletes another dictionary's work.
+    """
+    # Before anything reads the list, and long before the delete: the generated
+    # file names the source it was computed against, and a bare root list
+    # matches any source's rows, so a mismatch here silently deletes the wrong
+    # dictionary. Absent header (hand-written file, or one from a tool that does
+    # not write it yet) is unchecked, not rejected.
+    _check_headers(Path(roots), source, pair)
+    wanted: list[str] = []
+    replacements = 0
+    for line in Path(roots).read_text(encoding="utf-8").splitlines():
+        if not line.strip() or line.startswith("#"):
+            continue
+        root, _, gloss = line.partition("\t")
+        if gloss.strip():
+            replacements += 1
+            continue
+        wanted.append(root.strip())
+    # Deduped: `delete_root_definitions` reports rows deleted, so a root listed
+    # twice printed "Pruned 1 of 2" and repeated itself in the unknown-roots
+    # line. `--prune-out` cannot emit a duplicate, but a hand-written file is
+    # documented as tolerated input here.
+    wanted = list(dict.fromkeys(wanted))
+    if replacements:
+        click.echo(f"Skipped {replacements} rows carrying a gloss (replacements).")
+    if not wanted:
+        click.echo("No roots listed; nothing to prune.")
+        return
+
+    database = ScraperDatabase(db)
+    deleted, unknown = database.delete_root_definitions(wanted, source)
+    database.close()
+    click.echo(f"Pruned {deleted} of {len(wanted)} listed roots (source={source}).")
+    if unknown:
+        click.echo(f"Not in roots table: {' '.join(unknown)}")
 
 
 @main.command("validate")

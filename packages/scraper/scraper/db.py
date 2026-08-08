@@ -405,6 +405,58 @@ class ScraperDatabase:
         )
         self._conn.commit()
 
+    def delete_root_definitions(
+        self, roots: list[str], source: str
+    ) -> tuple[int, list[str]]:
+        """Drop ``source``'s definition for each listed Buckwalter root.
+
+        Returns ``(rows deleted, roots this database has no entry for)``.
+
+        `upsert_root_definition` merges on `(root_id, source)` and never
+        deletes, so a root the human override gate drops keeps its old gloss
+        forever without this. Scoped to one source: a root's Lane definition
+        must survive its Hans Wehr one being pruned.
+
+        The unknown-root list is returned rather than ignored because a
+        mistyped Buckwalter root deletes nothing and looks exactly like a root
+        that had nothing to delete.
+
+        The empty-list early return is defensive, not load-bearing: `IN ()` is
+        a SQLite extension and evaluates to false, so the delete is already a
+        no-op today (measured, sqlite 3.53.1). It stays because standard SQL
+        rejects that syntax, and the failure mode if some future backend parsed
+        it differently is deleting every row of `source`.
+
+        One statement per list, not batched, because the list cannot get near
+        the bind-parameter ceiling: it is a subset of the roots table, 1642 rows
+        today, against a measured `SQLITE_LIMIT_VARIABLE_NUMBER` of 32766. On a
+        build old enough to still cap at 999 this raises `OperationalError` at
+        `execute`, before any row is deleted -- loud and atomic, never a partial
+        prune -- so batching would buy nothing this cannot already do safely.
+        """
+        if not roots:
+            return 0, []
+        placeholders = ",".join("?" * len(roots))
+        # S608: only `placeholders` is interpolated, built from a list length.
+        # The source and every root are bound parameters.
+        known = {
+            row[0]
+            for row in self._conn.execute(
+                f"SELECT root_buckwalter FROM roots "  # noqa: S608
+                f"WHERE root_buckwalter IN ({placeholders})",
+                roots,
+            )
+        }
+        cur = self._conn.execute(
+            f"""DELETE FROM root_definitions
+                 WHERE source = ?
+                   AND root_id IN (SELECT id FROM roots
+                                    WHERE root_buckwalter IN ({placeholders}))""",  # noqa: S608
+            [source, *roots],
+        )
+        self._conn.commit()
+        return int(cur.rowcount), [r for r in roots if r not in known]
+
     def upsert_word_segment(self, s: WordSegmentModel) -> None:
         self._conn.execute(
             """INSERT INTO word_segments

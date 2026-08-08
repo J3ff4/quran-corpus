@@ -33,6 +33,1130 @@ Evidence differs per claim; none of it is carried over from prior narrative.
   trust it. Never infer these from GitHub metadata, which does not carry them.
 - "Nothing open" means no **open GitHub PR**, per `gh pr list --state open`. It
   says nothing about unmerged local branches, which are listed separately.
+- **IN PROGRESS 2026-08-06: phase 24 Part A, HW gloss quality** — branch
+  `feat/phase-24-gloss-quality`, plan `docs/plans/phase-24-gloss-quality.md`.
+  Phase 23 shipped with its human reject gate **un-run** (`hanswehr_rejects.txt`
+  still holds only its header comment, one touch in `4c77d00`), so 336 of the
+  1476 live glosses carry a defect. First gate was
+  `tools/audit_hanswehr_glosses.py`, classifying every generated gloss and
+  exiting 1 while any mechanical bucket sat above its ceiling; **superseded
+  2026-08-07 by `tools/hanswehr_baseline.py`** (see the gate-replaced note
+  below). Bucket counts in this block are that first gate's.
+  Baseline → now, measured against live `~/quran-data/quran.db`:
+  `frag 105→0  arabic 117→0  pageno 15→0  paren →0  long 53→0  stub 13→0
+  gone →0`, exit 0.
+  Whole-corpus effect vs the phase 23 live rows: **1173 unchanged, 277 changed,
+  98 quarantined** (26 of those newly, on top of the 72 phase 23 never glossed).
+  **Written live 2026-08-08 by Task 7** — see the Task 7 block below; the live
+  rows were phase 23's until then.
+  Commits `898913e` (audit gate), `6a61d82` (frag), `d279fe8` (arabic),
+  `8727daf` (long+pageno), `2e3f74d` (**round 2 — `/code-review` fixes**).
+  Gates local: 546 scraper tests ✓, ruff ✓.
+  **§4 step 3 ran once and found 10 issues, 3 of them regressions this branch
+  introduced** — a `" = "` cut point that truncated `sqT`/`drhm`, an
+  Arabic-tail cut with no floor that turned 8 roots into clean-looking junk
+  (`Alw`→`"-"`, `Hw$`→`"p1."`, `klb`→`"Icalb"`), and an `and <stem>` rule that
+  shipped the stem. All ten addressed in `2e3f74d`; two were deliberately not
+  fixed as proposed because measurement showed the proposed fix cost more than
+  it won (hamza-vs-possessive: ~50 roots lost to win 3), with the numbers
+  recorded in the code. Root causes were mostly **OCR damage in the source**
+  (`pl.`→`p1.`, `kalb`→`Icalb`), not parser logic.
+  Note the gate itself was part of the problem: it shared the page-number
+  regex with the code it audits (so it could not see that regex being wrong)
+  and had a `long` bucket no code path could empty. Both fixed; new `paren`
+  bucket added. Every rule is mutation-checked.
+  **§4 step 3 ran a second time on the round-2 diff and found 3 more
+  regressions this branch introduced, none of which any bucket could see.**
+  `_is_stem`/`_is_abbrev` stripped a trailing `;` as ordinary punctuation, so a
+  sense-final word read as head and the run ate it (`ywm` "day; pl. also: age,
+  era, time" → `"also: age, era, time"`; same for `xmr` "wine", `Hlm` "dream",
+  `j*E` "stem, trunk."). And the Arabic-tail cut deleted the whole English
+  definition of 13 roots, leaving only the transliterated headword that
+  `_quarantine` then waved through (`Afq` → `"ufq, ufuq"`, `Enq` → `"unuq,
+  unq"`, `*qn`, `wtd`, `sds`, `gbn`, `jrf`, `kbd`, `qnw`, `qny`, `qss`, `yqZ`,
+  `whn`). Fixed in round 3: `;` ends a sense and can never be head; a
+  comma-joined spelling chain is head when the parts share a consonant skeleton
+  (`ufq`/`ufuq` → `fq`), which is what tells a variant pair from two English
+  senses — requiring only "two words then an abbreviation" instead cost the
+  first sense of `nsb`, `nHb`, `Tfl` and `drhm`, measured and rejected.
+  **The lesson is about the gate, not the parser.** frag/arabic/pageno/paren/
+  long are all *shape* tests on text that survived, so deleting the text passes
+  every one — the gate read all-zero through both defects, and the line above
+  citing those zeros was the evidence. Round 3 adds the two buckets that
+  measure what is *missing*: `stub` (every word of the gloss shares one
+  consonant skeleton = the headword handed back) and `gone` (quarantine count
+  past `MAX_QUARANTINED = 98`, so "glossed nothing at all" cannot read as a
+  clean run). `stub` flags exactly the 13 on the round-2 code and 0 now.
+  `audit()` and `main()` also had **no tests at all** — third recurrence of the
+  CLI-wiring gap CodeRabbit persisted as a Learning on PR #71; covered now.
+  Round-3 gates local: **577 scraper tests ✓** (was 546), ruff ✓, mypy ✓ on the
+  two changed modules, gate exit 0, all 7 new rules mutation-checked.
+  **§4 step 3 ran a third time on the round-3 diff and found 5 more, all
+  confirmed against live data before fixing.** Two content defects the round-3
+  rules still walked past: (1) **25 glosses opened with their own transliterated
+  stem** — an assimilated verb or quadriliteral sits directly on the Arabic it
+  spells with nothing else marking it (`wjd` → `"yajidu to find"`, `zlzl` →
+  `"zalzala to shake"`), and no bucket saw it because `stub` needs *every* word
+  to respell the head; (2) the second-headword cut matched the literal `" -- "`
+  only, while HW writes it `"--("`, `" – "` and `" ― "` too, leaking a whole
+  second headword into `syH`, `fsH`, `Abd`, `zhr`. Fixed: a bare stem is head
+  when Arabic precedes it *and* an infinitive or grammar paren follows (both
+  halves needed — Arabic alone deletes `"عز might, power"`), and the cut is a
+  regex anchored on the preceding `;`. **That anchor is load-bearing:** HW
+  abbreviates plural suffixes with the same en dash (`pl. –āt`, `pl. –ūn`, 110
+  entries), so an unanchored cut takes the definition off at `"pl."`. Also
+  fixed: a homograph index set as its own token (`rfrf` → `"2 cushion, pad"`),
+  and `max_chars` binding `MAX_GLOSS_CHARS` at import while `classify` read it
+  at call time — the two could drift under any override, and the sync test only
+  moved the gate side. `MAX_QUARANTINED` was `98`, the *exact* live count, so
+  its documented one-entry headroom did not exist; now `108`.
+  Differential vs the round-3 code across all 1548 roots: **46 changed, every
+  one a restoration, quarantine unchanged at 98.** Known cost, 2 roots: a
+  qualifier paren the head opens is dropped (`Asr` loses "(leather)"), which
+  has always happened for diacritic-bearing heads and is now consistent.
+  Round-4 gates local: **593 scraper tests ✓**, ruff ✓, ruff format ✓, mypy ✓,
+  gate exit 0, all 6 new rules mutation-checked (the `;` anchor survived the
+  first pass — no test covered `pl. –āt` until this round).
+  **§4 step 3 ran a fourth time on the round-4 diff and found 3, all reproduced
+  on live data first.** (1) The comma-joined spelling-chain rule was keyed on
+  `tok` carrying the comma, so it could only ever mark a chain's *non-final*
+  members — the last spelling has plain English after it and nothing else fires,
+  so it shipped as the first gloss word (`qll` → `"qull littleness"`), and in a
+  three-member chain the middle one stranded too (`ybs` → `"yubs, yabas
+  dryness"`). Fixed by reading `prev` as well: `_gloss_start` only consults
+  `_is_stem` along the chain starting at token 0, so a `prev` that reaches it is
+  already head, and skeleton equality separates `"qill, qull"` from an English
+  pair. (2) `_is_stub` requires *every* word to respell the head, so it cannot
+  see the commoner shape — one head word then real English — which was live on
+  **22 roots** while the bucket read 0. New `head` bucket in the audit measures
+  it, reading the entry's first non-Arabic token (the headword transliteration,
+  by *position in the source*, owing nothing to `_gloss_start`). (3) `_is_abbrev`
+  as head evidence misfires on an OCR period inside real English: `frE` reads
+  `"twig, branch. bough, limb"`, `"branch."` passed as a grammar note and the run
+  ate the primary sense. Fixed with `_is_grammar_note` — a real note is followed
+  by what it governs, never by more English.
+  **The reviewer put finding 2 at 158 roots; the true count is 22.** Its measure
+  compared the gloss's first word against the entry's first *ASCII* token, and
+  an entry that runs straight from Arabic into English has no transliteration at
+  all — so that token *is* the gloss's first word and matches itself. 136 of the
+  158 were correct glosses (`smw` "height, altitude", `SlH` "peace"). The same
+  artefact is why `_head_leftover` excludes the identical token, and there is a
+  test pinning it.
+  Two more found while fixing, same defect family: the plural transliteration
+  sitting on mid-entry Arabic (`nfs` → `"anfus soul"`, 10 roots) — head only when
+  something precedes that Arabic, since HW runs straight from a *headword* into
+  English and the headword is token 0; and excluded when what precedes is `pl.`,
+  which means HW omitted the plural's transliteration and the definition resumes
+  on the Arabic (`sfH`). And `_is_verbal_noun` compared a 3-char prefix, which a
+  passive stem breaks (`bht`: `buhita` vs `(baht)`) — consonants are what the two
+  actually share. Narrowing `_is_abbrev` first cost `jnd`/`bld`/`xmr`/`qws` their
+  whole definition: HW chains gender and number with "and" (`"m. and f., pl."`),
+  caught by the differential, not by any test.
+  Differential vs the round-4 code across all 1548 roots: **25 changed, every one
+  a restoration, no losses, no quarantine movement (98).** `head` ceiling is 3
+  against a live count of 1 — `drhm` glosses درهم *dirham* as "dirhem, drachma",
+  correct English colliding with the head by construction, so the bucket cannot
+  reach zero. On the round-4 extractor it reports all 22 and exits 1.
+  Round-5 gates local: **622 scraper tests ✓** (was 593), ruff ✓, ruff format ✓,
+  mypy ✓, gate exit 0, all 10 new rules mutation-checked — **2 survived the first
+  pass** (the `pl.` exclusion, and reading the same entry the gloss was cut from;
+  both tests were too weak, now fixed). Gotcha logged: two `.py` edits of equal
+  length in the same second reuse the stale `__pycache__` bytecode, which briefly
+  made the gate report a mutant's numbers after the restore — `find -name
+  __pycache__ -exec rm -rf` before trusting a post-mutation reading.
+  **§4 step 3 ran a fifth time (round 6) and found 5 — 4 fixed, 1 declined with
+  a measurement.** All reproduced on live data before any edit.
+  (1) MEDIUM, `hanswehr_gloss.py`: the literal `" -- "` cut sat unanchored in
+  `cut_points` beside the deliberately `;`-anchored `_SECOND_HEAD`. HW writes
+  `--` two ways — a second Form-I headword *between* senses, and an em-dash
+  placeholder *inside* a grammar parenthesis (`"to transform (من – الى ه s.o.
+  from -- into)"`). Cutting the placeholder deleted every later sense and
+  `_balance_parens` then ate the orphaned `(`, so nothing marked the wound:
+  `msx` shipped `"transform"` for a four-sense entry. New `_dash_cut` gates on
+  **paren depth**, which separates all 8 live cases. Deleting the cut and
+  leaning on `_SECOND_HEAD` alone was measured and loses `qdr`/`$ry`/`h$$`/`wH$`
+  — `wH$` opens its second head on a comma, which that pattern cannot see.
+  (2) MEDIUM, `audit_hanswehr_glosses.py`: `head` and `gone` were only written
+  into the result once they exceeded their ceiling, so the tool printed
+  `head 0  gone 0` on a run where 1 root shipped a head leftover and **98 were
+  quarantined** — byte-identical to a clean run. Exactly the "never ran vs found
+  nothing" signature §5 exists to prevent, and `STATUS.md` above read those
+  zeros as "nothing quarantined". `audit` now returns populations unconditionally
+  and `main` gates, printing `count/ceiling` and `OVER` per bucket. With the
+  count visible the headroom is no longer needed to explain a red gate, so
+  `MAX_QUARANTINED` drops **108 → 98** and `MAX_HEAD_LEFTOVER` **3 → 1**: exact
+  live counts, so +1 now actually reds the gate (verified: `gone 98/97 OVER`,
+  exit 1). At 108 a regression quarantining nine more roots printed nothing.
+  (3) LOW: the paren lookahead in `_gloss_start` asked only whether the head run
+  resumed after the closing token, and walked through a `;` to find out — the one
+  boundary round 3 declared uncrossable. `sfH` closes on `"mountain);"` and
+  resumes on the *next sense's* `"pl."`, so the entry's primary sense was marked
+  head; it shipped `"flat, rocky surface"` instead of `"foot (of a mountain)"`.
+  The round-5 test had pinned that wrong value as "live, not ideal" — now fixed
+  rather than pinned.
+  (4) LOW, **declined**: `_gloss_start`'s `elif _is_abbrev(tok)` still promotes
+  an OCR-period English word when *it* is the token judged, so `wH$` loses
+  `"waste."`. Instrumented the whole corpus: **20 tokens reach that branch, 19
+  are genuine abbreviations** (`perf.` ×13, `pl.`, `n.`, `pass.`, `imperf.:`,
+  `genit.`) and one is `waste.`. Swapping in `_is_grammar_note` there breaks all
+  19 to fix 1; every discriminator that separates them needs four separate rule
+  extensions (paren-stripping the lookahead, `or`, `to`, a `prev`-based chain
+  rule), which is the over-fitting that caused the round-5 regressions. Left as
+  a known one-root defect for the `hanswehr_overrides.tsv` path (plan Task 5),
+  which exists for exactly this.
+  (5) LOW: `_is_stub` false-positives on English irregular plurals — `_skeleton`
+  drops vowels, so `"foot, feet"`/`"man, men"`/`"tooth, teeth"` all read as stubs.
+  Zero live, but an unclearable bucket is what the module docstring bans. Given
+  `MAX_STUB`, held at 0 so it still gates.
+  Reviewer's finding 1 named 4 roots; **3** — `xlT` was already bounded by
+  `max_senses`. Differential vs `771201f` across all 1548: **4 changed, all
+  restorations, no losses, quarantine unchanged (98).** `nsf` now carries HW's
+  literal `"(wind -- the dust)"` placeholder into its gloss; left as-is rather
+  than invent a substitution.
+  Round-6 gates local: **634 tests ✓** (was 622), ruff ✓, ruff format ✓, mypy ✓,
+  live gate exit 0. 10 mutants, **9 die**; the survivor is `MAX_QUARANTINED`'s
+  *value* — a live-data calibration no unit test can kill without being
+  tautological, so the live gate run is its check, not a pinned constant.
+  **§4 step 3 ran a sixth time (round 7) and found 6.** User split them (§4
+  bans batching two features through one loop): **this commit ships 4/5/6**,
+  and findings **1/2/3 are one coupled defect deferred to its own loop**.
+  All six were reproduced on live data before anything changed.
+  - **#4 fixed** — `_PAGE_NUMBER` matched the "10" of "10,000" (space left,
+    comma right) while its leading `\s` skipped the "000", shipping
+    `"= ,000 dirhams"`. Comma boundary qualified to `,(?!\d)`. The old comment
+    claiming every real quantity is spelled out was false and is gone; HW
+    writes `= 10,000 dirhams`, `Aleppo 320 g`, `2-9000`.
+  - **#5 fixed** — the gate's `_PAGENO` flagged numbers `_PAGE_NUMBER`
+    structurally cannot strip → an unclearable bucket, which the audit
+    docstring forbids. Measured over **all 3337 reachable definitions: 16
+    unstrippable → 0**, while the gate still fires on 312, so it did not go
+    blind. Fix keeps the looseness where it earned a real catch (trailing
+    side, `"a taste 315,"`) and restores the leading `\s`, the one property
+    every page number has and no false hit does.
+  - **#6 DECLINED, measured** — `_strip_tail` can delete a real final word
+    ending in "." (`"to blow up, blast."` → `"to blow up,"`). Real mechanism,
+    **zero live instances**: all **19** tokens that rule deletes across the
+    1548 roots are genuine markers (`pl.`×9, `pass.`×5, `pass.:`, `n.`, `un.`,
+    `Engl.`). Narrowing to a closed vocabulary breaks 19 to fix 0 and reopens
+    the OCR variant (`p1.`) it exists for. Its docstring claimed English "is
+    never shortened" — false, now corrected in place with the measurement so
+    the next reader sees the risk instead of the reassurance.
+  - **DEFERRED to the next loop — #1/#2/#3, one coupled HIGH defect.**
+    `_head_leftover`'s `head != first` guard means the `head` bucket can only
+    fire when the gloss's first word is a *different* spelling of the head.
+    The dominant shape — the transliteration surviving **verbatim** — is
+    invisible. Re-derived: **138 roots excluded by that guard, ~132 are real
+    leftovers** (`qlb` → `"qalb reversal, inversion"`, `fqr` → `"faqr
+    poverty"`, `jld` → `"jald flogging"`); only **6** are genuine English
+    (`Ezz`, `nSb`, `fwz`, `Smm`, `zrE`, `hzl`). So the reviewer's ~119 was if
+    anything *under*-stated, and both the `MAX_HEAD_LEFTOVER = 1` comment
+    ("Live count is 1: `drhm`") and this file's earlier "true count is 22" are
+    wrong. **⚠ the gate's `head 1/1` is not trustworthy until this lands.**
+    Root cause is `_is_stem`: a diacritic-free transliterated head followed
+    directly by plain English matches no head rule. Agreed fix (user-chosen):
+    thread the Buckwalter root into `select_gloss` (2 callers) + a
+    Buckwalter→Latin consonant map, and cut a leading ASCII token whose
+    skeleton respells the root — the only signal separating `"qalb"` from
+    `"might"`. Full 1548-root differential required before commit.
+  Round-7 gates local: **647 tests ✓** (was 634), ruff ✓, ruff format ✓,
+  mypy ✓, live gate exit 0 (`head 1/1`, `gone 98/98`). **6 mutants, all 6
+  die** — M5 (drop the `)`/`-` guard) initially survived, which exposed that
+  my first tests only covered shapes the leading `\s` already excluded; the
+  guard is load-bearing on exactly 3 live entries (`$rq` `(till 1950)`, `fwj`
+  `since 1922)`, `rbE` `25-piaster`), now pinned. Differential vs `8b0755f`
+  across all 1548 roots: **0 changed** — both fixes are for latent defects, so
+  no live gloss moves; the synthetic repros plus the 16→0 measurement are the
+  evidence, not the differential.
+  **Gate replaced 2026-08-07 (user call: "make the differential the gate").**
+  Six rounds of review showed the shape buckets caught almost nothing the
+  corpus differential missed, while their *ceilings* produced two of the bugs
+  (`MAX_HEAD_LEFTOVER = 1` certifying an unmeasured population; a tolerance
+  that hid a 98-root quarantine behind a printed `0`). The differential was a
+  scratchpad script re-run by hand each round — now it is
+  `tools/hanswehr_baseline.py` + a committed `tools/hanswehr_baseline.tsv`
+  (1642 rows, `root  status  buckets  gloss`, sorted by root, 100K).
+  `audit_hanswehr_glosses` keeps `classify`/`_is_stub`/`_head_leftover` and
+  **loses `audit()`, `main()`, `ceilings()`, `MAX_QUARANTINED`, `MAX_STUB`,
+  `MAX_HEAD_LEFTOVER`** — buckets are now a *column*, so a regex change that
+  reclassifies a root is a reviewed diff line, not a number to notice moved.
+  Live: `roots 1642  kept 1450  no_gloss 98  not_in_hanswehr 94`, `buckets 1
+  (head 1 = drhm)`, added/removed/changed 0, exit 0. Fixed a real drift while
+  wiring it: the old `audit()` silently skipped the 94 roots absent from HW,
+  so it measured a different population than the importer shipped; they are
+  rows now. 9 mutants run, all 9 die. 658 tests ✓ (was 647), ruff/format/mypy
+  ✓ on the 4 touched files (the 2 pre-existing `tools/` E501s are untouched).
+  The point of the artefact: `--update` is the only way to move it, so the
+  deferred #1/#2/#3 fix will land its ~132 changed glosses **as a diff a
+  reviewer reads**, which no gate exit code ever showed.
+
+  **Round 8 = the `/code-review` on that swap, 4 findings, 2026-08-07.** Two
+  commits, and the baseline earned its keep on the first day it existed — every
+  claim below is a diff someone can read, not an exit code.
+  - `2c4a769` — `_DANGLING_PUNCT` covered only `[,;]` while every surrounding
+    strip uses `" ,;:"`, so an orphaned `:` survived to the end of a gloss and
+    an orphaned `.` was stripped nowhere. 13 roots. The period needs a
+    lookahead the others do not: HW's spaced ellipsis and an OCR period
+    standing in for a word's first letter are not orphans (6 roots would ship
+    `"if only...!"` / `"to.xpeat"`). Also `_is_transliteration` no longer calls
+    English carrying a curly quote or dash a transliteration (latent — masked
+    by `max_senses` today).
+  - `2c4a769` — **finding 2 DECLINED, with the measurement.** The review said
+    switching the `_is_abbrev` head branch to `_is_grammar_note` costs one
+    root; measured over all 1642 it recovers one word (`wH$`'s "waste.") and
+    costs four (`Tfq`, `qdd`, `bht`, and `qws` drops to `no_gloss`), because a
+    genuine note is also followed by an infinitive or a bare stem. Recorded at
+    the branch so round 9 does not re-propose it.
+  - `aa75d64` — **finding 1 = the deferred #1/#2/#3 work, done.** 124 roots
+    shipped their own transliteration as their first gloss word. Root cause:
+    the head run's evidence is all *positional* and an entry running straight
+    from Arabic into English offers none — the missing evidence is the root,
+    which lives in the corpus, not the text. `select_gloss(root=...)` threads
+    it; a token that respells the root **and** sits on Arabic is head. Both
+    halves matter: Arabic alone would cut "عز might, power", respelling alone
+    would cut `drhm`'s correct "dirhem, drachma". `_ROOT_RADICALS` measured
+    against the corpus (this OCR writes خ as "ḳ"→"k", ج as "j"; scored all 4
+    combinations, 1124/1548 vs 1044 next best); و/ي reduce out as long vowels
+    (349 of 424 misses); 2 strong consonants minimum (`Awh`→"h" would delete
+    its own gloss "oh!"). `_head_leftover` loses the `head != first` exclusion
+    — the round-7 bug — and reads the root instead: 127 roots against the
+    pre-fix corpus, **3 after** (`drhm`, `jnn`, `lyt`, all reviewable rows).
+    Fallout deletion: `generate` no longer re-derives the picked entry.
+  - Live now: `roots 1642  kept 1450  no_gloss 98  not_in_hanswehr 94`,
+    `buckets 3 (head 3)`, added/removed/changed 0, exit 0. **No status moved —
+    nothing dropped to `no_gloss`.** 123 of the 124 gloss changes are exactly
+    one leading token removed and every one of those is a transliteration; the
+    124th (`ksd`) resolves a whole head run and closes a paren the cap had cut.
+    695 tests ✓ (was 658). 10 mutants across the two commits, all 10 die.
+- **Round 9 = the `/code-review` on those fixes, 6 findings, 2026-08-07.** All
+  6 real; 2 were live content loss, 4 were dead code and stale docs. Nothing
+  declined this round.
+  - `26f6d1c` — **two bugs in the length cap, both losing gloss text.**
+    (1) `rfind`'s window is half-open, so `rfind(";", 0, max_chars)` could not
+    see a sense boundary sitting *on* the cap — legal, since the text before it
+    is exactly `max_chars` long. All three windows carried it (`;`, the `,`/`:`
+    fallback, the bare-space fallback); all three now search `max_chars + 1`.
+    `qll` lost 120 characters, `nqm` 95, `Zhr` 6. The three recovered glosses
+    are each **exactly 150 characters**, which is the bug's signature.
+    (2) The cap was measured *before* `_balance_parens`, so a gloss over the cap
+    only because of an unterminated `(` — a tail the balancer was about to
+    delete — got cut at an earlier boundary for nothing. Balance now runs before
+    the measurement as well as after; the later call stays, because truncating
+    can open a paren of its own. `$kl`: 81 chars where balanced is 118.
+  - `80421b1` — **dead code and two docstrings that lied.** `pick_entry` was
+    public solely for the re-derivation round 8 deleted, and its docstring still
+    named that consumer; inlined into its one caller. `_head_leftover`'s
+    docstring claimed "0 live" against a baseline reading `head 3` and a comment
+    20 lines above naming the 3 — it cannot reach 0, `drhm`/`jnn` are English
+    words that spell their own root. `hanswehr_baseline`'s docstring now says
+    outright that **nothing runs it**: it needs two sqlite files kept outside the
+    repo, no pytest case can invoke it, and this repo has no CI, so pytest+ruff+
+    mypy all go green on a change that rewrites a hundred glosses.
+  - Live now: `roots 1642  kept 1450  no_gloss 98  not_in_hanswehr 94`,
+    `buckets 3 (head 3)`, added/removed/changed 0, exit 0. The baseline moved by
+    **4 rows, all strict content gains**, no status and no bucket changed.
+    698 tests ✓ (was 695). 7 mutants — each window reverted separately, each
+    `_balance_parens` call removed separately, the sense boundary disabled,
+    `prefer_nominal` inlined away — all 7 die. Two of them survived the first
+    fixture I wrote and the fixtures were fixed, not the claim.
+  - Finding 5 was **this ledger**, and both its claims were wrong (§14 again):
+    the branch *was* pushed, and it read "15 commits ahead" where `git log` gave
+    16. Corrected below. The reviewer's own restatement was also wrong ("5
+    commits behind its upstream"); `git status -sb` read `ahead 9`.
+- **Round 10 = the `/code-review` on the round-9 fixes, 6 findings, 2026-08-07.**
+  5 accepted, 1 declined with a measurement. Every finding was verified against
+  live data before acting, and one of them was materially understated.
+  - `32e3685` — **four extractor defects; 13 baseline rows move, all gains.**
+    (1) `_respells_root` demanded strong-consonant *equality*, but the two sides
+    spell gemination differently — a Buckwalter root doubles a radical HW writes
+    once (`hmm` vs "hum") and writes once what HW doubles (`mjs` vs "majass") —
+    and HW carries tanwīn into the transliteration ("qiran", "taran"). **8 roots
+    handed back their own headword** as the first word of their definition. Both
+    folded away now. The two-consonant floor stays and is measured *before* the
+    fold; measured after, a geminate root collapses to one letter and falls under
+    it, which is how my first attempt handed `Aff` back its "afaf".
+    (2) `_is_stem` excluded a grammar note two tokens back. Its stated reason was
+    **stale** — `sfH` is byte-identical without the exclusion, because the
+    Arabic-tail cut removes the sense the comment credited it with saving — and
+    it cost the shape it was written to keep: `wkA` shipped "aukiya", a plural
+    transliteration HW does spell out.
+    (3) `_XREF` needed no lookahead for "see also", which is only ever a
+    cross-reference; `bAr` shipped "; see also under" and `klA` "; see also
+    alphabetically". The lookahead stays for bare "see" — `$hd` and `Tlb` both
+    reach a real one mid-gloss, and dropping it truncates them.
+    (4) `_strip_tail`'s `_HOMOGRAPH` check was dead: HW writes the index onto the
+    transliteration, which is head material at the *front*, and no entry ends on
+    one. Removing it leaves all 1642 rows byte-identical.
+  - `f80c601` — **the `head` bucket was calling the head cut's own predicate.**
+    `_head_leftover` called `_respells_root` directly, which this module's
+    docstring has forbidden since it was written, and the reason is what
+    happened: a bucket sharing its subject's predicate is blind exactly where the
+    subject is. Seven roots shipped a transliterated headword while every bucket
+    in their row read `-`. The comparison is written out separately now — looser
+    by design, with **no floor**, so it reports `nwy` (a real leftover the cut
+    declines) at the price of flagging `Awh` ("oh!") and `hrE` ("hurry"). A test
+    asserts the two predicates *disagree* on `nwy`, so re-wiring the bucket onto
+    the cut fails rather than passes quietly. `head` 3 → 6, all 6 agreed here.
+    A prefix-compatible rule was measured first and rejected: 19 correct English
+    glosses flagged ("be distant", "gain booty") against 5 real leftovers.
+  - **Declined, finding 5** (`_dash_cut`'s one-sided paren clamp), and the
+    measurement is the point. 17 entries carry a `" -- "` the depth counter
+    refuses — not the 9 reported — and in **all 17 the dash is the placeholder
+    inside its own parenthesis**, which must not be cut. The obvious repair
+    (reset depth at a sense boundary) is a **regression**: HW puts `;` inside
+    parentheses, and `wSl` loses a sense to it. The correct repair (skip a
+    never-closed `(`) changes **nothing** across 1642 rows, so the pre-pass it
+    needs is not carried. All of that is now in the docstring so round 11 does
+    not re-propose the wrong fix.
+  - Live now: `roots 1642  kept 1450  no_gloss 98  not_in_hanswehr 94`,
+    `buckets 7 (frag 1, head 6)`, added/removed/changed 0, exit 0. Baseline moved
+    **15 rows: 11 gloss gains, 0 losses**, plus 4 rows newly flagged (`Esy` frag,
+    `Awh`/`hrE`/`nwy` head). 720 tests ✓ (was 698). **10 mutants, all 10 die** —
+    each fold reverted separately on both sides, the floor moved after the fold,
+    the exclusion restored, `_XREF` narrowed and widened, `_ARABIC_TAIL`
+    disabled, the bucket re-wired onto `_respells_root`, the CLI check reordered.
+    Two of my expected strings were wrong on first run and were corrected against
+    the code, not the other way round.
+  - Pre-existing ruff: 12 errors, all in untouched files, confirmed by re-running
+    with these changes stashed.
+  Live `quran.db` HW rows are still phase 23's.
+- **Part B started 2026-08-07: plan Tasks 5 and 6 done, `3674200` + `cb6d016`.**
+  Neither writes the live DB.
+  - `3674200` — **Task 5, overrides + candidate columns.** The 76 wrong-sense
+    roots are not automatable (`quran_occurrence` is one value per headword, so
+    it says which *head* is Quranic and never which sense), so
+    `tools/hanswehr_overrides.tsv` is where the human decision lives:
+    `root<TAB>gloss`, an empty gloss drops the root and lets Lane lead. A reject
+    list only deletes, and the measured failures want a *different* gloss —
+    `ArD` should read "earth; land, country", not vanish. Applied **after** the
+    HW lookup, so an override corrects which HW sense ships and cannot invent a
+    gloss for a root HW does not carry (it would store under
+    `source = 'hanswehr'` while coming from nowhere in Hans Wehr).
+    `candidates()` surfaces what `select_gloss` cut away — the block past a
+    second Form-I headword's `" -- "` and the derived-form block inside `<b>`,
+    plus the nominal reading. `kfr`'s "be an infidel" and `rsl`'s "send out"
+    live in exactly those cuts. It finds the dash with `_dash_cut`, not
+    `find(" -- ")`, so it offers the block the extractor actually removed rather
+    than the em-dash placeholder inside a grammar parenthesis. **1221 of 1450
+    live roots carry ≥1 alternative**; the review TSV appends them as ragged
+    columns (padding ~1500 clean rows to a fixed width buries the interesting
+    ones). Review file regenerated at `~/quran-data/hw24_review.tsv`.
+    `hanswehr_baseline.generate` reads the overrides file too — without it a
+    human decision would change the shipped corpus with the baseline unmoved,
+    the same "gate measures a different population" drift the retired `audit()`
+    had. Both silent-loss shapes in the file raise: a line with **no tab** would
+    read as "drop this root" (one missing keystroke = a deleted definition), and
+    a duplicate root would let one decision overwrite another.
+  - `cb6d016` — **Task 6, `prune-definitions`.** The delete path `import-lane`
+    lacks: it upserts on `(root_id, source)` and never removes, so an override
+    drop silently does nothing. Lives on `ScraperDatabase` beside
+    `delete_root_forms`, scoped to one source so a root's Lane row survives its
+    HW row being pruned. `--source` has **no default** — the only destructive
+    command in the group. Roots absent from the `roots` table are named in the
+    output, because a mistyped Buckwalter root deletes nothing and reads exactly
+    like a root with nothing to delete.
+  - **Corrected a claim of my own before committing:** the empty-list guard in
+    `delete_root_definitions` is defensive, *not* load-bearing — `IN ()` is a
+    SQLite extension that evaluates to false (measured, sqlite 3.53.1), so a
+    mutant that removed the guard survived. The guard stays (standard SQL
+    rejects the syntax; the failure mode is deleting every row of that source)
+    but the docstring and the test now say what is actually true, and the test
+    was re-pointed at the property it does pin — the delete's root scoping.
+  - 740 tests ✓ (was 735 after Task 5, 720 before). Live gate unchanged:
+    `roots 1642  kept 1450`, `buckets 7`, changed 0, exit 0 — Task 5/6 add a
+    decision *path*, no decision has been made yet, so no gloss moved. **11
+    mutants across the two tasks; 10 die, 1 survivor understood and documented
+    above.** Ruff: same 4 pre-existing errors on untouched lines of the files
+    touched (of the 12 repo-wide).
+- **Round 11 `/code-review` (2026-08-07) on `32e3685..cb6d016`: 7 findings, all
+  accepted and fixed — `23ac1a4` + `f5bddba`.** The review mutation-tested 20
+  guards itself and found 2 survivors; those were findings 1 and 2.
+  - `23ac1a4` — extractor and bucket. **`_head_leftover` refused any gloss
+    whose first word was non-ASCII**, which is HW's *normal* transliteration
+    shape (macrons, ‘ain). The one bucket documented to over-report for a human
+    was the one place it under-reported, and on exactly its own subject:
+    `("kalāl weariness", "kll")` folds perfectly and the guard discarded it.
+    Removing it moves 0 of the live 1642 and no live gloss opens on Arabic, so
+    it is free today; what it buys is a future regression being visible.
+    **The head run knew 3 of the 4 dashes `_SECOND_HEAD` treats as one class,
+    three different ways** — `-`/`–` by name, `―` only because
+    `_is_transliteration` calls it transliteration, `—` by neither (it is in
+    `_TYPOGRAPHIC_STRIP`, so it ended the run and the entry was lost whole to
+    the Arabic-tail cut). Not live; one OCR variant away. **`_head_word`'s
+    sense-boundary rule had no test** — the rule `90283ea`/`e822a18` were
+    written for. Mutating it left 740 green while the live gate moved 3 glosses
+    (`stt` "six"→"sixteen", `bgl` "mule"→"female mule", `Aty`). The existing
+    cases survive that mutation because their first sense is not head-shaped;
+    the new ones use live `stt`/`bgl`, where the token past the boundary is a
+    transliteration and a plural marker.
+  - `f5bddba` — override gate. **`prune-definitions` would have deleted the
+    glosses Task 7 had just installed**: it took field 1 of every line, and
+    `hanswehr_overrides.tsv` — the file its own header points the operator at —
+    holds drops and replacements side by side. It reads that file's semantics
+    now (empty gloss = drop, gloss = skip with a count). `test_cli.py` was
+    reinforcing the wrong usage, writing a replacement into `drop.tsv` and
+    asserting it was pruned. **An override for a non-target root** (mistyped, or
+    one HW lacks) was silently ignored; it returns as an `unused_override`
+    quarantine row now, so it reaches the review TSV, the baseline and the
+    summary instead of reading as "the override worked and the gloss is gone".
+    **`hanswehr_baseline.generate` unpacked a fixed 3-tuple** from the ragged
+    `review_rows` — 3 wide only because it passes no `options`, and a variadic
+    tuple unpacks to any arity so mypy cannot see the day that changes; it
+    would fail at runtime after the full index build. Reads positionally now.
+    **`test_the_shipped_overrides_file_parses` asserted the file was empty** —
+    Task 7 populates it, so a pure data change would go red with the obvious
+    fix being to delete the file's only check.
+  - 751 tests ✓ (was 740). Live gate still `roots 1642  kept 1450  no_gloss 98
+    not_in_hanswehr 94`, `buckets 7 (frag 1, head 6)`, added/removed/changed 0,
+    exit 0. **All 7 fixes mutation-checked; all 7 die** — including the ragged-
+    row read, pinned by feeding `generate` a 5-wide row. Ruff/format/mypy on the
+    10 touched files: 3 errors and all 5 format hunks on pre-existing lines
+    outside the diff.
+  - **Round 12 (`/code-review` on `cb6d016..f5bddba`) — 4 findings, all real,
+    all fixed. `78f3d28` + `4f12e17`.**
+    - `78f3d28` — **an override naming a root HW lacks emitted two rows for one
+      root.** The lookup quarantines `not_in_hanswehr` *before* `used.add(bw)`,
+      so the tail sweep appended a second `unused_override`. Two rows under one
+      root is a duplicate `hanswehr_baseline.read` refuses, so the next gate run
+      dies `duplicate root` and stays dead until someone hand-edits the
+      baseline — on the Task 7 path, editing hand-written Buckwalter. Keeps the
+      `unused_override` row (it says the decision did not ship); `stats` counts
+      both. A test was *asserting* the two-row pair, so it shipped pinned.
+    - `4f12e17` — **the import stranded the glosses this phase exists to
+      remove.** `import-lane` upserts and never deletes; **26 of the 192
+      quarantined roots still hold a phase-23 `hanswehr` row** — `$fh` = "see 2
+      شف", `Hnk` = "i u", thirteen roots = "and". The plan pruned only override
+      drops, hand-derived with `awk`, and there are zero of those. An overrides
+      file cannot close it: it names only roots a human chose. `--prune-out`
+      now generates the list (every root holding a row at `--source` the run did
+      not re-produce); **required**, since forgetting it reproduces the bug
+      silently. Verified live: writes exactly those 26. Sibling
+      `prepare_corpus_form_glosses` raises here instead (`must_yield`) — right
+      there, wrong here: there a lost gloss means the parser broke, here it
+      means the parser worked. No prune ceiling — the baseline gate already
+      fails the run that would prune everything. Same commit drops the
+      instruction to point `prune-definitions` at the overrides file, the only
+      path where its no-TAB-means-drop parsing (looser than `load_overrides`,
+      which raises) could turn a missing keystroke into a deleted gloss.
+    - 752 tests ✓ (was 751). Live gate unchanged: `roots 1642 kept 1450
+      no_gloss 98 not_in_hanswehr 94`, `buckets 7`, added/removed/changed 0,
+      exit 0. Ruff/format/mypy clean on the touched files bar 3 pre-existing
+      `cli.py` errors outside the diff (`cli.py` change is docstring-only).
+  - **Round 13 (`/code-review` on `f5bddba..4f12e17`) — 7 findings. 5 fixed, 1
+    pushed back with a measurement, 1 comment correction. `0708701`, `9fdbf20`,
+    `b8596ce`, `5353d37`, `81c8655`, `d08ef32`.**
+    - **Pushed back: `_SECOND_HEAD` needs `_dash_cut`'s paren-depth guard.** The
+      hole is real synthetically — a `;` then a placeholder dash inside a
+      grammar paren truncates the entry to its first sense, invisibly. Live it
+      is empty: across all 1642 targets **exactly 2 entries put the match at
+      non-zero depth, `Ewd` and `wjf`, and both are genuine second headwords**
+      reading as nested only because an earlier bracket was never closed
+      (`wjf` opens `(wajf, وجوف wujūf, وجيف` and stops). The guard fixes nothing
+      and regresses those two — the case `_dash_cut`'s docstring already hands
+      to this pattern. Recorded in the comment + a regression test (`81c8655`).
+    - `b8596ce` — **`candidates` hid the removed sense from the human gate.** It
+      offered only `_dash_cut`'s block, so the three spellings `_SECOND_HEAD`
+      covers were invisible. **7 of 1642, several the Quranic sense** — `zkw`
+      "grow, increase", `syH` "travel, journey", `wjf` "throb, beat". `_XREF`'s
+      block deliberately still not offered: a redirect, not a sense, and it adds
+      a candidate to 0 of the 1642. **`hw24_review.tsv` regenerated** — 7 rows
+      changed, all additive columns, no gloss column moved.
+    - `5353d37` — **an override for a root HW lacks executes as a deletion.** It
+      cannot ship (a `source='hanswehr'` gloss must come from HW), so the root
+      falls to `--prune-out`. The deletion is *right* — that live row is the
+      stale junk Task 7 removes, and exempting it re-strands what `4f12e17`
+      fixed — but the only trace was a review-TSV line nobody reads during an
+      import, beside a `0 overrides unused` counter that stays 0. Now a stdout
+      WARNING naming the roots.
+    - `81c8655` — **a gloss could ship ending on a dangling `–`.**
+      `_TYPOGRAPHIC_STRIP` holds `–`/`—` so `_is_transliteration` calls a bare
+      one ASCII and `_strip_tail` leaves it, while `―` is popped. One dash
+      class, three outcomes. Stripped in `_balance_parens`, the single funnel.
+      0 live glosses affected — closes the class, not a case.
+    - `9fdbf20` — **the baseline's 192 quarantine rows end in a tab**; any
+      whitespace trim turns all 192 into 3-column rows and `read` raises,
+      leaving the gate unrunnable. Column restored on read, gated on the buckets
+      cell reading `-` so a genuinely *dropped* middle column still raises.
+    - `0708701` — a root listed twice in `prune-definitions --roots` printed
+      `Pruned 1 of 2`, the signature of a mistyped root.
+    - 758 tests ✓ (was 752). **All 6 new tests mutation-checked; all 6 die** —
+      including the pushed-back one, killed by temporarily adding the depth
+      guard. Live gate unchanged: `roots 1642 kept 1450 no_gloss 98
+      not_in_hanswehr 94`, `buckets 7`, added/removed/changed 0, exit 0. Prune
+      list still exactly 26. Ruff/format clean on 7 of 8 touched files; the 8th
+      is `cli.py`, whose 3 errors are pre-existing and outside the diff.
+  - **PR #75 OPEN 2026-08-08** (`gh pr view 75`), `feat(scraper): improve Hans
+    Wehr glosses and make the import prunable`, 38 commits at open. §4 step 3
+    was stopped after round 13 — the loop had hit diminishing returns (**17
+    commits since `f80c601`, the last to change a single shipped gloss**;
+    rounds 11-13 moved `added/removed/changed 0`), so the branch went to the §5
+    gate instead of a 14th local round.
+  - **§5 CodeRabbit round 1 on `#75` — CHANGES_REQUESTED, 6 inline findings + 1
+    failed `mode: error` pre-merge check. 4 fixed, 2 declined with replies.
+    `1e8e041`, `a7a4c30`, `884f19b`, `f203f39`.**
+    - **Pre-merge check `New Logic Ships With Tests` ❌** — found only by
+      opening the walkthrough's collapsed `<details>`, exactly the fail-open
+      signature §5 records. `main`'s `len(changed) > args.show` branch had no
+      test: every CLI case used the default limit with ≤1 change. A truncation
+      that does not announce itself reads as the whole story — a 400-root
+      regression would print 20 and look like 20. Covered in `884f19b`.
+      `Docstring Coverage ⚠️ 57.08%` ignored per the standing note: codebase-wide
+      and `mode: warning`, no per-PR docstring moves it. Title check ✅.
+    - `1e8e041` — **`read` split on `splitlines()`, `write` joins on `"\n"`.**
+      `build_rows` rejects only `\t\n\r`, while `splitlines()` also breaks on
+      `\v`, `\f`, `\x1c`-`\x1e`, `\x85`, U+2028/9. A gloss carrying one passes
+      the writer's guard, ships as one row, reads back as two — second row fails
+      the column check, gate unrunnable. Source is OCR text. Fixed in the reader:
+      the file is `"\n"`-joined, so matching that is the whole contract.
+    - `a7a4c30` — **`_sources` left `load_overrides` unpatched**, so all 28
+      baseline tests read the shipped `hanswehr_overrides.tsv`. Empty today, so
+      green; **Task 7 fills it**, and an override naming a fixture root would
+      turn unrelated assertions red on a pure *data* change. Simulated with one
+      line for `nfs`: **5 of 28 fail**.
+    - `f203f39` — plan doc. Self-Review still said Part A was "gated by the
+      audit exiting 0"; round 3 replaced that with the differential and the file
+      map already said so. **And the override-verification snippet interpolated
+      a Buckwalter root into a grep pattern: 48 target roots carry `*` (ذ), and
+      a leading one (`*Ab`, `*b*b`) makes grep exit 2, which `||` reports as
+      `MISSING FROM OUTPUT`.** Now `grep -qxF` on field 1.
+    - **Declined: "reference CLAUDE.md §4 instead of duplicating the loop."** The
+      two lines duplicate no step list — line 14 *is* that reference, and line 13
+      carries only the §5 fail-open gotchas learned on #59/#63. Replacing them
+      leaves a pointer to a pointer minus the warnings.
+    - **Declined: "add immutable gate evidence to `STATUS.md`."** §14 defines
+      this file as a scratch board, not release evidence, and committed stdout is
+      no more immutable than the prose describing it. The premise's true half —
+      **no `.github/workflows/` exists** — is real and filed as **issue #76**;
+      adding CI inside the PR it would grade is the self-modifying-gate shape §5
+      forbids.
+    - **760 tests ✓** (was 758). Both new tests mutation-checked, both die. Gate
+      unchanged: `roots 1642 kept 1450 no_gloss 98 not_in_hanswehr 94`,
+      `buckets 7`, added/removed/changed 0, exit 0.
+  - **§5 CodeRabbit round 2 on `66ad1e2` — APPROVED**, status `success` /
+    `Review completed` (read, not assumed: a rate-limited refusal posts the same
+    green with `Review rate limited` in the description). Verdict targets the new
+    head, not `b8cd636`.
+    - **An approval is not "no findings left."** Round 1 carried **2 findings
+      CodeRabbit could not post inline** — "Some comments are outside the diff
+      and can't be posted inline due to platform limitations", collapsed under
+      *Outside diff range comments (2)* in the review body. With no thread to
+      resolve, they do not resurface on re-review and the round-2 approval says
+      nothing about them. Both were real. **Read the round-1 body, not the
+      round-2 verdict** — a new fail-open signature, alongside the green
+      rate-limit status and the hidden `mode: error` check.
+    - `1a45e5a` — `test_main_writes_both_tsvs_and_reports_the_buckets` read the
+      shipped `hanswehr_overrides.tsv` (`main()` calls `load_overrides()` with no
+      argument); the sibling test below it patches that call, this one did not.
+      Same defect `a7a4c30` fixed in the baseline tests, different file.
+      Measured: two simulated task-7 rows fail **1 of 28** before, **0 of 28**
+      after.
+    - `8d1f370` — **`import-lane --source` defaulted to `lane`, a tag no row has
+      ever carried.** Live sources are `corpus-forms` 155, `hanswehr` 1476,
+      `perseus-lane` 217, `qurandev-lane` 1386. Worst in the pair this phase
+      built: `prepare_hanswehr_glosses` scopes its prune list to its own
+      `--source` and `prune-definitions` requires the tag, so forgetting the flag
+      on task 7's import half **deletes 1476 live Hans Wehr rows and reinstalls
+      them as orphans no query joins on** — corpus gone, both commands reporting
+      success. Now `required=True`. Every documented invocation already passes
+      it, so nothing to update; phase 20 made the same forgotten-flag inversion
+      for `--only-missing`.
+    - **761 tests ✓** (was 760). Both new tests mutation-checked, both die
+      (default restored → `assert 0 == 2`). Gate unchanged: added/removed/changed
+      0, exit 0. `cli.py`'s 3 ruff errors + reformat verdict are byte-identical
+      at HEAD — pre-existing, outside the diff.
+  - **§5 CodeRabbit round 3 on `698969b` — clean-pass shape** (empty `COMMENTED`
+    review, no inline comments) **but one more outside-diff finding**, so the
+    round-2 lesson held on its first re-test. `003c60b`.
+    - **The prune list did not name the source it was computed for.** Required
+      flags stop `--source` being *forgotten*; nothing stopped the prune and the
+      import naming **different** ones, and the list is bare roots so it matches
+      any source's rows. Prune `corpus-forms` + import `hanswehr` = one
+      dictionary deleted, another installed in its place, both commands green.
+    - Fixed by making the artifacts self-describing: `prepare_hanswehr_glosses`
+      opens `--out` and `--prune-out` with `# source: <tag>`, and both consumers
+      refuse a disagreeing `--source` **before the DB is opened** — fail before
+      the delete, not report it after. New `scraper/source_header.py`. Verified
+      on the live artifact: `/tmp/hw24_prune.txt` raises against
+      `--source corpus-forms`.
+    - **Absent header stays unchecked, never a failure.** Both consumers already
+      skipped `#`, so the corpus-forms / perseus-lane / qurandev-lane TSVs stay
+      importable; a hard requirement would strand all three, none regenerated
+      here. CodeRabbit's own tag was 🏗️ Heavy lift — the header is ~50 lines
+      because both consumers already had the parsing hook.
+    - Plan Task 7 snippets corrected: `grep -c`/`wc -l` are now rows **+ 1**.
+    - **764 tests ✓** (was 761). All 3 new tests mutation-checked, all 3 die
+      (drop the prune guard, drop the import guard, make an absent header raise).
+      Gate unchanged: added/removed/changed 0, exit 0. mypy clean on the new
+      module.
+    - Process note: `git checkout -- scraper/cli.py` to undo a mutation
+      discarded **three uncommitted edits** in the same file — the second time
+      this exact command has done that on this branch. Mutate and restore with
+      a targeted string edit; never `git checkout` a file holding live work.
+  - **§5 CodeRabbit round 4 on `6536a71` — RATE LIMITED, and it still returned a
+    finding.** Commit status was `success` / **`Review rate limited`** — fail-open
+    signature 1, the green that is not a pass. Zero review objects on the head.
+    - But the *reply comment* it posted before refusing carried both a
+      verification and a new **P2**: it confirmed the source-header fix ("both
+      consumers validate the generated first-line header before they open the
+      database… headerless legacy artifacts remain importable") and then flagged
+      `--show`. So a rate-limited round is not necessarily an empty one — read
+      the comment body, not just the status.
+    - `ad8f9cf` — **negative `--show` made the gate lie in the direction of
+      alarm.** It reaches a slice bound *and* a subtraction: over two changed
+      roots, `--show -1` prints one and reports `... 3 more` — four claimed where
+      two moved, from the one tool whose whole job is naming exactly which roots
+      moved. Reproduced before fixing. Rejected via `parser.error`, not clamped:
+      clamping accepts an operator typo silently. **765 tests ✓** (was 764), new
+      test mutation-checked and dies, ruff clean, gate unchanged.
+    - **Not re-requested.** A push already triggers an incremental review, and an
+      `@coderabbitai review` fired on top of one is the *second* request that
+      eats the quota — which is what produced this refusal. Waiting on a
+      push-triggered review instead. **That wait was a mistake** — see round 5:
+      a *refused* round leaves nothing in flight to wait for.
+    - **The gate had reviewed no commit past `698969b`.** `ad8f9cf` is the fix;
+      the branch head carrying it is **`b1a09f4`**, and neither had a review
+      object. Not a pass, not an override: §5 blocks until CodeRabbit reviews
+      the head, and the head is the sha the PR points at, never the fix commit
+      inside it.
+  - **§5 CodeRabbit round 5 on `b1a09f4` — first attempt was swallowed: a new,
+    fifth fail-open signature.** CodeRabbit does **not** auto-retry after a quota
+    reset: both push-triggered attempts stayed stamped `04:44:40Z` with nothing
+    re-firing, and the limit notice's "next review available in 21 minutes" had
+    elapsed ~25 min earlier. So a request after a *refused* round is a first
+    request, not the duplicate that eats quota — the round-4 rule applies only to
+    a review already **in flight**.
+    - **But the request itself was swallowed.** The comment led with ~200 words
+      of fix narrative and ended in `@coderabbitai review`; that routes the whole
+      body to the **chat** handler and the command never runs. Tells, all in the
+      reply: a leading `> [!TIP] For best results, initiate chat on the files or
+      code changes`, a `<details>🧩 Analysis chain` block of the scripts it ran,
+      and an explicit "The sandbox did not run the test suite."
+    - **The chat reply reads exactly like a clean round and is not one.** It ran
+      `git show` / `ast-grep outline` / `rg` over the parser and the new test,
+      confirmed `parser.error` fires before `generate()`, confirmed no later
+      commit touches those files, and closed with "I found no additional issue in
+      this follow-up patch" — all correct, all **scoped to `ad8f9cf` alone**,
+      never the head. Zero review objects, so §5 has nothing to gate on.
+    - **Proved mechanically, not inferred.** Re-posted `@coderabbitai review`
+      **bare**, in its own comment with no other text (`5224823289`, 05:57:26Z):
+      the commit status flipped to `Review in progress` at **05:57:33Z**, 7
+      seconds later. The prose-wrapped request had left it on `04:44:40Z`.
+    - Rule: **post the command bare.** Put the fix narrative in a separate
+      comment if it is worth writing down.
+    - **Verdict: review `4888280584` on `b1a09f4`, 05:59:48Z,
+      `CHANGES_REQUESTED` — 1 Minor.** All five fail-open signatures checked and
+      clear: status description `Review completed` (not the green rate limit),
+      a real review object on the head (not a chat reply), base is `main` (not
+      stacked), and **zero** "outside diff range" comments in the body — the
+      first round since round 1 with none. Pre-merge table **8 ✅ / 1 ❌**, the ❌
+      being `Docstring Coverage` at 57.08% vs 80.00% — `mode: warning`,
+      codebase-wide, the known non-actionable one; it does not block and no
+      per-PR docstring moves it.
+    - The finding was **this file**: line 714 called `ad8f9cf` "this head" when
+      the head was `b1a09f4`, and line 712 recorded a wait for a
+      push-triggered review that never fired. Both genuine, both corrected in
+      the round-4 block above. Declined one clause of the ask: CodeRabbit wanted
+      the head recorded as `PENDING` with "no completed review object", which
+      was true when it scanned and false by the time it posted — the review
+      raising it completed at 05:59:48Z. Recording a status that is stale on
+      arrival is the drift §14 exists to stop.
+  §5 gate **cleared on `ad7bbab`** — round 6, `Review completed` 06:04:27Z,
+  walkthrough marker "No actionable comments were generated in the recent
+  review. 🎉" over `b1a09f4..ad7bbab`, 7 of 7 threads resolved, zero
+  outside-diff-range comments, pre-merge table 8 ✅ / 1 ❌ (`Docstring Coverage`,
+  `mode: warning`, codebase-wide, the known non-actionable one). All five
+  fail-open signatures checked clear. `reviewDecision` still reads
+  `CHANGES_REQUESTED`: the documented sticky artifact — a clean incremental pass
+  submits no review object, so GitHub keeps pinning the last submitted state.
+  Not a finding, and **not self-dismissed**; clearing it cosmetically needs an
+  `@coderabbitai full review`, not spent because no merge is pending.
+  - **TASK 7 LIVE IMPORT done 2026-08-08** (outside git; `~/quran-data/quran.db`).
+    **User ruled: import with the overrides file EMPTY** — the human eyeball
+    pass over the 1450 review rows was waived, so every gloss is the extractor's
+    auto-pick, including the 76 roots where HW's chosen sense disagreed
+    semantically with Lane. Concern was raised once and the ruling stands; the
+    backup makes it reversible.
+    Backup **`~/quran-data/quran.db.bak-phase24`** (139,919,360 B) taken first
+    via the sqlite `.backup()` API, not `cp` — the dev server holds the DB, and
+    a byte copy of a live file with a `-wal` alongside is not a snapshot.
+    Verified to carry the pre-import 1476.
+    Then `prune-definitions --source hanswehr --roots /tmp/hw24_prune.txt` →
+    **"Pruned 26 of 26"**, then `import-lane hw24_import.tsv --source hanswehr`
+    → **1450 definitions**.
+    Verified by **diffing live against the backup**, not by row count (the count
+    is the check that cannot see a deletion — see the gloss-gate note above):
+    `added 0  removed 26  changed 461`, 0 empty definitions. Sources now
+    `hanswehr 1450 / qurandev-lane 1386 / perseus-lane 217 / corpus-forms 155`.
+    All **26 pruned roots have a Lane fallback** (`qurandev-lane` or
+    `perseus-lane`), so none lost its definition — the prune demotes, it does
+    not blank.
+    The 461 changes are the phase-24 cuts landing: verb-vowel prefixes gone
+    (`$hq` "a i to bray (donkey)" → "bray (donkey)"), chain spellings gone
+    (`$hw` "u and شهي šahiya a to desire…" → "desire, wish, covet, crave,
+    long"), em-dash truncation repaired (`nsf` and `msx` both **grew**).
+    **Known cost, visible in the diff:** the cut is aggressive where the entry
+    turns to transliteration early — `Aty` went to bare `"arrive"` (−125 chars)
+    and `jlw` to `"clean, polish; to clear"` (−160). Correct but thin; these are
+    exactly what the waived override pass would have caught. Fixable any time by
+    filling `hanswehr_overrides.tsv` and re-running the prune+import pair.
+    Smoke-checked live: `/dictionary/fsd` 200, HW gloss leading, Lane below in
+    the collapsible.
+  - **TASK 8 RAN 2026-08-08 and STOPPED at its own Step 3 "stop and report"
+    checkpoint. Recommendation: do not import Salmoné; the source is obsolete.**
+    Read-only throughout, no DB write. `fetch-salmone` → `salmone.xml`
+    **28,944,030 B**, matching the plan's expected size exactly, at
+    `~/quran-data/refdata/salmone/` (outside the repo, §11). Prepare tool ran
+    clean: **12 glossed of 14 targets** (2 not in Salmoné, 0 no-sense, **10
+    `unmatched`, 0 tied**).
+    **The plan's 101-target expectation is stale, and Task 7 is not why.** The
+    target query is "roots with no definition other than `perseus-lane`"
+    (`load_salmone_targets`), and **phase 23's** 1476 HW glosses had already
+    collapsed it: the pre-Task-7 backup answers **13**, live answers **14** (+1
+    is a root left holding only `perseus-lane` after today's prune). Phase 22's
+    91-of-101 value proposition no longer exists.
+    **Verified against the corpus's own `word_glosses`** rather than eyeballing
+    the English — 2 right, 3 partial, **7 flat wrong of 12**:
+    `hmn` همن "Pocketed." vs corpus "the Guardian"; `SmE` صمع "Small-eared." vs
+    "monasteries"; `Tff` طفف "Edge, border, margin" vs "those who give less";
+    `nSy` نصي "A white thistle." vs "forelock"; `hTE` هطع "Broad road." vs
+    "Racing ahead"; `Eyn` عين "smote with the evil eye" vs "eyes / springs";
+    `gvw` غثو "Carried, washed away." vs "stubble". Only `kyf` and `$r*m` land.
+    That 10-of-12 `unmatched` rate is the phase-21 failure mode the plan names:
+    the leading sense taken with no corpus form behind it.
+    **It would add zero correct definitions.** 13 of the 14 targets are the
+    `hw_gap_24.tsv` roots, and `perseus-lane` already covers 6 of them with a
+    *better* gloss (`kyf` "Quality as answering; how?", `h$m` "He crushed it",
+    `SmE`, `Sxx`). Of the 8 roots with no definition at all, Salmoné reaches 6
+    and gets 5 wrong. Net gain ≈ one partial row (`SwE`).
+    Minor extractor defect noted, not fixed: `&c.` renders as `"& c."`
+    (`h$m` "Broken & c.", `SwE` "a certain measure ( for corn & c. )").
+    Artifacts: `/tmp/salmone.tsv` (12 rows), `~/quran-data/salmone_review.tsv`
+    (14 + header). `salmone_rejects.txt` deliberately left **empty** — filling it
+    with 10 rejects would dress up a source that should simply not ship.
+  **RULED 2026-08-08 by the owner: drop Salmoné, hand-gloss the 14.** Task 9 is
+  therefore no longer a Salmoné import.
+- **Task 9 replaced 2026-08-08: `editorial`, 14 hand-written glosses.**
+  Source tag `editorial`, **rank -1** — above `hanswehr`, because the text is
+  written from the corpus's own per-word glosses for that exact root, so it is
+  the most Quran-specific gloss a root can carry. -1 rather than a tie at 0:
+  a tie falls to the `rd.source` alphabetical tie-break, the accident
+  `roots.ts` already carries a comment about. Today the two never meet —
+  `editorial` covers only roots with nothing else.
+  Glosses live in `packages/scraper/tools/editorial_glosses.tsv`, with the
+  `# source: editorial` header binding it to `--source editorial`; imported by
+  the existing `import-lane`, no new code path.
+  **Salmoné removed from the user-facing surface**, since it now carries zero
+  rows: `/about` credit deleted, `SOURCE_LABELS` entry deleted, `salmone` CASE
+  arm deleted (it falls to the ELSE, pinned by a test). The scraper tooling
+  (`tools/prepare_salmone_glosses.py`, `sources/salmone.py`, their tests) is
+  **kept** — inert, tested, and the only way back if the source is ever revived.
+  **LIVE 2026-08-08**, owner-authorised in the moment. Backup first via the
+  sqlite `.backup()` API (never `cp` — the dev server holds the DB):
+  `~/quran-data/quran.db.bak-phase24-editorial`, 139,919,360 B, carrying the
+  pre-import 4 sources. Then `import-lane ... --source editorial` → 14.
+  Verified by **diffing live against that backup**, never by row count
+  (see the gloss-gate lesson): **added 14, removed 0, changed 0**, 0 empty
+  definitions. Both gap counters now **zero** — roots with no definition at all
+  8 → 0, roots carrying only `perseus-lane` 14 → 0. **Every root in the corpus
+  now has a definition.** Smoked `/dictionary/{hmn,kyf,Eyn}` → 200 with the
+  editorial gloss rendering, and on `kyf` it renders *above* the perseus-lane
+  entry, which stays below.
+  Code `2213188`. Tests: `packages/data` 249, `apps/web` 483, lint clean; the
+  new rank test was mutation-checked (rank -1 → 2 fails it).
+  Branch `feat/phase-24-gloss-quality`; re-derive the ahead/behind counts with
+  `git rev-list --count` per §14 rather than trusting a number written here.
+- **Round 14 (`/code-review` on `2213188`/`fee97cf`) — 3 findings, all real,
+  all fixed 2026-08-08.** None in the editorial glosses themselves; all three
+  sit in code the editorial work touched or replaced.
+  1. `prepare_hanswehr_glosses.py` warned `override(s) will be DELETED, not
+     applied -- Hans Wehr has no entry` for a **deliberate drop** (empty
+     gloss), whose quarantine also lands it in `stale`. `bw in overrides` →
+     `overrides.get(bw)`: a drop executes as written, so warning that it failed
+     states a false reason. Latent only because the overrides file shipped
+     empty — dropping is the documented Task-7 workflow.
+  2. `candidates()` read its cut-away blocks off `entries[0]` (the verb) even
+     when `prefer_nominal` ships a different entry, so the **shipped** entry's
+     derived-form and second-headword senses never reached the reviewer — the
+     exact case the function exists for. Measured against the vendored HW:
+     **63 of 1642 targets** gained a candidate, several Quranic (`Ebd` "servant
+     (of God)", `wly` "helper, supporter, benefactor", `xyr` "good, benefit").
+     Review furniture only — `hanswehr_baseline` re-run after the fix is still
+     `added 0 / removed 0 / changed 0`, so no shipped gloss moved.
+  3. `/about` linked the editorial credit to `github.com/J3ff4/quran-corpus-pwa`,
+     which `gh repo view` reports **private** — the only 404 on the page that
+     states the licence terms. `Source.href` is now optional; a source with no
+     public home renders as plain text and drops its host line. Restore the
+     link when the repo goes public (blocked on the orphaned-object GC).
+  Gates: scraper 767 (+2), `apps/web` 483, tsc + eslint + ruff clean; both new
+  scraper assertions mutation-checked (reverting each fix fails its test), and
+  the `/about` test mutation-checked by re-adding an href.
+- **Round 15 (CodeRabbit on `3cf0670`) — 5 findings (2 inline, 3 outside diff
+  range); 2 fixed, 3 declined with reasons 2026-08-08.** Outside-diff-range
+  findings carry no thread and never resurface, so they are recorded here.
+  1. FIXED — `/about` deleted the Salmoné credit but the Hans Wehr note still
+     read "Unlike Lane **and Salmoné**", naming a dictionary the page no longer
+     credits and the app never ships. The test that was meant to catch this
+     asserted `/Salmoné's Arabic-English Dictionary/` — the credit's *title* —
+     so the bare surname passed it; widened to `/Salmoné/`.
+  2. FIXED — prune list and `--out` were bound only by `# source: hanswehr`,
+     which **every** run writes: prune with run B's list, import run A's
+     glosses, and the source holds neither run (a root B dropped survives the
+     prune that never listed it). `source_header.header(source, run)` now
+     stamps both halves of one prepare run with `<timestamp>-<uuid6>`, and
+     `check_pair` + a `--pair` flag on `import-lane`/`prune-definitions`
+     refuses a mismatch **before** the delete or the upsert. Unlike a missing
+     `# source:` line, a missing *stamp* under `--pair` fails rather than
+     passing unchecked: asking for the comparison asks for the guarantee, and
+     an unstamped file cannot give it. Flag is optional — the three older
+     prepare tools stamp nothing and their TSVs still import.
+  3. DECLINED (false) — "`_dash_cut` supports Unicode dash variants, so
+     `dash + len(" -- ")` eats the first character". It does not: `_dash_cut`
+     matches only `text.startswith(" -- ", i)`. Verified — `_dash_cut("grow —
+     increase")` is `-1`. Unicode dashes live in `_SECOND_HEAD`, which the same
+     code already reads via `end(1)`.
+  4. DECLINED (stale) — "record test-count provenance, GitHub reports CodeRabbit
+     PENDING with no check runs". 765 and 767 already sit in their own round
+     blocks (round 4 vs round 14); the PENDING was a snapshot of the bot's own
+     in-flight run, and the head status now reads `success / Review completed`.
+  5. DECLINED (intentional) — About says "Editorial gloss**es** (this project)"
+     where `definitionSourceLabel('editorial')` says the singular. Plural names
+     the collection on a credits list, singular labels one definition under one
+     root; sharing the string would couple `/about` to `lib/` for one entry.
+  Gates: scraper **769** (+2), `apps/web` 483, tsc + eslint clean; `hanswehr_
+  baseline` still `added 0 / removed 0 / changed 0`. Ruff reports 3 errors in
+  `cli.py` (lines 269/547/563) — all pre-existing, confirmed by re-running it on
+  a stashed tree. All three new assertions mutation-checked: disabling the stamp
+  comparison, dropping the missing-stamp guard, and un-stamping the prune list
+  each fail exactly their own test.
+- **Round 16 + 17 (CodeRabbit on `72306c6`) — 6 findings; 4 fixed, 2 declined
+  with reasons 2026-08-08.** Two runs landed on one head: the incremental review
+  of `3cf0670..72306c6` (2 findings, one of them outside diff range and so
+  recorded here) and the `@coderabbitai full review` that followed it (4 inline,
+  whole-branch scope, which is why they reach files the last diff never touched).
+  1. FIXED — `--pair` had two holes. `# source: hanswehr run: ` parses to a
+     *blank* stamp, which is not `None`, so two blank files satisfied the
+     comparison; blank now reads as absent. And `check_pair` compared only the
+     stamps: each command runs `check` on the artifact it consumes and never on
+     the one `--pair` names, so one stamp across two sources walked the
+     cross-source delete back in through the flag added to tighten it. Tags are
+     compared too now. The *source* half of `_parse` stays unnormalised on
+     purpose — blank there is a mangled tag, and `check` must keep raising a
+     mismatch rather than wave it through as the untagged file it is not.
+  2. FIXED — `prepare_hanswehr_glosses.main` wrote `--out` and `--prune-out`,
+     *then* ran the `candidates` sweep that builds the review payload — the step
+     that re-slices every kept entry and the likeliest of the three to raise. A
+     raise left both paired halves on disk carrying one run stamp and no review
+     TSV, which `--pair` validates happily: the prune and the import would then
+     run over a corpus no human ever saw, the only trace a missing file. All
+     three are computed before any is written.
+  3. FIXED — `hanswehr_baseline` refused a duplicate root in the baseline it
+     *reads* but not in the rows it *generates*: the dict comprehension collapsed
+     one, `compare` read "no change" for the row that vanished, and under
+     `--update` the pair was written to the file for the next non-update run to
+     choke on. Checked on both paths now, before either can report a clean gate.
+  4. FIXED — the plan's Salmoné sanity-check step ran
+     `audit_hanswehr_glosses.py --help >/dev/null`, which reads no TSV and
+     classifies no gloss; an operator could record a pass that measured nothing.
+     Line deleted, the twenty-row read that does the work kept.
+  5. DECLINED (false, measured) — "QAC roots include `qr'`, `>kl`, `s>l`, whose
+     hamza seats `_root_skeleton` keeps and `_skeleton` strips, so
+     `_respells_root` rejects matching headwords". Not in this corpus: all
+     **1642** `roots.root_buckwalter` values were scanned and **0** contain any
+     of `' > < & } |` — this pipeline writes the seat as `A` (`Akl`, not `>kl`).
+     Distinct characters across every root = 28, all covered by `_ROOT_RADICALS`.
+     Mapping the seats in changes 0 of the 1450 live glosses. The finding's own
+     footer reads `Source: Linters/SAST tools` — inferred from the QAC
+     convention, not read off this repo's data.
+  6. DECLINED (false premise) — "import before pruning: if the import fails, the
+     source can remain partially or completely deleted". It cannot. `stale` is
+     `live - emitted`, so the prune list and the import set are **disjoint by
+     construction**: a failed import after a prune leaves every kept root on its
+     old gloss with the stale junk gone, and nothing needing restoring. The
+     proposed order is the worse half — a failed prune after an import leaves
+     phase 23's known-junk rows live at rank 0, where a *missing* hanswehr row
+     would have fallen back to Lane. Comment now states the disjointness so the
+     question does not come back.
+  Gates: scraper **772** (+3), tsc + eslint clean; `apps/web` untouched this
+  round (the `/about` fix landed in `72306c6`), so its 483 were not re-run.
+  `ruff check` + `ruff format --check` clean on all six changed files.
+  `hanswehr_baseline` still `roots 1642 kept 1450 no_gloss 98 not_in_hanswehr 94
+  / added 0 / removed 0 / changed 0`, and a full `prepare_hanswehr_glosses` run
+  against the live DBs after the reorder still emits 1450 glosses, 0 stale, with
+  one stamp across both files. Four mutations checked, each failing only its own
+  test: un-normalising the blank stamp, deleting the source comparison, deleting
+  the duplicate guard, and moving the two writes back ahead of the sweep.
+- **Round 18 (CodeRabbit on `47f3caf`) — 1 finding, fixed 2026-08-08.** The
+  incremental review settled `CHANGES_REQUESTED` at 11:21:46Z. The
+  `@coderabbitai full review` requested alongside it was **refused for quota**
+  and never ran — the commit status is a green `success` whose *description*
+  reads `Review rate limited` (CLAUDE.md §5, fail-open signature 1). The full
+  review on this head is still owed; the round below does not discharge it.
+  1. FIXED — round 17's fix shrank the write window without closing it.
+     Computing all three payloads first still installed `--out` and
+     `--prune-out` one statement ahead of the review TSV, so a failure in
+     between (ENOSPC, a `--review` path naming a directory) left a stamp-matched
+     pair on disk with no review artifact — the same state item 2 above was
+     written to prevent, one statement narrower. New `_install` stages every
+     payload to a sibling temp file and moves them only once all three have
+     landed, review first. That puts every realistic failure before anything is
+     installed. If a move fails anyway, **both halves of the pair are removed**:
+     an earlier run's pair carries its own matching stamps, so surviving intact
+     it would pass `--pair` and import the *previous* run's corpus under the
+     operator's belief that they were importing this one. Two missing files stop
+     both commands with a plain ENOENT.
+  Gates: scraper **773** (+1); `apps/web` untouched again this round, 483 not
+  re-run. `ruff check` + `ruff format --check` clean on both changed files.
+  `hanswehr_baseline` still `roots 1642 kept 1450 no_gloss 98 not_in_hanswehr 94
+  / buckets 7 / added 0 / removed 0 / changed 0`, and a live-DB
+  `prepare_hanswehr_glosses` run through the new install path emits the same
+  1450 glosses / 0 stale / one stamp across both files, leaving no `.tmp`
+  sibling behind. The new assertion is mutation-checked twice: dropping the
+  pair cleanup leaves the earlier run's `out.tsv` in place, and reverting to
+  sequential writes never reaches the move at all — both fail only this test.
+- **Round 19 (CodeRabbit on `16937c2`) — 4 findings, all fixed 2026-08-08.** Two
+  runs again: the incremental on the push (2) and the `@coderabbitai full review`
+  that finally ran once the quota reset (2, one of them in `cli.py`, a file the
+  last three diffs never touched). CodeRabbit also confirmed round 18's deviation
+  — removing the pair rather than leaving mismatched stamps — and recorded it as
+  a learning.
+  1. FIXED — the round-18 regression test injected its failure by *call order*
+     (`if len(calls) > 1`), which pins nothing about the artifact it names: had
+     `_install` ever moved the pair ahead of the review TSV the test would have
+     stayed green while asserting the opposite. And `prepare_hanswehr_glosses.os`
+     **is** the `os` module, so patching `os.replace` on it is process-wide for
+     the test's duration — anything else calling it, pytest included, would have
+     raised the injected `OSError` and reported the wrong failure. Keyed on the
+     destination path now, plus two assertions the test was missing: the review
+     artifact installs *first* and survives, which nothing else would notice
+     `_install` dropping.
+  2. FIXED — `mkstemp` opens 0600, so staging silently changed the artifacts
+     from 0644 (plain creation under umask 022) to owner-only. Mode restored
+     from the live umask before the move; verified 644 on all three by a real
+     run. Also `flush()` + `os.fsync()` per payload and an fsync of each parent
+     directory after the moves: a rename is atomic against a crash *mid-write*,
+     not against the write never reaching disk, and `check_pair` reads two
+     header lines — so a truncated `--out` beside an intact `--prune-out` passes
+     it and imports a partial corpus over the live dictionary.
+  3. FIXED — the plan's Task 7 Step 1 and Task 9 Step 1 both said
+     `cp ~/quran-data/quran.db …`, which contradicts what the runs actually did
+     (STATUS.md, phase-24 Task 7: `.backup()`, "the dev server holds the DB, and
+     a byte copy of a live file with a `-wal` alongside is not a snapshot").
+     Task 6 Step 6 starts that dev server, so an operator following the plan
+     literally takes a non-snapshot as the gate's only safety net. Both steps now
+     use the sqlite `.backup()` API; both Rollback lines say to stop the server
+     and clear a stale `-wal`/`-shm` before restoring.
+  4. FIXED — `source_header.check`/`check_pair` raise `ValueError`, which click
+     does not translate, so the guard on the one command that *deletes* rows
+     reached the operator as a traceback with the explanation buried in it. New
+     `cli._check_headers` wraps both calls and re-raises `click.ClickException`
+     (`Error: <message>`, exit 1). Six assertions in `test_cli.py` moved from
+     `str(result.exception)` to `result.output` accordingly — `CliRunner` leaves
+     a `ClickException` as `SystemExit(1)`.
+  Gates: scraper **773**, `hanswehr_baseline` unchanged
+  (`kept 1450 / buckets 7 / added 0 / removed 0 / changed 0`), live-DB
+  `prepare_hanswehr_glosses` run emits 1450 / 0 stale / one stamp / **mode 644**
+  on all three. `apps/web` untouched for a third round, 483 not re-run. Ruff:
+  the same 3 pre-existing `cli.py` errors and the same pre-existing reformat,
+  both confirmed identical on a stashed tree; the new helper is in neither.
+  Mutations: no-op'ing `_check_headers` and re-raising `ValueError` instead of
+  `ClickException` each fail exactly the five `--pair`/`--source` tests.
+  Fixes shipped as `6638ec7`; `16937c2` is the reviewed commit, not the head.
+- **Round 20 (CodeRabbit on `6638ec7`) — 1 finding fixed, 1 rejected
+  2026-08-08.** Incremental only: the `@coderabbitai full review` requested
+  after round 19 came back **rate limited**, and the commit status for it is a
+  green `success` whose *description* reads `Review rate limited` — the §5
+  signature. Review `4889192154` is `CHANGES_REQUESTED` on the current head. The
+  full review is still owed on `6638ec7`.
+  1. FIXED — `_install` registered each temp file for cleanup *after* writing
+     it, so a failure in `write`/`flush`/`fsync`/`chmod` left that one temp file
+     behind: it was not yet in `staged`, and the handler only removes what is.
+     A dotfile (`.out.tsv.<rand>.tmp`) beside the artifact it never became —
+     invisible to `ls`, and nothing later reads or clears it. Registered
+     immediately after `mkstemp` now, before the first fallible call. New test
+     `test_main_leaves_no_temp_file_when_staging_itself_fails` injects an
+     `OSError` in `chmod` keyed on the `.tmp` suffix (same discipline as the
+     move test — the patch lands on the `os` module itself); restoring the old
+     ordering fails that test and only that test, out of 774.
+  2. REJECTED — asked to rewrite the round-19 checkpoint above to drop its
+     "findings, fixes, gates, tests, mutations, lint" record and state that the
+     head carries no check runs and `COMMENTED` reviews only. The premise is
+     wrong twice: the block is headed *"CodeRabbit on `16937c2`"*, so it does
+     not claim to describe the head, and the review carrying the request is
+     itself `CHANGES_REQUESTED` on `6638ec7`. The gates it records were run and
+     the numbers measured; deleting them would make this ledger less true, not
+     more. Took the one accurate part — the block never named where the fixes
+     landed — as the `6638ec7` line above.
+  Gates: scraper **774** (773 + the new test), ruff clean on both changed files,
+  `hanswehr_baseline` unchanged
+  (`kept 1450 / buckets 7 / added 0 / removed 0 / changed 0`, exit 0).
+  `apps/web` untouched for a fourth round, 483 not re-run.
+  Fixes shipped as `09afdba`; CodeRabbit then withdrew finding 2 itself
+  ("The failure was a scope error… the `Review rate limited` status is a
+  fail-open condition, not an absence of status") and stored a Learning that a
+  round heading scopes its evidence to the reviewed commit.
+- **Round 21 (CodeRabbit on `09afdba`) — 11 findings, 10 fixed / 1 declined
+  2026-08-08.** First run that actually read this head: the two `full review`
+  requests before it were both refused for quota, and one of them produced a
+  **sixth §5 fail-open signature** — a refused review still submitted an
+  `APPROVED` review object (`4889203420`, **body length 0, zero attached
+  comments**) and flipped the status to green `success | Review approved`. The
+  documented tell does not fire here: the description reads *approved*, not
+  `Review rate limited`. What gives it away is the empty body plus the
+  walkthrough's own banner, *"Review limit reached — we couldn't start this
+  review."* Cause: 30 bot reviews on this PR tripped CodeRabbit's adaptive
+  per-developer limit. The real reviews are `4889300888` and `4889316320`, both
+  `CHANGES_REQUESTED`, both full-scope (`d6a0a93`..`09afdba`, 21 files) — while
+  the commit status still reads green `success | Review completed`. **The status
+  never carries the verdict.**
+  1. FIXED (🟠 Major, security) — `about/page.tsx` licensed the editorial
+     glosses as *"Original text, same licence as this project"*. They are
+     composed from the Quranic Arabic Corpus's own word-by-word glosses, so the
+     corpus's GPL and its attribution / link / copyright-notice terms carry
+     over; the old line implied the whole entry was this project's to license.
+     Now names the corpus terms and the rights holder explicitly.
+  2. FIXED (🟡 Minor) — `--source` was operator input written straight into the
+     artifact header, and `_parse` reads only the first line: a `\n` in it hid
+     everything after from `check` and landed the remainder in the file as a
+     data row (a forged gloss, a forged prune root); a `\t` split the comment
+     into TSV fields. Rejected in `header()` — the one path every artifact's
+     header is built through — rather than at each call site. New test
+     `test_a_header_refuses_a_value_that_would_break_its_line`; deleting the
+     guard fails that test and only it.
+  3. FIXED (🟡 Minor, vacuous assertion) —
+     `test_delete_root_definitions_of_an_empty_list_touches_nothing` claimed to
+     pin that a delete losing its `root_id IN (...)` clause "would empty the
+     whole source here". Unreachable: `if not roots: return 0, []` fires first,
+     so no DELETE ever runs in that test. Docstring corrected to the empty-list
+     return contract only, and the coverage it claimed added as
+     `test_delete_root_definitions_scopes_to_the_listed_roots` — three rows
+     across two roots and two sources, one unknown root in the list. Dropping
+     either half of the WHERE clause fails the new test and only it.
+  4. DECLINED (🟡 Minor) — batch `delete_root_definitions` under SQLite's
+     bind-parameter ceiling. The list is a subset of `roots`, 1642 rows today,
+     against a measured `SQLITE_LIMIT_VARIABLE_NUMBER` of **32766** (sqlite
+     3.53.1, the venv's). On a build old enough to cap at 999 it raises
+     `OperationalError` at `execute` — before any row is deleted, so loud and
+     atomic, never a partial prune. Batching buys nothing that is not already
+     safe. Bound and ceiling recorded in the docstring so the next reader does
+     not re-derive it.
+  5. Seven findings on `docs/plans/phase-24-gloss-quality.md`, all drift between
+     the plan and what shipped. Per the user's call, the three that could
+     mislead an operator running live commands were **corrected**: Step 4 now
+     passes `--pair` on both halves (—`--source` alone lets run A's prune list
+     pair with run B's glosses), Task 6's interface documents the header/run
+     validation that runs before SQLite is opened, and Tasks 8–9 carry
+     do-not-execute banners naming what replaced Salmoné (14 editorial glosses
+     at rank -1, verified live) and noting the rank-2 slot is gone from
+     `DEFINITION_SOURCE_RANK`. The remaining four — Task 1's superseded
+     `audit()`/`main()` contract, the `--show` example, the `select_gloss`
+     /`candidates` signatures, the pre-editorial gap counts — are covered by a
+     dated banner at the top: a plan records intent, the code is the contract.
+  Gates: scraper **776** (774 + 2 new tests), `apps/web` **483**, `tsc --noEmit`
+  clean, eslint clean on the changed file, ruff check clean on every changed
+  Python file (the 12 repo-wide findings and the `ruff format` drift in
+  `db.py`/`test_db.py` are all pre-existing — identical at baseline, and
+  reformatting would move a `# noqa: S608` off its statement).
+  `hanswehr_baseline` unchanged
+  (`kept 1450 / buckets 7 / added 0 / removed 0 / changed 0`, exit 0).
 - **MERGED 2026-08-06 06:46Z: phase 23, Hans Wehr top glosses** — **PR #74
   squashed to `4c77d00`** (`gh pr view 74 --json mergedAt,mergeCommit`), branch
   `feat/phase-23-hanswehr-glosses` deleted local + remote

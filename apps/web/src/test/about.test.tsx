@@ -32,19 +32,31 @@ describe('About page', () => {
     ).toBeInTheDocument();
   });
 
-  it('credits Salmoné and both Perseus-supplied works', () => {
+  it('does not credit Salmoné, whose import phase 24 dropped', () => {
+    // A credit for a dictionary carrying zero rows tells a reader the app
+    // draws on a source it does not. The Perseus credit stays -- perseus-lane
+    // still has 217 rows -- but must no longer claim Salmoné's text with it.
     render(<About />);
-    // href, not just the name: a credit pointing at the wrong host is an
-    // attribution failure the accessible name alone would never catch.
+    // The whole name, not just the credit's title: deleting the Salmoné entry
+    // left the Hans Wehr note still contrasting itself with "Lane and Salmoné",
+    // naming a dictionary the page never credits and the app never ships.
+    expect(screen.queryByText(/Salmoné/)).toBeNull();
+    expect(screen.queryByText(/Librairie du Liban, 1889/)).toBeNull();
     expect(
-      screen.getByRole('link', {
-        name: "An Advanced Learner's Arabic-English Dictionary (Salmoné)",
-      }),
-    ).toHaveAttribute('href', 'https://www.perseus.tufts.edu/hopper/');
-    expect(screen.getByText(/Librairie du Liban, 1889/)).toBeInTheDocument();
-    expect(
-      screen.getByText(/Lane's Lexicon and of Salmoné's Arabic-English Dictionary/),
+      screen.getByText(/The TEI text of Lane's Lexicon behind root definitions/),
     ).toBeInTheDocument();
+  });
+
+  it('credits the hand-written editorial glosses without a dead link', () => {
+    // The glosses are this project's own and its repository is private, so the
+    // credit carries no href -- a 404 on the page that states the licence terms
+    // is worse than plain text. Give it a public home and the link comes back.
+    render(<About />);
+    expect(screen.getByText('Editorial glosses (this project)')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Editorial glosses (this project)' }),
+    ).toBeNull();
+    expect(screen.getByText(/no dictionary in the pipeline covers/)).toBeInTheDocument();
   });
 
   it('credits machine-assisted Uzbek glosses (NLLB)', () => {

@@ -5,7 +5,7 @@ import tempfile
 import pytest
 
 from scraper.db import ScraperDatabase
-from scraper.models import RootModel, SurahModel
+from scraper.models import RootDefinitionModel, RootModel, SurahModel
 
 
 @pytest.fixture
@@ -491,3 +491,62 @@ def test_get_or_create_root_invalidates_only_when_it_inserts(ranked_db):
 
     ranked_db.get_or_create_root("ArD", "أرض")
     assert _ranks(ranked_db) == [None, None, None]
+
+
+def test_delete_root_definitions_of_an_empty_list_touches_nothing(tmp_path):
+    """An empty root list must delete nothing, not everything at that source.
+
+    Only the empty-list contract: `(0, [])` and no row gone. It pins neither the
+    early return -- `IN ()` is a SQLite extension evaluating to false, so
+    removing the guard leaves this green -- nor the scoping, because the return
+    fires before either statement runs and no DELETE executes here at all.
+    `test_delete_root_definitions_scopes_to_the_listed_roots` covers that.
+    """
+    path = str(tmp_path / "t.db")
+    db = ScraperDatabase(path)
+    root_id = db.get_or_create_root("ArD", "ارض")
+    db.upsert_root_definition(
+        RootDefinitionModel(root_id=root_id, source="hanswehr", definition="termite")
+    )
+    assert db.delete_root_definitions([], "hanswehr") == (0, [])
+    db.close()
+
+    conn = sqlite3.connect(path)
+    assert conn.execute("SELECT COUNT(*) FROM root_definitions").fetchone()[0] == 1
+    conn.close()
+
+
+def test_delete_root_definitions_scopes_to_the_listed_roots(tmp_path):
+    """Both halves of the WHERE clause, on a call that actually reaches the
+    DELETE. Losing `root_id IN (...)` empties the whole source; losing
+    `source = ?` takes another dictionary's row for the same root with it.
+
+    The unknown root is in the list because a mistyped Buckwalter spelling
+    deletes nothing and looks exactly like a root that had nothing to delete --
+    the returned list is the only thing that tells them apart.
+    """
+    path = str(tmp_path / "t.db")
+    db = ScraperDatabase(path)
+    keep = db.get_or_create_root("qlb", "قلب")
+    drop = db.get_or_create_root("ArD", "ارض")
+    for root_id, source, definition in (
+        (keep, "hanswehr", "reversal"),
+        (drop, "hanswehr", "termite"),
+        (drop, "qurandev-lane", "earth"),
+    ):
+        db.upsert_root_definition(
+            RootDefinitionModel(root_id=root_id, source=source, definition=definition)
+        )
+
+    assert db.delete_root_definitions(["ArD", "Ar9"], "hanswehr") == (1, ["Ar9"])
+    db.close()
+
+    conn = sqlite3.connect(path)
+    surviving = conn.execute(
+        "SELECT r.root_buckwalter, d.source FROM root_definitions d"
+        " JOIN roots r ON r.id = d.root_id"
+        " ORDER BY r.root_buckwalter, d.source"
+    ).fetchall()
+    conn.close()
+
+    assert surviving == [("ArD", "qurandev-lane"), ("qlb", "hanswehr")]

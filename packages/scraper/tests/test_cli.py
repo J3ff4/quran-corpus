@@ -7,6 +7,7 @@ from click.testing import CliRunner
 
 from scraper.checkpoint import Checkpoint
 from scraper.cli import main
+from scraper.source_header import check_pair, header
 
 
 @pytest.fixture
@@ -383,3 +384,355 @@ def test_fetch_salmone_reports_the_file_and_honours_force(tmp_path, monkeypatch)
         main, ["fetch-salmone", "--dest", str(tmp_path), "--force"]
     )
     assert result.exit_code == 0 and calls == [False, True]
+
+
+# ---- phase 24, task 6: the delete path `import-lane` lacks.
+
+
+def _seed_definitions(db, rows):
+    """`rows` is `[(root_buckwalter, source, definition), ...]`."""
+    conn = sqlite3.connect(db)
+    for bw, source, definition in rows:
+        conn.execute(
+            "INSERT OR IGNORE INTO roots (root_buckwalter, root_arabic,"
+            " occurrence_count) VALUES (?, ?, 1)",
+            (bw, bw),
+        )
+        conn.execute(
+            "INSERT INTO root_definitions (root_id, source, definition)"
+            " SELECT id, ?, ? FROM roots WHERE root_buckwalter = ?",
+            (source, definition, bw),
+        )
+    conn.commit()
+    conn.close()
+
+
+def _prune_args(db, roots):
+    return [
+        "prune-definitions",
+        "--db",
+        db,
+        "--source",
+        "hanswehr",
+        "--roots",
+        str(roots),
+    ]
+
+
+def _definitions(db):
+    conn = sqlite3.connect(db)
+    rows = conn.execute(
+        "SELECT r.root_buckwalter, d.source FROM root_definitions d"
+        " JOIN roots r ON r.id = d.root_id ORDER BY r.root_buckwalter, d.source"
+    ).fetchall()
+    conn.close()
+    return rows
+
+
+def test_prune_definitions_deletes_only_the_named_source(runner, tmp_path):
+    """A root dropped by the override gate must lose its Hans Wehr row and keep
+    its Lane one -- that is the whole point of dropping it, Lane then leads."""
+    db = str(tmp_path / "t.db")
+    runner.invoke(main, ["seed", "--db", db])
+    _seed_definitions(
+        db,
+        [
+            ("ArD", "hanswehr", "termite"),
+            ("ArD", "qurandev-lane", "earth"),
+            ("qlb", "hanswehr", "reversal"),
+        ],
+    )
+    roots = tmp_path / "drop.tsv"
+    roots.write_text("# dropped by the human gate\nArD\t\n", encoding="utf-8")
+
+    result = runner.invoke(
+        main,
+        _prune_args(db, roots),
+    )
+    assert result.exit_code == 0, result.output
+    assert "Pruned 1 of 1" in result.output
+    assert _definitions(db) == [("ArD", "qurandev-lane"), ("qlb", "hanswehr")]
+
+
+def test_prune_definitions_skips_a_row_that_carries_a_replacement_gloss(
+    runner, tmp_path
+):
+    """`hanswehr_overrides.tsv` is what the operator points this at, and it
+    holds drops (empty gloss) *and* replacements side by side.
+
+    Taking field 1 of every line would delete the replacements too: run
+    `import-lane` to install five corrected glosses, then this to drop three,
+    and all eight rows go. The replacement must survive untouched.
+    """
+    db = str(tmp_path / "t.db")
+    runner.invoke(main, ["seed", "--db", db])
+    _seed_definitions(db, [("ArD", "hanswehr", "earth"), ("qlb", "hanswehr", "mould")])
+    roots = tmp_path / "overrides.tsv"
+    roots.write_text("ArD\tearth; land, country\nqlb\t\n", encoding="utf-8")
+
+    result = runner.invoke(main, _prune_args(db, roots))
+    assert result.exit_code == 0, result.output
+    assert "Skipped 1 rows carrying a gloss" in result.output
+    assert "Pruned 1 of 1" in result.output
+    assert _definitions(db) == [("ArD", "hanswehr")]
+
+
+def test_prune_definitions_names_a_root_the_database_does_not_have(runner, tmp_path):
+    """A mistyped Buckwalter root deletes nothing and reads exactly like a root
+    with nothing to delete. Say which ones, or the typo ships."""
+    db = str(tmp_path / "t.db")
+    runner.invoke(main, ["seed", "--db", db])
+    _seed_definitions(db, [("ArD", "hanswehr", "termite")])
+    roots = tmp_path / "drop.tsv"
+    roots.write_text("ArD\nAr9\n", encoding="utf-8")
+
+    result = runner.invoke(
+        main,
+        _prune_args(db, roots),
+    )
+    assert result.exit_code == 0, result.output
+    assert "Pruned 1 of 2" in result.output
+    assert "Not in roots table: Ar9" in result.output
+
+
+def test_prune_definitions_counts_a_duplicated_root_once(runner, tmp_path):
+    """The denominator is the listed roots and the numerator is rows deleted, so
+    a root listed twice printed "Pruned 1 of 2" -- the signature of a mistyped
+    root -- and repeated itself in the unknown-roots line."""
+    db = str(tmp_path / "t.db")
+    runner.invoke(main, ["seed", "--db", db])
+    _seed_definitions(db, [("ArD", "hanswehr", "termite")])
+    roots = tmp_path / "drop.tsv"
+    roots.write_text("ArD\nArD\nAr9\nAr9\n", encoding="utf-8")
+
+    result = runner.invoke(main, _prune_args(db, roots))
+    assert result.exit_code == 0, result.output
+    assert "Pruned 1 of 2" in result.output
+    assert "Not in roots table: Ar9" in result.output
+
+
+def test_prune_definitions_does_nothing_for_an_empty_list(runner, tmp_path):
+    db = str(tmp_path / "t.db")
+    runner.invoke(main, ["seed", "--db", db])
+    _seed_definitions(db, [("ArD", "hanswehr", "termite")])
+    roots = tmp_path / "drop.tsv"
+    roots.write_text("# nothing dropped yet\n", encoding="utf-8")
+
+    result = runner.invoke(
+        main,
+        _prune_args(db, roots),
+    )
+    assert result.exit_code == 0
+    assert "nothing to prune" in result.output
+    assert _definitions(db) == [("ArD", "hanswehr")]
+
+
+def test_prune_definitions_refuses_a_list_built_for_another_source(runner, tmp_path):
+    """A prune list is bare roots, so it matches *any* source's rows. Requiring
+    the flag stops it being forgotten, not the operator naming a different
+    dictionary from the one the list was computed against -- which deletes rows
+    nothing is about to reinstall. Must refuse before the delete, not report it."""
+    db = str(tmp_path / "t.db")
+    runner.invoke(main, ["seed", "--db", db])
+    _seed_definitions(db, [("ArD", "hanswehr", "termite")])
+    roots = tmp_path / "drop.tsv"
+    roots.write_text("# source: corpus-forms\nArD\n", encoding="utf-8")
+
+    result = runner.invoke(main, _prune_args(db, roots))
+    assert result.exit_code != 0
+    assert "generated for source 'corpus-forms'" in result.output
+    assert _definitions(db) == [("ArD", "hanswehr")]
+
+
+def test_import_lane_refuses_a_tsv_built_for_another_source(runner, tmp_path):
+    """The other half of the same pair: prune at the right source, import at the
+    wrong one, and the dictionary is deleted and reinstalled under a name no
+    query joins on."""
+    db = str(tmp_path / "t.db")
+    runner.invoke(main, ["seed", "--db", db])
+    tsv = tmp_path / "in.tsv"
+    tsv.write_text("# source: hanswehr\nArD\tearth\n", encoding="utf-8")
+
+    result = runner.invoke(
+        main, ["import-lane", str(tsv), "--db", db, "--source", "corpus-forms"]
+    )
+    assert result.exit_code != 0
+    assert "generated for source 'hanswehr'" in result.output
+    assert _definitions(db) == []
+
+
+def test_import_lane_accepts_a_tsv_whose_header_matches(runner, tmp_path):
+    """And an artifact with no header at all stays importable -- the three other
+    prepare tools do not write one, and none of their output is regenerated
+    here."""
+    db = str(tmp_path / "t.db")
+    runner.invoke(main, ["seed", "--db", db])
+    tagged, bare = tmp_path / "tagged.tsv", tmp_path / "bare.tsv"
+    tagged.write_text("# source: hanswehr\nArD\tearth\n", encoding="utf-8")
+    bare.write_text("qlb\treversal\n", encoding="utf-8")
+
+    for path in (tagged, bare):
+        result = runner.invoke(
+            main, ["import-lane", str(path), "--db", db, "--source", "hanswehr"]
+        )
+        assert result.exit_code == 0, result.output
+    assert _definitions(db) == [("ArD", "hanswehr"), ("qlb", "hanswehr")]
+
+
+def test_the_pair_flag_refuses_artifacts_from_two_different_runs(runner, tmp_path):
+    """The tag pairs the two *sources*; every run of one tool writes the same
+    one. Prune with run B's list, import run A's glosses, and the source holds
+    neither run: a root B dropped survives the prune that never listed it. The
+    stamp is the only thing that separates them, and both halves must refuse."""
+    db = str(tmp_path / "t.db")
+    runner.invoke(main, ["seed", "--db", db])
+    _seed_definitions(db, [("ArD", "hanswehr", "termite")])
+    tsv_a, roots_b = tmp_path / "a.tsv", tmp_path / "b.txt"
+    tsv_a.write_text("# source: hanswehr run: r-a\nqlb\treversal\n", encoding="utf-8")
+    roots_b.write_text("# source: hanswehr run: r-b\nArD\n", encoding="utf-8")
+
+    prune = runner.invoke(main, _prune_args(db, roots_b) + ["--pair", str(tsv_a)])
+    imp = runner.invoke(
+        main,
+        ["import-lane", str(tsv_a), "--db", db, "--source", "hanswehr"]
+        + ["--pair", str(roots_b)],
+    )
+
+    for result in (prune, imp):
+        assert result.exit_code != 0
+        assert "is from run" in result.output
+    # Neither touched the DB: the check runs before the delete and the upsert.
+    assert _definitions(db) == [("ArD", "hanswehr")]
+
+
+def test_the_pair_flag_accepts_one_run_and_rejects_an_unstamped_file(runner, tmp_path):
+    """Matching stamps pass. An *absent* stamp fails, unlike a missing `# source:`
+    line -- passing --pair asks for the guarantee, and a file with no stamp
+    cannot give it, so silently accepting it would report a check never made."""
+    db = str(tmp_path / "t.db")
+    runner.invoke(main, ["seed", "--db", db])
+    tsv, roots = tmp_path / "out.tsv", tmp_path / "prune.txt"
+    tsv.write_text("# source: hanswehr run: r-1\nqlb\treversal\n", encoding="utf-8")
+    roots.write_text("# source: hanswehr run: r-1\nArD\n", encoding="utf-8")
+    bare = tmp_path / "bare.txt"
+    bare.write_text("# source: hanswehr\nArD\n", encoding="utf-8")
+
+    ok = runner.invoke(
+        main,
+        ["import-lane", str(tsv), "--db", db, "--source", "hanswehr"]
+        + ["--pair", str(roots)],
+    )
+    assert ok.exit_code == 0, ok.output
+    assert _definitions(db) == [("qlb", "hanswehr")]
+
+    unstamped = runner.invoke(
+        main,
+        ["import-lane", str(tsv), "--db", db, "--source", "hanswehr"]
+        + ["--pair", str(bare)],
+    )
+    assert unstamped.exit_code != 0
+    assert "carries no run stamp" in unstamped.output
+
+
+def test_the_pair_flag_refuses_a_blank_stamp_and_a_cross_source_pair(runner, tmp_path):
+    """Two holes the run stamp left open. A blank stamp is absent, not a value two
+    files can agree on. And the tags must match too: each command runs `check` on
+    the artifact it consumes and never on the one `--pair` names, so one stamp
+    across two sources would walk the cross-source delete back in through the
+    flag added to tighten it."""
+    db = str(tmp_path / "t.db")
+    runner.invoke(main, ["seed", "--db", db])
+    _seed_definitions(db, [("ArD", "hanswehr", "termite")])
+    tsv, blank = tmp_path / "out.tsv", tmp_path / "blank.txt"
+    tsv.write_text("# source: hanswehr run: r-1\nqlb\treversal\n", encoding="utf-8")
+    blank.write_text("# source: hanswehr run: \nArD\n", encoding="utf-8")
+    blank_tsv = tmp_path / "blank.tsv"
+    blank_tsv.write_text("# source: hanswehr run: \nqlb\treversal\n", encoding="utf-8")
+    lane_roots = tmp_path / "lane.txt"
+    lane_roots.write_text("# source: lane run: r-1\nArD\n", encoding="utf-8")
+
+    def _import(pair: Path):
+        return runner.invoke(
+            main,
+            ["import-lane", str(blank_tsv if pair is blank else tsv)]
+            + ["--db", db, "--source", "hanswehr", "--pair", str(pair)],
+        )
+
+    blanks = _import(blank)
+    assert blanks.exit_code != 0
+    assert "carries no run stamp" in blanks.output
+
+    crossed = _import(lane_roots)
+    assert crossed.exit_code != 0
+    assert "was generated for source" in crossed.output
+
+    # Neither reached the upsert, so `qlb` never landed and `ArD` still stands.
+    assert _definitions(db) == [("ArD", "hanswehr")]
+
+
+def test_a_header_refuses_a_value_that_would_break_its_line():
+    """`--source` is operator input and `_parse` reads only the first line. A
+    newline in it therefore hides everything after from `check`, and what it
+    hides lands in the artifact as a data row -- a forged gloss in the TSV, a
+    forged root in the prune list. A tab is the TSV separator, so it splits the
+    comment into fields instead.
+
+    Rejected where the line is built, not at each call site: this is the one
+    path every artifact's header goes through.
+    """
+    for value in ("hanswehr\nqlb\tforged", "hanswehr\rforged", "hans\twehr"):
+        with pytest.raises(ValueError, match="single comment line"):
+            header(value)
+        # Every case through `run` too: it lands on the same line, so a guard
+        # covering only `source` leaves the stamp able to break it.
+        with pytest.raises(ValueError, match="single comment line"):
+            header("hanswehr", value)
+
+    assert header("hanswehr", "r-1") == "# source: hanswehr run: r-1\n"
+
+
+def test_a_header_refuses_a_source_carrying_the_run_separator(tmp_path):
+    """`_parse` partitions at the first ` run: `, so a source carrying one hands
+    its own tail to the run field: `--source "hanswehr run: forged"` writes a
+    stamp no prepare run produced, and `check_pair` then compares that instead
+    of the real one -- two files from different runs agreeing because both
+    sources were mistyped the same way.
+
+    The run itself is not restricted: it is last on the line, so the first
+    separator is still the real one and the value round-trips whole.
+    """
+    with pytest.raises(ValueError, match="run separator"):
+        header("hanswehr run: forged")
+    with pytest.raises(ValueError, match="run separator"):
+        header("hanswehr run: forged", "r-1")
+
+    # Read back through the consumer, not just as a string: the claim is that
+    # the stamp survives `_parse` intact, which is what `check_pair` compares.
+    a, b = tmp_path / "a.tsv", tmp_path / "b.tsv"
+    for path in (a, b):
+        path.write_text(header("hanswehr", "a run: b"), encoding="utf-8")
+    assert check_pair(a, b) == "a run: b"
+
+
+def test_import_lane_requires_a_source(runner, tmp_path):
+    """Its old default, "lane", is a tag no row carries. Omitting the flag after a
+    prune scoped to `hanswehr` deletes that dictionary and reinstalls it under a
+    name nothing joins on -- the pair silently loses a live corpus."""
+    tsv = tmp_path / "in.tsv"
+    tsv.write_text("ArD\tearth\n", encoding="utf-8")
+    result = runner.invoke(
+        main, ["import-lane", str(tsv), "--db", str(tmp_path / "t.db")]
+    )
+    assert result.exit_code == 2
+
+
+def test_prune_definitions_requires_a_source(runner, tmp_path):
+    """No default: this is the one destructive command here, and a defaulted tag
+    would delete whichever dictionary happened to be named in the code."""
+    roots = tmp_path / "drop.tsv"
+    roots.write_text("ArD\n", encoding="utf-8")
+    result = runner.invoke(
+        main,
+        ["prune-definitions", "--db", str(tmp_path / "t.db"), "--roots", str(roots)],
+    )
+    assert result.exit_code == 2

@@ -1,0 +1,33 @@
+# source: editorial
+#
+# Hand-written glosses for the roots no dictionary in the pipeline covers.
+#
+# Phase 24 Task 8 killed the last automated candidate: Salmone reached 12 of
+# these 14 roots and got 7 flat wrong ("Pocketed." for همن, "Small-eared." for
+# صمع), because its leading sense is taken with no corpus form behind it. So
+# these are written by hand, one per root, from the corpus's own per-word
+# English glosses (word_glosses) plus whatever perseus-lane already carries --
+# i.e. from the senses the Quran actually uses, not from a dictionary's first
+# entry.
+#
+# Format is import-lane's: root_buckwalter<TAB>definition. The header line above
+# binds the file to `--source editorial` (scraper/source_header.py); importing
+# it under any other tag raises.
+#
+# import-lane only upserts. Editing a row here and re-importing rewrites it;
+# DELETING a row here does not delete anything live -- that needs
+# prune-definitions --source editorial (see tools/hanswehr_overrides.tsv).
+kyf	how?; in what manner, in what state
+Eyn	eye; spring, fountain; wide-eyed
+fAy	group, party, band; company of troops
+dmw	blood
+nSy	forelock, the lock of hair over the forehead
+hTE	to hasten with the gaze fixed ahead; to race forward
+gvw	scum, refuse; dry stubble swept along by a torrent
+h$m	to crush, to break into fragments; dry crumbled stalks
+hmn	to watch over, to guard; guardian, protector
+$r*m	small band, troop, detachment
+SmE	monastery, hermitage, cloister
+SwE	measure; drinking cup, bowl
+Sxx	to deafen with a piercing noise; deafening blast
+Tff	to give short measure; to defraud in weighing

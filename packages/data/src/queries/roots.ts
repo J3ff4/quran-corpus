@@ -257,11 +257,24 @@ export async function getRootForms(db: Client, rootId: number): Promise<RootForm
  *  carries both today; the ordering is what stops the first one that does from
  *  silently rendering the weaker gloss.
  *
- *  `salmone` (Salmoné's Arabic-English Dictionary, 1889) sits below curated
- *  Lane — a learner's dictionary against the standard classical lexicon — but
- *  above both `corpus-forms` and `perseus-lane`, because its sense is picked
- *  per root for the form the corpus actually uses, unlike `perseus-lane`'s
- *  fixed leading form-I verb sense.
+ *  `editorial` outranks everything, at -1. It is the hand-written gloss for
+ *  the roots no dictionary in the pipeline reaches, composed from the corpus's
+ *  own per-word glosses for that exact root — so where it exists it is the
+ *  most Quran-specific text available, and a dictionary's leading sense should
+ *  not displace it. -1 rather than a tie at 0 with `hanswehr`: a tie would fall
+ *  through to the `rd.source` tie-break and be decided alphabetically, which is
+ *  the accident the rest of this comment exists to have removed. Today the two
+ *  never meet — `editorial` covers only roots with no other definition at all —
+ *  so this fixes the order before the first root carries both, not after.
+ *
+ *  `salmone` (Salmoné's Arabic-English Dictionary, 1889) has no rank because
+ *  it has no rows: phase 24 dropped the import after checking its output
+ *  against the corpus glosses — 7 of the 12 roots it reached were flat wrong
+ *  ("Pocketed." for همن), because it takes its leading sense with no corpus
+ *  form behind it, the same defect that demoted `perseus-lane` above. The 14
+ *  roots it was meant to fill are the `editorial` rows instead. It falls to the
+ *  ELSE, which is correct for a source that should not outrank anything; give
+ *  it a rank here if it is ever revived.
  *
  *  `hanswehr` (Hans Wehr's Dictionary of Modern Written Arabic) ranks above
  *  everything, including curated Lane: it is the concise modern gloss meant
@@ -275,10 +288,10 @@ export async function getRootForms(db: Client, rootId: number): Promise<RootForm
  *  so a rank change here changes which single gloss it shows.
  */
 export const DEFINITION_SOURCE_RANK = `CASE rd.source
+       WHEN 'editorial' THEN -1
        WHEN 'hanswehr' THEN 0
        WHEN 'lane' THEN 1
        WHEN 'qurandev-lane' THEN 1
-       WHEN 'salmone' THEN 2
        WHEN 'corpus-forms' THEN 3
        WHEN 'perseus-lane' THEN 4
        ELSE 5

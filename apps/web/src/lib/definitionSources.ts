@@ -16,9 +16,13 @@ const SOURCE_LABELS = new Map<string, string>([
   ['qurandev-lane', "Lane's Lexicon"],
   ['perseus-lane', "Lane's Lexicon"],
   ['corpus-forms', 'Quranic Arabic Corpus'],
-  ['salmone', "Salmoné's Arabic-English Dictionary"],
   ['hanswehr', 'Hans Wehr Dictionary of Modern Written Arabic'],
+  ['editorial', 'Editorial gloss (this project)'],
 ]);
+/* No 'salmone' entry: phase 24 dropped that import, so the tag has no rows to
+   credit. Its 14 roots are the 'editorial' ones. Restore the entry with the
+   rows if it is ever revived -- the fallback below would otherwise credit the
+   raw tag. */
 
 /**
  * Label for a definition source; the raw tag when it is unmapped, null when

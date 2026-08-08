@@ -11,7 +11,11 @@ export const dynamic = 'force-dynamic';
 
 interface Source {
   name: string;
-  href: string;
+  // Optional: a source with no public home renders as plain text rather than a
+  // link. Every third-party entry has one -- this exists for the app's own
+  // editorial glosses, whose repository is private, and a credit link that 404s
+  // is worse than no link on the page that carries the licence terms.
+  href?: string;
   provides: string;
   license: string;
   note: string;
@@ -47,17 +51,9 @@ const sources: Source[] = [
     name: 'Perseus Digital Library',
     href: 'https://www.perseus.tufts.edu/hopper/',
     provides:
-      "The TEI text of Lane's Lexicon and of Salmoné's Arabic-English Dictionary behind root definitions that the qurandev/roots compilation does not cover.",
+      "The TEI text of Lane's Lexicon behind root definitions that the qurandev/roots compilation does not cover.",
     license: 'Free redistribution with attribution',
     note: 'Text provided by Perseus Digital Library, with funding from The U.S. Department of Education and The Max Planck Society. Lane’s 1863 lexicon is itself public domain; Perseus’s terms require this credit, that their availability statement stay intact, and that modifications be offered back.',
-  },
-  {
-    name: "An Advanced Learner's Arabic-English Dictionary (Salmoné)",
-    href: 'https://www.perseus.tufts.edu/hopper/',
-    provides:
-      'Root definitions selected for the form the Quran uses, filling roots that Lane has nothing for.',
-    license: 'Public domain (text); CC BY-SA 3.0 US (Perseus digitisation)',
-    note: 'H. Anthony Salmoné, Beirut: Librairie du Liban, 1889. Text provided by the Perseus Digital Library, digitised with National Science Foundation funding. The 1889 work is public domain by age; Perseus’s markup is CC BY-SA 3.0 US and this credit is its condition.',
   },
   {
     name: 'Hans Wehr Dictionary of Modern Written Arabic (Cowan ed.)',
@@ -65,7 +61,14 @@ const sources: Source[] = [
     provides:
       "The concise modern gloss shown first for each root, with Lane's fuller classical entry rendered collapsible below it.",
     license: '© Harrassowitz Verlag / Spoken Language Services — used with attribution',
-    note: 'J. Milton Cowan, ed., 4th edition. Unlike Lane and Salmoné, this dictionary remains under active copyright; its gloss is shown with attribution to the rights holders, not as public domain text.',
+    note: 'J. Milton Cowan, ed., 4th edition. Unlike Lane, this dictionary remains under active copyright; its gloss is shown with attribution to the rights holders, not as public domain text.',
+  },
+  {
+    name: 'Editorial glosses (this project)',
+    provides:
+      'Hand-written definitions for the 14 roots no dictionary in the pipeline covers, composed from the corpus’s own word-by-word glosses for that root.',
+    license: 'Original wording; derived from Quranic Arabic Corpus glosses (GNU General Public License)',
+    note: 'Written for the sense the Quran uses rather than a dictionary’s leading entry. Because each one is composed from the corpus’s own word-by-word glosses, the Quranic Arabic Corpus terms carry over: annotation © Kais Dukes, Language Research Group, University of Leeds, credited and linked above. Not a lexicon: these are short working glosses, and a root that later gains a real dictionary entry keeps both.',
   },
   {
     name: 'NLLB-200 (Meta AI)',
@@ -128,19 +131,27 @@ export default function AboutPage() {
             className="rounded-lg border border-paper-200 p-4 dark:border-night-100"
           >
             <div className="mb-1 flex items-baseline justify-between gap-3">
-              <a
-                href={source.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-medium text-paper-900 underline decoration-paper-300 underline-offset-2 transition-colors hover:decoration-paper-600 dark:text-paper-100 dark:decoration-night-100"
-              >
-                {source.name}
-              </a>
+              {source.href ? (
+                <a
+                  href={source.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-paper-900 underline decoration-paper-300 underline-offset-2 transition-colors hover:decoration-paper-600 dark:text-paper-100 dark:decoration-night-100"
+                >
+                  {source.name}
+                </a>
+              ) : (
+                <span className="font-medium text-paper-900 dark:text-paper-100">
+                  {source.name}
+                </span>
+              )}
               <span className="shrink-0 rounded-full bg-paper-100 px-2.5 py-0.5 text-xs text-paper-600 dark:bg-night-100 dark:text-paper-400">
                 {source.license}
               </span>
             </div>
-            <p className="mb-1 text-xs text-paper-400">{new URL(source.href).host}</p>
+            {source.href && (
+              <p className="mb-1 text-xs text-paper-400">{new URL(source.href).host}</p>
+            )}
             <p className="mb-1 text-sm text-paper-700 dark:text-paper-300">
               {source.provides}
             </p>

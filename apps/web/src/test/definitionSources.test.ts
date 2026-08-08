@@ -28,10 +28,14 @@ describe('definitionSourceLabel', () => {
     expect(definitionSourceLabel('perseus-lane')).toBe("Lane's Lexicon");
   });
 
-  it('names the Salmoné dictionary', () => {
-    expect(definitionSourceLabel('salmone')).toBe(
-      "Salmoné's Arabic-English Dictionary",
-    );
+  it('names the hand-written editorial glosses', () => {
+    expect(definitionSourceLabel('editorial')).toBe('Editorial gloss (this project)');
+  });
+
+  it('does not credit the dropped Salmoné import as a dictionary', () => {
+    // Phase 24 dropped it; the tag has no rows. If one ever appears it must
+    // read as unmapped, not as a dictionary this project claims to carry.
+    expect(definitionSourceLabel('salmone')).toBe('salmone');
   });
 
   it('names the Hans Wehr dictionary', () => {

@@ -1,0 +1,21 @@
+# root<TAB>gloss -- the human decision for a root whose auto-selected Hans Wehr
+# gloss is the wrong entry or the wrong sense. Nothing in the source picks a
+# sense (hanswehr.sqlite's quran_occurrence is per headword, not per sense --
+# see docs/plans/phase-24-gloss-quality.md), so this file is the only place
+# that knowledge lives.
+#
+# An EMPTY gloss drops the root's hanswehr row entirely, letting Lane lead.
+# `import-lane` upserts and never deletes, so dropping needs a prune first --
+# but do NOT point `prune-definitions` at this file. It only knows the roots a
+# human named, and the run also quarantines roots nothing chose (`no_gloss`,
+# `not_in_hanswehr`), which keep their old row just the same. The prune list is
+# generated: `prepare_hanswehr_glosses --prune-out` writes every root holding a
+# hanswehr row this run did not re-produce, drops included.
+#
+# Applied after the Hans Wehr lookup, so it corrects which HW sense ships and
+# cannot invent a gloss for a root HW does not carry. An override for a root
+# HW has no entry for is therefore never applied -- it is reported as
+# `unused_override` rather than silently ignored.
+#
+# Populated by the Task 7 human gate from the `options` columns of
+# ~/quran-data/hw24_review.tsv. Empty until then.

@@ -688,9 +688,11 @@ describe('roots queries', () => {
     expect(defs.map((d) => d.source)).toEqual(['qurandev-lane', 'perseus-lane']);
   });
 
-  it('ranks a Salmoné gloss above both the corpus strip and perseus-lane', async () => {
-    // Salmoné is a dictionary entry selected for the form the Quran uses; the
-    // other two are a scraped form-strip and Lane's leading form-I verb sense.
+  it('leaves the dropped salmone tag below every ranked source', async () => {
+    // Phase 24 dropped that import and its CASE arm with it, so the tag now
+    // falls to the ELSE. corpus-forms and perseus-lane are the two weakest
+    // ranked sources: a salmone row must sort under both, not lead by the
+    // alphabet the way an unmapped tag would if the ELSE were removed too.
     const local = newFileDb();
     await runMigrations(local);
     await local.execute(
@@ -704,9 +706,9 @@ describe('roots queries', () => {
     );
     const defs = await getRootDefinitions(local, 1);
     expect(defs.map((d) => d.source)).toEqual([
-      'salmone',
       'corpus-forms',
       'perseus-lane',
+      'salmone',
     ]);
   });
 
@@ -722,7 +724,6 @@ describe('roots queries', () => {
     await local.execute(
       `INSERT INTO root_definitions (root_id,source,definition) VALUES
        (1,'lane','to write'),(1,'qurandev-lane','to write'),
-       (1,'salmone','To write.'),
        (1,'corpus-forms','write'),(1,'hanswehr','to write, pen, draft')`,
     );
     const defs = await getRootDefinitions(local, 1);
@@ -730,31 +731,35 @@ describe('roots queries', () => {
       'hanswehr',
       'lane',
       'qurandev-lane',
-      'salmone',
       'corpus-forms',
     ]);
   });
 
-  it('keeps curated Lane above Salmoné, and Salmoné above the rest', async () => {
-    // corpus-forms is in here to pin the lower edge too: curated Lane outranks
-    // an unmapped source by the ELSE arm alone, so asserting only the Lane
-    // side would still pass with the salmone branch deleted.
+  it('ranks a hand-written editorial gloss above every dictionary', async () => {
+    // The editorial gloss is written from the corpus's own per-word glosses for
+    // that root, so it is the most Quran-specific text a root can carry. -1,
+    // not a tie at 0 with hanswehr: a tie falls through to the `rd.source`
+    // tie-break, where 'editorial' would win only by the letter e. Every other
+    // ranked source is present so a deleted CASE arm cannot pass by accident.
     const local = newFileDb();
     await runMigrations(local);
     await local.execute(
       `INSERT INTO roots (id,root_buckwalter,root_arabic,occurrence_count)
-       VALUES (1,'SbE','ص ب ع',2)`,
+       VALUES (1,'hmn','ه م ن',2)`,
     );
     await local.execute(
       `INSERT INTO root_definitions (root_id,source,definition) VALUES
-       (1,'salmone','Finger; digit.'),(1,'qurandev-lane','the finger'),
-       (1,'corpus-forms','finger')`,
+       (1,'hanswehr','to watch'),(1,'qurandev-lane','he watched over'),
+       (1,'corpus-forms','guardian'),(1,'perseus-lane','He was a guardian over it'),
+       (1,'editorial','to watch over, to guard; guardian, protector')`,
     );
     const defs = await getRootDefinitions(local, 1);
     expect(defs.map((d) => d.source)).toEqual([
+      'editorial',
+      'hanswehr',
       'qurandev-lane',
-      'salmone',
       'corpus-forms',
+      'perseus-lane',
     ]);
   });
 });
