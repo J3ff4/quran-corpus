@@ -111,6 +111,24 @@ reviews:
     - "!**/dist/**"
 
   path_instructions:
+    - path: "{STATUS.md,docs/plans/**}"
+      instructions: >-
+        Ledger prose, not shipped code. STATUS.md is a scratch board and
+        docs/plans/** records intent at planning time; both drift from the code
+        by design and CLAUDE.md sec 14 and sec 6 both say the code is the
+        contract. Do not report drift between these files and the codebase, do
+        not report stale or superseded narrative, and do not propose rewording,
+        structure, or documentation-coverage changes here. On PR #75 that class
+        of finding was 30 of the first 60, and each one was answered by editing
+        prose inside the open PR, which the next round then re-read as new diff.
+
+        These paths are deliberately NOT in path_filters. Excluding them would
+        also remove them from the No-secrets-or-credentials pre-merge check, and
+        that check is this repo's only automated secret gate: there is no CI
+        workflow, no pre-commit hook, and GitHub secret scanning is unavailable
+        while the repo is private. A key has reached a non-code path here before
+        (the SQLCipher keys purged from temp/). Keep flagging credentials,
+        tokens, keys, and live command lines carrying them in these files.
     - path: "apps/web/src/components/**"
       instructions: >-
         Client components must import from @quran-corpus/data/client, never the
