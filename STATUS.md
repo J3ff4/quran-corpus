@@ -7,7 +7,7 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-08-06
+Updated: 2026-08-08
 
 ## Now
 Evidence differs per claim; none of it is carried over from prior narrative.
@@ -33,8 +33,12 @@ Evidence differs per claim; none of it is carried over from prior narrative.
   trust it. Never infer these from GitHub metadata, which does not carry them.
 - "Nothing open" means no **open GitHub PR**, per `gh pr list --state open`. It
   says nothing about unmerged local branches, which are listed separately.
-- **IN PROGRESS 2026-08-06: phase 24 Part A, HW gloss quality** — branch
-  `feat/phase-24-gloss-quality`, plan `docs/plans/phase-24-gloss-quality.md`.
+- **MERGED 2026-08-08 23:09Z: phase 24, HW gloss quality — PR #75 squashed to
+  `6b49392`** (`gh pr view 75 --json mergedAt,mergeCommit`), branch
+  `feat/phase-24-gloss-quality` deleted local + remote (`git ls-remote --heads
+  origin` returns nothing for it). Everything below is the run that got there;
+  the closing summary is the **round 22–25** block after round 21.
+  Started 2026-08-06 from plan `docs/plans/phase-24-gloss-quality.md`.
   Phase 23 shipped with its human reject gate **un-run** (`hanswehr_rejects.txt`
   still holds only its header comment, one touch in `4c77d00`), so 336 of the
   1476 live glosses carry a defect. First gate was
@@ -1157,6 +1161,68 @@ Evidence differs per claim; none of it is carried over from prior narrative.
   reformatting would move a `# noqa: S608` off its statement).
   `hanswehr_baseline` unchanged
   (`kept 1450 / buckets 7 / added 0 / removed 0 / changed 0`, exit 0).
+- **Rounds 22–25 (CodeRabbit, 2026-08-08) — the close-out. 9 findings, all real,
+  all fixed; then a genuine clean pass, then merge.** Written *at merge*, not per
+  round: 30 of this PR's first 60 findings were on `STATUS.md` and the phase
+  plan, neither of which ships, so appending a block per round was manufacturing
+  the next round's findings. The per-round detail lives in the commit bodies
+  (`ec5dfa5`, `a0e40b9`, `7bc2bbf`, `f857117`, `f9d6607`, `39bdd48`, `7db4c14`).
+  - **Round 22, 2 findings.** `ec5dfa5`: the delimiter loop passed every invalid
+    value through `header(value)`, which exercises `source` alone — `run` was
+    checked for a newline only, though both land on the same line. Both
+    parameters now run every case. `a0e40b9`: the fixture's
+    `root_definitions.root_id` came from a subquery on `root_buckwalter`, so a
+    mistyped root inserted **NULL** and `load_live_roots` dropped the row on its
+    JOIN — a test that asserts nothing about pruning while still passing.
+    `NOT NULL` turns that into an `IntegrityError` at insert.
+  - **Round 24, 5 findings** (`7bc2bbf`, `f857117`, `f9d6607`, `39bdd48`). Two
+    were real holes in guards added earlier in this same PR: `select_gloss`
+    accepted a **negative `max_chars`** and fell through to `cleaned[:-1]`, so
+    the cap silently did not bind; and `--source "hanswehr run: x"` **forged a
+    run stamp**, because `_parse` partitions at the first ` run: ` — `check_pair`
+    then compared the forgery instead of the stamp the prepare run wrote. Only
+    `source` needed the guard: the run is last on the line, so it round-trips
+    whole, asserted positively through `check_pair`. Third: a **blank override
+    root** (`"   \tearth"`) is neither an empty line nor a missing tab, so it
+    passed both existing guards, keyed the decision on `""`, and got quarantined
+    — a typo reported as "Hans Wehr has no entry". Plus two hygiene fixes: a
+    hardcoded `150` bound to `MAX_GLOSS_CHARS`, and 6 duplicated HW fixtures
+    folded into `_hw_db(tmp_path, entries=...)`.
+  - **Round 25, 2 findings, both outside diff range** (`7db4c14`). `select_gloss([],
+    max_chars=-1)` returned `None` before reaching the new cap guard, so an
+    invalid cap read as "no gloss for this root" until a root happened to have an
+    entry; validation moved above the empty-input return. And
+    `test_truncates_at_a_sense_boundary_not_mid_word` asserted only
+    `all(s.strip() for s in gloss.split(";"))` — **a mid-sense cut at a space
+    satisfies that**, so the boundary the test is named for was never checked. It
+    now compares the senses to a prefix of the whole ones *and* asserts
+    truncation happened at all, or an untruncated gloss would satisfy the prefix
+    check and the cap could stop binding without failing anything.
+  - **§5 tell that mattered: an `APPROVED` can sit beside unaddressed findings.**
+    Round 24's review submitted `CHANGES_REQUESTED` (body 4371) and round 25's
+    run submitted an **empty `APPROVED`** three seconds after a 5629-byte
+    `COMMENTED` carrying 2 outside-diff-range findings. Those have **no review
+    thread**, so "0 unresolved threads" was true and meaningless. Read the review
+    *body*, not the thread count.
+  - **The clean pass, head `7db4c14`.** Status description `Review completed`
+    (not `Review rate limited`); commit range re-targeted `39bdd48..7db4c14`;
+    **zero review objects on the head** — the clean-pass signature — corroborated
+    by the walkthrough's *"No actionable comments were generated in the recent
+    review"*; zero unresolved threads; `reviewDecision=APPROVED`,
+    `mergeStateStatus=CLEAN`. Pre-merge table opened rather than assumed: **8
+    passed, 1 failed** — Docstring Coverage 60.38% vs 80%, `mode: warning`,
+    codebase-wide and non-actionable per-PR (same on #69, #70).
+  - Gates at `7db4c14`: scraper **779** (776 + 3), ruff check ✓, ruff format ✓,
+    `hanswehr_baseline` **added 0 / removed 0 / changed 0**, exit 0
+    (`kept 1450  no_gloss 98  not_in_hanswehr 94  buckets 7`).
+  - **§4 step 3 was not run on rounds 22–25.** It ran nine times earlier in this
+    phase; the user called merge with it outstanding on the last four rounds.
+    Recorded, not hidden.
+  - Gotcha for the next session: `packages/scraper/quran.db` is a **stale 176 KB
+    stub** with 0 roots. The live DB is `apps/web/quran.db` →
+    `~/quran-data/quran.db`, and the HW source is `~/quran-data/hanswehr.sqlite`
+    (not under `refdata/`). Point `hanswehr_baseline.py` at those or it reports
+    `removed 1642` and exits 1 against an empty database.
 - **MERGED 2026-08-06 06:46Z: phase 23, Hans Wehr top glosses** — **PR #74
   squashed to `4c77d00`** (`gh pr view 74 --json mergedAt,mergeCommit`), branch
   `feat/phase-23-hanswehr-glosses` deleted local + remote
