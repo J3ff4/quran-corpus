@@ -18,6 +18,7 @@ Output feeds ``import-lane --source qurandev-lane``.
 
 from __future__ import annotations
 
+import html
 import json
 import re
 import sqlite3
@@ -47,10 +48,16 @@ _APPARATUS_MARKERS = [
 def clean_meaning(meaning: str) -> str:
     """Strip trailing Lane apparatus, keeping only the leading English gloss.
 
+    Source meanings carry raw HTML entities (``&quot;``, ``&nbsp;``, ``&#1584;``)
+    that would otherwise reach the DB and render literally in the UI, so they are
+    decoded first and the resulting whitespace (incl. NBSP) re-collapsed, matching
+    ``scraper.lane_gloss._plain``.
+
     Returns the gloss up to the earliest apparatus marker (or the whole string
     if none), trimmed of dangling punctuation. Apparatus-only meanings return
     "" and are dropped by :func:`build_rows`.
     """
+    meaning = " ".join(html.unescape(meaning).split())
     starts = [m.start() for r in _APPARATUS_MARKERS if (m := r.search(meaning))]
     cut = meaning[: min(starts)] if starts else meaning
     return cut.strip(" ,.;:-—")

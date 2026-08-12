@@ -71,6 +71,17 @@ def test_clean_meaning_keeps_gloss_strips_apparatus():
         assert clean_meaning(gloss) == gloss
 
 
+def test_clean_meaning_decodes_html_entities():
+    # entities in the source would otherwise render literally in the UI
+    assert (
+        clean_meaning("denote the meaning &quot;a little&quot;")
+        == 'denote the meaning "a little"'
+    )
+    assert clean_meaning("&#1584;&#1603; A &amp; B") == "ذك A & B"
+    # NBSP decodes to whitespace and is collapsed away, not left leading/doubled
+    assert clean_meaning("&nbsp; to wait,&nbsp;lay in wait") == "to wait, lay in wait"
+
+
 def test_clean_meaning_drops_apparatus_only():
     # entry that is pure apparatus (no leading English gloss) → "" → dropped
     assert clean_meaning("Etala vb. (I) perf. act. 44:47") == ""
