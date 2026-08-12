@@ -49,15 +49,19 @@ import sqlite3
 from pathlib import Path
 
 from scraper.sources.lane import normalize_slash_spacing
-from tools.prepare_qurandev_roots import _MARKUP
+from tools.prepare_qurandev_roots import _MARKUP, _TRIM, decode_collapse
 
 SOURCE = "qurandev-lane"
 
 
 def clean(definition: str) -> str:
-    """Reproduce what a re-import writes: decode, collapse, trim, space slashes."""
-    collapsed = " ".join(html.unescape(definition).split()).strip(" ,.;:-—")
-    return normalize_slash_spacing(collapsed)
+    """Reproduce what a re-import writes: decode, collapse, trim, space slashes.
+
+    Borrows ``decode_collapse`` and the trim set from the importer rather than
+    restating them — the contract here is "what a re-import would write", so a
+    change there must not leave this behind.
+    """
+    return normalize_slash_spacing(decode_collapse(definition).strip(_TRIM))
 
 
 def find_rows(

@@ -32,9 +32,7 @@ from pathlib import Path
 # We cut at the earliest apparatus marker, keeping only the leading gloss.
 # Proven safe by spike: real 1-word glosses (orphan/milk/city) survive; entries
 # that are pure apparatus (no English gloss) cut to empty and are dropped.
-_POS = (
-    r"(?:n\.f\.|n\.m\.|n\.vb\.|vb\.|adj\.|pcple\.|perf\.|impf\.|impv\.|pass\.|act\.)"
-)
+_POS = r"(?:n\.f\.|n\.m\.|n\.vb\.|vb\.|adj\.|pcple\.|perf\.|impf\.|impv\.|pass\.|act\.)"
 _APPARATUS_MARKERS = [
     # lemma immediately followed by a POS/form label (anchored so a bare gloss
     # word is never mistaken for a lemma): "taraka vb.", "juz n.m."
@@ -50,17 +48,31 @@ _APPARATUS_MARKERS = [
 # center;" align="center">     &#1584; &#1603; &#1585;' — an attribute fragment
 # from a stripped <p>, and what follows is the Arabic letters of the *wrong* root
 # (dhal-kaf-ra, i.e. *kr) rather than a gloss, so there is nothing to salvage.
-# Matched against the raw meaning. Decoding first cannot expose markup that was
-# hidden, only manufacture it out of escaped text ("&lt;b&gt;" -> "<b>"), so the
-# raw string is the honest thing to judge. Both orderings agree on today's file:
-# the only two entity-escaped angle brackets are "-&gt;" inside a gloss, which
-# needs an opening "<" to match here and so trips neither.
+# Checked twice, raw and again after cleaning. Raw, because that is the source's
+# own encoding. Again after, because the cleaned string is what gets *written*:
+# clean_meaning decodes entities, so an escaped "&lt;b&gt;" passes the raw check
+# and lands in the TSV as real markup. Both checks agree on today's file — the
+# only entity-escaped angle brackets are "-&gt;" inside a gloss, which needs an
+# opening "<" to match here and so trips neither.
 #
 # The attribute alternative demands a quoted value, not a bare "align =", because
 # this file's glosses use "=" as prose ("= Ta-Siin-Ayn"); an English gloss reading
 # "to align = to make straight" must not be discarded as corrupt. The one real row
 # carries 'style="text-align: center;"', so the quote costs nothing.
 _MARKUP = re.compile(r"""</?[a-zA-Z][^>]*>|\b(?:class|style|align)\s*=\s*["']""")
+
+# Dangling punctuation left by an apparatus cut. Shared with the one-shot repair
+# tool (tools/fix_gloss_entities.py), which must trim exactly what this does.
+_TRIM = " ,.;:-—"
+
+
+def decode_collapse(text: str) -> str:
+    """Decode HTML entities and collapse the resulting whitespace (incl. NBSP).
+
+    Shared with :mod:`tools.fix_gloss_entities`: its contract is to reproduce
+    what a re-import writes, so the two must not drift.
+    """
+    return " ".join(html.unescape(text).split())
 
 
 def clean_meaning(meaning: str) -> str:
@@ -75,10 +87,10 @@ def clean_meaning(meaning: str) -> str:
     if none), trimmed of dangling punctuation. Apparatus-only meanings return
     "" and are dropped by :func:`build_rows`.
     """
-    meaning = " ".join(html.unescape(meaning).split())
+    meaning = decode_collapse(meaning)
     starts = [m.start() for r in _APPARATUS_MARKERS if (m := r.search(meaning))]
     cut = meaning[: min(starts)] if starts else meaning
-    return cut.strip(" ,.;:-—")
+    return cut.strip(_TRIM)
 
 
 def build_rows(
@@ -114,10 +126,13 @@ def build_rows(
         if bw not in valid_roots:
             stats["unknown_root"] += 1
             continue
-        if _MARKUP.search(definition):  # checked raw: clean_meaning decodes "&gt;"
+        if _MARKUP.search(definition):  # raw: the source's own encoding
             stats["markup"] += 1
             continue
         definition = clean_meaning(definition)
+        if _MARKUP.search(definition):  # decoded: this is what gets written
+            stats["markup"] += 1
+            continue
         if not definition:  # was pure apparatus, no real gloss
             stats["apparatus_only"] += 1
             continue

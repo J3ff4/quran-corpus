@@ -125,3 +125,23 @@ def test_markup_meaning_is_dropped_but_gt_entity_survives():
     assert rows == [("b$r", "Complexion/Hue->Delicacy")]
     assert stats["markup"] == 1
     assert stats["kept"] == 1
+
+
+def test_escaped_markup_is_dropped_after_decoding():
+    """The raw check alone would write real markup into the TSV.
+
+    ``clean_meaning`` decodes entities, so a source row carrying escaped markup
+    passes the raw guard and comes out the other side as a real tag. What gets
+    written has to be judged too — same lesson as the repair tool's second
+    check (``fix_gloss_entities.find_rows``).
+    """
+    raw = _cp1252(
+        [
+            {"RootCode": "ktb", "Meanings": "&lt;p class=&quot;x&quot;&gt;to write"},
+            {"RootCode": "slm", "Meanings": "peace"},
+        ]
+    )
+    rows, stats = build_rows(raw, valid_roots={"ktb", "slm"})
+    assert rows == [("slm", "peace")]
+    assert stats["markup"] == 1
+    assert stats["kept"] == 1
