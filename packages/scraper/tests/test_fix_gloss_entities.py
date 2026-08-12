@@ -1,8 +1,10 @@
 """Tests for the root_definitions HTML-entity repair."""
 
 import sqlite3
+import sys
+from unittest.mock import patch
 
-from tools.fix_gloss_entities import find_rows
+from tools.fix_gloss_entities import find_rows, main
 
 
 def _db(rows: list[tuple[str, str, str]]) -> sqlite3.Connection:
@@ -82,7 +84,9 @@ def test_leaves_clean_rows_alone():
 def test_markup_row_is_reported_not_repaired():
     """The one corrupt row must not be decoded back into a plausible gloss.
 
-    Verbatim from the pre-fix backup. Repairing it would turn visible entity
+    The ``*kw`` string is byte-verbatim from the pre-fix backup (row id 4446):
+    the write path stores source text as-is, so ``>`` is a literal and the
+    numeric entities are singly escaped. Repairing it would turn visible entity
     noise into real Arabic — the letters of the *wrong* root (*kr) — so the
     junk starts reading as data, and ``import-lane`` only upserts, so nothing
     would take it out again. It belongs to ``prune-definitions``, not here.
@@ -92,12 +96,92 @@ def test_markup_row_is_reported_not_repaired():
             (
                 "*kw",
                 "qurandev-lane",
-                '"MsoNormal" style="text-align: center;" align="center"&gt; '
-                "&amp;#1584; &amp;#1603; &amp;#1585",
+                '"MsoNormal" style="text-align: center;" align="center"> '
+                "&#1584; &#1603; &#1585",
             ),
             ("ktb", "qurandev-lane", "to write&nbsp"),
         ]
     )
-    rows, markup = find_rows(conn)
+    rows, unrepairable = find_rows(conn)
     assert [(bw, new) for _id, bw, _old, new in rows] == [("ktb", "to write")]
-    assert [bw for bw, _old in markup] == ["*kw"]
+    assert [(bw, reason) for bw, _old, reason in unrepairable] == [("*kw", "markup")]
+
+
+def test_escaped_markup_is_caught_after_decoding():
+    """Real markup must never be *written* — the raw check alone misses it.
+
+    The live ``*kw`` row happens to carry unescaped quotes, so the raw check
+    fires on it. A row whose markup arrived entity-escaped passes that check
+    while ``clean()`` decodes it into real markup, which is exactly what this
+    tool must not put in the DB.
+    """
+    conn = _db([("zzz", "qurandev-lane", "&lt;b&gt;bold&lt;/b&gt; gloss")])
+    rows, unrepairable = find_rows(conn)
+    assert rows == []
+    assert [reason for _bw, _old, reason in unrepairable] == ["markup after decoding"]
+
+
+def test_row_decoding_to_empty_is_not_blanked():
+    """A definition that cleans to "" is reported, never written.
+
+    ``--apply`` would otherwise run ``SET definition = ''`` — a state no import
+    can produce (``build_rows`` drops it, ``import_lane_definitions`` skips it),
+    and a blank gloss in the UI hides what entity noise advertised.
+    """
+    conn = _db(
+        [("zzz", "qurandev-lane", "&nbsp;&nbsp;"), ("ktb", "qurandev-lane", "x")]
+    )
+    rows, unrepairable = find_rows(conn)
+    assert rows == []
+    assert [(bw, reason) for bw, _old, reason in unrepairable] == [
+        ("zzz", "decodes to empty")
+    ]
+
+
+def test_slash_spacing_matches_a_reimport():
+    """``clean`` must apply every step a re-import applies, slashes included.
+
+    A re-import runs ``clean_meaning`` *then* ``import_lane_definitions`` →
+    ``normalize_slash_spacing``; omitting the second leaves the repaired row
+    diverging from what the importer would write.
+    """
+    conn = _db([("srr", "qurandev-lane", "couch&#47;throne&nbsp")])
+    rows, _ = find_rows(conn)
+    assert [new for _id, _bw, _old, new in rows] == ["couch/ throne"]
+
+
+def test_apply_writes_decoded_rows(tmp_path):
+    """Cover the write path: --apply gating and the UPDATE parameter order.
+
+    ``find_rows`` is pure, so a transposed ``(new, rid)`` in ``main`` would ship
+    silently on a tool whose only job is mutating the live DB.
+    """
+    db = tmp_path / "t.db"
+    conn = sqlite3.connect(db)
+    conn.executescript(
+        "CREATE TABLE roots (id INTEGER PRIMARY KEY, root_buckwalter TEXT);"
+        "CREATE TABLE root_definitions ("
+        " id INTEGER PRIMARY KEY, root_id INTEGER, source TEXT, definition TEXT);"
+        "INSERT INTO roots VALUES (7,'ktb'), (9,'rHm');"
+        "INSERT INTO root_definitions VALUES"
+        " (41,7,'qurandev-lane','to write&nbsp'),"
+        " (42,9,'hanswehr','to be merciful&nbsp');"
+    )
+    conn.commit()
+    conn.close()
+
+    def _defs():
+        c = sqlite3.connect(db)
+        try:
+            return dict(c.execute("SELECT id, definition FROM root_definitions"))
+        finally:
+            c.close()
+
+    with patch.object(sys, "argv", ["fix", "--db", str(db)]):
+        main()
+    assert _defs()[41] == "to write&nbsp"  # dry-run by default
+
+    with patch.object(sys, "argv", ["fix", "--db", str(db), "--apply"]):
+        main()
+    # keyed by id, not by row order, and the out-of-scope source is untouched
+    assert _defs() == {41: "to write", 42: "to be merciful&nbsp"}

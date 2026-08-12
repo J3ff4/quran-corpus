@@ -12,17 +12,27 @@ for other sources — ``hanswehr`` glosses legitimately end in ``s.th.``/``e.g.`
 and its own extractor never strips ``.`` for that reason.
 
 Apparatus-cleaning is *not* re-applied — that would re-cut glosses on markers
-that only made sense against the raw source (it alters one live row). Only
-decoding, whitespace collapse, and the trailing-punctuation trim run here. The
-trim can drop a terminal ``.`` (7 rows did), which is deliberate: it matches
-what a re-import through ``clean_meaning`` now produces.
+that only made sense against the raw source (it alters one live row). Decoding,
+whitespace collapse, the trailing-punctuation trim and
+:func:`~scraper.sources.lane.normalize_slash_spacing` run here, which is the rest
+of what a re-import applies (``clean_meaning`` then ``import_lane_definitions``).
+The trim can drop a terminal ``.`` (7 rows did), which is deliberate: it matches
+what a re-import now produces.
 
-Markup-bearing rows are reported, never repaired, for the same reason: a
-re-import *drops* them (:data:`~tools.prepare_qurandev_roots._MARKUP`), so
-decoding one would put back a row the importer refuses to emit — and decoding is
-what disguises it, since ``*kw``'s ``&#1584;`` becomes real Arabic and the junk
-starts reading as a gloss. ``import-lane`` only upserts, so nothing would remove
-it again; delete such rows instead (``scraper prune-definitions``).
+Rows the importer would refuse are reported, never repaired, because
+``import-lane`` only upserts — nothing would take a bad row back out afterwards.
+Delete those instead (``scraper prune-definitions``). Two cases:
+
+* **Markup** (:data:`~tools.prepare_qurandev_roots._MARKUP`), checked both raw
+  and decoded. Raw, because that is how the importer judges it; decoded, because
+  decoded is what gets *written* — an entity-escaped ``&lt;b&gt;`` passes the raw
+  check and would put real markup into the DB. Decoding is also what disguises
+  the damage: ``*kw``'s ``&#1584;`` becomes real Arabic and the junk starts
+  reading as a gloss.
+* **Decodes to empty** (e.g. a definition that is only ``&nbsp;``). ``build_rows``
+  drops those as ``apparatus_only`` and ``import_lane_definitions`` skips them, so
+  writing ``''`` would produce a state no import can reach — and a blank gloss in
+  the UI hides the problem that visible entity noise at least advertised.
 
 Idempotent in practice: ``html.unescape`` decodes one level, so text that was
 double-encoded (``&amp;quot;``) would still hold an entity and change again on a
@@ -38,24 +48,27 @@ import html
 import sqlite3
 from pathlib import Path
 
+from scraper.sources.lane import normalize_slash_spacing
 from tools.prepare_qurandev_roots import _MARKUP
 
 SOURCE = "qurandev-lane"
 
 
 def clean(definition: str) -> str:
-    """Decode entities, re-collapse whitespace, trim dangling punctuation."""
-    return " ".join(html.unescape(definition).split()).strip(" ,.;:-—")
+    """Reproduce what a re-import writes: decode, collapse, trim, space slashes."""
+    collapsed = " ".join(html.unescape(definition).split()).strip(" ,.;:-—")
+    return normalize_slash_spacing(collapsed)
 
 
 def find_rows(
     conn: sqlite3.Connection,
-) -> tuple[list[tuple[int, str, str, str]], list[tuple[str, str]]]:
+) -> tuple[list[tuple[int, str, str, str]], list[tuple[str, str, str]]]:
     """Split repairable rows from unrepairable ones.
 
-    Returns ``(repairs, markup)`` — ``repairs`` is (id, buckwalter, old, new)
-    for every row whose entities decode to something different, ``markup`` is
-    (buckwalter, definition) for rows the importer would now drop outright.
+    Returns ``(repairs, unrepairable)`` — ``repairs`` is (id, buckwalter, old,
+    new) for every row whose entities decode to something different,
+    ``unrepairable`` is (buckwalter, definition, reason) for rows the importer
+    would drop outright rather than write.
     """
     rows = conn.execute(
         "SELECT rd.id, r.root_buckwalter, rd.definition "
@@ -64,11 +77,11 @@ def find_rows(
         (SOURCE,),
     ).fetchall()
     out = []
-    markup = []
+    unrepairable = []
     for rid, bw, old in rows:
         # Judged raw, before any decode, exactly as the importer judges it.
         if _MARKUP.search(old):
-            markup.append((bw, old))
+            unrepairable.append((bw, old, "markup"))
             continue
         # Gate on decoding, not on a regex: html.unescape is the authority on
         # what is an entity (it also decodes semicolon-less "&nbsp", which a
@@ -77,9 +90,16 @@ def find_rows(
         if html.unescape(old) == old:
             continue
         new = clean(old)
+        # Re-checked on the decoded text: that is what would be written.
+        if _MARKUP.search(new):
+            unrepairable.append((bw, old, "markup after decoding"))
+            continue
+        if not new:
+            unrepairable.append((bw, old, "decodes to empty"))
+            continue
         if new != old:
             out.append((rid, bw, old, new))
-    return out, markup
+    return out, unrepairable
 
 
 def main() -> None:
@@ -94,11 +114,11 @@ def main() -> None:
     mode = "?mode=rw" if args.apply else "?mode=ro"
     conn = sqlite3.connect(f"file:{args.db}{mode}", uri=True)
     try:
-        rows, markup = find_rows(conn)
+        rows, unrepairable = find_rows(conn)
         for _rid, bw, old, new in rows:
             print(f"{bw}\n  - {old}\n  + {new}")
-        for bw, old in markup:
-            print(f"{bw}\n  ! markup, not repairable — prune this row: {old}")
+        for bw, old, reason in unrepairable:
+            print(f"{bw}\n  ! {reason} — not repairable, prune this row: {old}")
         if args.apply and rows:
             conn.executemany(
                 "UPDATE root_definitions SET definition = ? WHERE id = ?",
@@ -107,7 +127,7 @@ def main() -> None:
             conn.commit()
         print(
             f"\n{len(rows)} rows {'updated' if args.apply else 'would change'}, "
-            f"{len(markup)} skipped as markup"
+            f"{len(unrepairable)} skipped as unrepairable"
         )
     finally:
         conn.close()
