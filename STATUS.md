@@ -7,7 +7,7 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-08-08
+Updated: 2026-08-12
 
 ## Now
 Evidence differs per claim; none of it is carried over from prior narrative.
@@ -33,6 +33,45 @@ Evidence differs per claim; none of it is carried over from prior narrative.
   trust it. Never infer these from GitHub metadata, which does not carry them.
 - "Nothing open" means no **open GitHub PR**, per `gh pr list --state open`. It
   says nothing about unmerged local branches, which are listed separately.
+- **PARKED 2026-08-12: `fix/gloss-html-entities`, 5 commits, no PR, not merged.**
+  `4b5eb0b` `37d1c42` `c70085e` `fbbcaf3` `85b1a0d`, pushed to origin. Parked on
+  purpose: the repo is private (`gh repo view --json isPrivate` → `true`), so the
+  §5 CodeRabbit gate has no runnable form. Merging would be a **third** owner
+  override after #63 and #67 — and worse than either, because with no PR the diff
+  would never be visible to the bot even retroactively. Open the PR after the repo
+  goes public (Queue 5), let CodeRabbit read it, then merge.
+  Nothing is broken meanwhile: **the user-visible fix is already live in the DB**
+  (entities decoded, the one junk row pruned); what is unmerged is the tooling and
+  the guards that stop it recurring.
+  What it fixes: `root_definitions.definition` held raw HTML entities for
+  `qurandev-lane` (rendered literally in the UI — `denote the meaning &quot;a
+  little&quot;`). Importer now decodes (`clean_meaning`); `tools/fix_gloss_entities.py`
+  is the one-shot repair for rows already imported. Live dry-run today reports
+  **0 rows would change, 0 unrepairable** — the repair has been applied.
+  Live row 4446 (`*kw`) was Word-export junk (`"MsoNormal" style=…`), pruned live;
+  the same junk is *upstream* in `meanings.json`, so `_MARKUP` in `build_rows` now
+  drops it too — a live delete alone would be undone by the next import.
+  §4 step 3 ran **three times**: round 1 → 4 findings / 2 taken, round 2 → 5 / 5
+  taken (one would have written `definition = ''` into the live DB via `--apply`),
+  round 3 → 4 / 2 taken, all low, no live-path bug. Called converged at round 3:
+  its one real finding was the *same class* as round 2's, not a new one — the
+  importer had the mirror blind spot (guard checked the raw meaning, `clean_meaning`
+  decodes right after, so escaped `&lt;p class=&quot;x&quot;&gt;` reached the TSV as
+  a real tag). Generalized rule: **guard what you WRITE, not only what you read.**
+  Two round-3 findings declined with reasons recorded in `85b1a0d`'s body.
+  Every new guard mutation-checked (mutant restored, each fails exactly its own
+  test). Real-file check: TSV output byte-identical before vs after the new guard,
+  1385 kept / 1 markup — a pure guard, zero behaviour change today.
+  Gates local at `85b1a0d`: **790 scraper tests ✓**, ruff check ✓ on all four
+  touched files (7 remaining errors are pre-existing, in `test_db.py` /
+  `test_review_glosses.py`), ruff format ✓, mypy ✓.
+  **Second parked branch: `chore/coderabbit-exclude-ledger-prose`** (`1c741a1`,
+  pushed, no PR) — tells CodeRabbit not to review drift in STATUS.md and the plans,
+  after 30 of #75's 60 findings came from ledger prose. Parked for the same reason
+  *plus* §5's self-modifying-gate rule: a `.coderabbit.yaml` change is reviewed on
+  its own merits and never rides with work that benefits from the loosening.
+  So Housekeeping's "zero branches" is **stale as of today — two live branches**,
+  both deliberate.
 - **MERGED 2026-08-08 23:09Z: phase 24, HW gloss quality — PR #75 squashed to
   `6b49392`** (`gh pr view 75 --json mergedAt,mergeCommit`), branch
   `feat/phase-24-gloss-quality` deleted local + remote (`git ls-remote --heads
@@ -2857,6 +2896,10 @@ Re-queried directly 2026-07-22 (do not trust older counts in this file's history
    d. Only then flip visibility.
    e. After public: enable branch protection (free once public) requiring the
       CodeRabbit check, or §5 stays convention-only.
+   f. Then land the two parked branches, each as its own PR, CodeRabbit-reviewed:
+      `chore/coderabbit-exclude-ledger-prose` **first** (it is a gate change, §5
+      says never in the same PR as work that benefits from it), then
+      `fix/gloss-html-entities`. See the PARKED block at the top of "Now".
 6. Housekeeping — branches DONE (zero remain, 2026-07-27). Left: one genuinely
    untracked file, `docs/plans/phase-12-hamza-seat-fix.md` (cosmetic; the other
    two in the old claim were tracked/ignored all along — see Housekeeping).
