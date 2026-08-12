@@ -11,8 +11,9 @@ Fetch the raw file (not committed — third-party data artifact); the raw URL is
 The file is Windows-1252 encoded (curly quotes as 0x92). ``RootCode`` is
 Buckwalter and maps 1:1 onto ``roots.root_buckwalter``. We filter to roots that
 already exist in the target DB so vocalized proper-noun codes (e.g.
-``<iboraAhiym``) never get created as junk triliteral roots, drop empty
-meanings, and strip trailing Lane apparatus (see :func:`clean_meaning`).
+``<iboraAhiym``) never get created as junk triliteral roots, drop empty and
+markup-bearing meanings (see :data:`_MARKUP`), and strip trailing Lane apparatus
+(see :func:`clean_meaning`).
 Output feeds ``import-lane --source qurandev-lane``.
 """
 
@@ -44,6 +45,18 @@ _APPARATUS_MARKERS = [
     re.compile(r"\bLL,\s*V\d"),  # short-cite "LL, V7"
 ]
 
+# A meaning is English prose; HTML markup in it means the source row is corrupt,
+# not that it needs unwrapping. One row is (*kw): '"MsoNormal" style="text-align:
+# center;" align="center">     &#1584; &#1603; &#1585;' — an attribute fragment
+# from a stripped <p>, and what follows is the Arabic letters of the *wrong* root
+# (dhal-kaf-ra, i.e. *kr) rather than a gloss, so there is nothing to salvage.
+# Matched against the raw meaning. Decoding first cannot expose markup that was
+# hidden, only manufacture it out of escaped text ("&lt;b&gt;" -> "<b>"), so the
+# raw string is the honest thing to judge. Both orderings agree on today's file:
+# the only two entity-escaped angle brackets are "-&gt;" inside a gloss, which
+# needs an opening "<" to match here and so trips neither.
+_MARKUP = re.compile(r"</?[a-zA-Z][^>]*>|\b(?:class|style|align)\s*=")
+
 
 def clean_meaning(meaning: str) -> str:
     """Strip trailing Lane apparatus, keeping only the leading English gloss.
@@ -68,9 +81,10 @@ def build_rows(
 ) -> tuple[list[tuple[str, str]], dict[str, int]]:
     """Decode + filter + clean meanings.json bytes to (buckwalter, def) rows.
 
-    Keeps rows whose RootCode is in ``valid_roots`` and whose meaning is
-    non-empty after apparatus-cleaning. Returns (rows, stats) where stats
-    explains what was dropped.
+    Keeps rows whose RootCode is in ``valid_roots``, carry no HTML markup, and
+    whose meaning is non-empty after apparatus-cleaning. Returns (rows, stats)
+    where stats explains what was dropped; ``total`` equals the sum of the
+    outcome buckets.
     """
     entries = json.loads(raw.decode("cp1252"))
     rows: list[tuple[str, str]] = []
@@ -78,6 +92,7 @@ def build_rows(
         "total": len(entries),
         "empty": 0,
         "unknown_root": 0,
+        "markup": 0,
         "apparatus_only": 0,
         "duplicate": 0,
         "kept": 0,
@@ -93,6 +108,9 @@ def build_rows(
             continue
         if bw not in valid_roots:
             stats["unknown_root"] += 1
+            continue
+        if _MARKUP.search(definition):  # checked raw: clean_meaning decodes "&gt;"
+            stats["markup"] += 1
             continue
         definition = clean_meaning(definition)
         if not definition:  # was pure apparatus, no real gloss
@@ -132,6 +150,7 @@ def main() -> None:
         f"qurandev/roots → TSV: {stats['kept']} kept "
         f"({stats['total']} total, {stats['empty']} empty, "
         f"{stats['unknown_root']} not-a-DB-root, "
+        f"{stats['markup']} markup, "
         f"{stats['apparatus_only']} apparatus-only, "
         f"{stats['duplicate']} duplicate) → {args.out}"
     )

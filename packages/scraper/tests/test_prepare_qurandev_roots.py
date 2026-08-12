@@ -28,6 +28,7 @@ def test_filters_and_decodes():
         "total": 4,
         "empty": 1,
         "unknown_root": 1,
+        "markup": 0,
         "apparatus_only": 0,
         "duplicate": 0,
         "kept": 2,
@@ -51,6 +52,7 @@ def test_duplicate_rootcode_counted_and_stats_balance():
     assert stats["total"] == (
         stats["empty"]
         + stats["unknown_root"]
+        + stats["markup"]
         + stats["apparatus_only"]
         + stats["duplicate"]
         + stats["kept"]
@@ -98,4 +100,28 @@ def test_apparatus_only_meaning_is_dropped():
     rows, stats = build_rows(raw, valid_roots={"ytm", "Etl"})
     assert rows == [("ytm", "orphan, fatherless")]
     assert stats["apparatus_only"] == 1
+    assert stats["kept"] == 1
+
+
+def test_markup_meaning_is_dropped_but_gt_entity_survives():
+    """The one corrupt upstream row is dropped; "&gt;" as content is not markup.
+
+    Both meanings are verbatim from meanings.json — ``*kw`` is the whole of the
+    file's markup contamination, and ``b$r`` is why the guard requires a real
+    ``<tag>`` or ``attr=`` rather than a stray angle bracket: a gloss may
+    legitimately contain "->".
+    """
+    raw = _cp1252(
+        [
+            {
+                "RootCode": "*kw",
+                "Meanings": '"MsoNormal" style="text-align: center;" '
+                'align="center">     &#1584; &#1603; &#1585;',
+            },
+            {"RootCode": "b$r", "Meanings": "Complexion/Hue-&gt;Delicacy"},
+        ]
+    )
+    rows, stats = build_rows(raw, valid_roots={"*kw", "b$r"})
+    assert rows == [("b$r", "Complexion/Hue->Delicacy")]
+    assert stats["markup"] == 1
     assert stats["kept"] == 1
