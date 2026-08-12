@@ -55,7 +55,12 @@ _APPARATUS_MARKERS = [
 # raw string is the honest thing to judge. Both orderings agree on today's file:
 # the only two entity-escaped angle brackets are "-&gt;" inside a gloss, which
 # needs an opening "<" to match here and so trips neither.
-_MARKUP = re.compile(r"</?[a-zA-Z][^>]*>|\b(?:class|style|align)\s*=")
+#
+# The attribute alternative demands a quoted value, not a bare "align =", because
+# this file's glosses use "=" as prose ("= Ta-Siin-Ayn"); an English gloss reading
+# "to align = to make straight" must not be discarded as corrupt. The one real row
+# carries 'style="text-align: center;"', so the quote costs nothing.
+_MARKUP = re.compile(r"""</?[a-zA-Z][^>]*>|\b(?:class|style|align)\s*=\s*["']""")
 
 
 def clean_meaning(meaning: str) -> str:

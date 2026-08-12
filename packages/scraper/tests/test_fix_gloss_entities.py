@@ -35,7 +35,7 @@ def test_decodes_entities_and_collapses_nbsp():
             ("srr", "qurandev-lane", "couch/ throne.&nbsp"),
         ]
     )
-    assert [(bw, new) for _id, bw, _old, new in find_rows(conn)] == [
+    assert [(bw, new) for _id, bw, _old, new in find_rows(conn)[0]] == [
         ("$yA", 'the meaning "a little"'),
         ("rbS", "to wait, lay in wait"),
         ("xdd", "to clave, to mark"),
@@ -58,7 +58,7 @@ def test_only_touches_qurandev_lane():
             ("ktb", "qurandev-lane", "to write&nbsp"),
         ]
     )
-    assert [(bw, new) for _id, bw, _old, new in find_rows(conn)] == [
+    assert [(bw, new) for _id, bw, _old, new in find_rows(conn)[0]] == [
         ("ktb", "to write")
     ]
 
@@ -76,4 +76,28 @@ def test_leaves_clean_rows_alone():
             ("Elm", "qurandev-lane", "to know, A & B, 100% sure"),
         ]
     )
-    assert find_rows(conn) == []
+    assert find_rows(conn) == ([], [])
+
+
+def test_markup_row_is_reported_not_repaired():
+    """The one corrupt row must not be decoded back into a plausible gloss.
+
+    Verbatim from the pre-fix backup. Repairing it would turn visible entity
+    noise into real Arabic — the letters of the *wrong* root (*kr) — so the
+    junk starts reading as data, and ``import-lane`` only upserts, so nothing
+    would take it out again. It belongs to ``prune-definitions``, not here.
+    """
+    conn = _db(
+        [
+            (
+                "*kw",
+                "qurandev-lane",
+                '"MsoNormal" style="text-align: center;" align="center"&gt; '
+                "&amp;#1584; &amp;#1603; &amp;#1585",
+            ),
+            ("ktb", "qurandev-lane", "to write&nbsp"),
+        ]
+    )
+    rows, markup = find_rows(conn)
+    assert [(bw, new) for _id, bw, _old, new in rows] == [("ktb", "to write")]
+    assert [bw for bw, _old in markup] == ["*kw"]

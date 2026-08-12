@@ -17,6 +17,13 @@ decoding, whitespace collapse, and the trailing-punctuation trim run here. The
 trim can drop a terminal ``.`` (7 rows did), which is deliberate: it matches
 what a re-import through ``clean_meaning`` now produces.
 
+Markup-bearing rows are reported, never repaired, for the same reason: a
+re-import *drops* them (:data:`~tools.prepare_qurandev_roots._MARKUP`), so
+decoding one would put back a row the importer refuses to emit — and decoding is
+what disguises it, since ``*kw``'s ``&#1584;`` becomes real Arabic and the junk
+starts reading as a gloss. ``import-lane`` only upserts, so nothing would remove
+it again; delete such rows instead (``scraper prune-definitions``).
+
 Idempotent in practice: ``html.unescape`` decodes one level, so text that was
 double-encoded (``&amp;quot;``) would still hold an entity and change again on a
 second run. No such row exists; ordinary rows converge after one pass.
@@ -31,6 +38,8 @@ import html
 import sqlite3
 from pathlib import Path
 
+from tools.prepare_qurandev_roots import _MARKUP
+
 SOURCE = "qurandev-lane"
 
 
@@ -39,8 +48,15 @@ def clean(definition: str) -> str:
     return " ".join(html.unescape(definition).split()).strip(" ,.;:-—")
 
 
-def find_rows(conn: sqlite3.Connection) -> list[tuple[int, str, str, str]]:
-    """Return (id, root_buckwalter, old, new) for every row needing repair."""
+def find_rows(
+    conn: sqlite3.Connection,
+) -> tuple[list[tuple[int, str, str, str]], list[tuple[str, str]]]:
+    """Split repairable rows from unrepairable ones.
+
+    Returns ``(repairs, markup)`` — ``repairs`` is (id, buckwalter, old, new)
+    for every row whose entities decode to something different, ``markup`` is
+    (buckwalter, definition) for rows the importer would now drop outright.
+    """
     rows = conn.execute(
         "SELECT rd.id, r.root_buckwalter, rd.definition "
         "FROM root_definitions rd JOIN roots r ON r.id = rd.root_id "
@@ -48,7 +64,12 @@ def find_rows(conn: sqlite3.Connection) -> list[tuple[int, str, str, str]]:
         (SOURCE,),
     ).fetchall()
     out = []
+    markup = []
     for rid, bw, old in rows:
+        # Judged raw, before any decode, exactly as the importer judges it.
+        if _MARKUP.search(old):
+            markup.append((bw, old))
+            continue
         # Gate on decoding, not on a regex: html.unescape is the authority on
         # what is an entity (it also decodes semicolon-less "&nbsp", which a
         # strict pattern misses), and rows with nothing to decode are left
@@ -58,7 +79,7 @@ def find_rows(conn: sqlite3.Connection) -> list[tuple[int, str, str, str]]:
         new = clean(old)
         if new != old:
             out.append((rid, bw, old, new))
-    return out
+    return out, markup
 
 
 def main() -> None:
@@ -73,16 +94,21 @@ def main() -> None:
     mode = "?mode=rw" if args.apply else "?mode=ro"
     conn = sqlite3.connect(f"file:{args.db}{mode}", uri=True)
     try:
-        rows = find_rows(conn)
+        rows, markup = find_rows(conn)
         for _rid, bw, old, new in rows:
             print(f"{bw}\n  - {old}\n  + {new}")
+        for bw, old in markup:
+            print(f"{bw}\n  ! markup, not repairable — prune this row: {old}")
         if args.apply and rows:
             conn.executemany(
                 "UPDATE root_definitions SET definition = ? WHERE id = ?",
                 [(new, rid) for rid, _bw, _old, new in rows],
             )
             conn.commit()
-        print(f"\n{len(rows)} rows {'updated' if args.apply else 'would change'}")
+        print(
+            f"\n{len(rows)} rows {'updated' if args.apply else 'would change'}, "
+            f"{len(markup)} skipped as markup"
+        )
     finally:
         conn.close()
 
