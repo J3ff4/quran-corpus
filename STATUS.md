@@ -37,9 +37,11 @@ and stay in the old repo (CodeRabbit's #75 rounds included — the substance is
 already condensed here and in memory). Old repo keeps its 1 star and its pinned
 objects.
 
-🔴 **`J3ff4/quran-corpus-pwa` must stay private forever.** It still serves the
-purged SQLCipher key by SHA. Deleting it is the permanent fix and is safe now
-(zero forks) — do that once satisfied nothing else is needed from it.
+🔴 **`J3ff4/quran-corpus-pwa` is KEPT, and stays private forever.** It still
+serves the purged SQLCipher key by SHA, so its visibility must never change.
+**User ruled 2026-08-13: do not delete it** — it is the archive of the 75 PR
+timelines and their review threads, which were not transferable. Do not re-raise
+deletion; private is the whole remedy. Its `origin` here is the `old` remote.
 
 Evidence differs per claim; none of it is carried over from prior narrative.
 - Merge state, merge SHAs, timestamps, open/closed: `gh pr list --state all` and
