@@ -1,6 +1,6 @@
 # Issue tracker: GitHub
 
-Issues and PRDs for this repo live as GitHub issues on `J3ff4/quran-corpus-pwa`.
+Issues and PRDs for this repo live as GitHub issues on `J3ff4/quran-corpus`.
 Use the `gh` CLI for all operations.
 
 ## Conventions

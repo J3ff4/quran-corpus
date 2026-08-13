@@ -228,7 +228,7 @@ CodeRabbit gate.
 
 ### Issue tracker
 
-GitHub Issues on `J3ff4/quran-corpus-pwa`, via the `gh` CLI. See
+GitHub Issues on `J3ff4/quran-corpus`, via the `gh` CLI. See
 `docs/agents/issue-tracker.md`. Note that opening a *PR* remains the user's call
 (never `gh pr create` unprompted); that restriction does not extend to issues.
 

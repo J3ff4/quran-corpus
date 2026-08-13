@@ -7,9 +7,40 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-08-12
+Updated: 2026-08-13
 
 ## Now
+
+### 🔀 REPO MIGRATED — `quran-corpus-pwa` → `quran-corpus` (2026-08-13)
+The orphaned-object blocker is **gone**, and no support ticket was ever filed.
+
+**Why the old plan was never going to work.** GC collects *unreachable* objects.
+All 75 `refs/pull/N/head` refs held the pre-rewrite commits **reachable**, so they
+were not garbage at all — waiting was futile at any horizon, and `refs/pull/*` is
+GitHub-internal and read-only, deletable by nobody outside GitHub. Re-probed
+2026-08-13, 17 days after the rewrite: old SHA still resolved, `contents/temp`
+still returned all 14 entries. Hence the docs routing it to Support.
+
+**What was done instead.** Old repo had `forks: 0`, `network_count: 0` — nothing
+outside it held those objects, so a fresh repo is born clean:
+- New repo **`J3ff4/quran-corpus`**, created **private**, verified, then published.
+- All 3 branches pushed, `main` parity exact at `a9f10ec`.
+- Pre-flight on the full history, all clean: no `temp/` in any commit, no
+  `.db/.apk/.so/.zip/.key/.pem/.env` ever added on any ref, no blob > 1 MB, no
+  secret pattern (`PRAGMA key`, `ghp_`, `AKIA`, PEM headers, …) across all refs.
+- Post-push probes on the new repo: old SHA `422 No commit found`, `temp/` `404`.
+- Issues transferred: #76 → **#1** (CI gap), #77 → **#2** (ejtaal links).
+- Remotes: `origin` = new repo, `old` = the old one; all 3 branches re-tracked.
+
+**Cost, accepted:** 75 PR timelines and their review threads are not transferable
+and stay in the old repo (CodeRabbit's #75 rounds included — the substance is
+already condensed here and in memory). Old repo keeps its 1 star and its pinned
+objects.
+
+🔴 **`J3ff4/quran-corpus-pwa` must stay private forever.** It still serves the
+purged SQLCipher key by SHA. Deleting it is the permanent fix and is safe now
+(zero forks) — do that once satisfied nothing else is needed from it.
+
 Evidence differs per claim; none of it is carried over from prior narrative.
 - Merge state, merge SHAs, timestamps, open/closed: `gh pr list --state all` and
   `gh pr view <n> --json mergedAt,mergeCommit`, cross-checked with
@@ -668,7 +699,8 @@ Evidence differs per claim; none of it is carried over from prior narrative.
     - **Declined: "add immutable gate evidence to `STATUS.md`."** §14 defines
       this file as a scratch board, not release evidence, and committed stdout is
       no more immutable than the prose describing it. The premise's true half —
-      **no `.github/workflows/` exists** — is real and filed as **issue #76**;
+      **no `.github/workflows/` exists** — is real and filed as **issue #76**
+      (now **#1** after the 2026-08-13 repo migration);
       adding CI inside the PR it would grade is the self-modifying-gate shape §5
       forbids.
     - **760 tests ✓** (was 758). Both new tests mutation-checked, both die. Gate
@@ -928,7 +960,9 @@ Evidence differs per claim; none of it is carried over from prior narrative.
      which `gh repo view` reports **private** — the only 404 on the page that
      states the licence terms. `Source.href` is now optional; a source with no
      public home renders as plain text and drops its host line. Restore the
-     link when the repo goes public (blocked on the orphaned-object GC).
+     link when the repo goes public — and point it at
+     `github.com/J3ff4/quran-corpus`, the 2026-08-13 replacement repo, never the
+     old one (which stays private forever).
   Gates: scraper 767 (+2), `apps/web` 483, tsc + eslint + ruff clean; both new
   scraper assertions mutation-checked (reverting each fix fails its test), and
   the `/about` test mutation-checked by re-adding an href.
@@ -2117,10 +2151,9 @@ Evidence differs per claim; none of it is carried over from prior narrative.
   both now in CLAUDE.md §5: a quota-refused review posts a **green `success`** status
   reading `Review rate limited`, and a failed error-mode pre-merge check pins
   requested-changes with the reason buried in the walkthrough's collapsed block.
-- **Next: the GitHub Support GC** (`~/quran-data/github-support-request.md`, still
-  unsubmitted). Longest-lead blocker — the repo cannot go public until the
-  pre-rewrite objects are gone, and branch protection (which is what would make §5
-  enforceable rather than conventional) needs public.
+- **Next: the GitHub Support GC** — ~~`~/quran-data/github-support-request.md`~~
+  **SUPERSEDED 2026-08-13.** Never submitted; solved by migrating to a fresh repo
+  instead. See "Now".
 
 ### Phase 17 — single-form root_forms fix, DONE + MERGED (PR #60, `edea0a0`)
 
@@ -2387,16 +2420,16 @@ Decision: repo goes public, review bot switches Greptile → CodeRabbit.
 - **Nothing lost.** Reference data → `~/quran-data/refdata/` (98 MB). Spike code →
   `~/quran-data/spike/` + README. Verified backup bundle →
   `~/quran-data/qcp-backup-20260727-183938.bundle` ("records a complete history").
-- 🔴 **BLOCKER — do NOT flip visibility.** GitHub still serves the pre-rewrite blobs
-  by SHA, and **all 58 PR timelines still list those SHAs**, so the purged key is
-  discoverable, not merely guessable:
-  ```
-  gh api "repos/J3ff4/quran-corpus-pwa/contents/temp/split_config.arm64_v8a.apk?ref=8ce09b6" --jq .size
-  → 23257744
-  ```
-  Only GitHub Support can GC it. Request drafted:
-  `~/quran-data/github-support-request.md` — ends with the two commands that must
-  BOTH 404 before visibility changes.
+- 🔴 **BLOCKER (2026-07-27 → RESOLVED 2026-08-13 by migration, see "Now").** GitHub
+  kept serving the pre-rewrite blobs by SHA — a `contents/temp?ref=<old-sha>` call
+  returned the full 14-entry listing including the 23 MB APK — and all 75 PR
+  timelines listed those SHAs, so the purged key was discoverable, not merely
+  guessable. Re-verified live 2026-08-13, 17 days after the rewrite.
+  **Why waiting could never fix it:** GC only collects *unreachable* objects, and
+  all 75 `refs/pull/N/head` refs held those commits reachable. `refs/pull/*` is
+  GitHub-internal and read-only — no git command deletes it, which is exactly why
+  the docs route this to Support. The old repo (`J3ff4/quran-corpus-pwa`) still
+  carries all of it and must stay **private**.
 - Also unlocked by going public: **branch protection**, unavailable on free private
   repos (403 "Upgrade to GitHub Pro or make this repository public"). Until then
   §5 is convention, not a mechanical block.
@@ -2891,9 +2924,11 @@ Re-queried directly 2026-07-22 (do not trust older counts in this file's history
    DB but are invisible in the app (reader hardcodes `en`).
 5. **Going public — next actions, in order:**
    a. Decide the #59 blocking-mode question (warning → error?), land #59.
-   b. Submit `~/quran-data/github-support-request.md`; wait for GC confirmation.
-   c. Re-run the two verification commands — BOTH must 404.
-   d. Only then flip visibility.
+   b. ~~Submit `~/quran-data/github-support-request.md`~~ — **DONE differently
+      2026-08-13**: migrated to a fresh repo, no ticket ever filed. See "Now".
+   c. ~~Re-run the two verification commands~~ — replaced by the new repo's own
+      probes, all clean (old SHA 422, `temp/` 404).
+   d. Flip `J3ff4/quran-corpus` to public.
    e. After public: enable branch protection (free once public) requiring the
       CodeRabbit check, or §5 stays convention-only.
    f. Then land the two parked branches, each as its own PR, CodeRabbit-reviewed:
