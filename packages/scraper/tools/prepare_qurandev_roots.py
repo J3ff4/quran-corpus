@@ -59,7 +59,13 @@ _APPARATUS_MARKERS = [
 # this file's glosses use "=" as prose ("= Ta-Siin-Ayn"); an English gloss reading
 # "to align = to make straight" must not be discarded as corrupt. The one real row
 # carries 'style="text-align: center;"', so the quote costs nothing.
-_MARKUP = re.compile(r"""</?[a-zA-Z][^>]*>|\b(?:class|style|align)\s*=\s*["']""")
+#
+# "<!" catches comments and declarations (<!-- ... -->, <!DOCTYPE html>), which the
+# tag alternative misses: "!" is not [a-zA-Z]. Matched bare rather than as a closed
+# "<!...>" so an unterminated comment is rejected too — this is a detector, it only
+# ever rejects, so it need not span the whole construct. No English gloss contains
+# "<!".
+_MARKUP = re.compile(r"""</?[a-zA-Z][^>]*>|<!|\b(?:class|style|align)\s*=\s*["']""")
 
 # Dangling punctuation left by an apparatus cut. Shared with the one-shot repair
 # tool (tools/fix_gloss_entities.py), which must trim exactly what this does.

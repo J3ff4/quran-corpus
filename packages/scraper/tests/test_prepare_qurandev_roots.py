@@ -145,3 +145,25 @@ def test_escaped_markup_is_dropped_after_decoding():
     assert rows == [("slm", "peace")]
     assert stats["markup"] == 1
     assert stats["kept"] == 1
+
+
+def test_comments_and_declarations_are_markup():
+    """"<!" constructs are markup too — "!" is not matched by the tag branch.
+
+    Both raw and entity-escaped forms must be rejected, and an unterminated
+    comment (no closing "-->") must not slip through on a technicality.
+    """
+    raw = _cp1252(
+        [
+            {"RootCode": "ktb", "Meanings": "<!-- source note --> to write"},
+            {"RootCode": "slm", "Meanings": "&lt;!-- escaped note --&gt; peace"},
+            {"RootCode": "rHm", "Meanings": "<!DOCTYPE html> mercy"},
+            {"RootCode": "ytm", "Meanings": "<!-- unterminated orphan"},
+            {"RootCode": "Elm", "Meanings": "knowledge"},
+        ]
+    )
+    rows, stats = build_rows(
+        raw, valid_roots={"ktb", "slm", "rHm", "ytm", "Elm"}
+    )
+    assert rows == [("Elm", "knowledge")]
+    assert stats["markup"] == 4

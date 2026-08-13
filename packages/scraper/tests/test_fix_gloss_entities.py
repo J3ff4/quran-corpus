@@ -121,6 +121,27 @@ def test_escaped_markup_is_caught_after_decoding():
     assert [reason for _bw, _old, reason in unrepairable] == ["markup after decoding"]
 
 
+def test_comments_and_declarations_are_caught():
+    """Shares ``_MARKUP`` with the importer, so "<!" must stop here too.
+
+    Raw on the first row, entity-escaped on the second — the escaped one only
+    becomes a comment after ``clean()`` decodes it, so it exercises the second
+    check the same way ``&lt;b&gt;`` does above.
+    """
+    conn = _db(
+        [
+            ("zzz", "qurandev-lane", "<!-- note --> gloss"),
+            ("yyy", "qurandev-lane", "&lt;!DOCTYPE html&gt; gloss"),
+        ]
+    )
+    rows, unrepairable = find_rows(conn)
+    assert rows == []
+    assert [reason for _bw, _old, reason in unrepairable] == [
+        "markup",
+        "markup after decoding",
+    ]
+
+
 def test_row_decoding_to_empty_is_not_blanked():
     """A definition that cleans to "" is reported, never written.
 
