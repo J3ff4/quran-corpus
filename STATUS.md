@@ -66,14 +66,25 @@ Evidence differs per claim; none of it is carried over from prior narrative.
   trust it. Never infer these from GitHub metadata, which does not carry them.
 - "Nothing open" means no **open GitHub PR**, per `gh pr list --state open`. It
   says nothing about unmerged local branches, which are listed separately.
-- **PARKED 2026-08-12: `fix/gloss-html-entities`, 5 commits, no PR, not merged.**
-  `4b5eb0b` `37d1c42` `c70085e` `fbbcaf3` `85b1a0d`, pushed to origin. Parked on
-  purpose: the repo is private (`gh repo view --json isPrivate` → `true`), so the
-  §5 CodeRabbit gate has no runnable form. Merging would be a **third** owner
-  override after #63 and #67 — and worse than either, because with no PR the diff
-  would never be visible to the bot even retroactively. Open the PR after the repo
-  goes public (Queue 5), let CodeRabbit read it, then merge.
-  Nothing is broken meanwhile: **the user-visible fix is already live in the DB**
+- **MERGED 2026-08-14 04:49Z: `fix/gloss-html-entities` — PR #3 squashed to
+  `da4c130`**, branch deleted local + remote. Parked 2026-08-12 as 5 commits with
+  no PR (`4b5eb0b` `37d1c42` `c70085e` `fbbcaf3` `85b1a0d`) *because* the repo was
+  private and the §5 gate had no runnable form; merging then would have been a
+  **third** owner override after #63 and #67, and worse than either, since with no
+  PR the diff would never have been visible to the bot even retroactively. The
+  migration to the public `J3ff4/quran-corpus` removed that block, so it went
+  through the gate properly instead — **no override was ever taken here.**
+  §5 on the merged head `b4d6ba1`: `APPROVED`, status `success | Review completed`,
+  pre-merge check table **9/9 passed**, no `Outside diff range` block, both earlier
+  threads (one 🟠 Major, one 🟡 Minor, both on `prepare_qurandev_roots.py`)
+  resolved. Three rounds were needed — round 1 `COMMENTED` on `fa97965`, round 2
+  `CHANGES_REQUESTED` on `b91299e`, round 3 `APPROVED` on `b4d6ba1`. A fourth
+  attempt at 02:44Z was **rate-limited**, and posted the §5 fail-open shape: green
+  `success` whose description read `Review rate limited`. Waited out the window,
+  re-requested bare at 04:44Z; the pass is distinguished from that refusal by the
+  walkthrough's `updated_at` moving (22:54 → 04:47:05) and the check table
+  re-running — **not** by the review object, whose body is empty either way.
+  Nothing was broken while parked: **the user-visible fix was already live in the DB**
   (entities decoded, the one junk row pruned); what is unmerged is the tooling and
   the guards that stop it recurring.
   What it fixes: `root_definitions.definition` held raw HTML entities for
@@ -98,13 +109,14 @@ Evidence differs per claim; none of it is carried over from prior narrative.
   Gates local at `85b1a0d`: **790 scraper tests ✓**, ruff check ✓ on all four
   touched files (7 remaining errors are pre-existing, in `test_db.py` /
   `test_review_glosses.py`), ruff format ✓, mypy ✓.
-  **Second parked branch: `chore/coderabbit-exclude-ledger-prose`** (`1c741a1`,
-  pushed, no PR) — tells CodeRabbit not to review drift in STATUS.md and the plans,
-  after 30 of #75's 60 findings came from ledger prose. Parked for the same reason
-  *plus* §5's self-modifying-gate rule: a `.coderabbit.yaml` change is reviewed on
-  its own merits and never rides with work that benefits from the loosening.
-  So Housekeeping's "zero branches" is **stale as of today — two live branches**,
-  both deliberate.
+  **Sibling branch `chore/coderabbit-exclude-ledger-prose`** (`1c741a1`) — tells
+  CodeRabbit not to review drift in STATUS.md and the plans, after 30 of #75's 60
+  findings came from ledger prose. **MERGED 2026-08-14 02:47Z as PR #4, squashed to
+  `f1ac015`**, branch deleted. Shipped *alone*, ahead of #3 and never with it, per
+  §5's self-modifying-gate rule: a `.coderabbit.yaml` change is reviewed on its own
+  merits and never rides with work that benefits from the loosening.
+  Both branches are now gone (`git ls-remote --heads origin`, `git branch`), so
+  Housekeeping's "zero branches" is accurate again and no PR is open.
 - **MERGED 2026-08-08 23:09Z: phase 24, HW gloss quality — PR #75 squashed to
   `6b49392`** (`gh pr view 75 --json mergedAt,mergeCommit`), branch
   `feat/phase-24-gloss-quality` deleted local + remote (`git ls-remote --heads
