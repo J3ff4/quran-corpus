@@ -19,6 +19,14 @@
     },
     "test": {
       "dependsOn": ["^build"]
+    },
+    "generate:m0-db": {
+      "dependsOn": ["^build"],
+      "cache": false
+    },
+    "generate:m1-db": {
+      "dependsOn": ["^build"],
+      "cache": false
     }
   }
 }

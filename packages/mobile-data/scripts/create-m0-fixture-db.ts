@@ -1,9 +1,17 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createDatabase } from '@quran-corpus/data';
 
-const dbPath = resolve('../../apps/mobile/assets/db/quran-m0.db');
-const schemaPath = resolve('../data/schema.sql');
+// Derived from this file's own location, not the cwd: the previous relative
+// resolve() only landed on the right paths when the script happened to be
+// invoked from inside packages/mobile-data, and silently pointed elsewhere
+// otherwise. Same fix as create-m1-reader-db.ts.
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+const dbPath = resolve(repoRoot, 'apps/mobile/assets/db/quran-m0.db');
+// The canonical schema, the same one packages/scraper writes against. The
+// column lists below must track it; generate:m0-db fails loudly on drift.
+const schemaPath = resolve(repoRoot, 'packages/data/schema.sql');
 
 type Statement = { sql: string; args: unknown[] };
 

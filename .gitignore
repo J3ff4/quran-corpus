@@ -32,6 +32,10 @@ apps/web/public/sw.js.map
 
 # Database files — data artifacts stay out of git
 *.db
+# ...except the 176 KB M0 fixture, which is committed on purpose: it is test
+# data, not corpus, and m0Fixture.test.ts asserts it unconditionally so the
+# schema contract keeps its teeth on a fresh clone. Regenerate: pnpm generate:m0-db
+!apps/mobile/assets/db/quran-m0.db
 
 # Raw scraped/imported data snapshots — re-fetch, never commit (CLAUDE.md §11)
 data-snapshots/
