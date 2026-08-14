@@ -85,8 +85,8 @@ Evidence differs per claim; none of it is carried over from prior narrative.
   walkthrough's `updated_at` moving (22:54 → 04:47:05) and the check table
   re-running — **not** by the review object, whose body is empty either way.
   Nothing was broken while parked: **the user-visible fix was already live in the DB**
-  (entities decoded, the one junk row pruned); what is unmerged is the tooling and
-  the guards that stop it recurring.
+  (entities decoded, the one junk row pruned); what #3 finally landed is the tooling
+  and the guards that stop it recurring.
   What it fixes: `root_definitions.definition` held raw HTML entities for
   `qurandev-lane` (rendered literally in the UI — `denote the meaning &quot;a
   little&quot;`). Importer now decodes (`clean_meaning`); `tools/fix_gloss_entities.py`
@@ -109,6 +109,36 @@ Evidence differs per claim; none of it is carried over from prior narrative.
   Gates local at `85b1a0d`: **790 scraper tests ✓**, ruff check ✓ on all four
   touched files (7 remaining errors are pre-existing, in `test_db.py` /
   `test_review_glosses.py`), ruff format ✓, mypy ✓.
+  **Post-merge smoke, 2026-08-14 on `main` at `28d39a4`** — local runs, no CI, so
+  this is a transcript claim tied to that SHA (see the evidence rules above):
+  - Full scraper suite **793 passed in 14.85s** (790 + PR #4's 3). Must be invoked
+    as `.venv/bin/python -m pytest`; bare `python3` dies at collection with
+    `ModuleNotFoundError: No module named 'scraper'`.
+  - Scoped to #3's four files: ruff check ✓, `ruff format --check` ✓, mypy ✓
+    (`no issues found in 4 source files`).
+  - **Repo-wide is worse than the line above claims** — that "7 pre-existing" was a
+    *scoped* run. Whole repo: **12** ruff errors across 7 files
+    (`test_review_glosses.py` ×4, `cli.py` ×3, then `spike_form_lemma_alignment.py`,
+    `import_alqurancloud.py`, `test_db.py`, `qul.py`, `corpus_parser.py`), **28**
+    files `ruff format` would rewrite, **7** mypy errors in 5 files (`scraper/mt.py`
+    + `test_mt.py` assignment types, rest annotation notes). None in a file #3
+    touched. Not new debt, just never counted before.
+  - `fix_gloss_entities.py --db ~/quran-data/quran.db` dry-run: **0 rows would
+    change, 0 skipped as unrepairable** — steady state holds, nothing regressed and
+    no new entity-bearing row arrived. `--apply` NOT re-run (needs explicit
+    permission + fresh backup).
+  - **Real-file compare, `d77c16a` vs `28d39a4`**, same `meanings.json` (fetched to
+    scratchpad, never committed), same live DB: `1386 kept` → `1385 kept (… 1
+    markup …)`. 70 rows changed, 1 dropped, 0 added. Dropped row is exactly the
+    known `*kw` Word-export junk. For **all 1385** rows
+    `decode+collapse(OLD) == NEW`, **0 mismatches**, and **0** rows lose a
+    non-whitespace character — the content-loss check the gloss gate is blind to,
+    since shape buckets stay green when text is deleted. Residual entities in the
+    output: 0. Residual tags: 0.
+  - Scope correction: the "byte-identical" claim two lines up is about the round-3
+    guard commit alone. **Branch-vs-main is not byte-identical** — 70 rows move,
+    because the entity decode rode the same branch. Both can be true; this run
+    measured the branch, so it neither confirms nor refutes the per-commit claim.
   **Sibling branch `chore/coderabbit-exclude-ledger-prose`** (`1c741a1`) — tells
   CodeRabbit not to review drift in STATUS.md and the plans, after 30 of #75's 60
   findings came from ledger prose. **MERGED 2026-08-14 02:47Z as PR #4, squashed to
