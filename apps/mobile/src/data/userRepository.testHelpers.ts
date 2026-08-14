@@ -1,14 +1,19 @@
-import type { MobileDataClient, MobileRow, SqlValue } from '@quran-corpus/mobile-data';
+import type { MobileDataClient, SqlValue } from '@quran-corpus/mobile-data';
 
-interface BookmarkRow {
+// Type aliases, not interfaces: only an alias picks up the implicit index
+// signature that satisfies MobileRow (Record<string, SqlValue>). That is what
+// lets the stores be handed back as rows without an `as unknown as` cast, so a
+// renamed column in the repository breaks the build here instead of silently
+// returning rows the reader cannot read.
+type BookmarkRow = {
   surah_id: number;
   ayah_number: number;
-}
+};
 
-interface HistoryRow {
+type HistoryRow = {
   surah_id: number;
   ayah_number: number;
-}
+};
 
 export function createMemoryUserClient(): MobileDataClient {
   const bookmarks = new Map<string, BookmarkRow>();
@@ -34,7 +39,9 @@ export function createMemoryUserClient(): MobileDataClient {
 
       if (sql.includes('FROM bookmarks')) {
         return {
-          rows: [...bookmarks.values()].sort((a, b) => a.surah_id - b.surah_id || a.ayah_number - b.ayah_number) as unknown as MobileRow[],
+          rows: [...bookmarks.values()].sort(
+            (a, b) => a.surah_id - b.surah_id || a.ayah_number - b.ayah_number,
+          ),
         };
       }
 
@@ -45,7 +52,7 @@ export function createMemoryUserClient(): MobileDataClient {
       }
 
       if (sql.includes('FROM reading_history')) {
-        return { rows: history ? ([history] as unknown as MobileRow[]) : [] };
+        return { rows: history ? [history] : [] };
       }
 
       if (sql.startsWith('INSERT INTO settings')) {

@@ -1,12 +1,13 @@
 import React from 'react';
-import { act, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMemoryUserClient } from '../data/userRepository.testHelpers';
 import { setBookmark } from '../data/userRepository';
 import BookmarksTab from '../../app/(tabs)/bookmarks';
 
 const mocks = vi.hoisted(() => ({
   userClient: null as ReturnType<typeof createMemoryUserClient> | null,
+  openUserDb: null as (() => Promise<ReturnType<typeof createMemoryUserClient> | null>) | null,
   focusCallbacks: [] as Array<() => void | (() => void)>,
 }));
 
@@ -14,12 +15,10 @@ vi.mock('@quran-corpus/mobile-data', () => ({
   createExpoSqliteClient: (db: unknown) => db,
 }));
 
-vi.mock('../data/userDb', () => ({
-  openUserDb: async () => mocks.userClient,
-}));
-
+// One factory only: `@/data/userDb` and `../data/userDb` resolve to the same
+// module, so a second vi.mock for the relative form is dead weight.
 vi.mock('@/data/userDb', () => ({
-  openUserDb: async () => mocks.userClient,
+  openUserDb: async () => (mocks.openUserDb ? mocks.openUserDb() : mocks.userClient),
 }));
 
 vi.mock('@/settings/settingsStore', () => ({
@@ -51,8 +50,11 @@ vi.mock('react-native', async () => {
 describe('BookmarksTab', () => {
   beforeEach(() => {
     mocks.userClient = createMemoryUserClient();
+    mocks.openUserDb = null;
     mocks.focusCallbacks = [];
   });
+
+  afterEach(cleanup);
 
   it('refreshes persisted bookmarks when the tab regains focus', async () => {
     const userClient = requireUserClient();
@@ -66,6 +68,21 @@ describe('BookmarksTab', () => {
     });
 
     await waitFor(() => expect(screen.getByText('Open 2:255')).toBeTruthy());
+  });
+
+  it('renders the failure and clears the spinner when the user DB cannot open', async () => {
+    mocks.openUserDb = async () => {
+      throw new Error('database is locked');
+    };
+
+    render(<BookmarksTab />);
+
+    await screen.findByText('database is locked');
+    // Both halves matter: a regression that leaves the spinner up forever, or
+    // one that renders the error alongside the empty state, would otherwise
+    // ship silently.
+    expect(screen.queryByText('loading')).toBeNull();
+    expect(screen.queryByText('No bookmarks yet')).toBeNull();
   });
 });
 

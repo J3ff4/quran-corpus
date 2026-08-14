@@ -6,29 +6,44 @@ const sqliteDir = 'file:///docs/SQLite';
 const targetPath = `${sqliteDir}/${corpusDbFileName}`;
 const stagingPath = `${targetPath}${stagingSuffix}`;
 
-function createFileSystem(exists: boolean) {
+const assetUri = 'file:///asset/quran.db';
+
+/**
+ * A path-aware fake filesystem holding path -> contents.
+ *
+ * Path-aware rather than a single `exists` flag, because the interesting state
+ * is a *staging* file left behind by an interrupted extract while the target is
+ * still absent -- one boolean cannot express that, so a test named for it was
+ * really re-running the first-launch case.
+ */
+function createFileSystem(initialFiles: Record<string, string>) {
+  const files = new Map(Object.entries({ [assetUri]: 'fresh', ...initialFiles }));
   const calls: string[] = [];
 
   const fileSystem: CorpusDbFileSystem = {
     makeDirectoryAsync: vi.fn(async () => {
       calls.push('makeDirectory');
     }),
-    getInfoAsync: vi.fn(async () => {
+    getInfoAsync: vi.fn(async (uri: string) => {
       calls.push('getInfo');
-      return { exists };
+      return { exists: files.has(uri) };
     }),
-    deleteAsync: vi.fn(async () => {
+    deleteAsync: vi.fn(async (uri: string) => {
       calls.push('delete');
+      files.delete(uri);
     }),
-    copyAsync: vi.fn(async () => {
+    copyAsync: vi.fn(async ({ from, to }: { from: string; to: string }) => {
       calls.push('copy');
+      files.set(to, files.get(from) ?? 'missing');
     }),
-    moveAsync: vi.fn(async () => {
+    moveAsync: vi.fn(async ({ from, to }: { from: string; to: string }) => {
       calls.push('move');
+      files.set(to, files.get(from) ?? 'missing');
+      files.delete(from);
     }),
   };
 
-  return { fileSystem, calls };
+  return { fileSystem, calls, files };
 }
 
 describe('openCorpusDb constants', () => {
@@ -40,8 +55,8 @@ describe('openCorpusDb constants', () => {
 
 describe('ensureCorpusDbFile', () => {
   it('stages the copy and renames it into place on first launch', async () => {
-    const { fileSystem, calls } = createFileSystem(false);
-    const resolveAssetUri = vi.fn(async () => 'file:///asset/quran.db');
+    const { fileSystem, calls, files } = createFileSystem({});
+    const resolveAssetUri = vi.fn(async () => assetUri);
 
     const result = await ensureCorpusDbFile(fileSystem, sqliteDir, resolveAssetUri);
 
@@ -50,21 +65,27 @@ describe('ensureCorpusDbFile', () => {
     // become targetPath via the rename, so a kill mid-copy cannot leave a
     // truncated file that later launches mistake for a complete database.
     expect(calls).toEqual(['makeDirectory', 'getInfo', 'delete', 'copy', 'move']);
-    expect(fileSystem.copyAsync).toHaveBeenCalledWith({ from: 'file:///asset/quran.db', to: stagingPath });
+    expect(fileSystem.copyAsync).toHaveBeenCalledWith({ from: assetUri, to: stagingPath });
     expect(fileSystem.moveAsync).toHaveBeenCalledWith({ from: stagingPath, to: targetPath });
+    expect(files.get(targetPath)).toBe('fresh');
+    expect(files.has(stagingPath)).toBe(false);
   });
 
-  it('clears a staging file left behind by an interrupted extract', async () => {
-    const { fileSystem } = createFileSystem(false);
+  it('discards a staging file left behind by an interrupted extract', async () => {
+    const { fileSystem, calls, files } = createFileSystem({ [stagingPath]: 'truncated' });
 
-    await ensureCorpusDbFile(fileSystem, sqliteDir, async () => 'file:///asset/quran.db');
+    await ensureCorpusDbFile(fileSystem, sqliteDir, async () => assetUri);
 
     expect(fileSystem.deleteAsync).toHaveBeenCalledWith(stagingPath, { idempotent: true });
+    // The delete has to precede the copy, or the stale bytes survive under the
+    // scratch name and the rename publishes a truncated database.
+    expect(calls.indexOf('delete')).toBeLessThan(calls.indexOf('copy'));
+    expect(files.get(targetPath)).toBe('fresh');
   });
 
   it('never touches the asset or the filesystem again once the DB is extracted', async () => {
-    const { fileSystem, calls } = createFileSystem(true);
-    const resolveAssetUri = vi.fn(async () => 'file:///asset/quran.db');
+    const { fileSystem, calls } = createFileSystem({ [targetPath]: 'fresh' });
+    const resolveAssetUri = vi.fn(async () => assetUri);
 
     const result = await ensureCorpusDbFile(fileSystem, sqliteDir, resolveAssetUri);
 
@@ -78,7 +99,7 @@ describe('ensureCorpusDbFile', () => {
   });
 
   it('propagates an unresolvable asset without leaving a partial target', async () => {
-    const { fileSystem } = createFileSystem(false);
+    const { fileSystem } = createFileSystem({});
     const resolveAssetUri = vi.fn(async () => {
       throw new Error('Bundled corpus DB asset did not resolve to a local URI');
     });

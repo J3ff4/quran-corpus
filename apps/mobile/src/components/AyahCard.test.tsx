@@ -70,6 +70,8 @@ describe('AyahCard', () => {
   });
 
   it('announces the disabled audio control and the bookmarked state', () => {
+    const onToggleAudio = vi.fn();
+
     render(
       <AyahCard
         ayahNumber={255}
@@ -80,13 +82,19 @@ describe('AyahCard', () => {
         uiLocale="en"
         audioDisabled
         onToggleBookmark={vi.fn()}
-        onToggleAudio={vi.fn()}
+        onToggleAudio={onToggleAudio}
       />,
     );
 
     // Without accessibilityState this announced as an ordinary button whose
     // press does nothing.
-    expect(screen.getByRole('button', { name: 'Play' })).toHaveProperty('ariaDisabled', 'true');
+    const play = screen.getByRole('button', { name: 'Play' });
+    expect(play).toHaveProperty('ariaDisabled', 'true');
     expect(screen.getByRole('button', { name: 'Remove bookmark' })).toHaveProperty('ariaSelected', 'true');
+
+    // This is the shipped default state, not an edge case: audio is disabled
+    // whenever EXPO_PUBLIC_AUDIO_API_BASE_URL is unset.
+    fireEvent.click(play);
+    expect(onToggleAudio).not.toHaveBeenCalled();
   });
 });
