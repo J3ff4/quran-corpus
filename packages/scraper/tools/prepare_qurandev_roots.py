@@ -11,13 +11,15 @@ Fetch the raw file (not committed — third-party data artifact); the raw URL is
 The file is Windows-1252 encoded (curly quotes as 0x92). ``RootCode`` is
 Buckwalter and maps 1:1 onto ``roots.root_buckwalter``. We filter to roots that
 already exist in the target DB so vocalized proper-noun codes (e.g.
-``<iboraAhiym``) never get created as junk triliteral roots, drop empty
-meanings, and strip trailing Lane apparatus (see :func:`clean_meaning`).
+``<iboraAhiym``) never get created as junk triliteral roots, drop empty and
+markup-bearing meanings (see :data:`_MARKUP`), and strip trailing Lane apparatus
+(see :func:`clean_meaning`).
 Output feeds ``import-lane --source qurandev-lane``.
 """
 
 from __future__ import annotations
 
+import html
 import json
 import re
 import sqlite3
@@ -30,9 +32,7 @@ from pathlib import Path
 # We cut at the earliest apparatus marker, keeping only the leading gloss.
 # Proven safe by spike: real 1-word glosses (orphan/milk/city) survive; entries
 # that are pure apparatus (no English gloss) cut to empty and are dropped.
-_POS = (
-    r"(?:n\.f\.|n\.m\.|n\.vb\.|vb\.|adj\.|pcple\.|perf\.|impf\.|impv\.|pass\.|act\.)"
-)
+_POS = r"(?:n\.f\.|n\.m\.|n\.vb\.|vb\.|adj\.|pcple\.|perf\.|impf\.|impv\.|pass\.|act\.)"
 _APPARATUS_MARKERS = [
     # lemma immediately followed by a POS/form label (anchored so a bare gloss
     # word is never mistaken for a lemma): "taraka vb.", "juz n.m."
@@ -43,17 +43,64 @@ _APPARATUS_MARKERS = [
     re.compile(r"\bLL,\s*V\d"),  # short-cite "LL, V7"
 ]
 
+# A meaning is English prose; HTML markup in it means the source row is corrupt,
+# not that it needs unwrapping. One row is (*kw): '"MsoNormal" style="text-align:
+# center;" align="center">     &#1584; &#1603; &#1585;' — an attribute fragment
+# from a stripped <p>, and what follows is the Arabic letters of the *wrong* root
+# (dhal-kaf-ra, i.e. *kr) rather than a gloss, so there is nothing to salvage.
+# Judged on the *cleaned* string, because that is what gets written. Judging the
+# raw source instead would be both too weak and too strong: too weak because
+# clean_meaning decodes entities, so an escaped "&lt;b&gt;" reads as prose raw
+# and lands in the TSV as a real tag; too strong because the apparatus cut throws
+# the tail away, so markup surviving only in a discarded Lane citation would
+# condemn a gloss that imports perfectly clean. Today's file agrees either way —
+# its only entity-escaped angle brackets are "-&gt;" inside a gloss, which needs
+# an opening "<" to match here.
+#
+# The attribute alternative demands a quoted value, not a bare "align =", because
+# this file's glosses use "=" as prose ("= Ta-Siin-Ayn"); an English gloss reading
+# "to align = to make straight" must not be discarded as corrupt. The one real row
+# carries 'style="text-align: center;"', so the quote costs nothing.
+#
+# "<!" and "<?" catch the two constructs the tag alternative cannot see, because
+# neither "!" nor "?" is [a-zA-Z]: comments and declarations (<!-- ... -->,
+# <!DOCTYPE html>) and processing instructions (<?xml version="1.0"?>). Matched
+# bare rather than as closed "<!...>" / "<?...?>" so an unterminated one is
+# rejected too — this is a detector, it only ever rejects a row and never
+# rewrites it, so it need not span the whole construct. No English gloss contains
+# "<!" or "<?".
+_MARKUP = re.compile(r"""</?[a-zA-Z][^>]*>|<[!?]|\b(?:class|style|align)\s*=\s*["']""")
+
+# Dangling punctuation left by an apparatus cut. Shared with the one-shot repair
+# tool (tools/fix_gloss_entities.py), which must trim exactly what this does.
+_TRIM = " ,.;:-—"
+
+
+def decode_collapse(text: str) -> str:
+    """Decode HTML entities and collapse the resulting whitespace (incl. NBSP).
+
+    Shared with :mod:`tools.fix_gloss_entities`: its contract is to reproduce
+    what a re-import writes, so the two must not drift.
+    """
+    return " ".join(html.unescape(text).split())
+
 
 def clean_meaning(meaning: str) -> str:
     """Strip trailing Lane apparatus, keeping only the leading English gloss.
+
+    Source meanings carry raw HTML entities (``&quot;``, ``&nbsp;``, ``&#1584;``)
+    that would otherwise reach the DB and render literally in the UI, so they are
+    decoded first and the resulting whitespace (incl. NBSP) re-collapsed, matching
+    ``scraper.lane_gloss._plain``.
 
     Returns the gloss up to the earliest apparatus marker (or the whole string
     if none), trimmed of dangling punctuation. Apparatus-only meanings return
     "" and are dropped by :func:`build_rows`.
     """
+    meaning = decode_collapse(meaning)
     starts = [m.start() for r in _APPARATUS_MARKERS if (m := r.search(meaning))]
     cut = meaning[: min(starts)] if starts else meaning
-    return cut.strip(" ,.;:-—")
+    return cut.strip(_TRIM)
 
 
 def build_rows(
@@ -61,9 +108,9 @@ def build_rows(
 ) -> tuple[list[tuple[str, str]], dict[str, int]]:
     """Decode + filter + clean meanings.json bytes to (buckwalter, def) rows.
 
-    Keeps rows whose RootCode is in ``valid_roots`` and whose meaning is
-    non-empty after apparatus-cleaning. Returns (rows, stats) where stats
-    explains what was dropped.
+    Keeps rows whose RootCode is in ``valid_roots`` and whose cleaned meaning is
+    non-empty and free of HTML markup. Returns (rows, stats) where stats explains
+    what was dropped; ``total`` equals the sum of the outcome buckets.
     """
     entries = json.loads(raw.decode("cp1252"))
     rows: list[tuple[str, str]] = []
@@ -71,6 +118,7 @@ def build_rows(
         "total": len(entries),
         "empty": 0,
         "unknown_root": 0,
+        "markup": 0,
         "apparatus_only": 0,
         "duplicate": 0,
         "kept": 0,
@@ -88,6 +136,9 @@ def build_rows(
             stats["unknown_root"] += 1
             continue
         definition = clean_meaning(definition)
+        if _MARKUP.search(definition):  # cleaned: this is what gets written
+            stats["markup"] += 1
+            continue
         if not definition:  # was pure apparatus, no real gloss
             stats["apparatus_only"] += 1
             continue
@@ -125,6 +176,7 @@ def main() -> None:
         f"qurandev/roots → TSV: {stats['kept']} kept "
         f"({stats['total']} total, {stats['empty']} empty, "
         f"{stats['unknown_root']} not-a-DB-root, "
+        f"{stats['markup']} markup, "
         f"{stats['apparatus_only']} apparatus-only, "
         f"{stats['duplicate']} duplicate) → {args.out}"
     )
