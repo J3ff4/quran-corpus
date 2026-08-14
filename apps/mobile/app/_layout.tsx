@@ -52,8 +52,15 @@ export default function RootLayout() {
     if (settled) void SplashScreen.hideAsync();
   }, [settled]);
 
-  if (fontError) throw fontError;
-  if (corpusError) throw corpusError;
+  if (fontError || corpusError) {
+    // Hidden here rather than left to the effect above: React aborts the render
+    // when a component throws, so this component never commits and none of its
+    // effects run. With auto-hide disabled that left a failed launch sitting
+    // behind the native splash forever -- the one case where the user most
+    // needs to see what went wrong.
+    void SplashScreen.hideAsync();
+    throw fontError ?? corpusError;
+  }
   if (!fontsLoaded || !corpusReady) {
     // Sits behind the held splash; only ever seen if preventAutoHideAsync lost
     // the race, which is exactly when a bare white screen would be worst.
