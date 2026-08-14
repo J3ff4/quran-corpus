@@ -7,6 +7,11 @@ export function createLatestReadingPositionRecorder(
   onError: (message: string) => void,
 ): LatestReadingPositionRecorder {
   let queuedAyah: number | null = null;
+  // SurahReader records from onViewableItemsChanged, which fires on every
+  // scroll event while the same first ayah stays visible. Without this the
+  // device takes one SQLite upsert per event to rewrite the row it just wrote.
+  // Only set on success, so a failed write leaves the position re-recordable.
+  let lastPersistedAyah: number | null = null;
   let writing = false;
 
   async function drainQueue() {
@@ -20,6 +25,7 @@ export function createLatestReadingPositionRecorder(
 
         try {
           await persist(ayahNumber);
+          lastPersistedAyah = ayahNumber;
         } catch (cause) {
           onError(cause instanceof Error ? cause.message : 'Unable to update reading history');
         }
@@ -32,6 +38,7 @@ export function createLatestReadingPositionRecorder(
 
   return {
     record(ayahNumber) {
+      if (ayahNumber === lastPersistedAyah) return;
       queuedAyah = ayahNumber;
       void drainQueue();
     },
