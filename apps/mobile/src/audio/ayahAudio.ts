@@ -30,7 +30,18 @@ export const expoAudioAyahAudioPlayer: AyahAudioPlayer = {
     player.play();
     return {
       stopAsync: async () => player.pause(),
-      unloadAsync: async () => player.release(),
+      // Both calls, in this order. On Android they do different halves of the
+      // teardown: AudioModule holds every player in a strong-ref
+      // ConcurrentHashMap, `remove()` drops that entry without touching the
+      // ExoPlayer, and `release()` tears down the ExoPlayer without touching
+      // the map. release() alone leaked a released player into the registry,
+      // which setAudioModeAsync and OnDestroy then iterate and call .ref.stop()
+      // on -- one leak per ayah played. remove() has to come first: release()
+      // unlinks the JS shared object, leaving no native counterpart to resolve.
+      unloadAsync: async () => {
+        player.remove();
+        player.release();
+      },
     };
   },
 };
@@ -123,6 +134,10 @@ export function useAyahAudioController(
       }
 
       playbackRef.current = nextPlayback;
+      // Clear again, not just at the top: stopping the *previous* handle above
+      // can set an error, and this play superseded it. Without this the user
+      // reads "Unable to stop audio" while the new ayah is audibly playing.
+      setError(null);
       setPlayingAyah(ayah);
     } catch (cause) {
       if (requestRef.current === requestId) {

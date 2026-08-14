@@ -67,8 +67,13 @@ describe('getAyahAudioUrl', () => {
 
     expect(mocks.createAudioPlayer).toHaveBeenCalledWith('https://audio.example/003001.mp3');
     expect(nativePlayer.play).toHaveBeenCalled();
+    expect(nativePlayer.remove).toHaveBeenCalled();
     expect(nativePlayer.release).toHaveBeenCalled();
-    expect(nativePlayer.remove).not.toHaveBeenCalled();
+    // Order matters on Android -- see the comment on unloadAsync. Asserting it
+    // here because getting it backwards fails only on a device, never in CI.
+    expect(nativePlayer.remove.mock.invocationCallOrder[0]).toBeLessThan(
+      nativePlayer.release.mock.invocationCallOrder[0] as number,
+    );
   });
 
   it('unloads playback even when stopping rejects', async () => {
