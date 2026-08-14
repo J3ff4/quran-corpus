@@ -1,0 +1,229 @@
+import { createHash } from 'node:crypto';
+import { access, copyFile, mkdir, readFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createDatabase } from '@quran-corpus/data';
+
+const repoRoot = resolve('../..');
+const approvalPath = resolve(repoRoot, 'docs/data-sources-m1.md');
+const targetDbPath = resolve(repoRoot, 'apps/mobile/assets/db/quran.db');
+
+const selectedTranslators = {
+  en: 'Saheeh International',
+  ru: 'Abu Adel',
+  uz: 'Muhammad Sodik Muhammad Yusuf',
+} as const;
+const incompleteSelectionMessage =
+  'M1 translation selection must contain exactly one selected translator for en, uz, and ru.';
+
+export interface TranslationContractSummary {
+  translator: string;
+  rows: number;
+}
+
+export interface M1ReaderDbContractSummary {
+  surahs: number;
+  ayahs: number;
+  words: number;
+  languages: string[];
+  selectedTranslations: Record<keyof typeof selectedTranslators, TranslationContractSummary>;
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function fileSha256(path: string): Promise<string> {
+  return createHash('sha256').update(await readFile(path)).digest('hex');
+}
+
+function numberValue(value: unknown): number {
+  return Number(value ?? 0);
+}
+
+async function primaryCheckoutRoot(repoRootPath: string): Promise<string> {
+  const gitPath = resolve(repoRootPath, '.git');
+
+  try {
+    const gitFile = await readFile(gitPath, 'utf8');
+    const match = gitFile.match(/^gitdir:\s*(.+)\s*$/m);
+    if (!match) return repoRootPath;
+
+    const gitDir = resolve(repoRootPath, match[1]);
+    const worktreeMarker = '/.git/worktrees/';
+    const markerIndex = gitDir.indexOf(worktreeMarker);
+    return markerIndex === -1 ? repoRootPath : gitDir.slice(0, markerIndex);
+  } catch {
+    return repoRootPath;
+  }
+}
+
+export async function resolveM1ReaderDbSource({
+  repoRoot: repoRootPath = repoRoot,
+  envSourceDbPath = process.env.QURAN_CORPUS_SOURCE_DB,
+}: {
+  repoRoot?: string;
+  envSourceDbPath?: string;
+} = {}): Promise<string> {
+  const primaryRoot = await primaryCheckoutRoot(repoRootPath);
+  const canonicalDbPath = resolve(primaryRoot, '../quran-data/quran.db');
+  if (await pathExists(canonicalDbPath)) return canonicalDbPath;
+  if (envSourceDbPath && (await pathExists(envSourceDbPath))) return envSourceDbPath;
+
+  throw new Error(
+    `Missing canonical Quran DB at ${canonicalDbPath}. Set QURAN_CORPUS_SOURCE_DB to a valid quran.db fallback.`,
+  );
+}
+
+export async function syncM1ReaderDbAsset({
+  sourceDbPath,
+  targetDbPath,
+}: {
+  sourceDbPath: string;
+  targetDbPath: string;
+}): Promise<{ copied: boolean; sourceSha256: string; targetSha256: string }> {
+  const sourceSha256 = await fileSha256(sourceDbPath);
+  const targetSha256 = (await pathExists(targetDbPath)) ? await fileSha256(targetDbPath) : '';
+
+  if (sourceSha256 !== targetSha256) {
+    await mkdir(dirname(targetDbPath), { recursive: true });
+    await copyFile(sourceDbPath, targetDbPath);
+    return { copied: true, sourceSha256, targetSha256: sourceSha256 };
+  }
+
+  return { copied: false, sourceSha256, targetSha256 };
+}
+
+export function parseM1TranslationSelection(approval: string): Record<keyof typeof selectedTranslators, string> {
+  const selections = new Map<keyof typeof selectedTranslators, string>();
+  const duplicates = new Set<keyof typeof selectedTranslators>();
+
+  for (const line of approval.split(/\r?\n/)) {
+    const columns = line
+      .trim()
+      .split('|')
+      .map((column) => column.trim())
+      .filter(Boolean);
+
+    if (columns.length !== 2) continue;
+
+    const [languageCode, translator] = columns;
+    if (languageCode !== 'en' && languageCode !== 'ru' && languageCode !== 'uz') continue;
+
+    if (selections.has(languageCode)) duplicates.add(languageCode);
+    selections.set(languageCode, translator);
+  }
+
+  if (duplicates.size > 0) throw new Error(incompleteSelectionMessage);
+
+  for (const [languageCode, translator] of Object.entries(selectedTranslators)) {
+    if (selections.get(languageCode as keyof typeof selectedTranslators) !== translator) {
+      throw new Error(incompleteSelectionMessage);
+    }
+  }
+
+  return {
+    en: selections.get('en') ?? '',
+    ru: selections.get('ru') ?? '',
+    uz: selections.get('uz') ?? '',
+  };
+}
+
+export async function validateM1ReaderDbContract(dbPath = targetDbPath): Promise<M1ReaderDbContractSummary> {
+  const db = createDatabase(`file:${dbPath}`);
+
+  try {
+    const [surahs, ayahs, words, languages, translations] = await Promise.all([
+      db.execute('SELECT count(*) AS n FROM surahs'),
+      db.execute('SELECT count(*) AS n FROM ayahs'),
+      db.execute('SELECT count(*) AS n FROM words'),
+      db.execute("SELECT code FROM languages WHERE code IN ('en', 'uz', 'ru') ORDER BY code"),
+      db.execute({
+        sql: `
+          SELECT language_code, translator, count(*) AS n
+          FROM translations
+          WHERE (
+            language_code = 'en' AND translator = ?
+          ) OR (
+            language_code = 'ru' AND translator = ?
+          ) OR (
+            language_code = 'uz' AND translator = ?
+          )
+          GROUP BY language_code, translator
+          ORDER BY language_code
+        `,
+        args: [selectedTranslators.en, selectedTranslators.ru, selectedTranslators.uz],
+      }),
+    ]);
+
+    const selectedTranslations = Object.fromEntries(
+      Object.entries(selectedTranslators).map(([languageCode, translator]) => {
+        const row = translations.rows.find(
+          (candidate) => candidate.language_code === languageCode && candidate.translator === translator,
+        );
+
+        return [
+          languageCode,
+          {
+            translator,
+            rows: numberValue(row?.n),
+          },
+        ];
+      }),
+    ) as M1ReaderDbContractSummary['selectedTranslations'];
+
+    const summary: M1ReaderDbContractSummary = {
+      surahs: numberValue(surahs.rows[0]?.n),
+      ayahs: numberValue(ayahs.rows[0]?.n),
+      words: numberValue(words.rows[0]?.n),
+      languages: languages.rows.map((row) => String(row.code)),
+      selectedTranslations,
+    };
+
+    if (summary.surahs !== 114) throw new Error(`Expected 114 surahs, found ${summary.surahs}`);
+    if (summary.ayahs !== 6236) throw new Error(`Expected 6236 ayahs, found ${summary.ayahs}`);
+    if (summary.words <= 0) throw new Error('Expected word rows for M1 reader DB');
+    if (summary.languages.join(',') !== 'en,ru,uz') {
+      throw new Error(`Expected content languages en,ru,uz, found ${summary.languages.join(',')}`);
+    }
+
+    for (const [languageCode, translation] of Object.entries(summary.selectedTranslations)) {
+      if (translation.rows !== 6236) {
+        throw new Error(
+          `Expected 6236 ${languageCode} rows for ${translation.translator}, found ${translation.rows}`,
+        );
+      }
+    }
+
+    return summary;
+  } finally {
+    db.close();
+  }
+}
+
+export async function ensureM1ReaderDb() {
+  const approval = await readFile(approvalPath, 'utf8');
+  parseM1TranslationSelection(approval);
+
+  const sourceDbPath = await resolveM1ReaderDbSource();
+  await syncM1ReaderDbAsset({ sourceDbPath, targetDbPath });
+
+  return validateM1ReaderDbContract(targetDbPath);
+}
+
+async function main() {
+  const summary = await ensureM1ReaderDb();
+  console.log(`M1 reader DB ready: ${summary.surahs} surahs, ${summary.ayahs} ayahs, ${summary.words} words`);
+}
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  main().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}

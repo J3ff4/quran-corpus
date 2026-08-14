@@ -13,6 +13,10 @@
     "./client": {
       "import": "./dist/client.js",
       "types": "./dist/client.d.ts"
+    },
+    "./mobile": {
+      "import": "./dist/mobile.js",
+      "types": "./dist/mobile.d.ts"
     }
   },
   "scripts": {
