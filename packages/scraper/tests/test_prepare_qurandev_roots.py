@@ -168,8 +168,8 @@ def test_markup_in_the_discarded_apparatus_tail_keeps_the_gloss():
     assert stats["kept"] == 2
 
 
-def test_comments_and_declarations_are_markup():
-    """ "<!" constructs are markup too — "!" is not matched by the tag branch.
+def test_comments_declarations_and_pis_are_markup():
+    """ "<!" and "<?" are markup too — neither "!" nor "?" is [a-zA-Z].
 
     Both raw and entity-escaped forms must be rejected, and an unterminated
     comment (no closing "-->") must not slip through on a technicality.
@@ -180,9 +180,12 @@ def test_comments_and_declarations_are_markup():
             {"RootCode": "slm", "Meanings": "&lt;!-- escaped note --&gt; peace"},
             {"RootCode": "rHm", "Meanings": "<!DOCTYPE html> mercy"},
             {"RootCode": "ytm", "Meanings": "<!-- unterminated orphan"},
+            {"RootCode": "b$r", "Meanings": '<?xml version="1.0"?> complexion'},
+            {"RootCode": "qwl", "Meanings": "&lt;?php echo $x; ?&gt; to say"},
             {"RootCode": "Elm", "Meanings": "knowledge"},
         ]
     )
-    rows, stats = build_rows(raw, valid_roots={"ktb", "slm", "rHm", "ytm", "Elm"})
+    valid = {"ktb", "slm", "rHm", "ytm", "b$r", "qwl", "Elm"}
+    rows, stats = build_rows(raw, valid_roots=valid)
     assert rows == [("Elm", "knowledge")]
-    assert stats["markup"] == 4
+    assert stats["markup"] == 6
