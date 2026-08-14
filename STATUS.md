@@ -3014,6 +3014,44 @@ Re-queried directly 2026-07-22 (do not trust older counts in this file's history
     no test asserts hover classes). Three `dark:hover:bg-*` additions, one
     commit, no schema or data impact.
 
+13. **§13 model-floor breach, phase 15 (sajdah mark) — logged, no action taken.**
+    Three implementer subagents were dispatched on **Haiku** on 2026-07-21
+    (03:24, 03:26, 03:34 UTC), a month after the Sonnet floor landed (`7dc8ae0`,
+    2026-06-18). Stated reason at the time, from the transcript: "mechanical,
+    complete spec, cheap model" — the one task in that phase carrying a design
+    decision (reader fragment scoping) was deliberately kept on Sonnet. These are
+    the **only** Haiku dispatches in the project's history; every other Agent call
+    is `sonnet`, `opus`, or unset.
+
+    Affected commits — `463d9a6` (`isSajdahAyah` helper), `245a045` (`SajdahMark`
+    component), `d837063` (WbW card-view wiring). 68 lines total, 43 of them tests.
+    The two Sonnet-authored siblings, `2ce30bf` (reader) and `f4e29c2` (WbW list),
+    are not affected.
+
+    Re-reviewed 2026-08-13, verdict **no re-review needed**:
+    - Each already had a Sonnet task reviewer immediately after (03:26/03:28/03:36)
+      plus the Opus whole-branch review at 03:43. Haiku wrote; it never signed off.
+    - The one load-bearing assumption — that U+06E9 in the Tanzil text identifies
+      sajdah ayahs, so no hand-authored list can drift — holds against the live DB:
+      **exactly 15** rows, the canonical set (7:206, 13:15, 16:50, 17:109, 19:58,
+      22:18, 22:77, 25:60, 27:26, 32:15, 38:24, 41:38, 53:62, 84:21, 96:19). 22:77
+      present, so it is the Shafi'i/Hanbali 15, matching the docstring.
+    - No double-render: `words` rows containing U+06E9 = **0**, so the appended
+      `<SajdahMark />` never duplicates a glyph already inside a word token. Both
+      components' fallback branches print raw `textUthmani` (glyph inline, no
+      appended mark).
+    - Contrast: both render sites sit on the page background, not a `paper-100`
+      card, so `text-paper-600` is the AA-passing case per the `paper-*` table.
+
+    Two nits left unfixed, neither worth its own commit: `SajdahMark` hardcodes
+    `text-2xl` while `AyahView`'s row is `text-3xl` and passes no `className`, so
+    the glyph renders a step small in reading view; and its `aria-label` is
+    hardcoded English — but `WbwWordCell` does the same, so that is codebase-wide,
+    not something these commits introduced.
+
+    Note §4's `/code-review` step did not exist on 2026-07-21 (added ~2026-07-26,
+    around #55), so its absence on this phase is not a skipped step.
+
 ## Notes
 - Uzbek edition = Cyrillic (uz.sodik). Latin variant not done.
 - Greptile: DEMOTED to advisory 2026-07-27 (see "Review gate" above). Free plan
