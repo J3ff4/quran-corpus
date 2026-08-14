@@ -7,8 +7,13 @@ export type UiStringKey =
   | 'tabs.settings'
   | 'bookmarks.empty'
   | 'bookmarks.entryPrefix'
+  | 'bookmarks.loadFailed'
   | 'home.continue'
   | 'home.noHistory'
+  | 'home.loadFailed'
+  | 'reader.loadFailed'
+  | 'reader.bookmarkFailed'
+  | 'reader.positionFailed'
   | 'reader.translation'
   | 'reader.bookmark'
   | 'reader.removeBookmark'
@@ -20,6 +25,7 @@ export type UiStringKey =
   | 'settings.about'
   | 'settings.analyticsOn'
   | 'settings.analyticsOff'
+  | 'settings.storageUnavailable'
   | 'settings.themeSystem'
   | 'settings.themeLight'
   | 'settings.themeDark'
@@ -41,8 +47,13 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'tabs.settings': 'Settings',
     'bookmarks.empty': 'No bookmarks yet',
     'bookmarks.entryPrefix': 'Open',
+    'bookmarks.loadFailed': 'Unable to load bookmarks',
     'home.continue': 'Continue reading',
     'home.noHistory': 'No reading history yet',
+    'home.loadFailed': 'Unable to load reading history',
+    'reader.loadFailed': 'Unable to load surah',
+    'reader.bookmarkFailed': 'Unable to update bookmark',
+    'reader.positionFailed': 'Unable to save reading position',
     'reader.translation': 'Translation',
     'reader.bookmark': 'Bookmark',
     'reader.removeBookmark': 'Remove bookmark',
@@ -54,6 +65,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.about': 'About and credits',
     'settings.analyticsOn': 'Analytics: On',
     'settings.analyticsOff': 'Analytics: Off',
+    'settings.storageUnavailable': 'Settings cannot be saved right now. Changes may be lost when you close the app.',
     'settings.themeSystem': 'System',
     'settings.themeLight': 'Light',
     'settings.themeDark': 'Dark',
@@ -74,8 +86,13 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'tabs.settings': 'Sozlamalar',
     'bookmarks.empty': 'Hali xatcho‘p yo‘q',
     'bookmarks.entryPrefix': 'Ochish',
+    'bookmarks.loadFailed': 'Xatcho‘plarni yuklab bo‘lmadi',
     'home.continue': 'O‘qishni davom ettirish',
     'home.noHistory': 'Hali o‘qish tarixi yo‘q',
+    'home.loadFailed': 'O‘qish tarixini yuklab bo‘lmadi',
+    'reader.loadFailed': 'Surani yuklab bo‘lmadi',
+    'reader.bookmarkFailed': 'Xatcho‘pni yangilab bo‘lmadi',
+    'reader.positionFailed': 'O‘qish joyini saqlab bo‘lmadi',
     'reader.translation': 'Tarjima',
     'reader.bookmark': 'Xatcho‘p',
     'reader.removeBookmark': 'Xatcho‘pni olib tashlash',
@@ -87,6 +104,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.about': 'Ilova va manbalar',
     'settings.analyticsOn': 'Tahlil: yoqilgan',
     'settings.analyticsOff': 'Tahlil: o‘chirilgan',
+    'settings.storageUnavailable': 'Sozlamalarni hozir saqlab bo‘lmaydi. Ilovani yopganingizda o‘zgarishlar yo‘qolishi mumkin.',
     'settings.themeSystem': 'Tizim',
     'settings.themeLight': 'Yorug‘',
     'settings.themeDark': 'Qorong‘i',
@@ -107,8 +125,13 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'tabs.settings': 'Настройки',
     'bookmarks.empty': 'Закладок пока нет',
     'bookmarks.entryPrefix': 'Открыть',
+    'bookmarks.loadFailed': 'Не удалось загрузить закладки',
     'home.continue': 'Продолжить чтение',
     'home.noHistory': 'Истории чтения пока нет',
+    'home.loadFailed': 'Не удалось загрузить историю чтения',
+    'reader.loadFailed': 'Не удалось загрузить суру',
+    'reader.bookmarkFailed': 'Не удалось обновить закладку',
+    'reader.positionFailed': 'Не удалось сохранить позицию чтения',
     'reader.translation': 'Перевод',
     'reader.bookmark': 'Закладка',
     'reader.removeBookmark': 'Удалить закладку',
@@ -120,6 +143,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.about': 'О приложении и источниках',
     'settings.analyticsOn': 'Аналитика: включена',
     'settings.analyticsOff': 'Аналитика: выключена',
+    'settings.storageUnavailable': 'Настройки сейчас не сохраняются. Изменения могут быть потеряны при закрытии приложения.',
     'settings.themeSystem': 'Система',
     'settings.themeLight': 'Светлая',
     'settings.themeDark': 'Темная',
