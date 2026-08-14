@@ -2747,8 +2747,8 @@ PR **#5** on `J3ff4/quran-corpus`, open.
 **Nothing here has run on a physical device.** Every green number below is a local
 transcript. Neither repo has ever had CI. Treat accordingly.
 
-Gate at time of writing: build 4/4, type-check 6/6, lint 2/2, test 6/6, 804 tests
-(data 252, web 483, mobile 59, mobile-data 10).
+Gate at time of writing: build 4/4, type-check 6/6, lint 2/2, test 6/6, 810 tests
+(data 252, web 483, mobile 65, mobile-data 10).
 
 ### Deferred from CodeRabbit review of #5 — heavy lift, NOT done
 1. `getAyahReaderLocation` (`apps/mobile/src/data/corpusRepository.ts`) calls
@@ -2764,9 +2764,20 @@ Gate at time of writing: build 4/4, type-check 6/6, lint 2/2, test 6/6, 804 test
    temps first.
 3. `userRepository.testHelpers.ts` fakes SQLite in-memory. Real-SQLite +
    real-schema tests would catch schema drift the fakes cannot.
-4. Home "continue reading" opens the surah at ayah 1, discarding the saved ayah.
-   Needs `initialScrollIndex`/`scrollToIndex` + `onScrollToIndexFailed` on a
-   variable-height FlatList — not a one-liner. `accessibilityLabel` part IS done.
+4. `scripts/generate-icons.ts` has no tests. Blocked on infrastructure, not effort:
+   there is no test runner at the repo root (turbo runs per-package), and `main()`
+   executes on import so the module cannot be imported without running it. Belongs
+   with workstream E when CI lands.
+
+Item 4 of the previous list — "continue reading" discarding the saved ayah — is
+DONE (`e1c305a`): both link forms pass the ayah, the route validates it, and
+`SurahReader` scrolls with a capped `onScrollToIndexFailed` retry.
+
+### Won't fix — decided, with reason
+- Moving the surah-existence check ahead of the `Promise.all` fan-out in
+  `getSurahReader`. CodeRabbit rated it "low value" itself. It would serialize an
+  extra round trip onto every *valid* read to save work on the invalid-ID path,
+  which is the wrong trade for the only path users take.
 
 ### Accepted trade-off — do not "fix" without deciding
 - Settings retry backoff stalls unrelated keys behind a persistently failing one
