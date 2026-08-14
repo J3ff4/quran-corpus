@@ -21,12 +21,15 @@ interface PlaybackHandle {
 }
 
 export interface AyahAudioPlayer {
-  playUrl: (url: string) => Promise<PlaybackHandle>;
+  playUrl: (url: string, onFinished: () => void) => Promise<PlaybackHandle>;
 }
 
 export const expoAudioAyahAudioPlayer: AyahAudioPlayer = {
-  async playUrl(url: string) {
+  async playUrl(url: string, onFinished: () => void) {
     const player = createAudioPlayer(url);
+    const subscription = player.addListener('playbackStatusUpdate', (status) => {
+      if (status.didJustFinish) onFinished();
+    });
     player.play();
     return {
       stopAsync: async () => player.pause(),
@@ -39,6 +42,7 @@ export const expoAudioAyahAudioPlayer: AyahAudioPlayer = {
       // on -- one leak per ayah played. remove() has to come first: release()
       // unlinks the JS shared object, leaving no native counterpart to resolve.
       unloadAsync: async () => {
+        subscription.remove();
         player.remove();
         player.release();
       },
@@ -46,10 +50,73 @@ export const expoAudioAyahAudioPlayer: AyahAudioPlayer = {
   },
 };
 
+// al-Baqarah, the longest surah. A cheap upper bound is enough here: the point
+// is to keep an out-of-range or non-integer value from ever reaching the query
+// string, not to know each surah's exact length.
+const MAX_AYAH = 286;
+
+function assertAyahReference(surah: number, ayah: number) {
+  if (!Number.isInteger(surah) || surah < 1 || surah > 114) {
+    throw new Error(`Refusing audio request for surah ${surah}`);
+  }
+  if (!Number.isInteger(ayah) || ayah < 1 || ayah > MAX_AYAH) {
+    throw new Error(`Refusing audio request for ayah ${ayah}`);
+  }
+}
+
+/**
+ * Origins an audio URL may point at.
+ *
+ * Defaults to the endpoint's own origin and fails closed: if audio is served
+ * from a separate CDN, list it in EXPO_PUBLIC_AUDIO_ALLOWED_ORIGINS rather than
+ * widening this. The response used to be cast straight to the result type and
+ * handed to createAudioPlayer, and Expo will happily open file: and content:
+ * URIs -- so a malformed or tampered response could point playback at a local
+ * resource instead of at audio.
+ */
+function allowedAudioOrigins(baseUrl: string): Set<string> {
+  const configured = (process.env.EXPO_PUBLIC_AUDIO_ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map((origin: string) => origin.trim())
+    .filter(Boolean);
+  return new Set([new URL(baseUrl).origin, ...configured]);
+}
+
+function parseAudioResponse(payload: unknown, baseUrl: string): AyahAudioResponse {
+  if (typeof payload !== 'object' || payload === null) {
+    throw new Error('Audio endpoint returned a malformed payload');
+  }
+
+  const { url, duration_ms: durationMs, source, attribution } = payload as Record<string, unknown>;
+  if (typeof url !== 'string') throw new Error('Audio endpoint returned no url');
+
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error('Audio endpoint returned a relative url');
+  }
+
+  if (parsed.protocol !== 'https:') {
+    throw new Error(`Refusing audio url with scheme ${parsed.protocol}`);
+  }
+  if (!allowedAudioOrigins(baseUrl).has(parsed.origin)) {
+    throw new Error(`Refusing audio url from ${parsed.origin}`);
+  }
+
+  return {
+    url: parsed.toString(),
+    duration_ms: typeof durationMs === 'number' ? durationMs : null,
+    source: typeof source === 'string' ? source : '',
+    attribution: typeof attribution === 'string' ? attribution : '',
+  };
+}
+
 export async function getAyahAudioUrl(
   params: AyahAudioParams,
   fetchFn: typeof fetch = fetch,
 ): Promise<AyahAudioResponse> {
+  assertAyahReference(params.surah, params.ayah);
   const reciter = params.reciter ?? 'abdul-rashid-sufi';
   const url = new URL('/api/v1/audio/ayah', params.baseUrl);
   url.searchParams.set('reciter', reciter);
@@ -58,16 +125,17 @@ export async function getAyahAudioUrl(
 
   const response = await fetchFn(url.toString());
   if (!response.ok) throw new Error(`Audio endpoint failed with ${response.status}`);
-  return (await response.json()) as AyahAudioResponse;
+  return parseAudioResponse(await response.json(), params.baseUrl);
 }
 
 export async function playAyahAudioUrl(
   params: AyahAudioParams,
   player: AyahAudioPlayer,
   fetchFn: typeof fetch = fetch,
+  onFinished: () => void = () => undefined,
 ): Promise<PlaybackHandle> {
   const audio = await getAyahAudioUrl(params, fetchFn);
-  return player.playUrl(audio.url);
+  return player.playUrl(audio.url, onFinished);
 }
 
 async function stopPlayback(handle: PlaybackHandle | null) {
@@ -127,7 +195,19 @@ export function useAyahAudioController(
         }
       });
 
-      const nextPlayback = await playAyahAudioUrl({ baseUrl, surah, ayah }, player);
+      // Audio that simply reaches its end never told anyone: the button stayed
+      // on "Pause" for a finished ayah, and the handle stayed loaded until the
+      // next toggle. Guarded by requestId so a track finishing after the user
+      // has already started another one cannot clear the newer playback.
+      const handleFinished = () => {
+        if (requestRef.current !== requestId) return;
+        const finished = playbackRef.current;
+        playbackRef.current = null;
+        setPlayingAyah(null);
+        void stopPlayback(finished).catch(() => undefined);
+      };
+
+      const nextPlayback = await playAyahAudioUrl({ baseUrl, surah, ayah }, player, fetch, handleFinished);
       if (requestRef.current !== requestId) {
         await stopPlayback(nextPlayback).catch(() => undefined);
         return;
