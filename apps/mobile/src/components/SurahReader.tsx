@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { FlatList, Text, View, type ViewToken } from 'react-native';
 import type { SurahReaderData } from '@/data/corpusRepository';
 import type { UiLocaleCode } from '@/i18n/languages';
@@ -29,7 +29,13 @@ export function SurahReader({
 }: SurahReaderProps) {
   const theme = useThemeColors();
   const onReadingAyahRef = useRef(onReadingAyah);
-  onReadingAyahRef.current = onReadingAyah;
+  // In an effect, not during render: a render React discards would otherwise
+  // leave the ref pointing at a callback that never committed, and FlatList
+  // calls onViewableItemsChanged outside the React tree, so it would happily
+  // invoke it. (Not useEffectEvent -- that is only callable from an Effect.)
+  useEffect(() => {
+    onReadingAyahRef.current = onReadingAyah;
+  }, [onReadingAyah]);
 
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     const firstVisibleAyah = viewableItems[0]?.item as SurahReaderData['ayahs'][number] | undefined;
@@ -42,7 +48,9 @@ export function SurahReader({
       keyExtractor={(item) => String(item.ayah.id)}
       ListHeaderComponent={
         <View style={{ paddingHorizontal: 20, paddingVertical: 16, gap: 6 }}>
-          <Text style={{ color: theme.text, fontSize: 24, fontWeight: '700' }}>{data.surah.name_translit}</Text>
+          <Text accessibilityRole="header" style={{ color: theme.text, fontSize: 24, fontWeight: '700' }}>
+            {data.surah.name_translit}
+          </Text>
           <Text style={{ color: theme.mutedText }}>{data.surah.name_translation}</Text>
         </View>
       }

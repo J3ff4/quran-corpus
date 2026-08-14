@@ -10,9 +10,13 @@ import { createLatestReadingPositionRecorder } from '@/data/latestReadingPositio
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { openUserDb } from '@/data/userDb';
 import { getBookmarks, recordReadingPosition, setBookmark } from '@/data/userRepository';
+import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
-import { colors } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
+
+function errorTextStyle(danger: string) {
+  return { color: danger, padding: 20 };
+}
 
 function parseSurahId(value: string | string[] | undefined): number | null {
   const raw = Array.isArray(value) ? value[0] : value;
@@ -83,7 +87,7 @@ export default function SurahRoute() {
           );
         }
       } catch (cause) {
-        if (!cancelled) setError(cause instanceof Error ? cause.message : 'Unable to load surah');
+        if (!cancelled) setError(cause instanceof Error ? cause.message : t(uiLocale, 'reader.loadFailed'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -113,7 +117,7 @@ export default function SurahRoute() {
       await setBookmark(userClient, surahId, ayahNumber, nextBookmarked);
     } catch (cause) {
       setBookmarks(previousBookmarks);
-      setBookmarkError(cause instanceof Error ? cause.message : 'Unable to update bookmark');
+      setBookmarkError(cause instanceof Error ? cause.message : t(uiLocale, 'reader.bookmarkFailed'));
     }
   }
 
@@ -128,7 +132,9 @@ export default function SurahRoute() {
   if (error || !reader) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', padding: 20, backgroundColor: theme.background }}>
-        <Text style={{ color: colors.danger }}>{error ?? 'Unable to load surah'}</Text>
+        <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ color: theme.danger }}>
+          {error ?? t(uiLocale, 'reader.loadFailed')}
+        </Text>
       </View>
     );
   }
@@ -148,9 +154,24 @@ export default function SurahRoute() {
           readingRecorder?.record(ayahNumber);
         }}
       />
-      {bookmarkError ? <Text style={{ color: colors.danger, padding: 20 }}>{bookmarkError}</Text> : null}
-      {readingError ? <Text style={{ color: colors.danger, padding: 20 }}>{readingError}</Text> : null}
-      {audio.audioError ? <Text style={{ color: colors.danger, padding: 20 }}>{audio.audioError}</Text> : null}
+      {/* Live regions: a bookmark or playback failure happens after the tap,
+          with nothing taking focus, so TalkBack would otherwise never announce
+          that the action the user just took did not work. */}
+      {bookmarkError ? (
+        <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={errorTextStyle(theme.danger)}>
+          {bookmarkError}
+        </Text>
+      ) : null}
+      {readingError ? (
+        <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={errorTextStyle(theme.danger)}>
+          {readingError}
+        </Text>
+      ) : null}
+      {audio.audioError ? (
+        <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={errorTextStyle(theme.danger)}>
+          {audio.audioError}
+        </Text>
+      ) : null}
     </View>
   );
 }

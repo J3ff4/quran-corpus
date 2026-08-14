@@ -11,12 +11,18 @@ interface LanguageSelectorProps {
 export function LanguageSelector({ value, onChange }: LanguageSelectorProps) {
   const theme = useThemeColors();
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 20, paddingVertical: 12 }}>
+    <View
+      accessibilityRole="radiogroup"
+      style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 20, paddingVertical: 12 }}
+    >
       {contentLanguages.map((item) => (
         <Pressable
           key={item.code}
-          accessibilityRole="button"
-          accessibilityState={{ selected: item.code === value }}
+          // radio, not button: these are an exclusive choice, and the radio
+          // role is what tells a screen reader "1 of 3" instead of leaving
+          // selection state as an afterthought on a button.
+          accessibilityRole="radio"
+          accessibilityState={{ selected: item.code === value, checked: item.code === value }}
           onPress={() => onChange(item.code)}
           style={{
             minHeight: touchTargets.compact,
@@ -26,7 +32,7 @@ export function LanguageSelector({ value, onChange }: LanguageSelectorProps) {
             backgroundColor: item.code === value ? theme.accent : theme.surface,
           }}
         >
-          <Text style={{ color: item.code === value ? 'white' : theme.text }}>{item.nativeLabel}</Text>
+          <Text style={{ color: item.code === value ? theme.onAccent : theme.text }}>{item.nativeLabel}</Text>
         </Pressable>
       ))}
     </View>
