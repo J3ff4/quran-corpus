@@ -12,6 +12,7 @@ import { openUserDb } from '@/data/userDb';
 import { getBookmarks, recordReadingPosition, setBookmark } from '@/data/userRepository';
 import { useAppSettings } from '@/settings/settingsStore';
 import { colors } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/themeContext';
 
 function parseSurahId(value: string | string[] | undefined): number | null {
   const raw = Array.isArray(value) ? value[0] : value;
@@ -25,6 +26,7 @@ export default function SurahRoute() {
   const params = useLocalSearchParams<{ surahId: string }>();
   const surahId = useMemo(() => parseSurahId(params.surahId), [params.surahId]);
   const { contentLanguage, setContentLanguage, uiLocale } = useAppSettings();
+  const theme = useThemeColors();
   const audio = useAyahAudioController(process.env.EXPO_PUBLIC_AUDIO_API_BASE_URL, surahId);
   const [reader, setReader] = useState<SurahReaderData | null>(null);
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set());
@@ -111,7 +113,7 @@ export default function SurahRoute() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.paper }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.background }}>
         <ActivityIndicator />
       </View>
     );
@@ -119,14 +121,14 @@ export default function SurahRoute() {
 
   if (error || !reader) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', padding: 20, backgroundColor: colors.paper }}>
+      <View style={{ flex: 1, justifyContent: 'center', padding: 20, backgroundColor: theme.background }}>
         <Text style={{ color: colors.danger }}>{error ?? 'Unable to load surah'}</Text>
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.paper }}>
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
       <LanguageSelector value={contentLanguage} onChange={setContentLanguage} />
       <SurahReader
         data={reader}

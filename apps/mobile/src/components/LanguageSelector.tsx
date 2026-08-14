@@ -1,6 +1,7 @@
 import { Pressable, Text, View } from 'react-native';
 import { contentLanguages, type ContentLanguageCode } from '@/i18n/languages';
-import { colors, touchTargets } from '@/theme/tokens';
+import { touchTargets } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/themeContext';
 
 interface LanguageSelectorProps {
   value: ContentLanguageCode;
@@ -8,6 +9,7 @@ interface LanguageSelectorProps {
 }
 
 export function LanguageSelector({ value, onChange }: LanguageSelectorProps) {
+  const theme = useThemeColors();
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 20, paddingVertical: 12 }}>
       {contentLanguages.map((item) => (
@@ -21,10 +23,10 @@ export function LanguageSelector({ value, onChange }: LanguageSelectorProps) {
             borderRadius: 20,
             paddingHorizontal: 14,
             justifyContent: 'center',
-            backgroundColor: item.code === value ? colors.accent : '#ede6d8',
+            backgroundColor: item.code === value ? theme.accent : theme.surface,
           }}
         >
-          <Text style={{ color: item.code === value ? 'white' : colors.ink }}>{item.nativeLabel}</Text>
+          <Text style={{ color: item.code === value ? 'white' : theme.text }}>{item.nativeLabel}</Text>
         </Pressable>
       ))}
     </View>

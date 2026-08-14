@@ -2,7 +2,8 @@ import { FlatList, Pressable, Text, View, type ListRenderItem } from 'react-nati
 import type { SurahListItem } from '@/data/corpusRepository';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
-import { colors, touchTargets } from '@/theme/tokens';
+import { touchTargets } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/themeContext';
 
 interface SurahListProps {
   surahs: SurahListItem[];
@@ -13,6 +14,7 @@ interface SurahListProps {
 const rowHeight = 76;
 
 export function SurahList({ surahs, uiLocale, onOpenSurah }: SurahListProps) {
+  const theme = useThemeColors();
   const ayahsSuffix = t(uiLocale, 'surahList.ayahsSuffix');
   const renderItem: ListRenderItem<SurahListItem> = ({ item }) => (
     <Pressable
@@ -24,7 +26,7 @@ export function SurahList({ surahs, uiLocale, onOpenSurah }: SurahListProps) {
         paddingHorizontal: 20,
         paddingVertical: 12,
         borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+        borderBottomColor: theme.border,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -32,12 +34,12 @@ export function SurahList({ surahs, uiLocale, onOpenSurah }: SurahListProps) {
       }}
     >
       <View style={{ flex: 1, gap: 4, minHeight: touchTargets.minimum }}>
-        <Text style={{ color: colors.ink, fontSize: 17, fontWeight: '600' }}>{item.nameTranslit}</Text>
-        <Text style={{ color: colors.muted, fontSize: 13 }}>
+        <Text style={{ color: theme.text, fontSize: 17, fontWeight: '600' }}>{item.nameTranslit}</Text>
+        <Text style={{ color: theme.mutedText, fontSize: 13 }}>
           {item.nameTranslation} · {item.ayahCount} {ayahsSuffix}
         </Text>
       </View>
-      <Text style={{ color: colors.ink, fontFamily: 'Hafs', fontSize: 28, textAlign: 'right' }}>{item.nameArabic}</Text>
+      <Text style={{ color: theme.text, fontFamily: 'Hafs', fontSize: 28, textAlign: 'right' }}>{item.nameArabic}</Text>
     </Pressable>
   );
 

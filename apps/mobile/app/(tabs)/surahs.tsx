@@ -7,9 +7,11 @@ import { getSurahList, type SurahListItem } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { useAppSettings } from '@/settings/settingsStore';
 import { colors } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/themeContext';
 
 export default function SurahsTab() {
   const { uiLocale } = useAppSettings();
+  const theme = useThemeColors();
   const [surahs, setSurahs] = useState<SurahListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +44,7 @@ export default function SurahsTab() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.paper }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.background }}>
         <ActivityIndicator />
       </View>
     );
@@ -50,14 +52,14 @@ export default function SurahsTab() {
 
   if (error) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', padding: 20, backgroundColor: colors.paper }}>
+      <View style={{ flex: 1, justifyContent: 'center', padding: 20, backgroundColor: theme.background }}>
         <Text style={{ color: colors.danger }}>{error}</Text>
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.paper }}>
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
       <SurahList surahs={surahs} uiLocale={uiLocale} onOpenSurah={openSurah} />
     </View>
   );

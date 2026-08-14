@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { openCorpusDb, useCorpusFonts } from '@/data/openCorpusDb';
 import { AppSettingsProvider } from '@/settings/settingsStore';
+import { ThemeProvider } from '@/theme/ThemeProvider';
 
 // Hold the native splash across the first-launch extract below. Expo hides it
 // as soon as the root component mounts, which on a cold install would flash
@@ -66,7 +67,9 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AppSettingsProvider>
-        <Stack screenOptions={{ headerShown: false }} />
+        <ThemeProvider>
+          <Stack screenOptions={{ headerShown: false }} />
+        </ThemeProvider>
       </AppSettingsProvider>
     </GestureHandlerRootView>
   );

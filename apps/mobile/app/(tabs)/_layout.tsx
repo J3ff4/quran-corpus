@@ -1,19 +1,20 @@
 import { Tabs } from 'expo-router';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
-import { colors } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/themeContext';
 
 export default function TabsLayout() {
   const { uiLocale } = useAppSettings();
+  const theme = useThemeColors();
 
   return (
     <Tabs
       screenOptions={{
-        headerStyle: { backgroundColor: colors.paper },
-        headerTintColor: colors.ink,
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.muted,
-        tabBarStyle: { backgroundColor: colors.paper, borderTopColor: colors.border },
+        headerStyle: { backgroundColor: theme.background },
+        headerTintColor: theme.text,
+        tabBarActiveTintColor: theme.accent,
+        tabBarInactiveTintColor: theme.mutedText,
+        tabBarStyle: { backgroundColor: theme.background, borderTopColor: theme.border },
       }}
     >
       <Tabs.Screen name="index" options={{ title: t(uiLocale, 'tabs.home') }} />

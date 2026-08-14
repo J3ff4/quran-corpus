@@ -1,7 +1,8 @@
 import { Pressable, Text, View } from 'react-native';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
-import { colors, typography } from '@/theme/tokens';
+import { typography } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/themeContext';
 
 export interface AyahCardProps {
   ayahNumber: number;
@@ -26,35 +27,36 @@ export function AyahCard({
   onToggleBookmark,
   onToggleAudio,
 }: AyahCardProps) {
+  const theme = useThemeColors();
   return (
     <View
       style={{
         paddingHorizontal: 20,
         paddingVertical: 18,
         borderBottomWidth: 1,
-        borderBottomColor: colors.border,
+        borderBottomColor: theme.border,
         gap: 14,
       }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <Text style={{ color: colors.muted, fontSize: typography.caption }}>{ayahNumber}</Text>
+        <Text style={{ color: theme.mutedText, fontSize: typography.caption }}>{ayahNumber}</Text>
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <Pressable accessibilityRole="button" onPress={() => onToggleBookmark(ayahNumber)}>
-            <Text style={{ color: bookmarked ? colors.accent : colors.muted }}>
+            <Text style={{ color: bookmarked ? theme.accent : theme.mutedText }}>
               {bookmarked ? t(uiLocale, 'reader.removeBookmark') : t(uiLocale, 'reader.bookmark')}
             </Text>
           </Pressable>
           <Pressable accessibilityRole="button" disabled={audioDisabled} onPress={() => onToggleAudio(ayahNumber)}>
-            <Text style={{ color: audioDisabled ? colors.muted : colors.accent }}>
+            <Text style={{ color: audioDisabled ? theme.mutedText : theme.accent }}>
               {playing ? t(uiLocale, 'reader.pause') : t(uiLocale, 'reader.play')}
             </Text>
           </Pressable>
         </View>
       </View>
-      <Text style={{ color: colors.ink, fontFamily: 'Hafs', fontSize: typography.arabicReader, textAlign: 'right' }}>
+      <Text style={{ color: theme.text, fontFamily: 'Hafs', fontSize: typography.arabicReader, textAlign: 'right' }}>
         {arabicText}
       </Text>
-      {translationText ? <Text style={{ color: colors.ink, fontSize: typography.body }}>{translationText}</Text> : null}
+      {translationText ? <Text style={{ color: theme.text, fontSize: typography.body }}>{translationText}</Text> : null}
     </View>
   );
 }

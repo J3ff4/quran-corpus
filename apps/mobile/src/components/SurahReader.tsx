@@ -2,8 +2,9 @@ import { useRef } from 'react';
 import { FlatList, Text, View, type ViewToken } from 'react-native';
 import type { SurahReaderData } from '@/data/corpusRepository';
 import type { UiLocaleCode } from '@/i18n/languages';
-import { colors } from '@/theme/tokens';
+
 import { AyahCard } from './AyahCard';
+import { useThemeColors } from '@/theme/themeContext';
 
 interface SurahReaderProps {
   data: SurahReaderData;
@@ -26,6 +27,7 @@ export function SurahReader({
   onToggleAudio,
   onReadingAyah,
 }: SurahReaderProps) {
+  const theme = useThemeColors();
   const onReadingAyahRef = useRef(onReadingAyah);
   onReadingAyahRef.current = onReadingAyah;
 
@@ -40,8 +42,8 @@ export function SurahReader({
       keyExtractor={(item) => String(item.ayah.id)}
       ListHeaderComponent={
         <View style={{ paddingHorizontal: 20, paddingVertical: 16, gap: 6 }}>
-          <Text style={{ color: colors.ink, fontSize: 24, fontWeight: '700' }}>{data.surah.name_translit}</Text>
-          <Text style={{ color: colors.muted }}>{data.surah.name_translation}</Text>
+          <Text style={{ color: theme.text, fontSize: 24, fontWeight: '700' }}>{data.surah.name_translit}</Text>
+          <Text style={{ color: theme.mutedText }}>{data.surah.name_translation}</Text>
         </View>
       }
       renderItem={({ item }) => (
@@ -58,7 +60,7 @@ export function SurahReader({
         />
       )}
       onViewableItemsChanged={onViewableItemsChanged.current}
-      style={{ flex: 1, backgroundColor: colors.paper }}
+      style={{ flex: 1, backgroundColor: theme.background }}
       contentContainerStyle={{ paddingBottom: 24 }}
     />
   );
