@@ -20,7 +20,6 @@ const allowedPropertyKeys = new Set([
   'uiLocale',
   'contentLanguage',
   'theme',
-  'fontScale',
   'analyticsEnabled',
   'audioEnabled',
   'screen',

@@ -10,7 +10,6 @@ export interface AppSettings {
   uiLocale: UiLocaleCode;
   contentLanguage: ContentLanguageCode;
   theme: ThemePreference;
-  fontScale: number;
   analyticsEnabled: boolean;
 }
 
@@ -18,7 +17,6 @@ export interface AppSettingsContextValue extends AppSettings {
   setUiLocale: (locale: UiLocaleCode) => void;
   setContentLanguage: (language: ContentLanguageCode) => void;
   setTheme: (theme: ThemePreference) => void;
-  setFontScale: (fontScale: number) => void;
   setAnalyticsEnabled: (enabled: boolean) => void;
 }
 
@@ -26,13 +24,17 @@ const defaultSettings: AppSettings = {
   uiLocale: 'en',
   contentLanguage: 'en',
   theme: 'system',
-  fontScale: 1,
   analyticsEnabled: false,
 };
 
 const AppSettingsContext = createContext<AppSettingsContextValue | null>(null);
 
-const settingKeys = ['uiLocale', 'contentLanguage', 'theme', 'fontScale', 'analyticsEnabled'] as const;
+// No fontScale here: Android's system font-size setting already scales every
+// <Text> (allowFontScaling defaults to true), so an in-app duplicate was a
+// second source of truth for the same thing. It was persisted but read by
+// nothing and never surfaced in Settings, so no installed build can have a
+// stored value to migrate.
+const settingKeys = ['uiLocale', 'contentLanguage', 'theme', 'analyticsEnabled'] as const;
 
 function isUiLocale(value: string | null): value is UiLocaleCode {
   return uiLocales.some((locale) => locale.code === value);
@@ -47,7 +49,7 @@ function isTheme(value: string | null): value is ThemePreference {
 }
 
 export async function loadPersistedAppSettings(client: MobileDataClient): Promise<AppSettings> {
-  const [uiLocale, contentLanguage, theme, fontScale, analyticsEnabled] = await Promise.all(
+  const [uiLocale, contentLanguage, theme, analyticsEnabled] = await Promise.all(
     settingKeys.map((key) => getSetting(client, key)),
   );
   const persistedUiLocale = uiLocale ?? null;
@@ -58,7 +60,6 @@ export async function loadPersistedAppSettings(client: MobileDataClient): Promis
     uiLocale: isUiLocale(persistedUiLocale) ? persistedUiLocale : defaultSettings.uiLocale,
     contentLanguage: isContentLanguage(persistedContentLanguage) ? persistedContentLanguage : defaultSettings.contentLanguage,
     theme: isTheme(persistedTheme) ? persistedTheme : defaultSettings.theme,
-    fontScale: fontScale ? Number(fontScale) || defaultSettings.fontScale : defaultSettings.fontScale,
     analyticsEnabled: analyticsEnabled === 'true',
   };
 }
@@ -225,7 +226,6 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       setUiLocale: (uiLocale) => updateSetting('uiLocale', uiLocale),
       setContentLanguage: (contentLanguage) => updateSetting('contentLanguage', contentLanguage),
       setTheme: (theme) => updateSetting('theme', theme),
-      setFontScale: (fontScale) => updateSetting('fontScale', fontScale),
       setAnalyticsEnabled: (analyticsEnabled) => updateSetting('analyticsEnabled', analyticsEnabled),
     }),
     [settings, userClient],
