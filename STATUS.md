@@ -7,7 +7,7 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-08-13
+Updated: 2026-08-14
 
 ## Now
 
@@ -2736,6 +2736,52 @@ Greptile stays installed as advisory (user's call), no longer gates.
   `ALTER TABLE` for `grammar_note` on the TS side (`packages/data/src/migrate.ts`,
   mirrors the scraper's own `_migrate_add_word_columns`) + accepted-tradeoff reply on
   the `COALESCE` staleness finding (matches sibling optional fields, kept as-is).
+
+## Mobile (`apps/mobile`, Expo SDK 57)
+
+Android app folded into this monorepo 2026-08-14 via unrelated-histories merge
+(21 commits preserved from the archived `J3ff4/quran-corpus-android-app`). It had
+forked `packages/data` + `packages/config`; both forks deleted, canonical copies win.
+PR **#5** on `J3ff4/quran-corpus`, open.
+
+**Nothing here has run on a physical device.** Every green number below is a local
+transcript. Neither repo has ever had CI. Treat accordingly.
+
+Gate at time of writing: build 4/4, type-check 6/6, lint 2/2, test 6/6, 804 tests
+(data 252, web 483, mobile 59, mobile-data 10).
+
+### Deferred from CodeRabbit review of #5 — heavy lift, NOT done
+1. `getAyahReaderLocation` (`apps/mobile/src/data/corpusRepository.ts`) calls
+   `getSurahReader`, which runs 4 surah-wide queries and materializes every ayah,
+   word and translation — for surah 2 that is 286 ayahs + several thousand word rows
+   — to return ONE ayah. Home tab hits this on every focus. Fix = narrow
+   single-ayah query in `packages/data` (queries live there, not in the app).
+2. Atomic publish for generated DB assets
+   (`packages/mobile-data/scripts/create-m1-reader-db.ts`, sibling
+   `create-m0-fixture-db.ts`). Interrupted generation can leave the final DB absent,
+   empty or partial. Same tmp-then-rename shape already used in `openCorpusDb.ts`.
+   Stage at a sibling temp path, rename after validation/`db.close()`, sweep stale
+   temps first.
+3. `userRepository.testHelpers.ts` fakes SQLite in-memory. Real-SQLite +
+   real-schema tests would catch schema drift the fakes cannot.
+4. Home "continue reading" opens the surah at ayah 1, discarding the saved ayah.
+   Needs `initialScrollIndex`/`scrollToIndex` + `onScrollToIndexFailed` on a
+   variable-height FlatList — not a one-liner. `accessibilityLabel` part IS done.
+
+### Accepted trade-off — do not "fix" without deciding
+- Settings retry backoff stalls unrelated keys behind a persistently failing one
+  (up to the 30s cap; change lost if process dies in that window). This is
+  DELIBERATE — see `d34b438 fix(mobile): scope settings retry backoff` and the test
+  `does not bypass retry backoff for unrelated setting changes`. Buys: not hammering
+  a failing SQLite. Reversing it breaks that named test from a settled review thread.
+
+### Blocked on user
+- APK: needs interactive `eas login`, then `eas build -p android --profile preview`.
+- `docs/data-sources-m1.md`: every row "Needs release sign-off"; About screen says so
+  6×. Blocks Play Store release, not development. Owner = Codex.
+
+### Not started
+- Workstream E: `.coderabbit.yaml` mobile rules, `.github/workflows/ci.yml`.
 
 ## Data DB (`/home/claude/quran-data/quran.db`, ~113MB; several `.bak` snapshots)
 Re-queried directly 2026-07-22 (do not trust older counts in this file's history):
