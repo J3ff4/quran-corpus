@@ -1,10 +1,16 @@
 import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { openCorpusDb, useCorpusFonts } from '@/data/openCorpusDb';
 import { AppSettingsProvider } from '@/settings/settingsStore';
+
+// Hold the native splash across the first-launch extract below. Expo hides it
+// as soon as the root component mounts, which on a cold install would flash
+// splash -> blank -> spinner for the several seconds the copy takes.
+void SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useCorpusFonts();
@@ -36,9 +42,20 @@ export default function RootLayout() {
     };
   }, []);
 
+  // Release the splash once there is something to show -- including an error
+  // screen. Hiding only on success would leave a failed launch stuck behind the
+  // splash with no way to see what went wrong.
+  const settled = (fontsLoaded && corpusReady) || Boolean(fontError) || Boolean(corpusError);
+
+  useEffect(() => {
+    if (settled) void SplashScreen.hideAsync();
+  }, [settled]);
+
   if (fontError) throw fontError;
   if (corpusError) throw corpusError;
   if (!fontsLoaded || !corpusReady) {
+    // Sits behind the held splash; only ever seen if preventAutoHideAsync lost
+    // the race, which is exactly when a bare white screen would be worst.
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator />

@@ -14,6 +14,8 @@
     "lint": "turbo lint",
     "type-check": "turbo type-check",
     "test": "turbo test",
+    "generate:icons": "tsx scripts/generate-icons.ts",
+    "generate:icons:mobile": "tsx scripts/generate-icons.ts --mobile-only",
     "generate:m0-db": "turbo generate:m0-db",
     "generate:m1-db": "turbo generate:m1-db",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,css,md}\" --ignore-path .gitignore"
