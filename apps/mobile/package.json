@@ -15,7 +15,6 @@
   },
   "dependencies": {
     "@expo/ui": "~57.0.7",
-    "@gorhom/bottom-sheet": "^5.2.14",
     "@quran-corpus/data": "workspace:*",
     "@quran-corpus/mobile-data": "workspace:*",
     "expo": "~57.0.8",
