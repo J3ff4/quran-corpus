@@ -63,6 +63,20 @@ function selectedTranslationByAyah(
       grouped.set(translation.ayah_id, translation);
     }
   }
+
+  // The guard above covers a language the DB does not carry at all (no rows).
+  // This covers the other half: rows exist for the language but under a
+  // different translator string, which filters every ayah out and renders a
+  // blank translation pane with nothing to say why. Fail loudly instead --
+  // the reader already has an error state, and a silent blank pane reads as a
+  // corrupt download.
+  if (translations.length > 0 && grouped.size === 0) {
+    const present = [...new Set(translations.map((translation) => translation.translator))];
+    throw new Error(
+      `No ${languageCode} translation by ${selectedTranslator} in the bundled DB (found: ${present.join(', ')})`,
+    );
+  }
+
   return grouped;
 }
 

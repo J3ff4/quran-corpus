@@ -31,6 +31,15 @@ describe('getSurahReader', () => {
     expect(reader.ayahs[0]?.translation?.translator).toBe('Abu Adel');
     expect(reader.ayahs[0]?.words.map((word) => word.position)).toEqual([1, 2]);
   });
+
+  it('reports a bundled DB whose rows use a different translator', async () => {
+    // Rows exist for the language, but none by the translator this build
+    // selects. Previously every ayah filtered out and the reader showed a
+    // blank translation pane with no explanation.
+    const client = createFakeClient({ ruTranslator: 'Someone Else' });
+
+    await expect(getSurahReader(client, 2, 'ru')).rejects.toThrow(/No ru translation by/);
+  });
 });
 
 describe('getAyahReaderLocation', () => {
@@ -42,7 +51,7 @@ describe('getAyahReaderLocation', () => {
   });
 });
 
-function createFakeClient(): MobileDataClient {
+function createFakeClient({ ruTranslator = 'Abu Adel' }: { ruTranslator?: string } = {}): MobileDataClient {
   const surahs: MobileRow[] = [
     surahRow({
       id: 1,
@@ -75,8 +84,8 @@ function createFakeClient(): MobileDataClient {
   const translations: MobileRow[] = [
     translationRow({ id: 301, ayah_id: 101, language_code: 'uz', translator: 'M0 translator', text: 'Uzbek ayah one' }),
     translationRow({ id: 400, ayah_id: 201, language_code: 'ru', translator: 'Elmir Kuliev', text: 'Wrong Russian ayah one' }),
-    translationRow({ id: 401, ayah_id: 201, language_code: 'ru', translator: 'Abu Adel', text: 'Russian ayah one' }),
-    translationRow({ id: 402, ayah_id: 202, language_code: 'ru', translator: 'Abu Adel', text: 'Russian ayah two' }),
+    translationRow({ id: 401, ayah_id: 201, language_code: 'ru', translator: ruTranslator, text: 'Russian ayah one' }),
+    translationRow({ id: 402, ayah_id: 202, language_code: 'ru', translator: ruTranslator, text: 'Russian ayah two' }),
   ];
   const segments: MobileRow[] = [
     segmentRow({ id: 501, word_id: 1001, segment_index: 1, pos_tag: 'P', form_arabic: 'ب' }),
@@ -85,7 +94,15 @@ function createFakeClient(): MobileDataClient {
 
   return {
     async execute(statement) {
-      const sql = typeof statement === 'string' ? statement : statement.sql;
+      // Normalized, and matched on WHERE predicates rather than table aliases.
+      // The shared queries are authored as indented template literals, so
+      // matching raw text couples this fake to their line breaks; and the
+      // word-detail query ('FROM words WHERE id = ?') differs from the
+      // surah-words query ('FROM words w JOIN ...') only by the alias, so an
+      // alias match routed a word ID into the surah branch as soon as either
+      // query was reformatted.
+      const rawSql = typeof statement === 'string' ? statement : statement.sql;
+      const sql = rawSql.replace(/\s+/g, ' ').trim();
       const args = typeof statement === 'string' ? [] : (statement.args ?? []);
 
       if (sql.includes('FROM surahs ORDER BY id')) {
@@ -97,7 +114,10 @@ function createFakeClient(): MobileDataClient {
       if (sql.includes('FROM ayahs WHERE surah_id')) {
         return { rows: ayahs.filter((ayah) => ayah['surah_id'] === args[0]) };
       }
-      if (sql.includes('FROM words w')) {
+      if (sql.includes('FROM words WHERE id = ?')) {
+        return { rows: words.filter((word) => word['id'] === args[0]) };
+      }
+      if (sql.includes('FROM words w JOIN ayahs a') && sql.includes('WHERE a.surah_id = ?')) {
         const [surahId] = args;
         const ayahIds = new Set(ayahs.filter((ayah) => ayah['surah_id'] === surahId).map((ayah) => ayah['id']));
         return { rows: words.filter((word) => ayahIds.has(word['ayah_id'])) };
@@ -110,9 +130,6 @@ function createFakeClient(): MobileDataClient {
             (row) => ayahIds.has(row['ayah_id']) && row['language_code'] === languageCode,
           ),
         };
-      }
-      if (sql.includes('FROM words WHERE id')) {
-        return { rows: words.filter((word) => word['id'] === args[0]) };
       }
       if (sql.includes('FROM word_segments WHERE word_id IN')) {
         return { rows: segments.filter((segment) => args.includes(segment['word_id'] as SqlValue)) };
