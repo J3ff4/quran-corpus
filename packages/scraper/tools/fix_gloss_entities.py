@@ -24,11 +24,13 @@ Rows the importer would refuse are reported, never repaired, because
 Delete those instead (``scraper prune-definitions``). Two cases:
 
 * **Markup** (:data:`~tools.prepare_qurandev_roots._MARKUP`), checked both raw
-  and decoded. Raw, because that is how the importer judges it; decoded, because
-  decoded is what gets *written* — an entity-escaped ``&lt;b&gt;`` passes the raw
-  check and would put real markup into the DB. Decoding is also what disguises
-  the damage: ``*kw``'s ``&#1584;`` becomes real Arabic and the junk starts
-  reading as a gloss.
+  and decoded. Raw, because this tool rewrites a row in place and never re-cuts
+  apparatus, so markup already stored is corruption nothing downstream removes —
+  unlike the importer, which judges only the cleaned string because its cut may
+  discard the offending tail. Decoded, because decoded is what gets *written* —
+  an entity-escaped ``&lt;b&gt;`` passes the raw check and would put real markup
+  into the DB. Decoding is also what disguises the damage: ``*kw``'s ``&#1584;``
+  becomes real Arabic and the junk starts reading as a gloss.
 * **Decodes to empty** (e.g. a definition that is only ``&nbsp;``). ``build_rows``
   drops those as ``apparatus_only`` and ``import_lane_definitions`` skips them, so
   writing ``''`` would produce a state no import can reach — and a blank gloss in
@@ -83,7 +85,7 @@ def find_rows(
     out = []
     unrepairable = []
     for rid, bw, old in rows:
-        # Judged raw, before any decode, exactly as the importer judges it.
+        # Judged raw: nothing here cuts apparatus, so stored markup stays stored.
         if _MARKUP.search(old):
             unrepairable.append((bw, old, "markup"))
             continue

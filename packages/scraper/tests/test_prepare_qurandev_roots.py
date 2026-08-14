@@ -128,12 +128,12 @@ def test_markup_meaning_is_dropped_but_gt_entity_survives():
 
 
 def test_escaped_markup_is_dropped_after_decoding():
-    """The raw check alone would write real markup into the TSV.
+    """Checking the raw source alone would write real markup into the TSV.
 
     ``clean_meaning`` decodes entities, so a source row carrying escaped markup
-    passes the raw guard and comes out the other side as a real tag. What gets
-    written has to be judged too — same lesson as the repair tool's second
-    check (``fix_gloss_entities.find_rows``).
+    reads as prose raw and comes out the other side as a real tag. The guard
+    runs on the cleaned string for exactly this reason — same lesson as the
+    repair tool's second check (``fix_gloss_entities.find_rows``).
     """
     raw = _cp1252(
         [
@@ -147,8 +147,29 @@ def test_escaped_markup_is_dropped_after_decoding():
     assert stats["kept"] == 1
 
 
+def test_markup_in_the_discarded_apparatus_tail_keeps_the_gloss():
+    """Markup the cut throws away must not condemn the row.
+
+    The guard judges what gets *written*, so a stray tag surviving only inside
+    a Lane citation — the part ``clean_meaning`` discards — leaves a gloss that
+    imports perfectly clean. Judging the raw source instead would drop it.
+    The escaped form takes the same path: ``clean_meaning`` decodes before it
+    cuts, so the decoded tag is still in the tail.
+    """
+    raw = _cp1252(
+        [
+            {"RootCode": "rHm", "Meanings": "mercy — Lane's Lexicon, page: 1 <br>"},
+            {"RootCode": "ktb", "Meanings": "to write. katab vb. (I) &lt;br&gt;"},
+        ]
+    )
+    rows, stats = build_rows(raw, valid_roots={"rHm", "ktb"})
+    assert rows == [("rHm", "mercy"), ("ktb", "to write")]
+    assert stats["markup"] == 0
+    assert stats["kept"] == 2
+
+
 def test_comments_and_declarations_are_markup():
-    """"<!" constructs are markup too — "!" is not matched by the tag branch.
+    """ "<!" constructs are markup too — "!" is not matched by the tag branch.
 
     Both raw and entity-escaped forms must be rejected, and an unterminated
     comment (no closing "-->") must not slip through on a technicality.
@@ -162,8 +183,6 @@ def test_comments_and_declarations_are_markup():
             {"RootCode": "Elm", "Meanings": "knowledge"},
         ]
     )
-    rows, stats = build_rows(
-        raw, valid_roots={"ktb", "slm", "rHm", "ytm", "Elm"}
-    )
+    rows, stats = build_rows(raw, valid_roots={"ktb", "slm", "rHm", "ytm", "Elm"})
     assert rows == [("Elm", "knowledge")]
     assert stats["markup"] == 4

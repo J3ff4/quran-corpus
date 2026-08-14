@@ -48,12 +48,14 @@ _APPARATUS_MARKERS = [
 # center;" align="center">     &#1584; &#1603; &#1585;' — an attribute fragment
 # from a stripped <p>, and what follows is the Arabic letters of the *wrong* root
 # (dhal-kaf-ra, i.e. *kr) rather than a gloss, so there is nothing to salvage.
-# Checked twice, raw and again after cleaning. Raw, because that is the source's
-# own encoding. Again after, because the cleaned string is what gets *written*:
-# clean_meaning decodes entities, so an escaped "&lt;b&gt;" passes the raw check
-# and lands in the TSV as real markup. Both checks agree on today's file — the
-# only entity-escaped angle brackets are "-&gt;" inside a gloss, which needs an
-# opening "<" to match here and so trips neither.
+# Judged on the *cleaned* string, because that is what gets written. Judging the
+# raw source instead would be both too weak and too strong: too weak because
+# clean_meaning decodes entities, so an escaped "&lt;b&gt;" reads as prose raw
+# and lands in the TSV as a real tag; too strong because the apparatus cut throws
+# the tail away, so markup surviving only in a discarded Lane citation would
+# condemn a gloss that imports perfectly clean. Today's file agrees either way —
+# its only entity-escaped angle brackets are "-&gt;" inside a gloss, which needs
+# an opening "<" to match here.
 #
 # The attribute alternative demands a quoted value, not a bare "align =", because
 # this file's glosses use "=" as prose ("= Ta-Siin-Ayn"); an English gloss reading
@@ -104,10 +106,9 @@ def build_rows(
 ) -> tuple[list[tuple[str, str]], dict[str, int]]:
     """Decode + filter + clean meanings.json bytes to (buckwalter, def) rows.
 
-    Keeps rows whose RootCode is in ``valid_roots``, carry no HTML markup, and
-    whose meaning is non-empty after apparatus-cleaning. Returns (rows, stats)
-    where stats explains what was dropped; ``total`` equals the sum of the
-    outcome buckets.
+    Keeps rows whose RootCode is in ``valid_roots`` and whose cleaned meaning is
+    non-empty and free of HTML markup. Returns (rows, stats) where stats explains
+    what was dropped; ``total`` equals the sum of the outcome buckets.
     """
     entries = json.loads(raw.decode("cp1252"))
     rows: list[tuple[str, str]] = []
@@ -132,11 +133,8 @@ def build_rows(
         if bw not in valid_roots:
             stats["unknown_root"] += 1
             continue
-        if _MARKUP.search(definition):  # raw: the source's own encoding
-            stats["markup"] += 1
-            continue
         definition = clean_meaning(definition)
-        if _MARKUP.search(definition):  # decoded: this is what gets written
+        if _MARKUP.search(definition):  # cleaned: this is what gets written
             stats["markup"] += 1
             continue
         if not definition:  # was pure apparatus, no real gloss
