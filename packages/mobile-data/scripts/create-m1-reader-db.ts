@@ -3,6 +3,7 @@ import { access, copyFile, mkdir, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createDatabase } from '@quran-corpus/data';
+import { selectedTranslators } from '../src/translators.js';
 
 // Derived from this file's own location, not the cwd: `resolve('../..')` only
 // landed on the repo root when the script happened to be invoked from inside
@@ -11,11 +12,6 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const approvalPath = resolve(repoRoot, 'docs/data-sources-m1.md');
 const targetDbPath = resolve(repoRoot, 'apps/mobile/assets/db/quran.db');
 
-const selectedTranslators = {
-  en: 'Saheeh International',
-  ru: 'Abu Adel',
-  uz: 'Muhammad Sodik Muhammad Yusuf',
-} as const;
 const incompleteSelectionMessage =
   'M1 translation selection must contain exactly one selected translator for en, uz, and ru.';
 

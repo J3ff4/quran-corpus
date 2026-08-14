@@ -1,4 +1,4 @@
-import type { Client } from '@libsql/client';
+import type { QueryClient } from '../queryClient.js';
 import type { ConcordanceEntry, LemmaEntry } from '../types.js';
 import type { ConcordancePageOpts } from './roots.js';
 import { DEFINITION_SOURCE_RANK } from './roots.js';
@@ -51,7 +51,7 @@ export const LEMMA_GLOSS_LIMIT = 5;
  *  occurrences (NEG 704, INTG 92, SUB 79, COND 23, SUP 13). `senses` returns
  *  the full breakdown and the header renders all of it. */
 export async function getLemmaEntry(
-  db: Client,
+  db: QueryClient,
   lemmaBw: string,
   lang = 'en',
 ): Promise<LemmaEntry | null> {
@@ -169,7 +169,7 @@ export async function getLemmaEntry(
 /** Total matched occurrences for a lemma -- the paging total, cheap COUNT with
  *  no verse rebuild. A lemma is a whole-word attribute, so this is a direct
  *  `words` count (no segment join needed, unlike root). */
-export async function countLemmaConcordance(db: Client, lemmaBw: string): Promise<number> {
+export async function countLemmaConcordance(db: QueryClient, lemmaBw: string): Promise<number> {
   const res = await db.execute({
     sql: 'SELECT COUNT(*) AS n FROM words WHERE lemma_buckwalter = ?',
     args: [lemmaBw],
@@ -184,7 +184,7 @@ export async function countLemmaConcordance(db: Client, lemmaBw: string): Promis
  *  lemma pages). Deterministic surah->ayah->position order so LIMIT/OFFSET
  *  paging never repeats or skips an occurrence. */
 export async function getLemmaConcordancePage(
-  db: Client,
+  db: QueryClient,
   lemmaBw: string,
   opts: LemmaConcordanceOpts = {},
 ): Promise<ConcordanceEntry[]> {

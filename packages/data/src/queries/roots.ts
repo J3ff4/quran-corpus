@@ -1,4 +1,5 @@
-import type { Client, Row } from '@libsql/client';
+import type { Client } from '@libsql/client';
+import type { QueryClient, QueryRow } from '../queryClient.js';
 import type {
   Root,
   RootForm,
@@ -11,7 +12,7 @@ import { compareRootsArabic, foldRootArabic, foldRootArabicSql } from '../text/a
 import { stripQuranicAnnotations } from '../text/normalize.js';
 import { assertPagingBounds, buildVerseWordsByAyah } from './concordance.js';
 
-function rowToRoot(r: Row): Root {
+function rowToRoot(r: QueryRow): Root {
   return {
     id: r['id'] as number,
     root_buckwalter: r['root_buckwalter'] as string,
@@ -20,7 +21,7 @@ function rowToRoot(r: Row): Root {
   };
 }
 
-function rowToForm(r: Row): RootForm {
+function rowToForm(r: QueryRow): RootForm {
   return {
     id: r['id'] as number,
     root_id: r['root_id'] as number,
@@ -34,7 +35,7 @@ function rowToForm(r: Row): RootForm {
   };
 }
 
-function rowToDefinition(r: Row): RootDefinition {
+function rowToDefinition(r: QueryRow): RootDefinition {
   return {
     id: r['id'] as number,
     root_id: r['root_id'] as number,
@@ -43,7 +44,7 @@ function rowToDefinition(r: Row): RootDefinition {
   };
 }
 
-export async function getRootByBuckwalter(db: Client, bw: string): Promise<Root | null> {
+export async function getRootByBuckwalter(db: QueryClient, bw: string): Promise<Root | null> {
   const res = await db.execute({
     sql: 'SELECT * FROM roots WHERE root_buckwalter = ?',
     args: [bw],
@@ -53,11 +54,11 @@ export async function getRootByBuckwalter(db: Client, bw: string): Promise<Root 
 
 /** The one hijāʾī ordering. Shared so backfillRootSortOrder, which must read
  *  inside its own transaction, cannot drift from what getAllRoots returns. */
-function orderRoots(rows: Row[]): Root[] {
+function orderRoots(rows: QueryRow[]): Root[] {
   return rows.map(rowToRoot).sort((a, b) => compareRootsArabic(a.root_arabic, b.root_arabic));
 }
 
-export async function getAllRoots(db: Client): Promise<Root[]> {
+export async function getAllRoots(db: QueryClient): Promise<Root[]> {
   return orderRoots((await db.execute('SELECT * FROM roots')).rows);
 }
 
@@ -127,7 +128,7 @@ export async function backfillRootSortOrderIfStale(db: Client): Promise<number> 
  *  column (backfillRootSortOrder). Falls back to a full compareRootsArabic sort
  *  when sort_order hasn't been backfilled (fresh rebuild), keeping correctness. */
 export async function getRootNeighbors(
-  db: Client,
+  db: QueryClient,
   bw: string,
 ): Promise<{ prev: string | null; next: string | null }> {
   const cur = await db.execute({
@@ -163,7 +164,7 @@ export async function getRootNeighbors(
 
 /** Slim: just root_arabic for every root — for alphabet letter counts without
  *  reading/sorting full rows when the display list comes from another query. */
-export async function getRootArabicList(db: Client): Promise<string[]> {
+export async function getRootArabicList(db: QueryClient): Promise<string[]> {
   const res = await db.execute('SELECT root_arabic FROM roots');
   return res.rows.map((r) => r['root_arabic'] as string);
 }
@@ -171,7 +172,7 @@ export async function getRootArabicList(db: Client): Promise<string[]> {
 /** Every root plus a concatenated gloss blob, for a one-shot static payload
  *  that the dictionary page's client-side search can filter by meaning
  *  without a per-keystroke server round-trip. */
-export async function getRootSearchList(db: Client): Promise<RootSearchItem[]> {
+export async function getRootSearchList(db: QueryClient): Promise<RootSearchItem[]> {
   const res = await db.execute(
     `SELECT r.id, r.root_buckwalter, r.root_arabic, r.occurrence_count,
             GROUP_CONCAT(f.gloss, ' ') AS gloss_blob
@@ -189,7 +190,7 @@ export async function getRootSearchList(db: Client): Promise<RootSearchItem[]> {
   }));
 }
 
-export async function getRootsByFrequency(db: Client, limit = 200): Promise<Root[]> {
+export async function getRootsByFrequency(db: QueryClient, limit = 200): Promise<Root[]> {
   const res = await db.execute({
     sql: 'SELECT * FROM roots ORDER BY occurrence_count DESC, root_buckwalter LIMIT ?',
     args: [limit],
@@ -197,7 +198,7 @@ export async function getRootsByFrequency(db: Client, limit = 200): Promise<Root
   return res.rows.map(rowToRoot);
 }
 
-export async function searchRoots(db: Client, q: string): Promise<Root[]> {
+export async function searchRoots(db: QueryClient, q: string): Promise<Root[]> {
   const like = `%${q}%`;
   // Arabic is matched on the folded form of BOTH sides: the stored spelling is
   // corpus orthography (`أرض`) but most keyboards produce bare alef first, and
@@ -215,7 +216,7 @@ export async function searchRoots(db: Client, q: string): Promise<Root[]> {
   return res.rows.map(rowToRoot);
 }
 
-export async function getRootForms(db: Client, rootId: number): Promise<RootForm[]> {
+export async function getRootForms(db: QueryClient, rootId: number): Promise<RootForm[]> {
   const res = await db.execute({
     // form_arabic IS NULL only ever marked See-Also junk (external dictionary
     // links the pre-fix scraper mistook for forms); real forms always carry
@@ -298,7 +299,7 @@ export const DEFINITION_SOURCE_RANK = `CASE rd.source
      END, rd.source`;
 
 export async function getRootDefinitions(
-  db: Client,
+  db: QueryClient,
   rootId: number,
 ): Promise<RootDefinition[]> {
   const res = await db.execute({
@@ -310,7 +311,7 @@ export async function getRootDefinitions(
   return res.rows.map(rowToDefinition);
 }
 
-export async function getRootEntry(db: Client, bw: string): Promise<RootEntry | null> {
+export async function getRootEntry(db: QueryClient, bw: string): Promise<RootEntry | null> {
   const root = await getRootByBuckwalter(db, bw);
   if (!root) return null;
   const [forms, definitions] = await Promise.all([
@@ -340,7 +341,7 @@ export interface ConcordancePageOpts {
  *  root_forms rows; omitted/empty keeps the original fast unfiltered query
  *  (no join) so the common "All" case doesn't pay for a feature it doesn't use. */
 export async function countRootConcordance(
-  db: Client,
+  db: QueryClient,
   bw: string,
   formIds?: number[],
 ): Promise<number> {
@@ -384,7 +385,7 @@ export async function countRootConcordance(
  *  inline subquery -- no extra required param) so `form_id` can tag it;
  *  `opts.formIds` additionally narrows to specific forms when provided. */
 export async function getRootConcordancePage(
-  db: Client,
+  db: QueryClient,
   bw: string,
   opts: ConcordancePageOpts = {},
 ): Promise<ConcordanceEntry[]> {
@@ -452,7 +453,7 @@ export async function getRootConcordancePage(
 
 /** Full concordance for a root (unbounded). Thin wrapper over the paged query. */
 export async function getRootConcordance(
-  db: Client,
+  db: QueryClient,
   bw: string,
   lang = 'en',
   batchSize = 500,

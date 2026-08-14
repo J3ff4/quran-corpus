@@ -1,3 +1,5 @@
+import type { QueryClient } from '@quran-corpus/data/mobile';
+
 export type SqlValue = string | number | boolean | null;
 export type MobileRow = Record<string, SqlValue>;
 
@@ -5,9 +7,10 @@ export interface ExpoSqliteLike {
   getAllAsync<T extends MobileRow>(sql: string, params?: SqlValue[]): Promise<T[]>;
 }
 
-export interface MobileDataClient {
-  execute(statement: string | { sql: string; args?: SqlValue[] }): Promise<{ rows: MobileRow[] }>;
-}
+/** The read contract packages/data queries take. Aliased rather than redeclared:
+ *  when this was a separate-but-parallel interface the two drifted, and
+ *  apps/mobile bridged the gap with `client as never` on every call. */
+export type MobileDataClient = QueryClient;
 
 export function createExpoSqliteClient(db: ExpoSqliteLike): MobileDataClient {
   return {

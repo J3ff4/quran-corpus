@@ -1,9 +1,9 @@
-import type { Client, Row } from '@libsql/client';
+import type { QueryClient, QueryRow } from '../queryClient.js';
 import type { Ayah, Word } from '../types.js';
 import { getWordsByAyah } from './words.js';
 import { stripQuranicAnnotations } from '../text/normalize.js';
 
-function rowToAyah(row: Row): Ayah {
+function rowToAyah(row: QueryRow): Ayah {
   return {
     id: row['id'] as number,
     surah_id: row['surah_id'] as number,
@@ -16,7 +16,7 @@ function rowToAyah(row: Row): Ayah {
   };
 }
 
-export async function getAyahsBySurah(db: Client, surahId: number): Promise<Ayah[]> {
+export async function getAyahsBySurah(db: QueryClient, surahId: number): Promise<Ayah[]> {
   const result = await db.execute({
     sql: 'SELECT * FROM ayahs WHERE surah_id = ? ORDER BY ayah_number',
     args: [surahId],
@@ -25,7 +25,7 @@ export async function getAyahsBySurah(db: Client, surahId: number): Promise<Ayah
 }
 
 export async function getAyahWithWords(
-  db: Client,
+  db: QueryClient,
   ayahId: number,
 ): Promise<{ ayah: Ayah; words: Word[] } | null> {
   const result = await db.execute({

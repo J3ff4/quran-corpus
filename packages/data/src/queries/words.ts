@@ -1,4 +1,4 @@
-import type { Client, Row } from '@libsql/client';
+import type { QueryClient, QueryRow } from '../queryClient.js';
 import type { Word, WordSegment, ConceptTag, WordDetail } from '../types.js';
 import { stripQuranicAnnotations } from '../text/normalize.js';
 
@@ -6,7 +6,7 @@ function strip(s: string | null): string | null {
   return s == null ? null : stripQuranicAnnotations(s);
 }
 
-function rowToWord(row: Row): Word {
+function rowToWord(row: QueryRow): Word {
   return {
     id: row['id'] as number,
     ayah_id: row['ayah_id'] as number,
@@ -26,7 +26,7 @@ function rowToWord(row: Row): Word {
   };
 }
 
-export async function getWordsByAyah(db: Client, ayahId: number): Promise<Word[]> {
+export async function getWordsByAyah(db: QueryClient, ayahId: number): Promise<Word[]> {
   const result = await db.execute({
     sql: 'SELECT * FROM words WHERE ayah_id = ? ORDER BY position',
     args: [ayahId],
@@ -34,7 +34,7 @@ export async function getWordsByAyah(db: Client, ayahId: number): Promise<Word[]
   return result.rows.map(rowToWord);
 }
 
-export async function getWordsBySurah(db: Client, surahId: number): Promise<Word[]> {
+export async function getWordsBySurah(db: QueryClient, surahId: number): Promise<Word[]> {
   const result = await db.execute({
     sql: `SELECT w.*
           FROM words w
@@ -47,7 +47,7 @@ export async function getWordsBySurah(db: Client, surahId: number): Promise<Word
 }
 
 export async function getWordsBySurahAyahRange(
-  db: Client,
+  db: QueryClient,
   surahId: number,
   loAyah: number,
   hiAyah: number,
@@ -63,7 +63,7 @@ export async function getWordsBySurahAyahRange(
   return result.rows.map(rowToWord);
 }
 
-function rowToSegment(row: Row): WordSegment {
+function rowToSegment(row: QueryRow): WordSegment {
   return {
     id: row['id'] as number,
     word_id: row['word_id'] as number,
@@ -78,7 +78,7 @@ function rowToSegment(row: Row): WordSegment {
   };
 }
 
-function rowToConceptTag(row: Row): ConceptTag {
+function rowToConceptTag(row: QueryRow): ConceptTag {
   return {
     id: row['id'] as number,
     word_id: row['word_id'] as number,
@@ -88,7 +88,7 @@ function rowToConceptTag(row: Row): ConceptTag {
 }
 
 export async function getWordByLocation(
-  db: Client,
+  db: QueryClient,
   surah: number,
   ayah: number,
   position: number,
@@ -104,7 +104,7 @@ export async function getWordByLocation(
 }
 
 export async function getWordDetail(
-  db: Client,
+  db: QueryClient,
   wordId: number,
 ): Promise<WordDetail | null> {
   const wordRes = await db.execute({
@@ -130,7 +130,7 @@ export async function getWordDetail(
 }
 
 export async function getSegmentsByWordIds(
-  db: Client,
+  db: QueryClient,
   wordIds: number[],
 ): Promise<WordSegment[]> {
   if (wordIds.length === 0) return [];

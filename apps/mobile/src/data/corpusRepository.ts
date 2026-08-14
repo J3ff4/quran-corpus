@@ -1,4 +1,4 @@
-import type { MobileDataClient } from '@quran-corpus/mobile-data';
+import { selectedTranslators, type MobileDataClient } from '@quran-corpus/mobile-data';
 import {
   getAyahsBySurah,
   getAllSurahs,
@@ -17,11 +17,11 @@ import {
 import type { ContentLanguageCode } from '../i18n/languages';
 
 const M0_SURAH_ID = 1;
-const selectedTranslators: Record<ContentLanguageCode, string> = {
-  en: 'Saheeh International',
-  uz: 'Muhammad Sodik Muhammad Yusuf',
-  ru: 'Abu Adel',
-};
+
+// Fails the build if the shared list ever stops covering every content language
+// the UI offers -- otherwise a new language would render a permanently blank
+// translation pane instead of an error.
+const translatorByLanguage: Record<ContentLanguageCode, string> = selectedTranslators;
 
 export interface ReaderAyah {
   ayah: Ayah;
@@ -56,7 +56,7 @@ function selectedTranslationByAyah(
   translations: Translation[],
   languageCode: ContentLanguageCode,
 ): Map<number, Translation> {
-  const selectedTranslator = selectedTranslators[languageCode];
+  const selectedTranslator = translatorByLanguage[languageCode];
   const grouped = new Map<number, Translation>();
   for (const translation of translations) {
     if (translation.translator === selectedTranslator) {
@@ -67,8 +67,7 @@ function selectedTranslationByAyah(
 }
 
 export async function getSurahList(client: MobileDataClient): Promise<SurahListItem[]> {
-  const db = client as never;
-  const surahs = await getAllSurahs(db);
+  const surahs = await getAllSurahs(client);
   return surahs.map((surah) => ({
     id: surah.id,
     nameArabic: surah.name_arabic,
@@ -83,12 +82,11 @@ export async function getSurahReader(
   surahId: number,
   languageCode: ContentLanguageCode,
 ): Promise<SurahReaderData> {
-  const db = client as never;
   const [surah, ayahs, words, translations] = await Promise.all([
-    getSurahById(db, surahId),
-    getAyahsBySurah(db, surahId),
-    getWordsBySurah(db, surahId),
-    getTranslationsBySurahAndLang(db, surahId, languageCode),
+    getSurahById(client, surahId),
+    getAyahsBySurah(client, surahId),
+    getWordsBySurah(client, surahId),
+    getTranslationsBySurahAndLang(client, surahId, languageCode),
   ]);
 
   if (!surah) throw new Error(`Surah not found: ${surahId}`);
@@ -132,8 +130,7 @@ export async function getM0WordDetail(
   client: MobileDataClient,
   wordId: number,
 ): Promise<MobileWordDetail> {
-  const db = client as never;
-  const detail = await getWordDetail(db, wordId);
-  const segments = detail ? await getSegmentsByWordIds(db, [detail.word.id]) : [];
+  const detail = await getWordDetail(client, wordId);
+  const segments = detail ? await getSegmentsByWordIds(client, [detail.word.id]) : [];
   return { detail, segments };
 }

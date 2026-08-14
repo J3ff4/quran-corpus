@@ -1,7 +1,7 @@
-import type { Client, Row } from '@libsql/client';
+import type { QueryClient, QueryRow } from '../queryClient.js';
 import type { Translation } from '../types.js';
 
-function rowToTranslation(row: Row): Translation {
+function rowToTranslation(row: QueryRow): Translation {
   return {
     id: row['id'] as number,
     ayah_id: row['ayah_id'] as number,
@@ -11,7 +11,7 @@ function rowToTranslation(row: Row): Translation {
   };
 }
 
-export async function getTranslationsByAyah(db: Client, ayahId: number): Promise<Translation[]> {
+export async function getTranslationsByAyah(db: QueryClient, ayahId: number): Promise<Translation[]> {
   const result = await db.execute({
     sql: 'SELECT * FROM translations WHERE ayah_id = ? ORDER BY language_code',
     args: [ayahId],
@@ -20,7 +20,7 @@ export async function getTranslationsByAyah(db: Client, ayahId: number): Promise
 }
 
 export async function getTranslation(
-  db: Client,
+  db: QueryClient,
   ayahId: number,
   languageCode: string,
 ): Promise<Translation | null> {
@@ -33,7 +33,7 @@ export async function getTranslation(
 }
 
 export async function getTranslationsBySurahAndLang(
-  db: Client,
+  db: QueryClient,
   surahId: number,
   languageCode: string,
 ): Promise<Translation[]> {

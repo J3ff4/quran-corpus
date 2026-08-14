@@ -1,9 +1,9 @@
-import type { Client } from '@libsql/client';
+import type { QueryClient } from '../queryClient.js';
 import type { LemmaFrequencyEntry, VerbConcordanceEntry } from '../types.js';
 import { stripQuranicAnnotations } from '../text/normalize.js';
 
 export async function getLemmaFrequency(
-  db: Client,
+  db: QueryClient,
   limit = 200,
 ): Promise<LemmaFrequencyEntry[]> {
   const res = await db.execute({
@@ -23,7 +23,7 @@ export async function getLemmaFrequency(
 }
 
 export async function getVerbConcordance(
-  db: Client,
+  db: QueryClient,
   limit = 200,
 ): Promise<VerbConcordanceEntry[]> {
   const res = await db.execute({
