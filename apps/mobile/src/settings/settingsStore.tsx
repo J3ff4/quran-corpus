@@ -149,12 +149,10 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
 
   function updateSetting<TKey extends keyof AppSettings>(key: TKey, value: AppSettings[TKey]) {
     setSettings((current) => ({ ...current, [key]: value }));
-    if (userClient) {
-      queuePendingSetting(key, value);
-      schedulePendingSettingsPersistence(userClient);
-      return;
-    }
+    // Queue unconditionally: with no client yet, hydration drains the queue
+    // once it opens one.
     queuePendingSetting(key, value);
+    if (userClient) schedulePendingSettingsPersistence(userClient);
   }
 
   function queuePendingSetting<TKey extends keyof AppSettings>(key: TKey, value: AppSettings[TKey]) {
@@ -239,6 +237,14 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
         hasNewerPendingSettings = true;
       }
     }
+    // A write that lands proves the store is reachable again, so a later
+    // failure should not inherit the exponent an earlier failure streak built
+    // up. Without this a single bad patch could keep every subsequent retry
+    // near the 30 s cap for the rest of the session, even after several
+    // successful writes in between. The drained-queue branch below resets too,
+    // for the case where every entry was superseded and none was written.
+    if (persistedKeys.size > 0) persistenceRetryAttemptRef.current = 0;
+
     pendingSettingsRef.current = nextPending;
     if (Object.keys(nextPending).length === 0) {
       persistenceRetryAttemptRef.current = 0;

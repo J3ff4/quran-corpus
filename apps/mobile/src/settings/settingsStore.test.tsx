@@ -30,13 +30,16 @@ function requireSettings(settings: AppSettingsContextValue | null): AppSettingsC
 }
 
 describe('AppSettingsProvider', () => {
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
   beforeEach(() => {
     mocks.userClient = createMemoryUserClient();
     mocks.openUserDb = null;
+  });
+
+  afterEach(() => {
+    // Cases below leave a scheduled 30 s retry alive; clearing before swapping
+    // back to real timers keeps it from firing into the next test's client.
+    vi.clearAllTimers();
+    vi.useRealTimers();
   });
 
   it('hydrates persisted settings and writes setting changes through useAppSettings', async () => {
