@@ -26,9 +26,23 @@ function parseSurahId(value: string | string[] | undefined): number | null {
   return parsed;
 }
 
+// 286 is al-Baqarah, the longest surah; a row that does not exist in this
+// surah simply resolves to no index and the reader opens at the top.
+function parseAyahNumber(value: string | string[] | undefined): number | null {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (!raw) return null;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 286) return null;
+  return parsed;
+}
+
 export default function SurahRoute() {
-  const params = useLocalSearchParams<{ surahId: string }>();
+  const params = useLocalSearchParams<{ surahId: string; ayah?: string }>();
   const surahId = useMemo(() => parseSurahId(params.surahId), [params.surahId]);
+  // Bookmarks and the Home tab's continue link both carry the ayah they mean.
+  // Validated the same way as surahId -- it arrives from a URL, so it is
+  // untrusted input even when we are the only ones writing the links.
+  const initialAyahNumber = useMemo(() => parseAyahNumber(params.ayah), [params.ayah]);
   const { contentLanguage, setContentLanguage, uiLocale } = useAppSettings();
   const theme = useThemeColors();
   const audio = useAyahAudioController(process.env.EXPO_PUBLIC_AUDIO_API_BASE_URL, surahId);
@@ -148,6 +162,7 @@ export default function SurahRoute() {
         playingAyah={audio.playingAyah}
         audioEnabled={audio.audioEnabled}
         uiLocale={uiLocale}
+        initialAyahNumber={initialAyahNumber}
         onToggleBookmark={toggleBookmark}
         onToggleAudio={audio.toggleAyah}
         onReadingAyah={(ayahNumber) => {

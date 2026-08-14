@@ -30,7 +30,12 @@ export default function HomeTab() {
       ) : null}
       {!loading && !error && position ? (
         <Link
-          href={{ pathname: '/surah/[surahId]', params: { surahId: String(position.surahId) } }}
+          href={{
+            pathname: '/surah/[surahId]',
+            // Without the ayah the link opened the surah at ayah 1, which for
+            // al-Baqarah means the saved position was 254 rows away.
+            params: { surahId: String(position.surahId), ayah: String(position.ayahNumber) },
+          }}
           // The visible label is bare coordinates ("2:255"); on its own a screen
           // reader announces two numbers with no indication of what tapping does.
           accessibilityLabel={`${t(uiLocale, 'home.continue')} ${position.surahId}:${position.ayahNumber}`}

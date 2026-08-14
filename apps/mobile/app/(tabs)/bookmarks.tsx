@@ -32,7 +32,10 @@ export default function BookmarksTab() {
       {bookmarks.map((bookmark) => (
         <Link
           key={`${bookmark.surahId}:${bookmark.ayahNumber}`}
-          href={{ pathname: '/surah/[surahId]', params: { surahId: String(bookmark.surahId) } }}
+          href={{
+            pathname: '/surah/[surahId]',
+            params: { surahId: String(bookmark.surahId), ayah: String(bookmark.ayahNumber) },
+          }}
           accessibilityRole="link"
           style={{ color: theme.accent }}
         >
