@@ -90,6 +90,7 @@ describe('AppSettingsProvider', () => {
   it('retries pending pre-hydration settings after a transient save failure', async () => {
     const userClient = requireSettingsClient();
     await saveSetting(userClient, 'uiLocale', 'ru');
+    vi.useFakeTimers();
     const flakyClient = failFirstSettingWrite(userClient, 'uiLocale');
     const openDeferred = deferred<MobileDataClient>();
     mocks.openUserDb = () => openDeferred.promise as Promise<ReturnType<typeof createMemoryUserClient>>;
@@ -106,14 +107,20 @@ describe('AppSettingsProvider', () => {
     });
     openDeferred.resolve(flakyClient);
 
-    await waitFor(() => expect(requireSettings(settings).uiLocale).toBe('uz'));
+    await vi.waitFor(() => expect(requireSettings(settings).uiLocale).toBe('uz'));
 
     act(() => {
       requireSettings(settings).setAnalyticsEnabled(true);
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 1100));
-    await waitFor(async () => {
+    // Fake timers, matching the sibling backoff cases. This used to be a real
+    // 1.1s sleep hard-coded against the 1000ms retry constant: slow, prone to
+    // flaking on a loaded runner, and it silently stopped exercising the retry
+    // at all if that constant ever grew.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    await vi.waitFor(async () => {
       await expect(getSetting(userClient, 'uiLocale')).resolves.toBe('uz');
     });
   });
