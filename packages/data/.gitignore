@@ -1,5 +1,0 @@
-# Build artifacts
-dist/
-
-# Generated from schema.sql by scripts/generate-schema.mjs
-src/schema.generated.ts

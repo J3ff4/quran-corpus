@@ -1,6 +1,6 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import { createDatabase } from '../../data/src/db.js';
+import { createDatabase } from '@quran-corpus/data';
 
 const dbPath = resolve('../../apps/mobile/assets/db/quran-m0.db');
 const schemaPath = resolve('../data/schema.sql');

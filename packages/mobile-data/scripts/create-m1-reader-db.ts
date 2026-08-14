@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { access, copyFile, mkdir, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createDatabase } from '../../data/src/db.js';
+import { createDatabase } from '@quran-corpus/data';
 
 const repoRoot = resolve('../..');
 const approvalPath = resolve(repoRoot, 'docs/data-sources-m1.md');

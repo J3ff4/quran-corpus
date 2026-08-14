@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { createDatabase } from '../../data/src/db.js';
+import { createDatabase } from '@quran-corpus/data';
 
 describe('M0 fixture DB artifact', () => {
   it('exists and is non-empty after generate:m0-db', async () => {
