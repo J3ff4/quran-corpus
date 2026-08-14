@@ -18,6 +18,9 @@ export interface AppSettingsContextValue extends AppSettings {
   setContentLanguage: (language: ContentLanguageCode) => void;
   setTheme: (theme: ThemePreference) => void;
   setAnalyticsEnabled: (enabled: boolean) => void;
+  /** Set while the settings database cannot be opened, so a screen can say so
+   *  instead of letting changes look saved when nothing is being persisted. */
+  storageError: string | null;
 }
 
 const defaultSettings: AppSettings = {
@@ -49,12 +52,20 @@ function isTheme(value: string | null): value is ThemePreference {
 }
 
 export async function loadPersistedAppSettings(client: MobileDataClient): Promise<AppSettings> {
-  const [uiLocale, contentLanguage, theme, analyticsEnabled] = await Promise.all(
-    settingKeys.map((key) => getSetting(client, key)),
+  // Keyed, not positional. This used to destructure the Promise.all result by
+  // index, which is correct only as long as nobody reorders settingKeys or
+  // inserts a key in the middle. Doing either would have silently fed the theme
+  // value to the locale validator, which rejects it and falls back to the
+  // default -- a settings reset with no error, and every value is a plain
+  // string so the tests would still have passed.
+  const entries = await Promise.all(
+    settingKeys.map(async (key) => [key, (await getSetting(client, key)) ?? null] as const),
   );
-  const persistedUiLocale = uiLocale ?? null;
-  const persistedContentLanguage = contentLanguage ?? null;
-  const persistedTheme = theme ?? null;
+  const persisted = Object.fromEntries(entries) as Record<(typeof settingKeys)[number], string | null>;
+  const persistedUiLocale = persisted.uiLocale;
+  const persistedContentLanguage = persisted.contentLanguage;
+  const persistedTheme = persisted.theme;
+  const analyticsEnabled = persisted.analyticsEnabled;
 
   return {
     uiLocale: isUiLocale(persistedUiLocale) ? persistedUiLocale : defaultSettings.uiLocale,
@@ -73,6 +84,7 @@ type PendingSettingEntry = [keyof AppSettings, AppSettings[keyof AppSettings]];
 export function AppSettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(defaultSettings);
   const [userClient, setUserClient] = useState<MobileDataClient | null>(null);
+  const [storageError, setStorageError] = useState<string | null>(null);
   const pendingSettingsRef = useRef<Partial<AppSettings>>({});
   const pendingPersistenceRef = useRef<Promise<void>>(Promise.resolve());
   const pendingImmediatePersistenceRef = useRef(false);
@@ -84,6 +96,8 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     persistenceSchedulerActiveRef.current = true;
     let cancelled = false;
+    let hydrationAttempt = 0;
+    let hydrationTimer: ReturnType<typeof setTimeout> | null = null;
 
     async function hydrateSettings() {
       const db = await openUserDb();
@@ -93,16 +107,38 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
         const pendingSettings = { ...pendingSettingsRef.current };
         setUserClient(client);
         setSettings({ ...persisted, ...pendingSettings });
+        setStorageError(null);
         schedulePendingSettingsPersistence(client);
       }
     }
 
-    hydrateSettings().catch(() => {
-      // Keep defaults if local user settings cannot be opened.
-    });
+    // Retried, and surfaced. A rejected open used to be swallowed here, which
+    // left userClient null forever -- so updateSetting took the queue-only
+    // branch on every later change, and each one sat in pendingSettingsRef with
+    // no client, no scheduler, no retry and nothing on screen. The user changed
+    // a setting, watched it apply, restarted, and found it reverted. The retry
+    // machinery below covers failed *writes*; this covers the failed open.
+    function attemptHydration() {
+      hydrateSettings().catch((cause) => {
+        if (cancelled) return;
+        setStorageError(cause instanceof Error ? cause.message : 'Unable to open settings storage');
+        const retryDelayMs = Math.min(1000 * 2 ** hydrationAttempt, 30000);
+        hydrationAttempt += 1;
+        hydrationTimer = setTimeout(() => {
+          hydrationTimer = null;
+          if (!cancelled) attemptHydration();
+        }, retryDelayMs);
+      });
+    }
+
+    attemptHydration();
     return () => {
       cancelled = true;
       persistenceSchedulerActiveRef.current = false;
+      if (hydrationTimer) {
+        clearTimeout(hydrationTimer);
+        hydrationTimer = null;
+      }
       if (persistenceRetryTimerRef.current) {
         clearTimeout(persistenceRetryTimerRef.current);
         persistenceRetryTimerRef.current = null;
@@ -223,12 +259,13 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AppSettingsContextValue>(
     () => ({
       ...settings,
+      storageError,
       setUiLocale: (uiLocale) => updateSetting('uiLocale', uiLocale),
       setContentLanguage: (contentLanguage) => updateSetting('contentLanguage', contentLanguage),
       setTheme: (theme) => updateSetting('theme', theme),
       setAnalyticsEnabled: (analyticsEnabled) => updateSetting('analyticsEnabled', analyticsEnabled),
     }),
-    [settings, userClient],
+    [settings, storageError, userClient],
   );
 
   return <AppSettingsContext.Provider value={value}>{children}</AppSettingsContext.Provider>;

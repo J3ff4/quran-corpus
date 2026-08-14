@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import { contentLanguages, uiLocales } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
+import { touchTargets } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
 const themeLabelKeys = {
@@ -11,6 +12,34 @@ const themeLabelKeys = {
   dark: 'settings.themeDark',
 } as const;
 
+/**
+ * One option in a single-choice row.
+ *
+ * Selection used to be accent-vs-muted text and nothing else, which fails WCAG
+ * 1.4.1 (colour as the only carrier of meaning) and left the three groups on
+ * this screen unreadable to anyone who cannot separate those two greens. The
+ * filled/hollow bullet and the weight change carry the same information without
+ * colour. The bullet is decorative, so accessibilityLabel keeps it out of what
+ * a screen reader announces -- the radio role already conveys selection there.
+ */
+function ChoiceOption({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+  const theme = useThemeColors();
+  return (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityState={{ selected, checked: selected }}
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={{ minHeight: touchTargets.minimum, justifyContent: 'center', paddingHorizontal: 4 }}
+    >
+      <Text style={{ color: selected ? theme.accent : theme.mutedText, fontWeight: selected ? '700' : '400' }}>
+        {selected ? '● ' : '○ '}
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 export default function SettingsTab() {
   const settings = useAppSettings();
   const { uiLocale } = settings;
@@ -18,55 +47,51 @@ export default function SettingsTab() {
 
   return (
     <View style={{ flex: 1, padding: 20, gap: 16, backgroundColor: theme.background }}>
-      <Text style={{ color: theme.text, fontSize: 20, fontWeight: '700' }}>{t(uiLocale, 'tabs.settings')}</Text>
-      <View style={{ gap: 8 }}>
+      <Text accessibilityRole="header" style={{ color: theme.text, fontSize: 20, fontWeight: '700' }}>
+        {t(uiLocale, 'tabs.settings')}
+      </Text>
+      {/* Without this the screen happily accepts changes it is not persisting. */}
+      {settings.storageError ? (
+        <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ color: theme.danger }}>
+          {t(uiLocale, 'settings.storageUnavailable')}
+        </Text>
+      ) : null}
+      <View accessibilityRole="radiogroup" style={{ gap: 8 }}>
         <Text style={{ color: theme.text, fontWeight: '600' }}>{t(uiLocale, 'settings.language')}</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {uiLocales.map((locale) => (
-            <Pressable
+            <ChoiceOption
               key={locale.code}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: locale.code === settings.uiLocale }}
+              label={locale.nativeLabel}
+              selected={locale.code === settings.uiLocale}
               onPress={() => settings.setUiLocale(locale.code)}
-            >
-              <Text style={{ color: locale.code === settings.uiLocale ? theme.accent : theme.mutedText }}>
-                {locale.nativeLabel}
-              </Text>
-            </Pressable>
+            />
           ))}
         </View>
       </View>
-      <View style={{ gap: 8 }}>
+      <View accessibilityRole="radiogroup" style={{ gap: 8 }}>
         <Text style={{ color: theme.text, fontWeight: '600' }}>{t(uiLocale, 'reader.translation')}</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           {contentLanguages.map((language) => (
-            <Pressable
+            <ChoiceOption
               key={language.code}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: language.code === settings.contentLanguage }}
+              label={language.nativeLabel}
+              selected={language.code === settings.contentLanguage}
               onPress={() => settings.setContentLanguage(language.code)}
-            >
-              <Text style={{ color: language.code === settings.contentLanguage ? theme.accent : theme.mutedText }}>
-                {language.nativeLabel}
-              </Text>
-            </Pressable>
+            />
           ))}
         </View>
       </View>
-      <View style={{ gap: 8 }}>
+      <View accessibilityRole="radiogroup" style={{ gap: 8 }}>
         <Text style={{ color: theme.text, fontWeight: '600' }}>{t(uiLocale, 'settings.theme')}</Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {(['system', 'light', 'dark'] as const).map((option) => (
-            <Pressable
+            <ChoiceOption
               key={option}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: option === settings.theme }}
+              label={t(uiLocale, themeLabelKeys[option])}
+              selected={option === settings.theme}
               onPress={() => settings.setTheme(option)}
-            >
-              <Text style={{ color: option === settings.theme ? theme.accent : theme.mutedText }}>
-                {t(uiLocale, themeLabelKeys[option])}
-              </Text>
-            </Pressable>
+            />
           ))}
         </View>
       </View>
@@ -74,12 +99,17 @@ export default function SettingsTab() {
         accessibilityRole="switch"
         accessibilityState={{ checked: settings.analyticsEnabled }}
         onPress={() => settings.setAnalyticsEnabled(!settings.analyticsEnabled)}
+        style={{ minHeight: touchTargets.minimum, justifyContent: 'center' }}
       >
         <Text style={{ color: settings.analyticsEnabled ? theme.accent : theme.mutedText }}>
           {t(uiLocale, settings.analyticsEnabled ? 'settings.analyticsOn' : 'settings.analyticsOff')}
         </Text>
       </Pressable>
-      <Link href="/about" style={{ color: theme.accent }}>
+      <Link
+        href="/about"
+        accessibilityRole="link"
+        style={{ color: theme.accent, minHeight: touchTargets.minimum, paddingTop: 12 }}
+      >
         {t(uiLocale, 'settings.about')}
       </Link>
     </View>
