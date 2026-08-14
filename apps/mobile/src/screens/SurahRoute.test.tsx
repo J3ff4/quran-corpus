@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import SurahRoute from '../../app/surah/[surahId]';
 
@@ -125,7 +125,7 @@ describe('SurahRoute', () => {
     expect(screen.getByText('reader-content')).toBeTruthy();
   });
 
-  it('clears stale mutation feedback after a later reading history write succeeds', async () => {
+  it('keeps a bookmark failure on screen while background reading writes run', async () => {
     const readingWrite = deferred<void>();
     mocks.setBookmark.mockRejectedValue(new Error('bookmark write boom'));
     mocks.recordReadingPosition.mockReturnValue(readingWrite.promise);
@@ -135,16 +135,33 @@ describe('SurahRoute', () => {
     fireEvent.click(screen.getByText('bookmark'));
     await waitFor(() => expect(screen.getByText('bookmark write boom')).toBeTruthy());
 
+    // Scrolling drives this write, so it must not clear feedback the user never
+    // acknowledged -- their bookmark is still unsaved.
     fireEvent.click(screen.getByText('read ayah'));
     await waitFor(() => expect(mocks.recordReadingPosition).toHaveBeenCalled());
-    expect(screen.queryByText('bookmark write boom')).toBeNull();
+    expect(screen.getByText('bookmark write boom')).toBeTruthy();
 
-    readingWrite.resolve();
-    await waitFor(async () => {
+    await act(async () => {
+      readingWrite.resolve();
       await readingWrite.promise;
     });
-    expect(screen.queryByText('bookmark write boom')).toBeNull();
+
+    expect(screen.getByText('bookmark write boom')).toBeTruthy();
     expect(screen.getByText('reader-content')).toBeTruthy();
+  });
+
+  it('surfaces bookmark and reading failures independently', async () => {
+    mocks.setBookmark.mockRejectedValue(new Error('bookmark write boom'));
+    mocks.recordReadingPosition.mockRejectedValue(new Error('reading position write boom'));
+    render(<SurahRoute />);
+
+    await screen.findByText('reader-content');
+    fireEvent.click(screen.getByText('bookmark'));
+    await waitFor(() => expect(screen.getByText('bookmark write boom')).toBeTruthy());
+
+    fireEvent.click(screen.getByText('read ayah'));
+    await waitFor(() => expect(screen.getByText('reading position write boom')).toBeTruthy());
+    expect(screen.getByText('bookmark write boom')).toBeTruthy();
   });
 });
 

@@ -32,15 +32,20 @@ export default function SurahRoute() {
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [mutationError, setMutationError] = useState<string | null>(null);
+  // Two error slots, not one. Reading-position writes are driven by scrolling,
+  // so a single shared slot let a background write silently wipe the bookmark
+  // failure the user was still reading -- their bookmark stayed unsaved with
+  // nothing on screen to say so.
+  const [bookmarkError, setBookmarkError] = useState<string | null>(null);
+  const [readingError, setReadingError] = useState<string | null>(null);
   const readingRecorder = useMemo(() => {
     if (!surahId) return null;
     return createLatestReadingPositionRecorder(async (ayahNumber) => {
-      setMutationError(null);
+      setReadingError(null);
       const userDb = await openUserDb();
       const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
       await recordReadingPosition(userClient, surahId, ayahNumber);
-    }, setMutationError);
+    }, setReadingError);
   }, [surahId]);
 
   useEffect(() => {
@@ -55,7 +60,8 @@ export default function SurahRoute() {
 
       setLoading(true);
       setError(null);
-      setMutationError(null);
+      setBookmarkError(null);
+      setReadingError(null);
 
       try {
         const [corpusDb, userDb] = await Promise.all([openCorpusDb(), openUserDb()]);
@@ -101,13 +107,13 @@ export default function SurahRoute() {
     });
 
     try {
-      setMutationError(null);
+      setBookmarkError(null);
       const userDb = await openUserDb();
       const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
       await setBookmark(userClient, surahId, ayahNumber, nextBookmarked);
     } catch (cause) {
       setBookmarks(previousBookmarks);
-      setMutationError(cause instanceof Error ? cause.message : 'Unable to update bookmark');
+      setBookmarkError(cause instanceof Error ? cause.message : 'Unable to update bookmark');
     }
   }
 
@@ -142,7 +148,8 @@ export default function SurahRoute() {
           readingRecorder?.record(ayahNumber);
         }}
       />
-      {mutationError ? <Text style={{ color: colors.danger, padding: 20 }}>{mutationError}</Text> : null}
+      {bookmarkError ? <Text style={{ color: colors.danger, padding: 20 }}>{bookmarkError}</Text> : null}
+      {readingError ? <Text style={{ color: colors.danger, padding: 20 }}>{readingError}</Text> : null}
       {audio.audioError ? <Text style={{ color: colors.danger, padding: 20 }}>{audio.audioError}</Text> : null}
     </View>
   );
