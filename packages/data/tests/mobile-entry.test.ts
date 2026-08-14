@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 describe('@quran-corpus/data/mobile', () => {
@@ -19,4 +22,77 @@ describe('@quran-corpus/data/mobile', () => {
     expect('runMigrations' in mod).toBe(false);
     expect('backfillSearchIndex' in mod).toBe(false);
   });
+
+  // The two cases above only inspect the entry point's own exports, which is
+  // the weaker half of the guarantee. Node resolves @libsql/client happily
+  // under Vitest, so a *transitive* runtime import would pass both of them and
+  // then fail in Metro, on a device, when the RN bundle cannot resolve a node
+  // driver. This walks the real import graph instead.
+  it('pulls no node-only module into the mobile graph', () => {
+    const srcRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../src');
+    const entry = resolve(srcRoot, 'mobile.ts');
+
+    const visited = new Set<string>();
+    const offenders: string[] = [];
+    const queue = [entry];
+
+    while (queue.length > 0) {
+      const file = queue.pop();
+      if (!file || visited.has(file)) continue;
+      visited.add(file);
+
+      for (const specifier of runtimeImportsOf(file)) {
+        if (specifier === '@libsql/client') {
+          offenders.push(`${relativeToSrc(srcRoot, file)} imports ${specifier}`);
+          continue;
+        }
+        if (!specifier.startsWith('.')) continue;
+
+        // Authored as ESM with .js specifiers; the sources are .ts.
+        const resolved = resolve(dirname(file), specifier.replace(/\.js$/, '.ts'));
+        const name = relativeToSrc(srcRoot, resolved);
+        if (name === 'db.ts' || name === 'migrate.ts') {
+          offenders.push(`${relativeToSrc(srcRoot, file)} imports ${name}`);
+          continue;
+        }
+        queue.push(resolved);
+      }
+    }
+
+    expect(offenders).toEqual([]);
+    // Guards the walker itself: if resolution silently produced nothing, the
+    // assertion above would pass while checking nothing at all.
+    expect(visited.size).toBeGreaterThan(5);
+  });
 });
+
+function relativeToSrc(srcRoot: string, file: string): string {
+  return file.startsWith(srcRoot) ? file.slice(srcRoot.length + 1) : file;
+}
+
+/**
+ * Import specifiers that survive to runtime.
+ *
+ * `import type` / `export type` are erased by the compiler, so they cannot drag
+ * anything into the bundle -- roots.ts and search.ts legitimately take a libsql
+ * `Client` as a type on their write paths, and flagging those would be wrong.
+ */
+function runtimeImportsOf(file: string): string[] {
+  let source: string;
+  try {
+    source = readFileSync(file, 'utf8');
+  } catch {
+    return [];
+  }
+
+  const specifiers: string[] = [];
+  const pattern = /(?:^|\n)\s*(import|export)\s+([^'"]*?)from\s*['"]([^'"]+)['"]/g;
+  let match = pattern.exec(source);
+  while (match) {
+    const clause = match[2] ?? '';
+    const specifier = match[3];
+    if (specifier && !/^\s*type\s/.test(clause)) specifiers.push(specifier);
+    match = pattern.exec(source);
+  }
+  return specifiers;
+}

@@ -12,6 +12,13 @@
 // Anything that writes (db.ts, migrate.ts, backfills) keeps taking `Client`:
 // this type is deliberately read-only, and widening it would hand the mobile
 // entry point a write path it must not have.
+//
+// To be precise about what "read-only" buys you: this is a *typing* boundary,
+// not a runtime one. It stops the query layer from reaching for batch,
+// transaction or migrate; it cannot stop a caller passing a DELETE through
+// execute(). The runtime guarantee has to live on the connection, because the
+// same client type also serves the read-write user DB -- apps/mobile opens the
+// bundled corpus with `PRAGMA query_only = ON` for exactly that reason.
 
 /** A bind parameter. Deliberately the *intersection* of what libsql and
  *  expo-sqlite accept, not the union: the corpus schema binds only ints and

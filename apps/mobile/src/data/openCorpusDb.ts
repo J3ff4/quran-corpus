@@ -83,7 +83,16 @@ export async function openCorpusDb(): Promise<SQLite.SQLiteDatabase> {
 
   await extraction;
 
-  return SQLiteRuntime.openDatabaseSync(corpusDbFileName);
+  const db = SQLiteRuntime.openDatabaseSync(corpusDbFileName);
+  // Enforced by SQLite on the connection, not by inspecting SQL strings before
+  // we hand them over. The corpus is shipped content and nothing in the app has
+  // any business writing to it, but the query client is the same one the
+  // read-write user DB uses, so the boundary cannot live in the client. A
+  // string filter would also be the weaker guarantee -- it has to be right
+  // about every statement form, whereas query_only makes the engine itself
+  // refuse writes and DDL on this handle.
+  db.execSync('PRAGMA query_only = ON;');
+  return db;
 }
 
 export function useCorpusFonts(): [boolean, Error | null] {
