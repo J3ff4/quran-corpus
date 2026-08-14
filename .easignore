@@ -34,10 +34,14 @@ ios/
 *.key
 *.mobileprovision
 
-# Secrets
-.env
-.env.local
-.env.*.local
+# Secrets.
+#
+# Deliberately the broad glob, not the three specific names this used to list:
+# .env.production, .env.development and .env.test matched none of them, and
+# because this file REPLACES .gitignore, anything unmatched here is uploaded.
+# Add a negation only for a file that is known non-secret and needed by the
+# build -- and only after reading it.
+.env*
 
 # Python (packages/scraper plays no part in a mobile build)
 __pycache__/
