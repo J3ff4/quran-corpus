@@ -33,10 +33,11 @@ See `PRD-quran-corpus-pwa.md` for the web product and `docs/PRD-android-first-mo
 
 - `packages/data` is the single source of truth for schema and queries. **Web, mobile, and scraper all depend on it.** Never duplicate schema or query logic into an app.
 - Keep `packages/data` free of any web, Next, Expo, or React Native imports so it stays portable across all three consumers.
-- `packages/data` has three entry points and they are not interchangeable:
+- `packages/data` has four entry points and they are not interchangeable:
   - `.` — the full barrel. Pulls `@libsql/client`. Server and Node scripts only.
   - `./client` — browser-safe pure functions and types. Required in any file with `'use client'`; the barrel drags libsql into the client bundle and breaks hydration app-wide.
   - `./mobile` — read-only query subset with no `createDatabase`, migrations, or backfills. Required in `apps/mobile`; the barrel pulls the native libsql driver into the React Native module graph.
+  - `./user-db` — the write-capable user database (bookmarks, reading history, settings). Separate from `./mobile` precisely because it writes; it is a leaf module with no runtime imports at all, so it adds nothing to the Metro graph.
   - `tests/client-entry.test.ts` and `tests/mobile-entry.test.ts` guard those module graphs. Do not weaken them.
 - `apps/mobile` depends on `packages/mobile-data`, which adapts the shared data API to Expo SQLite.
 - **Forking a shared package is never the answer.** In July 2026 the Android app began life in a separate repo with copies of `packages/data` and `packages/config`; within two weeks the copy had lost the `trg_roots_sort_order_*` invalidation triggers, the `text/buckwalter.ts` trust-boundary validators, and 199 lines of `queries/roots.ts`. If a shared package does not fit a new consumer, change the shared package (§12).
