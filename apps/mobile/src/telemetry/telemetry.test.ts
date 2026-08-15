@@ -49,6 +49,21 @@ describe('telemetry', () => {
     expect(posthog.capture).toHaveBeenCalledWith('reader_ayah_opened', { surah: 3 });
   });
 
+  it('drops a non-object payload instead of throwing at the call site', () => {
+    const posthog = { capture: vi.fn() };
+    const sentry = { captureException: vi.fn() };
+    const telemetry = createTelemetry({ posthog: posthog as never, sentry: sentry as never });
+
+    // A JS caller can pass null, and Object.entries(null) throws. Telemetry
+    // sits inside user-facing paths, so it has to swallow this, not surface it.
+    telemetry.captureEvent('app_opened', null as never);
+    telemetry.captureException('unknown', 'not an object' as never);
+
+    expect(posthog.capture).toHaveBeenCalledWith('app_opened', {});
+    const [, context] = sentry.captureException.mock.calls[0] as [Error, { extra: unknown }];
+    expect(context.extra).toEqual({});
+  });
+
   it('drops out-of-range values for approved numeric keys', () => {
     const posthog = { capture: vi.fn() };
     const telemetry = createTelemetry({ posthog: posthog as never, sentry: null });

@@ -85,13 +85,19 @@ const propertyValidators: Record<string, (value: TelemetryValue) => boolean> = {
   source: isOneOf(sources),
 };
 
-export function sanitizeProperties(properties: TelemetryProperties = {}): TelemetryProperties {
+// `unknown` rather than TelemetryProperties: the types say callers pass an
+// object, but this is a trust boundary and callers may be plain JS. `null`
+// reaches Object.entries and throws, which would take down whatever
+// user-facing path emitted the event -- telemetry must fail quiet, not loud.
+export function sanitizeProperties(properties: unknown = {}): TelemetryProperties {
+  if (properties === null || typeof properties !== 'object') return {};
+
   return Object.fromEntries(
     // hasOwn before the lookup: a plain object literal inherits from
     // Object.prototype, so keys like `toString`, `valueOf` or `constructor`
     // resolve to an inherited function, get called, return something truthy,
     // and survive the filter -- the key-only bypass this table exists to stop.
-    Object.entries(properties).filter(
+    Object.entries(properties as TelemetryProperties).filter(
       ([key, value]) => Object.hasOwn(propertyValidators, key) && (propertyValidators[key]?.(value) ?? false),
     ),
   );
