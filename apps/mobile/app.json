@@ -12,7 +12,6 @@
     ],
     "android": {
       "package": "com.qurancorpus.mobile",
-      "minSdkVersion": 26,
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/icons/adaptive-icon.png",
@@ -48,7 +47,12 @@
       "audioApiBaseUrl": "",
       "sentryDsn": "",
       "posthogKey": "",
-      "posthogHost": ""
-    }
+      "posthogHost": "",
+      "router": {},
+      "eas": {
+        "projectId": "9f4c8261-5416-4df2-9045-b6c3ac5e98f9"
+      }
+    },
+    "owner": "ihorsherbyna"
   }
 }
