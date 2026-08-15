@@ -42,6 +42,33 @@ export const USER_DB_SCHEMA = `
   );
 `;
 
+/** 114 surahs; al-Baqarah is the longest at 286 ayahs. */
+const SURAH_COUNT = 114;
+const LONGEST_SURAH_AYAH_COUNT = 286;
+
+/**
+ * Reject a coordinate that cannot name a real ayah.
+ *
+ * `INTEGER NOT NULL` is not a range check: SQLite stores 0, -1 and 9999 just as
+ * happily, and the corrupt row only shows up later as a bookmark that opens
+ * nothing or a "continue reading" link to a surah that does not exist. This is
+ * the write boundary for a shared API that any consumer can call, so the check
+ * belongs here rather than in whichever screen happens to call it -- the route
+ * layer's own validation covers the URL, not a direct call.
+ *
+ * Deliberately the widest plausible bound rather than the true ayah count for
+ * the given surah: this package holds no per-surah counts without a query, and
+ * the point is to reject the impossible, not to re-derive the corpus.
+ */
+function assertAyahCoordinate(surahId: number, ayahNumber: number): void {
+  if (!Number.isInteger(surahId) || surahId < 1 || surahId > SURAH_COUNT) {
+    throw new RangeError(`surahId must be an integer in 1..${SURAH_COUNT}, got ${surahId}`);
+  }
+  if (!Number.isInteger(ayahNumber) || ayahNumber < 1 || ayahNumber > LONGEST_SURAH_AYAH_COUNT) {
+    throw new RangeError(`ayahNumber must be an integer in 1..${LONGEST_SURAH_AYAH_COUNT}, got ${ayahNumber}`);
+  }
+}
+
 export interface Bookmark {
   surahId: number;
   ayahNumber: number;
@@ -58,6 +85,14 @@ export async function setBookmark(
   ayahNumber: number,
   bookmarked: boolean,
 ): Promise<void> {
+  assertAyahCoordinate(surahId, ayahNumber);
+  // Guarded too: a JS caller passing a string would take the DELETE branch for
+  // '' and the INSERT branch for anything else, so a typo silently becomes the
+  // opposite operation.
+  if (typeof bookmarked !== 'boolean') {
+    throw new TypeError(`bookmarked must be a boolean, got ${typeof bookmarked}`);
+  }
+
   if (bookmarked) {
     await client.execute({
       sql: `INSERT INTO bookmarks (surah_id, ayah_number)
@@ -92,6 +127,8 @@ export async function recordReadingPosition(
   surahId: number,
   ayahNumber: number,
 ): Promise<void> {
+  assertAyahCoordinate(surahId, ayahNumber);
+
   await client.execute({
     sql: `INSERT INTO reading_history (id, surah_id, ayah_number, updated_at)
           VALUES (1, ?, ?, CURRENT_TIMESTAMP)
