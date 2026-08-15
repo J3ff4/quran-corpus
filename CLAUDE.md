@@ -52,94 +52,109 @@ See `PRD-quran-corpus-pwa.md` for the web product and `docs/PRD-android-first-mo
 
 -----
 
-## 4. The Mandatory 6-Step Loop
+## 4. The Mandatory Loop
 
 Every unit of work (a feature, a fix, a module) follows this loop. Do not skip steps. Do not batch multiple features through one loop.
 
 1. **Implement** — write code to spec, matching existing conventions.
 1. **Self Review** — re-read the diff against DRY / SOLID / OWASP and this file. Check for duplication, leaked abstractions, missing validation.
-1. **Code Review** — run `/code-review` on the change. This is the first *independent* read of the diff; self-review is the agent grading its own work. Plain `/code-review` is included in the Pro plan and runs locally — use it by default. `/code-review ultra` bills separately ($5–25/run) and is reserved for changes where a missed bug is expensive; never launch it without asking.
 1. **Quality Review** — run lint, type-check, and tests. All must pass. No `// @ts-ignore`, no disabled lint rules without an inline justification comment.
-1. **Automated Review** — run the review gate on the change (CodeRabbit; see §5).
-1. **Final Review** — re-review after fixes; confirm no regression, then commit.
+1. **Mutation-check new logic** — for a branch, loop, parser, or validator, delete the fix (or flip the condition) and confirm a test actually fails. A test that passes both ways asserts nothing, and that has slipped through twice (PRs #71, #73).
+1. **Independent Review** — **only when §5 says the change needs one.** Most changes do not.
+1. **Commit.**
 
-Step 3 is **user-triggered**: the agent cannot launch `/code-review` itself. When the loop reaches it, the agent stops and asks the user to run it, then acts on the findings. Do not silently skip the step because it needs a human keystroke.
+Step 5 is **user-triggered**: the agent cannot launch `/code-review` itself. When a change meets a §5 trigger, the agent stops and asks the user to run it, then acts on the findings. Do not silently skip it because it needs a human keystroke — and do not invoke it for changes that fall outside the triggers.
 
 If any step surfaces an issue, fix and **restart from step 2** for the affected code.
 
 -----
 
-## 5. Automated Review Gate (HARD BLOCK)
+## 5. Independent Review (scoped)
 
-**CodeRabbit is the gate.** Greptile stays installed for now so the two can be
-compared over a few PRs, but it is advisory — it does not block, and it cannot
-gate anyway (see below).
+Independent review is **no longer a blanket gate**. It was one through
+2026-08-15, and the ledger is unambiguous about what that cost: PR #75 took 25
+review rounds, PR #71 took 7 with 11 of 29 findings withdrawn as wrong, and 30
+of #75's 60 findings were against `STATUS.md` and a plan doc rather than code.
+Much of the remaining effort went to detecting the reviewer's own fail-open
+modes rather than to code quality. Pre-production, that trade stopped paying.
 
-- Run the review on every meaningful change. Config lives in `.coderabbit.yaml`;
-  it points CodeRabbit at this file, so **rules added here are enforced by the
-  bot** — keep the two in sync.
-- **A change is blocked until CodeRabbit raises no unresolved findings.** Never
-  proceed, never merge, never move to the next task while one is outstanding.
-  `request_changes_workflow` is on, so this shows up as a requested-changes
-  state rather than a score. **The author may never override it** —
-  `override_requested_reviewers_only: true` removes the self-grant path
-  CodeRabbit otherwise offers. CodeRabbit has no setting that forbids an
-  override outright: the one remaining path is a *requested reviewer*
-  dismissing a failed check. This repo requests none, so today that path is
-  empty — if a human reviewer is ever added, they inherit the only override
-  that exists, and this rule is what tells them not to use it.
-- Address every finding: fix it, or — if it is a false positive — reply to the
-  bot's comment saying why, and record the same reasoning in the PR/commit body.
-  Replying teaches it; a silent dismissal does not.
-- **Re-run after fixes.** A claimed fix without a fresh review does not count.
-- **Distinguish "no findings" from "never ran."** Zero check-runs / zero comments
-  is a lapse signature, not a pass — confirm the bot actually reviewed the head
-  commit before treating silence as approval. Greptile's 50/month free cap hit
-  mid-review on PR #58 and produced exactly this, which is why it can no longer
-  be the gate: a quota-limited reviewer fails open.
-- CodeRabbit's free tier covers **unlimited public repositories** — that is a
-  repository-count allowance, not a review-volume one. **Review volume stays
-  plan- and rate-limit dependent** (reviews/hour, with a separate open-source
-  tier). So a paused, rate-limited or missing review is still possible, and
-  still counts as **blocked, never passed**. Going public does not retire this
-  rule; check the review actually ran.
-- The config is set to fail closed: `fail_commit_status: true` turns a
-  review-service error into a red status instead of a silent green, and
-  `auto_pause_after_reviewed_commits: 0` stops it from quietly giving up on a
-  branch after five commits and letting a later fix land unreviewed, and
-  `drafts: true` overrides a default that skips draft PRs entirely — otherwise
-  work can be pushed, reviewed by nobody, and marked ready with only the final
-  diff ever seen. **It does
-  not cover the rate limit.** Observed on PR #59 (2026-07-28): a review refused
-  for quota posted a **green `success`** status whose description read `Review
-  rate limited` — the state is indistinguishable from a pass unless the
-  description is read. Read it; wait for the quota; re-request.
-- **`.coderabbit.yaml` is part of the diff it governs**, so a PR can weaken its
-  own gate — deleting `request_changes_workflow`, or filtering its own files out
-  of review. CodeRabbit's answer is an org/workspace global override, which
-  outranks the repo file; this repo is owned by a personal account, which has no
-  organization tier to host one, so that fix is unavailable today. Until it
-  exists, treat any diff touching `.coderabbit.yaml` or this section as
-  self-modifying: review the gate change on its own merits before the code it
-  would let through, and never in the same PR as work that benefits from the
-  loosening.
-- **Read the pre-merge check table, not just the review verdict.** A failed
-  `mode: error` check holds the PR in requested-changes with no finding and no
-  comment attached to it — the reason lives only inside a collapsed `<details>`
-  block in CodeRabbit's walkthrough comment. On PR #59 (2026-07-28) that was the
-  title check, failing for a missing Conventional Commits scope while the review
-  itself read "No actionable comments were generated"; two re-reviews were spent
-  guessing before anyone opened the block, and the second exhausted the quota for
-  48 minutes. Before re-requesting a review to clear a stuck state, open the
-  walkthrough and find which check failed — re-running does not re-read what you
-  have not fixed.
+It still pays on a narrow slice, because the one failure mode self-review cannot
+fix is the author being convinced by their own diff. On PR #5 an independent
+read caught a `packages/data` §2 violation, two regressions introduced an hour
+earlier, and an ayah-coordinate validator that had already passed self-review,
+an OWASP check *and* a mutation-check. All three were data-layer or
+input-validation defects. That is the slice worth keeping.
 
-### Greptile (advisory, being retired)
-- Free plan: 50 reviews/month. Quota exhaustion looks like 0 check-runs.
-- Findings are still worth reading during the comparison window; they do not
-  block, and its verdict does not substitute for CodeRabbit's.
+### When a change needs an independent read
+
+Any one of these triggers it:
+
+- **`packages/data` schema or queries** — the single source of truth; a mistake
+  here reaches web, mobile and scraper at once.
+- **Input validation or any trust boundary** — §3 OWASP applies, and this is the
+  class the author is measurably worst at self-checking.
+- **Anything writing the on-device user DB** — that file lives on a user's phone
+  and survives app updates, so a bad row is not fixed by shipping a new build.
+  "We are pre-production" does not apply to persisted device state.
+
+Everything else — UI, styling, refactors, tests, docs, build scripts, plan files
+— ships on §4's self-review plus lint/type-check/tests. Do not escalate on a
+hunch; if a change is genuinely ambiguous, ask (§12) rather than defaulting to a
+review round.
+
+### How to run it
+
+- `/code-review` is the tool, and it is user-triggered (§4). Plain
+  `/code-review` is included in the Pro plan and runs locally — use it by
+  default. `/code-review ultra` bills separately ($5-25/run); **never launch it
+  without asking.**
+- **One pass, not a loop to green.** Read the findings, fix what is real, and
+  say plainly which ones are being declined and why. Re-run only when a fix was
+  substantial enough to plausibly introduce a new defect — not to clear a
+  scoreboard.
+- Findings against prose (`STATUS.md`, plan docs, commit bodies) are advisory.
+  Do not spend a round on them.
+
+### CodeRabbit
+
+Not the gate any more. It stays installed and may still comment on PRs; treat
+its output as **advisory** — read it, fix what is real, never block on it, never
+re-request a review to clear a stuck state, never poll for its status.
+
+`.coderabbit.yaml` still points the bot at this file, so it will keep enforcing
+rules written here. That is harmless while it is advisory. **If it is ever
+restored as a blocking gate, re-read the fail-open signatures below first** —
+each was observed live, and every one of them looks exactly like a pass:
+
+- A rate-limited refusal posts a **green** status described `Review rate
+  limited` (#59).
+- A skipped review posts a **green** status reading `Review skipped: manual
+  review required for this OSS repository`. Under 10 stars auto-review is off,
+  so every push needs a bare `@coderabbitai review` — prose around it downgrades
+  it to a chat reply.
+- A quota-refused run submits an **empty `APPROVED`** under a green `Review
+  approved` status (#75).
+- A failed `mode: error` pre-merge check holds the PR with **no finding and no
+  comment**; the reason lives only inside a collapsed `<details>` in the
+  walkthrough (#59).
+- A clean pass submits **no review object at all** (#63).
+- Thread replies are review objects with **empty bodies**, so "a review exists
+  at head" is not evidence that a review ran.
+- "Outside diff range" findings have **no thread**, so an `APPROVED` never
+  accounts for them (#75).
+- Zero check-runs is a **lapse signature, not a pass**.
+
+A gate that fails open in eight distinct ways, each indistinguishable from
+success without reading a description string, has to be verified by hand every
+single time. Retiring that labour is most of the point of this section.
+
+### Greptile
+
+Uninstalled in spirit — it was demoted to advisory on 2026-07-27 after its
+50/month cap blew mid-review, and it has no role now. Its verdict gates nothing.
 
 -----
+
 
 ## 6. Phase Planning Workflow
 
@@ -194,7 +209,7 @@ Work proceeds in phases. Before writing code for a phase:
 - **Conventional Commits** for every commit: `type(scope): subject`.
   - Types: `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `chore`, `style`, `build`, `ci`.
   - Scope = package or area, e.g. `feat(scraper): ...`, `fix(web/word-popover): ...`, `chore(data): ...`, `feat(mobile): ...`, `fix(mobile-data): ...`.
-- One logical change per commit. Commit only after the 6-step loop completes and the review gate passes (§5).
+- One logical change per commit. Commit only after §4's loop completes — including an independent review when §5 calls for one.
 - Imperative mood, concise subject (≤ ~72 chars). Body explains *why* when non-obvious; reference review false-positive justifications here.
 - Never commit secrets, scraped raw HTML dumps, or large binary data into git (use `.gitignore`; raw scrape snapshots live outside version control or in a data artifact store).
 
@@ -247,8 +262,8 @@ Stop and ask rather than guess on: schema changes, adding a dependency, anything
 Machine-readable config for the installed engineering skills, under `docs/agents/`.
 These files tell a skill *where* things live; they do not grant it authority. §4 and
 §5 still govern review — in particular, `mattpocock-skills:code-review` is an
-additional reader, **not** a substitute for §4 step 3 (`/code-review`) or the §5
-CodeRabbit gate.
+additional reader, **not** a substitute for the scoped `/code-review` that §4 and
+§5 require on data-layer and trust-boundary changes.
 
 ### Issue tracker
 
