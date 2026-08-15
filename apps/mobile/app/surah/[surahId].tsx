@@ -116,7 +116,6 @@ export default function SurahRoute() {
   async function toggleBookmark(ayahNumber: number) {
     if (!surahId) return;
     const nextBookmarked = !bookmarks.has(ayahNumber);
-    const previousBookmarks = new Set(bookmarks);
     setBookmarks((current) => {
       const next = new Set(current);
       if (nextBookmarked) next.add(ayahNumber);
@@ -130,7 +129,16 @@ export default function SurahRoute() {
       const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
       await setBookmark(userClient, surahId, ayahNumber, nextBookmarked);
     } catch (cause) {
-      setBookmarks(previousBookmarks);
+      // Undo this ayah only, off the current set. Restoring a snapshot taken
+      // before the write would also revert any toggle that landed while this
+      // one was in flight, leaving the list disagreeing with SQLite until the
+      // next focus reload.
+      setBookmarks((current) => {
+        const next = new Set(current);
+        if (nextBookmarked) next.delete(ayahNumber);
+        else next.add(ayahNumber);
+        return next;
+      });
       setBookmarkError(cause instanceof Error ? cause.message : t(uiLocale, 'reader.bookmarkFailed'));
     }
   }

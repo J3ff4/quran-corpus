@@ -35,15 +35,18 @@ vi.mock('@/components/LanguageSelector', async () => {
 vi.mock('@/components/SurahReader', async () => {
   const React = await import('react');
   return {
-    SurahReader: ({ onToggleBookmark, onReadingAyah }: {
+    SurahReader: ({ onToggleBookmark, onReadingAyah, bookmarkedAyahs }: {
       onToggleBookmark: (ayahNumber: number) => void;
       onReadingAyah?: (ayahNumber: number) => void;
+      bookmarkedAyahs: Set<number>;
     }) =>
       React.createElement(
         'div',
         null,
         React.createElement('span', null, 'reader-content'),
+        React.createElement('span', null, `bookmarked:${[...bookmarkedAyahs].sort((a, b) => a - b).join(',')}`),
         React.createElement('button', { onClick: () => onToggleBookmark(255) }, 'bookmark'),
+        React.createElement('button', { onClick: () => onToggleBookmark(257) }, 'bookmark other'),
         React.createElement('button', { onClick: () => onReadingAyah?.(256) }, 'read ayah'),
       ),
   };
@@ -114,6 +117,27 @@ describe('SurahRoute', () => {
     expect(screen.getByText('reader-content')).toBeTruthy();
   });
 
+  it('reverts only the failed ayah when another bookmark lands mid-write', async () => {
+    const failingWrite = deferred<void>();
+    mocks.setBookmark.mockImplementation((_client: unknown, _surahId: number, ayahNumber: number) =>
+      ayahNumber === 255 ? failingWrite.promise : Promise.resolve(),
+    );
+    render(<SurahRoute />);
+
+    await screen.findByText('reader-content');
+    fireEvent.click(screen.getByText('bookmark'));
+    fireEvent.click(screen.getByText('bookmark other'));
+    await waitFor(() => expect(screen.getByText('bookmarked:255,257')).toBeTruthy());
+
+    failingWrite.reject(new Error('bookmark write boom'));
+
+    // 257 is committed in SQLite. Restoring a set snapshotted before 255's
+    // write would drop it from the list too, and the reader would disagree
+    // with the DB until the next focus reload.
+    await waitFor(() => expect(screen.getByText('bookmark write boom')).toBeTruthy());
+    expect(screen.getByText('bookmarked:257')).toBeTruthy();
+  });
+
   it('keeps the reader visible when reading history persistence fails', async () => {
     mocks.recordReadingPosition.mockRejectedValue(new Error('reading position write boom'));
     render(<SurahRoute />);
@@ -167,8 +191,10 @@ describe('SurahRoute', () => {
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((settle) => {
+  let reject!: (cause: unknown) => void;
+  const promise = new Promise<T>((settle, fail) => {
     resolve = settle;
+    reject = fail;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 }
