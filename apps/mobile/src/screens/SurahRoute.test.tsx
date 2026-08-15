@@ -2,6 +2,7 @@ import React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import SurahRoute from '../../app/surah/[surahId]';
+import { deferred } from '../testing/deferred';
 
 const mocks = vi.hoisted(() => ({
   setBookmark: vi.fn(),
@@ -181,20 +182,10 @@ describe('SurahRoute', () => {
 
     await screen.findByText('reader-content');
     fireEvent.click(screen.getByText('bookmark'));
-    await waitFor(() => expect(screen.getByText('bookmark write boom')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Unable to update bookmark')).toBeTruthy());
 
     fireEvent.click(screen.getByText('read ayah'));
-    await waitFor(() => expect(screen.getByText('reading position write boom')).toBeTruthy());
-    expect(screen.getByText('bookmark write boom')).toBeTruthy();
+    await waitFor(() => expect(screen.getByText('Unable to save reading position')).toBeTruthy());
+    expect(screen.getByText('Unable to update bookmark')).toBeTruthy();
   });
 });
-
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (cause: unknown) => void;
-  const promise = new Promise<T>((settle, fail) => {
-    resolve = settle;
-    reject = fail;
-  });
-  return { promise, resolve, reject };
-}

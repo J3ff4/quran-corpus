@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createLatestReadingPositionRecorder } from './latestReadingPositionRecorder';
+import { deferred } from '../testing/deferred';
 
 describe('createLatestReadingPositionRecorder', () => {
   it('serializes overlapping writes so the newest queued ayah is persisted last', async () => {
@@ -56,11 +57,3 @@ describe('createLatestReadingPositionRecorder', () => {
     expect(onError).toHaveBeenCalledTimes(1);
   });
 });
-
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((settle) => {
-    resolve = settle;
-  });
-  return { promise, resolve };
-}

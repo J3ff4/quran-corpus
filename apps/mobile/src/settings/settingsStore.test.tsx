@@ -5,6 +5,7 @@ import type { MobileDataClient } from '@quran-corpus/mobile-data';
 import { createMemoryUserClient } from '../data/userRepository.testHelpers';
 import { getSetting, saveSetting } from '../data/userRepository';
 import { AppSettingsProvider, useAppSettings, type AppSettingsContextValue } from './settingsStore';
+import { deferred } from '../testing/deferred';
 
 const mocks = vi.hoisted(() => ({
   userClient: null as ReturnType<typeof createMemoryUserClient> | null,
@@ -370,15 +371,6 @@ function requireSettingsClient() {
   return mocks.userClient;
 }
 
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((settle, fail) => {
-    resolve = settle;
-    reject = fail;
-  });
-  return { promise, resolve, reject };
-}
 
 function failFirstSettingWrite(client: MobileDataClient, keyToFail: string): MobileDataClient {
   let failed = false;
