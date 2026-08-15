@@ -87,7 +87,13 @@ const propertyValidators: Record<string, (value: TelemetryValue) => boolean> = {
 
 export function sanitizeProperties(properties: TelemetryProperties = {}): TelemetryProperties {
   return Object.fromEntries(
-    Object.entries(properties).filter(([key, value]) => propertyValidators[key]?.(value) ?? false),
+    // hasOwn before the lookup: a plain object literal inherits from
+    // Object.prototype, so keys like `toString`, `valueOf` or `constructor`
+    // resolve to an inherited function, get called, return something truthy,
+    // and survive the filter -- the key-only bypass this table exists to stop.
+    Object.entries(properties).filter(
+      ([key, value]) => Object.hasOwn(propertyValidators, key) && (propertyValidators[key]?.(value) ?? false),
+    ),
   );
 }
 

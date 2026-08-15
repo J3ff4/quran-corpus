@@ -31,6 +31,24 @@ describe('telemetry', () => {
     expect(posthog.capture).toHaveBeenCalledWith('reader_ayah_opened', { surah: 2 });
   });
 
+  it('drops properties named after inherited Object.prototype members', () => {
+    const posthog = { capture: vi.fn() };
+    const telemetry = createTelemetry({ posthog: posthog as never, sentry: null });
+
+    // Looking the validator up without an own-property check finds these on
+    // Object.prototype, calls them, and gets a truthy result -- so the value
+    // rode straight through the allowlist.
+    telemetry.captureEvent('reader_ayah_opened', {
+      toString: '/data/user/0/com.qurancorpus.mobile/secret',
+      valueOf: 'user@example.com',
+      constructor: 'must not be sent',
+      hasOwnProperty: 'must not be sent',
+      surah: 3,
+    } as never);
+
+    expect(posthog.capture).toHaveBeenCalledWith('reader_ayah_opened', { surah: 3 });
+  });
+
   it('drops out-of-range values for approved numeric keys', () => {
     const posthog = { capture: vi.fn() };
     const telemetry = createTelemetry({ posthog: posthog as never, sentry: null });
