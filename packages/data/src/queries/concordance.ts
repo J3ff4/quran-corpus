@@ -1,4 +1,4 @@
-import type { Client } from '@libsql/client';
+import type { QueryClient } from '../queryClient.js';
 import type { VerseWord } from '../types.js';
 import { stripQuranicAnnotations } from '../text/normalize.js';
 
@@ -74,7 +74,7 @@ export function assertPagingBounds(limit: number | undefined, offset: number): v
  * (999 pre-3.32).
  */
 export async function buildVerseWordsByAyah(
-  db: Client,
+  db: QueryClient,
   ayahIds: number[],
   batchSize = 500,
 ): Promise<Map<number, VerseWord[]>> {

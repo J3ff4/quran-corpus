@@ -11,6 +11,20 @@ node_modules
 .next/
 dist/
 out/
+coverage/
+.expo/
+
+# Expo / React Native. `expo prebuild` regenerates android/ and ios/ from
+# app.json, so the native projects are build output, not source. The signing
+# material below must never reach git — EAS holds the release keystore.
+android/
+ios/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
 
 # Serwist-generated service worker (build artifact, not source)
 apps/web/public/sw.js
@@ -18,6 +32,10 @@ apps/web/public/sw.js.map
 
 # Database files — data artifacts stay out of git
 *.db
+# ...except the 176 KB M0 fixture, which is committed on purpose: it is test
+# data, not corpus, and m0Fixture.test.ts asserts it unconditionally so the
+# schema contract keeps its teeth on a fresh clone. Regenerate: pnpm generate:m0-db
+!apps/mobile/assets/db/quran-m0.db
 
 # Raw scraped/imported data snapshots — re-fetch, never commit (CLAUDE.md §11)
 data-snapshots/
@@ -75,3 +93,10 @@ quran-data/
 # Duplicate local copies of the repo (nested clone + zip download) — never version them
 quran-corpus-pwa/
 quran-corpus-pwa-main.zip
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

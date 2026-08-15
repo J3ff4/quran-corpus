@@ -1,0 +1,32 @@
+{
+  "name": "@quran-corpus/mobile-data",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "generate:m0-db": "tsx scripts/create-m0-fixture-db.ts",
+    "generate:m1-db": "tsx scripts/create-m1-reader-db.ts"
+  },
+  "dependencies": {
+    "@quran-corpus/data": "workspace:*"
+  },
+  "devDependencies": {
+    "@quran-corpus/config": "workspace:*",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}

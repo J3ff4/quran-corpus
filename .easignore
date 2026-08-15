@@ -1,0 +1,75 @@
+# What EAS Build uploads.
+#
+# READ THIS BEFORE EDITING. When .easignore exists, eas-cli uses it *instead
+# of* .gitignore -- not in addition to it. So this file has to restate the
+# exclusions that matter, and it silently stops tracking .gitignore the moment
+# the two drift. Keep them in step.
+#
+# The whole reason it exists: .gitignore carries `*.db`, because the 134 MB
+# corpus DB is generated and must never be committed. Under .gitignore alone,
+# EAS would exclude it from the archive and the build would *succeed* -- and
+# ship an app with no database, failing only on the device, on first open. The
+# negation at the bottom is the point of this file. Everything above it is
+# there so the negation can exist without dragging up node_modules with it.
+
+# Dependencies and build output
+node_modules
+.pnpm-store/
+.next/
+dist/
+build/
+.turbo/
+coverage/
+*.tsbuildinfo
+
+# Native projects: `expo prebuild` regenerates these on the build machine.
+android/
+ios/
+.expo/
+
+# Signing material must never leave this machine -- EAS holds the keystore.
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Secrets.
+#
+# Deliberately the broad glob, not the three specific names this used to list:
+# .env.production, .env.development and .env.test matched none of them, and
+# because this file REPLACES .gitignore, anything unmatched here is uploaded.
+# Add a negation only for a file that is known non-secret and needed by the
+# build -- and only after reading it.
+.env*
+
+# Python (packages/scraper plays no part in a mobile build)
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Scrape artefacts and snapshots
+data-snapshots/
+.snapshots/
+raw-scrape/
+*checkpoint*.json
+*.stale.bak
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Databases -- generated artefacts, same rule as .gitignore...
+*.db
+*.db-shm
+*.db-wal
+# ...except the bundled corpus, which IS the app's content. Sidecars stay
+# excluded: SQLite recreates -wal/-shm on the device, and the committed -wal
+# here is 0 bytes anyway.
+!apps/mobile/assets/db/quran.db

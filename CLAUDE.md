@@ -1,14 +1,14 @@
 # CLAUDE.md
 
-Project governance for the **Quranic Corpus Mobile-First PWA**. This file is binding. Read it fully before any task. If a request conflicts with these rules, surface the conflict before proceeding.
+Project governance for the **Quran Corpus** monorepo — a mobile-first PWA and a native Android app over one shared data layer. This file is binding. Read it fully before any task. If a request conflicts with these rules, surface the conflict before proceeding.
 
 -----
 
 ## 1. Project Summary
 
-A beautiful, mobile-first, installable PWA presenting the Quranic corpus — Arabic text, word-by-word morphology/grammar, and multi-language translations (English, Uzbek, Russian, extensible). Data is scraped once from corpus.quran.com, supplemented by open datasets (Tanzil, QuranEnc), normalized into SQLite/libSQL (Turso), and served via Next.js. A native mobile app will later consume the same data layer.
+Two products over one corpus: a beautiful, mobile-first, installable PWA, and an Android-first native app (Expo/React Native) portable to iOS. Both present Arabic text, word-by-word morphology/grammar, and multi-language translations (English, Uzbek, Russian, extensible). Data is scraped once from corpus.quran.com, supplemented by open datasets (Tanzil, QuranEnc), normalized into SQLite/libSQL, served via Next.js on the web and bundled as a local SQLite file on mobile.
 
-See `PRD.md` for full requirements. CLAUDE.md governs *how* we build; PRD governs *what*.
+See `PRD-quran-corpus-pwa.md` for the web product and `docs/PRD-android-first-mobile-app.md` for the Android app. CLAUDE.md governs *how* we build; the PRDs govern *what*.
 
 -----
 
@@ -17,19 +17,29 @@ See `PRD.md` for full requirements. CLAUDE.md governs *how* we build; PRD govern
 ```
 /
 ├── apps/
-│   └── web/            # Next.js (App Router) PWA — the product
+│   ├── web/            # Next.js (App Router) PWA — the web product
+│   └── mobile/         # Expo React Native app — Android first, iOS scalable
 ├── packages/
 │   ├── scraper/        # corpus.quran.com scraper + dataset importers (Tanzil, QuranEnc)
 │   ├── data/           # shared: schema, migrations, seed/export, typed data-access layer
+│   ├── mobile-data/    # Expo SQLite adapter and mobile DB fixture generation
 │   └── config/         # shared tsconfig, eslint, tailwind preset, prettier
 ├── docs/
 │   └── plans/          # phase plans live here (one file per phase)
-├── PRD.md
+├── PRD-quran-corpus-pwa.md
+├── docs/PRD-android-first-mobile-app.md
 └── CLAUDE.md
 ```
 
-- `packages/data` is the single source of truth for schema and queries. **Web and scraper both depend on it.** Never duplicate schema or query logic into an app.
-- The future mobile app will be added as `apps/mobile` and will reuse `packages/data`. Keep `packages/data` free of any web/Next-specific imports so it stays portable.
+- `packages/data` is the single source of truth for schema and queries. **Web, mobile, and scraper all depend on it.** Never duplicate schema or query logic into an app.
+- Keep `packages/data` free of any web, Next, Expo, or React Native imports so it stays portable across all three consumers.
+- `packages/data` has three entry points and they are not interchangeable:
+  - `.` — the full barrel. Pulls `@libsql/client`. Server and Node scripts only.
+  - `./client` — browser-safe pure functions and types. Required in any file with `'use client'`; the barrel drags libsql into the client bundle and breaks hydration app-wide.
+  - `./mobile` — read-only query subset with no `createDatabase`, migrations, or backfills. Required in `apps/mobile`; the barrel pulls the native libsql driver into the React Native module graph.
+  - `tests/client-entry.test.ts` and `tests/mobile-entry.test.ts` guard those module graphs. Do not weaken them.
+- `apps/mobile` depends on `packages/mobile-data`, which adapts the shared data API to Expo SQLite.
+- **Forking a shared package is never the answer.** In July 2026 the Android app began life in a separate repo with copies of `packages/data` and `packages/config`; within two weeks the copy had lost the `trg_roots_sort_order_*` invalidation triggers, the `text/buckwalter.ts` trust-boundary validators, and 199 lines of `queries/roots.ts`. If a shared package does not fit a new consumer, change the shared package (§12).
 
 -----
 
@@ -146,18 +156,31 @@ Work proceeds in phases. Before writing code for a phase:
 
 ## 7. Tech Stack (see PRD for rationale)
 
+**Web (`apps/web`)**
+
 - Next.js (App Router) + TypeScript + Tailwind CSS
-- SQLite via Turso/libSQL (embedded; embedded-replica model maps to future mobile local-first DB)
+- SQLite via Turso/libSQL (embedded; the embedded-replica model maps to the mobile local-first DB)
 - Framer Motion for animation (Emil Kowalski-style interaction/motion patterns)
 - next-intl (or equivalent) for UI i18n; translation *content* lives in the DB per `language_code`, decoupled from UI locale
-- Scraper: Python (Playwright/BeautifulSoup) or Node — choose per scraping ergonomics; isolated in `packages/scraper`
 - Self-hosted on Proxmox homelab via Docker, behind existing Caddy + Cloudflare Tunnel
+
+**Mobile (`apps/mobile`)**
+
+- React Native + Expo + TypeScript, Expo Router for navigation
+- Expo SQLite over a bundled DB file first; keep a path open for versioned REST/API updates later
+- Streamed audio only, through our own thin endpoint contract
+- Builds go through EAS Build; the native `android/` and `ios/` directories are `expo prebuild` output and stay out of git
+
+**Shared**
+
+- Scraper: Python (Playwright/BeautifulSoup), isolated in `packages/scraper` — the only writer of the corpus DB
+- DB-backed translation content keyed by `language_code`; UI i18n is separate and starts with English, Uzbek, and Russian
 
 -----
 
 ## 8. Design Discipline
 
-- **Design before code.** Mockups via the UI/UX design plugin first.
+- **Design before code.** Mockups via the UI/UX design plugin first. On mobile, keep Android platform conventions while preserving the Quran Corpus brand.
 - Apply the **Emil Kowalski** skill for motion/interaction detail (bottom sheets, easing, transitions, optimistic feel).
 - Draw component/layout inspiration from **21st.dev** templates — adapt and recompose, never ship verbatim copies.
 - **It must not look like AI slop.** Distinctive typography (proper Uthmani Arabic face + refined Latin face), a custom non-generic color system (warm paper light mode, low-contrast night dark mode), elegant mixed RTL/LTR handling.
@@ -170,7 +193,7 @@ Work proceeds in phases. Before writing code for a phase:
 
 - **Conventional Commits** for every commit: `type(scope): subject`.
   - Types: `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `chore`, `style`, `build`, `ci`.
-  - Scope = package or area, e.g. `feat(scraper): ...`, `fix(web/word-popover): ...`, `chore(data): ...`.
+  - Scope = package or area, e.g. `feat(scraper): ...`, `fix(web/word-popover): ...`, `chore(data): ...`, `feat(mobile): ...`, `fix(mobile-data): ...`.
 - One logical change per commit. Commit only after the 6-step loop completes and the review gate passes (§5).
 - Imperative mood, concise subject (≤ ~72 chars). Body explains *why* when non-obvious; reference review false-positive justifications here.
 - Never commit secrets, scraped raw HTML dumps, or large binary data into git (use `.gitignore`; raw scrape snapshots live outside version control or in a data artifact store).
@@ -180,8 +203,9 @@ Work proceeds in phases. Before writing code for a phase:
 ## 10. Testing
 
 - Unit tests for `packages/data` (data-access layer) and scraper parsing/morphology logic.
-- Component tests for key interactive UI: word morphology popover, language switcher, audio player.
-- Playwright E2E smoke test for the core reading flow on a mobile viewport.
+- Component tests for key interactive UI on both apps: word morphology popover, language switcher, audio player.
+- Playwright E2E smoke test for the core reading flow on a mobile viewport (`apps/web`).
+- `apps/mobile` has no emulator in CI, so its equivalent gate is the on-device smoke checklist in `README.md`. A milestone is not complete until that checklist has been run on real hardware and the result recorded in the phase plan's verification log — "implementation complete, verification pending" is an unmet exit criterion, not a pass.
 - Tests must pass in step 4 of the loop. New logic ships with tests.
 
 -----

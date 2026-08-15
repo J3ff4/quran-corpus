@@ -1,7 +1,7 @@
-import type { Client, Row } from '@libsql/client';
+import type { QueryClient, QueryRow } from '../queryClient.js';
 import type { WordGloss } from '../types.js';
 
-function rowToWordGloss(row: Row): WordGloss {
+function rowToWordGloss(row: QueryRow): WordGloss {
   return {
     id: row['id'] as number,
     word_id: row['word_id'] as number,
@@ -11,7 +11,7 @@ function rowToWordGloss(row: Row): WordGloss {
 }
 
 export async function getGlossesBySurahAndLang(
-  db: Client,
+  db: QueryClient,
   surahId: number,
   languageCode: string,
 ): Promise<WordGloss[]> {
@@ -36,7 +36,7 @@ export interface GlossWithLang {
  *  else the fallback lang (default 'en'), tagged with which lang was used so
  *  the UI can mark a fallback. When lang === fallback the tag is always that. */
 export async function getGlossesWithFallback(
-  db: Client,
+  db: QueryClient,
   surahId: number,
   lang: string,
   fallback = 'en',
