@@ -20,6 +20,10 @@ export default function SurahsTab() {
     let cancelled = false;
 
     async function loadSurahs() {
+      // Cleared per run, not just on first mount: this effect reruns when
+      // uiLocale changes, and a stale error from an earlier failure would keep
+      // the error branch rendering over the list this run just loaded.
+      setError(null);
       try {
         const db = await openCorpusDb();
         const client = createExpoSqliteClient(db as ExpoSqliteLike);

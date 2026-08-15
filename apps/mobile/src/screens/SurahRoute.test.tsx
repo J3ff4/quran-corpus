@@ -7,6 +7,8 @@ import { deferred } from '../testing/deferred';
 const mocks = vi.hoisted(() => ({
   setBookmark: vi.fn(),
   recordReadingPosition: vi.fn(),
+  uiLocale: 'en',
+  getSurahReader: vi.fn(),
 }));
 
 vi.mock('expo-router', () => ({
@@ -61,8 +63,7 @@ vi.mock('@/data/userDb', () => ({
   openUserDb: async () => ({}),
 }));
 
-vi.mock('@/data/corpusRepository', () => ({
-  getSurahReader: async () => ({
+const readerFixture = {
     surah: { id: 2, name_arabic: 'البقرة', name_translit: 'Al-Baqarah', name_translation: 'The Cow', ayah_count: 286 },
     ayahs: [
       {
@@ -71,7 +72,10 @@ vi.mock('@/data/corpusRepository', () => ({
         translation: { ayah_id: 8, language: 'en', translator: 'Saheeh International', text: 'Allah - there is no deity except Him' },
       },
     ],
-  }),
+};
+
+vi.mock('@/data/corpusRepository', () => ({
+  getSurahReader: (...args: unknown[]) => mocks.getSurahReader(...args),
 }));
 
 vi.mock('@/data/userRepository', () => ({
@@ -84,7 +88,7 @@ vi.mock('@/settings/settingsStore', () => ({
   useAppSettings: () => ({
     contentLanguage: 'en',
     setContentLanguage: vi.fn(),
-    uiLocale: 'en',
+    uiLocale: mocks.uiLocale,
   }),
 }));
 
@@ -105,6 +109,24 @@ describe('SurahRoute', () => {
   beforeEach(() => {
     mocks.setBookmark.mockReset();
     mocks.recordReadingPosition.mockReset();
+    mocks.uiLocale = 'en';
+    mocks.getSurahReader.mockReset();
+    mocks.getSurahReader.mockResolvedValue(readerFixture);
+  });
+
+  it('retranslates a load failure when the UI language changes', async () => {
+    mocks.getSurahReader.mockRejectedValue(new Error('no such table: ayahs'));
+
+    const { rerender } = render(<SurahRoute />);
+    await screen.findByText('Unable to load surah');
+
+    // The effect stores a string already translated with the locale it
+    // captured, so it has to rerun when that locale changes -- otherwise the
+    // failure stays in the previous language for as long as it is on screen.
+    mocks.uiLocale = 'uz';
+    rerender(<SurahRoute />);
+
+    await waitFor(() => expect(screen.getByText('Surani yuklab bo\u2018lmadi')).toBeTruthy());
   });
 
   it('keeps the reader visible when bookmark persistence fails', async () => {

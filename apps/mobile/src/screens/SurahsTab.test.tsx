@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   getSurahList: vi.fn(),
   push: vi.fn(),
   openCorpusDb: null as (() => Promise<unknown>) | null,
+  uiLocale: 'en',
 }));
 
 vi.mock('@quran-corpus/mobile-data', () => ({
@@ -24,7 +25,7 @@ vi.mock('@/data/corpusRepository', () => ({
 }));
 
 vi.mock('@/settings/settingsStore', () => ({
-  useAppSettings: () => ({ uiLocale: 'en' }),
+  useAppSettings: () => ({ uiLocale: mocks.uiLocale }),
 }));
 
 vi.mock('expo-router', () => ({
@@ -63,6 +64,7 @@ describe('SurahsTab', () => {
     mocks.getSurahList.mockReset();
     mocks.push.mockReset();
     mocks.openCorpusDb = null;
+    mocks.uiLocale = 'en';
   });
 
   afterEach(cleanup);
@@ -91,6 +93,23 @@ describe('SurahsTab', () => {
       pathname: '/surah/[surahId]',
       params: { surahId: '1' },
     });
+  });
+
+  it('clears an earlier failure when a later load succeeds', async () => {
+    mocks.openCorpusDb = () => Promise.reject(new Error('no such table: surahs'));
+    mocks.getSurahList.mockResolvedValue([alFatihah]);
+
+    const { rerender } = render(<SurahsTab />);
+    await screen.findByRole('alert');
+
+    // Changing the UI language reruns the effect. Without clearing the slot per
+    // run, the stale error keeps rendering over the list this run just loaded.
+    mocks.openCorpusDb = null;
+    mocks.uiLocale = 'uz';
+    rerender(<SurahsTab />);
+
+    await waitFor(() => expect(screen.getByText('Al-Fatihah')).toBeTruthy());
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('announces a localized failure and clears the spinner', async () => {

@@ -111,7 +111,10 @@ export default function SurahRoute() {
     return () => {
       cancelled = true;
     };
-  }, [contentLanguage, surahId]);
+    // uiLocale included: the effect stores a string already translated with the
+    // locale it captured, so without this a language switch after a failure
+    // leaves the old language on screen.
+  }, [contentLanguage, surahId, uiLocale]);
 
   async function toggleBookmark(ayahNumber: number) {
     if (!surahId) return;
