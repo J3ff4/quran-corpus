@@ -64,6 +64,17 @@ describe('@quran-corpus/data/mobile', () => {
     // assertion above would pass while checking nothing at all.
     expect(visited.size).toBeGreaterThan(5);
   });
+
+  it('counts a side-effect import as a runtime import', () => {
+    // No `from` clause and no bindings, but Metro still loads the module. The
+    // parser used to require `from`, so this class of import was invisible to
+    // the graph walk above -- the one thing that walk exists to catch.
+    expect(parseRuntimeImports("import './register-node-only.js';")).toEqual(['./register-node-only.js']);
+    expect(parseRuntimeImports("import type { Client } from '@libsql/client';")).toEqual([]);
+    expect(parseRuntimeImports("export { getSurahById } from './queries/surahs.js';")).toEqual([
+      './queries/surahs.js',
+    ]);
+  });
 });
 
 function relativeToSrc(srcRoot: string, file: string): string {
@@ -78,19 +89,26 @@ function relativeToSrc(srcRoot: string, file: string): string {
  * `Client` as a type on their write paths, and flagging those would be wrong.
  */
 function runtimeImportsOf(file: string): string[] {
-  let source: string;
   try {
-    source = readFileSync(file, 'utf8');
+    return parseRuntimeImports(readFileSync(file, 'utf8'));
   } catch {
     return [];
   }
+}
 
+/** The parsing half, split out so its edge cases are testable without a file. */
+function parseRuntimeImports(source: string): string[] {
   const specifiers: string[] = [];
-  const pattern = /(?:^|\n)\s*(import|export)\s+([^'"]*?)from\s*['"]([^'"]+)['"]/g;
+  // The `from` clause is optional: `import './register.js'` is a side-effect
+  // import with no bindings, and it pulls the module into the bundle exactly
+  // like a named one. The old pattern required `from`, so a single such line
+  // anywhere under src/ would have walked straight past this guard and taken a
+  // node-only module into the Metro graph with it.
+  const pattern = /(?:^|\n)\s*(?:import|export)\s+(?:([^'"]*?)from\s*)?['"]([^'"]+)['"]/g;
   let match = pattern.exec(source);
   while (match) {
-    const clause = match[2] ?? '';
-    const specifier = match[3];
+    const clause = match[1] ?? '';
+    const specifier = match[2];
     if (specifier && !/^\s*type\s/.test(clause)) specifiers.push(specifier);
     match = pattern.exec(source);
   }
