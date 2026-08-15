@@ -42,9 +42,34 @@ export const USER_DB_SCHEMA = `
   );
 `;
 
-/** 114 surahs; al-Baqarah is the longest at 286 ayahs. */
-const SURAH_COUNT = 114;
-const LONGEST_SURAH_AYAH_COUNT = 286;
+/**
+ * Ayahs per surah, indexed by `surahId - 1`.
+ *
+ * Inlined rather than queried because this module is the user database and the
+ * counts live in the corpus one -- a validator that needed a second connection
+ * to run would not be usable from a write path. It is also why the table is
+ * inlined rather than split into its own module: `userData.ts` is asserted to be
+ * an import-free leaf of the Metro graph (`tests/mobile-entry.test.ts`).
+ *
+ * Fixed data, so a stale copy is not a risk -- the ayah division of the Hafs
+ * text has not moved in centuries. Generated from `surahs.ayah_count` in the
+ * corpus DB and cross-checked against `COUNT(*)` and `MAX(ayah_number)` over the
+ * `ayahs` table for all 114 rows; the total is the canonical 6236.
+ */
+const SURAH_AYAH_COUNTS = [
+  7, 286, 200, 176, 120, 165, 206, 75, 129, 109,
+  123, 111, 43, 52, 99, 128, 111, 110, 98, 135,
+  112, 78, 118, 64, 77, 227, 93, 88, 69, 60,
+  34, 30, 73, 54, 45, 83, 182, 88, 75, 85,
+  54, 53, 89, 59, 37, 35, 38, 29, 18, 45,
+  60, 49, 62, 55, 78, 96, 29, 22, 24, 13,
+  14, 11, 11, 18, 12, 12, 30, 52, 52, 44,
+  28, 28, 20, 56, 40, 31, 50, 40, 46, 42,
+  29, 19, 36, 25, 22, 17, 19, 26, 30, 20,
+  15, 21, 11, 8, 8, 19, 5, 8, 8, 11,
+  11, 8, 3, 9, 5, 4, 7, 3, 6, 3,
+  5, 4, 5, 6,
+] as const;
 
 /**
  * Reject a coordinate that cannot name a real ayah.
@@ -56,16 +81,19 @@ const LONGEST_SURAH_AYAH_COUNT = 286;
  * belongs here rather than in whichever screen happens to call it -- the route
  * layer's own validation covers the URL, not a direct call.
  *
- * Deliberately the widest plausible bound rather than the true ayah count for
- * the given surah: this package holds no per-surah counts without a query, and
- * the point is to reject the impossible, not to re-derive the corpus.
+ * Bounded per surah, not by the longest one: a global 1..286 cap accepts
+ * al-Fatiha ayah 286, which is exactly the kind of row that stores cleanly and
+ * then opens nothing. 108 of the 114 surahs are shorter than half that cap.
  */
 function assertAyahCoordinate(surahId: number, ayahNumber: number): void {
-  if (!Number.isInteger(surahId) || surahId < 1 || surahId > SURAH_COUNT) {
-    throw new RangeError(`surahId must be an integer in 1..${SURAH_COUNT}, got ${surahId}`);
+  if (!Number.isInteger(surahId) || surahId < 1 || surahId > SURAH_AYAH_COUNTS.length) {
+    throw new RangeError(`surahId must be an integer in 1..${SURAH_AYAH_COUNTS.length}, got ${surahId}`);
   }
-  if (!Number.isInteger(ayahNumber) || ayahNumber < 1 || ayahNumber > LONGEST_SURAH_AYAH_COUNT) {
-    throw new RangeError(`ayahNumber must be an integer in 1..${LONGEST_SURAH_AYAH_COUNT}, got ${ayahNumber}`);
+  // Indexed after the range check above, so this is always a number; the
+  // fallback exists only to satisfy noUncheckedIndexedAccess.
+  const ayahCount = SURAH_AYAH_COUNTS[surahId - 1] ?? 0;
+  if (!Number.isInteger(ayahNumber) || ayahNumber < 1 || ayahNumber > ayahCount) {
+    throw new RangeError(`ayahNumber must be an integer in 1..${ayahCount} for surah ${surahId}, got ${ayahNumber}`);
   }
 }
 

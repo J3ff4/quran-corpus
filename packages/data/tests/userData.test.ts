@@ -30,6 +30,12 @@ describe('user-data write validation', () => {
     ['fractional ayah', 1, 2.5],
     ['NaN', Number.NaN, 1],
     ['Infinity', 1, Number.POSITIVE_INFINITY],
+    // Within 1..286, so a single global cap accepted all of these. Each one
+    // stores cleanly and then opens nothing, because the surah has no such ayah.
+    ['ayah past the end of al-Fatiha', 1, 8],
+    ['ayah past the end of an-Nas', 114, 7],
+    ['al-Baqarah ayah count applied to the next surah', 3, 286],
+    ['ayah past the end of the shortest surah', 108, 4],
   ];
 
   it.each(badCoordinates)('rejects a bookmark with %s', async (_label, surahId, ayahNumber) => {
@@ -58,13 +64,40 @@ describe('user-data write validation', () => {
   it('writes the boundary coordinates that are actually valid', async () => {
     const { client, statements } = recordingClient();
 
-    await setBookmark(client, 1, 1, true);
-    await setBookmark(client, 114, 286, false);
+    // Each one is the last ayah of its own surah -- the largest coordinate the
+    // per-surah bound may still accept.
+    await setBookmark(client, 1, 7, true);
+    await setBookmark(client, 114, 6, false);
     await recordReadingPosition(client, 2, 286);
 
     expect(statements).toHaveLength(3);
     expect(statements[0]).toContain('INSERT INTO bookmarks');
     expect(statements[1]).toContain('DELETE FROM bookmarks');
     expect(statements[2]).toContain('INSERT INTO reading_history');
+  });
+
+  // The counts are inlined, so nothing at runtime would notice a mistyped digit
+  // -- it would just quietly accept or reject one wrong coordinate. 6236 is the
+  // canonical total of the Hafs text, so a single wrong entry fails this.
+  it('accepts the last ayah of every surah and rejects the one after it', async () => {
+    const { client, statements } = recordingClient();
+    let total = 0;
+
+    for (let surahId = 1; surahId <= 114; surahId += 1) {
+      let lastValid = 0;
+      for (let ayahNumber = 1; ayahNumber <= 287; ayahNumber += 1) {
+        try {
+          await recordReadingPosition(client, surahId, ayahNumber);
+          lastValid = ayahNumber;
+        } catch {
+          break;
+        }
+      }
+      expect(lastValid).toBeGreaterThan(0);
+      total += lastValid;
+    }
+
+    expect(total).toBe(6236);
+    expect(statements).toHaveLength(6236);
   });
 });
