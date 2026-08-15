@@ -17,6 +17,10 @@
     "./mobile": {
       "import": "./dist/mobile.js",
       "types": "./dist/mobile.d.ts"
+    },
+    "./user-db": {
+      "import": "./dist/userData.js",
+      "types": "./dist/userData.d.ts"
     }
   },
   "scripts": {

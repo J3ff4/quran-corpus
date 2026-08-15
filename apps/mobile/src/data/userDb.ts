@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { USER_DB_SCHEMA } from '@quran-corpus/data/user-db';
 
 const USER_DB_NAME = 'quran-corpus-user.db';
 
@@ -19,26 +20,11 @@ export function openUserDb(): Promise<SQLite.SQLiteDatabase> {
   return connection;
 }
 
+// Opening is expo-sqlite's job and stays here; the schema it applies is not
+// ours to define -- it comes from packages/data so the app and any other
+// consumer of the user DB cannot disagree about its shape.
 async function createUserDb() {
   const db = await SQLite.openDatabaseAsync(USER_DB_NAME);
-  await db.execAsync(`
-    CREATE TABLE IF NOT EXISTS bookmarks (
-      surah_id INTEGER NOT NULL,
-      ayah_number INTEGER NOT NULL,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      PRIMARY KEY (surah_id, ayah_number)
-    );
-    CREATE TABLE IF NOT EXISTS reading_history (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
-      surah_id INTEGER NOT NULL,
-      ayah_number INTEGER NOT NULL,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-    CREATE TABLE IF NOT EXISTS settings (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL,
-      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
+  await db.execAsync(USER_DB_SCHEMA);
   return db;
 }

@@ -65,6 +65,16 @@ describe('@quran-corpus/data/mobile', () => {
     expect(visited.size).toBeGreaterThan(5);
   });
 
+  // The user-DB entry ships in the same Metro bundle as ./mobile, so it needs
+  // the same guarantee. It is checked separately rather than walked, because it
+  // is meant to stay a leaf: plain SQL over a structural client type, with the
+  // only import erased at compile time.
+  it('keeps the user-db entry free of runtime imports', () => {
+    const srcRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../src');
+
+    expect(runtimeImportsOf(resolve(srcRoot, 'userData.ts'))).toEqual([]);
+  });
+
   it('counts a side-effect import as a runtime import', () => {
     // No `from` clause and no bindings, but Metro still loads the module. The
     // parser used to require `from`, so this class of import was invisible to
