@@ -46,7 +46,7 @@ describe('createLatestReadingPositionRecorder', () => {
     const recorder = createLatestReadingPositionRecorder(persist, onError);
 
     recorder.record(1);
-    await vi.waitFor(() => expect(onError).toHaveBeenCalledWith('disk full'));
+    await vi.waitFor(() => expect(onError).toHaveBeenCalledWith(new Error('disk full')));
 
     // A rejected write must not wedge the queue: the recorder is the only path
     // reading position takes, so a single failure would otherwise mean the app

@@ -4,7 +4,10 @@ export interface LatestReadingPositionRecorder {
 
 export function createLatestReadingPositionRecorder(
   persist: (ayahNumber: number) => Promise<void>,
-  onError: (message: string) => void,
+  // Handed the raw cause, not a message: this module has no locale, and the
+  // fallback wording for a non-Error throw is `reader.positionFailed`, which
+  // only the caller can translate.
+  onError: (cause: unknown) => void,
 ): LatestReadingPositionRecorder {
   let queuedAyah: number | null = null;
   // SurahReader records from onViewableItemsChanged, which fires on every
@@ -27,7 +30,7 @@ export function createLatestReadingPositionRecorder(
           await persist(ayahNumber);
           lastPersistedAyah = ayahNumber;
         } catch (cause) {
-          onError(cause instanceof Error ? cause.message : 'Unable to update reading history');
+          onError(cause);
         }
       }
     } finally {

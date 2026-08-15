@@ -63,8 +63,8 @@ export default function SurahRoute() {
       const userDb = await openUserDb();
       const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
       await recordReadingPosition(userClient, surahId, ayahNumber);
-    }, setReadingError);
-  }, [surahId]);
+    }, (cause) => setReadingError(cause instanceof Error ? cause.message : t(uiLocale, 'reader.positionFailed')));
+  }, [surahId, uiLocale]);
 
   useEffect(() => {
     let cancelled = false;
