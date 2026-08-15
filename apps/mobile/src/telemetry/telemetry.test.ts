@@ -94,7 +94,9 @@ describe('telemetry', () => {
     const posthog = { capture: vi.fn() };
     const telemetry = createTelemetry({ posthog: posthog as never, sentry: null });
 
-    telemetry.captureEvent('user typed: my password is hunter2' as never, { surah: 1 });
+    // Free-form text where an event name belongs: whatever the user typed would
+    // become the event name itself, and event names are not scrubbed downstream.
+    telemetry.captureEvent('user typed: where is the nearest mosque' as never, { surah: 1 });
 
     expect(posthog.capture).not.toHaveBeenCalled();
   });
@@ -103,7 +105,7 @@ describe('telemetry', () => {
     const sentry = { captureException: vi.fn() };
     const telemetry = createTelemetry({ posthog: null, sentry: sentry as never });
 
-    telemetry.captureException('audio_fetch_failed', { surah: 1, token: 'secret' });
+    telemetry.captureException('audio_fetch_failed', { surah: 1, note: 'a private reading note' });
 
     const [reported, context] = sentry.captureException.mock.calls[0] as [Error, { extra: unknown }];
     expect(reported.message).toBe('audio_fetch_failed');
