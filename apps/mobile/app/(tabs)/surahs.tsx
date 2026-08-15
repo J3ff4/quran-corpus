@@ -6,7 +6,6 @@ import { SurahList } from '@/components/SurahList';
 import { getSurahList, type SurahListItem } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { useAppSettings } from '@/settings/settingsStore';
-import { colors } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
 export default function SurahsTab() {
@@ -53,7 +52,7 @@ export default function SurahsTab() {
   if (error) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', padding: 20, backgroundColor: theme.background }}>
-        <Text style={{ color: colors.danger }}>{error}</Text>
+        <Text style={{ color: theme.danger }}>{error}</Text>
       </View>
     );
   }
