@@ -63,7 +63,7 @@ export default function SurahRoute() {
       const userDb = await openUserDb();
       const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
       await recordReadingPosition(userClient, surahId, ayahNumber);
-    }, (cause) => setReadingError(cause instanceof Error ? cause.message : t(uiLocale, 'reader.positionFailed')));
+    }, () => setReadingError(t(uiLocale, 'reader.positionFailed')));
   }, [surahId, uiLocale]);
 
   useEffect(() => {
@@ -71,7 +71,7 @@ export default function SurahRoute() {
 
     async function loadReader() {
       if (!surahId) {
-        setError('Invalid surah');
+        setError(t(uiLocale, 'reader.invalidSurah'));
         setLoading(false);
         return;
       }
@@ -100,8 +100,8 @@ export default function SurahRoute() {
             ),
           );
         }
-      } catch (cause) {
-        if (!cancelled) setError(cause instanceof Error ? cause.message : t(uiLocale, 'reader.loadFailed'));
+      } catch {
+        if (!cancelled) setError(t(uiLocale, 'reader.loadFailed'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -128,7 +128,7 @@ export default function SurahRoute() {
       const userDb = await openUserDb();
       const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
       await setBookmark(userClient, surahId, ayahNumber, nextBookmarked);
-    } catch (cause) {
+    } catch {
       // Undo this ayah only, off the current set. Restoring a snapshot taken
       // before the write would also revert any toggle that landed while this
       // one was in flight, leaving the list disagreeing with SQLite until the
@@ -139,7 +139,7 @@ export default function SurahRoute() {
         else next.add(ayahNumber);
         return next;
       });
-      setBookmarkError(cause instanceof Error ? cause.message : t(uiLocale, 'reader.bookmarkFailed'));
+      setBookmarkError(t(uiLocale, 'reader.bookmarkFailed'));
     }
   }
 

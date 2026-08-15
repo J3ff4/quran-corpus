@@ -77,7 +77,7 @@ describe('BookmarksTab', () => {
 
     render(<BookmarksTab />);
 
-    await screen.findByText('database is locked');
+    await screen.findByText('Unable to load bookmarks');
     // Both halves matter: a regression that leaves the spinner up forever, or
     // one that renders the error alongside the empty state, would otherwise
     // ship silently.

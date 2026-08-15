@@ -5,6 +5,7 @@ import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobil
 import { SurahList } from '@/components/SurahList';
 import { getSurahList, type SurahListItem } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
+import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
 import { useThemeColors } from '@/theme/themeContext';
 
@@ -24,8 +25,10 @@ export default function SurahsTab() {
         const client = createExpoSqliteClient(db as ExpoSqliteLike);
         const list = await getSurahList(client);
         if (!cancelled) setSurahs(list);
-      } catch (cause) {
-        if (!cancelled) setError(cause instanceof Error ? cause.message : 'Unable to load surahs');
+      } catch {
+        // Localized, never the driver's message: an expo-sqlite failure reads
+        // in untranslated English and can name a path on the device.
+        if (!cancelled) setError(t(uiLocale, 'surahList.loadFailed'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -35,7 +38,7 @@ export default function SurahsTab() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [uiLocale]);
 
   function openSurah(item: SurahListItem) {
     router.push({ pathname: '/surah/[surahId]', params: { surahId: String(item.id) } });
@@ -52,7 +55,11 @@ export default function SurahsTab() {
   if (error) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', padding: 20, backgroundColor: theme.background }}>
-        <Text style={{ color: theme.danger }}>{error}</Text>
+        {/* Live region: the list never gets focus, so without this TalkBack
+            announces nothing when the load fails. */}
+        <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ color: theme.danger }}>
+          {error}
+        </Text>
       </View>
     );
   }

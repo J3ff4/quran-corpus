@@ -49,8 +49,12 @@ export function useUserDbOnFocus<T>(
           const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
           const result = await loadRef.current(userClient);
           if (!cancelled) setData(result);
-        } catch (cause) {
-          if (!cancelled) setError(cause instanceof Error ? cause.message : fallbackMessage);
+        } catch {
+          // Always the localized string, never `cause.message`. A rejected
+          // promise here is an expo-sqlite or storage failure, whose message is
+          // untranslated internal English and can carry a file path -- neither
+          // belongs on screen in a Uzbek or Russian UI.
+          if (!cancelled) setError(fallbackMessage);
         } finally {
           if (!cancelled) setLoading(false);
         }

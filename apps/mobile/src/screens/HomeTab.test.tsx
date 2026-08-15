@@ -78,7 +78,7 @@ describe('HomeTab', () => {
 
     render(<HomeTab />);
 
-    await waitFor(() => expect(screen.getByText('user db is locked')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Unable to load reading history')).toBeTruthy());
     expect(screen.queryByText('No reading history yet')).toBeNull();
   });
 });

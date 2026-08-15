@@ -114,7 +114,7 @@ describe('SurahRoute', () => {
     await screen.findByText('reader-content');
     fireEvent.click(screen.getByText('bookmark'));
 
-    await waitFor(() => expect(screen.getByText('bookmark write boom')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Unable to update bookmark')).toBeTruthy());
     expect(screen.getByText('reader-content')).toBeTruthy();
   });
 
@@ -135,7 +135,7 @@ describe('SurahRoute', () => {
     // 257 is committed in SQLite. Restoring a set snapshotted before 255's
     // write would drop it from the list too, and the reader would disagree
     // with the DB until the next focus reload.
-    await waitFor(() => expect(screen.getByText('bookmark write boom')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Unable to update bookmark')).toBeTruthy());
     expect(screen.getByText('bookmarked:257')).toBeTruthy();
   });
 
@@ -146,7 +146,7 @@ describe('SurahRoute', () => {
     await screen.findByText('reader-content');
     fireEvent.click(screen.getByText('read ayah'));
 
-    await waitFor(() => expect(screen.getByText('reading position write boom')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Unable to save reading position')).toBeTruthy());
     expect(screen.getByText('reader-content')).toBeTruthy();
   });
 
@@ -158,20 +158,20 @@ describe('SurahRoute', () => {
 
     await screen.findByText('reader-content');
     fireEvent.click(screen.getByText('bookmark'));
-    await waitFor(() => expect(screen.getByText('bookmark write boom')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Unable to update bookmark')).toBeTruthy());
 
     // Scrolling drives this write, so it must not clear feedback the user never
     // acknowledged -- their bookmark is still unsaved.
     fireEvent.click(screen.getByText('read ayah'));
     await waitFor(() => expect(mocks.recordReadingPosition).toHaveBeenCalled());
-    expect(screen.getByText('bookmark write boom')).toBeTruthy();
+    expect(screen.getByText('Unable to update bookmark')).toBeTruthy();
 
     await act(async () => {
       readingWrite.resolve();
       await readingWrite.promise;
     });
 
-    expect(screen.getByText('bookmark write boom')).toBeTruthy();
+    expect(screen.getByText('Unable to update bookmark')).toBeTruthy();
     expect(screen.getByText('reader-content')).toBeTruthy();
   });
 

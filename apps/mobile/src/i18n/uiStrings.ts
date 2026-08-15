@@ -12,6 +12,7 @@ export type UiStringKey =
   | 'home.noHistory'
   | 'home.loadFailed'
   | 'reader.loadFailed'
+  | 'reader.invalidSurah'
   | 'reader.bookmarkFailed'
   | 'reader.positionFailed'
   | 'reader.translation'
@@ -20,6 +21,7 @@ export type UiStringKey =
   | 'reader.play'
   | 'reader.pause'
   | 'surahList.ayahsSuffix'
+  | 'surahList.loadFailed'
   | 'settings.language'
   | 'settings.theme'
   | 'settings.about'
@@ -52,6 +54,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'home.noHistory': 'No reading history yet',
     'home.loadFailed': 'Unable to load reading history',
     'reader.loadFailed': 'Unable to load surah',
+    'reader.invalidSurah': 'That surah does not exist',
     'reader.bookmarkFailed': 'Unable to update bookmark',
     'reader.positionFailed': 'Unable to save reading position',
     'reader.translation': 'Translation',
@@ -60,6 +63,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.play': 'Play',
     'reader.pause': 'Pause',
     'surahList.ayahsSuffix': 'ayahs',
+    'surahList.loadFailed': 'Unable to load surahs',
     'settings.language': 'Language',
     'settings.theme': 'Theme',
     'settings.about': 'About and credits',
@@ -91,6 +95,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'home.noHistory': 'Hali o‘qish tarixi yo‘q',
     'home.loadFailed': 'O‘qish tarixini yuklab bo‘lmadi',
     'reader.loadFailed': 'Surani yuklab bo‘lmadi',
+    'reader.invalidSurah': 'Bunday sura yo‘q',
     'reader.bookmarkFailed': 'Xatcho‘pni yangilab bo‘lmadi',
     'reader.positionFailed': 'O‘qish joyini saqlab bo‘lmadi',
     'reader.translation': 'Tarjima',
@@ -99,6 +104,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.play': 'Ijro etish',
     'reader.pause': 'To‘xtatish',
     'surahList.ayahsSuffix': 'oyat',
+    'surahList.loadFailed': 'Suralarni yuklab bo‘lmadi',
     'settings.language': 'Til',
     'settings.theme': 'Mavzu',
     'settings.about': 'Ilova va manbalar',
@@ -130,6 +136,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'home.noHistory': 'Истории чтения пока нет',
     'home.loadFailed': 'Не удалось загрузить историю чтения',
     'reader.loadFailed': 'Не удалось загрузить суру',
+    'reader.invalidSurah': 'Такой суры не существует',
     'reader.bookmarkFailed': 'Не удалось обновить закладку',
     'reader.positionFailed': 'Не удалось сохранить позицию чтения',
     'reader.translation': 'Перевод',
@@ -138,6 +145,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.play': 'Воспроизвести',
     'reader.pause': 'Пауза',
     'surahList.ayahsSuffix': 'аятов',
+    'surahList.loadFailed': 'Не удалось загрузить суры',
     'settings.language': 'Язык',
     'settings.theme': 'Тема',
     'settings.about': 'О приложении и источниках',
