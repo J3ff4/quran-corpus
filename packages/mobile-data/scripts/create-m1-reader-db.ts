@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createDatabase } from '@quran-corpus/data';
 import { selectedTranslators } from '../src/translators.js';
-import { sealDbForBundling } from './sealDb.js';
+import { checkpointWal, sealDbForBundling } from './sealDb.js';
 
 // Derived from this file's own location, not the cwd: `resolve('../..')` only
 // landed on the repo root when the script happened to be invoked from inside
@@ -105,7 +105,7 @@ export async function syncM1ReaderDbAsset({
   // app reads the same file and wants to stay in WAL.
   const source = createDatabase(`file:${sourceDbPath}`);
   try {
-    await source.execute('PRAGMA wal_checkpoint(TRUNCATE)');
+    await checkpointWal(source);
   } finally {
     source.close();
   }

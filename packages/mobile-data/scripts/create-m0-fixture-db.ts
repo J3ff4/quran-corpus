@@ -2,6 +2,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createDatabase } from '@quran-corpus/data';
+import { removeJournalSidecars, sealOpenDb } from './sealDb.js';
 
 // Derived from this file's own location, not the cwd: the previous relative
 // resolve() only landed on the right paths when the script happened to be
@@ -252,13 +253,15 @@ async function main() {
     // canonical schema is born in WAL mode -- three files on disk, of which a
     // bundled asset carries exactly one. This fixture is committed and loaded
     // as an asset, so it has the same one-file constraint as the shipped corpus
-    // DB (see sealDbForBundling). Left until after every write, because leaving
-    // WAL mode checkpoints. Done on this connection rather than by reopening:
-    // libsql holds the WAL lock past close(), so a reopen here hits SQLITE_BUSY.
-    await db.execute('PRAGMA journal_mode = DELETE');
+    // DB, and gets it from the same implementation rather than a second copy.
+    // Left until after every write, because leaving WAL mode checkpoints, and
+    // run on this connection because libsql holds the WAL lock past close().
+    await sealOpenDb(db);
   } finally {
     db.close();
   }
+
+  await removeJournalSidecars(dbPath);
 }
 
 main().catch((error) => {
