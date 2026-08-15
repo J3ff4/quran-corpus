@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createDatabase } from '@quran-corpus/data';
 import { selectedTranslators } from '../src/translators.js';
+import { sealDbForBundling } from './sealDb.js';
 
 // Derived from this file's own location, not the cwd: `resolve('../..')` only
 // landed on the repo root when the script happened to be invoked from inside
@@ -96,17 +97,30 @@ export async function syncM1ReaderDbAsset({
 }: {
   sourceDbPath: string;
   targetDbPath: string;
-}): Promise<{ copied: boolean; sourceSha256: string; targetSha256: string }> {
-  const sourceSha256 = await fileSha256(sourceDbPath);
-  const targetSha256 = (await pathExists(targetDbPath)) ? await fileSha256(targetDbPath) : '';
-
-  if (sourceSha256 !== targetSha256) {
-    await mkdir(dirname(targetDbPath), { recursive: true });
-    await copyFile(sourceDbPath, targetDbPath);
-    return { copied: true, sourceSha256, targetSha256: sourceSha256 };
+}): Promise<{ sourceSha256: string; targetSha256: string }> {
+  // copyFile takes the main database file and nothing else, so committed pages
+  // still sitting in the canonical DB's WAL would be silently left behind and
+  // the app would ship a corpus missing whatever the scraper wrote last. Fold
+  // them in first. This does not change the source's journal mode -- the web
+  // app reads the same file and wants to stay in WAL.
+  const source = createDatabase(`file:${sourceDbPath}`);
+  try {
+    await source.execute('PRAGMA wal_checkpoint(TRUNCATE)');
+  } finally {
+    source.close();
   }
 
-  return { copied: false, sourceSha256, targetSha256 };
+  const sourceSha256 = await fileSha256(sourceDbPath);
+
+  await mkdir(dirname(targetDbPath), { recursive: true });
+  await copyFile(sourceDbPath, targetDbPath);
+  await sealDbForBundling(targetDbPath);
+
+  // Unconditional, where this used to skip when the shas matched. Sealing
+  // rewrites the copy's header, so a sealed target is never byte-identical to
+  // its WAL-mode source and that comparison could only ever answer "different".
+  // Hashing 134 MB costs about what copying it does, so the skip bought little.
+  return { sourceSha256, targetSha256: await fileSha256(targetDbPath) };
 }
 
 export function parseM1TranslationSelection(approval: string): Record<keyof typeof selectedTranslators, string> {

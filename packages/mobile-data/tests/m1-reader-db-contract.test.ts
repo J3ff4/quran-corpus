@@ -105,24 +105,54 @@ describe('M1 reader DB contract', () => {
     await expect(resolveM1ReaderDbSource({ repoRoot: worktreeRoot })).resolves.toBe(canonicalDb);
   });
 
-  it('overwrites an existing mobile DB when it differs from the canonical source', async () => {
+  it('overwrites a stale mobile DB and seals the copy out of WAL mode', async () => {
     const workspace = await createTempDir();
     const canonicalDb = resolve(workspace, 'quran-data/quran.db');
     const targetDb = resolve(workspace, 'app/assets/db/quran.db');
     await mkdir(resolve(workspace, 'quran-data'), { recursive: true });
     await mkdir(resolve(workspace, 'app/assets/db'), { recursive: true });
-    await writeFile(canonicalDb, 'canonical db');
     await writeFile(targetDb, 'stale db');
 
-    const result = await syncM1ReaderDbAsset({ sourceDbPath: canonicalDb, targetDbPath: targetDb });
+    const source = createDatabase(`file:${canonicalDb}`);
+    await source.execute('PRAGMA journal_mode = WAL');
+    await source.execute('CREATE TABLE marker (n INTEGER)');
+    await source.execute('INSERT INTO marker (n) VALUES (7)');
+    source.close();
+    // Guards the premise of the case: with a source that is not in WAL mode
+    // there is nothing to seal and the assertions below would pass vacuously.
+    expect((await readFile(canonicalDb))[18]).toBe(2);
 
-    expect(result.copied).toBe(true);
-    await expect(readFile(targetDb, 'utf8')).resolves.toBe('canonical db');
+    await syncM1ReaderDbAsset({ sourceDbPath: canonicalDb, targetDbPath: targetDb });
+
+    // Header bytes 18 and 19 are the file format write/read versions. 2 means a
+    // reader must find a -wal sidecar alongside the file, and only the main file
+    // is bundled into the APK -- so a 2 here is an app that cannot open its own
+    // database on device.
+    const header = await readFile(targetDb);
+    expect([header[18], header[19]]).toEqual([1, 1]);
+    expect(existsSync(`${targetDb}-wal`)).toBe(false);
+    expect(existsSync(`${targetDb}-shm`)).toBe(false);
+
+    const target = createDatabase(`file:${targetDb}`);
+    const rows = (await target.execute('SELECT n FROM marker')).rows;
+    target.close();
+    expect(Number(rows[0]?.n)).toBe(7);
   });
 
 });
 
 describeWithDb('M1 reader DB artifact', () => {
+  it('is a single self-contained file, not a WAL-mode database', async () => {
+    // The one assertion that reflects how the file is actually consumed: Metro
+    // bundles apps/mobile/assets/db/quran.db and nothing beside it, so a
+    // WAL-mode header sends SQLite looking for a sidecar that is not in the APK
+    // and the corpus fails to open on device.
+    const header = await readFile(dbPath);
+    expect([header[18], header[19]]).toEqual([1, 1]);
+    expect(existsSync(`${dbPath}-wal`)).toBe(false);
+    expect(existsSync(`${dbPath}-shm`)).toBe(false);
+  });
+
   it('contains complete reader rows and selected translations', async () => {
     const summary = await validateM1ReaderDbContract(dbPath);
 

@@ -248,7 +248,14 @@ async function main() {
       'write',
     );
 
-    await db.execute('PRAGMA wal_checkpoint(TRUNCATE)');
+    // schema.sql:2 is `PRAGMA journal_mode = WAL`, so anything built from the
+    // canonical schema is born in WAL mode -- three files on disk, of which a
+    // bundled asset carries exactly one. This fixture is committed and loaded
+    // as an asset, so it has the same one-file constraint as the shipped corpus
+    // DB (see sealDbForBundling). Left until after every write, because leaving
+    // WAL mode checkpoints. Done on this connection rather than by reopening:
+    // libsql holds the WAL lock past close(), so a reopen here hits SQLITE_BUSY.
+    await db.execute('PRAGMA journal_mode = DELETE');
   } finally {
     db.close();
   }
