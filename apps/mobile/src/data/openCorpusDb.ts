@@ -4,7 +4,9 @@ import type * as ExpoFont from 'expo-font';
 import type * as SQLite from 'expo-sqlite';
 import type * as ExpoSQLite from 'expo-sqlite';
 
-export const corpusDbAssetName = 'quran.db';
+// No constant for the asset name: Metro needs a string literal inside
+// require(), so the one below is the only place it can live and a second copy
+// here would only drift.
 export const corpusDbFileName = 'quran-corpus-m1.db';
 
 // The extraction below copies ~134 MB while the user stares at a fresh install,

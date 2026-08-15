@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CorpusDbFileSystem } from './openCorpusDb';
-import { corpusDbAssetName, corpusDbFileName, ensureCorpusDbFile, stagingSuffix } from './openCorpusDb';
+import { corpusDbFileName, ensureCorpusDbFile, stagingSuffix } from './openCorpusDb';
 
 const sqliteDir = 'file:///docs/SQLite';
 const targetPath = `${sqliteDir}/${corpusDbFileName}`;
@@ -47,8 +47,7 @@ function createFileSystem(initialFiles: Record<string, string>) {
 }
 
 describe('openCorpusDb constants', () => {
-  it('uses the bundled M1 DB asset name and stable local filename', () => {
-    expect(corpusDbAssetName).toBe('quran.db');
+  it('uses a stable local filename', () => {
     expect(corpusDbFileName).toBe('quran-corpus-m1.db');
   });
 });
