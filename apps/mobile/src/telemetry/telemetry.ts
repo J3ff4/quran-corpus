@@ -92,15 +92,24 @@ const propertyValidators: Record<string, (value: TelemetryValue) => boolean> = {
 export function sanitizeProperties(properties: unknown = {}): TelemetryProperties {
   if (properties === null || typeof properties !== 'object') return {};
 
-  return Object.fromEntries(
-    // hasOwn before the lookup: a plain object literal inherits from
-    // Object.prototype, so keys like `toString`, `valueOf` or `constructor`
-    // resolve to an inherited function, get called, return something truthy,
-    // and survive the filter -- the key-only bypass this table exists to stop.
-    Object.entries(properties as TelemetryProperties).filter(
-      ([key, value]) => Object.hasOwn(propertyValidators, key) && (propertyValidators[key]?.(value) ?? false),
-    ),
-  );
+  try {
+    return Object.fromEntries(
+      // hasOwn before the lookup: a plain object literal inherits from
+      // Object.prototype, so keys like `toString`, `valueOf` or `constructor`
+      // resolve to an inherited function, get called, return something truthy,
+      // and survive the filter -- the key-only bypass this table exists to stop.
+      Object.entries(properties as TelemetryProperties).filter(
+        ([key, value]) => Object.hasOwn(propertyValidators, key) && (propertyValidators[key]?.(value) ?? false),
+      ),
+    );
+  } catch {
+    // Object.entries *reads* every enumerable property, so an object carrying a
+    // getter that throws takes the whole call down -- the null guard above does
+    // not cover it, because such an object is a perfectly ordinary non-null
+    // object. Same rule as everywhere else here: drop the payload, never let
+    // telemetry be the reason a user-facing path fails.
+    return {};
+  }
 }
 
 export function createTelemetry({ posthog, sentry }: TelemetryProviders) {

@@ -64,6 +64,23 @@ describe('telemetry', () => {
     expect(context.extra).toEqual({});
   });
 
+  it('drops a payload whose getter throws during enumeration', () => {
+    const posthog = { capture: vi.fn() };
+    const telemetry = createTelemetry({ posthog: posthog as never, sentry: null });
+
+    // A non-null object, so the typeof guard passes it -- but Object.entries
+    // reads every enumerable property, and this one throws when read.
+    const hostile = {
+      surah: 1,
+      get screen(): string {
+        throw new Error('/data/user/0/com.qurancorpus.mobile/secret');
+      },
+    };
+
+    expect(() => telemetry.captureEvent('reader_ayah_opened', hostile as never)).not.toThrow();
+    expect(posthog.capture).toHaveBeenCalledWith('reader_ayah_opened', {});
+  });
+
   it('drops out-of-range values for approved numeric keys', () => {
     const posthog = { capture: vi.fn() };
     const telemetry = createTelemetry({ posthog: posthog as never, sentry: null });
