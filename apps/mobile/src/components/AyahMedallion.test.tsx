@@ -1,6 +1,10 @@
 import React from 'react';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  MEDALLION_BACKING_PATH,
+  MEDALLION_OUTLINE_PATH,
+} from '@quran-corpus/config/ornaments/medallion';
 import { AyahMedallion } from './AyahMedallion';
 import { ThemeContext } from '@/theme/themeContext';
 import { themeColors } from '@/theme/tokens';
@@ -63,6 +67,21 @@ describe('AyahMedallion', () => {
     // A filled backing plus the stroked outline. One path means the port
     // dropped a layer and the number sits on whatever is behind the card.
     expect(container.querySelectorAll('path')).toHaveLength(2);
+  });
+
+  it('gives each layer its own geometry', () => {
+    const { container } = render(<AyahMedallion n={1} uiLocale="en" />);
+
+    const [backing, outline] = Array.from(container.querySelectorAll('path')).map((path) =>
+      path.getAttribute('d'),
+    );
+    // The two paths come from separate exports of the shared ornament module.
+    // Wiring both layers to one constant still renders two paths and still
+    // passes the count above -- it just draws the outline twice, with the
+    // backing plate missing.
+    expect(backing).toBe(MEDALLION_BACKING_PATH);
+    expect(outline).toBe(MEDALLION_OUTLINE_PATH);
+    expect(backing).not.toBe(outline);
   });
 
   it('takes its colours from the theme, not a hardcoded hex', () => {

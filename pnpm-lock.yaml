@@ -153,6 +153,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@quran-corpus/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@quran-corpus/data':
         specifier: workspace:*
         version: link:../../packages/data
@@ -178,9 +181,6 @@ importers:
       '@next/eslint-plugin-next':
         specifier: ^16.2.9
         version: 16.2.9
-      '@quran-corpus/config':
-        specifier: workspace:*
-        version: link:../../packages/config
       '@serwist/next':
         specifier: ^9.0.0
         version: 9.5.11(next@15.5.19(@babel/core@7.29.7)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)(typescript@5.9.3)

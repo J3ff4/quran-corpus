@@ -8,6 +8,7 @@
     "./eslint": "./eslint/index.js",
     "./tailwind/preset": "./tailwind/preset.ts",
     "./theme/palette": "./theme/palette.ts",
+    "./ornaments/medallion": "./ornaments/medallion.ts",
     "./prettier": "./prettier/index.js"
   },
   "devDependencies": {
