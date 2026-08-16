@@ -5,7 +5,15 @@ export type UiStringKey =
   | 'tabs.home'
   | 'tabs.surahs'
   | 'tabs.bookmarks'
+  | 'tabs.morphology'
   | 'tabs.settings'
+  | 'wbw.title'
+  | 'wbw.previous'
+  | 'wbw.next'
+  // Prefix for the pager's range, read as "Ayahs 11-20". The bare "11-20" on
+  // screen announces as two numbers with nothing to say what they count.
+  | 'wbw.rangeLabel'
+  | 'morphology.noHistory'
   | 'bookmarks.empty'
   | 'bookmarks.entryPrefix'
   | 'bookmarks.loadFailed'
@@ -64,7 +72,13 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'tabs.home': 'Home',
     'tabs.surahs': 'Surahs',
     'tabs.bookmarks': 'Bookmarks',
+    'tabs.morphology': 'Morphology',
     'tabs.settings': 'Settings',
+    'wbw.title': 'Word by word',
+    'wbw.previous': 'Previous ayahs',
+    'wbw.next': 'Next ayahs',
+    'wbw.rangeLabel': 'Ayahs',
+    'morphology.noHistory': 'No reading history yet',
     'bookmarks.empty': 'No bookmarks yet',
     'bookmarks.entryPrefix': 'Open',
     'bookmarks.loadFailed': 'Unable to load bookmarks',
@@ -119,7 +133,13 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'tabs.home': 'Bosh sahifa',
     'tabs.surahs': 'Suralar',
     'tabs.bookmarks': 'Xatcho‘plar',
+    'tabs.morphology': 'Morfologiya',
     'tabs.settings': 'Sozlamalar',
+    'wbw.title': 'So‘zma-so‘z',
+    'wbw.previous': 'Oldingi oyatlar',
+    'wbw.next': 'Keyingi oyatlar',
+    'wbw.rangeLabel': 'Oyatlar',
+    'morphology.noHistory': 'Hali o‘qish tarixi yo‘q',
     'bookmarks.empty': 'Hali xatcho‘p yo‘q',
     'bookmarks.entryPrefix': 'Ochish',
     'bookmarks.loadFailed': 'Xatcho‘plarni yuklab bo‘lmadi',
@@ -174,7 +194,13 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'tabs.home': 'Главная',
     'tabs.surahs': 'Суры',
     'tabs.bookmarks': 'Закладки',
+    'tabs.morphology': 'Морфология',
     'tabs.settings': 'Настройки',
+    'wbw.title': 'Пословно',
+    'wbw.previous': 'Предыдущие аяты',
+    'wbw.next': 'Следующие аяты',
+    'wbw.rangeLabel': 'Аяты',
+    'morphology.noHistory': 'Истории чтения пока нет',
     'bookmarks.empty': 'Закладок пока нет',
     'bookmarks.entryPrefix': 'Открыть',
     'bookmarks.loadFailed': 'Не удалось загрузить закладки',

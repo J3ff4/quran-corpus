@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Text, View, type ViewToken } from 'react-native';
+import { FlatList, Pressable, Text, View, type ViewToken } from 'react-native';
 import { router } from 'expo-router';
 import type { Word } from '@quran-corpus/data/mobile';
 import type { ReaderAyah, SurahReaderData, WordSummary } from '@/data/corpusRepository';
 import type { UiLocaleCode } from '@/i18n/languages';
+import { t } from '@/i18n/uiStrings';
 
 import { AyahCard } from './AyahCard';
 import { WordSheet } from './WordSheet';
+import { Icon } from './icons/Icon';
+import { touchTargets } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
 interface SurahReaderProps {
@@ -177,11 +180,42 @@ export function SurahReader({
         data={data.ayahs}
         keyExtractor={(item) => String(item.ayah.id)}
         ListHeaderComponent={
-          <View style={{ paddingHorizontal: 20, paddingVertical: 16, gap: 6 }}>
-            <Text accessibilityRole="header" style={{ color: theme.text, fontSize: 24, fontWeight: '700' }}>
-              {data.surah.name_translit}
-            </Text>
-            <Text style={{ color: theme.mutedText }}>{data.surah.name_translation}</Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: 20,
+              paddingVertical: 16,
+              gap: 12,
+            }}
+          >
+            <View style={{ flexShrink: 1, gap: 6 }}>
+              <Text accessibilityRole="header" style={{ color: theme.text, fontSize: 24, fontWeight: '700' }}>
+                {data.surah.name_translit}
+              </Text>
+              <Text style={{ color: theme.mutedText }}>{data.surah.name_translation}</Text>
+            </View>
+            {/* ponytail: lives in the list header, so it scrolls away with the
+                surah title. The morphology tab is the persistent entry point;
+                giving the reader its own fixed top bar to hold one button means
+                either a second surah title on screen or a navigation-header
+                rewrite, and app/_layout.tsx currently runs headerShown: false
+                for every route. */}
+            <Pressable
+              testID="open-wbw"
+              accessibilityRole="button"
+              accessibilityLabel={t(uiLocale, 'wbw.title')}
+              onPress={() => router.push(`/surah/${data.surah.id}/words`)}
+              style={{
+                minHeight: touchTargets.minimum,
+                minWidth: touchTargets.minimum,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Icon name="words" color={theme.accent} />
+            </Pressable>
           </View>
         }
         renderItem={({ item }) => (

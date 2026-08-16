@@ -40,6 +40,13 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="morphology"
+        options={{
+          title: t(uiLocale, 'tabs.morphology'),
+          tabBarIcon: ({ color, size }) => <Icon name="words" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
         name="settings"
         options={{
           title: t(uiLocale, 'tabs.settings'),

@@ -8,6 +8,7 @@ import {
   getSurahList,
   getSurahReader,
   getWbwRange,
+  getWbwScreen,
   getWordAtLocation,
   getWordsForAyah,
   getWordSummary,
@@ -459,8 +460,45 @@ describe('getWbwRange', () => {
     expect(pages[0]!.words.map((word) => word.id)).toEqual([2001, 2002]);
   });
 
+  it("scopes each page's segment map to that page's own words", async () => {
+    // The segments are fetched once for the whole range, so the obvious
+    // implementation hands every page the same map. Lookups still work --
+    // word_id is unique across the corpus -- but anything that iterates
+    // `page.segments` reads the neighbouring ayahs' grammar as this ayah's.
+    const pages = await getWbwRange(createFakeClient(), 2, 1, 2);
+
+    expect([...pages[0]!.segments.keys()]).toEqual([2001, 2002]);
+    expect([...pages[1]!.segments.keys()]).toEqual([2003]);
+  });
+
   it('returns an empty list for a range with no ayahs', async () => {
     expect(await getWbwRange(createFakeClient(), 2, 900, 910)).toEqual([]);
+  });
+});
+
+describe('getWbwScreen', () => {
+  it('returns the surah alongside the range it served', async () => {
+    const screen = await getWbwScreen(createFakeClient(), 2, 1);
+
+    // ayah_count is what bounds the pager, so a screen that renders without it
+    // offers a next page past the end of the surah.
+    expect(screen.surah.ayah_count).toBe(286);
+    expect([screen.from, screen.to]).toEqual([1, 10]);
+    expect(screen.pages.map((page) => page.ayahNumber)).toEqual([1, 2]);
+  });
+
+  it('clamps a start past the end of the surah', async () => {
+    // parseAyahNumber caps at 286 -- al-Baqarah's length -- so `/surah/1/words
+    // ?from=200` is a link a user can actually follow. Unclamped it queries
+    // ayahs 200-209 of al-Fatihah and renders an empty screen with a pager
+    // that cannot get back.
+    const screen = await getWbwScreen(createFakeClient(), 1, 200);
+
+    expect([screen.from, screen.to]).toEqual([7, 7]);
+  });
+
+  it('rejects for a surah that is not in the bundled DB', async () => {
+    await expect(getWbwScreen(createFakeClient(), 99, 1)).rejects.toThrow(/Surah not found/);
   });
 });
 

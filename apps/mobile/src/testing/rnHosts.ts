@@ -19,6 +19,7 @@ import React from 'react';
  */
 interface HostProps {
   accessibilityLabel?: string;
+  accessibilityLiveRegion?: 'none' | 'polite' | 'assertive';
   accessibilityRole?: string;
   accessibilityState?: { disabled?: boolean; selected?: boolean };
   children?: React.ReactNode;
@@ -32,6 +33,7 @@ interface HostProps {
   // every render.
   accessible?: unknown;
   contentContainerStyle?: unknown;
+  importantForAccessibility?: unknown;
   onLayout?: unknown;
   pointerEvents?: unknown;
 }
@@ -45,6 +47,7 @@ function flattenStyle(style: unknown): Record<string, unknown> | undefined {
 export function host(tag: string) {
   return function Host({
     accessibilityLabel,
+    accessibilityLiveRegion,
     accessibilityRole,
     accessibilityState,
     children,
@@ -54,6 +57,7 @@ export function host(tag: string) {
     testID,
     accessible: _accessible,
     contentContainerStyle: _contentContainerStyle,
+    importantForAccessibility: _importantForAccessibility,
     onLayout: _onLayout,
     pointerEvents: _pointerEvents,
     ...props
@@ -63,6 +67,12 @@ export function host(tag: string) {
       {
         ...props,
         'aria-label': accessibilityLabel,
+        // Mapped, not dropped: an error a screen reader must announce after
+        // the tap that caused it is exactly the kind of thing a test should be
+        // able to assert on. RN spells the off state 'none'; ARIA spells it
+        // 'off'.
+        'aria-live':
+          accessibilityLiveRegion === 'none' ? 'off' : accessibilityLiveRegion,
         // Mapped rather than spread: React warns about an unknown
         // accessibilityState attribute on a DOM node, and mapping it is what
         // lets a test see the state a control announces.

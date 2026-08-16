@@ -309,6 +309,20 @@ describe('SurahReader', () => {
     // path or arrive at the root screen as different characters.
     expect(mocks.push).toHaveBeenCalledWith('/root/r%24m');
   });
+
+  it('opens the word-by-word screen for the surah on display', async () => {
+    // Surah 2, not the fixture's default 1: with the id equal to the literal
+    // in the route this passes just as well when the control is hardcoded.
+    const base = readerData(1);
+    const data = { ...base, surah: { ...base.surah, id: 2 } };
+    render(<SurahReader {...baseProps(data)} />);
+
+    fireEvent.click(screen.getByTestId('open-wbw'));
+
+    // The surah on screen, not a hardcoded one: the control lives in the list
+    // header, which every surah renders.
+    expect(mocks.push).toHaveBeenCalledWith('/surah/2/words');
+  });
 });
 
 function baseProps(data: ReturnType<typeof readerData>) {

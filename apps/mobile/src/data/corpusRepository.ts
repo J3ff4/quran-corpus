@@ -241,11 +241,57 @@ export async function getWbwRange(
 
   return [...byAyah.entries()]
     .sort(([a], [b]) => a - b)
-    .map(([ayahNumber, ayahWords]) => ({
-      ayahNumber,
-      words: [...ayahWords].sort((a, b) => a.position - b.position),
-      segments: byWord,
-    }));
+    .map(([ayahNumber, ayahWords]) => {
+      const pageWords = [...ayahWords].sort((a, b) => a.position - b.position);
+      return {
+        ayahNumber,
+        words: pageWords,
+        // This ayah's segments only. Handing every page the whole range's map
+        // is correct by lookup -- word_id is unique across the corpus -- but
+        // it makes `page.segments` a lie: anything that iterates it instead of
+        // getting by id reads the neighbouring ayahs' grammar too, and there
+        // is nothing on screen to say so.
+        segments: new Map(pageWords.map((word) => [word.id, byWord.get(word.id) ?? []])),
+      };
+    });
+}
+
+/** Ayahs per word-by-word page. Al-Baqarah's densest ten run to roughly 400
+ *  words; the whole-surah load this replaces was 6,116 (see getSurahReader). */
+export const WBW_PAGE_SIZE = 10;
+
+/** The range a page starting at `from` covers, clamped to the surah's length.
+ *
+ *  Not aligned to multiples of ten: every entry point carries the ayah the
+ *  reader means (a bookmark at 2:255 opens a page at 255, not at 251). */
+export function wbwPageRange(from: number, ayahCount: number): [number, number] {
+  const start = Math.max(1, Math.min(from, ayahCount));
+  return [start, Math.min(ayahCount, start + WBW_PAGE_SIZE - 1)];
+}
+
+export interface WbwScreenData {
+  surah: Surah;
+  /** The range actually served, clamped -- `from` may arrive from a deep link
+   *  naming an ayah past the end of this surah. */
+  from: number;
+  to: number;
+  pages: WbwPage[];
+}
+
+/** The word-by-word screen's whole payload: the surah row (for its name and
+ *  `ayah_count`, which bounds the pager) plus one page per ayah in range. */
+export async function getWbwScreen(
+  client: MobileDataClient,
+  surahId: number,
+  fromAyah: number,
+): Promise<WbwScreenData> {
+  // Sequential, not Promise.all: the range query is only well-formed once
+  // ayah_count has clamped it. Parallel saves one round trip on a local file
+  // and costs an empty screen for every ayah past the end of a short surah.
+  const surah = await getSurahById(client, surahId);
+  if (!surah) throw new Error(`Surah not found: ${surahId}`);
+  const [from, to] = wbwPageRange(fromAyah, surah.ayah_count);
+  return { surah, from, to, pages: await getWbwRange(client, surahId, from, to) };
 }
 
 export async function getRootScreen(
