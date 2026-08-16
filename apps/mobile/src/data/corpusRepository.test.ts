@@ -22,14 +22,13 @@ describe('getSurahList', () => {
 });
 
 describe('getSurahReader', () => {
-  it('groups ayahs, words, and selected language translations for any surah', async () => {
+  it('groups ayahs and selected language translations for any surah', async () => {
     const reader = await getSurahReader(createFakeClient(), 2, 'ru');
 
     expect(reader.surah.id).toBe(2);
     expect(reader.ayahs).toHaveLength(2);
     expect(reader.ayahs[0]?.translation?.language_code).toBe('ru');
     expect(reader.ayahs[0]?.translation?.translator).toBe('Abu Adel');
-    expect(reader.ayahs[0]?.words.map((word) => word.position)).toEqual([1, 2]);
   });
 
   it('reports a bundled DB whose rows use a different translator', async () => {
@@ -47,7 +46,7 @@ describe('getAyahReaderLocation', () => {
     const ayah = await getAyahReaderLocation(createFakeClient(), 2, 1, 'ru');
 
     expect(ayah?.ayah.ayah_number).toBe(1);
-    expect(ayah?.words).toHaveLength(2);
+    expect(ayah?.translation?.text).toBe('Russian ayah one');
   });
 });
 
@@ -117,10 +116,14 @@ function createFakeClient({ ruTranslator = 'Abu Adel' }: { ruTranslator?: string
       if (sql.includes('FROM words WHERE id = ?')) {
         return { rows: words.filter((word) => word['id'] === args[0]) };
       }
-      if (sql.includes('FROM words w JOIN ayahs a') && sql.includes('WHERE a.surah_id = ?')) {
-        const [surahId] = args;
-        const ayahIds = new Set(ayahs.filter((ayah) => ayah['surah_id'] === surahId).map((ayah) => ayah['id']));
-        return { rows: words.filter((word) => ayahIds.has(word['ayah_id'])) };
+      // Tripwire, not a stub: the whole-surah word fetch is 6116 rows for
+      // al-Baqarah that no screen reads, and it was the heaviest work on the
+      // reader's open path. Any test that opens a reader fails if it returns.
+      // Matched through ORDER BY so the ayah-range query -- same table, same
+      // join, the on-demand fetch word-by-word display will use -- is not
+      // caught by this too.
+      if (sql.includes('FROM words w JOIN ayahs a') && sql.includes('WHERE a.surah_id = ? ORDER BY')) {
+        throw new Error('Reader must not fetch every word of a surah; nothing renders them');
       }
       if (sql.includes('FROM translations t')) {
         const [surahId, languageCode] = args;

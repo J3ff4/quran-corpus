@@ -1,13 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Ayah } from '@quran-corpus/data/client';
+import { ayahAudioUrl, type Ayah } from '@quran-corpus/data/client';
 
 function buildAudioUrl(ayah: Ayah): string {
+  // The template moved to packages/data so the mobile reader plays the same
+  // recitation from the same host; the per-ayah override stays here because
+  // only this app reads the column.
   if (ayah.audio_url) return ayah.audio_url;
-  const s = String(ayah.surah_id).padStart(3, '0');
-  const a = String(ayah.ayah_number).padStart(3, '0');
-  return `https://everyayah.com/data/Abdul_Basit_Murattal_64kbps/${s}${a}.mp3`;
+  return ayahAudioUrl(ayah.surah_id, ayah.ayah_number);
 }
 
 export interface AyahAudioState {

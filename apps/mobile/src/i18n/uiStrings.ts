@@ -1,3 +1,4 @@
+import { AYAH_AUDIO_ATTRIBUTION } from '@quran-corpus/data/mobile';
 import type { UiLocaleCode } from './languages';
 
 export type UiStringKey =
@@ -15,6 +16,7 @@ export type UiStringKey =
   | 'reader.invalidSurah'
   | 'reader.bookmarkFailed'
   | 'reader.positionFailed'
+  | 'reader.audioFailed'
   | 'reader.translation'
   | 'reader.bookmark'
   | 'reader.removeBookmark'
@@ -57,6 +59,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.invalidSurah': 'That surah does not exist',
     'reader.bookmarkFailed': 'Unable to update bookmark',
     'reader.positionFailed': 'Unable to save reading position',
+    'reader.audioFailed': 'Unable to play audio',
     'reader.translation': 'Translation',
     'reader.bookmark': 'Bookmark',
     'reader.removeBookmark': 'Remove bookmark',
@@ -81,7 +84,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceUzbek': 'Uzbek translation: Muhammad Sodik Muhammad Yusuf. Source approval incomplete.',
     'about.sourceRussian': 'Russian translation: Abu Adel. Source approval incomplete.',
     'about.sourceHafs': 'Hafs font: apps/mobile/assets/fonts/hafs.18.woff2. Source approval incomplete.',
-    'about.sourceAudio': 'Abdul Rashid Sufi audio metadata: Source approval incomplete.',
+    'about.sourceAudio': `Recitation: ${AYAH_AUDIO_ATTRIBUTION}. Source approval incomplete.`,
   },
   uz: {
     'tabs.home': 'Bosh sahifa',
@@ -98,6 +101,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.invalidSurah': 'Bunday sura yo‘q',
     'reader.bookmarkFailed': 'Xatcho‘pni yangilab bo‘lmadi',
     'reader.positionFailed': 'O‘qish joyini saqlab bo‘lmadi',
+    'reader.audioFailed': 'Audioni ijro etib bo‘lmadi',
     'reader.translation': 'Tarjima',
     'reader.bookmark': 'Xatcho‘p',
     'reader.removeBookmark': 'Xatcho‘pni olib tashlash',
@@ -122,7 +126,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceUzbek': 'O‘zbekcha tarjima: Muhammad Sodik Muhammad Yusuf. Manba tasdig‘i tugallanmagan.',
     'about.sourceRussian': 'Ruscha tarjima: Abu Adel. Manba tasdig‘i tugallanmagan.',
     'about.sourceHafs': 'Hafs shrifti: apps/mobile/assets/fonts/hafs.18.woff2. Manba tasdig‘i tugallanmagan.',
-    'about.sourceAudio': 'Abdul Rashid Sufi audio metama’lumotlari: manba tasdig‘i tugallanmagan.',
+    'about.sourceAudio': `Qiroat: ${AYAH_AUDIO_ATTRIBUTION}. Manba tasdig‘i tugallanmagan.`,
   },
   ru: {
     'tabs.home': 'Главная',
@@ -139,6 +143,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.invalidSurah': 'Такой суры не существует',
     'reader.bookmarkFailed': 'Не удалось обновить закладку',
     'reader.positionFailed': 'Не удалось сохранить позицию чтения',
+    'reader.audioFailed': 'Не удалось воспроизвести аудио',
     'reader.translation': 'Перевод',
     'reader.bookmark': 'Закладка',
     'reader.removeBookmark': 'Удалить закладку',
@@ -163,7 +168,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceUzbek': 'Узбекский перевод: Muhammad Sodik Muhammad Yusuf. Подтверждение источника не завершено.',
     'about.sourceRussian': 'Русский перевод: Abu Adel. Подтверждение источника не завершено.',
     'about.sourceHafs': 'Шрифт Hafs: apps/mobile/assets/fonts/hafs.18.woff2. Подтверждение источника не завершено.',
-    'about.sourceAudio': 'Аудиометаданные Abdul Rashid Sufi: подтверждение источника не завершено.',
+    'about.sourceAudio': `Чтение: ${AYAH_AUDIO_ATTRIBUTION}. Подтверждение источника не завершено.`,
   },
 };
 

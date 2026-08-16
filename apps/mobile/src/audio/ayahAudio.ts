@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { createAudioPlayer } from 'expo-audio';
+import { ayahAudioUrl, AYAH_AUDIO_ATTRIBUTION, AYAH_AUDIO_ORIGIN } from '@quran-corpus/data/mobile';
+import type { UiStringKey } from '../i18n/uiStrings';
 
 export interface AyahAudioParams {
-  baseUrl: string;
+  /** The thin endpoint's origin. Undefined until one is deployed. */
+  baseUrl?: string | undefined;
   surah: number;
   ayah: number;
-  reciter?: 'abdul-rashid-sufi';
 }
+
+/** Only meaningful to the endpoint; the public fallback serves one recitation. */
+const ENDPOINT_RECITER = 'abdul-rashid-sufi';
 
 export interface AyahAudioResponse {
   url: string;
@@ -21,14 +26,19 @@ interface PlaybackHandle {
 }
 
 export interface AyahAudioPlayer {
-  playUrl: (url: string, onFinished: () => void) => Promise<PlaybackHandle>;
+  /** onStopped fires once playback ends, with the driver's message if it failed. */
+  playUrl: (url: string, onStopped: (error: string | null) => void) => Promise<PlaybackHandle>;
 }
 
 export const expoAudioAyahAudioPlayer: AyahAudioPlayer = {
-  async playUrl(url: string, onFinished: () => void) {
+  async playUrl(url: string, onStopped: (error: string | null) => void) {
     const player = createAudioPlayer(url);
     const subscription = player.addListener('playbackStatusUpdate', (status) => {
-      if (status.didJustFinish) onFinished();
+      // A failed load never rejects play(): ExoPlayer reports it on this same
+      // status event. Without reading it, an offline tap or a 404 leaves the
+      // card on "Pause" for ever with nothing playing and nothing said.
+      if (status.error) onStopped(status.error);
+      else if (status.didJustFinish) onStopped(null);
     });
     player.play();
     return {
@@ -117,9 +127,23 @@ export async function getAyahAudioUrl(
   fetchFn: typeof fetch = fetch,
 ): Promise<AyahAudioResponse> {
   assertAyahReference(params.surah, params.ayah);
-  const reciter = params.reciter ?? 'abdul-rashid-sufi';
+
+  // No endpoint has ever been deployed, so with the fetch as the only path the
+  // Play button was dead in every build. Fall back to the source the web reader
+  // already streams from, built by the shared helper so the two cannot drift.
+  // The URL is constructed here from two validated integers rather than parsed
+  // out of a response, so none of the checks in parseAudioResponse apply to it.
+  if (!params.baseUrl) {
+    return {
+      url: ayahAudioUrl(params.surah, params.ayah),
+      duration_ms: null,
+      source: AYAH_AUDIO_ORIGIN,
+      attribution: AYAH_AUDIO_ATTRIBUTION,
+    };
+  }
+
   const url = new URL('/api/v1/audio/ayah', params.baseUrl);
-  url.searchParams.set('reciter', reciter);
+  url.searchParams.set('reciter', ENDPOINT_RECITER);
   url.searchParams.set('surah', String(params.surah));
   url.searchParams.set('ayah', String(params.ayah));
 
@@ -132,10 +156,10 @@ export async function playAyahAudioUrl(
   params: AyahAudioParams,
   player: AyahAudioPlayer,
   fetchFn: typeof fetch = fetch,
-  onFinished: () => void = () => undefined,
+  onStopped: (error: string | null) => void = () => undefined,
 ): Promise<PlaybackHandle> {
   const audio = await getAyahAudioUrl(params, fetchFn);
-  return player.playUrl(audio.url, onFinished);
+  return player.playUrl(audio.url, onStopped);
 }
 
 async function stopPlayback(handle: PlaybackHandle | null) {
@@ -153,7 +177,9 @@ export function useAyahAudioController(
   player: AyahAudioPlayer = expoAudioAyahAudioPlayer,
 ) {
   const [playingAyah, setPlayingAyah] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // A key, not a message. Playback failures come from ExoPlayer and fetch in
+  // English; the screen localizes this and the cause goes to the log instead.
+  const [error, setError] = useState<UiStringKey | null>(null);
   const playbackRef = useRef<PlaybackHandle | null>(null);
   const requestRef = useRef(0);
 
@@ -167,7 +193,7 @@ export function useAyahAudioController(
   }, []);
 
   async function toggleAyah(ayah: number) {
-    if (!baseUrl || !surah) return;
+    if (!surah) return;
     const requestId = requestRef.current + 1;
     requestRef.current = requestId;
 
@@ -178,9 +204,8 @@ export function useAyahAudioController(
       try {
         await stopPlayback(playback);
       } catch (cause) {
-        if (requestRef.current === requestId) {
-          setError(cause instanceof Error ? cause.message : 'Unable to stop audio');
-        }
+        console.error('[audio] stop failed', { surah, ayah, cause });
+        if (requestRef.current === requestId) setError('reader.audioFailed');
       }
       return;
     }
@@ -189,25 +214,29 @@ export function useAyahAudioController(
       setError(null);
       const previousPlayback = playbackRef.current;
       playbackRef.current = null;
-      await stopPlayback(previousPlayback).catch((cause) => {
-        if (requestRef.current === requestId) {
-          setError(cause instanceof Error ? cause.message : 'Unable to stop audio');
-        }
+      await stopPlayback(previousPlayback).catch((cause: unknown) => {
+        console.error('[audio] stop failed', { surah, ayah, cause });
+        if (requestRef.current === requestId) setError('reader.audioFailed');
       });
 
       // Audio that simply reaches its end never told anyone: the button stayed
       // on "Pause" for a finished ayah, and the handle stayed loaded until the
-      // next toggle. Guarded by requestId so a track finishing after the user
-      // has already started another one cannot clear the newer playback.
-      const handleFinished = () => {
+      // next toggle. Same path reports a failed load, which never arrives as a
+      // rejection. Guarded by requestId so a track ending after the user has
+      // already started another one cannot clear the newer playback.
+      const handleStopped = (playbackError: string | null) => {
         if (requestRef.current !== requestId) return;
-        const finished = playbackRef.current;
+        const stopped = playbackRef.current;
         playbackRef.current = null;
         setPlayingAyah(null);
-        void stopPlayback(finished).catch(() => undefined);
+        if (playbackError) {
+          console.error('[audio] playback failed', { surah, ayah, playbackError });
+          setError('reader.audioFailed');
+        }
+        void stopPlayback(stopped).catch(() => undefined);
       };
 
-      const nextPlayback = await playAyahAudioUrl({ baseUrl, surah, ayah }, player, fetch, handleFinished);
+      const nextPlayback = await playAyahAudioUrl({ baseUrl, surah, ayah }, player, fetch, handleStopped);
       if (requestRef.current !== requestId) {
         await stopPlayback(nextPlayback).catch(() => undefined);
         return;
@@ -220,16 +249,20 @@ export function useAyahAudioController(
       setError(null);
       setPlayingAyah(ayah);
     } catch (cause) {
+      console.error('[audio] load failed', { surah, ayah, cause });
       if (requestRef.current === requestId) {
         playbackRef.current = null;
         setPlayingAyah(null);
-        setError(cause instanceof Error ? cause.message : 'Unable to load audio');
+        setError('reader.audioFailed');
       }
     }
   }
 
   return {
-    audioEnabled: Boolean(baseUrl),
+    // Not `Boolean(baseUrl)` any more: audio no longer needs an endpoint to
+    // resolve a URL, so the buttons are live in every build. What it still
+    // needs is the network -- offline, playback fails and says so.
+    audioEnabled: true,
     audioError: error,
     playingAyah,
     toggleAyah,

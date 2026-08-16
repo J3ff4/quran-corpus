@@ -29,9 +29,12 @@ export default function SurahsTab() {
         const client = createExpoSqliteClient(db as ExpoSqliteLike);
         const list = await getSurahList(client);
         if (!cancelled) setSurahs(list);
-      } catch {
-        // Localized, never the driver's message: an expo-sqlite failure reads
+      } catch (cause) {
+        // Logged, not shown: the driver's message is the only thing that says
+        // *why* a load failed, and every on-device failure so far has been
+        // diagnosed from `adb logcat`. It stays out of the UI because it reads
         // in untranslated English and can name a path on the device.
+        console.error('[surahs] load failed', cause);
         if (!cancelled) setError(t(uiLocale, 'surahList.loadFailed'));
       } finally {
         if (!cancelled) setLoading(false);

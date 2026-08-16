@@ -39,6 +39,17 @@ describe('getAyahAudioUrl', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('resolves the shared public URL when no endpoint is configured', async () => {
+    // No thin endpoint is deployed, so this is the path every shipped build
+    // takes; when it returned nothing the Play button was inert.
+    const fetchMock = audioFetch('https://api.example/002255.mp3');
+
+    const result = await getAyahAudioUrl({ surah: 2, ayah: 255 }, fetchMock as never);
+
+    expect(result.url).toBe('https://everyayah.com/data/Abdul_Basit_Murattal_64kbps/002255.mp3');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('refuses a non-https url', async () => {
     // Expo opens file: and content: URIs, so a tampered response could aim
     // playback at a local resource.
@@ -108,10 +119,10 @@ describe('getAyahAudioUrl', () => {
 
   it('reports natural completion instead of leaving the ayah marked as playing', async () => {
     const handle = { stopAsync: vi.fn(), unloadAsync: vi.fn() };
-    let finish: (() => void) | undefined;
+    let finish: ((error: string | null) => void) | undefined;
     const player = {
-      playUrl: vi.fn().mockImplementation((_url: string, onFinished: () => void) => {
-        finish = onFinished;
+      playUrl: vi.fn().mockImplementation((_url: string, onStopped: (error: string | null) => void) => {
+        finish = onStopped;
         return Promise.resolve(handle);
       }),
     };
@@ -124,7 +135,7 @@ describe('getAyahAudioUrl', () => {
     expect(result.current.playingAyah).toBe(255);
 
     await act(async () => {
-      finish?.();
+      finish?.(null);
     });
 
     expect(result.current.playingAyah).toBeNull();
@@ -230,6 +241,75 @@ describe('getAyahAudioUrl', () => {
 
     expect(result.current.playingAyah).toBe(2);
     expect(result.current.audioError).toBeNull();
+  });
+
+  it('plays the public recitation when no endpoint is configured', async () => {
+    // The state every shipped build is in. While audioEnabled was
+    // Boolean(baseUrl) the button was disabled here and none of the tests
+    // above noticed, because all of them pass a base URL.
+    const handle = { stopAsync: vi.fn(), unloadAsync: vi.fn() };
+    const player = { playUrl: vi.fn().mockResolvedValue(handle) };
+    const { result } = renderHook(() => useAyahAudioController(undefined, 2, player));
+
+    expect(result.current.audioEnabled).toBe(true);
+    await act(async () => {
+      await result.current.toggleAyah(255);
+    });
+
+    expect(player.playUrl).toHaveBeenCalledWith(
+      'https://everyayah.com/data/Abdul_Basit_Murattal_64kbps/002255.mp3',
+      expect.any(Function),
+    );
+    expect(result.current.playingAyah).toBe(255);
+  });
+
+  it('reports a failed load instead of sitting on Pause with nothing playing', async () => {
+    // Offline, or an mp3 that 404s: play() still resolves and the failure
+    // arrives on the status event, so without reading it the card stays on
+    // "Pause" for ever and the user is told nothing.
+    const handle = { stopAsync: vi.fn(), unloadAsync: vi.fn() };
+    let stopped: ((error: string | null) => void) | undefined;
+    const player = {
+      playUrl: vi.fn().mockImplementation((_url: string, onStopped: (error: string | null) => void) => {
+        stopped = onStopped;
+        return Promise.resolve(handle);
+      }),
+    };
+    const { result } = renderHook(() => useAyahAudioController(undefined, 2, player));
+
+    await act(async () => {
+      await result.current.toggleAyah(255);
+    });
+    await act(async () => {
+      stopped?.('Source error: Unable to connect');
+    });
+
+    expect(result.current.playingAyah).toBeNull();
+    // A key, not the driver's English message -- the screen localizes it.
+    expect(result.current.audioError).toBe('reader.audioFailed');
+    await waitFor(() => expect(handle.unloadAsync).toHaveBeenCalled());
+  });
+
+  it('forwards a driver playback error from the Expo Audio player', async () => {
+    const subscription = { remove: vi.fn() };
+    let emit: ((status: { didJustFinish?: boolean; error?: string | null }) => void) | undefined;
+    const nativePlayer = {
+      play: vi.fn(),
+      pause: vi.fn(),
+      release: vi.fn(),
+      remove: vi.fn(),
+      addListener: vi.fn().mockImplementation((_event: string, listener: typeof emit) => {
+        emit = listener;
+        return subscription;
+      }),
+    };
+    mocks.createAudioPlayer.mockReturnValue(nativePlayer);
+    const onStopped = vi.fn();
+
+    await expoAudioAyahAudioPlayer.playUrl('https://everyayah.com/data/x/001001.mp3', onStopped);
+    emit?.({ error: 'Source error', didJustFinish: false });
+
+    expect(onStopped).toHaveBeenCalledWith('Source error');
   });
 });
 

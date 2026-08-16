@@ -92,8 +92,8 @@ describe('AyahCard', () => {
     expect(play).toHaveProperty('ariaDisabled', 'true');
     expect(screen.getByRole('button', { name: 'Remove bookmark' })).toHaveProperty('ariaSelected', 'true');
 
-    // This is the shipped default state, not an edge case: audio is disabled
-    // whenever EXPO_PUBLIC_AUDIO_API_BASE_URL is unset.
+    // Audio is live in shipped builds now, so this covers the disabled prop
+    // rather than the default: a disabled Play must not fire the handler.
     fireEvent.click(play);
     expect(onToggleAudio).not.toHaveBeenCalled();
   });

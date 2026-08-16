@@ -100,7 +100,9 @@ export default function SurahRoute() {
             ),
           );
         }
-      } catch {
+      } catch (cause) {
+        // See the note in app/(tabs)/surahs.tsx: logged for logcat, never shown.
+        console.error('[reader] load failed', { surahId, cause });
         if (!cancelled) setError(t(uiLocale, 'reader.loadFailed'));
       } finally {
         if (!cancelled) setLoading(false);
@@ -131,7 +133,8 @@ export default function SurahRoute() {
       const userDb = await openUserDb();
       const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
       await setBookmark(userClient, surahId, ayahNumber, nextBookmarked);
-    } catch {
+    } catch (cause) {
+      console.error('[reader] bookmark write failed', { surahId, ayahNumber, cause });
       // Undo this ayah only, off the current set. Restoring a snapshot taken
       // before the write would also revert any toggle that landed while this
       // one was in flight, leaving the list disagreeing with SQLite until the
@@ -195,7 +198,7 @@ export default function SurahRoute() {
       ) : null}
       {audio.audioError ? (
         <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={errorTextStyle(theme.danger)}>
-          {audio.audioError}
+          {t(uiLocale, audio.audioError)}
         </Text>
       ) : null}
     </View>

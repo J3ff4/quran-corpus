@@ -66,7 +66,23 @@ export async function ensureCorpusDbFile(
 // Memoizing also spares every later call an extra filesystem round-trip.
 let extraction: Promise<string> | null = null;
 
-export async function openCorpusDb(): Promise<SQLite.SQLiteDatabase> {
+// The open handle is memoized too, mirroring openUserDb. Every screen mount
+// re-opened the database, and each open re-ran the PRAGMA below and took
+// another native reference to the same cached connection that nothing ever
+// releases. One connection for the process is what the app actually wants.
+let connection: Promise<SQLite.SQLiteDatabase> | null = null;
+
+export function openCorpusDb(): Promise<SQLite.SQLiteDatabase> {
+  // Do not cache a failure: a transient open error would otherwise poison every
+  // later call for the lifetime of the process.
+  connection ??= createCorpusDb().catch((error: unknown) => {
+    connection = null;
+    throw error;
+  });
+  return connection;
+}
+
+async function createCorpusDb(): Promise<SQLite.SQLiteDatabase> {
   const { Asset } = require('expo-asset') as typeof ExpoAsset;
   const FileSystem = require('expo-file-system/legacy') as typeof ExpoFileSystemLegacy;
   const SQLiteRuntime = require('expo-sqlite') as typeof ExpoSQLite;

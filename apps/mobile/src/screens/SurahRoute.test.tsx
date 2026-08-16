@@ -21,7 +21,7 @@ vi.mock('@quran-corpus/mobile-data', () => ({
 
 vi.mock('@/audio/ayahAudio', () => ({
   useAyahAudioController: () => ({
-    audioEnabled: false,
+    audioEnabled: true,
     audioError: null,
     playingAyah: null,
     toggleAyah: vi.fn(),
@@ -68,7 +68,6 @@ const readerFixture = {
     ayahs: [
       {
         ayah: { id: 8, surah_id: 2, ayah_number: 255, text_uthmani: 'الله لا إله إلا هو' },
-        words: [],
         translation: { ayah_id: 8, language: 'en', translator: 'Saheeh International', text: 'Allah - there is no deity except Him' },
       },
     ],
