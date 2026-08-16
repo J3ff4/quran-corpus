@@ -39,6 +39,14 @@ vi.mock('react-native', async () => {
   };
 });
 
+vi.mock('react-native-svg', async () => {
+  const React = await import('react');
+  const Svg = ({ children, ...props }: { children?: React.ReactNode }) =>
+    React.createElement('svg', props, children);
+  const Path = (props: { d: string }) => React.createElement('path', props);
+  return { default: Svg, Svg, Path };
+});
+
 describe('AyahCard', () => {
   // This suite renders more than once and the project does not enable
   // testing-library's global auto-cleanup, so without this each case queries

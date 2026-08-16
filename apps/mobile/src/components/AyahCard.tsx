@@ -3,6 +3,7 @@ import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
 import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
+import { AyahMedallion } from './AyahMedallion';
 
 const pressableStyle = {
   minHeight: touchTargets.minimum,
@@ -46,7 +47,7 @@ export function AyahCard({
       }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <Text style={{ color: theme.mutedText, fontSize: typography.caption }}>{ayahNumber}</Text>
+        <AyahMedallion n={ayahNumber} />
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <Pressable
             accessibilityRole="button"

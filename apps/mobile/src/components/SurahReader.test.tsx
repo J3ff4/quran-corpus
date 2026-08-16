@@ -46,6 +46,17 @@ vi.mock('react-native', async () => {
   };
 });
 
+// SurahReader renders AyahCard, which now draws the AyahMedallion rosette --
+// a real react-native-svg import with no jsdom implementation. Same mock
+// factory as AyahCard.test.tsx / AyahMedallion.test.tsx.
+vi.mock('react-native-svg', async () => {
+  const React = await import('react');
+  const Svg = ({ children, ...props }: { children?: React.ReactNode }) =>
+    React.createElement('svg', props, children);
+  const Path = (props: { d: string }) => React.createElement('path', props);
+  return { default: Svg, Svg, Path };
+});
+
 describe('SurahReader', () => {
   beforeEach(() => {
     mocks.scrollToIndex.mockClear();
