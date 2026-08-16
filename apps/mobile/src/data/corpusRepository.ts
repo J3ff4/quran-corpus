@@ -5,12 +5,10 @@ import {
   getSegmentsByWordIds,
   getSurahById,
   getTranslationsBySurahAndLang,
-  getWordsBySurah,
   getWordDetail,
   type Ayah,
   type Surah,
   type Translation,
-  type Word,
   type WordDetail,
   type WordSegment,
 } from '@quran-corpus/data/mobile';
@@ -26,7 +24,6 @@ const translatorByLanguage: Record<ContentLanguageCode, string> = selectedTransl
 export interface ReaderAyah {
   ayah: Ayah;
   translation: Translation | null;
-  words: Word[];
 }
 
 export interface SurahReaderData {
@@ -40,16 +37,6 @@ export interface SurahListItem {
   nameTranslit: string;
   nameTranslation: string;
   ayahCount: number;
-}
-
-function groupWordsByAyah(words: Word[]): Map<number, Word[]> {
-  const grouped = new Map<number, Word[]>();
-  for (const word of words) {
-    const existing = grouped.get(word.ayah_id) ?? [];
-    existing.push(word);
-    grouped.set(word.ayah_id, existing);
-  }
-  return grouped;
 }
 
 function selectedTranslationByAyah(
@@ -96,16 +83,19 @@ export async function getSurahReader(
   surahId: number,
   languageCode: ContentLanguageCode,
 ): Promise<SurahReaderData> {
-  const [surah, ayahs, words, translations] = await Promise.all([
+  // Words are deliberately not fetched here. Nothing in the reader renders
+  // them, and pulling every word of a surah moved 6116 rows across the bridge
+  // for al-Baqarah alone -- the heaviest thing the app did, for output no
+  // screen read. Word-by-word display (M2 parity) needs one ayah's words on
+  // demand, not the whole surah up front, so this is not a fetch to restore.
+  const [surah, ayahs, translations] = await Promise.all([
     getSurahById(client, surahId),
     getAyahsBySurah(client, surahId),
-    getWordsBySurah(client, surahId),
     getTranslationsBySurahAndLang(client, surahId, languageCode),
   ]);
 
   if (!surah) throw new Error(`Surah not found: ${surahId}`);
 
-  const wordsByAyah = groupWordsByAyah(words);
   const translationsByAyah = selectedTranslationByAyah(translations, languageCode);
 
   return {
@@ -113,7 +103,6 @@ export async function getSurahReader(
     ayahs: ayahs.map((ayah) => ({
       ayah,
       translation: translationsByAyah.get(ayah.id) ?? null,
-      words: wordsByAyah.get(ayah.id) ?? [],
     })),
   };
 }

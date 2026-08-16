@@ -22,14 +22,20 @@ describe('getSurahList', () => {
 });
 
 describe('getSurahReader', () => {
-  it('groups ayahs, words, and selected language translations for any surah', async () => {
+  it('groups ayahs and selected language translations for any surah', async () => {
     const reader = await getSurahReader(createFakeClient(), 2, 'ru');
 
     expect(reader.surah.id).toBe(2);
     expect(reader.ayahs).toHaveLength(2);
     expect(reader.ayahs[0]?.translation?.language_code).toBe('ru');
     expect(reader.ayahs[0]?.translation?.translator).toBe('Abu Adel');
-    expect(reader.ayahs[0]?.words.map((word) => word.position)).toEqual([1, 2]);
+  });
+
+  // The fake client throws on the surah-words query, so this fails the moment
+  // the whole-surah word fetch comes back. It is 6116 rows for al-Baqarah that
+  // no screen reads, and it was the heaviest work on the reader's open path.
+  it('does not fetch every word of the surah', async () => {
+    await expect(getSurahReader(createFakeClient(), 2, 'ru')).resolves.toBeDefined();
   });
 
   it('reports a bundled DB whose rows use a different translator', async () => {
@@ -47,7 +53,7 @@ describe('getAyahReaderLocation', () => {
     const ayah = await getAyahReaderLocation(createFakeClient(), 2, 1, 'ru');
 
     expect(ayah?.ayah.ayah_number).toBe(1);
-    expect(ayah?.words).toHaveLength(2);
+    expect(ayah?.translation?.text).toBe('Russian ayah one');
   });
 });
 
@@ -118,9 +124,7 @@ function createFakeClient({ ruTranslator = 'Abu Adel' }: { ruTranslator?: string
         return { rows: words.filter((word) => word['id'] === args[0]) };
       }
       if (sql.includes('FROM words w JOIN ayahs a') && sql.includes('WHERE a.surah_id = ?')) {
-        const [surahId] = args;
-        const ayahIds = new Set(ayahs.filter((ayah) => ayah['surah_id'] === surahId).map((ayah) => ayah['id']));
-        return { rows: words.filter((word) => ayahIds.has(word['ayah_id'])) };
+        throw new Error('Reader must not fetch every word of a surah; nothing renders them');
       }
       if (sql.includes('FROM translations t')) {
         const [surahId, languageCode] = args;

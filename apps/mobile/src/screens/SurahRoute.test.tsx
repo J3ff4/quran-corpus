@@ -68,7 +68,6 @@ const readerFixture = {
     ayahs: [
       {
         ayah: { id: 8, surah_id: 2, ayah_number: 255, text_uthmani: 'الله لا إله إلا هو' },
-        words: [],
         translation: { ayah_id: 8, language: 'en', translator: 'Saheeh International', text: 'Allah - there is no deity except Him' },
       },
     ],

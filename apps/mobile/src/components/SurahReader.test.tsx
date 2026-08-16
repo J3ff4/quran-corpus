@@ -153,7 +153,6 @@ function readerData(ayahCount = 1) {
         page: 1,
         audio_url: null,
       },
-      words: [],
       translation: {
         id: index + 1,
         ayah_id: index + 1,
