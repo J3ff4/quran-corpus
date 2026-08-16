@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { createAudioPlayer } from 'expo-audio';
+import { ayahAudioUrl, AYAH_AUDIO_ATTRIBUTION, AYAH_AUDIO_ORIGIN } from '@quran-corpus/data/mobile';
 
 export interface AyahAudioParams {
-  baseUrl: string;
+  /** The thin endpoint's origin. Undefined until one is deployed. */
+  baseUrl?: string | undefined;
   surah: number;
   ayah: number;
   reciter?: 'abdul-rashid-sufi';
@@ -117,6 +119,21 @@ export async function getAyahAudioUrl(
   fetchFn: typeof fetch = fetch,
 ): Promise<AyahAudioResponse> {
   assertAyahReference(params.surah, params.ayah);
+
+  // No endpoint has ever been deployed, so with the fetch as the only path the
+  // Play button was dead in every build. Fall back to the source the web reader
+  // already streams from, built by the shared helper so the two cannot drift.
+  // The URL is constructed here from two validated integers rather than parsed
+  // out of a response, so none of the checks in parseAudioResponse apply to it.
+  if (!params.baseUrl) {
+    return {
+      url: ayahAudioUrl(params.surah, params.ayah),
+      duration_ms: null,
+      source: AYAH_AUDIO_ORIGIN,
+      attribution: AYAH_AUDIO_ATTRIBUTION,
+    };
+  }
+
   const reciter = params.reciter ?? 'abdul-rashid-sufi';
   const url = new URL('/api/v1/audio/ayah', params.baseUrl);
   url.searchParams.set('reciter', reciter);
@@ -167,7 +184,7 @@ export function useAyahAudioController(
   }, []);
 
   async function toggleAyah(ayah: number) {
-    if (!baseUrl || !surah) return;
+    if (!surah) return;
     const requestId = requestRef.current + 1;
     requestRef.current = requestId;
 
@@ -229,7 +246,10 @@ export function useAyahAudioController(
   }
 
   return {
-    audioEnabled: Boolean(baseUrl),
+    // Not `Boolean(baseUrl)` any more: audio no longer needs an endpoint to
+    // resolve a URL, so the buttons are live in every build. What it still
+    // needs is the network -- offline, playback fails and says so.
+    audioEnabled: true,
     audioError: error,
     playingAyah,
     toggleAyah,

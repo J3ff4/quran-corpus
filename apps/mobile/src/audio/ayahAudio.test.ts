@@ -39,6 +39,17 @@ describe('getAyahAudioUrl', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('resolves the shared public URL when no endpoint is configured', async () => {
+    // No thin endpoint is deployed, so this is the path every shipped build
+    // takes; when it returned nothing the Play button was inert.
+    const fetchMock = audioFetch('https://api.example/002255.mp3');
+
+    const result = await getAyahAudioUrl({ surah: 2, ayah: 255 }, fetchMock as never);
+
+    expect(result.url).toBe('https://everyayah.com/data/Abdul_Basit_Murattal_64kbps/002255.mp3');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('refuses a non-https url', async () => {
     // Expo opens file: and content: URIs, so a tampered response could aim
     // playback at a local resource.
