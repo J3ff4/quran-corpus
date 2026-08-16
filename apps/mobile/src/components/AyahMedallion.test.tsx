@@ -61,6 +61,23 @@ describe('AyahMedallion', () => {
     expect(screen.getByText('7')).toBeTruthy();
   });
 
+  it('shrinks only three-digit numbers so they clear the rosette border', () => {
+    const fontSizeFor = (n: number) => {
+      const { unmount } = render(<AyahMedallion n={n} uiLocale="en" />);
+      const size = parseFloat(screen.getByText(String(n)).style.fontSize);
+      unmount();
+      return size;
+    };
+
+    // Observed on device, build 49e4a81f: at maximum system font size the box
+    // grows with fontScale, but the notched star has no flat side for the
+    // digits to grow into, so three of them ran into the border. Two digits
+    // had room and must keep full size -- shrinking every ayah number to fix
+    // Al-Baqarah 286 would be a regression on the other 6000-odd verses.
+    expect(fontSizeFor(99)).toBe(fontSizeFor(7));
+    expect(fontSizeFor(286)).toBeLessThan(fontSizeFor(99));
+  });
+
   it('draws both layers of the rosette', () => {
     const { container } = render(<AyahMedallion n={1} uiLocale="en" />);
 

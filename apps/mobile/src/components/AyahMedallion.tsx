@@ -26,6 +26,12 @@ export function AyahMedallion({ n, uiLocale }: { n: number; uiLocale: UiLocaleCo
   // font-scale control precisely because the system setting already does
   // this for every <Text>, so the box has to follow it too.
   const box = SIZE * fontScale;
+  // Three digits still touch the rosette border at maximum system font size --
+  // observed on device, build 49e4a81f. Growing the box instead would push the
+  // marker into the ayah text, and the notched star has no flat side to grow
+  // into, so the number is what gives way. Al-Baqarah runs to 286, so 3 digits
+  // is the widest case there is.
+  const fontSize = Math.round(SIZE * 0.38 * (n >= 100 ? 0.9 : 1));
 
   return (
     <View
@@ -55,7 +61,7 @@ export function AyahMedallion({ n, uiLocale }: { n: number; uiLocale: UiLocaleCo
       <Text
         style={{
           color: theme.mutedText,
-          fontSize: Math.round(SIZE * 0.38),
+          fontSize,
           fontVariant: ['tabular-nums'],
         }}
       >
