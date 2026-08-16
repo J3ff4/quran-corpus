@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, cleanup, render } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SurahReader } from './SurahReader';
 
@@ -10,10 +10,43 @@ const mocks = vi.hoisted(() => ({
     | null,
   scrollToIndex: vi.fn(),
   scrollToOffset: vi.fn(),
+  push: vi.fn(),
 }));
+
+vi.mock('expo-router', () => ({ router: { push: mocks.push } }));
+
+// The sheet has its own suite; stubbed here so this one covers the wiring --
+// which summary opens, and which route each action pushes -- without pulling
+// reanimated and gesture-handler into it.
+vi.mock('./WordSheet', async () => {
+  const React = await import('react');
+  return {
+    WordSheet: ({ summary, onOpenDetail, onOpenRoot }: {
+      summary: { word: { id: number } } | null;
+      onOpenDetail: (word: unknown) => void;
+      onOpenRoot: (rootBuckwalter: string) => void;
+    }) =>
+      summary
+        ? React.createElement(
+            'div',
+            { 'data-testid': 'word-sheet' },
+            React.createElement('span', null, String(summary.word.id)),
+            React.createElement('button', {
+              'data-testid': 'open-detail',
+              onClick: () => onOpenDetail(summary.word),
+            }),
+            React.createElement('button', {
+              'data-testid': 'open-root',
+              onClick: () => onOpenRoot("r$m"),
+            }),
+          )
+        : null,
+  };
+});
 
 vi.mock('react-native', async () => {
   const React = await import('react');
+  const { host } = await import('@/testing/rnHosts.js');
   return {
     // Forwards the ref, so the imperative scroll calls the component makes on
     // mount are observable. A plain function component silently swallows it
@@ -39,10 +72,9 @@ vi.mock('react-native', async () => {
         data.map((item, index) => React.createElement('div', { key: index }, renderItem({ item, index }))),
       );
     },
-    Pressable: ({ children, onPress }: { children?: React.ReactNode; onPress?: () => void }) =>
-      React.createElement('button', { onClick: onPress }, children),
-    Text: ({ children }: { children?: React.ReactNode }) => React.createElement('span', null, children),
-    View: ({ children }: { children?: React.ReactNode }) => React.createElement('div', null, children),
+    Pressable: host('button'),
+    Text: host('span'),
+    View: host('div'),
     useWindowDimensions: () => ({ width: 400, height: 800, scale: 2, fontScale: 1 }),
   };
 });
@@ -51,6 +83,7 @@ describe('SurahReader', () => {
   beforeEach(() => {
     mocks.scrollToIndex.mockClear();
     mocks.scrollToOffset.mockClear();
+    mocks.push.mockClear();
   });
 
   afterEach(cleanup);
@@ -118,6 +151,133 @@ describe('SurahReader', () => {
       vi.useRealTimers();
     }
   });
+
+  it('fetches words for ayahs that scroll into view, plus a lookahead', async () => {
+    const loadWords = vi.fn(async (ayahId: number) => surahWords(ayahId));
+    render(<SurahReader {...baseProps(readerData(10))} loadWords={loadWords} />);
+
+    await act(async () => {
+      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: readerData(10).ayahs[0] }] });
+    });
+
+    expect(loadWords).toHaveBeenCalledWith(100);
+    // The ayah in view plus WORD_LOOKAHEAD: a reader who taps a word the
+    // instant an ayah lands otherwise waits on a query.
+    expect(loadWords).toHaveBeenCalledTimes(4);
+  });
+
+  it('does not refetch an ayah it already has', async () => {
+    // onViewableItemsChanged fires on every scroll frame that changes the set.
+    // Without the cache check this is a query per frame.
+    const loadWords = vi.fn(async (ayahId: number) => surahWords(ayahId));
+    const data = readerData(10);
+    render(<SurahReader {...baseProps(data)} loadWords={loadWords} />);
+
+    await act(async () => {
+      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
+    });
+    await act(async () => {
+      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
+    });
+
+    expect(loadWords).toHaveBeenCalledTimes(4);
+  });
+
+  it('retries an ayah whose words failed to load', async () => {
+    // Marked as requested before the await, so without clearing it on failure
+    // the ayah stays untappable for as long as the screen is open.
+    const loadWords = vi.fn(async () => {
+      throw new Error('db is locked');
+    });
+    const data = readerData(1);
+    render(<SurahReader {...baseProps(data)} loadWords={loadWords} />);
+
+    await act(async () => {
+      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
+    });
+    await act(async () => {
+      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
+    });
+
+    expect(loadWords).toHaveBeenCalledTimes(2);
+  });
+
+  it('opens the sheet for the word that was pressed', async () => {
+    const data = readerData(1);
+    const loadWordSummary = vi.fn(async (word: { id: number }) => ({
+      word,
+      segments: [],
+      gloss: null,
+    }));
+    render(
+      <SurahReader
+        {...baseProps(data)}
+        loadWords={async (ayahId) => surahWords(ayahId)}
+        loadWordSummary={loadWordSummary as never}
+      />,
+    );
+
+    await act(async () => {
+      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getAllByTestId('word-token')[1]!);
+    });
+
+    // The second token, not the first: a sheet that always shows word 1 is
+    // exactly what passing the token list instead of the pressed word gives.
+    expect(loadWordSummary).toHaveBeenCalledWith(expect.objectContaining({ position: 2 }));
+    expect(screen.getByTestId('word-sheet').textContent).toContain('1002');
+  });
+
+  it('pushes the word route by ayah number, not ayah id', async () => {
+    const data = readerData(3);
+    render(
+      <SurahReader
+        {...baseProps(data)}
+        loadWords={async (ayahId) => surahWords(ayahId)}
+        loadWordSummary={(async (word: { id: number }) => ({ word, segments: [], gloss: null })) as never}
+      />,
+    );
+
+    await act(async () => {
+      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[1] }] });
+    });
+    await act(async () => {
+      // Ayah 1 was never in view, so it has no words and no tokens: the first
+      // token on screen is ayah 2's first word.
+      fireEvent.click(screen.getAllByTestId('word-token')[0]!);
+    });
+    fireEvent.click(screen.getByTestId('open-detail'));
+
+    // /word/[surah]/[ayah]/[position] takes the ayah's number in the surah.
+    // The word row carries ayah_id, which is a database key -- pushing it
+    // routes to a different ayah entirely, or to none.
+    expect(mocks.push).toHaveBeenCalledWith('/word/1/2/1');
+  });
+
+  it('percent-encodes the buckwalter root in the route it pushes', async () => {
+    const data = readerData(1);
+    render(
+      <SurahReader
+        {...baseProps(data)}
+        loadWords={async (ayahId) => surahWords(ayahId)}
+        loadWordSummary={(async (word: { id: number }) => ({ word, segments: [], gloss: null })) as never}
+      />,
+    );
+
+    await act(async () => {
+      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getAllByTestId('word-token')[0]!);
+    });
+    fireEvent.click(screen.getByTestId('open-root'));
+
+    // Buckwalter uses $ < > ' and & as letters; raw, they either break the
+    // path or arrive at the root screen as different characters.
+    expect(mocks.push).toHaveBeenCalledWith('/root/r%24m');
+  });
 });
 
 function baseProps(data: ReturnType<typeof readerData>) {
@@ -130,6 +290,26 @@ function baseProps(data: ReturnType<typeof readerData>) {
     onToggleBookmark: vi.fn(),
     onToggleAudio: vi.fn(),
   };
+}
+
+function surahWords(ayahId: number) {
+  return ['بسم', 'الله'].map((textArabic, index) => ({
+    id: ayahId * 10 + index + 1,
+    ayah_id: ayahId,
+    position: index + 1,
+    text_arabic: textArabic,
+    transliteration: null,
+    root: null,
+    lemma: null,
+    root_buckwalter: null,
+    lemma_buckwalter: null,
+    pos_tag: 'N',
+    morphology_json: null,
+    morphology_description: null,
+    grammar_arabic: null,
+    grammar_note: null,
+    audio_url: null,
+  }));
 }
 
 function readerData(ayahCount = 1) {
@@ -145,7 +325,9 @@ function readerData(ayahCount = 1) {
     },
     ayahs: Array.from({ length: ayahCount }, (_unused, index) => ({
       ayah: {
-        id: index + 1,
+        // Offset from ayah_number on purpose: with the two equal, every test
+        // below passes just as well when the code uses the wrong one.
+        id: 100 + index,
         surah_id: 1,
         ayah_number: index + 1,
         text_uthmani: 'بسم الله',
@@ -156,7 +338,7 @@ function readerData(ayahCount = 1) {
       },
       translation: {
         id: index + 1,
-        ayah_id: index + 1,
+        ayah_id: 100 + index,
         language_code: 'en',
         language: 'en',
         translator: 'Saheeh International',

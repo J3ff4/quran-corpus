@@ -4,33 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AyahCard } from './AyahCard';
 
 vi.mock('react-native', async () => {
-  const React = await import('react');
-  const host =
-    (tag: string) =>
-    ({ accessibilityRole, accessibilityLabel, accessibilityState, children, disabled, onPress, ...props }: {
-      accessibilityRole?: string;
-      accessibilityLabel?: string;
-      accessibilityState?: { disabled?: boolean; selected?: boolean };
-      children?: React.ReactNode;
-      disabled?: boolean;
-      onPress?: () => void;
-    }) =>
-      React.createElement(
-        tag,
-        {
-          ...props,
-          'aria-label': accessibilityLabel,
-          // Mapped rather than spread: React warns about an unknown
-          // accessibilityState attribute on a DOM node, and mapping it is what
-          // lets the assertions below see the announced state.
-          'aria-disabled': accessibilityState?.disabled,
-          'aria-selected': accessibilityState?.selected,
-          disabled,
-          onClick: onPress,
-          role: accessibilityRole,
-        },
-        children,
-      );
+  const { host } = await import('@/testing/rnHosts.js');
 
   return {
     Pressable: host('button'),
@@ -39,6 +13,14 @@ vi.mock('react-native', async () => {
     useWindowDimensions: () => ({ width: 400, height: 800, scale: 2, fontScale: 1 }),
   };
 });
+
+const baseProps = {
+  surahId: 2,
+  // Empty is the reader's own starting state: words are fetched per ayah as
+  // the list scrolls.
+  words: [],
+  onWordPress: () => {},
+};
 
 describe('AyahCard', () => {
   // This suite renders more than once and the project does not enable
@@ -52,6 +34,7 @@ describe('AyahCard', () => {
 
     render(
       <AyahCard
+        {...baseProps}
         ayahNumber={1}
         arabicText="Arabic text"
         translationText="Translation text"
@@ -75,6 +58,7 @@ describe('AyahCard', () => {
 
     render(
       <AyahCard
+        {...baseProps}
         ayahNumber={255}
         arabicText="Arabic text"
         translationText="Translation text"
@@ -97,5 +81,25 @@ describe('AyahCard', () => {
     // rather than the default: a disabled Play must not fire the handler.
     fireEvent.click(play);
     expect(onToggleAudio).not.toHaveBeenCalled();
+  });
+
+  it('still renders the Arabic when the reader has no words for the ayah', () => {
+    // Words load per ayah as the list scrolls; a card that renders nothing
+    // until they arrive flickers blank on every scroll.
+    render(
+      <AyahCard
+        {...baseProps}
+        ayahNumber={1}
+        arabicText="Arabic text"
+        translationText={null}
+        bookmarked={false}
+        playing={false}
+        uiLocale="en"
+        onToggleBookmark={vi.fn()}
+        onToggleAudio={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Arabic text')).toBeTruthy();
   });
 });

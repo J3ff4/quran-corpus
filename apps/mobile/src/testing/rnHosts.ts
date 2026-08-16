@@ -20,6 +20,7 @@ import React from 'react';
 interface HostProps {
   accessibilityLabel?: string;
   accessibilityRole?: string;
+  accessibilityState?: { disabled?: boolean; selected?: boolean };
   children?: React.ReactNode;
   onPress?: () => void;
   role?: string;
@@ -27,7 +28,9 @@ interface HostProps {
   testID?: string;
   // Native-only props with no DOM equivalent. Destructured so they never reach
   // createElement: React logs "Unknown event handler property" for onLayout and
-  // an unknown-attribute warning for pointerEvents, on every render.
+  // a non-boolean-attribute warning for `accessible` and pointerEvents, on
+  // every render.
+  accessible?: unknown;
   onLayout?: unknown;
   pointerEvents?: unknown;
 }
@@ -42,11 +45,13 @@ export function host(tag: string) {
   return function Host({
     accessibilityLabel,
     accessibilityRole,
+    accessibilityState,
     children,
     onPress,
     role,
     style,
     testID,
+    accessible: _accessible,
     onLayout: _onLayout,
     pointerEvents: _pointerEvents,
     ...props
@@ -56,6 +61,11 @@ export function host(tag: string) {
       {
         ...props,
         'aria-label': accessibilityLabel,
+        // Mapped rather than spread: React warns about an unknown
+        // accessibilityState attribute on a DOM node, and mapping it is what
+        // lets a test see the state a control announces.
+        'aria-disabled': accessibilityState?.disabled,
+        'aria-selected': accessibilityState?.selected,
         // `role` wins: it is the cross-platform prop, and components that set
         // it (role="dialog") leave accessibilityRole undefined, which would
         // otherwise overwrite it with nothing.

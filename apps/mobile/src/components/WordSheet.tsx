@@ -175,7 +175,7 @@ export function WordSheet({ summary, uiLocale, onClose, onOpenDetail, onOpenRoot
               fontFamily: 'Hafs',
               fontSize: typography.arabicTitle,
               textAlign: 'right',
-              // See AyahCard: textAlign places the block, writingDirection
+              // See AyahText: textAlign places the block, writingDirection
               // drives the bidi resolution inside the Arabic run.
               writingDirection: 'rtl',
             }}

@@ -1,11 +1,18 @@
 import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
-import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
+import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 import { useAyahAudioController } from '@/audio/ayahAudio';
 import { LanguageSelector } from '@/components/LanguageSelector';
 import { SurahReader } from '@/components/SurahReader';
-import { getSurahReader, type SurahReaderData } from '@/data/corpusRepository';
+import type { Word } from '@quran-corpus/data/mobile';
+import {
+  getSurahGlosses,
+  getSurahReader,
+  getWordsForAyah,
+  getWordSummary,
+  type SurahReaderData,
+} from '@/data/corpusRepository';
 import { createLatestReadingPositionRecorder } from '@/data/latestReadingPositionRecorder';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { openUserDb } from '@/data/userDb';
@@ -47,6 +54,9 @@ export default function SurahRoute() {
   const theme = useThemeColors();
   const audio = useAyahAudioController(process.env.EXPO_PUBLIC_AUDIO_API_BASE_URL, surahId);
   const [reader, setReader] = useState<SurahReaderData | null>(null);
+  // Kept so the reader can query words for the ayahs scrolling into view,
+  // rather than reopening the database on every tap.
+  const [corpusClient, setCorpusClient] = useState<MobileDataClient | null>(null);
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -83,14 +93,17 @@ export default function SurahRoute() {
 
       try {
         const [corpusDb, userDb] = await Promise.all([openCorpusDb(), openUserDb()]);
-        const corpusClient = createExpoSqliteClient(corpusDb as ExpoSqliteLike);
+        // Not named corpusClient: that is the state this assigns to, and a
+        // shadowing local here is a rename away from a silent no-op.
+        const client = createExpoSqliteClient(corpusDb as ExpoSqliteLike);
         const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
         const [data, savedBookmarks] = await Promise.all([
-          getSurahReader(corpusClient, surahId, contentLanguage),
+          getSurahReader(client, surahId, contentLanguage),
           getBookmarks(userClient),
         ]);
 
         if (!cancelled) {
+          setCorpusClient(client);
           setReader(data);
           setBookmarks(
             new Set(
@@ -117,6 +130,32 @@ export default function SurahRoute() {
     // locale it captured, so without this a language switch after a failure
     // leaves the old language on screen.
   }, [contentLanguage, surahId, uiLocale]);
+
+  // One query per surah, not per word tap: getSurahGlosses returns the whole
+  // surah's glosses, and al-Baqarah's are 6,116 rows.
+  const glossesRef = useRef<{ key: string; glosses: Map<number, string> } | null>(null);
+  const loadWordSummary = useCallback(
+    async (word: Word) => {
+      if (!corpusClient || !surahId) throw new Error('reader is not loaded');
+      const key = `${surahId}:${contentLanguage}`;
+      if (glossesRef.current?.key !== key) {
+        glossesRef.current = {
+          key,
+          glosses: await getSurahGlosses(corpusClient, surahId, contentLanguage),
+        };
+      }
+      return getWordSummary(corpusClient, word, glossesRef.current.glosses.get(word.id) ?? null);
+    },
+    [contentLanguage, corpusClient, surahId],
+  );
+
+  const loadWords = useCallback(
+    async (ayahId: number) => {
+      if (!corpusClient) return [];
+      return getWordsForAyah(corpusClient, ayahId);
+    },
+    [corpusClient],
+  );
 
   async function toggleBookmark(ayahNumber: number) {
     if (!surahId) return;
@@ -177,6 +216,8 @@ export default function SurahRoute() {
         audioEnabled={audio.audioEnabled}
         uiLocale={uiLocale}
         initialAyahNumber={initialAyahNumber}
+        loadWords={loadWords}
+        loadWordSummary={loadWordSummary}
         onToggleBookmark={toggleBookmark}
         onToggleAudio={audio.toggleAyah}
         onReadingAyah={(ayahNumber) => {

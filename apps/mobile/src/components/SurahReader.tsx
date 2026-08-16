@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Text, View, type ViewToken } from 'react-native';
-import type { SurahReaderData } from '@/data/corpusRepository';
+import { router } from 'expo-router';
+import type { Word } from '@quran-corpus/data/mobile';
+import type { ReaderAyah, SurahReaderData, WordSummary } from '@/data/corpusRepository';
 import type { UiLocaleCode } from '@/i18n/languages';
 
 import { AyahCard } from './AyahCard';
+import { WordSheet } from './WordSheet';
 import { useThemeColors } from '@/theme/themeContext';
 
 interface SurahReaderProps {
@@ -14,6 +17,10 @@ interface SurahReaderProps {
   uiLocale: UiLocaleCode;
   /** Ayah to open at, from a bookmark or the saved reading position. */
   initialAyahNumber?: number | null;
+  /** Omitted leaves the reader as a plain mushaf: every ayah renders its full
+   *  Uthmani text, with no tap targets. */
+  loadWords?: (ayahId: number) => Promise<Word[]>;
+  loadWordSummary?: (word: Word) => Promise<WordSummary>;
   onToggleBookmark: (ayahNumber: number) => void;
   onToggleAudio: (ayahNumber: number) => void;
   onReadingAyah?: (ayahNumber: number) => void;
@@ -27,6 +34,16 @@ interface SurahReaderProps {
 const MAX_SCROLL_RETRIES = 5;
 const SCROLL_RETRY_DELAY_MS = 120;
 
+// Ayahs fetched ahead of the one scrolling into view. The whole-surah fetch is
+// deliberately not restored -- corpusRepository.ts records why (6,116 word rows
+// for al-Baqarah). Per-ayah with a lookahead keeps every query bounded and, on
+// a local SQLite file, lands before the ayah reaches the middle of the screen.
+const WORD_LOOKAHEAD = 3;
+
+// Shared instance: a fresh `[]` per render would change AyahText's memo key
+// for every not-yet-loaded ayah on every scroll frame.
+const EMPTY_WORDS: Word[] = [];
+
 export function SurahReader({
   data,
   bookmarkedAyahs,
@@ -34,6 +51,8 @@ export function SurahReader({
   audioEnabled,
   uiLocale,
   initialAyahNumber,
+  loadWords,
+  loadWordSummary,
   onToggleBookmark,
   onToggleAudio,
   onReadingAyah,
@@ -75,49 +94,134 @@ export function SurahReader({
     [],
   );
   const onReadingAyahRef = useRef(onReadingAyah);
+  const loadWordsRef = useRef(loadWords);
+  const ayahsRef = useRef(data.ayahs);
   // In an effect, not during render: a render React discards would otherwise
   // leave the ref pointing at a callback that never committed, and FlatList
   // calls onViewableItemsChanged outside the React tree, so it would happily
   // invoke it. (Not useEffectEvent -- that is only callable from an Effect.)
   useEffect(() => {
     onReadingAyahRef.current = onReadingAyah;
-  }, [onReadingAyah]);
+    loadWordsRef.current = loadWords;
+    ayahsRef.current = data.ayahs;
+  }, [onReadingAyah, loadWords, data.ayahs]);
 
-  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
-    const firstVisibleAyah = viewableItems[0]?.item as SurahReaderData['ayahs'][number] | undefined;
-    if (firstVisibleAyah) onReadingAyahRef.current?.(firstVisibleAyah.ayah.ayah_number);
+  const [wordsByAyah, setWordsByAyah] = useState<Map<number, Word[]>>(new Map());
+  // Separate from the state map, and written before the await:
+  // onViewableItemsChanged fires on every scroll frame that changes the set,
+  // so a check against state alone would issue a fresh query per frame for as
+  // long as the first one is still in flight.
+  const requestedRef = useRef(new Set<number>());
+
+  const fetchWordsRef = useRef(async (ayahId: number) => {
+    const load = loadWordsRef.current;
+    if (!load) return;
+    const ayahs = ayahsRef.current;
+    const start = ayahs.findIndex((item) => item.ayah.id === ayahId);
+    if (start < 0) return;
+
+    await Promise.all(
+      ayahs.slice(start, start + 1 + WORD_LOOKAHEAD).map(async (item) => {
+        const id = item.ayah.id;
+        if (requestedRef.current.has(id)) return;
+        requestedRef.current.add(id);
+        try {
+          const words = await load(id);
+          setWordsByAyah((current) => new Map(current).set(id, words));
+        } catch (cause) {
+          // Cleared so the next scroll past this ayah tries again, rather than
+          // leaving it permanently untappable. Logged for logcat, never shown:
+          // the ayah still renders its text, so there is nothing for the
+          // reader to act on.
+          requestedRef.current.delete(id);
+          console.error('[reader] word load failed', { ayahId: id, cause });
+        }
+      }),
+    );
   });
 
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    const firstVisibleAyah = viewableItems[0]?.item as ReaderAyah | undefined;
+    if (firstVisibleAyah) onReadingAyahRef.current?.(firstVisibleAyah.ayah.ayah_number);
+    for (const token of viewableItems) {
+      const item = token.item as ReaderAyah | undefined;
+      if (item) void fetchWordsRef.current(item.ayah.id);
+    }
+  });
+
+  const [openWord, setOpenWord] = useState<WordSummary | null>(null);
+
+  const onWordPress = useCallback(
+    (word: Word) => {
+      if (!loadWordSummary) return;
+      loadWordSummary(word)
+        .then(setOpenWord)
+        .catch((cause: unknown) => {
+          // Nothing opens. A sheet with the morphology missing would look like
+          // the word has none, which is never true.
+          console.error('[reader] word summary failed', { wordId: word.id, cause });
+        });
+    },
+    [loadWordSummary],
+  );
+
+  const ayahNumberOf = useCallback(
+    (word: Word) => data.ayahs.find((item) => item.ayah.id === word.ayah_id)?.ayah.ayah_number,
+    [data.ayahs],
+  );
+
   return (
-    <FlatList
-      ref={listRef}
-      data={data.ayahs}
-      keyExtractor={(item) => String(item.ayah.id)}
-      ListHeaderComponent={
-        <View style={{ paddingHorizontal: 20, paddingVertical: 16, gap: 6 }}>
-          <Text accessibilityRole="header" style={{ color: theme.text, fontSize: 24, fontWeight: '700' }}>
-            {data.surah.name_translit}
-          </Text>
-          <Text style={{ color: theme.mutedText }}>{data.surah.name_translation}</Text>
-        </View>
-      }
-      renderItem={({ item }) => (
-        <AyahCard
-          ayahNumber={item.ayah.ayah_number}
-          arabicText={item.ayah.text_uthmani}
-          translationText={item.translation?.text ?? null}
-          bookmarked={bookmarkedAyahs.has(item.ayah.ayah_number)}
-          playing={playingAyah === item.ayah.ayah_number}
-          uiLocale={uiLocale}
-          audioDisabled={!audioEnabled}
-          onToggleBookmark={onToggleBookmark}
-          onToggleAudio={onToggleAudio}
-        />
-      )}
-      onViewableItemsChanged={onViewableItemsChanged.current}
-      onScrollToIndexFailed={onScrollToIndexFailed}
-      style={{ flex: 1, backgroundColor: theme.background }}
-      contentContainerStyle={{ paddingBottom: 24 }}
-    />
+    <View style={{ flex: 1 }}>
+      <FlatList
+        ref={listRef}
+        data={data.ayahs}
+        keyExtractor={(item) => String(item.ayah.id)}
+        ListHeaderComponent={
+          <View style={{ paddingHorizontal: 20, paddingVertical: 16, gap: 6 }}>
+            <Text accessibilityRole="header" style={{ color: theme.text, fontSize: 24, fontWeight: '700' }}>
+              {data.surah.name_translit}
+            </Text>
+            <Text style={{ color: theme.mutedText }}>{data.surah.name_translation}</Text>
+          </View>
+        }
+        renderItem={({ item }) => (
+          <AyahCard
+            surahId={data.surah.id}
+            ayahNumber={item.ayah.ayah_number}
+            arabicText={item.ayah.text_uthmani}
+            words={wordsByAyah.get(item.ayah.id) ?? EMPTY_WORDS}
+            translationText={item.translation?.text ?? null}
+            bookmarked={bookmarkedAyahs.has(item.ayah.ayah_number)}
+            playing={playingAyah === item.ayah.ayah_number}
+            uiLocale={uiLocale}
+            audioDisabled={!audioEnabled}
+            onToggleBookmark={onToggleBookmark}
+            onToggleAudio={onToggleAudio}
+            onWordPress={onWordPress}
+          />
+        )}
+        onViewableItemsChanged={onViewableItemsChanged.current}
+        onScrollToIndexFailed={onScrollToIndexFailed}
+        style={{ flex: 1, backgroundColor: theme.background }}
+        contentContainerStyle={{ paddingBottom: 24 }}
+      />
+      <WordSheet
+        summary={openWord}
+        uiLocale={uiLocale}
+        onClose={() => setOpenWord(null)}
+        onOpenDetail={(word) => {
+          const ayahNumber = ayahNumberOf(word);
+          if (ayahNumber === undefined) return;
+          setOpenWord(null);
+          router.push(`/word/${data.surah.id}/${ayahNumber}/${word.position}`);
+        }}
+        onOpenRoot={(rootBuckwalter) => {
+          setOpenWord(null);
+          // Buckwalter carries `$`, `<` and `'`, none of which survive a raw
+          // path segment.
+          router.push(`/root/${encodeURIComponent(rootBuckwalter)}`);
+        }}
+      />
+    </View>
   );
 }
