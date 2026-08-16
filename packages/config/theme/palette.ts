@@ -5,10 +5,11 @@
 // import tailwindcss types here, do not add a build step, do not compile to
 // .js. Same rule as tailwind/preset.ts next door.
 //
-// Scope: the neutral scales plus web's brand accent. The --pos-*/--form-*
-// tokens still live in apps/web/src/app/globals.css with their contrast-ratio
-// commentary; they move here in M3, when mobile's morphology pills become the
-// second consumer.
+// Scope: the neutral scales, web's brand accent, and (since M3, when mobile's
+// morphology pills became the second consumer) the --pos-*/--form-* colours
+// with their contrast-ratio commentary. apps/web/src/app/globals.css holds a
+// copy of the latter for Tailwind to read; posColor.parity.test.ts holds the
+// two equal.
 
 export const paper = {
   50: '#faf8f3',

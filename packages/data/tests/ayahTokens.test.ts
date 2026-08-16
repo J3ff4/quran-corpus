@@ -52,6 +52,17 @@ describe('alignAyahTokens', () => {
     expect(tokens![0]!.wordIndex).toBe(0);
   });
 
+  it('strips a byte-order mark from inside a token, not only a leading one', () => {
+    // The leading case above passes with or without the strip: JS `\s` already
+    // matches U+FEFF, so split() drops it either way. Only a BOM *inside* a
+    // token proves the replace() does anything -- without it this splits into
+    // three tokens against two word rows and the whole ayah fails to align.
+    const tokens = alignAyahTokens('ab\uFEFFc d', ['abc', 'd'], { surahId: 2, ayahNumber: 2 });
+    expect(tokens).not.toBeNull();
+    expect(tokens!).toHaveLength(2);
+    expect(tokens![0]!.text).toBe('abc');
+  });
+
   it('keeps a mid-ayah pause mark attached to the word it follows', () => {
     const tokens = alignAyahTokens(AL_BAQARAH_44, words(10), { surahId: 2, ayahNumber: 44 });
     expect(tokens).not.toBeNull();

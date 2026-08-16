@@ -23,6 +23,19 @@ function declarations(prefix: string) {
   return found;
 }
 
+/** Asserts globals.css declares exactly `keys` under `--<prefix>-`, per theme.
+ *  Sorted sets, so a duplicate or a rename fails rather than a miscount. */
+function expectNames(prefix: string, light: string[], dark: string[]) {
+  const names = (isDark: boolean) =>
+    declarations(prefix)
+      .filter((d) => d.dark === isDark)
+      .map((d) => d.name)
+      .sort();
+  const expected = (keys: string[]) => keys.map((k) => `${prefix}-${k}`).sort();
+  expect(names(false)).toEqual(expected(light));
+  expect(names(true)).toEqual(expected(dark));
+}
+
 describe('globals.css / palette.ts parity', () => {
   it('keeps every --pos-* token equal to the palette', () => {
     // The palette is the source of truth for mobile; globals.css is the copy
@@ -39,9 +52,10 @@ describe('globals.css / palette.ts parity', () => {
 
   it('covers every bucket the palette defines, in both themes', () => {
     // The loop above passes vacuously if globals.css declares nothing at all.
-    const found = declarations('pos');
-    expect(found.filter((d) => !d.dark)).toHaveLength(Object.keys(posColors.light).length);
-    expect(found.filter((d) => d.dark)).toHaveLength(Object.keys(posColors.dark).length);
+    // Compare the *names*, not the count: a duplicated --pos-noun line in place
+    // of --pos-pron keeps the count right while web emits var(--pos-pron) for
+    // every pronoun, which resolves to nothing and silently inherits body ink.
+    expectNames('pos', Object.keys(posColors.light), Object.keys(posColors.dark));
   });
 
   it('keeps every --form-* token equal to the palette', () => {
@@ -54,9 +68,7 @@ describe('globals.css / palette.ts parity', () => {
   });
 
   it('covers every derived form the palette defines, in both themes', () => {
-    const found = declarations('form');
-    expect(found.filter((d) => !d.dark)).toHaveLength(Object.keys(formColors.light).length);
-    expect(found.filter((d) => d.dark)).toHaveLength(Object.keys(formColors.dark).length);
+    expectNames('form', Object.keys(formColors.light), Object.keys(formColors.dark));
   });
 
   it('keeps --ease-out equal to the palette', () => {

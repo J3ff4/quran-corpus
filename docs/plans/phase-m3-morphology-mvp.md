@@ -1711,7 +1711,10 @@ export function AyahText({ textUthmani, words, surahId, ayahNumber, onWordPress 
       words.length > 0
         ? alignAyahTokens(textUthmani, words.map((word) => word.text_arabic), { surahId, ayahNumber })
         : null,
-    [textUthmani, words.length, surahId, ayahNumber],
+    // `words`, not `words.length` -- the memo reads text_arabic, so a same-length
+    // array with corrected text would otherwise reuse stale tokens. apps/mobile
+    // has no eslint-plugin-react-hooks, so nothing would flag it.
+    [textUthmani, words, surahId, ayahNumber],
   );
 
   const style = {
