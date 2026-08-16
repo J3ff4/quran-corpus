@@ -1,4 +1,12 @@
-import { paper as paperScale } from '@quran-corpus/config/theme/palette';
+import { paper as paperScale, posColors } from '@quran-corpus/config/theme/palette';
+import type { PosBucket } from '@quran-corpus/data/mobile';
+
+// Widened out of the palette's `as const` literal types on purpose. Two
+// reasons: ThemeProvider types its context as `typeof themeColors.light`, and
+// literal hexes make the dark theme fail to match the light one; and this
+// annotation is what makes the compiler check that the palette covers every
+// bucket posBucket can return, rather than leaving it to the runtime test.
+const pos: { light: Record<PosBucket, string>; dark: Record<PosBucket, string> } = posColors;
 
 export const colors = {
   paper: paperScale[50],
@@ -30,6 +38,10 @@ export const themeColors = {
     accent: colors.accent,
     danger: colors.danger, // 6.9:1 on paper
     onAccent: '#ffffff', // 6.0:1 on accent
+    // Same hexes web uses, and the same background (#faf8f3 = paper-50), so
+    // the light-mode ratios in packages/config/theme/palette.ts carry over
+    // unchanged. Lowest is 5.79:1 on the page, 6.05:1 on a card.
+    pos: pos.light,
   },
   dark: {
     background: colors.night,
@@ -45,6 +57,10 @@ export const themeColors = {
     // Not white: white on the night accent is 2.9:1. Dark ink on that mint is
     // the readable pairing.
     onAccent: colors.night, // 6.3:1 on accent
+    // Re-measured against mobile's warm #151412, not web's neutral #141414:
+    // noun 8.38, verb 9.00, prep 10.78, pron 9.90, other 7.92:1. All clear AA
+    // on the #1d1b18 card surface too, where the lowest is 7.4:1.
+    pos: pos.dark,
   },
 };
 
