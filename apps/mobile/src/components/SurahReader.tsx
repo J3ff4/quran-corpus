@@ -202,6 +202,11 @@ export function SurahReader({
         )}
         onViewableItemsChanged={onViewableItemsChanged.current}
         onScrollToIndexFailed={onScrollToIndexFailed}
+        // WordSheet sets role="dialog"/aria-modal, but accessibilityViewIsModal
+        // is iOS-only -- on Android the ayah text and both card buttons stay
+        // reachable by TalkBack swipe while the sheet covers them, so the
+        // modal is only visually modal (CLAUDE.md §8, WCAG AA).
+        importantForAccessibility={openWord ? 'no-hide-descendants' : 'auto'}
         style={{ flex: 1, backgroundColor: theme.background }}
         contentContainerStyle={{ paddingBottom: 24 }}
       />

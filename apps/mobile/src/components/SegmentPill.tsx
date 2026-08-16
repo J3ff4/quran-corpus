@@ -30,6 +30,13 @@ export function SegmentPill({ segment }: SegmentPillProps) {
         paddingHorizontal: 8,
         paddingVertical: 4,
         backgroundColor: theme.surface,
+        // The fill alone is not enough: WordSheet paints its own body
+        // theme.surface, so inside the sheet the pill is 1:1 against its
+        // container and the chip reads as a loose floating label. The hairline
+        // is what shows on both backdrops -- the same token AyahCard already
+        // relies on to separate ayahs against theme.background.
+        borderWidth: 1,
+        borderColor: theme.border,
         alignItems: 'center',
         gap: 2,
       }}

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { BackHandler, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import Animated, {
@@ -59,13 +59,23 @@ export function WordSheet({ summary, uiLocale, onClose, onOpenDetail, onOpenRoot
   const fade = useSharedValue(0);
   const sheetHeight = useSharedValue(0);
 
+  // Read through a ref so the entrance effect below does not depend on it.
+  // With screenHeight in those deps, an Android split-screen resize while the
+  // sheet is open re-runs the entrance: the sheet snaps a full screen down and
+  // slides back in, mid-read. Synced in an effect declared first, so it has
+  // committed before the entrance effect runs on the same pass.
+  const screenHeightRef = useRef(screenHeight);
+  useEffect(() => {
+    screenHeightRef.current = screenHeight;
+  }, [screenHeight]);
+
   useEffect(() => {
     if (!open) {
       // Reset rather than animate out: the sheet unmounts the moment `summary`
       // goes null -- keeping it mounted would leave a full-screen backdrop
       // swallowing every tap in the reader -- so there is no view left to run
       // an exit on. This puts the next open back off-screen.
-      translateY.value = screenHeight;
+      translateY.value = screenHeightRef.current;
       fade.value = 0;
       return;
     }
@@ -73,11 +83,11 @@ export function WordSheet({ summary, uiLocale, onClose, onOpenDetail, onOpenRoot
       translateY.value = 0;
       fade.value = withTiming(1, { duration: FADE_MS });
     } else {
-      translateY.value = screenHeight;
+      translateY.value = screenHeightRef.current;
       translateY.value = withSpring(0, SPRING);
       fade.value = withSpring(1, SPRING);
     }
-  }, [open, reduced, screenHeight, translateY, fade]);
+  }, [open, reduced, translateY, fade]);
 
   useEffect(() => {
     if (!open) return;

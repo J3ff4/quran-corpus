@@ -51,12 +51,13 @@ vi.mock('react-native', async () => {
     // Forwards the ref, so the imperative scroll calls the component makes on
     // mount are observable. A plain function component silently swallows it
     // and every scroll assertion would pass against a null ref.
-    FlatList: ({ data, ListHeaderComponent, renderItem, onViewableItemsChanged, onScrollToIndexFailed, ref }: {
+    FlatList: ({ data, ListHeaderComponent, renderItem, onViewableItemsChanged, onScrollToIndexFailed, importantForAccessibility, ref }: {
       data: unknown[];
       ListHeaderComponent?: React.ReactNode;
       renderItem: (info: { item: unknown; index: number }) => React.ReactNode;
       onViewableItemsChanged?: (info: { viewableItems: Array<{ item: unknown }> }) => void;
       onScrollToIndexFailed?: (info: { index: number; averageItemLength: number }) => void;
+      importantForAccessibility?: string;
       ref?: React.Ref<unknown>;
     }) => {
       mocks.onViewableItemsChanged = onViewableItemsChanged ?? null;
@@ -67,7 +68,10 @@ vi.mock('react-native', async () => {
       }));
       return React.createElement(
         'div',
-        null,
+        // Surfaced as an attribute: it is the only thing keeping the reader
+        // out of TalkBack's swipe order while the sheet is up, and RN's own
+        // prop has no DOM equivalent to assert against.
+        { 'data-important-for-accessibility': importantForAccessibility },
         ListHeaderComponent,
         data.map((item, index) => React.createElement('div', { key: index }, renderItem({ item, index }))),
       );
@@ -200,6 +204,33 @@ describe('SurahReader', () => {
     });
 
     expect(loadWords).toHaveBeenCalledTimes(2);
+  });
+
+  it('takes the reader out of the accessibility tree while the sheet is open', async () => {
+    // accessibilityViewIsModal is iOS-only, so without this the ayah text and
+    // both card buttons stay reachable by TalkBack swipe underneath a sheet
+    // that visually covers them.
+    const data = readerData(1);
+    const { container } = render(
+      <SurahReader
+        {...baseProps(data)}
+        loadWords={async (ayahId) => surahWords(ayahId)}
+        loadWordSummary={(async (word: { id: number }) => ({ word, segments: [], gloss: null })) as never}
+      />,
+    );
+    const list = () => container.querySelector('[data-important-for-accessibility]');
+
+    expect(list()?.getAttribute('data-important-for-accessibility')).toBe('auto');
+
+    await act(async () => {
+      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getAllByTestId('word-token')[0]!);
+    });
+
+    expect(screen.getByTestId('word-sheet')).toBeTruthy();
+    expect(list()?.getAttribute('data-important-for-accessibility')).toBe('no-hide-descendants');
   });
 
   it('opens the sheet for the word that was pressed', async () => {
