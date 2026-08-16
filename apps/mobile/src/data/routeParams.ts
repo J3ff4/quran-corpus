@@ -8,6 +8,12 @@
  * drift.
  */
 
+// Not re-implemented here. buckwalter.ts already validates the corpus charset,
+// caps the length and refuses double-encoded input -- which is exactly this
+// route's threat -- and CLAUDE.md §2 records what happened the last time a
+// consumer kept its own copy of those validators.
+export { parseRootParam } from '@quran-corpus/data/mobile';
+
 /** Shared shape: a 1-based corpus coordinate with an upper bound.
  *
  *  Both guards are needed and they catch different inputs. `Number.isInteger`

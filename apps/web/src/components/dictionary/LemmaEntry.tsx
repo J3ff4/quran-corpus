@@ -6,7 +6,7 @@ import { ClampedText } from '../ui/ClampedText';
 import { InfoPopover } from '../ui/InfoPopover';
 import { posColor } from '../../lib/posColor';
 import { rootPath, lemmaConcordanceEndpoint } from '../../lib/routes';
-import { definitionSourceLabel } from '../../lib/definitionSources';
+import { definitionSourceLabel } from '@quran-corpus/data/client';
 
 interface LemmaEntryProps {
   entry: LemmaEntryT;

@@ -50,6 +50,7 @@ export {
   parseConcordancePaging,
   assertPagingBounds,
 } from './queries/concordance.js';
+export { definitionSourceLabel } from './definitionSources.js';
 export { buckwalterToArabic, compareRootsArabic, rootFirstLetter, ARABIC_ALPHABET_ORDER } from './text/arabic.js';
 export {
   isBuckwalter,
