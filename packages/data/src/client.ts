@@ -17,6 +17,7 @@ export {
 export { trimConcordanceVerse } from './text/concordanceTrim.js';
 export type { TrimmedVerse } from './text/concordanceTrim.js';
 export { isSajdahAyah } from './text/sajdah.js';
+export { alignAyahTokens, type AyahToken } from './text/ayahTokens.js';
 export { decodeSegment, posLabelEn } from './morphology/decode.js';
 
 // All of them, not a curated subset. `types.ts` is a pure declaration file with

@@ -63,10 +63,12 @@ The fix is to tokenize **the Uthmani text itself** and attach word metadata by i
 2. Split on whitespace, drop empties.
 3. Peel leading standalone marks into unindexed tokens.
 4. Merge any remaining standalone mark into the preceding token.
-5. If `ayahNumber === 1`, `surahId ∉ {1, 9}`, and the merged count is `wordCount + 4`, the first four tokens are the basmala and stay unindexed.
-6. If the remaining count still differs from `wordCount`, alignment failed — return `null` and let the caller render the plain blob.
+5. If `ayahNumber === 1`, `surahId ∉ {1, 9}`, and the merged count is `tokenCount + 4`, the first four tokens are the basmala and stay unindexed.
+6. If the remaining count still differs from `tokenCount`, alignment failed — return `null` and let the caller render the plain blob.
 
-Step 5 must run **after** step 4, not before. Running it first scores 99.50% because a waqf-bearing ayah has more raw tokens than `wordCount + 4`.
+Step 5 must run **after** step 4, not before. Running it first scores 99.50% because an ayah 1 that also carries a waqf mark has more raw tokens than `tokenCount + 4`.
+
+`tokenCount` is not the word-row count. **Amended during execution, 2026-08-16:** 37:130's `إِلْ يَاسِينَ` is the one word row in the corpus whose `text_arabic` contains a space, so it is one word and two whitespace-separated tokens. Counting rows made it the single alignment failure in the whole Quran (6235/6236). `alignAyahTokens` therefore takes the ayah's **word texts**, not a count, and lets a row claim as many tokens as it spans. Callers already hold the texts, so this costs nothing at the call site.
 
 ---
 
@@ -169,10 +171,12 @@ git commit -m "docs(mobile): renumber PRD phases to match plan files"
   }
   export function alignAyahTokens(
     textUthmani: string,
-    wordCount: number,
+    wordTexts: readonly string[],
     ref: { surahId: number; ayahNumber: number },
   ): AyahToken[] | null;
   ```
+  `wordTexts` is the ayah's `words.text_arabic` in `position` order — see the
+  amendment under "The alignment finding" for why this is not a bare count.
   `wordIndex` is a 0-based index into the ayah's `position`-ordered word list, or `null` for text with no word row (basmala, `۞`, a leading pause mark). `null` return means alignment failed and the caller must render the raw string.
 
 - [ ] **Step 1: Write the failing tests**
@@ -363,7 +367,11 @@ Three mutations. Each must turn a test red; if one stays green, that test assert
 
 1. Move the `hasBasmala` block above the merge loop → "keeps a mid-ayah pause mark attached" must fail.
 2. Drop `ref.surahId !== 1` → "exempts al-Fatiha and at-Tawba" must fail.
-3. Change `if (merged.length - offset !== wordCount) return null;` to `return []` → "returns null when the counts cannot be reconciled" must fail.
+3. Change `if (merged.length - offset !== tokenCount) return null;` to `return []` → "returns null when the counts cannot be reconciled" must fail.
+4. Replace `spans` with `wordTexts.map(() => 1)` → the 37:130 joined-word test must fail.
+5. Change `if (remaining === 0)` to `if (true)` → same test must fail.
+
+The plan's original mutation 2 ("drop `ref.surahId !== 1`") **survived** the suite as first written: neither 1:1 nor 9:1 hits the count tie in the live DB, so the exemption is unreachable through real data and the test asserting it was vacuous. Rewritten during execution with synthetic tie inputs that do reach it.
 
 Restore after each. Confirm `packages/data/node_modules/.vite` is not serving a stale transform if a mutation appears to do nothing.
 
@@ -380,7 +388,7 @@ const c = createClient({ url: 'file:' + require('fs').realpathSync('../../apps/w
   const r = await c.execute(\"SELECT a.surah_id s, a.ayah_number n, a.text_uthmani u, (SELECT count(*) FROM words w WHERE w.ayah_id=a.id) c FROM ayahs a\");
   let ok = 0, bad = [];
   for (const row of r.rows) {
-    const t = alignAyahTokens(row.u, Number(row.c), { surahId: Number(row.s), ayahNumber: Number(row.n) });
+    const t = alignAyahTokens(row.u, wordTextsFor(row.id), { surahId: Number(row.s), ayahNumber: Number(row.n) });
     if (t) ok++; else if (bad.length < 10) bad.push(row.s + ':' + row.n);
   }
   console.log('aligned', ok + '/' + r.rows.length, 'failures:', JSON.stringify(bad));
@@ -1699,7 +1707,10 @@ describe('AyahText', () => {
 export function AyahText({ textUthmani, words, surahId, ayahNumber, onWordPress }: AyahTextProps) {
   const theme = useThemeColors();
   const tokens = useMemo(
-    () => (words.length > 0 ? alignAyahTokens(textUthmani, words.length, { surahId, ayahNumber }) : null),
+    () =>
+      words.length > 0
+        ? alignAyahTokens(textUthmani, words.map((word) => word.text_arabic), { surahId, ayahNumber })
+        : null,
     [textUthmani, words.length, surahId, ayahNumber],
   );
 

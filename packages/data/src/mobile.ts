@@ -44,6 +44,7 @@ export {
 export { buckwalterToArabic, compareRootsArabic, rootFirstLetter, ARABIC_ALPHABET_ORDER } from './text/arabic.js';
 export { trimConcordanceVerse } from './text/concordanceTrim.js';
 export { isSajdahAyah } from './text/sajdah.js';
+export { alignAyahTokens, type AyahToken } from './text/ayahTokens.js';
 export { decodeSegment, posLabelEn } from './morphology/decode.js';
 export type {
   Surah,
