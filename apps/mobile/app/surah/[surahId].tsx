@@ -1,22 +1,16 @@
 import { useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 import { useAyahAudioController } from '@/audio/ayahAudio';
 import { LanguageSelector } from '@/components/LanguageSelector';
 import { SurahReader } from '@/components/SurahReader';
-import type { Word } from '@quran-corpus/data/mobile';
-import {
-  getSurahGlosses,
-  getSurahReader,
-  getWordsForAyah,
-  getWordSummary,
-  type SurahReaderData,
-} from '@/data/corpusRepository';
+import { getSurahReader, getWordsForAyah, type SurahReaderData } from '@/data/corpusRepository';
 import { createLatestReadingPositionRecorder } from '@/data/latestReadingPositionRecorder';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { parseAyahNumber, parseSurahId } from '@/data/routeParams';
 import { openUserDb } from '@/data/userDb';
+import { useWordSummaryLoader } from '@/data/useWordSummaryLoader';
 import { getBookmarks, recordReadingPosition, setBookmark } from '@/data/userRepository';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
@@ -114,23 +108,9 @@ export default function SurahRoute() {
     // leaves the old language on screen.
   }, [contentLanguage, surahId, uiLocale]);
 
-  // One query per surah, not per word tap: getSurahGlosses returns the whole
-  // surah's glosses, and al-Baqarah's are 6,116 rows.
-  const glossesRef = useRef<{ key: string; glosses: Map<number, string> } | null>(null);
-  const loadWordSummary = useCallback(
-    async (word: Word) => {
-      if (!corpusClient || !surahId) throw new Error('reader is not loaded');
-      const key = `${surahId}:${contentLanguage}`;
-      if (glossesRef.current?.key !== key) {
-        glossesRef.current = {
-          key,
-          glosses: await getSurahGlosses(corpusClient, surahId, contentLanguage),
-        };
-      }
-      return getWordSummary(corpusClient, word, glossesRef.current.glosses.get(word.id) ?? null);
-    },
-    [contentLanguage, corpusClient, surahId],
-  );
+  // One gloss query per surah, not per word tap. Shared with the word-by-word
+  // screen, which opens the same sheet off the same database.
+  const loadWordSummary = useWordSummaryLoader(corpusClient, surahId, contentLanguage);
 
   const loadWords = useCallback(
     async (ayahId: number) => {
