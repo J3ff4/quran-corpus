@@ -1271,7 +1271,7 @@ git commit -m "feat(mobile): add word, segment and root reads for the morphology
   ```
   Tasks 8, 9, 10 and 11 all consume `SegmentPill`; Task 8 consumes `useReducedMotion`.
 
-- [ ] **Step 1: Write the failing test for `useReducedMotion`**
+- [x] **Step 1: Write the failing test for `useReducedMotion`**
 
 Create `apps/mobile/src/motion/useReducedMotion.test.ts`:
 
@@ -1323,12 +1323,12 @@ describe('useReducedMotion', () => {
 });
 ```
 
-- [ ] **Step 2: Run and verify it fails**
+- [x] **Step 2: Run and verify it fails**
 
 Run: `pnpm --filter mobile test -- useReducedMotion`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implement `useReducedMotion`**
+- [x] **Step 3: Implement `useReducedMotion`**
 
 ```ts
 import { useEffect, useState } from 'react';
@@ -1362,12 +1362,12 @@ export function useReducedMotion(): boolean {
 }
 ```
 
-- [ ] **Step 4: Run and verify it passes**
+- [x] **Step 4: Run and verify it passes**
 
 Run: `pnpm --filter mobile test -- useReducedMotion`
 Expected: PASS, 3 tests.
 
-- [ ] **Step 5: Write the failing test for `SegmentPill`**
+- [x] **Step 5: Write the failing test for `SegmentPill`**
 
 Create `apps/mobile/src/components/SegmentPill.test.tsx`. Mock `react-native` with the same `host()` helper `AyahMedallion.test.tsx` uses — copy it rather than importing, matching that file's existing convention.
 
@@ -1409,18 +1409,18 @@ describe('SegmentPill', () => {
 });
 ```
 
-- [ ] **Step 6: Run and verify it fails, then implement**
+- [x] **Step 6: Run and verify it fails, then implement**
 
 Create `apps/mobile/src/components/SegmentPill.tsx`. It renders the segment's Arabic (when present) above `decodeSegment(segment).pos.en`, tinted with `theme.pos[posBucket(segment.pos_tag)]` and left at `theme.text` when the bucket is null. Border-radius 6, `paddingHorizontal: 8`, `paddingVertical: 4`, `backgroundColor: theme.surface`.
 
 Run: `pnpm --filter mobile test -- SegmentPill`
 Expected: PASS, 5 tests.
 
-- [ ] **Step 7: Mutation-check**
+- [x] **Step 7: Mutation-check**
 
 Change the DET fallback to use `theme.pos.other`. The DET test must fail. Restore.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add apps/mobile/src/components/SegmentPill.tsx apps/mobile/src/components/SegmentPill.test.tsx \
