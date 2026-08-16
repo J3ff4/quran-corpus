@@ -1,3 +1,4 @@
+import type { ColorValue } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 export type IconName = 'home' | 'book' | 'bookmark' | 'settings' | 'menu';
@@ -30,7 +31,7 @@ export function Icon({
   size = 24,
 }: {
   name: IconName;
-  color: string;
+  color: ColorValue;
   size?: number;
 }) {
   return (

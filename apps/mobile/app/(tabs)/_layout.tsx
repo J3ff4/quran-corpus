@@ -22,28 +22,28 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: t(uiLocale, 'tabs.home'),
-          tabBarIcon: ({ color, size }) => <Icon name="home" color={color as string} size={size} />,
+          tabBarIcon: ({ color, size }) => <Icon name="home" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="surahs"
         options={{
           title: t(uiLocale, 'tabs.surahs'),
-          tabBarIcon: ({ color, size }) => <Icon name="book" color={color as string} size={size} />,
+          tabBarIcon: ({ color, size }) => <Icon name="book" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="bookmarks"
         options={{
           title: t(uiLocale, 'tabs.bookmarks'),
-          tabBarIcon: ({ color, size }) => <Icon name="bookmark" color={color as string} size={size} />,
+          tabBarIcon: ({ color, size }) => <Icon name="bookmark" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: t(uiLocale, 'tabs.settings'),
-          tabBarIcon: ({ color, size }) => <Icon name="settings" color={color as string} size={size} />,
+          tabBarIcon: ({ color, size }) => <Icon name="settings" color={color} size={size} />,
         }}
       />
     </Tabs>
