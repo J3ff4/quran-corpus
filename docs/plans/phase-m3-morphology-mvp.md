@@ -132,11 +132,11 @@ No trust boundary is crossed (the DB is bundled, not user input) and nothing in 
 - Consumes: nothing.
 - Produces: nothing in code. Unblocks every later commit message referencing M3.
 
-- [ ] **Step 1: Read the current phase list**
+- [x] **Step 1: Read the current phase list**
 
 Run: `sed -n '410,440p' docs/PRD-android-first-mobile-app.md`
 
-- [ ] **Step 2: Renumber so M2 is Design Foundation and M3 is Morphology MVP**
+- [x] **Step 2: Renumber so M2 is Design Foundation and M3 is Morphology MVP**
 
 The PRD currently calls Morphology MVP "M2" and Dictionary + Search "M3". Plan files spent M2 on the design foundation. Shift the PRD's list down by one from Morphology MVP onward, and insert Design Foundation as M2. Add a one-line note under the list:
 
@@ -145,7 +145,7 @@ The PRD currently calls Morphology MVP "M2" and Dictionary + Search "M3". Plan f
 > M2 on 2026-08-16 and everything below it shifted by one.
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/PRD-android-first-mobile-app.md
@@ -179,7 +179,7 @@ git commit -m "docs(mobile): renumber PRD phases to match plan files"
   amendment under "The alignment finding" for why this is not a bare count.
   `wordIndex` is a 0-based index into the ayah's `position`-ordered word list, or `null` for text with no word row (basmala, `۞`, a leading pause mark). `null` return means alignment failed and the caller must render the raw string.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `packages/data/tests/ayahTokens.test.ts`:
 
@@ -263,12 +263,12 @@ describe('alignAyahTokens', () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests and verify they fail**
+- [x] **Step 2: Run the tests and verify they fail**
 
 Run: `pnpm --filter @quran-corpus/data test -- ayahTokens`
 Expected: FAIL — `Failed to resolve import "../src/text/ayahTokens.js"`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `packages/data/src/text/ayahTokens.ts`:
 
@@ -356,12 +356,12 @@ export function alignAyahTokens(
 }
 ```
 
-- [ ] **Step 4: Run the tests and verify they pass**
+- [x] **Step 4: Run the tests and verify they pass**
 
 Run: `pnpm --filter @quran-corpus/data test -- ayahTokens`
 Expected: PASS, 7 tests.
 
-- [ ] **Step 5: Mutation-check (§4 step 4)**
+- [x] **Step 5: Mutation-check (§4 step 4)**
 
 Three mutations. Each must turn a test red; if one stays green, that test asserts nothing and must be rewritten before moving on.
 
@@ -375,7 +375,7 @@ The plan's original mutation 2 ("drop `ref.surahId !== 1`") **survived** the sui
 
 Restore after each. Confirm `packages/data/node_modules/.vite` is not serving a stale transform if a mutation appears to do nothing.
 
-- [ ] **Step 6: Verify against the whole corpus**
+- [x] **Step 6: Verify against the whole corpus**
 
 Not a unit test — a one-off confirmation that the 100% figure still holds against the live DB.
 
@@ -399,7 +399,7 @@ const c = createClient({ url: 'file:' + require('fs').realpathSync('../../apps/w
 
 Expected: `aligned 6236/6236 failures: []`, exit 0. Requires `pnpm --filter @quran-corpus/data build` first.
 
-- [ ] **Step 7: Re-export from all three entry points**
+- [x] **Step 7: Re-export from all three entry points**
 
 Add to `packages/data/src/client.ts`, `packages/data/src/mobile.ts`, and `packages/data/src/index.ts`:
 
@@ -409,12 +409,12 @@ export { alignAyahTokens, type AyahToken } from './text/ayahTokens.js';
 
 `ayahTokens.ts` imports nothing, so it adds no edge to either guarded module graph.
 
-- [ ] **Step 8: Run the entry-point guards**
+- [x] **Step 8: Run the entry-point guards**
 
 Run: `pnpm --filter @quran-corpus/data test`
 Expected: PASS, including `client-entry.test.ts` and `mobile-entry.test.ts`.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add packages/data/src/text/ayahTokens.ts packages/data/tests/ayahTokens.test.ts \
@@ -427,11 +427,11 @@ text_uthmani deletes them from the reading surface. Tokenize the Uthmani
 text instead and attach word metadata by index. Verified 6236/6236 ayahs."
 ```
 
-- [ ] **Step 10: STOP — request `/code-review`**
+- [x] **Step 10: STOP — request `/code-review`**
 
 Per the Governance section, this task's parser is the one §5 trigger in the phase. Ask the user to run plain `/code-review` (not `ultra`). Act on real findings, state plainly which are declined and why, and do not re-run to clear a scoreboard.
 
-- [ ] **Step 11: Open an issue for web's pause-mark loss**
+- [x] **Step 11: Open an issue for web's pause-mark loss**
 
 ```bash
 gh issue create --repo J3ff4/quran-corpus \
@@ -457,7 +457,7 @@ gh issue create --repo J3ff4/quran-corpus \
   ```
   `null` means "render as plain default text, no colour". Task 4 (web) and Task 5 (mobile) both consume this.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `packages/data/tests/buckets.test.ts`:
 
@@ -504,12 +504,12 @@ describe('posBucket', () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests and verify they fail**
+- [x] **Step 2: Run the tests and verify they fail**
 
 Run: `pnpm --filter @quran-corpus/data test -- buckets`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `packages/data/src/morphology/buckets.ts`:
 
@@ -550,27 +550,27 @@ export function posBucket(posTag: string | null | undefined): PosBucket | null {
 }
 ```
 
-- [ ] **Step 4: Run the tests and verify they pass**
+- [x] **Step 4: Run the tests and verify they pass**
 
 Run: `pnpm --filter @quran-corpus/data test -- buckets`
 Expected: PASS, 5 tests.
 
-- [ ] **Step 5: Mutation-check**
+- [x] **Step 5: Mutation-check**
 
 Change `if (posTag === 'DET') return null;` to `return 'other';`. The DET test must fail. Restore.
 
-- [ ] **Step 6: Re-export from all three entry points**
+- [x] **Step 6: Re-export from all three entry points**
 
 ```ts
 export { posBucket, type PosBucket } from './morphology/buckets.js';
 ```
 
-- [ ] **Step 7: Run the full data suite**
+- [x] **Step 7: Run the full data suite**
 
 Run: `pnpm --filter @quran-corpus/data test`
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add packages/data/src/morphology/buckets.ts packages/data/tests/buckets.test.ts \
@@ -605,7 +605,7 @@ git commit -m "feat(data): add posBucket, the shared POS tag to colour-bucket ma
   ```
   Task 5 consumes `posColors`.
 
-- [ ] **Step 1: Add the tokens to the palette**
+- [x] **Step 1: Add the tokens to the palette**
 
 Append to `packages/config/theme/palette.ts`, carrying the contrast-ratio comments across verbatim from `globals.css` — they are the evidence the values are AA, and dropping them loses that:
 
@@ -660,7 +660,7 @@ export const easeOut = 'cubic-bezier(0.23, 1, 0.32, 1)';
 
 The `#555` → `#555555` and `#aaa` → `#aaaaaa` expansion is deliberate: the parity test in Step 4 compares strings, and CSS shorthand would make an identical colour compare unequal.
 
-- [ ] **Step 2: Shrink web's `posColor` to a bucket lookup**
+- [x] **Step 2: Shrink web's `posColor` to a bucket lookup**
 
 Rewrite `apps/web/src/lib/posColor.ts`. The DET carve-out and the noun-set membership both move into `posBucket`; this file is now nothing but bucket→CSS-variable, so the long comment goes with the logic it described:
 
@@ -679,12 +679,12 @@ export function posColor(posTag: string | null): string | null {
 }
 ```
 
-- [ ] **Step 3: Verify web's existing `posColor` tests still pass unchanged**
+- [x] **Step 3: Verify web's existing `posColor` tests still pass unchanged**
 
 Run: `pnpm --filter web test -- posColor`
 Expected: PASS with no edits to the existing test files. If any fail, the refactor changed behaviour and must be corrected — the four existing consumers (`SegmentPills.tsx`, `SegmentCard.tsx`, `WbwWordRow.tsx`, `LemmaEntry.tsx`) are unmodified and expect the old output exactly.
 
-- [ ] **Step 4: Write the parity test**
+- [x] **Step 4: Write the parity test**
 
 `globals.css` keeps the literal hexes (a CSS file cannot import TypeScript, and adding a generator step is more machinery than the problem is worth). The test is what stops the two copies drifting.
 
@@ -758,18 +758,18 @@ describe('globals.css / palette.ts parity', () => {
 });
 ```
 
-- [ ] **Step 5: Normalise the CSS shorthand and run the parity test**
+- [x] **Step 5: Normalise the CSS shorthand and run the parity test**
 
 In `apps/web/src/app/globals.css`, expand `#555` → `#555555` (lines 27, 53) and `#aaa` → `#aaaaaa` (lines 69, 77).
 
 Run: `pnpm --filter web test -- posColor.parity`
 Expected: PASS, 5 tests.
 
-- [ ] **Step 6: Mutation-check the parity test**
+- [x] **Step 6: Mutation-check the parity test**
 
 Change `--pos-noun` in `globals.css` to `#000000`. The first parity test must fail. Restore. Then delete every `--pos-*` line from `globals.css`; the *coverage* test must fail (the first would pass vacuously). Restore.
 
-- [ ] **Step 7: Lint, type-check, full suites**
+- [x] **Step 7: Lint, type-check, full suites**
 
 ```bash
 pnpm --filter web lint && pnpm --filter web type-check && pnpm --filter web test
@@ -777,7 +777,7 @@ pnpm --filter @quran-corpus/data test
 ```
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add packages/config/theme/palette.ts apps/web/src/lib/posColor.ts \
@@ -801,7 +801,7 @@ test holds the two copies equal."
 - Consumes: `posColors` from Task 4, `posBucket`/`PosBucket` from Task 3.
 - Produces: `themeColors.light.pos` and `themeColors.dark.pos`, both `Record<PosBucket, string>`. Task 7 (SegmentPill) consumes them via `useThemeColors()`.
 
-- [ ] **Step 1: Measure the contrast ratios against mobile's own backgrounds**
+- [x] **Step 1: Measure the contrast ratios against mobile's own backgrounds**
 
 Mobile's light background is `paperScale[50]` — the same `#faf8f3` the web ratios were measured against, so light carries over unchanged. Mobile's dark background is `#151412` (warm), not web's `#141414` (neutral grey). Compute each dark bucket's ratio against `#151412` before writing anything:
 
@@ -817,7 +817,7 @@ for (const [k,v] of Object.entries({noun:'#7fb0ff',verb:'#ff9a8f',prep:'#6fd9b8'
 
 Any bucket under 4.5:1 must be lightened until it passes, and the new hex written back to `packages/config/theme/palette.ts` **and** `globals.css` — the parity test from Task 4 will catch it if only one is edited. Record the measured ratio as a comment beside each value, matching the convention already in `tokens.ts`.
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 Create `apps/mobile/src/theme/posColors.test.ts`:
 
@@ -880,12 +880,12 @@ describe('mobile POS colours', () => {
 });
 ```
 
-- [ ] **Step 3: Run and verify it fails**
+- [x] **Step 3: Run and verify it fails**
 
 Run: `pnpm --filter mobile test -- posColors`
 Expected: FAIL — `themeColors.light.pos` is undefined.
 
-- [ ] **Step 4: Add `pos` to both themes**
+- [x] **Step 4: Add `pos` to both themes**
 
 In `apps/mobile/src/theme/tokens.ts`, import the palette's POS colours and add a `pos` key to each theme. Use the ratios measured in Step 1 as the comments:
 
@@ -910,16 +910,16 @@ and inside `themeColors.dark`:
     pos: posColors.dark,
 ```
 
-- [ ] **Step 5: Run and verify it passes**
+- [x] **Step 5: Run and verify it passes**
 
 Run: `pnpm --filter mobile test -- posColors`
 Expected: PASS, 4 tests. If the AA test fails, go back to Step 1 — the value is wrong, not the test.
 
-- [ ] **Step 6: Mutation-check**
+- [x] **Step 6: Mutation-check**
 
 Set `posColors.dark.other` to `#333333` in the palette. The AA test must fail. Restore, and re-run Task 4's parity test to confirm the palette and `globals.css` are back in agreement.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add apps/mobile/src/theme/tokens.ts apps/mobile/src/theme/posColors.test.ts \
@@ -977,13 +977,13 @@ git commit -m "feat(mobile): add POS bucket colours to both themes"
 
 `getWordSummary` takes the whole `Word` rather than an id because every caller already has one: `AyahText`'s `onWordPress` hands the `Word` straight over. Re-fetching it by id would be a query to recover something already in hand.
 
-- [ ] **Step 1: Read the existing repository and its tests**
+- [x] **Step 1: Read the existing repository and its tests**
 
 Run: `cat apps/mobile/src/data/corpusRepository.ts && head -60 apps/mobile/src/data/corpusRepository.test.ts`
 
 Match the existing conventions exactly: functions take `client` first, throw with a message naming the missing thing rather than returning a silent null for a genuine corruption, and never fetch data no screen reads.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Append to `apps/mobile/src/data/corpusRepository.test.ts`, following the fake-client pattern already in that file:
 
@@ -1101,12 +1101,12 @@ describe('getRootScreen', () => {
 });
 ```
 
-- [ ] **Step 3: Run and verify they fail**
+- [x] **Step 3: Run and verify they fail**
 
 Run: `pnpm --filter mobile test -- corpusRepository`
 Expected: FAIL — the five functions are not exported.
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 Add to `apps/mobile/src/data/corpusRepository.ts`. Import the additional queries from `@quran-corpus/data/mobile` — **never the barrel** (§2: the barrel pulls the native libsql driver into Metro's graph).
 
@@ -1230,12 +1230,12 @@ export async function getRootScreen(
 
 Both upstream shapes above are verified, not assumed. If a test still disagrees, re-read the query rather than adjusting the test.
 
-- [ ] **Step 5: Run and verify they pass**
+- [x] **Step 5: Run and verify they pass**
 
 Run: `pnpm --filter mobile test -- corpusRepository`
 Expected: PASS.
 
-- [ ] **Step 6: Mutation-check**
+- [x] **Step 6: Mutation-check**
 
 Four mutations, each must turn a test red:
 
@@ -1244,7 +1244,7 @@ Four mutations, each must turn a test red:
 3. Delete the `segment_index` sort in `getWordSummary` → the segment-order test.
 4. In `getWbwRange`, pass `byWord` itself as each page's `segments` **without** the per-word `.get()` at the render site → Task 12's grid test, not this one. Note it here so the two are not both skipped.
 
-- [ ] **Step 7: Lint, type-check, commit**
+- [x] **Step 7: Lint, type-check, commit**
 
 ```bash
 pnpm --filter mobile lint && pnpm --filter mobile type-check && pnpm --filter mobile test
