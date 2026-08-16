@@ -43,6 +43,7 @@ vi.mock('react-native', async () => {
       React.createElement('button', { onClick: onPress }, children),
     Text: ({ children }: { children?: React.ReactNode }) => React.createElement('span', null, children),
     View: ({ children }: { children?: React.ReactNode }) => React.createElement('div', null, children),
+    useWindowDimensions: () => ({ width: 400, height: 800, scale: 2, fontScale: 1 }),
   };
 });
 

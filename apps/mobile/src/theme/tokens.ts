@@ -1,8 +1,16 @@
+import { paper as paperScale } from '@quran-corpus/config/theme/palette';
+
 export const colors = {
-  paper: '#faf8f3',
-  ink: '#1f1a14',
+  paper: paperScale[50],
+  ink: paperScale[900],
   muted: '#7b7165',
+  // Deliberately NOT the web brand accent (terracotta, accent-500 #bd5f30).
+  // Owner ruling 2026-08-16: the two products keep separate accents, and
+  // parity covers the paper/night neutrals only. Do not "fix" this to match.
   accent: '#1f6f5b',
+  // Warm near-miss of the shared night-400 (#141414), which is pure grey.
+  // Not the same colour and not rounded to it -- the warmth is the night
+  // mode's character.
   night: '#151412',
   nightText: '#f1ede4',
   border: '#ded6c9',

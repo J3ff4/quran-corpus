@@ -2,6 +2,9 @@ import withSerwist from '@serwist/next';
 import type { NextConfig } from 'next';
 
 const config: NextConfig = {
+  // packages/config ships raw .ts (no build step), so Next has to compile it --
+  // the ayah-medallion geometry is imported from there by a client component.
+  transpilePackages: ['@quran-corpus/config'],
   // @libsql/client uses native Node.js bindings — must not be bundled by webpack.
   // serverExternalPackages is listed here for clarity; webpack externals below handles pnpm virtual store paths.
   serverExternalPackages: ['@libsql/client', 'libsql'],

@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM"]
+  },
+  // Both roots, not just src/: tsconfig.json excludes **/*.test.* everywhere, so
+  // a test file under app/ that this glob missed would fall out of BOTH programs
+  // and go silently untyped.
+  "include": [
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "app/**/*.test.ts",
+    "app/**/*.test.tsx"
+  ],
+  "exclude": []
+}

@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@quran-corpus/config": "workspace:*",
     "@quran-corpus/data": "workspace:*",
     "framer-motion": "^11.0.0",
     "next": "^15.0.0",
@@ -23,7 +24,6 @@
     "@eslint/eslintrc": "^3.3.5",
     "@serwist/next": "^9.0.0",
     "@next/eslint-plugin-next": "^16.2.9",
-    "@quran-corpus/config": "workspace:*",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",

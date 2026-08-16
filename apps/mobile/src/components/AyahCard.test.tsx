@@ -36,6 +36,7 @@ vi.mock('react-native', async () => {
     Pressable: host('button'),
     Text: host('span'),
     View: host('div'),
+    useWindowDimensions: () => ({ width: 400, height: 800, scale: 2, fontScale: 1 }),
   };
 });
 

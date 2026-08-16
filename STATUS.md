@@ -7,7 +7,7 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-08-14
+Updated: 2026-08-16
 
 ## Now
 
@@ -2742,13 +2742,71 @@ Greptile stays installed as advisory (user's call), no longer gates.
 Android app folded into this monorepo 2026-08-14 via unrelated-histories merge
 (21 commits preserved from the archived `J3ff4/quran-corpus-android-app`). It had
 forked `packages/data` + `packages/config`; both forks deleted, canonical copies win.
-PR **#5** on `J3ff4/quran-corpus`, open.
+PR **#5** on `J3ff4/quran-corpus` — **MERGED** `da9a694` (this file said "open" until
+2026-08-15; re-verified against `git log` before correcting, per §14).
 
 **Nothing here has run on a physical device.** Every green number below is a local
 transcript. Neither repo has ever had CI. Treat accordingly.
 
-Gate at time of writing: build 4/4, type-check 6/6, lint 2/2, test 6/6, 810 tests
-(data 252, web 483, mobile 65, mobile-data 10).
+Gate as of 2026-08-16: type-check 6/6 (mobile is two tsc programs now), lint 2/2,
+test 6/6 uncached, 879 tests (data 287, web 483, mobile 97, mobile-data 12).
+
+### M2 design foundation — CODE COMPLETE, DEVICE GATE UNRUN (2026-08-15)
+
+Branch `feat/m2-design-foundation`, 12 commits `262ac77..08c420c`, **not merged, no PR
+opened.** Plan `docs/plans/phase-m2-design-foundation.md`.
+
+🔴 **M2 IS NOT DONE.** The Verification Log in the plan is still empty. CLAUDE.md §10:
+"implementation complete, verification pending" is an unmet exit criterion, not a pass.
+Do not mark this done from the green numbers above — they are all local transcripts.
+
+What landed: `packages/config/theme/palette.ts` (paper/night/accent, one home, imported
+by the Tailwind preset and mobile `tokens.ts`); `react-native-svg@15.15.4` (SDK-57 pin);
+real tab icons ported from web's `BottomNav`/`DrawerMenu`; the mushaf ayah medallion
+replacing a bare digit in `AyahCard`.
+
+**Ships as a fresh sideload, never an OTA** — `react-native-svg` is a native module.
+Uninstall the M1 build first or a clean build can look broken.
+
+Two things static review cannot close, both checklist items in the plan. A second
+review (`/code-review`, 2026-08-16) **downgraded the first one** by reading
+`react-native-svg`'s own source rather than reasoning about it — `Svg extends
+Shape<SvgProps>` renders an inner `<G>` and `lib/extract/extractProps.ts` builds an
+`inherited` propList, so RN does implement inheritance. Reading the source is not the
+same as watching it paint, so the device check stays; it is no longer a live suspicion.
+- `Icon.tsx` sets `stroke`/`fill` on `<Svg>` and relies on `<Path>` inheriting. Tests
+  mock `react-native-svg` with real DOM `<svg>`, where the *browser's* inheritance
+  applies — if RN's differed, every test would pass and every icon render wrong.
+- Medallion at max system font size (`d27a17f` scaled the box by `fontScale` to fix a
+  WCAG 1.4.4 clip on 3-digit ayahs). jsdom has no layout engine, so hardware is the
+  only guard on that fix.
+
+Also verified by that review and needing no device check: the palette extraction is
+value-identical (loaded the preset through the real jiti Tailwind uses — `paper.50`,
+`night.400`, `accent.500` byte-for-byte what `preset.ts` declared on main, so no web
+class can have moved), and `react-native-svg@15.15.4` matches `expo@57.0.12`'s
+`bundledNativeModules.json` exactly.
+
+§5 not triggered: no `packages/data` change, no trust boundary, no user-DB write.
+Reviewed by self-review + a whole-branch read (0 Critical, 4 Important, 4 Minor, all
+Important fixed in `d27a17f`, re-review clean), then a second `/code-review` pass which
+found 1 Medium + 3 Low, all fixed in `cd55796`/`08c420c`:
+- The medallion's `accessibilityLabel` was hardcoded English in an app where every
+  other string is localized — a **regression for uz/ru**, since it replaced a bare
+  digit TalkBack had read in the user's own language.
+- vitest's include globs were never widened alongside `tsconfig.test.json` in
+  `5cb4d34`, so a test under `app/` would type-check and then silently never run.
+- The svg mock factory was copy-pasted into four suites (CLAUDE.md §3); now one
+  vitest setup file.
+- `menu` was in `IconName`/`PATHS` with no consumer, as was the medallion's `size`
+  prop. Both dropped.
+
+⚠️ A ruling made during M2 was **wrong and is worth not repeating**:
+`/// <reference lib="dom" />` in a test file is NOT file-scoped — it adds the lib to the
+whole *program*, so `document`/`window` type-checked clean throughout `apps/mobile`
+source for three commits. Fixed by splitting the tsc programs (`tsconfig.test.json`).
+Acceptance criterion 2 was also amended: as written it was false and unachievable
+(`app.json` is JSON and can never import the palette).
 
 ### Deferred from CodeRabbit review of #5 — heavy lift, NOT done
 1. `getAyahReaderLocation` (`apps/mobile/src/data/corpusRepository.ts`) calls
