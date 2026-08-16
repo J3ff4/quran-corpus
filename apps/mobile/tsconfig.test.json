@@ -3,14 +3,9 @@
   "compilerOptions": {
     "lib": ["ES2022", "DOM"]
   },
-  // Both roots, not just src/: tsconfig.json excludes **/*.test.* everywhere, so
-  // a test file under app/ that this glob missed would fall out of BOTH programs
-  // and go silently untyped.
-  "include": [
-    "src/**/*.test.ts",
-    "src/**/*.test.tsx",
-    "app/**/*.test.ts",
-    "app/**/*.test.tsx"
-  ],
+  // src/ only, matching vitest.config.ts. app/ must not hold test files at all
+  // (expo-router bundles everything under it as a route), so there is nothing
+  // there for this glob to miss. Route tests sit in src/test/routes/.
+  "include": ["src/**/*.test.ts", "src/**/*.test.tsx"],
   "exclude": []
 }

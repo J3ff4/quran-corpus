@@ -10,9 +10,11 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
-    // Kept in step with tsconfig.test.json's include: a test under app/ that
-    // only one of the two globs matches either runs untyped or type-checks
-    // without ever running, and both failures are silently green.
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'app/**/*.test.ts', 'app/**/*.test.tsx'],
+    // src/ only, deliberately. A test file under app/ is matched by
+    // expo-router's require.context and becomes both a route and a Metro
+    // module, which ships vitest and react-dom to the device and breaks
+    // `expo export` outright. Route tests live in src/test/routes/ and import
+    // the route by relative path. Kept in step with tsconfig.test.json.
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
   },
 });

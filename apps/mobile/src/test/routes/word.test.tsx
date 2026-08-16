@@ -2,7 +2,11 @@ import React from 'react';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Word, WordSegment } from '@quran-corpus/data/mobile';
-import WordDetailRoute from './[position]';
+// Route tests live here, not beside the route. expo-router's require.context
+// pulls EVERY .ts/.tsx under app/ into the bundle as a route, so a colocated
+// test ships vitest and react-dom to the device and registers itself as a
+// screen. Verified: `expo export --platform android` fails outright.
+import WordDetailRoute from '../../../app/word/[surah]/[ayah]/[position]';
 
 const mocks = vi.hoisted(() => ({
   params: { surah: '2', ayah: '255', position: '1' } as Record<string, string>,
