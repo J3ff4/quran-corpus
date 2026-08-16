@@ -1934,11 +1934,11 @@ git commit -m "feat(mobile): add the full word-analysis screen"
 - Consumes: `getRootScreen` (Task 6).
 - Produces: the route `/root/[buckwalter]`, pushed by `WordSheet`'s root link.
 
-- [ ] **Step 1: Add UI strings**
+- [x] **Step 1: Add UI strings**
 
 `root.title`, `root.forms`, `root.definitions`, `root.noDefinition`, `root.notFound` — en/uz/ru.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 ```tsx
 describe('root route', () => {
@@ -1975,7 +1975,7 @@ describe('root route', () => {
 });
 ```
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 **Do not write a validator.** `packages/data/src/text/buckwalter.ts` already exports `parseRootParam(raw: string): string | null` — it validates against the Buckwalter charset, enforces `ROOT_BUCKWALTER_MAX`, and rejects double-encoded input, which is exactly this route's threat. CLAUDE.md §2 records that a fork of this repo lost these validators; writing a second copy here is how that happens.
 
@@ -1992,11 +1992,11 @@ Then `routeParams.ts` just re-exports it for the route to import alongside `pars
 Run: `pnpm --filter mobile test -- buckwalter && pnpm --filter @quran-corpus/data test`
 Expected: PASS, 4 tests plus the entry guards.
 
-- [ ] **Step 4: Mutation-check**
+- [x] **Step 4: Mutation-check**
 
 Replace the `parseRootParam` call with `(raw) => raw || null`. The rejection test must fail. Restore.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add "apps/mobile/app/root" apps/mobile/src/data/routeParams.ts apps/mobile/src/i18n/uiStrings.ts
