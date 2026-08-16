@@ -31,13 +31,6 @@ describe('getSurahReader', () => {
     expect(reader.ayahs[0]?.translation?.translator).toBe('Abu Adel');
   });
 
-  // The fake client throws on the surah-words query, so this fails the moment
-  // the whole-surah word fetch comes back. It is 6116 rows for al-Baqarah that
-  // no screen reads, and it was the heaviest work on the reader's open path.
-  it('does not fetch every word of the surah', async () => {
-    await expect(getSurahReader(createFakeClient(), 2, 'ru')).resolves.toBeDefined();
-  });
-
   it('reports a bundled DB whose rows use a different translator', async () => {
     // Rows exist for the language, but none by the translator this build
     // selects. Previously every ayah filtered out and the reader showed a
@@ -123,7 +116,13 @@ function createFakeClient({ ruTranslator = 'Abu Adel' }: { ruTranslator?: string
       if (sql.includes('FROM words WHERE id = ?')) {
         return { rows: words.filter((word) => word['id'] === args[0]) };
       }
-      if (sql.includes('FROM words w JOIN ayahs a') && sql.includes('WHERE a.surah_id = ?')) {
+      // Tripwire, not a stub: the whole-surah word fetch is 6116 rows for
+      // al-Baqarah that no screen reads, and it was the heaviest work on the
+      // reader's open path. Any test that opens a reader fails if it returns.
+      // Matched through ORDER BY so the ayah-range query -- same table, same
+      // join, the on-demand fetch word-by-word display will use -- is not
+      // caught by this too.
+      if (sql.includes('FROM words w JOIN ayahs a') && sql.includes('WHERE a.surah_id = ? ORDER BY')) {
         throw new Error('Reader must not fetch every word of a surah; nothing renders them');
       }
       if (sql.includes('FROM translations t')) {
