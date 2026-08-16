@@ -1,4 +1,5 @@
 import { Tabs } from 'expo-router';
+import { Icon } from '@/components/icons/Icon';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
 import { useThemeColors } from '@/theme/themeContext';
@@ -17,10 +18,34 @@ export default function TabsLayout() {
         tabBarStyle: { backgroundColor: theme.background, borderTopColor: theme.border },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: t(uiLocale, 'tabs.home') }} />
-      <Tabs.Screen name="surahs" options={{ title: t(uiLocale, 'tabs.surahs') }} />
-      <Tabs.Screen name="bookmarks" options={{ title: t(uiLocale, 'tabs.bookmarks') }} />
-      <Tabs.Screen name="settings" options={{ title: t(uiLocale, 'tabs.settings') }} />
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: t(uiLocale, 'tabs.home'),
+          tabBarIcon: ({ color, size }) => <Icon name="home" color={color as string} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="surahs"
+        options={{
+          title: t(uiLocale, 'tabs.surahs'),
+          tabBarIcon: ({ color, size }) => <Icon name="book" color={color as string} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="bookmarks"
+        options={{
+          title: t(uiLocale, 'tabs.bookmarks'),
+          tabBarIcon: ({ color, size }) => <Icon name="bookmark" color={color as string} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: t(uiLocale, 'tabs.settings'),
+          tabBarIcon: ({ color, size }) => <Icon name="settings" color={color as string} size={size} />,
+        }}
+      />
     </Tabs>
   );
 }
