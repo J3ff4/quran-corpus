@@ -2,13 +2,20 @@ import { selectedTranslators, type MobileDataClient } from '@quran-corpus/mobile
 import {
   getAyahsBySurah,
   getAllSurahs,
+  getGlossesWithFallback,
+  getRootEntry,
   getSegmentsByWordIds,
   getSurahById,
   getTranslationsBySurahAndLang,
+  getWordByLocation,
   getWordDetail,
+  getWordsByAyah,
+  getWordsBySurahAyahRange,
   type Ayah,
+  type RootEntry,
   type Surah,
   type Translation,
+  type Word,
   type WordDetail,
   type WordSegment,
 } from '@quran-corpus/data/mobile';
@@ -127,6 +134,125 @@ export async function getM0SurahReader(
 export interface MobileWordDetail {
   detail: WordDetail | null;
   segments: WordSegment[];
+}
+
+export async function getWordsForAyah(client: MobileDataClient, ayahId: number): Promise<Word[]> {
+  const words = await getWordsByAyah(client, ayahId);
+  // Defence in depth, not a fix for a missing ORDER BY -- the shared query
+  // already sorts. The reader aligns these to Uthmani tokens by array index,
+  // so if that ordering ever changes the page still renders and every word
+  // simply shows its neighbour's grammar, which nothing would surface.
+  return [...words].sort((a, b) => a.position - b.position);
+}
+
+// getGlossesWithFallback takes a SURAH id, not a word-id list, so glosses are
+// fetched once per surah and cached rather than queried per word tap. Its rows
+// carry `gloss_text`, not `text`.
+export async function getSurahGlosses(
+  client: MobileDataClient,
+  surahId: number,
+  languageCode: ContentLanguageCode,
+): Promise<Map<number, string>> {
+  const glosses = await getGlossesWithFallback(client, surahId, languageCode);
+  return new Map(glosses.map((gloss) => [gloss.word_id, gloss.gloss_text]));
+}
+
+export interface WordSummary {
+  word: Word;
+  segments: WordSegment[];
+  gloss: string | null;
+}
+
+/** Takes the whole `Word` rather than an id because every caller already holds
+ *  one -- re-fetching it would be a query to recover something in hand. */
+export async function getWordSummary(
+  client: MobileDataClient,
+  word: Word,
+  gloss: string | null,
+): Promise<WordSummary> {
+  const segments = await getSegmentsByWordIds(client, [word.id]);
+  return {
+    word,
+    // The sheet renders pills in array order, so a prefix sorted after its
+    // stem misdescribes the word's structure.
+    segments: [...segments].sort((a, b) => a.segment_index - b.segment_index),
+    // A missing gloss is normal, not an error: it must not suppress the
+    // morphology, which is the part that always exists.
+    gloss,
+  };
+}
+
+export async function getWordAtLocation(
+  client: MobileDataClient,
+  surahId: number,
+  ayahNumber: number,
+  position: number,
+  languageCode: ContentLanguageCode,
+): Promise<WordSummary | null> {
+  const word = await getWordByLocation(client, surahId, ayahNumber, position);
+  if (!word) return null;
+  const glosses = await getSurahGlosses(client, surahId, languageCode);
+  return getWordSummary(client, word, glosses.get(word.id) ?? null);
+}
+
+export interface WbwPage {
+  ayahNumber: number;
+  words: Word[];
+  segments: Map<number, WordSegment[]>;
+}
+
+export async function getWbwRange(
+  client: MobileDataClient,
+  surahId: number,
+  fromAyah: number,
+  toAyah: number,
+): Promise<WbwPage[]> {
+  const words = await getWordsBySurahAyahRange(client, surahId, fromAyah, toAyah);
+  if (words.length === 0) return [];
+
+  // One query for the whole page's segments, fanned back out by word_id. Per
+  // word it would be one round trip per cell -- ~150 for a ten-ayah page.
+  const allSegments = await getSegmentsByWordIds(
+    client,
+    words.map((word) => word.id),
+  );
+  const byWord = new Map<number, WordSegment[]>();
+  for (const segment of allSegments) {
+    const list = byWord.get(segment.word_id);
+    if (list) list.push(segment);
+    else byWord.set(segment.word_id, [segment]);
+  }
+  for (const list of byWord.values()) list.sort((a, b) => a.segment_index - b.segment_index);
+
+  // `Word` carries ayah_id, NOT ayah_number -- getWordsBySurahAyahRange orders
+  // by a.ayah_number but selects w.*, so the number never reaches the rows.
+  // Resolve it through the surah's ayahs.
+  const ayahs = await getAyahsBySurah(client, surahId);
+  const numberByAyahId = new Map(ayahs.map((ayah) => [ayah.id, ayah.ayah_number]));
+
+  const byAyah = new Map<number, Word[]>();
+  for (const word of words) {
+    const ayahNumber = numberByAyahId.get(word.ayah_id);
+    if (ayahNumber === undefined) continue;
+    const list = byAyah.get(ayahNumber);
+    if (list) list.push(word);
+    else byAyah.set(ayahNumber, [word]);
+  }
+
+  return [...byAyah.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([ayahNumber, ayahWords]) => ({
+      ayahNumber,
+      words: [...ayahWords].sort((a, b) => a.position - b.position),
+      segments: byWord,
+    }));
+}
+
+export async function getRootScreen(
+  client: MobileDataClient,
+  rootBuckwalter: string,
+): Promise<RootEntry | null> {
+  return getRootEntry(client, rootBuckwalter);
 }
 
 export async function getM0WordDetail(
