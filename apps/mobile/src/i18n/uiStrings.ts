@@ -1,3 +1,4 @@
+import { AYAH_AUDIO_ATTRIBUTION } from '@quran-corpus/data/mobile';
 import type { UiLocaleCode } from './languages';
 
 export type UiStringKey =
@@ -83,7 +84,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceUzbek': 'Uzbek translation: Muhammad Sodik Muhammad Yusuf. Source approval incomplete.',
     'about.sourceRussian': 'Russian translation: Abu Adel. Source approval incomplete.',
     'about.sourceHafs': 'Hafs font: apps/mobile/assets/fonts/hafs.18.woff2. Source approval incomplete.',
-    'about.sourceAudio': 'Abdul Rashid Sufi audio metadata: Source approval incomplete.',
+    'about.sourceAudio': `Recitation: ${AYAH_AUDIO_ATTRIBUTION}. Source approval incomplete.`,
   },
   uz: {
     'tabs.home': 'Bosh sahifa',
@@ -125,7 +126,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceUzbek': 'O‘zbekcha tarjima: Muhammad Sodik Muhammad Yusuf. Manba tasdig‘i tugallanmagan.',
     'about.sourceRussian': 'Ruscha tarjima: Abu Adel. Manba tasdig‘i tugallanmagan.',
     'about.sourceHafs': 'Hafs shrifti: apps/mobile/assets/fonts/hafs.18.woff2. Manba tasdig‘i tugallanmagan.',
-    'about.sourceAudio': 'Abdul Rashid Sufi audio metama’lumotlari: manba tasdig‘i tugallanmagan.',
+    'about.sourceAudio': `Qiroat: ${AYAH_AUDIO_ATTRIBUTION}. Manba tasdig‘i tugallanmagan.`,
   },
   ru: {
     'tabs.home': 'Главная',
@@ -167,7 +168,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceUzbek': 'Узбекский перевод: Muhammad Sodik Muhammad Yusuf. Подтверждение источника не завершено.',
     'about.sourceRussian': 'Русский перевод: Abu Adel. Подтверждение источника не завершено.',
     'about.sourceHafs': 'Шрифт Hafs: apps/mobile/assets/fonts/hafs.18.woff2. Подтверждение источника не завершено.',
-    'about.sourceAudio': 'Аудиометаданные Abdul Rashid Sufi: подтверждение источника не завершено.',
+    'about.sourceAudio': `Чтение: ${AYAH_AUDIO_ATTRIBUTION}. Подтверждение источника не завершено.`,
   },
 };
 
