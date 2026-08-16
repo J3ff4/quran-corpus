@@ -47,7 +47,7 @@ export function AyahCard({
       }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <AyahMedallion n={ayahNumber} />
+        <AyahMedallion n={ayahNumber} uiLocale={uiLocale} />
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <Pressable
             accessibilityRole="button"

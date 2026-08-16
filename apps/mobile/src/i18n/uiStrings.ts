@@ -22,6 +22,7 @@ export type UiStringKey =
   | 'reader.removeBookmark'
   | 'reader.play'
   | 'reader.pause'
+  | 'reader.ayahLabel'
   | 'surahList.ayahsSuffix'
   | 'surahList.loadFailed'
   | 'settings.language'
@@ -65,6 +66,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.removeBookmark': 'Remove bookmark',
     'reader.play': 'Play',
     'reader.pause': 'Pause',
+    'reader.ayahLabel': 'Ayah',
     'surahList.ayahsSuffix': 'ayahs',
     'surahList.loadFailed': 'Unable to load surahs',
     'settings.language': 'Language',
@@ -107,6 +109,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.removeBookmark': 'Xatcho‘pni olib tashlash',
     'reader.play': 'Ijro etish',
     'reader.pause': 'To‘xtatish',
+    'reader.ayahLabel': 'Oyat',
     'surahList.ayahsSuffix': 'oyat',
     'surahList.loadFailed': 'Suralarni yuklab bo‘lmadi',
     'settings.language': 'Til',
@@ -149,6 +152,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.removeBookmark': 'Удалить закладку',
     'reader.play': 'Воспроизвести',
     'reader.pause': 'Пауза',
+    'reader.ayahLabel': 'Аят',
     'surahList.ayahsSuffix': 'аятов',
     'surahList.loadFailed': 'Не удалось загрузить суры',
     'settings.language': 'Язык',

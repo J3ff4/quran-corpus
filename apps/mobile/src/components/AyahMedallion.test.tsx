@@ -27,19 +27,11 @@ vi.mock('react-native', async () => {
   };
 });
 
-vi.mock('react-native-svg', async () => {
-  const React = await import('react');
-  const Svg = ({ children, ...props }: { children?: React.ReactNode }) =>
-    React.createElement('svg', props, children);
-  const Path = (props: { d: string }) => React.createElement('path', props);
-  return { default: Svg, Svg, Path };
-});
-
 describe('AyahMedallion', () => {
   afterEach(cleanup);
 
   it('announces the ayah it marks', () => {
-    render(<AyahMedallion n={255} />);
+    render(<AyahMedallion n={255} uiLocale="en" />);
 
     // Queried by label, not by role: RN's accessibilityRole is "image", which
     // the mock passes straight through to a DOM role of "image" -- not the
@@ -50,14 +42,23 @@ describe('AyahMedallion', () => {
     expect(screen.getByLabelText('Ayah 255')).toBeTruthy();
   });
 
+  it('announces it in the reader locale, not always English', () => {
+    render(<AyahMedallion n={255} uiLocale="ru" />);
+
+    // The label replaced a bare digit, which TalkBack read in the user's own
+    // language. A hardcoded English label would make every verse in the surah
+    // announce "Ayah" to a Russian reader -- worse than the digit it replaced.
+    expect(screen.getByLabelText('Аят 255')).toBeTruthy();
+  });
+
   it('draws the number inside the rosette', () => {
-    render(<AyahMedallion n={7} />);
+    render(<AyahMedallion n={7} uiLocale="en" />);
 
     expect(screen.getByText('7')).toBeTruthy();
   });
 
   it('draws both layers of the rosette', () => {
-    const { container } = render(<AyahMedallion n={1} />);
+    const { container } = render(<AyahMedallion n={1} uiLocale="en" />);
 
     // A filled backing plus the stroked outline. One path means the port
     // dropped a layer and the number sits on whatever is behind the card.
@@ -67,7 +68,7 @@ describe('AyahMedallion', () => {
   it('takes its colours from the theme, not a hardcoded hex', () => {
     const { container } = render(
       <ThemeContext.Provider value={themeColors.dark}>
-        <AyahMedallion n={1} />
+        <AyahMedallion n={1} uiLocale="en" />
       </ThemeContext.Provider>,
     );
 

@@ -1,5 +1,7 @@
 import { Text, useWindowDimensions, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import type { UiLocaleCode } from '@/i18n/languages';
+import { t } from '@/i18n/uiStrings';
 import { useThemeColors } from '@/theme/themeContext';
 
 // Backing layer -- web's `fill-paper-50 dark:fill-night-100` path. Copied
@@ -17,7 +19,9 @@ const OUTLINE_PATH =
  * same marker; the source art's cream fill and dark stroke are replaced by
  * theme tokens, per CLAUDE.md §8.
  */
-export function AyahMedallion({ n, size = 28 }: { n: number; size?: number }) {
+const SIZE = 28;
+
+export function AyahMedallion({ n, uiLocale }: { n: number; uiLocale: UiLocaleCode }) {
   const theme = useThemeColors();
   const { fontScale } = useWindowDimensions();
   // Scales with the user's system font size so a three-digit ayah number
@@ -25,13 +29,16 @@ export function AyahMedallion({ n, size = 28 }: { n: number; size?: number }) {
   // apps/mobile/src/settings/settingsStore.tsx ~line 35: there is no in-app
   // font-scale control precisely because the system setting already does
   // this for every <Text>, so the box has to follow it too.
-  const box = size * fontScale;
+  const box = SIZE * fontScale;
 
   return (
     <View
       accessible
       accessibilityRole="image"
-      accessibilityLabel={`Ayah ${n}`}
+      // Localized, not a bare `Ayah ${n}`: this label replaced a loose digit
+      // that TalkBack read in the user's own language, so hardcoding English
+      // here would be a regression for the uz and ru locales specifically.
+      accessibilityLabel={`${t(uiLocale, 'reader.ayahLabel')} ${n}`}
       style={{ width: box, height: box, alignItems: 'center', justifyContent: 'center' }}
     >
       <Svg
@@ -52,7 +59,7 @@ export function AyahMedallion({ n, size = 28 }: { n: number; size?: number }) {
       <Text
         style={{
           color: theme.mutedText,
-          fontSize: Math.round(size * 0.38),
+          fontSize: Math.round(SIZE * 0.38),
           fontVariant: ['tabular-nums'],
         }}
       >
