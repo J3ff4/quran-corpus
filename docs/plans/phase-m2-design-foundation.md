@@ -37,7 +37,7 @@
 
 No new test here. The three scales become single-source the moment the preset imports them, so there is nothing left to drift; a test asserting the hexes would just be a second copy. The guard is web's existing suite plus a build, and Task 2's `tokens.test.ts` pins `paper-50`/`paper-900` by value.
 
-- [ ] **Step 1: Write the module**
+- [x] **Step 1: Write the module**
 
 Create `packages/config/theme/palette.ts`. Hexes are moved verbatim from `preset.ts` — no value changes in this task.
 
@@ -96,7 +96,7 @@ export const accent = {
 };
 ```
 
-- [ ] **Step 2: Add the export**
+- [x] **Step 2: Add the export**
 
 In `packages/config/package.json`, add one entry to `exports`, leaving the others untouched:
 
@@ -105,7 +105,7 @@ In `packages/config/package.json`, add one entry to `exports`, leaving the other
     "./theme/palette": "./theme/palette.ts",
 ```
 
-- [ ] **Step 3: Point the preset at it**
+- [x] **Step 3: Point the preset at it**
 
 In `packages/config/tailwind/preset.ts`, add the import below the existing `Config` type import and replace the three literal scale objects inside `theme.extend.colors`. `darkMode`, `fontFamily` and the file's top comment stay exactly as they are.
 
@@ -122,7 +122,7 @@ import { accent, night, paper } from '../theme/palette';
       },
 ```
 
-- [ ] **Step 4: Prove web is unmoved**
+- [x] **Step 4: Prove web is unmoved**
 
 Run, from the repo root:
 
@@ -136,7 +136,7 @@ Expected: all three pass. The build is the one that matters — it is jiti loadi
 
 Do not start `next build` while a `next dev` server is running on this repo — they share `.next` and it breaks the dev server.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/config/theme/palette.ts packages/config/package.json packages/config/tailwind/preset.ts
@@ -163,13 +163,13 @@ it used to declare, so web's classes are byte-identical."
 
 This is the task that proves Metro can resolve the package export. Nothing later depends on the palette until this passes.
 
-- [ ] **Step 1: Move the dependency**
+- [x] **Step 1: Move the dependency**
 
 `@quran-corpus/config` currently sits in `devDependencies` in `apps/mobile/package.json` — correct while it was only a tsconfig, wrong the moment mobile imports it at runtime. Move the line into `dependencies`, keep `"workspace:*"`.
 
 Then: `pnpm install`
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 Create `apps/mobile/src/theme/tokens.test.ts`:
 
@@ -207,7 +207,7 @@ describe('themeColors', () => {
 });
 ```
 
-- [ ] **Step 3: Run it, expect a resolution failure**
+- [x] **Step 3: Run it, expect a resolution failure**
 
 ```bash
 pnpm --filter @quran-corpus/mobile test -- tokens
@@ -222,7 +222,7 @@ Expected: FAIL. Either `Failed to resolve import "@quran-corpus/config/theme/pal
       ),
 ```
 
-- [ ] **Step 4: Source the neutrals from the palette**
+- [x] **Step 4: Source the neutrals from the palette**
 
 In `apps/mobile/src/theme/tokens.ts`, replace the first two entries of `colors` and add the import. Everything below `themeColors` is untouched — including every contrast comment.
 
@@ -248,7 +248,7 @@ export const colors = {
 };
 ```
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 ```bash
 pnpm --filter @quran-corpus/mobile test
@@ -256,11 +256,11 @@ pnpm --filter @quran-corpus/mobile test
 
 Expected: PASS, whole suite.
 
-- [ ] **Step 6: Mutation-check (CLAUDE.md §4 step 4)**
+- [x] **Step 6: Mutation-check (CLAUDE.md §4 step 4)**
 
 Temporarily set `themeColors.dark.danger` to `colors.danger`. Re-run. The second test MUST fail. Restore it. A test that passes both ways asserts nothing — this has slipped through twice on this repo.
 
-- [ ] **Step 7: Prove Metro resolves the export**
+- [x] **Step 7: Prove Metro resolves the export**
 
 The real risk in this phase. vitest passing does not prove it — vitest uses Vite's resolver, the device uses Metro's.
 
@@ -283,7 +283,7 @@ and import the deep path. `watchFolders` already covers the workspace root.
 
 Then delete `/tmp/m2-metro-check`.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add apps/mobile/package.json apps/mobile/src/theme/tokens.ts apps/mobile/src/theme/tokens.test.ts pnpm-lock.yaml
@@ -310,7 +310,7 @@ the two that a careless refactor flattens."
 
 `color` is an explicit prop because RN has no `currentColor`; callers pass a theme value.
 
-- [ ] **Step 1: Install**
+- [x] **Step 1: Install**
 
 ```bash
 pnpm --filter @quran-corpus/mobile exec npx expo install react-native-svg
@@ -318,7 +318,7 @@ pnpm --filter @quran-corpus/mobile exec npx expo install react-native-svg
 
 Expo picks the SDK-57-compatible version. Do not hand-pin it, and do not add `react-native-svg-transformer`.
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 Create `apps/mobile/src/components/icons/Icon.test.tsx`. The `react-native-svg` mock mirrors the `react-native` mock style already used in `AyahCard.test.tsx` — jsdom has no native module.
 
@@ -365,7 +365,7 @@ describe('Icon', () => {
 });
 ```
 
-- [ ] **Step 3: Run it, expect failure**
+- [x] **Step 3: Run it, expect failure**
 
 ```bash
 pnpm --filter @quran-corpus/mobile test -- Icon
@@ -373,7 +373,7 @@ pnpm --filter @quran-corpus/mobile test -- Icon
 
 Expected: FAIL — `Failed to resolve import "./Icon"`.
 
-- [ ] **Step 4: Write the component**
+- [x] **Step 4: Write the component**
 
 Create `apps/mobile/src/components/icons/Icon.tsx`:
 
@@ -432,7 +432,7 @@ export function Icon({
 }
 ```
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 ```bash
 pnpm --filter @quran-corpus/mobile test
@@ -440,11 +440,11 @@ pnpm --filter @quran-corpus/mobile test
 
 Expected: PASS.
 
-- [ ] **Step 6: Mutation-check**
+- [x] **Step 6: Mutation-check**
 
 Replace `stroke={color}` with `stroke="#000000"`. The second test MUST fail. Restore.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add apps/mobile/package.json apps/mobile/src/components/icons pnpm-lock.yaml
@@ -468,7 +468,7 @@ glyphs; settings is new because web's drawer has no settings entry."
 
 Tab *structure* does not change here — Home / Surahs / Bookmarks / Settings stays. The move to Home / Read / Dictionary / Menu is M4, when Dictionary exists to sit behind the tab.
 
-- [ ] **Step 1: Add the icons**
+- [x] **Step 1: Add the icons**
 
 Add the import, then a `tabBarIcon` to each of the four `Tabs.Screen` options. `color` and `size` come from react-navigation, already themed by the surrounding `screenOptions` (`tabBarActiveTintColor: theme.accent`, `tabBarInactiveTintColor: theme.mutedText`) — so the icons follow the theme without reading it themselves.
 
@@ -507,7 +507,7 @@ import { Icon } from '@/components/icons/Icon';
       />
 ```
 
-- [ ] **Step 2: Type-check and lint**
+- [x] **Step 2: Type-check and lint**
 
 ```bash
 pnpm --filter @quran-corpus/mobile type-check
@@ -516,7 +516,7 @@ pnpm --filter @quran-corpus/mobile lint
 
 Expected: both clean. No test here — this file is wiring with no branch or logic in it, and Task 3's tests already cover that every name renders a glyph. The real check is Task 6, on the device.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add "apps/mobile/app/(tabs)/_layout.tsx"
@@ -539,7 +539,7 @@ react-navigation's fallback glyph -- the tofu boxes in the first APK."
 - Consumes: `useThemeColors` from `@/theme/themeContext`, `react-native-svg` (Task 3).
 - Produces: `AyahMedallion` — `({ n: number; size?: number }) => JSX.Element`. Default `size` 28, matching web's `h-7 w-7`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `apps/mobile/src/components/AyahMedallion.test.tsx`. Mock both `react-native` and `react-native-svg`, same style as `AyahCard.test.tsx`.
 
@@ -606,7 +606,7 @@ describe('AyahMedallion', () => {
 });
 ```
 
-- [ ] **Step 2: Run it, expect failure**
+- [x] **Step 2: Run it, expect failure**
 
 ```bash
 pnpm --filter @quran-corpus/mobile test -- AyahMedallion
@@ -614,7 +614,7 @@ pnpm --filter @quran-corpus/mobile test -- AyahMedallion
 
 Expected: FAIL — `Failed to resolve import "./AyahMedallion"`.
 
-- [ ] **Step 3: Write the component**
+- [x] **Step 3: Write the component**
 
 Create `apps/mobile/src/components/AyahMedallion.tsx`. **Copy the two `d` strings verbatim** from `apps/web/src/components/reader/ornaments/AyahMedallion.tsx` — the backing path (the one on the `fill-paper-50` element) and the outline path (the `stroke-current` one, `strokeWidth={4}`, `strokeLinejoin="round"`). Do not retype or reformat them; they are ~2 KB each and a single altered digit deforms the star.
 
@@ -664,7 +664,7 @@ export function AyahMedallion({ n, size = 28 }: { n: number; size?: number }) {
 }
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 ```bash
 pnpm --filter @quran-corpus/mobile test
@@ -672,11 +672,11 @@ pnpm --filter @quran-corpus/mobile test
 
 Expected: PASS.
 
-- [ ] **Step 5: Mutation-check**
+- [x] **Step 5: Mutation-check**
 
 Delete the backing `<Path>`. The third test MUST fail. Restore.
 
-- [ ] **Step 6: Put it in the reader**
+- [x] **Step 6: Put it in the reader**
 
 In `apps/mobile/src/components/AyahCard.tsx`, replace the bare ayah number at line 49:
 
@@ -692,7 +692,7 @@ with:
 
 and add `import { AyahMedallion } from './AyahMedallion';`. `typography` is still used by the Arabic and translation text, so its import stays.
 
-- [ ] **Step 7: Run the full suite**
+- [x] **Step 7: Run the full suite**
 
 ```bash
 pnpm --filter @quran-corpus/mobile test
@@ -702,7 +702,7 @@ pnpm --filter @quran-corpus/mobile lint
 
 Expected: all pass. `AyahCard.test.tsx` mocks `react-native` only, so if it now fails on an unmocked `react-native-svg` import, add the same `vi.mock('react-native-svg', ...)` factory used above to that file.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add apps/mobile/src/components/AyahMedallion.tsx apps/mobile/src/components/AyahMedallion.test.tsx apps/mobile/src/components/AyahCard.tsx
@@ -722,7 +722,7 @@ number keeps its own accessible label."
 
 CLAUDE.md §10: `apps/mobile` has no emulator in CI, so the on-device checklist **is** the gate. "Implementation complete, verification pending" is an unmet exit criterion, not a pass.
 
-- [ ] **Step 1: Full green at the root**
+- [x] **Step 1: Full green at the root**
 
 ```bash
 pnpm lint
@@ -747,6 +747,18 @@ The README M1 smoke checklist, plus the M2-specific items:
 - All four tabs show an icon, not a tofu box — light mode and dark mode.
 - Icons follow the theme: active tab in the accent, inactive in muted.
 - Ayah numbers render the rosette in the reader, in both themes, with the number legible inside it.
+- **Set the system font size to maximum, open Al-Baqarah, scroll to ayah 100+.** The
+  three-digit number must stay fully inside the rosette — no wrap, no clipping, no
+  overlap with the ayah text beside it. Added at the final review: the medallion was a
+  fixed 28dp box around a `<Text>` that scales, so this regressed WCAG 1.4.4. Fixed in
+  `d27a17f` by scaling the box with `useWindowDimensions().fontScale`; no unit test
+  covers the scaling (jsdom has no layout engine), so **this item is the only real
+  guard on that fix.**
+- **Look closely at the tab icons and the rosette outline.** `Icon.tsx` sets
+  `stroke`/`fill`/`strokeWidth` on `<Svg>` and relies on `<Path>` inheriting them.
+  The component tests mock `react-native-svg` with real DOM `<svg>`, where the
+  *browser's* inheritance applies — so if react-native-svg's differs, all 96 tests
+  pass and every icon renders wrong. Static review cannot close this one.
 - The two checks still unrun from M1, which this build finally closes: reader in airplane mode, and switching UI locale independently of content language.
 
 - [ ] **Step 5: Record the result**
@@ -771,7 +783,16 @@ _To be filled in by Task 6. Format follows `docs/plans/phase-m1-real-offline-rea
 ## Acceptance criteria
 
 1. `@quran-corpus/config/theme/palette` exists, imported by `preset.ts` and by `apps/mobile/src/theme/tokens.ts`.
-2. No `paper` or `night` scale hex is a literal in more than one place in the repo.
+2. The `paper`/`night`/`accent` scales have exactly one definition, and every
+   consumer that *can* import it does. **Amended at the final review** — as first
+   written ("no scale hex is a literal in more than one place in the repo") this
+   was both false and unachievable. `#faf8f3` and `#1f1a14` also sit in
+   `apps/web/src/app/manifest.ts`, `apps/web/src/app/layout.tsx`,
+   `scripts/generate-icons.ts` and `apps/mobile/app.json` — all pre-existing, none
+   introduced by M2. The first three could import the new module; `app.json` is
+   JSON and never can. Chasing the three was declined here: it is three web/build
+   files plus `apps/web/src/test/manifest.test.ts`'s assertions, churned on a
+   mobile-design branch for zero behaviour change. Follow-up, not an M2 gate.
 3. `pnpm lint`, `pnpm type-check`, `pnpm test` pass at the repo root.
 4. The web suite passes unchanged, with no new web test.
 5. `tokens.test.ts` fails when dark `danger` is pointed at `colors.danger`.
