@@ -23,6 +23,10 @@ export type UiStringKey =
   | 'reader.play'
   | 'reader.pause'
   | 'reader.ayahLabel'
+  | 'word.fullAnalysis'
+  | 'word.root'
+  | 'word.noGloss'
+  | 'word.close'
   | 'surahList.ayahsSuffix'
   | 'surahList.loadFailed'
   | 'settings.language'
@@ -67,6 +71,10 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.play': 'Play',
     'reader.pause': 'Pause',
     'reader.ayahLabel': 'Ayah',
+    'word.fullAnalysis': 'Full analysis',
+    'word.root': 'Root',
+    'word.noGloss': 'No translation for this word',
+    'word.close': 'Close',
     'surahList.ayahsSuffix': 'ayahs',
     'surahList.loadFailed': 'Unable to load surahs',
     'settings.language': 'Language',
@@ -110,6 +118,10 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.play': 'Ijro etish',
     'reader.pause': 'To‘xtatish',
     'reader.ayahLabel': 'Oyat',
+    'word.fullAnalysis': 'To‘liq tahlil',
+    'word.root': 'O‘zak',
+    'word.noGloss': 'Bu so‘z uchun tarjima yo‘q',
+    'word.close': 'Yopish',
     'surahList.ayahsSuffix': 'oyat',
     'surahList.loadFailed': 'Suralarni yuklab bo‘lmadi',
     'settings.language': 'Til',
@@ -153,6 +165,10 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.play': 'Воспроизвести',
     'reader.pause': 'Пауза',
     'reader.ayahLabel': 'Аят',
+    'word.fullAnalysis': 'Полный разбор',
+    'word.root': 'Корень',
+    'word.noGloss': 'Нет перевода для этого слова',
+    'word.close': 'Закрыть',
     'surahList.ayahsSuffix': 'аятов',
     'surahList.loadFailed': 'Не удалось загрузить суры',
     'settings.language': 'Язык',

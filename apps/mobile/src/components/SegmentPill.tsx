@@ -24,6 +24,7 @@ export function SegmentPill({ segment }: SegmentPillProps) {
 
   return (
     <View
+      testID="segment-pill"
       style={{
         borderRadius: 6,
         paddingHorizontal: 8,
