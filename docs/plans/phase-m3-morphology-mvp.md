@@ -1839,11 +1839,11 @@ per visible ayah with a 3-ayah lookahead; the whole-surah fetch stays retired."
 - Consumes: `getWordAtLocation` (Task 6), `SegmentPill` (Task 7).
 - Produces: the route `/word/[surah]/[ayah]/[position]`, pushed by `WordSheet`'s "Full analysis".
 
-- [ ] **Step 1: Add UI strings**
+- [x] **Step 1: Add UI strings**
 
 `word.segments`, `word.grammar`, `word.notFound`, `word.transliteration` — in en/uz/ru, same table format as Task 8.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 ```tsx
 describe('word detail route', () => {
@@ -1885,7 +1885,7 @@ describe('word detail route', () => {
 });
 ```
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Reuse the `parseSurahId` / `parseAyahNumber` validators already in `apps/mobile/app/surah/[surahId].tsx` — extract them to `apps/mobile/src/data/routeParams.ts` and import in both rather than copying (§3 DRY). Add `parsePosition` there:
 
@@ -1909,11 +1909,11 @@ The two guards catch different inputs and both are needed: `Number.isInteger` re
 Run: `pnpm --filter mobile test -- position`
 Expected: PASS, 5 tests.
 
-- [ ] **Step 4: Mutation-check**
+- [x] **Step 4: Mutation-check**
 
 Remove the `parsePosition` bound check. The validation test must fail. Restore.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add "apps/mobile/app/word" apps/mobile/src/data/routeParams.ts apps/mobile/src/i18n/uiStrings.ts \
