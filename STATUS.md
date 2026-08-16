@@ -7,7 +7,7 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-08-14
+Updated: 2026-08-15
 
 ## Now
 
@@ -2742,13 +2742,50 @@ Greptile stays installed as advisory (user's call), no longer gates.
 Android app folded into this monorepo 2026-08-14 via unrelated-histories merge
 (21 commits preserved from the archived `J3ff4/quran-corpus-android-app`). It had
 forked `packages/data` + `packages/config`; both forks deleted, canonical copies win.
-PR **#5** on `J3ff4/quran-corpus`, open.
+PR **#5** on `J3ff4/quran-corpus` — **MERGED** `da9a694` (this file said "open" until
+2026-08-15; re-verified against `git log` before correcting, per §14).
 
 **Nothing here has run on a physical device.** Every green number below is a local
 transcript. Neither repo has ever had CI. Treat accordingly.
 
-Gate at time of writing: build 4/4, type-check 6/6, lint 2/2, test 6/6, 810 tests
-(data 252, web 483, mobile 65, mobile-data 10).
+Gate as of 2026-08-15: type-check 6/6, lint 2/2, test 6/6, 841 tests
+(data 252, web 483, mobile 96, mobile-data 10).
+
+### M2 design foundation — CODE COMPLETE, DEVICE GATE UNRUN (2026-08-15)
+
+Branch `feat/m2-design-foundation`, 8 commits `262ac77..5cb4d34`, **not merged, no PR
+opened.** Plan `docs/plans/phase-m2-design-foundation.md`.
+
+🔴 **M2 IS NOT DONE.** The Verification Log in the plan is still empty. CLAUDE.md §10:
+"implementation complete, verification pending" is an unmet exit criterion, not a pass.
+Do not mark this done from the green numbers above — they are all local transcripts.
+
+What landed: `packages/config/theme/palette.ts` (paper/night/accent, one home, imported
+by the Tailwind preset and mobile `tokens.ts`); `react-native-svg@15.15.4` (SDK-57 pin);
+real tab icons ported from web's `BottomNav`/`DrawerMenu`; the mushaf ayah medallion
+replacing a bare digit in `AyahCard`.
+
+**Ships as a fresh sideload, never an OTA** — `react-native-svg` is a native module.
+Uninstall the M1 build first or a clean build can look broken.
+
+Two things static review cannot close, both now checklist items in the plan:
+- `Icon.tsx` sets `stroke`/`fill` on `<Svg>` and relies on `<Path>` inheriting. Tests
+  mock `react-native-svg` with real DOM `<svg>`, where the *browser's* inheritance
+  applies — if RN's differs, all 96 tests pass and every icon renders wrong.
+- Medallion at max system font size (`d27a17f` scaled the box by `fontScale` to fix a
+  WCAG 1.4.4 clip on 3-digit ayahs). jsdom has no layout engine, so hardware is the
+  only guard on that fix.
+
+§5 not triggered: no `packages/data` change, no trust boundary, no user-DB write.
+Reviewed by self-review + a whole-branch read: 0 Critical, 4 Important, 4 Minor, all
+Important fixed in `d27a17f`, re-review clean.
+
+⚠️ A ruling made during M2 was **wrong and is worth not repeating**:
+`/// <reference lib="dom" />` in a test file is NOT file-scoped — it adds the lib to the
+whole *program*, so `document`/`window` type-checked clean throughout `apps/mobile`
+source for three commits. Fixed by splitting the tsc programs (`tsconfig.test.json`).
+Acceptance criterion 2 was also amended: as written it was false and unachievable
+(`app.json` is JSON and can never import the palette).
 
 ### Deferred from CodeRabbit review of #5 — heavy lift, NOT done
 1. `getAyahReaderLocation` (`apps/mobile/src/data/corpusRepository.ts`) calls
