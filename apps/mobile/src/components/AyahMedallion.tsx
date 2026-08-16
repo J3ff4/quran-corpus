@@ -1,4 +1,4 @@
-import { Text, View } from 'react-native';
+import { Text, useWindowDimensions, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useThemeColors } from '@/theme/themeContext';
 
@@ -19,16 +19,24 @@ const OUTLINE_PATH =
  */
 export function AyahMedallion({ n, size = 28 }: { n: number; size?: number }) {
   const theme = useThemeColors();
+  const { fontScale } = useWindowDimensions();
+  // Scales with the user's system font size so a three-digit ayah number
+  // (Al-Baqarah runs to 286) doesn't wrap and clip inside a fixed box. See
+  // apps/mobile/src/settings/settingsStore.tsx ~line 35: there is no in-app
+  // font-scale control precisely because the system setting already does
+  // this for every <Text>, so the box has to follow it too.
+  const box = size * fontScale;
 
   return (
     <View
+      accessible
       accessibilityRole="image"
       accessibilityLabel={`Ayah ${n}`}
-      style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}
+      style={{ width: box, height: box, alignItems: 'center', justifyContent: 'center' }}
     >
       <Svg
-        width={size}
-        height={size}
+        width={box}
+        height={box}
         viewBox="0 0 118.91 118.91"
         style={{ position: 'absolute' }}
       >
@@ -41,7 +49,15 @@ export function AyahMedallion({ n, size = 28 }: { n: number; size?: number }) {
           strokeLinejoin="round"
         />
       </Svg>
-      <Text style={{ color: theme.mutedText, fontSize: Math.round(size * 0.38) }}>{n}</Text>
+      <Text
+        style={{
+          color: theme.mutedText,
+          fontSize: Math.round(size * 0.38),
+          fontVariant: ['tabular-nums'],
+        }}
+      >
+        {n}
+      </Text>
     </View>
   );
 }

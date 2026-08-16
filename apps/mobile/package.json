@@ -8,7 +8,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "lint": "eslint . --ext .ts,.tsx",
-    "type-check": "tsc --noEmit",
+    "type-check": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "eas-build-post-install": "cd ../.. && pnpm --filter @quran-corpus/data build && pnpm --filter @quran-corpus/mobile-data build",
     "prebuild:assert-db": "test -f assets/db/quran.db || { echo 'Missing apps/mobile/assets/db/quran.db. The corpus DB is generated, not committed -- run: pnpm generate:m1-db' >&2; exit 1; }",

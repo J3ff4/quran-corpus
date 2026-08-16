@@ -1,4 +1,3 @@
-/// <reference lib="dom" />
 import React from 'react';
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';

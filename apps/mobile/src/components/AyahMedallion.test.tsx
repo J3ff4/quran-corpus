@@ -1,8 +1,9 @@
-/// <reference lib="dom" />
 import React from 'react';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AyahMedallion } from './AyahMedallion';
+import { ThemeContext } from '@/theme/themeContext';
+import { themeColors } from '@/theme/tokens';
 
 vi.mock('react-native', async () => {
   const React = await import('react');
@@ -19,7 +20,11 @@ vi.mock('react-native', async () => {
         children,
       );
 
-  return { Text: host('span'), View: host('div') };
+  return {
+    Text: host('span'),
+    View: host('div'),
+    useWindowDimensions: () => ({ width: 400, height: 800, scale: 2, fontScale: 1 }),
+  };
 });
 
 vi.mock('react-native-svg', async () => {
@@ -57,5 +62,20 @@ describe('AyahMedallion', () => {
     // A filled backing plus the stroked outline. One path means the port
     // dropped a layer and the number sits on whatever is behind the card.
     expect(container.querySelectorAll('path')).toHaveLength(2);
+  });
+
+  it('takes its colours from the theme, not a hardcoded hex', () => {
+    const { container } = render(
+      <ThemeContext.Provider value={themeColors.dark}>
+        <AyahMedallion n={1} />
+      </ThemeContext.Provider>,
+    );
+
+    const paths = container.querySelectorAll('path');
+    // Backing layer first, outline second -- matches render order in
+    // AyahMedallion.tsx. A hardcoded hex here would render fine in light mode
+    // and produce a cream blob on a near-black background in dark mode.
+    expect(paths[0]?.getAttribute('fill')).toBe(themeColors.dark.surface);
+    expect(paths[1]?.getAttribute('stroke')).toBe(themeColors.dark.mutedText);
   });
 });
