@@ -2022,11 +2022,11 @@ git commit -m "feat(mobile): add the minimal root screen"
 
 **Page size:** 10 ayahs. Al-Baqarah's densest ten run to roughly 400 words; a whole-surah load is 6,116 and is what `corpusRepository.ts:88` retired.
 
-- [ ] **Step 1: Add UI strings and the two icons**
+- [x] **Step 1: Add UI strings and the two icons**
 
 `wbw.title`, `wbw.previous`, `wbw.next`, `wbw.jumpToAyah`, `wbw.rangeLabel`, `tabs.morphology`, `morphology.noHistory` in en/uz/ru. Add `'words'` and `'root'` to `IconName` in `Icon.tsx` with paths drawn in the same style as the existing four.
 
-- [ ] **Step 2: Write the failing `VersePicker` tests**
+- [x] **Step 2: Write the failing `VersePicker` tests**
 
 ```tsx
 describe('VersePicker', () => {
@@ -2063,7 +2063,7 @@ describe('VersePicker', () => {
 });
 ```
 
-- [ ] **Step 3: Write the failing `WbwGrid` tests**
+- [x] **Step 3: Write the failing `WbwGrid` tests**
 
 ```tsx
 describe('WbwGrid', () => {
@@ -2103,22 +2103,22 @@ describe('WbwGrid', () => {
 });
 ```
 
-- [ ] **Step 4: Implement both, run, verify**
+- [x] **Step 4: Implement both, run, verify**
 
 `WbwGrid` uses `flexDirection: 'row-reverse'`, `flexWrap: 'wrap'` for RTL cell order. Per D6 this is the grid surface, so losing native line breaking is the intended trade.
 
 Run: `pnpm --filter mobile test -- Wbw VersePicker`
 Expected: PASS, 10 tests.
 
-- [ ] **Step 5: Mutation-check**
+- [x] **Step 5: Mutation-check**
 
 In `WbwGrid`, pass the whole `page.segments` map to every cell instead of `page.segments.get(word.id)`. "gives each cell its own segments" must fail. Restore. In `VersePicker`, change the clamp to `from + 9`; "clamps the final page" must fail. Restore.
 
-- [ ] **Step 6: Build the WbW route**
+- [x] **Step 6: Build the WbW route**
 
 `apps/mobile/app/surah/[surahId]/words.tsx` — validate `surahId` with the shared `parseSurahId`, read an optional `?from=` param, default to ayah 1, render `VersePicker` above a `FlatList` of `WbwGrid` pages, open `WordSheet` on cell press.
 
-- [ ] **Step 7: Add the reader's entry control**
+- [x] **Step 7: Add the reader's entry control**
 
 Add a `words` icon button to `SurahReader`'s existing `ListHeaderComponent` row, `minHeight: touchTargets.minimum`, pushing `/surah/[surahId]/words`.
 
@@ -2130,7 +2130,7 @@ Add a `words` icon button to `SurahReader`'s existing `ListHeaderComponent` row,
 // runs headerShown: false for every route.
 ```
 
-- [ ] **Step 8: Add the fifth tab**
+- [x] **Step 8: Add the fifth tab**
 
 `apps/mobile/app/(tabs)/morphology.tsx` reads `getLastReadingPosition` through the existing `useUserDbOnFocus` and redirects to that surah's WbW screen; with no history it shows `morphology.noHistory` and a link to the surah list. Register it in `_layout.tsx` between `bookmarks` and `settings`.
 
@@ -2147,7 +2147,7 @@ it('offers the surah list when there is no history', async () => {
 });
 ```
 
-- [ ] **Step 9: Full suite, lint, type-check, commit**
+- [x] **Step 9: Full suite, lint, type-check, commit**
 
 ```bash
 pnpm --filter mobile lint && pnpm --filter mobile type-check && pnpm --filter mobile test
