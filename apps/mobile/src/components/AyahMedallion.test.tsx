@@ -10,19 +10,7 @@ import { ThemeContext } from '@/theme/themeContext';
 import { themeColors } from '@/theme/tokens';
 
 vi.mock('react-native', async () => {
-  const React = await import('react');
-  const host =
-    (tag: string) =>
-    ({ accessibilityLabel, accessibilityRole, children, ...props }: {
-      accessibilityLabel?: string;
-      accessibilityRole?: string;
-      children?: React.ReactNode;
-    }) =>
-      React.createElement(
-        tag,
-        { ...props, 'aria-label': accessibilityLabel, role: accessibilityRole },
-        children,
-      );
+  const { host } = await import('@/testing/rnHosts.js');
 
   return {
     Text: host('span'),
