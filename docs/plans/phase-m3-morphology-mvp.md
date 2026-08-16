@@ -1627,7 +1627,7 @@ animation degrades to a 150ms fade under the system reduce-motion setting."
   }): JSX.Element;
   ```
 
-- [ ] **Step 1: Write the failing tests for `AyahText`**
+- [x] **Step 1: Write the failing tests for `AyahText`**
 
 ```tsx
 describe('AyahText', () => {
@@ -1701,7 +1701,7 @@ describe('AyahText', () => {
 });
 ```
 
-- [ ] **Step 2: Run and verify they fail, then implement `AyahText`**
+- [x] **Step 2: Run and verify they fail, then implement `AyahText`**
 
 ```tsx
 export function AyahText({ textUthmani, words, surahId, ayahNumber, onWordPress }: AyahTextProps) {
@@ -1760,11 +1760,11 @@ export function AyahText({ textUthmani, words, surahId, ayahNumber, onWordPress 
 Run: `pnpm --filter mobile test -- AyahText`
 Expected: PASS, 7 tests.
 
-- [ ] **Step 3: Mutation-check**
+- [x] **Step 3: Mutation-check**
 
 Change `words[token.wordIndex]` to `words[index]`. "passes the word the token maps to" must fail. Restore. Then change the `if (!tokens)` fallback to render the joined word text; "keeps the waqf pause marks visible" must fail. Restore.
 
-- [ ] **Step 4: Swap `AyahCard`'s `<Text>` for `AyahText`**
+- [x] **Step 4: Swap `AyahCard`'s `<Text>` for `AyahText`**
 
 `AyahCard` gains `words: Word[]`, `surahId: number`, `onWordPress: (word: Word) => void` and passes them through. Its existing tests stay green — add one:
 
@@ -1777,7 +1777,7 @@ it('still renders the Arabic when the reader has no words for the ayah', () => {
 });
 ```
 
-- [ ] **Step 5: Load words per visible ayah in `SurahReader`**
+- [x] **Step 5: Load words per visible ayah in `SurahReader`**
 
 `SurahReader` already tracks viewability via `onViewableItemsChanged` for reading-position recording. Extend that handler to fetch words for each newly viewable ayah plus a lookahead, cached in a `Map<number, Word[]>` state keyed by `ayah.id`.
 
@@ -1808,11 +1808,11 @@ it('does not refetch an ayah it already has', async () => {
 });
 ```
 
-- [ ] **Step 6: Mount the sheet in `SurahReader`**
+- [x] **Step 6: Mount the sheet in `SurahReader`**
 
 `SurahReader` holds `const [openWord, setOpenWord] = useState<WordSummary | null>(null)`, calls `getWordSummary` on press, and renders `<WordSheet>` as a sibling of the `FlatList`. `onOpenDetail` and `onOpenRoot` push the Task 10 and Task 11 routes via `expo-router`.
 
-- [ ] **Step 7: Lint, type-check, full suite, commit**
+- [x] **Step 7: Lint, type-check, full suite, commit**
 
 ```bash
 pnpm --filter mobile lint && pnpm --filter mobile type-check && pnpm --filter mobile test
