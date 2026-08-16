@@ -27,6 +27,10 @@ export type UiStringKey =
   | 'word.root'
   | 'word.noGloss'
   | 'word.close'
+  | 'word.segments'
+  | 'word.grammar'
+  | 'word.notFound'
+  | 'word.transliteration'
   | 'surahList.ayahsSuffix'
   | 'surahList.loadFailed'
   | 'settings.language'
@@ -75,6 +79,10 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'word.root': 'Root',
     'word.noGloss': 'No translation for this word',
     'word.close': 'Close',
+    'word.segments': 'Segments',
+    'word.grammar': 'Grammar',
+    'word.notFound': 'That word is not in the corpus',
+    'word.transliteration': 'Transliteration',
     'surahList.ayahsSuffix': 'ayahs',
     'surahList.loadFailed': 'Unable to load surahs',
     'settings.language': 'Language',
@@ -122,6 +130,10 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'word.root': 'O‘zak',
     'word.noGloss': 'Bu so‘z uchun tarjima yo‘q',
     'word.close': 'Yopish',
+    'word.segments': 'Bo‘laklar',
+    'word.grammar': 'Grammatika',
+    'word.notFound': 'Bu so‘z korpusda yo‘q',
+    'word.transliteration': 'Transliteratsiya',
     'surahList.ayahsSuffix': 'oyat',
     'surahList.loadFailed': 'Suralarni yuklab bo‘lmadi',
     'settings.language': 'Til',
@@ -169,6 +181,10 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'word.root': 'Корень',
     'word.noGloss': 'Нет перевода для этого слова',
     'word.close': 'Закрыть',
+    'word.segments': 'Сегменты',
+    'word.grammar': 'Грамматика',
+    'word.notFound': 'Этого слова нет в корпусе',
+    'word.transliteration': 'Транслитерация',
     'surahList.ayahsSuffix': 'аятов',
     'surahList.loadFailed': 'Не удалось загрузить суры',
     'settings.language': 'Язык',

@@ -15,6 +15,7 @@ import {
 } from '@/data/corpusRepository';
 import { createLatestReadingPositionRecorder } from '@/data/latestReadingPositionRecorder';
 import { openCorpusDb } from '@/data/openCorpusDb';
+import { parseAyahNumber, parseSurahId } from '@/data/routeParams';
 import { openUserDb } from '@/data/userDb';
 import { getBookmarks, recordReadingPosition, setBookmark } from '@/data/userRepository';
 import { t } from '@/i18n/uiStrings';
@@ -23,24 +24,6 @@ import { useThemeColors } from '@/theme/themeContext';
 
 function errorTextStyle(danger: string) {
   return { color: danger, padding: 20 };
-}
-
-function parseSurahId(value: string | string[] | undefined): number | null {
-  const raw = Array.isArray(value) ? value[0] : value;
-  if (!raw) return null;
-  const parsed = Number(raw);
-  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 114) return null;
-  return parsed;
-}
-
-// 286 is al-Baqarah, the longest surah; a row that does not exist in this
-// surah simply resolves to no index and the reader opens at the top.
-function parseAyahNumber(value: string | string[] | undefined): number | null {
-  const raw = Array.isArray(value) ? value[0] : value;
-  if (!raw) return null;
-  const parsed = Number(raw);
-  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 286) return null;
-  return parsed;
 }
 
 export default function SurahRoute() {

@@ -31,6 +31,7 @@ interface HostProps {
   // a non-boolean-attribute warning for `accessible` and pointerEvents, on
   // every render.
   accessible?: unknown;
+  contentContainerStyle?: unknown;
   onLayout?: unknown;
   pointerEvents?: unknown;
 }
@@ -52,6 +53,7 @@ export function host(tag: string) {
     style,
     testID,
     accessible: _accessible,
+    contentContainerStyle: _contentContainerStyle,
     onLayout: _onLayout,
     pointerEvents: _pointerEvents,
     ...props
