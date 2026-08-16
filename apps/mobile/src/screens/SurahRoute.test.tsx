@@ -21,7 +21,7 @@ vi.mock('@quran-corpus/mobile-data', () => ({
 
 vi.mock('@/audio/ayahAudio', () => ({
   useAyahAudioController: () => ({
-    audioEnabled: false,
+    audioEnabled: true,
     audioError: null,
     playingAyah: null,
     toggleAyah: vi.fn(),

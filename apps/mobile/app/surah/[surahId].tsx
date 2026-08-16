@@ -198,7 +198,7 @@ export default function SurahRoute() {
       ) : null}
       {audio.audioError ? (
         <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={errorTextStyle(theme.danger)}>
-          {audio.audioError}
+          {t(uiLocale, audio.audioError)}
         </Text>
       ) : null}
     </View>

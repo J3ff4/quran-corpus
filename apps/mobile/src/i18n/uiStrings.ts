@@ -15,6 +15,7 @@ export type UiStringKey =
   | 'reader.invalidSurah'
   | 'reader.bookmarkFailed'
   | 'reader.positionFailed'
+  | 'reader.audioFailed'
   | 'reader.translation'
   | 'reader.bookmark'
   | 'reader.removeBookmark'
@@ -57,6 +58,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.invalidSurah': 'That surah does not exist',
     'reader.bookmarkFailed': 'Unable to update bookmark',
     'reader.positionFailed': 'Unable to save reading position',
+    'reader.audioFailed': 'Unable to play audio',
     'reader.translation': 'Translation',
     'reader.bookmark': 'Bookmark',
     'reader.removeBookmark': 'Remove bookmark',
@@ -98,6 +100,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.invalidSurah': 'Bunday sura yo‘q',
     'reader.bookmarkFailed': 'Xatcho‘pni yangilab bo‘lmadi',
     'reader.positionFailed': 'O‘qish joyini saqlab bo‘lmadi',
+    'reader.audioFailed': 'Audioni ijro etib bo‘lmadi',
     'reader.translation': 'Tarjima',
     'reader.bookmark': 'Xatcho‘p',
     'reader.removeBookmark': 'Xatcho‘pni olib tashlash',
@@ -139,6 +142,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.invalidSurah': 'Такой суры не существует',
     'reader.bookmarkFailed': 'Не удалось обновить закладку',
     'reader.positionFailed': 'Не удалось сохранить позицию чтения',
+    'reader.audioFailed': 'Не удалось воспроизвести аудио',
     'reader.translation': 'Перевод',
     'reader.bookmark': 'Закладка',
     'reader.removeBookmark': 'Удалить закладку',
