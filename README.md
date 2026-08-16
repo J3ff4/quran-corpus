@@ -40,6 +40,38 @@ pnpm android
 13. Turn network on and confirm ayah audio plays.
 14. Turn network off again and confirm the reader still works and a Play tap reports that audio is unavailable rather than sitting on Pause.
 
+## M3 Morphology Smoke Test
+
+Run on a physical Android device, on a `preview` profile APK. Confirm the EAS
+upload is ~43 MB — a ~5 MB upload means `.easignore` dropped the bundled DB
+and every check below will fail for the wrong reason.
+
+1. Open al-Baqarah. Confirm the pause marks (`ۚ ۗ ۖ`) are still visible in
+   2:255 — the reader now tokenizes the text and this is what tokenizing the
+   word rows instead would have deleted.
+2. Open al-Alaq (96). Confirm the basmala still prefixes ayah 1.
+3. Open 2:44. Confirm the `۞` marker still leads the ayah.
+4. Tap a word. The sheet springs up from the bottom.
+5. Drag the sheet halfway down and let go — it springs back. Drag it past
+   halfway — it dismisses.
+6. Tap the backdrop — it dismisses. Press Android back — it dismisses.
+7. Scroll the reader with the sheet open. The scroll must not fight the drag.
+8. Settings → Accessibility → Remove animations, **on**. Reopen the sheet: it
+   fades, does not slide, and does not drag. Turn it back off without
+   restarting the app; the slide returns.
+9. Sheet → Full analysis. Segment pills are coloured and legible.
+10. Sheet → root link. The root screen shows Arabic, forms and a definition.
+11. Tap a word with no root (a pronoun, e.g. 2:255 هُوَ). Confirm there is
+    **no** root link rather than a dead one.
+12. Reader header → word-by-word. Page forward to the last page of al-Baqarah;
+    confirm it ends at 286 and Next is disabled.
+13. Morphology tab. Confirm it opens the WbW screen at your last-read position.
+14. Repeat 4, 9 and 12 in dark mode. Every POS colour must be legible on the
+    warm near-black background.
+15. System font size at maximum: repeat 4 and 12. Nothing clips; the sheet
+    still scrolls to its actions.
+16. Airplane mode: repeat 1, 4 and 12. All of it is local.
+
 ## Current Status
 
 M1 is in progress on an isolated branch. M0 contains an Expo Android app scaffold with a bundled SQLite fixture DB, Hafs font loading, English/Uzbek/Russian translation switching, word detail interaction, and a thin audio endpoint contract for streamed ayah recitation. Android emulator/device smoke verification remains pending.

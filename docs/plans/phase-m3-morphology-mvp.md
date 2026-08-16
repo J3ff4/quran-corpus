@@ -2166,7 +2166,7 @@ git commit -m "feat(mobile): add the word-by-word screen, reader control and mor
 
 **Interfaces:** consumes everything. Produces the §10 exit criterion.
 
-- [ ] **Step 1: Add the checklist to `README.md`**
+- [x] **Step 1: Add the checklist to `README.md`**
 
 Append after the M1 Android Smoke Test:
 
