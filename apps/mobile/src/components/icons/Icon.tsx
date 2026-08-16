@@ -1,13 +1,13 @@
 import type { ColorValue } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
-export type IconName = 'home' | 'book' | 'bookmark' | 'settings' | 'menu';
+export type IconName = 'home' | 'book' | 'bookmark' | 'settings';
 
 /**
  * Path data ported verbatim from web so the two products draw one glyph set:
- * home / book / menu from apps/web/src/components/shell/BottomNav.tsx,
- * bookmark from DrawerMenu.tsx. `settings` has no web counterpart -- the web
- * drawer has no settings entry -- so it is drawn here.
+ * home / book from apps/web/src/components/shell/BottomNav.tsx, bookmark from
+ * DrawerMenu.tsx. `settings` has no web counterpart -- the web drawer has no
+ * settings entry -- so it is drawn here.
  *
  * RN has no currentColor, so the stroke arrives as a prop from the theme.
  */
@@ -22,7 +22,6 @@ const PATHS: Record<IconName, string[]> = {
     'M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z',
     'M19.4 13a7.6 7.6 0 0 0 0-2l2-1.5-2-3.4-2.3 1a7.6 7.6 0 0 0-1.7-1l-.4-2.6h-4l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.3-1-2 3.4 2 1.5a7.6 7.6 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7.6 7.6 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.6 7.6 0 0 0 1.7-1l2.3 1 2-3.4z',
   ],
-  menu: ['M4 6h16M4 12h16M4 18h16'],
 };
 
 export function Icon({

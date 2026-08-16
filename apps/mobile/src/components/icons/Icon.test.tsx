@@ -1,15 +1,7 @@
 import React from 'react';
 import { cleanup, render } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { Icon } from './Icon';
-
-vi.mock('react-native-svg', async () => {
-  const React = await import('react');
-  const Svg = ({ children, ...props }: { children?: React.ReactNode }) =>
-    React.createElement('svg', props, children);
-  const Path = (props: { d: string }) => React.createElement('path', props);
-  return { default: Svg, Svg, Path };
-});
 
 describe('Icon', () => {
   afterEach(cleanup);
@@ -31,7 +23,7 @@ describe('Icon', () => {
   });
 
   it('has a glyph for every tab', () => {
-    for (const name of ['home', 'book', 'bookmark', 'settings', 'menu'] as const) {
+    for (const name of ['home', 'book', 'bookmark', 'settings'] as const) {
       const { container } = render(<Icon name={name} color="#000000" />);
       expect(container.querySelectorAll('path').length).toBeGreaterThan(0);
       cleanup();
