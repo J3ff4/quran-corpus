@@ -1526,6 +1526,44 @@ git commit -m "docs: add M1 verification checklist"
 
 ---
 
+---
+
+## Verification Log (on-device)
+
+CLAUDE.md section 10: no emulator in CI, so the gate is the README smoke
+checklist run on real hardware, recorded here.
+
+### Run 1 — 2026-08-15, EAS build `e1bd299a` at commit `a5337d7` (preview APK, physical Android)
+
+| Check | Result |
+| --- | --- |
+| App launches, no `execSync` rejection | PASS (WAL seal held) |
+| Arabic renders | PASS |
+| All translations render | PASS |
+| Bookmark survives app restart | PASS |
+| Open a surah from Surahs tab | **FAIL** — "Unable to load surah", and the Surahs tab then showed the same error until restart |
+| Ayah audio | **FAIL** — Play inert in every build |
+
+Both failures were diagnosed off-device: the reader fetched all 6116 words of
+al-Baqarah that no screen reads, the corpus handle was re-opened per screen,
+and `audioEnabled` was `Boolean(baseUrl)` with that env var set nowhere and no
+endpoint deployed. Fixes: `036e6cb`, `f9bf83e`, `280cfbd`, `477ef63`, plus
+`280cfbd` logging the driver error the catch blocks had been discarding.
+
+### Run 2 — 2026-08-16, EAS build `c8a534b8` at commit `477ef63`
+
+| Check | Result |
+| --- | --- |
+| Open a surah from Surahs tab | PASS |
+| Surahs tab stays usable afterwards | PASS |
+| Bookmark | PASS |
+| Ayah audio plays | PASS |
+
+Not yet exercised on device: airplane-mode reader (checklist 10 and 14) and
+locale switching (checklist 12). Commits `b353f3d`, `082decd` and `8209afd`
+(playback-failure reporting, localized audio error, credits attribution) landed
+after this build and are covered by tests only.
+
 ## Self-Review Checklist
 
 - Spec coverage: M1 PRD scope is covered by tasks for surah list, reader, translations, bookmarks, history, theme/settings, credits, audio, telemetry, and smoke verification.
