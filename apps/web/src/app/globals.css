@@ -24,7 +24,7 @@
   --pos-verb: #ab392c; /* 5.90 / 4.61:1 */
   --pos-prep: #0c6e55; /* 5.86 / 4.65:1 */
   --pos-pron: #86580f; /* 5.79 / 4.61:1 */
-  --pos-other: #555; /* 7.02 / 5.55:1 */
+  --pos-other: #555555; /* 7.02 / 5.55:1 */
 
   /* Dictionary derived-form category color-coding. Separate taxonomy from
      --pos-* (dictionary derived forms, not sentence-position POS tags) --
@@ -50,7 +50,7 @@
   --form-passive-participle: #914a6f; /* 5.80 / 4.62:1 */
   --form-noun: #2161b2; /* 5.79 / 4.60:1 */
   --form-adjective: #84590b; /* 5.79 / 4.64:1 */
-  --form-other: #555; /* 7.02 / 5.55:1 */
+  --form-other: #555555; /* 7.02 / 5.55:1 */
 
   /* The built-in CSS easings are too weak to read as intentional. Strong
      ease-out for anything entering or expanding -- it moves immediately, which
@@ -66,7 +66,7 @@
   --pos-verb: #ff9a8f;
   --pos-prep: #6fd9b8;
   --pos-pron: #e0b877;
-  --pos-other: #aaa;
+  --pos-other: #aaaaaa;
 
   --form-verb: #ff9a8f;
   --form-verbal-noun: #c3b0e8;
@@ -74,7 +74,7 @@
   --form-passive-participle: #e0a8c8;
   --form-noun: #7fb0ff;
   --form-adjective: #e8c477;
-  --form-other: #aaa;
+  --form-other: #aaaaaa;
 }
 
 [dir='rtl'] {

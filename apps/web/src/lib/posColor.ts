@@ -1,24 +1,12 @@
-const NOUN = new Set(['N', 'PN', 'ADJ']);
+import { posBucket } from '@quran-corpus/data/client';
 
 /**
- * Maps a POS tag to a theme-aware CSS color reference (a `var(--pos-*)`), or
- * null for "no color" (render as plain default text). corpus.quran.com's own
- * wordbyword.jsp doesn't surface DET as a distinct grammatical category (an
- * assimilated determiner prefix is folded into its preposition's label), so
- * it gets no color here either rather than sharing the muted --pos-other
- * bucket with NEG/REM/CONJ/etc.
+ * Maps a POS tag to a theme-aware CSS variable reference, or null for "no
+ * colour" (render as plain default text). The tag→bucket decision lives in
+ * packages/data/src/morphology/buckets.ts so mobile can share it; this file is
+ * only the web half, bucket→var().
  */
 export function posColor(posTag: string | null): string | null {
-  if (posTag === 'DET') return null;
-  if (posTag && NOUN.has(posTag)) return 'var(--pos-noun)';
-  switch (posTag) {
-    case 'V':
-      return 'var(--pos-verb)';
-    case 'P':
-      return 'var(--pos-prep)';
-    case 'PRON':
-      return 'var(--pos-pron)';
-    default:
-      return 'var(--pos-other)';
-  }
+  const bucket = posBucket(posTag);
+  return bucket ? `var(--pos-${bucket})` : null;
 }
