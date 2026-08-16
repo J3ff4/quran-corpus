@@ -1464,7 +1464,7 @@ git commit -m "feat(mobile): add the segment pill and the reduced-motion hook"
 | Dismiss | backdrop tap, Android back, drag past 25% of sheet height **or** velocity > 500 |
 | Reduced motion | opacity-only fade, `withTiming(150)`, no translate, drag disabled |
 
-- [ ] **Step 1: Add the UI strings**
+- [x] **Step 1: Add the UI strings**
 
 In `apps/mobile/src/i18n/uiStrings.ts`, add to the key union and all three locale maps:
 
@@ -1484,7 +1484,7 @@ In `apps/mobile/src/i18n/uiStrings.ts`, add to the key union and all three local
 
 `uiStrings.test.ts` already asserts every locale covers every key — it will fail until all three are filled in. That is the point; do not add the key to `en` alone.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Create `apps/mobile/src/components/WordSheet.test.tsx`. Mock `react-native-reanimated` with its documented jest mock and `react-native-gesture-handler` with pass-through hosts; assert behaviour, not animation frames.
 
@@ -1566,12 +1566,12 @@ describe('WordSheet', () => {
 });
 ```
 
-- [ ] **Step 3: Run and verify they fail**
+- [x] **Step 3: Run and verify they fail**
 
 Run: `pnpm --filter mobile test -- WordSheet`
 Expected: FAIL — module not found.
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 Build `WordSheet.tsx` to the motion spec table above. Structure, in order:
 
@@ -1582,16 +1582,16 @@ Build `WordSheet.tsx` to the motion spec table above. Structure, in order:
 5. `BackHandler.addEventListener('hardwareBackPress', ...)` returning `true` while open, removed on close.
 6. `Gesture.Pan()` updating a `translateY` shared value, `onEnd` deciding dismiss vs spring-back against the thresholds in the table. Disabled entirely when `useReducedMotion()` is true.
 
-- [ ] **Step 5: Run and verify they pass**
+- [x] **Step 5: Run and verify they pass**
 
 Run: `pnpm --filter mobile test -- WordSheet`
 Expected: PASS, 11 tests.
 
-- [ ] **Step 6: Mutation-check**
+- [x] **Step 6: Mutation-check**
 
 Nest the sheet inside the backdrop view. "does not close when the sheet body itself is pressed" must fail. Restore. Then remove the `root === null` guard; "omits the root link entirely" must fail. Restore.
 
-- [ ] **Step 7: Lint, type-check, commit**
+- [x] **Step 7: Lint, type-check, commit**
 
 ```bash
 pnpm --filter mobile lint && pnpm --filter mobile type-check && pnpm --filter mobile test
