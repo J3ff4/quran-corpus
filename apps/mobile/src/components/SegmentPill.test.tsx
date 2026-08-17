@@ -93,6 +93,14 @@ describe('SegmentPill', () => {
     expect(screen.getByText('ٱل')).toBeTruthy();
   });
 
+  it('tints the segment Arabic, not only its label', () => {
+    render(<SegmentPill segment={segment({ pos_tag: 'V', form_arabic: 'قَالَ' })} />);
+
+    const [arabic, label] = screen.getAllByTestId('segment-pill-text');
+    expect(arabic!.style.color).toBe(rgb(themeColors.light.pos.verb));
+    expect(label!.style.color).toBe(rgb(themeColors.light.pos.verb));
+  });
+
   it('omits the Arabic line rather than rendering an empty one', () => {
     // form_arabic is null on some segments; an empty <Text> leaves a blank
     // row that reads as a rendering bug.

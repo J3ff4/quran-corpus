@@ -2,6 +2,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
+import { SegmentedWord } from '@/components/SegmentedWord';
 import { SegmentPill } from '@/components/SegmentPill';
 import { getWordAtLocation, type WordSummary } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
@@ -86,19 +87,7 @@ export default function WordDetailRoute() {
       <Text accessibilityRole="header" style={{ color: theme.mutedText, fontSize: typography.caption }}>
         {`${t(uiLocale, 'reader.ayahLabel')} ${surahId}:${ayahNumber} · ${position}`}
       </Text>
-      <Text
-        style={{
-          color: theme.text,
-          fontFamily: 'Hafs',
-          fontSize: typography.arabicTitle,
-          textAlign: 'right',
-          // See AyahText: textAlign places the block, writingDirection drives
-          // the bidi resolution inside the Arabic run.
-          writingDirection: 'rtl',
-        }}
-      >
-        {word.text_arabic}
-      </Text>
+      <SegmentedWord word={word} segments={segments} fontSize={typography.arabicTitle} />
       {word.transliteration ? (
         // Labelled rather than captioned: a caption between the Arabic and its
         // transliteration breaks the pairing visually, but unlabelled the line

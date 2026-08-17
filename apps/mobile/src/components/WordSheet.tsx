@@ -16,6 +16,7 @@ import { t } from '@/i18n/uiStrings';
 import { useReducedMotion } from '@/motion/useReducedMotion';
 import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
+import { SegmentedWord } from './SegmentedWord';
 import { SegmentPill } from './SegmentPill';
 
 // NOT web's WordPopover spring any more. Owner ruling 2026-08-16, after the M3
@@ -190,19 +191,7 @@ export function WordSheet({ summary, uiLocale, onClose, onOpenDetail, onOpenRoot
               marginBottom: 20,
             }}
           />
-          <Text
-            style={{
-              color: theme.text,
-              fontFamily: 'Hafs',
-              fontSize: typography.arabicTitle,
-              textAlign: 'right',
-              // See AyahText: textAlign places the block, writingDirection
-              // drives the bidi resolution inside the Arabic run.
-              writingDirection: 'rtl',
-            }}
-          >
-            {word.text_arabic}
-          </Text>
+          <SegmentedWord word={word} segments={segments} fontSize={typography.arabicTitle} />
           <Text
             style={{ color: gloss ? theme.text : theme.mutedText, fontSize: typography.body }}
           >

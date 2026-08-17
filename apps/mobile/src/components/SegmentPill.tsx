@@ -43,8 +43,9 @@ export function SegmentPill({ segment }: SegmentPillProps) {
     >
       {segment.form_arabic ? (
         <Text
+          testID="segment-pill-text"
           style={{
-            color: theme.text,
+            color: labelColor,
             fontFamily: 'Hafs',
             fontSize: typography.body,
             writingDirection: 'rtl',
@@ -53,7 +54,7 @@ export function SegmentPill({ segment }: SegmentPillProps) {
           {segment.form_arabic}
         </Text>
       ) : null}
-      <Text style={{ color: labelColor, fontSize: typography.caption }}>
+      <Text testID="segment-pill-text" style={{ color: labelColor, fontSize: typography.caption }}>
         {decodeSegment(segment).pos.en}
       </Text>
     </View>
