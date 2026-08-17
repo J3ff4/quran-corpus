@@ -90,9 +90,23 @@ and every check below will fail for the wrong reason.
 22. Settings → Arabic size → Small, then Extra large. The reader Arabic, the
     basmala banner, the sheet hero and the root screen all change; the UI text
     does not.
+23. Reader header. Tap the globe. The language sheet slides up; pick a different
+    language and it closes on its own, with the translations underneath already
+    changed. Reopen it: backdrop tap dismisses, Android back dismisses, drag
+    down past a quarter dismisses.
+24. There is no fixed language pill row above ayah 1 any more. The first ayah
+    sits directly under the surah heading.
+25. Scroll down until the big surah heading leaves the screen. The surah name
+    appears in the header bar. Scroll back to the top: it goes away again. Repeat
+    at maximum system font size — the name must appear later, not at the top.
+26. Settings → **Reduce animations: on**. Open the language sheet: it fades, does
+    not slide, and does not drag.
+27. Settings → Language → Русский, then open any surah other than 1 and 9. With
+    TalkBack on, focus the basmala banner: it is announced in Russian, not as
+    "Bismillah".
 
 ## Current Status
 
 M0-M2 are complete. M3 (morphology) is implemented on `feat/m3-morphology`: an offline reader over a bundled SQLite DB, per-segment coloured word morphology behind a bottom sheet, word-detail and root screens, a word-by-word grid, and Hafs font loading with English/Uzbek/Russian translations. M3b then fixed the defects found on the first two device runs — sheet spring, basmala placement, navigation headers, the word-by-word screen's chrome, a four-step Arabic size setting and an in-app reduce-animations switch.
 
-CI has no Android emulator, so the M3 smoke checklist above is the only gate this app has. Run 1 of that checklist passed all 22 checks on the owner's device on 2026-08-17; the results, the one finding (the word sheet's spring, removed in `3ad1086` and awaiting a device re-check) and the still-open M2 rosette carry-over are in the Verification Log of `docs/plans/phase-m3-morphology-mvp.md`.
+CI has no Android emulator, so the M3 smoke checklist above is the only gate this app has. Run 1 passed all 22 checks on 2026-08-17 with one finding (the word sheet's spring). M3c then removed that spring, collapsed the reader's fixed language band into a header sheet, put the surah name in the header on scroll, and localised the basmala label. Run 2 must clear all 27 checks plus the M2 rosette carry-over; results go in the Verification Log of `docs/plans/phase-m3-morphology-mvp.md`.

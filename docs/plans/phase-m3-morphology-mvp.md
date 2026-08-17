@@ -2300,6 +2300,46 @@ Tasks 7 and 8 of the M3b plan, which write the on-device user DB. The owner
 waived it on 2026-08-17. That is the third such override and it is recorded here
 rather than left implicit; the code it covers is commits `37ae2d7` and `a137e9f`.
 
+### Run 2 — pending
+
+Carries two re-checks: **check 4** closes F4 (the sheet spring, rejected on Run
+1 and removed in `3ad1086`), and the **M2 carry-over** closes M2's Run 2 (fix
+`b795975`, an ancestor of this build).
+
+| # | Check | Result |
+| --- | --- | --- |
+| 1 | Pause marks still visible in 2:255 | unexercised |
+| 2 | Basmala still prefixes ayah 1 of al-Alaq (96) | unexercised |
+| 3 | `۞` marker still leads 2:44 | unexercised |
+| 4 | Word tap springs the sheet up from the bottom | unexercised |
+| 5 | Sheet drag: halfway springs back, past halfway dismisses | unexercised |
+| 6 | Backdrop tap and Android back both dismiss the sheet | unexercised |
+| 7 | Reader scroll does not fight the sheet drag | unexercised |
+| 8 | Reduce animations — in-app switch, both directions, then the OS setting | unexercised |
+| 9 | Full analysis: segment pills coloured and legible | unexercised |
+| 10 | Root screen shows Arabic, forms and a definition | unexercised |
+| 11 | Rootless word (2:255 هُوَ) shows no root link | unexercised |
+| 12 | Word-by-word pages to 286 and disables Next | unexercised |
+| 13 | Morphology tab opens WbW at the last-read position | unexercised |
+| 14 | Checks 4, 9, 12 in dark mode — every POS colour legible | unexercised |
+| 15 | System font size at maximum: checks 4 and 12, nothing clips | unexercised |
+| 16 | Airplane mode: checks 1, 4, 12 all local | unexercised |
+| 17 | Basmala is its own banner above ayah 1, not also inside it | unexercised |
+| 18 | al-Fatiha basmala once as ayah 1; at-Tawba none | unexercised |
+| 19 | Header back returns to reader; Android back to the surah list | unexercised |
+| 20 | Morphology tab keeps the tab bar, one header bar, back exits | unexercised |
+| 21 | Multi-segment word coloured per segment, joined with no gaps | unexercised |
+| 22 | Arabic size Small and Extra large move the Arabic, not the UI | unexercised |
+| 23 | Reader header. Tap the globe. The language sheet slides up; pick a different language and it closes on its own, with the translations underneath already changed. Reopen it: backdrop tap dismisses, Android back dismisses, drag down past a quarter dismisses. | unexercised |
+| 24 | There is no fixed language pill row above ayah 1 any more. The first ayah sits directly under the surah heading. | unexercised |
+| 25 | Scroll down until the big surah heading leaves the screen. The surah name appears in the header bar. Scroll back to the top: it goes away again. Repeat at maximum system font size — the name must appear later, not at the top. | unexercised |
+| 26 | Settings → **Reduce animations: on**. Open the language sheet: it fades, does not slide, and does not drag. | unexercised |
+| 27 | Settings → Language → Русский, then open any surah other than 1 and 9. With TalkBack on, focus the basmala banner: it is announced in Russian, not as "Bismillah". | unexercised |
+
+| Carry-over | Result |
+| --- | --- |
+| M2 Run 2 — three-digit ayah number inside the rosette at max font size | unexercised |
+
 ---
 
 ## Risks
