@@ -98,7 +98,10 @@ describe('AyahText', () => {
     expect(onWordPress).toHaveBeenCalledWith(expect.objectContaining({ position: 1 }));
   });
 
-  it('renders the basmala prefix as text with no tap target', () => {
+  it('renders the basmala prefix as a banner above the card, not in the run', () => {
+    // 96:1 is prefixed with the basmala; it's rendered separately by
+    // Bismillah above AyahCard, so the run starts at the ayah's own first
+    // word.
     render(
       <AyahText
         textUthmani={AL_ALAQ_1}
@@ -110,7 +113,28 @@ describe('AyahText', () => {
     );
 
     expect(screen.getAllByTestId('word-token')).toHaveLength(5);
-    expect(screen.getByText(/بِسْمِ/)).toBeTruthy();
+    expect(screen.getByTestId('ayah-run').textContent).toContain('ٱقْرَأْ');
+  });
+
+  it('leaves the basmala prefix out of the ayah run', () => {
+    // 96:1 renders the basmala as a banner above the card now, so keeping it
+    // in the run too would print it twice.
+    render(
+      <AyahText
+        textUthmani={AL_ALAQ_1}
+        words={alAlaq1Words}
+        surahId={96}
+        ayahNumber={1}
+        onWordPress={noop}
+      />,
+    );
+
+    expect(screen.getByTestId('ayah-run').textContent).not.toContain('ٱلرَّحْمَٰنِ');
+    expect(screen.getByTestId('ayah-run').textContent).toContain('ٱقْرَأْ');
+    // The separator before the first *rendered* token has to key off the
+    // preceding token's isBasmala, not just index === 0 -- otherwise the
+    // first real word after four dropped basmala tokens gets a leading space.
+    expect(screen.getByTestId('ayah-run').textContent?.startsWith(' ')).toBe(false);
   });
 
   it('keeps the waqf pause marks visible', () => {

@@ -60,10 +60,15 @@ export function AyahText({ textUthmani, words, surahId, ayahNumber, onWordPress 
     // native Arabic line breaking and justified mushaf flow.
     <Text testID="ayah-run" style={style}>
       {tokens.map((token, index) => {
+        // Rendered as its own banner above the card (see Bismillah), so the
+        // run drops it rather than printing it a second time. Filtered here
+        // and not in the memo so `index` still lines up with the token list
+        // the alignment produced.
+        if (token.isBasmala) return null;
         const word = token.wordIndex === null ? null : words[token.wordIndex];
         // The split dropped the whitespace; without this the ayah renders as
         // one unbroken string.
-        const separator = index === 0 ? '' : ' ';
+        const separator = index === 0 || tokens[index - 1]?.isBasmala ? '' : ' ';
         if (!word) {
           return (
             <Text key={index}>

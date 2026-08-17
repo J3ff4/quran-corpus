@@ -83,6 +83,25 @@ describe('AyahCard', () => {
     expect(onToggleAudio).not.toHaveBeenCalled();
   });
 
+  it('shows the basmala banner above ayah 1 only', () => {
+    const props = {
+      ...baseProps,
+      arabicText: 'Arabic text',
+      translationText: null,
+      bookmarked: false,
+      playing: false,
+      uiLocale: 'en' as const,
+      onToggleBookmark: vi.fn(),
+      onToggleAudio: vi.fn(),
+    };
+
+    const { rerender } = render(<AyahCard {...props} surahId={2} ayahNumber={1} />);
+    expect(screen.getByTestId('bismillah')).toBeTruthy();
+
+    rerender(<AyahCard {...props} surahId={2} ayahNumber={2} />);
+    expect(screen.queryByTestId('bismillah')).toBeNull();
+  });
+
   it('still renders the Arabic when the reader has no words for the ayah', () => {
     // Words load per ayah as the list scrolls; a card that renders nothing
     // until they arrive flickers blank on every scroll.
