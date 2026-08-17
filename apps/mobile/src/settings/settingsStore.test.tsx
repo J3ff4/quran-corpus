@@ -395,6 +395,19 @@ describe('loadPersistedAppSettings', () => {
     expect(settings.arabicScale).toBe('medium');
   });
 
+  it('reads reduceMotion as on only for the exact stored "true"', async () => {
+    // String(false) is 'false', which is truthy. This setting gates every
+    // animation in the app, so a stored off must not read as on.
+    const userClient = requireSettingsClient();
+    await saveSetting(userClient, 'reduceMotion', 'false');
+
+    await expect(loadPersistedAppSettings(userClient)).resolves.toMatchObject({ reduceMotion: false });
+
+    await saveSetting(userClient, 'reduceMotion', 'true');
+
+    await expect(loadPersistedAppSettings(userClient)).resolves.toMatchObject({ reduceMotion: true });
+  });
+
   it('rejects an arabicScale that only names a property of Object.prototype', async () => {
     // `value in arabicScales` would accept this and hand `toString` to the
     // multiply, which is NaN. Object.hasOwn is why it does not.

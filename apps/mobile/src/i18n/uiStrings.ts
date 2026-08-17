@@ -62,6 +62,8 @@ export type UiStringKey =
   | 'settings.arabicSizeMedium'
   | 'settings.arabicSizeLarge'
   | 'settings.arabicSizeXlarge'
+  | 'settings.reduceMotionOn'
+  | 'settings.reduceMotionOff'
   | 'about.title'
   | 'about.credits'
   | 'about.sourceApprovalIncomplete'
@@ -129,6 +131,8 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.arabicSizeMedium': 'Medium',
     'settings.arabicSizeLarge': 'Large',
     'settings.arabicSizeXlarge': 'Extra large',
+    'settings.reduceMotionOn': 'Reduce animations: on',
+    'settings.reduceMotionOff': 'Reduce animations: off',
     'about.title': 'About Quran Corpus',
     'about.credits': 'Credits',
     'about.sourceApprovalIncomplete': 'Source approval incomplete',
@@ -195,6 +199,8 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.arabicSizeMedium': 'O‘rtacha',
     'settings.arabicSizeLarge': 'Katta',
     'settings.arabicSizeXlarge': 'Juda katta',
+    'settings.reduceMotionOn': 'Animatsiyalarni kamaytirish: yoqilgan',
+    'settings.reduceMotionOff': 'Animatsiyalarni kamaytirish: o‘chirilgan',
     'about.title': 'Quran Corpus haqida',
     'about.credits': 'Manbalar',
     'about.sourceApprovalIncomplete': 'Manba tasdig‘i tugallanmagan',
@@ -261,6 +267,8 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.arabicSizeMedium': 'Средний',
     'settings.arabicSizeLarge': 'Крупный',
     'settings.arabicSizeXlarge': 'Очень крупный',
+    'settings.reduceMotionOn': 'Меньше анимации: включено',
+    'settings.reduceMotionOff': 'Меньше анимации: выключено',
     'about.title': 'О Quran Corpus',
     'about.credits': 'Источники',
     'about.sourceApprovalIncomplete': 'Подтверждение источников не завершено',

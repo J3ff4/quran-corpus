@@ -118,6 +118,20 @@ export default function SettingsTab() {
           ))}
         </View>
       </View>
+      {/* In-app because the OS switch has no single path: Pixel puts it under
+          Accessibility, Samsung under Visibility enhancements, and the owner's
+          device exposed neither. This one only ever ADDS reduced motion -- see
+          useReducedMotion. */}
+      <Pressable
+        accessibilityRole="switch"
+        accessibilityState={{ checked: settings.reduceMotion }}
+        onPress={() => settings.setReduceMotion(!settings.reduceMotion)}
+        style={{ minHeight: touchTargets.minimum, justifyContent: 'center' }}
+      >
+        <Text style={{ color: settings.reduceMotion ? theme.accent : theme.mutedText }}>
+          {t(uiLocale, settings.reduceMotion ? 'settings.reduceMotionOn' : 'settings.reduceMotionOff')}
+        </Text>
+      </Pressable>
       <Pressable
         accessibilityRole="switch"
         accessibilityState={{ checked: settings.analyticsEnabled }}

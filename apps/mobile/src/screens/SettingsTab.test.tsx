@@ -5,6 +5,8 @@ import SettingsTab from '../../app/(tabs)/settings';
 
 const mocks = vi.hoisted(() => ({
   setArabicScale: vi.fn(),
+  setReduceMotion: vi.fn(),
+  reduceMotion: false,
 }));
 
 vi.mock('@/settings/settingsStore', () => ({
@@ -14,11 +16,13 @@ vi.mock('@/settings/settingsStore', () => ({
     theme: 'system',
     analyticsEnabled: true,
     arabicScale: 'large',
+    reduceMotion: mocks.reduceMotion,
     setUiLocale: vi.fn(),
     setContentLanguage: vi.fn(),
     setTheme: vi.fn(),
     setAnalyticsEnabled: vi.fn(),
     setArabicScale: mocks.setArabicScale,
+    setReduceMotion: mocks.setReduceMotion,
   }),
 }));
 
@@ -59,6 +63,8 @@ vi.mock('react-native', async () => {
 describe('SettingsTab', () => {
   beforeEach(() => {
     mocks.setArabicScale.mockClear();
+    mocks.setReduceMotion.mockClear();
+    mocks.reduceMotion = false;
   });
 
   afterEach(cleanup);
@@ -81,5 +87,28 @@ describe('SettingsTab', () => {
 
     expect(screen.getByRole('switch', { checked: true })).toBeTruthy();
     expect(screen.getByText('Analytics: On')).toBeTruthy();
+  });
+
+  it('offers reduce animations as its own switch, off by default', () => {
+    render(<SettingsTab />);
+
+    // Two switches on this screen now, so the assertion names this one rather
+    // than taking whichever comes first.
+    expect(screen.getByText('Reduce animations: off')).toBeTruthy();
+
+    fireEvent.click(screen.getByText('Reduce animations: off'));
+
+    expect(mocks.setReduceMotion).toHaveBeenCalledWith(true);
+  });
+
+  it('turns reduce animations back off from the on state', () => {
+    // The other direction, so a switch hard-wired to `true` cannot pass: the
+    // owner has to be able to undo this without restarting the app.
+    mocks.reduceMotion = true;
+    render(<SettingsTab />);
+
+    fireEvent.click(screen.getByText('Reduce animations: on'));
+
+    expect(mocks.setReduceMotion).toHaveBeenCalledWith(false);
   });
 });

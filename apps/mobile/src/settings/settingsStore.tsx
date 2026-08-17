@@ -13,6 +13,7 @@ export interface AppSettings {
   theme: ThemePreference;
   analyticsEnabled: boolean;
   arabicScale: ArabicScale;
+  reduceMotion: boolean;
 }
 
 export interface AppSettingsContextValue extends AppSettings {
@@ -21,6 +22,7 @@ export interface AppSettingsContextValue extends AppSettings {
   setTheme: (theme: ThemePreference) => void;
   setAnalyticsEnabled: (enabled: boolean) => void;
   setArabicScale: (scale: ArabicScale) => void;
+  setReduceMotion: (reduce: boolean) => void;
   /** Set while the settings database cannot be opened, so a screen can say so
    *  instead of letting changes look saved when nothing is being persisted. */
   storageError: string | null;
@@ -32,6 +34,7 @@ const defaultSettings: AppSettings = {
   theme: 'system',
   analyticsEnabled: false,
   arabicScale: 'medium',
+  reduceMotion: false,
 };
 
 const AppSettingsContext = createContext<AppSettingsContextValue | null>(null);
@@ -48,7 +51,7 @@ const AppSettingsContext = createContext<AppSettingsContextValue | null>(null);
 // change -- the owner's report was that the Arabic dominated the card at any
 // system size. System scaling still composes on top; nothing here sets
 // allowFontScaling.
-const settingKeys = ['uiLocale', 'contentLanguage', 'theme', 'analyticsEnabled', 'arabicScale'] as const;
+const settingKeys = ['uiLocale', 'contentLanguage', 'theme', 'analyticsEnabled', 'arabicScale', 'reduceMotion'] as const;
 
 function isUiLocale(value: string | null): value is UiLocaleCode {
   return uiLocales.some((locale) => locale.code === value);
@@ -82,6 +85,7 @@ export async function loadPersistedAppSettings(client: MobileDataClient): Promis
   const persistedTheme = persisted.theme;
   const analyticsEnabled = persisted.analyticsEnabled;
   const persistedArabicScale = persisted.arabicScale;
+  const reduceMotion = persisted.reduceMotion;
 
   return {
     uiLocale: isUiLocale(persistedUiLocale) ? persistedUiLocale : defaultSettings.uiLocale,
@@ -89,6 +93,7 @@ export async function loadPersistedAppSettings(client: MobileDataClient): Promis
     theme: isTheme(persistedTheme) ? persistedTheme : defaultSettings.theme,
     analyticsEnabled: analyticsEnabled === 'true',
     arabicScale: isArabicScale(persistedArabicScale) ? persistedArabicScale : defaultSettings.arabicScale,
+    reduceMotion: reduceMotion === 'true',
   };
 }
 
@@ -288,6 +293,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       setTheme: (theme) => updateSetting('theme', theme),
       setAnalyticsEnabled: (analyticsEnabled) => updateSetting('analyticsEnabled', analyticsEnabled),
       setArabicScale: (arabicScale) => updateSetting('arabicScale', arabicScale),
+      setReduceMotion: (reduceMotion) => updateSetting('reduceMotion', reduceMotion),
     }),
     [settings, storageError, userClient],
   );
