@@ -284,6 +284,26 @@ describe('SurahReader', () => {
     expect(list()?.getAttribute('data-important-for-accessibility')).toBe('no-hide-descendants');
   });
 
+  it('takes the reader out of the accessibility tree while the language sheet alone is open', () => {
+    // The prop used to be keyed on openWord only, so with just the LANGUAGE
+    // sheet open the ayah list stayed 'auto' -- TalkBack could swipe past the
+    // sheet straight into the reader underneath it.
+    const { container } = render(<SurahReader {...baseProps(readerData(3))} />);
+    const list = () => container.querySelector('[data-important-for-accessibility]');
+
+    const headerRight = mocks.setOptions.mock.calls
+      .map(([options]) => options.headerRight)
+      .filter(Boolean)
+      .at(-1);
+    render(<div>{headerRight()}</div>);
+
+    expect(list()?.getAttribute('data-important-for-accessibility')).toBe('auto');
+
+    fireEvent.click(screen.getByTestId('open-language'));
+
+    expect(list()?.getAttribute('data-important-for-accessibility')).toBe('no-hide-descendants');
+  });
+
   it('opens the sheet for the word that was pressed', async () => {
     const data = readerData(1);
     const loadWordSummary = vi.fn(async (word: { id: number }) => ({
@@ -541,6 +561,39 @@ describe('SurahReader', () => {
     expect(onChangeContentLanguage).toHaveBeenCalledWith('ru');
   });
 
+  it('closes an open word sheet before opening the language sheet from the header', async () => {
+    // The header lives in expo-router's native toolbar, above WordSheet's
+    // absoluteFill backdrop, not inside it -- so without this the globe stays
+    // tappable while a word sheet is up, and the two backdrops stack instead
+    // of one replacing the other.
+    const data = readerData(1);
+    render(
+      <SurahReader
+        {...baseProps(data)}
+        loadWords={async (ayahId) => surahWords(ayahId)}
+        loadWordSummary={(async (word: { id: number }) => ({ word, segments: [], gloss: null })) as never}
+      />,
+    );
+
+    await act(async () => {
+      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getAllByTestId('word-token')[0]!);
+    });
+    expect(screen.getByTestId('word-sheet')).toBeTruthy();
+
+    const headerRight = mocks.setOptions.mock.calls
+      .map(([options]) => options.headerRight)
+      .filter(Boolean)
+      .at(-1);
+    render(<div>{headerRight()}</div>);
+    fireEvent.click(screen.getByTestId('open-language'));
+
+    expect(screen.queryByTestId('word-sheet')).toBeNull();
+    expect(screen.getByTestId('language-sheet')).toBeTruthy();
+  });
+
   function latestTitle() {
     return mocks.setOptions.mock.calls
       .map(([options]) => options.title)
@@ -553,7 +606,7 @@ describe('SurahReader', () => {
 
     // Duplicating the 24pt heading in the app bar on the first screenful is
     // exactly the doubled-up look CLAUDE.md §8 rules out.
-    expect(latestTitle() ?? '').toBe('');
+    expect(latestTitle()).toBe('');
   });
 
   it('fills the nav title in once the heading scrolls away', () => {
@@ -590,7 +643,7 @@ describe('SurahReader', () => {
       mocks.onScroll?.({ nativeEvent: { contentOffset: { y: 200 } } });
     });
 
-    expect(latestTitle() ?? '').toBe('');
+    expect(latestTitle()).toBe('');
   });
 
   it('holds the title back until the header has measured', () => {
@@ -602,7 +655,7 @@ describe('SurahReader', () => {
 
     // No onLayout yet: with no measured threshold, a naive `y > height` would
     // read 200 > 0 and flip the title on at the very top of the surah.
-    expect(latestTitle() ?? '').toBe('');
+    expect(latestTitle()).toBe('');
   });
 });
 

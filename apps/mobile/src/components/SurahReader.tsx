@@ -98,7 +98,19 @@ export function SurahReader({
             testID="open-language"
             accessibilityRole="button"
             accessibilityLabel={t(uiLocale, 'reader.chooseLanguage')}
-            onPress={() => setLanguageOpen(true)}
+            // closeSheet is declared further down (after openWord/requestRef),
+            // so it can't sit in this effect's dependency array without a
+            // temporal-dead-zone error -- but it's fine to call from inside
+            // this onPress, which only runs after the whole component body,
+            // closeSheet included, has finished evaluating. Without this call
+            // the globe button stays reachable while WordSheet is up: two
+            // stacked absoluteFill backdrops (the header is a native toolbar
+            // above WordSheet's, not inside it) and the word panel peeking out
+            // from behind the language panel.
+            onPress={() => {
+              closeSheet();
+              setLanguageOpen(true);
+            }}
             style={{
               minHeight: touchTargets.minimum,
               minWidth: touchTargets.minimum,
@@ -337,7 +349,7 @@ export function SurahReader({
         // is iOS-only -- on Android the ayah text and both card buttons stay
         // reachable by TalkBack swipe while the sheet covers them, so the
         // modal is only visually modal (CLAUDE.md §8, WCAG AA).
-        importantForAccessibility={openWord ? 'no-hide-descendants' : 'auto'}
+        importantForAccessibility={openWord || languageOpen ? 'no-hide-descendants' : 'auto'}
         style={{ flex: 1, backgroundColor: theme.background }}
         contentContainerStyle={{ paddingBottom: 24 }}
       />
