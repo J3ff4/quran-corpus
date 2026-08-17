@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useNavigation } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Text, View } from 'react-native';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
@@ -11,7 +11,6 @@ import { openCorpusDb } from '@/data/openCorpusDb';
 import { useWordSummaryLoader } from '@/data/useWordSummaryLoader';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
-import { typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
 interface OpenWord {
@@ -30,6 +29,7 @@ export interface WbwScreenProps {
 export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
   const { contentLanguage, uiLocale } = useAppSettings();
   const theme = useThemeColors();
+  const navigation = useNavigation();
 
   // Keyed on the raw params, and reset during render when they change.
   // expo-router reuses this component across in-app navigations to the same
@@ -86,6 +86,37 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
 
   const loadWordSummary = useWordSummaryLoader(corpusClient, surahId, contentLanguage);
 
+  // Surah name and pager live IN the nav header rather than in two rows under
+  // it. Stacked, the tab header, the title block and the pager row ate roughly
+  // a third of the screen before the first word (owner screenshot, 2026-08-17).
+  // Both entry points -- the morphology tab and the reader's word-by-word push
+  // -- already draw a header, so this reuses one bar instead of adding a third.
+  // headerTitle, not title: `title` also renames the bottom tab.
+  useEffect(() => {
+    navigation.setOptions({
+      headerTitle: wbw ? wbw.surah.name_translit : t(uiLocale, 'wbw.title'),
+      // Pulled while the sheet is up. The sheet and its backdrop render inside
+      // this screen, and the nav header sits above it -- so a pager left here
+      // stays lit over the dimmed grid, tappable by finger and reachable by
+      // TalkBack swipe, which is what the wrapper below prevents for
+      // everything the backdrop does cover.
+      headerRight:
+        wbw && !open
+          ? () => (
+              <VersePicker
+                from={wbw.from}
+                to={wbw.to}
+                ayahCount={wbw.surah.ayah_count}
+                uiLocale={uiLocale}
+                onRange={(nextFrom) => setFrom(nextFrom)}
+              />
+            )
+          : undefined,
+    });
+    // setFrom is deliberately absent: it closes over `paramKey`, which only
+    // changes together with the surah this effect already re-runs for.
+  }, [navigation, wbw, uiLocale, open]);
+
   // Taps are cheap and the grid puts ~150 of them on screen at once, so two can
   // easily be in flight together. Without the sequence check the sheet shows
   // whichever query finished last, which is not necessarily the word tapped
@@ -131,24 +162,11 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
-      {/* One wrapper around everything the sheet covers, not just the list.
-          accessibilityViewIsModal is iOS-only, so on Android this is what stops
-          TalkBack swiping into the pager and the title behind the sheet
-          (CLAUDE.md §8, WCAG AA). */}
+      {/* accessibilityViewIsModal is iOS-only, so on Android this is what stops
+          TalkBack swiping into the grid behind the sheet (CLAUDE.md §8, WCAG
+          AA). The header is outside it and cannot be wrapped, which is why the
+          pager is unmounted above rather than hidden here. */}
       <View style={{ flex: 1 }} importantForAccessibility={open ? 'no-hide-descendants' : 'auto'}>
-        <View style={{ paddingHorizontal: 12, paddingTop: 16, paddingBottom: 8, gap: 2 }}>
-          <Text accessibilityRole="header" style={{ color: theme.text, fontSize: typography.title, fontWeight: '700' }}>
-            {wbw.surah.name_translit}
-          </Text>
-          <Text style={{ color: theme.mutedText }}>{t(uiLocale, 'wbw.title')}</Text>
-        </View>
-        <VersePicker
-          from={wbw.from}
-          to={wbw.to}
-          ayahCount={wbw.surah.ayah_count}
-          uiLocale={uiLocale}
-          onRange={(nextFrom) => setFrom(nextFrom)}
-        />
         <FlatList
           data={wbw.pages}
           keyExtractor={(page) => String(page.ayahNumber)}
