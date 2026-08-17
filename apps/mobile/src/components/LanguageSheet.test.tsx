@@ -98,6 +98,14 @@ describe('LanguageSheet', () => {
     expect(screen.getByTestId('sheet').getAttribute('data-close-label')).toBe('Close');
   });
 
+  it('gives every language option a 48dp touch target', () => {
+    render(<LanguageSheet {...handlers} />);
+
+    for (const option of screen.getAllByRole('radio')) {
+      expect(Number(option.style.minHeight.replace('px', ''))).toBeGreaterThanOrEqual(48);
+    }
+  });
+
   it('heads the sheet so the list is not three unexplained pills', () => {
     render(<LanguageSheet {...handlers} />);
 

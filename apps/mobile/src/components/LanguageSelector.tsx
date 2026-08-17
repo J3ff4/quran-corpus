@@ -25,7 +25,7 @@ export function LanguageSelector({ value, onChange }: LanguageSelectorProps) {
           accessibilityState={{ selected: item.code === value, checked: item.code === value }}
           onPress={() => onChange(item.code)}
           style={{
-            minHeight: touchTargets.compact,
+            minHeight: touchTargets.minimum,
             borderRadius: 20,
             paddingHorizontal: 14,
             justifyContent: 'center',
