@@ -159,4 +159,27 @@ describe('alignAyahTokens', () => {
       { text: '۞', wordIndex: null },
     ]);
   });
+
+  it('marks the basmala prefix so a caller can lift it out of the run', () => {
+    // 96:1. The four basmala tokens have no word rows; the ayah's own three do.
+    const tokens = alignAyahTokens(
+      'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ ٱقْرَأْ بِٱسْمِ رَبِّكَ',
+      ['ٱقْرَأْ', 'بِٱسْمِ', 'رَبِّكَ'],
+      { surahId: 96, ayahNumber: 1 },
+    );
+
+    expect(tokens?.slice(0, 4).every((token) => token.isBasmala)).toBe(true);
+    expect(tokens?.slice(4).some((token) => token.isBasmala)).toBe(false);
+  });
+
+  it('marks nothing in al-Fatiha, whose ayah 1 IS the basmala', () => {
+    // Four real word rows. Marking them would delete the whole ayah from 1:1.
+    const tokens = alignAyahTokens(
+      'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ',
+      ['بِسْمِ', 'ٱللَّهِ', 'ٱلرَّحْمَٰنِ', 'ٱلرَّحِيمِ'],
+      { surahId: 1, ayahNumber: 1 },
+    );
+
+    expect(tokens?.some((token) => token.isBasmala)).toBe(false);
+  });
 });

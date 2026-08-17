@@ -24,6 +24,12 @@ export interface AyahToken {
   /** 0-based index into the ayah's position-ordered word list, or null for
    *  text with no word row. */
   wordIndex: number | null;
+  /** True on the tokens of the basmala that prefixes ayah 1 of most surahs.
+   *  They carry no word row, and a reader that shows the basmala as its own
+   *  banner needs to drop them from the ayah's run -- which it cannot decide
+   *  for itself, because `hasBasmala` below is settled by token arithmetic
+   *  that has to run after the mark merge. */
+  isBasmala?: true;
 }
 
 /**
@@ -90,7 +96,7 @@ export function alignAyahTokens(
   let remaining = spans[0] ?? 0;
   for (const [index, text] of merged.entries()) {
     if (index < offset) {
-      aligned.push({ text, wordIndex: null });
+      aligned.push({ text, wordIndex: null, isBasmala: true });
       continue;
     }
     aligned.push({ text, wordIndex });
