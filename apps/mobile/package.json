@@ -15,7 +15,6 @@
     "build": "pnpm prebuild:assert-db && expo export --platform android --output-dir dist"
   },
   "dependencies": {
-    "@expo/ui": "~57.0.7",
     "@quran-corpus/config": "workspace:*",
     "@quran-corpus/data": "workspace:*",
     "@quran-corpus/mobile-data": "workspace:*",
