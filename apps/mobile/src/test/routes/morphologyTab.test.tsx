@@ -107,6 +107,9 @@ describe('morphology tab', () => {
 
     expect(await screen.findByText('No reading history yet')).toBeTruthy();
     expect(mocks.getWbwScreen).not.toHaveBeenCalled();
+    // The tab is reachable before anything has been read, so the empty state
+    // needs a way forward rather than a dead end.
+    expect(screen.getByTestId('link').getAttribute('href')).toBe('/surahs');
   });
 
   it('does not claim an empty history while the read is still in flight', () => {
