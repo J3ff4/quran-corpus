@@ -1,16 +1,17 @@
-import { Link, Redirect } from 'expo-router';
+import { Link } from 'expo-router';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { getLastReadingPosition } from '@/data/userRepository';
 import { useUserDbOnFocus } from '@/data/useUserDbOnFocus';
 import { t } from '@/i18n/uiStrings';
+import { WbwScreen } from '@/screens/WbwScreen';
 import { useAppSettings } from '@/settings/settingsStore';
 import { typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
 /**
- * The morphology tab is a jump, not a screen: it sends the reader to the
- * word-by-word view of wherever they left off. It only renders anything at all
- * on a fresh install, where there is no position to jump to.
+ * The morphology tab opens on the word-by-word view of wherever the reader
+ * left off. The empty state below is the only thing it shows on a fresh
+ * install, where there is no position to open.
  */
 export default function MorphologyTab() {
   const { uiLocale } = useAppSettings();
@@ -25,8 +26,13 @@ export default function MorphologyTab() {
   // The empty state below is where loading has to be excluded -- it is the
   // branch that would otherwise flash "no reading history" at a reader who has
   // one.
+  // Rendered here, not redirected to. A <Redirect> out of the (tabs) group
+  // took the tab bar with it and pushed no history entry, so Android back
+  // popped an empty stack and killed the app (owner device report,
+  // 2026-08-16). The tab is a screen; back out of a tab root exiting is the
+  // platform's own behaviour.
   if (!error && position) {
-    return <Redirect href={`/surah/${position.surahId}/words?from=${position.ayahNumber}`} />;
+    return <WbwScreen surahId={position.surahId} from={position.ayahNumber} />;
   }
 
   return (
