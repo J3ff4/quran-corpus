@@ -49,7 +49,7 @@ export { parseRootParam, isRootBuckwalter, ROOT_BUCKWALTER_MAX } from './text/bu
 export { trimConcordanceVerse } from './text/concordanceTrim.js';
 export { definitionSourceLabel } from './definitionSources.js';
 export { isSajdahAyah } from './text/sajdah.js';
-export { alignAyahTokens, type AyahToken } from './text/ayahTokens.js';
+export { alignAyahTokens, splitBasmala, type AyahToken } from './text/ayahTokens.js';
 export { posBucket, type PosBucket } from './morphology/buckets.js';
 export { decodeSegment, posLabelEn } from './morphology/decode.js';
 export type {

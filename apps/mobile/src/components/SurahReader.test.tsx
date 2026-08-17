@@ -419,7 +419,51 @@ describe('SurahReader', () => {
     // data.surah.id changes.
     expect(mocks.push).toHaveBeenCalledWith('/surah/2/words');
   });
+  it('opens the surah with the basmala above ayah 1, not inside its card', () => {
+    // The device defect this replaced: the banner lived inside AyahCard, under
+    // the ayah number and bookmark row, and still read as ayah 1's own first
+    // line (owner report, 2026-08-17).
+    const data = withAyah1(96, 'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ ٱقْرَأْ');
+
+    const { container } = render(<SurahReader {...baseProps(data)} />);
+
+    const banner = screen.getByTestId('bismillah');
+    const card = screen.getByText('In the name of Allah').closest('div');
+    expect(card).toBeTruthy();
+    expect(card!.contains(banner)).toBe(false);
+    // No words are loaded here, which is every surah's first paint. The run
+    // still has to give the prefix up, or the basmala shows twice.
+    expect(container.textContent?.match(/ٱلرَّحِيمِ/gu)).toHaveLength(1);
+    expect(container.textContent).toContain('ٱقْرَأْ');
+  });
+
+  it.each([
+    [1, 'al-Fatiha, whose ayah 1 IS the basmala'],
+    [9, 'at-Tawba, which has none'],
+  ])('opens surah %i with no banner (%s)', (surahId) => {
+    const data = withAyah1(surahId, 'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ ٱقْرَأْ');
+
+    const { container } = render(<SurahReader {...baseProps(data)} />);
+
+    expect(screen.queryByTestId('bismillah')).toBeNull();
+    // And the ayah keeps every word it was given: on these two the prefix is
+    // not a prefix, so stripping it deletes real text.
+    expect(container.textContent).toContain('ٱلرَّحِيمِ');
+  });
 });
+
+/** readerData for one surah whose ayah 1 carries the given Uthmani text. */
+function withAyah1(surahId: number, textUthmani: string) {
+  const data = readerData();
+  return {
+    ...data,
+    surah: { ...data.surah, id: surahId },
+    ayahs: data.ayahs.map((item, index) =>
+      index === 0 ? { ...item, ayah: { ...item.ayah, text_uthmani: textUthmani } } : item,
+    ),
+  };
+}
+
 
 function baseProps(data: ReturnType<typeof readerData>) {
   return {

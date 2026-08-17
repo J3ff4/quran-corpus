@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, Text, View, type ViewToken } from 'react-native';
 import { router, useNavigation } from 'expo-router';
-import type { Word } from '@quran-corpus/data/mobile';
+import { splitBasmala, type Word } from '@quran-corpus/data/mobile';
 import type { ReaderAyah, SurahReaderData, WordSummary } from '@/data/corpusRepository';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
 
 import { AyahCard } from './AyahCard';
+import { Bismillah } from './Bismillah';
 import { WordSheet } from './WordSheet';
 import { Icon } from './icons/Icon';
 import { touchTargets } from '@/theme/tokens';
@@ -88,6 +89,17 @@ export function SurahReader({
       ),
     });
   }, [navigation, data.surah.id, uiLocale, theme.accent]);
+
+  // The surah's opening, above ayah 1's card rather than inside it: in the card
+  // it sat under the ayah number and bookmark row and still read as ayah 1's
+  // own first line (owner device report, 2026-08-17). Taken off ayah 1's text
+  // rather than held as a constant, so the banner carries that surah's own
+  // spelling -- 95 and 97 differ -- and AyahText strips exactly what shows here.
+  const basmala = useMemo(() => {
+    const first = data.ayahs.find((item) => item.ayah.ayah_number === 1);
+    if (!first) return null;
+    return splitBasmala(first.ayah.text_uthmani, { surahId: data.surah.id, ayahNumber: 1 }).basmala;
+  }, [data.ayahs, data.surah.id]);
 
   const initialIndex = useMemo(() => {
     if (!initialAyahNumber) return -1;
@@ -231,6 +243,7 @@ export function SurahReader({
               {data.surah.name_translit}
             </Text>
             <Text style={{ color: theme.mutedText }}>{data.surah.name_translation}</Text>
+            {basmala ? <Bismillah text={basmala} /> : null}
           </View>
         }
         renderItem={({ item }) => (

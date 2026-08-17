@@ -14,21 +14,23 @@ vi.mock('react-native', async () => {
 });
 
 describe('Bismillah', () => {
-  // This suite renders more than once via it.each and the project does not
-  // enable testing-library's global auto-cleanup, so without this each case
-  // queries the leftover DOM of the previous one (see AyahCard.test.tsx).
+  // This suite renders more than once and the project does not enable
+  // testing-library's global auto-cleanup, so without this each case queries
+  // the leftover DOM of the previous one (see AyahCard.test.tsx).
   afterEach(cleanup);
 
-  it('renders the banner for a normal surah', () => {
-    render(<Bismillah surahId={96} />);
-    expect(screen.getByTestId('bismillah')).toBeTruthy();
+  it('renders the text it is handed', () => {
+    render(<Bismillah text="بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ" />);
+
+    expect(screen.getByTestId('bismillah').textContent).toBe('بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ');
   });
 
-  it.each([
-    [1, 'al-Fatiha, where the basmala is ayah 1 itself'],
-    [9, 'at-Tawba, which has none'],
-  ])('renders nothing for surah %i (%s)', (surahId) => {
-    render(<Bismillah surahId={surahId} />);
-    expect(screen.queryByTestId('bismillah')).toBeNull();
+  it('renders the spelling of the surah it opens, not a canonical one', () => {
+    // 95:1 and 97:1 carry a shadda on the ba. Held as a constant here, the
+    // banner would contradict the mushaf text on those two surahs; who decides
+    // is splitBasmala, and this asserts the component defers to it.
+    render(<Bismillah text="بِّسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ" />);
+
+    expect(screen.getByTestId('bismillah').textContent).toBe('بِّسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ');
   });
 });

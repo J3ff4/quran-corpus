@@ -98,10 +98,10 @@ describe('AyahText', () => {
     expect(onWordPress).toHaveBeenCalledWith(expect.objectContaining({ position: 1 }));
   });
 
-  it('renders the basmala prefix as a banner above the card, not in the run', () => {
-    // 96:1 is prefixed with the basmala; it's rendered separately by
-    // Bismillah above AyahCard, so the run starts at the ayah's own first
-    // word.
+  it('leaves the basmala prefix out of the ayah run', () => {
+    // 96:1 is prefixed with the basmala. SurahReader prints it as a banner
+    // above the whole card, so keeping it in the run prints it twice -- which
+    // is the defect the banner move was made to fix.
     render(
       <AyahText
         textUthmani={AL_ALAQ_1}
@@ -113,22 +113,6 @@ describe('AyahText', () => {
     );
 
     expect(screen.getAllByTestId('word-token')).toHaveLength(5);
-    expect(screen.getByTestId('ayah-run').textContent).toContain('ٱقْرَأْ');
-  });
-
-  it('leaves the basmala prefix out of the ayah run', () => {
-    // 96:1 renders the basmala as a banner above the card now, so keeping it
-    // in the run too would print it twice.
-    render(
-      <AyahText
-        textUthmani={AL_ALAQ_1}
-        words={alAlaq1Words}
-        surahId={96}
-        ayahNumber={1}
-        onWordPress={noop}
-      />,
-    );
-
     expect(screen.getByTestId('ayah-run').textContent).not.toContain('ٱلرَّحْمَٰنِ');
     expect(screen.getByTestId('ayah-run').textContent).toContain('ٱقْرَأْ');
     // The separator before the first *rendered* token has to key off the
@@ -137,38 +121,22 @@ describe('AyahText', () => {
     expect(screen.getByTestId('ayah-run').textContent?.startsWith(' ')).toBe(false);
   });
 
-  it('renders the basmala banner exactly once when the run drops it', () => {
-    const { container } = render(
-      <AyahText
-        textUthmani={AL_ALAQ_1}
-        words={alAlaq1Words}
-        surahId={96}
-        ayahNumber={1}
-        onWordPress={noop}
-      />,
-    );
-
-    expect(screen.getByTestId('bismillah')).toBeTruthy();
-    // Banner text and run text together, so a basmala left in both would show
-    // up here as two occurrences.
-    expect(container.textContent?.match(/ٱلرَّحِيمِ/gu)).toHaveLength(1);
-  });
-
-  it('renders no banner while the words are still loading', () => {
+  it('leaves it out while the words are still loading, too', () => {
     // The reader starts every ayah with an empty `words`, so this is the first
-    // paint of ayah 1 of every surah but 1 and 9. The basmala is still inside
-    // the unaligned Uthmani text, so a banner here prints it twice.
+    // paint of ayah 1 of every surah but 1 and 9. The banner above does not
+    // wait for the words, so an unaligned run that keeps the prefix shows the
+    // basmala twice until the query lands.
     const { container } = render(
       <AyahText textUthmani={AL_ALAQ_1} words={[]} surahId={96} ayahNumber={1} onWordPress={noop} />,
     );
 
-    expect(screen.queryByTestId('bismillah')).toBeNull();
-    expect(container.textContent?.match(/ٱلرَّحِيمِ/gu)).toHaveLength(1);
+    expect(container.textContent).not.toContain('ٱلرَّحِيمِ');
+    expect(container.textContent).toContain('ٱقْرَأْ');
   });
 
-  it('renders no banner when alignment fails on ayah 1', () => {
-    // Same trap as the loading case: the fallback prints the whole Uthmani
-    // string, basmala included.
+  it('leaves it out when alignment fails on ayah 1', () => {
+    // Same trap as the loading case, permanently: this ayah never gets tap
+    // targets, so a prefix left in the fallback never goes away.
     const { container } = render(
       <AyahText
         textUthmani={AL_ALAQ_1}
@@ -180,8 +148,23 @@ describe('AyahText', () => {
     );
 
     expect(screen.queryAllByTestId('word-token')).toHaveLength(0);
-    expect(screen.queryByTestId('bismillah')).toBeNull();
-    expect(container.textContent?.match(/ٱلرَّحِيمِ/gu)).toHaveLength(1);
+    expect(container.textContent).not.toContain('ٱلرَّحِيمِ');
+    expect(container.textContent).toContain('ٱقْرَأْ');
+  });
+
+  it('keeps al-Fatiha ayah 1 whole, basmala and all', () => {
+    // 1:1 IS the basmala. Stripping it here empties the ayah.
+    const { container } = render(
+      <AyahText
+        textUthmani="بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ"
+        words={[]}
+        surahId={1}
+        ayahNumber={1}
+        onWordPress={noop}
+      />,
+    );
+
+    expect(container.textContent).toContain('ٱلرَّحِيمِ');
   });
 
   it('keeps the waqf pause marks visible', () => {

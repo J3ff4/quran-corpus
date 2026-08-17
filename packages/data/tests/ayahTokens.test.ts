@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { alignAyahTokens } from '../src/text/ayahTokens.js';
+import { alignAyahTokens, splitBasmala } from '../src/text/ayahTokens.js';
 
 // 1:1 in the DB is prefixed with a byte-order mark. Written as an escape, not
 // pasted: an editor or a reformat that silently drops the invisible U+FEFF
@@ -181,5 +181,72 @@ describe('alignAyahTokens', () => {
     );
 
     expect(tokens?.some((token) => token.isBasmala)).toBe(false);
+  });
+});
+
+describe('splitBasmala', () => {
+  it('takes the prefix off ayah 1 and leaves the ayah behind', () => {
+    const { basmala, rest } = splitBasmala(AL_ALAQ_1, { surahId: 96, ayahNumber: 1 });
+
+    expect(basmala).toBe('بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ');
+    // The reader prints `rest` as the ayah's own run, so anything of the
+    // prefix left in it shows the basmala twice: once as the banner, once
+    // inside ayah 1 -- the exact defect this replaced.
+    expect(rest).toBe('ٱقْرَأْ بِٱسْمِ رَبِّكَ ٱلَّذِى خَلَقَ');
+  });
+
+  it('returns the surah own spelling, not a canonical one', () => {
+    // 95:1 and 97:1 carry a shadda on the ba that the other 110 do not. A
+    // banner rendered from a hard-coded constant is misspelled on both.
+    const shadda = 'بِّسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ وَٱلتِّينِ';
+
+    expect(splitBasmala(shadda, { surahId: 95, ayahNumber: 1 }).basmala).toBe(
+      'بِّسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ',
+    );
+  });
+
+  it('splits an ayah 1 that also carries a mid-ayah waqf mark', () => {
+    // The mark makes the raw token count disagree with the word rows, which is
+    // what alignAyahTokens has to merge for. This path has no rows to agree
+    // with, so the mark must not disturb it.
+    const { basmala, rest } = splitBasmala(AL_ANAM_1, { surahId: 6, ayahNumber: 1 });
+
+    expect(basmala).toBe('بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ');
+    expect(rest.startsWith('ٱلْحَمْدُ')).toBe(true);
+    expect(rest).toContain('ۖ');
+  });
+
+  it('leaves al-Fatiha alone, whose ayah 1 IS the basmala', () => {
+    const { basmala, rest } = splitBasmala(AL_FATIHA_1, { surahId: 1, ayahNumber: 1 });
+
+    // Splitting here deletes the whole of 1:1 from the reader.
+    expect(basmala).toBeNull();
+    expect(rest).toBe(AL_FATIHA_1);
+  });
+
+  it('leaves at-Tawba alone, which has no basmala', () => {
+    const { basmala, rest } = splitBasmala(AT_TAWBA_1, { surahId: 9, ayahNumber: 1 });
+
+    // Splitting here eats the ayah's first four real words.
+    expect(basmala).toBeNull();
+    expect(rest).toBe(AT_TAWBA_1);
+  });
+
+  it('leaves every ayah but the first alone', () => {
+    const { basmala, rest } = splitBasmala(AL_BAQARAH_44, { surahId: 2, ayahNumber: 44 });
+
+    expect(basmala).toBeNull();
+    expect(rest).toBe(AL_BAQARAH_44);
+  });
+
+  it('splits nothing when the ayah is no longer than the prefix', () => {
+    // Fails closed rather than handing the reader an empty run under a banner.
+    const { basmala, rest } = splitBasmala('بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ', {
+      surahId: 2,
+      ayahNumber: 1,
+    });
+
+    expect(basmala).toBeNull();
+    expect(rest).toBe('بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ');
   });
 });

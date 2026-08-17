@@ -2,19 +2,19 @@ import { Text } from 'react-native';
 import { typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
-/** The same string web's ornament carries. Hard-coded rather than sliced out
- *  of ayah 1: the banner also has to render on the word-by-word screen, which
- *  never loads the ayah's Uthmani text. */
-const BASMALA = 'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ';
-
 /**
- * Basmala banner above a surah's first ayah, matching web's
- * `components/reader/ornaments/Bismillah.tsx`. Al-Fatiha's basmala IS its ayah
- * 1, and at-Tawba has none, so both render nothing.
+ * Basmala banner opening a surah, matching web's
+ * `components/reader/ornaments/Bismillah.tsx`.
+ *
+ * The text is passed in rather than held here: 95:1 and 97:1 spell it with a
+ * shadda on the ba and the other 110 do not, so a constant is wrong on two
+ * surahs. `splitBasmala` takes it off the ayah the reader is about to show,
+ * which also means the banner and the ayah run can never disagree. Al-Fatiha's
+ * basmala IS its ayah 1 and at-Tawba has none; on both, splitBasmala returns
+ * null and the caller renders nothing.
  */
-export function Bismillah({ surahId }: { surahId: number }) {
+export function Bismillah({ text }: { text: string }) {
   const theme = useThemeColors();
-  if (surahId === 1 || surahId === 9) return null;
 
   return (
     <Text
@@ -28,10 +28,11 @@ export function Bismillah({ surahId }: { surahId: number }) {
         fontSize: typography.arabicReader,
         textAlign: 'center',
         writingDirection: 'rtl',
+        marginTop: 12,
         marginBottom: 16,
       }}
     >
-      {BASMALA}
+      {text}
     </Text>
   );
 }

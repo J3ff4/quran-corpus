@@ -18,6 +18,40 @@ const STANDALONE_MARK = /^[ۖ-۞۩]+$/u;
 /** Token count of the basmala as it appears prefixed to ayah 1. */
 const BASMALA_TOKENS = 4;
 
+/**
+ * Splits the basmala prefix off ayah 1's Uthmani text.
+ *
+ * Unlike alignAyahTokens this needs no `words` rows, so a reader can show the
+ * basmala as its own banner before -- or without ever -- loading the ayah's
+ * morphology. The banner text comes back from the ayah itself rather than a
+ * constant: 95:1 and 97:1 spell it with a shadda on the ba (بِّسْمِ) and the
+ * other 110 do not, so a hard-coded string is wrong on two surahs.
+ *
+ * @returns `basmala` null when the ayah carries no prefix (1:1 IS the basmala,
+ *   9:1 has none, and any ayah but the first), with `rest` the untouched input.
+ */
+export function splitBasmala(
+  textUthmani: string,
+  ref: { surahId: number; ayahNumber: number },
+): { basmala: string | null; rest: string } {
+  if (ref.ayahNumber !== 1 || ref.surahId === 1 || ref.surahId === 9) {
+    return { basmala: null, rest: textUthmani };
+  }
+
+  // No explicit U+FEFF strip, unlike alignAyahTokens below: JavaScript's \s
+  // already matches the byte-order mark, so the split drops 1:1's on its own.
+  const tokens = textUthmani.split(/\s+/).filter(Boolean);
+  // Fail closed: an ayah 1 short enough to be nothing but the prefix would
+  // leave an empty run, and the reader would show a surah opening with no
+  // first ayah under it.
+  if (tokens.length <= BASMALA_TOKENS) return { basmala: null, rest: textUthmani };
+
+  return {
+    basmala: tokens.slice(0, BASMALA_TOKENS).join(' '),
+    rest: tokens.slice(BASMALA_TOKENS).join(' '),
+  };
+}
+
 export interface AyahToken {
   /** Uthmani text exactly as it appears, including any merged trailing mark. */
   text: string;

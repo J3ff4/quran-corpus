@@ -1,9 +1,8 @@
 import { useMemo } from 'react';
 import { Text } from 'react-native';
-import { alignAyahTokens, type Word } from '@quran-corpus/data/mobile';
+import { alignAyahTokens, splitBasmala, type Word } from '@quran-corpus/data/mobile';
 import { typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
-import { Bismillah } from './Bismillah';
 
 export interface AyahTextProps {
   textUthmani: string;
@@ -21,6 +20,13 @@ export interface AyahTextProps {
  * rows drop the waqf pause marks and carry nothing for the basmala that
  * prefixes ayah 1 -- see alignAyahTokens. The reading surface shows the mushaf
  * text; the word rows only supply what happens on a tap.
+ *
+ * The basmala banner is NOT rendered here. It belongs above the whole ayah 1
+ * card as the surah's opening (owner ruling 2026-08-17: inside the card it
+ * still reads as part of ayah 1), so SurahReader owns it. What this owes that
+ * banner is the other half of the split: ayah 1's run never contains the
+ * basmala, on the aligned path or the fallback, so the two can never disagree
+ * about whether it was taken out.
  */
 export function AyahText({ textUthmani, words, surahId, ayahNumber, onWordPress }: AyahTextProps) {
   const theme = useThemeColors();
@@ -53,18 +59,16 @@ export function AyahText({ textUthmani, words, surahId, ayahNumber, onWordPress 
 
   // No words yet, or an ayah alignAyahTokens could not reconcile. Either way
   // the reader shows the complete Uthmani text; only the tap targets are
-  // missing, which is the right thing to lose. No banner on this path: the
-  // basmala prefix is still inside `textUthmani`, so adding one prints it
-  // twice -- which it did on the first paint of every surah but 1 and 9,
-  // because `words` is empty until the ayah scrolls into view.
-  if (!tokens) return <Text style={style}>{textUthmani}</Text>;
+  // missing, which is the right thing to lose. The basmala still comes off:
+  // the banner above the card does not wait for the words to load, so leaving
+  // the prefix in here printed it twice on the first paint of every surah but
+  // 1 and 9.
+  if (!tokens) {
+    return <Text style={style}>{splitBasmala(textUthmani, { surahId, ayahNumber }).rest}</Text>;
+  }
 
   return (
     <>
-      {/* Owned here, not by AyahCard: only the alignment knows whether the
-          basmala was taken out of the run, and the banner has to appear
-          exactly when it was. */}
-      {tokens.some((token) => token.isBasmala) ? <Bismillah surahId={surahId} /> : null}
       {/* Nested <Text>, not a flexWrap row of Views: only one text run gets
           native Arabic line breaking and justified mushaf flow. */}
       <Text testID="ayah-run" style={style}>
