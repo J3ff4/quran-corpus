@@ -51,9 +51,11 @@ and every check below will fail for the wrong reason.
    word rows instead would have deleted.
 2. Open al-Alaq (96). Confirm the basmala still prefixes ayah 1.
 3. Open 2:44. Confirm the `۞` marker still leads the ayah.
-4. Tap a word. The sheet springs up from the bottom.
-5. Drag the sheet halfway down and let go — it springs back. Drag it past
-   halfway — it dismisses.
+4. Tap a word. The sheet rises from the bottom on an even timing curve and
+   stops dead — no spring, no bounce, no overshoot past its resting height.
+   This is the check that closes F4, so a bounce here is a FAIL.
+5. Drag the sheet halfway down and let go — it settles back without bouncing.
+   Drag it past halfway — it dismisses.
 6. Tap the backdrop — it dismisses. Press Android back — it dismisses.
 7. Scroll the reader with the sheet open. The scroll must not fight the drag.
 8. Settings (in the app) → **Reduce animations: on**. Reopen the sheet: it

@@ -2311,8 +2311,8 @@ Carries two re-checks: **check 4** closes F4 (the sheet spring, rejected on Run
 | 1 | Pause marks still visible in 2:255 | unexercised |
 | 2 | Basmala still prefixes ayah 1 of al-Alaq (96) | unexercised |
 | 3 | `۞` marker still leads 2:44 | unexercised |
-| 4 | Word tap springs the sheet up from the bottom | unexercised |
-| 5 | Sheet drag: halfway springs back, past halfway dismisses | unexercised |
+| 4 | Word tap raises the sheet on a timing curve — no spring, no bounce, no overshoot (closes F4) | unexercised |
+| 5 | Sheet drag: halfway settles back without bouncing, past halfway dismisses | unexercised |
 | 6 | Backdrop tap and Android back both dismiss the sheet | unexercised |
 | 7 | Reader scroll does not fight the sheet drag | unexercised |
 | 8 | Reduce animations — in-app switch, both directions, then the OS setting | unexercised |
