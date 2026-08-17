@@ -56,9 +56,13 @@ and every check below will fail for the wrong reason.
    halfway — it dismisses.
 6. Tap the backdrop — it dismisses. Press Android back — it dismisses.
 7. Scroll the reader with the sheet open. The scroll must not fight the drag.
-8. Settings → Accessibility → Remove animations, **on**. Reopen the sheet: it
+8. Settings (in the app) → **Reduce animations: on**. Reopen the sheet: it
    fades, does not slide, and does not drag. Turn it back off without
-   restarting the app; the slide returns.
+   restarting the app; the slide returns. Then repeat via the OS setting, which
+   must also reduce motion with the in-app switch off: Pixel is Settings →
+   Accessibility → Remove animations; Samsung is Settings → Accessibility →
+   Visibility enhancements → Remove animations; on a device with neither, use
+   Developer options → Animator duration scale → Animation off.
 9. Sheet → Full analysis. Segment pills are coloured and legible.
 10. Sheet → root link. The root screen shows Arabic, forms and a definition.
 11. Tap a word with no root (a pronoun, e.g. 2:255 هُوَ). Confirm there is
@@ -71,7 +75,24 @@ and every check below will fail for the wrong reason.
 15. System font size at maximum: repeat 4 and 12. Nothing clips; the sheet
     still scrolls to its actions.
 16. Airplane mode: repeat 1, 4 and 12. All of it is local.
+17. Open any surah other than 1 and 9. The basmala is its own centred line above
+    ayah 1, and does not also appear inside ayah 1's text.
+18. Open al-Fatiha. The basmala appears once, as ayah 1 — no banner above it.
+    Open at-Tawba (9). No basmala anywhere.
+19. From the reader, open a word sheet → Full analysis. Press the header back
+    arrow: it returns to the reader. Press Android back from the reader: it
+    returns to the surah list, and does not exit the app.
+20. Morphology tab. The bottom tab bar stays visible, and the surah name and
+    verse pager sit in the one header bar rather than stacking above the grid.
+    Android back exits the app from here, and from here only.
+21. Tap a multi-segment word (e.g. 2:2 بِٱلْغَيْبِ). The big Arabic in the sheet is
+    coloured per segment, joined as one word with no gaps between segments.
+22. Settings → Arabic size → Small, then Extra large. The reader Arabic, the
+    basmala banner, the sheet hero and the root screen all change; the UI text
+    does not.
 
 ## Current Status
 
-M1 is in progress on an isolated branch. M0 contains an Expo Android app scaffold with a bundled SQLite fixture DB, Hafs font loading, English/Uzbek/Russian translation switching, word detail interaction, and a thin audio endpoint contract for streamed ayah recitation. Android emulator/device smoke verification remains pending.
+M0-M2 are complete. M3 (morphology) is implemented on `feat/m3-morphology`: an offline reader over a bundled SQLite DB, per-segment coloured word morphology behind a bottom sheet, word-detail and root screens, a word-by-word grid, and Hafs font loading with English/Uzbek/Russian translations. M3b then fixed the defects found on the first two device runs — sheet spring, basmala placement, navigation headers, the word-by-word screen's chrome, a four-step Arabic size setting and an in-app reduce-animations switch.
+
+CI has no Android emulator, so the M3 smoke checklist above is the only gate this app has. It is not complete until all 22 checks have been run on real hardware and recorded in the Verification Log of `docs/plans/phase-m3-morphology-mvp.md`.
