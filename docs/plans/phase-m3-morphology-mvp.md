@@ -2229,8 +2229,58 @@ git commit -m "docs(mobile): record the M3 on-device verification run"
 
 ### Run 1 — pending
 
-Not yet run. This phase is **not complete** until this section carries a real
-result per CLAUDE.md §10.
+APK built and awaiting the device run. EAS build `bac194d4` at commit `9421560`
+(preview profile, Android APK). Upload was 43.6 MB, so the bundled DB went with
+it — a ~5 MB upload would have meant `.easignore` dropped it.
+
+The table below is the README's 22 checks, transcribed for filling in. **Every
+row reads `unexercised` until the device says otherwise.** Per the M2 log's
+convention, an unexercised check is recorded as unexercised and never implied to
+have passed. A FAIL is a finding, recorded with whether its fix was re-verified
+on device or carried to the next build.
+
+| # | Check | Result |
+| --- | --- | --- |
+| 1 | Pause marks still visible in 2:255 | unexercised |
+| 2 | Basmala still prefixes ayah 1 of al-Alaq (96) | unexercised |
+| 3 | `۞` marker still leads 2:44 | unexercised |
+| 4 | Word tap springs the sheet up from the bottom | unexercised |
+| 5 | Sheet drag: halfway springs back, past halfway dismisses | unexercised |
+| 6 | Backdrop tap and Android back both dismiss the sheet | unexercised |
+| 7 | Reader scroll does not fight the sheet drag | unexercised |
+| 8 | Reduce animations — in-app switch, both directions, then the OS setting | unexercised |
+| 9 | Full analysis: segment pills coloured and legible | unexercised |
+| 10 | Root screen shows Arabic, forms and a definition | unexercised |
+| 11 | Rootless word (2:255 هُوَ) shows no root link | unexercised |
+| 12 | Word-by-word pages to 286 and disables Next | unexercised |
+| 13 | Morphology tab opens WbW at the last-read position | unexercised |
+| 14 | Checks 4, 9, 12 in dark mode — every POS colour legible | unexercised |
+| 15 | System font size at maximum: checks 4 and 12, nothing clips | unexercised |
+| 16 | Airplane mode: checks 1, 4, 12 all local | unexercised |
+| 17 | Basmala is its own banner above ayah 1, not also inside it | unexercised |
+| 18 | al-Fatiha basmala once as ayah 1; at-Tawba none | unexercised |
+| 19 | Header back returns to reader; Android back to the surah list | unexercised |
+| 20 | Morphology tab keeps the tab bar, one header bar, back exits | unexercised |
+| 21 | Multi-segment word coloured per segment, joined with no gaps | unexercised |
+| 22 | Arabic size Small and Extra large move the Arabic, not the UI | unexercised |
+
+**M2 carry-over, due on this APK.** M2's Run 2 is still pending and its fix
+(`b795975`) is an ancestor of this build, so it can be closed here: system font
+size at maximum, al-Baqarah past ayah 100, three digits fully inside the rosette.
+
+| Carry-over | Result |
+| --- | --- |
+| M2 Run 2 — three-digit ayah number inside the rosette at max font size | unexercised |
+
+**Known and not a finding:** the build warns that the `preview` profile names
+channel `preview` while `expo-updates` is not installed. OTA updates are out of
+scope for M3; adding the package is a §12 dependency decision that has not been
+taken.
+
+**Review debt on this build.** CLAUDE.md §5 calls for a `/code-review` pass over
+Tasks 7 and 8 of the M3b plan, which write the on-device user DB. The owner
+waived it on 2026-08-17. That is the third such override and it is recorded here
+rather than left implicit; the code it covers is commits `37ae2d7` and `a137e9f`.
 
 ---
 
