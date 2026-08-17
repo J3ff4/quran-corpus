@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Word, WordSegment } from '@quran-corpus/data/mobile';
 import type { WordSummary } from '@/data/corpusRepository';
-import { WordSheet } from './WordSheet';
+import { SPRING_DAMPING_RATIO, WordSheet } from './WordSheet';
 
 const mocks = vi.hoisted(() => ({
   backPress: null as (() => boolean) | null,
@@ -260,5 +260,14 @@ describe('WordSheet', () => {
     for (const id of ['full-analysis', 'root-link']) {
       expect(Number(screen.getByTestId(id).style.minHeight.replace('px', ''))).toBeGreaterThanOrEqual(48);
     }
+  });
+
+  it('opens without overshooting', () => {
+    // ζ >= 1 is critically damped: the sheet settles at its resting position
+    // instead of passing it and coming back. Owner report 2026-08-16 called the
+    // ported web value "too springy and jumpy" on device.
+    expect(SPRING_DAMPING_RATIO).toBeGreaterThanOrEqual(1);
+    // And not so stiff it stops reading as a spring at all.
+    expect(SPRING_DAMPING_RATIO).toBeLessThan(1.2);
   });
 });

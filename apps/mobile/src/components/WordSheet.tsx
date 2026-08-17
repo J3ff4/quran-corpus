@@ -18,9 +18,20 @@ import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { SegmentPill } from './SegmentPill';
 
-// Ported from web's WordPopover so a reader who uses both products meets the
-// same sheet. Do not retune one of them alone.
-const SPRING = { damping: 28, stiffness: 320 } as const;
+// NOT web's WordPopover spring any more. Owner ruling 2026-08-16, after the M3
+// device run: web keeps its bounce, mobile softens. The port comment that used
+// to sit here said "do not retune one of them alone" -- that is now explicitly
+// overridden for this value, the same way the accent colour diverges in
+// theme/tokens.ts. Do not "fix" this back to web's numbers.
+//
+// reanimated's withSpring defaults mass 1, so the damping ratio is
+// damping / (2 * sqrt(stiffness)). 28/320 gave 0.78 -- underdamped, and the
+// overshoot is what read as jumpy on a 120 Hz panel.
+const SPRING = { damping: 38, stiffness: 320 } as const;
+
+/** Exported for the test: RN's animation internals are not observable from
+ *  jsdom, so the physics is asserted at the parameter instead of the frames. */
+export const SPRING_DAMPING_RATIO = SPRING.damping / (2 * Math.sqrt(SPRING.stiffness));
 const FADE_MS = 150;
 // Fractions of the sheet's own height and dp/s, matching Android's own sheets:
 // a short flick dismisses without having to drag the whole way down.
