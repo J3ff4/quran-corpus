@@ -1,6 +1,7 @@
 import React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { deferred } from '@/testing/deferred';
 import { SurahReader } from './SurahReader';
 
 const mocks = vi.hoisted(() => ({
@@ -27,8 +28,9 @@ vi.mock('expo-router', () => ({
 vi.mock('./WordSheet', async () => {
   const React = await import('react');
   return {
-    WordSheet: ({ summary, onOpenDetail, onOpenRoot }: {
+    WordSheet: ({ summary, onClose, onOpenDetail, onOpenRoot }: {
       summary: { word: { id: number } } | null;
+      onClose: () => void;
       onOpenDetail: (word: unknown) => void;
       onOpenRoot: (rootBuckwalter: string) => void;
     }) =>
@@ -37,6 +39,7 @@ vi.mock('./WordSheet', async () => {
             'div',
             { 'data-testid': 'word-sheet' },
             React.createElement('span', null, String(summary.word.id)),
+            React.createElement('button', { 'data-testid': 'close-sheet', onClick: onClose }),
             React.createElement('button', {
               'data-testid': 'open-detail',
               onClick: () => onOpenDetail(summary.word),
@@ -266,6 +269,89 @@ describe('SurahReader', () => {
     // exactly what passing the token list instead of the pressed word gives.
     expect(loadWordSummary).toHaveBeenCalledWith(expect.objectContaining({ position: 2 }));
     expect(screen.getByTestId('word-sheet').textContent).toContain('1002');
+  });
+
+  it('shows the word tapped last, not the query that finished last', async () => {
+    // The first tap of a surah is the slow one -- it warms the gloss cache --
+    // so a second tap really can resolve first. Without the sequence guard the
+    // sheet then shows word 1 while the user tapped word 2, and nothing on
+    // screen says the two disagree.
+    const data = readerData(1);
+    const first = deferred<{ word: { id: number } }>();
+    const second = deferred<{ word: { id: number } }>();
+    const pending = [first.promise, second.promise];
+    const loadWordSummary = vi.fn(() => pending.shift()!);
+
+    render(
+      <SurahReader
+        {...baseProps(data)}
+        loadWords={async (ayahId) => surahWords(ayahId)}
+        loadWordSummary={loadWordSummary as never}
+      />,
+    );
+
+    await act(async () => {
+      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getAllByTestId('word-token')[0]!);
+      fireEvent.click(screen.getAllByTestId('word-token')[1]!);
+    });
+
+    await act(async () => {
+      second.resolve({ word: { id: 1002 } });
+    });
+    await act(async () => {
+      first.resolve({ word: { id: 1001 } });
+    });
+
+    expect(screen.getByTestId('word-sheet').textContent).toContain('1002');
+  });
+
+  it('does not re-open the sheet with a tap that resolves after dismissal', async () => {
+    // Tap, then dismiss before the query lands. Closing has to invalidate the
+    // in-flight request, or the sheet the user just swiped away comes back by
+    // itself.
+    const data = readerData(1);
+    const open = deferred<{ word: { id: number } }>();
+    const late = deferred<{ word: { id: number } }>();
+    const pending = [open.promise, late.promise];
+
+    render(
+      <SurahReader
+        {...baseProps(data)}
+        loadWords={async (ayahId) => surahWords(ayahId)}
+        loadWordSummary={(() => pending.shift()!) as never}
+      />,
+    );
+
+    await act(async () => {
+      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
+    });
+
+    // First tap resolves, so there is a sheet on screen to dismiss.
+    await act(async () => {
+      fireEvent.click(screen.getAllByTestId('word-token')[0]!);
+    });
+    await act(async () => {
+      open.resolve({ word: { id: 1001 } });
+    });
+    expect(screen.getByTestId('word-sheet')).toBeTruthy();
+
+    // Second tap stays in flight across the dismissal.
+    await act(async () => {
+      fireEvent.click(screen.getAllByTestId('word-token')[1]!);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('close-sheet'));
+    });
+    expect(screen.queryByTestId('word-sheet')).toBeNull();
+
+    await act(async () => {
+      late.resolve({ word: { id: 1002 } });
+    });
+
+    expect(screen.queryByTestId('word-sheet')).toBeNull();
   });
 
   it('pushes the word route by ayah number, not ayah id', async () => {

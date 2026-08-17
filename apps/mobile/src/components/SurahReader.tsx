@@ -178,11 +178,22 @@ export function SurahReader({
 
   const [openWord, setOpenWord] = useState<WordSummary | null>(null);
 
+  // Same guard WbwScreen carries, for the same reason: two taps can be in
+  // flight together -- the first is the slow one, since it warms the surah's
+  // gloss cache -- so without the sequence check the sheet shows whichever
+  // query finished last rather than the word tapped last, and nothing on
+  // screen says so. Bumped on close too, so an in-flight tap cannot re-open
+  // the sheet the user has just dismissed.
+  const requestRef = useRef(0);
+
   const onWordPress = useCallback(
     (word: Word) => {
       if (!loadWordSummary) return;
+      const request = (requestRef.current += 1);
       loadWordSummary(word)
-        .then(setOpenWord)
+        .then((summary) => {
+          if (requestRef.current === request) setOpenWord(summary);
+        })
         .catch((cause: unknown) => {
           // Nothing opens. A sheet with the morphology missing would look like
           // the word has none, which is never true.
@@ -191,6 +202,11 @@ export function SurahReader({
     },
     [loadWordSummary],
   );
+
+  const closeSheet = useCallback(() => {
+    requestRef.current += 1;
+    setOpenWord(null);
+  }, []);
 
   const ayahNumberOf = useCallback(
     (word: Word) => data.ayahs.find((item) => item.ayah.id === word.ayah_id)?.ayah.ayah_number,
@@ -246,15 +262,15 @@ export function SurahReader({
       <WordSheet
         summary={openWord}
         uiLocale={uiLocale}
-        onClose={() => setOpenWord(null)}
+        onClose={closeSheet}
         onOpenDetail={(word) => {
           const ayahNumber = ayahNumberOf(word);
           if (ayahNumber === undefined) return;
-          setOpenWord(null);
+          closeSheet();
           router.push(`/word/${data.surah.id}/${ayahNumber}/${word.position}`);
         }}
         onOpenRoot={(rootBuckwalter) => {
-          setOpenWord(null);
+          closeSheet();
           // Buckwalter carries `$`, `<` and `'`, none of which survive a raw
           // path segment.
           router.push(`/root/${encodeURIComponent(rootBuckwalter)}`);
