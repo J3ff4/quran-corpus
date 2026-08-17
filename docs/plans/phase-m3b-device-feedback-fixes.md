@@ -152,7 +152,7 @@ it('opens without overshooting', () => {
 
 - [ ] **Step 2: Run it and confirm it fails**
 
-Run: `pnpm --filter @quran-corpus/mobile test -- WordSheet`
+Run: `pnpm --filter @quran-corpus/mobile exec vitest run WordSheet`
 Expected: FAIL — `SPRING_DAMPING_RATIO` is not exported.
 
 - [ ] **Step 3: Retune and export the ratio**
@@ -178,7 +178,7 @@ export const SPRING_DAMPING_RATIO = SPRING.damping / (2 * Math.sqrt(SPRING.stiff
 
 - [ ] **Step 4: Run it and confirm it passes**
 
-Run: `pnpm --filter @quran-corpus/mobile test -- WordSheet`
+Run: `pnpm --filter @quran-corpus/mobile exec vitest run WordSheet`
 Expected: PASS.
 
 - [ ] **Step 5: Mutation-check**
@@ -320,7 +320,7 @@ describe('Bismillah', () => {
 
 - [ ] **Step 8: Run and confirm it fails**
 
-Run: `pnpm --filter @quran-corpus/mobile test -- Bismillah`
+Run: `pnpm --filter @quran-corpus/mobile exec vitest run Bismillah`
 Expected: FAIL — module not found.
 
 - [ ] **Step 9: Write the banner**
@@ -371,7 +371,7 @@ export function Bismillah({ surahId }: { surahId: number }) {
 
 - [ ] **Step 10: Run and confirm it passes**
 
-Run: `pnpm --filter @quran-corpus/mobile test -- Bismillah`
+Run: `pnpm --filter @quran-corpus/mobile exec vitest run Bismillah`
 Expected: PASS.
 
 - [ ] **Step 11: Write the failing AyahText test**
@@ -401,7 +401,7 @@ it('leaves the basmala prefix out of the ayah run', () => {
 
 - [ ] **Step 12: Run and confirm it fails**
 
-Run: `pnpm --filter @quran-corpus/mobile test -- AyahText`
+Run: `pnpm --filter @quran-corpus/mobile exec vitest run AyahText`
 Expected: FAIL — the run still contains the basmala.
 
 - [ ] **Step 13: Drop the marked tokens**
@@ -426,7 +426,7 @@ space. Change the separator to trim it:
 
 - [ ] **Step 14: Run and confirm it passes**
 
-Run: `pnpm --filter @quran-corpus/mobile test -- AyahText`
+Run: `pnpm --filter @quran-corpus/mobile exec vitest run AyahText`
 Expected: PASS. The existing "renders the basmala prefix as text with no tap
 target" test now contradicts the new behaviour — rewrite it to assert the run
 starts at the ayah's own first word, and note the banner in its comment.
@@ -538,7 +538,7 @@ export default function WbwRoute() {
 
 - [ ] **Step 3: Run the existing suite unchanged**
 
-Run: `pnpm --filter @quran-corpus/mobile test -- words`
+Run: `pnpm --filter @quran-corpus/mobile exec vitest run words`
 Expected: all 12 PASS with no edits to the test file. If any needs editing, the
 move was not faithful — fix the move, not the test. The traversal/`0`/`115`
 cases in particular prove validation still runs before the DB opens.
@@ -609,7 +609,7 @@ for the first test; for the second, use the partial-mock shape
 
 - [ ] **Step 2: Run and confirm they fail**
 
-Run: `pnpm --filter @quran-corpus/mobile test -- morphologyTab`
+Run: `pnpm --filter @quran-corpus/mobile exec vitest run morphologyTab`
 Expected: FAIL — `Redirect` is called, no `wbw-screen`.
 
 - [ ] **Step 3: Replace the redirect**
@@ -633,7 +633,7 @@ load guard rejects a bad id before opening the corpus DB.
 
 - [ ] **Step 4: Run and confirm they pass**
 
-Run: `pnpm --filter @quran-corpus/mobile test -- morphologyTab`
+Run: `pnpm --filter @quran-corpus/mobile exec vitest run morphologyTab`
 Expected: PASS.
 
 - [ ] **Step 5: Mutation-check**
@@ -837,7 +837,7 @@ it('renders the fallback when the word has no segments at all', () => {
 
 - [ ] **Step 2: Run and confirm they fail**
 
-Run: `pnpm --filter @quran-corpus/mobile test -- SegmentedWord`
+Run: `pnpm --filter @quran-corpus/mobile exec vitest run SegmentedWord`
 Expected: FAIL — module not found.
 
 - [ ] **Step 3: Write the component**
@@ -909,7 +909,7 @@ export function SegmentedWord({ word, segments, fontSize }: SegmentedWordProps) 
 
 - [ ] **Step 4: Run and confirm they pass**
 
-Run: `pnpm --filter @quran-corpus/mobile test -- SegmentedWord`
+Run: `pnpm --filter @quran-corpus/mobile exec vitest run SegmentedWord`
 Expected: PASS.
 
 - [ ] **Step 5: Mutation-check**
@@ -1043,7 +1043,7 @@ it('falls back to medium for a value the store does not recognise', () => {
 
 - [ ] **Step 3: Run and confirm they fail**
 
-Run: `pnpm --filter @quran-corpus/mobile test -- useArabicSizes`
+Run: `pnpm --filter @quran-corpus/mobile exec vitest run useArabicSizes`
 Expected: FAIL — module not found.
 
 - [ ] **Step 4: Write the hook**
@@ -1081,7 +1081,7 @@ export function useArabicSizes(): ArabicSizes {
 
 - [ ] **Step 5: Run and confirm they pass**
 
-Run: `pnpm --filter @quran-corpus/mobile test -- useArabicSizes`
+Run: `pnpm --filter @quran-corpus/mobile exec vitest run useArabicSizes`
 Expected: PASS.
 
 - [ ] **Step 6: Persist the setting**
@@ -1275,7 +1275,7 @@ it('keeps the system flag even when the app setting is off', async () => {
 
 - [ ] **Step 2: Run and confirm both fail**
 
-Run: `pnpm --filter @quran-corpus/mobile test -- useReducedMotion`
+Run: `pnpm --filter @quran-corpus/mobile exec vitest run useReducedMotion`
 Expected: FAIL — the hook reads only `AccessibilityInfo`.
 
 - [ ] **Step 3: OR the two sources**
@@ -1295,7 +1295,7 @@ Update the doc comment: the hook is now "the system setting OR the in-app one".
 
 - [ ] **Step 4: Run and confirm both pass**
 
-Run: `pnpm --filter @quran-corpus/mobile test -- useReducedMotion`
+Run: `pnpm --filter @quran-corpus/mobile exec vitest run useReducedMotion`
 Expected: PASS.
 
 - [ ] **Step 5: Mutation-check**
