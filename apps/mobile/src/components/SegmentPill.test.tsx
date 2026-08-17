@@ -5,6 +5,7 @@ import type { WordSegment } from '@quran-corpus/data/mobile';
 import { SegmentPill } from './SegmentPill';
 import { ThemeContext } from '@/theme/themeContext';
 import { themeColors } from '@/theme/tokens';
+import { rgb } from '@/testing/rgb';
 
 vi.mock('react-native', async () => {
   const { host } = await import('@/testing/rnHosts.js');
@@ -29,13 +30,6 @@ function segment(overrides: Partial<WordSegment> = {}): WordSegment {
     root: null,
     ...overrides,
   };
-}
-
-/** jsdom normalizes an inline hex to `rgb(r, g, b)`, so a hex compared straight
- *  against `style.color` never matches -- including when the colour is wrong. */
-function rgb(hex: string): string {
-  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  return `rgb(${r}, ${g}, ${b})`;
 }
 
 describe('SegmentPill', () => {
