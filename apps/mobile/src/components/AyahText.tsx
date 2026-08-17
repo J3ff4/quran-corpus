@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { Text } from 'react-native';
 import { alignAyahTokens, splitBasmala, type Word } from '@quran-corpus/data/mobile';
-import { typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
+import { useArabicSizes } from '@/theme/useArabicSizes';
 
 export interface AyahTextProps {
   textUthmani: string;
@@ -30,6 +30,7 @@ export interface AyahTextProps {
  */
 export function AyahText({ textUthmani, words, surahId, ayahNumber, onWordPress }: AyahTextProps) {
   const theme = useThemeColors();
+  const sizes = useArabicSizes();
   const tokens = useMemo(
     () =>
       words.length > 0
@@ -49,7 +50,7 @@ export function AyahText({ textUthmani, words, surahId, ayahNumber, onWordPress 
   const style = {
     color: theme.text,
     fontFamily: 'Hafs',
-    fontSize: typography.arabicReader,
+    fontSize: sizes.reader,
     textAlign: 'right' as const,
     // textAlign only aligns the block. writingDirection drives the bidi
     // resolution, which orders markers, digits and punctuation correctly

@@ -10,6 +10,7 @@ import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
 import { typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
+import { useArabicSizes } from '@/theme/useArabicSizes';
 
 /** One root: its Arabic form, the derived forms the corpus records for it, and
  *  the lexicon definitions. Reached from the reader sheet's root link or from a
@@ -17,6 +18,7 @@ import { useThemeColors } from '@/theme/themeContext';
 export default function RootRoute() {
   const params = useLocalSearchParams<{ buckwalter: string }>();
   const theme = useThemeColors();
+  const sizes = useArabicSizes();
   const { uiLocale } = useAppSettings();
 
   // Untrusted: a path segment off a deep link. parseRootParam is the same
@@ -98,7 +100,7 @@ export default function RootRoute() {
         style={{
           color: theme.text,
           fontFamily: 'Hafs',
-          fontSize: typography.arabicTitle,
+          fontSize: sizes.title,
           textAlign: 'right',
           // See AyahText: textAlign places the block, writingDirection drives
           // the bidi resolution inside the Arabic run.

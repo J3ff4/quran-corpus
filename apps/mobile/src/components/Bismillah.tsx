@@ -1,6 +1,6 @@
 import { Text } from 'react-native';
-import { typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
+import { useArabicSizes } from '@/theme/useArabicSizes';
 
 /**
  * Basmala banner opening a surah, matching web's
@@ -15,6 +15,7 @@ import { useThemeColors } from '@/theme/themeContext';
  */
 export function Bismillah({ text }: { text: string }) {
   const theme = useThemeColors();
+  const sizes = useArabicSizes();
 
   return (
     <Text
@@ -23,9 +24,7 @@ export function Bismillah({ text }: { text: string }) {
       style={{
         color: theme.text,
         fontFamily: 'Hafs',
-        // typography.arabicReader until useArabicSizes lands in Task 6, which
-        // swaps this call site to sizes.banner.
-        fontSize: typography.arabicReader,
+        fontSize: sizes.banner,
         textAlign: 'center',
         writingDirection: 'rtl',
         marginTop: 12,

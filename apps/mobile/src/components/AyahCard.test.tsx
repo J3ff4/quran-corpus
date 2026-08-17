@@ -3,6 +3,13 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AyahCard } from './AyahCard';
 
+vi.mock('@/settings/settingsStore', () => ({
+  // Not a provider: the real store pulls expo-sqlite into the jsdom module
+  // graph, and every other component test here mocks it the same way. The
+  // step only has to be one useArabicSizes recognises.
+  useAppSettings: () => ({ arabicScale: 'medium' }),
+}));
+
 vi.mock('react-native', async () => {
   const { host } = await import('@/testing/rnHosts.js');
 

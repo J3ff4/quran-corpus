@@ -17,6 +17,13 @@ const mocks = vi.hoisted(() => ({
 
 // Not importOriginal: the real package doesn't parse under vitest (Metro-only
 // syntax), and SurahReader only ever touches these two exports.
+vi.mock('@/settings/settingsStore', () => ({
+  // Not a provider: the real store pulls expo-sqlite into the jsdom module
+  // graph, and every other component test here mocks it the same way. The
+  // step only has to be one useArabicSizes recognises.
+  useAppSettings: () => ({ arabicScale: 'medium' }),
+}));
+
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ setOptions: mocks.setOptions }),
   router: { push: mocks.push },

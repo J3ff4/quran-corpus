@@ -1,7 +1,11 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import SettingsTab from '../../app/(tabs)/settings';
+
+const mocks = vi.hoisted(() => ({
+  setArabicScale: vi.fn(),
+}));
 
 vi.mock('@/settings/settingsStore', () => ({
   useAppSettings: () => ({
@@ -9,10 +13,12 @@ vi.mock('@/settings/settingsStore', () => ({
     contentLanguage: 'en',
     theme: 'system',
     analyticsEnabled: true,
+    arabicScale: 'large',
     setUiLocale: vi.fn(),
     setContentLanguage: vi.fn(),
     setTheme: vi.fn(),
     setAnalyticsEnabled: vi.fn(),
+    setArabicScale: mocks.setArabicScale,
   }),
 }));
 
@@ -26,7 +32,8 @@ vi.mock('expo-router', async () => {
 vi.mock('react-native', async () => {
   const React = await import('react');
   return {
-    Pressable: ({ accessibilityRole, accessibilityState, children, onPress }: {
+    Pressable: ({ accessibilityLabel, accessibilityRole, accessibilityState, children, onPress }: {
+      accessibilityLabel?: string;
       accessibilityRole?: string;
       accessibilityState?: { checked?: boolean; selected?: boolean };
       children?: React.ReactNode;
@@ -36,6 +43,9 @@ vi.mock('react-native', async () => {
         'button',
         {
           role: accessibilityRole,
+          // Forwarded because ChoiceOption sets it precisely so the decorative
+          // bullet stays out of the accessible name.
+          'aria-label': accessibilityLabel,
           'aria-checked': accessibilityState?.checked ?? accessibilityState?.selected,
           onClick: onPress,
         },
@@ -47,6 +57,25 @@ vi.mock('react-native', async () => {
 });
 
 describe('SettingsTab', () => {
+  beforeEach(() => {
+    mocks.setArabicScale.mockClear();
+  });
+
+  afterEach(cleanup);
+
+  it('marks the stored Arabic step as the selected one and writes a new choice', () => {
+    render(<SettingsTab />);
+
+    // 'large' is what the mocked store holds, so the checked radio has to be
+    // that one and not the first option in the row.
+    expect(screen.getByRole('radio', { name: 'Large' }).getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByRole('radio', { name: 'Small' }).getAttribute('aria-checked')).toBe('false');
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Extra large' }));
+
+    expect(mocks.setArabicScale).toHaveBeenCalledWith('xlarge');
+  });
+
   it('exposes analytics as a checked switch', () => {
     render(<SettingsTab />);
 

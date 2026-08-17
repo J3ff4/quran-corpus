@@ -12,6 +12,13 @@ const themeLabelKeys = {
   dark: 'settings.themeDark',
 } as const;
 
+const arabicSizeLabelKeys = {
+  small: 'settings.arabicSizeSmall',
+  medium: 'settings.arabicSizeMedium',
+  large: 'settings.arabicSizeLarge',
+  xlarge: 'settings.arabicSizeXlarge',
+} as const;
+
 /**
  * One option in a single-choice row.
  *
@@ -91,6 +98,22 @@ export default function SettingsTab() {
               label={t(uiLocale, themeLabelKeys[option])}
               selected={option === settings.theme}
               onPress={() => settings.setTheme(option)}
+            />
+          ))}
+        </View>
+      </View>
+      {/* Four discrete steps, not a slider: these are the only values
+          useArabicSizes accepts, and a slider would imply a range that does
+          not exist. */}
+      <View accessibilityRole="radiogroup" style={{ gap: 8 }}>
+        <Text style={{ color: theme.text, fontWeight: '600' }}>{t(uiLocale, 'settings.arabicSize')}</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {(['small', 'medium', 'large', 'xlarge'] as const).map((option) => (
+            <ChoiceOption
+              key={option}
+              label={t(uiLocale, arabicSizeLabelKeys[option])}
+              selected={option === settings.arabicScale}
+              onPress={() => settings.setArabicScale(option)}
             />
           ))}
         </View>

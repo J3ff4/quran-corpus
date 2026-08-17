@@ -57,6 +57,11 @@ export type UiStringKey =
   | 'settings.themeSystem'
   | 'settings.themeLight'
   | 'settings.themeDark'
+  | 'settings.arabicSize'
+  | 'settings.arabicSizeSmall'
+  | 'settings.arabicSizeMedium'
+  | 'settings.arabicSizeLarge'
+  | 'settings.arabicSizeXlarge'
   | 'about.title'
   | 'about.credits'
   | 'about.sourceApprovalIncomplete'
@@ -119,6 +124,11 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.themeSystem': 'System',
     'settings.themeLight': 'Light',
     'settings.themeDark': 'Dark',
+    'settings.arabicSize': 'Arabic size',
+    'settings.arabicSizeSmall': 'Small',
+    'settings.arabicSizeMedium': 'Medium',
+    'settings.arabicSizeLarge': 'Large',
+    'settings.arabicSizeXlarge': 'Extra large',
     'about.title': 'About Quran Corpus',
     'about.credits': 'Credits',
     'about.sourceApprovalIncomplete': 'Source approval incomplete',
@@ -180,6 +190,11 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.themeSystem': 'Tizim',
     'settings.themeLight': 'Yorug‘',
     'settings.themeDark': 'Qorong‘i',
+    'settings.arabicSize': 'Arab yozuvi o‘lchami',
+    'settings.arabicSizeSmall': 'Kichik',
+    'settings.arabicSizeMedium': 'O‘rtacha',
+    'settings.arabicSizeLarge': 'Katta',
+    'settings.arabicSizeXlarge': 'Juda katta',
     'about.title': 'Quran Corpus haqida',
     'about.credits': 'Manbalar',
     'about.sourceApprovalIncomplete': 'Manba tasdig‘i tugallanmagan',
@@ -241,6 +256,11 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.themeSystem': 'Система',
     'settings.themeLight': 'Светлая',
     'settings.themeDark': 'Темная',
+    'settings.arabicSize': 'Размер арабского текста',
+    'settings.arabicSizeSmall': 'Мелкий',
+    'settings.arabicSizeMedium': 'Средний',
+    'settings.arabicSizeLarge': 'Крупный',
+    'settings.arabicSizeXlarge': 'Очень крупный',
     'about.title': 'О Quran Corpus',
     'about.credits': 'Источники',
     'about.sourceApprovalIncomplete': 'Подтверждение источников не завершено',

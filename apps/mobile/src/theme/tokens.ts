@@ -65,12 +65,26 @@ export const themeColors = {
 };
 
 export const typography = {
-  arabicReader: 34,
-  arabicTitle: 48,
+  // Was 34/48. Owner ruling 2026-08-16 after the M3 device run: the Arabic ran
+  // much larger than web's reader (30px) and dominated the card. These are the
+  // 'medium' step; useArabicSizes multiplies them.
+  arabicReader: 28,
+  arabicTitle: 36,
   title: 24,
   body: 16,
   caption: 13,
 };
+
+/** Reader-Arabic size steps. Multipliers, not absolute sizes, so Android's own
+ *  font scaling composes with this rather than being overridden by it. */
+export const arabicScales = {
+  small: 0.8,
+  medium: 1,
+  large: 1.25,
+  xlarge: 1.5,
+} as const;
+
+export type ArabicScale = keyof typeof arabicScales;
 
 export const touchTargets = {
   minimum: 48,

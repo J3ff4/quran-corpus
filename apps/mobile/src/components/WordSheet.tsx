@@ -16,6 +16,7 @@ import { t } from '@/i18n/uiStrings';
 import { useReducedMotion } from '@/motion/useReducedMotion';
 import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
+import { useArabicSizes } from '@/theme/useArabicSizes';
 import { SegmentedWord } from './SegmentedWord';
 import { SegmentPill } from './SegmentPill';
 
@@ -67,6 +68,7 @@ export interface WordSheetProps {
  */
 export function WordSheet({ summary, uiLocale, onClose, onOpenDetail, onOpenRoot }: WordSheetProps) {
   const theme = useThemeColors();
+  const sizes = useArabicSizes();
   const reduced = useReducedMotion();
   const { height: screenHeight } = useWindowDimensions();
   const open = summary !== null;
@@ -203,7 +205,7 @@ export function WordSheet({ summary, uiLocale, onClose, onOpenDetail, onOpenRoot
               marginBottom: 20,
             }}
           />
-          <SegmentedWord word={word} segments={segments} fontSize={typography.arabicTitle} />
+          <SegmentedWord word={word} segments={segments} fontSize={sizes.title} />
           <Text
             style={{ color: gloss ? theme.text : theme.mutedText, fontSize: typography.body }}
           >

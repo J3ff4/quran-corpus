@@ -11,6 +11,7 @@ import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
 import { typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
+import { useArabicSizes } from '@/theme/useArabicSizes';
 
 /** The full morphological analysis of one word, reached from the reader sheet's
  *  "Full analysis" link or from a deep link. */
@@ -21,6 +22,7 @@ export default function WordDetailRoute() {
   const position = useMemo(() => parsePosition(params.position), [params.position]);
   const { contentLanguage, uiLocale } = useAppSettings();
   const theme = useThemeColors();
+  const sizes = useArabicSizes();
   const [summary, setSummary] = useState<WordSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -87,7 +89,7 @@ export default function WordDetailRoute() {
       <Text accessibilityRole="header" style={{ color: theme.mutedText, fontSize: typography.caption }}>
         {`${t(uiLocale, 'reader.ayahLabel')} ${surahId}:${ayahNumber} · ${position}`}
       </Text>
-      <SegmentedWord word={word} segments={segments} fontSize={typography.arabicTitle} />
+      <SegmentedWord word={word} segments={segments} fontSize={sizes.title} />
       {word.transliteration ? (
         // Labelled rather than captioned: a caption between the Arabic and its
         // transliteration breaks the pairing visually, but unlabelled the line
