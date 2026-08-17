@@ -6,17 +6,11 @@ import type { WordSummary } from '@/data/corpusRepository';
 import { WordSheet } from './WordSheet';
 
 const mocks = vi.hoisted(() => ({
-  backPress: null as (() => boolean) | null,
-  backRemove: vi.fn(),
-  // In declaration order: translateY, fade, sheetHeight. The pan gesture is
-  // otherwise unreachable from a test -- GestureDetector is stubbed out -- and
-  // the drag-to-dismiss branch is the one place the two values move apart.
+  // In declaration order: translateY, fade, sheetHeight. Not asserted by any
+  // test here -- the drag/timing/back-button behaviour they'd exercise now
+  // lives in BottomSheet.test.tsx -- but useSharedValue still needs somewhere
+  // to record the values it hands out.
   sharedValues: [] as Array<{ value: unknown }>,
-  panEnd: null as ((event: { translationY: number; velocityY: number }) => void) | null,
-  // Which animation primitive each move went through. The frames are not
-  // observable from jsdom, but the choice of primitive is, and that is the
-  // whole of the owner's "no spring" ruling.
-  animations: [] as string[],
 }));
 
 vi.mock('@/settings/settingsStore', () => ({
@@ -36,10 +30,7 @@ vi.mock('react-native', async () => {
       addEventListener: () => ({ remove: () => {} }),
     },
     BackHandler: {
-      addEventListener: (_event: string, handler: () => boolean) => {
-        mocks.backPress = handler;
-        return { remove: mocks.backRemove };
-      },
+      addEventListener: () => ({ remove: () => {} }),
     },
     Pressable: host('button'),
     StyleSheet: { absoluteFill: {} },
@@ -66,14 +57,7 @@ vi.mock('react-native-reanimated', async () => {
       mocks.sharedValues.push(shared);
       return shared;
     },
-    withSpring: (to: unknown) => {
-      mocks.animations.push('spring');
-      return to;
-    },
-    withTiming: (to: unknown) => {
-      mocks.animations.push('timing');
-      return to;
-    },
+    withTiming: (to: unknown) => to,
     Easing: {
       cubic: (t: number) => t,
       in: (fn: unknown) => fn,
@@ -89,10 +73,7 @@ vi.mock('react-native-gesture-handler', () => ({
       const chain = {
         enabled: () => chain,
         onUpdate: () => chain,
-        onEnd: (handler: (event: { translationY: number; velocityY: number }) => void) => {
-          mocks.panEnd = handler;
-          return chain;
-        },
+        onEnd: () => chain,
       };
       return chain;
     },
@@ -164,11 +145,7 @@ const handlers = {
 
 describe('WordSheet', () => {
   beforeEach(() => {
-    mocks.backPress = null;
-    mocks.backRemove.mockClear();
     mocks.sharedValues = [];
-    mocks.panEnd = null;
-    mocks.animations = [];
   });
 
   afterEach(cleanup);
@@ -179,40 +156,6 @@ describe('WordSheet', () => {
     // Not "renders hidden": an always-mounted sheet keeps a full-screen
     // backdrop in the tree and swallows every tap in the reader.
     expect(container.firstChild).toBeNull();
-  });
-
-  it('restores the backdrop dim when a drag stops short of dismissing', () => {
-    // withSpring is `(to) => to` in this mock, so these are the targets the
-    // gesture commits to, not simulated frames.
-    render(<WordSheet summary={summary()} {...handlers} />);
-    const [translateY, fade] = mocks.sharedValues;
-    expect(mocks.sharedValues).toHaveLength(3);
-
-    // The real sequence: a dismissing drag starts the fade out, its spring is
-    // interrupted by a second drag, and that one stops short. Starting from a
-    // freshly opened sheet instead would assert nothing -- the entrance effect
-    // already left `fade` at 1.
-    mocks.panEnd?.({ translationY: 300, velocityY: 0 });
-    expect(fade!.value).toBe(0);
-
-    // Under a quarter of the 800px height and slow: the sheet springs back.
-    mocks.panEnd?.({ translationY: 40, velocityY: 0 });
-
-    expect(translateY!.value).toBe(0);
-    // A dismiss whose spring is interrupted leaves `fade` heading for 0 and
-    // never fires onClose, so the cancel path has to put it back -- otherwise
-    // the sheet sits fully visible over an undimmed reader, with an invisible
-    // backdrop still eating taps.
-    expect(fade!.value).toBe(1);
-  });
-
-  it('drops the backdrop dim when the drag does dismiss', () => {
-    render(<WordSheet summary={summary()} {...handlers} />);
-    const [, fade] = mocks.sharedValues;
-
-    mocks.panEnd?.({ translationY: 300, velocityY: 0 });
-
-    expect(fade!.value).toBe(0);
   });
 
   it('announces itself as a modal dialog', () => {
@@ -260,27 +203,6 @@ describe('WordSheet', () => {
     fireEvent.click(screen.getByRole('dialog'));
 
     expect(onClose).not.toHaveBeenCalled();
-  });
-
-  it('closes on the Android back button instead of leaving the reader', () => {
-    const onClose = vi.fn();
-    render(<WordSheet summary={summary()} {...handlers} onClose={onClose} />);
-
-    const handled = mocks.backPress?.();
-
-    expect(onClose).toHaveBeenCalledTimes(1);
-    // Returning false lets the press fall through to the navigator as well, so
-    // one back tap would dismiss the sheet AND leave the surah.
-    expect(handled).toBe(true);
-  });
-
-  it('stops intercepting back once it is closed', () => {
-    const { rerender } = render(<WordSheet summary={summary()} {...handlers} />);
-
-    rerender(<WordSheet summary={null} {...handlers} />);
-
-    // Left subscribed, the closed sheet swallows every back press in the app.
-    expect(mocks.backRemove).toHaveBeenCalled();
   });
 
   it('opens the full analysis for the word it is showing', () => {
@@ -331,18 +253,5 @@ describe('WordSheet', () => {
     for (const id of ['full-analysis', 'root-link']) {
       expect(Number(screen.getByTestId(id).style.minHeight.replace('px', ''))).toBeGreaterThanOrEqual(48);
     }
-  });
-
-  it('moves on a timing curve, never a spring', () => {
-    // Owner ruling 2026-08-17, after two failed attempts to tune the spring:
-    // "i dont like that spring. just regular movement is fine." Both the
-    // entrance and the drag-dismiss go through withTiming.
-    render(<WordSheet summary={summary()} {...handlers} />);
-    expect(mocks.animations).not.toHaveLength(0);
-
-    mocks.panEnd?.({ translationY: 300, velocityY: 0 });
-    mocks.panEnd?.({ translationY: 40, velocityY: 0 });
-
-    expect(mocks.animations).not.toContain('spring');
   });
 });
