@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Pressable, Text, View, type ViewToken } from 'react-native';
+import {
+  FlatList,
+  Pressable,
+  Text,
+  View,
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type ViewToken,
+} from 'react-native';
 import { router, useNavigation } from 'expo-router';
 import { splitBasmala, type Word } from '@quran-corpus/data/mobile';
 import type { ReaderAyah, SurahReaderData, WordSummary } from '@/data/corpusRepository';
@@ -117,6 +126,33 @@ export function SurahReader({
       ),
     });
   }, [navigation, data.surah.id, uiLocale, theme.accent]);
+
+  // The nav header's title is empty while the list header's 24pt heading is on
+  // screen and fills in once it scrolls past -- Android's own app-bar
+  // behaviour, and it keeps the surah name on screen at ayah 150 where the list
+  // header is long gone. Measured, not a constant: the header grows with the
+  // Arabic size setting and the OS font scale.
+  const [titleVisible, setTitleVisible] = useState(false);
+  const headerHeightRef = useRef(0);
+
+  useEffect(() => {
+    navigation.setOptions({ title: titleVisible ? data.surah.name_translit : '' });
+  }, [navigation, titleVisible, data.surah.name_translit]);
+
+  const onScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const height = headerHeightRef.current;
+      // Until the header has measured, there is no threshold to cross and the
+      // title stays empty rather than flipping on at offset 0.
+      if (height <= 0) return;
+      // 8dp of slack so a heading resting exactly on the boundary does not
+      // toggle the title on every scroll frame.
+      const next = event.nativeEvent.contentOffset.y > height - 8;
+      // Guarded: setOptions on every frame re-renders the whole navigator.
+      setTitleVisible((current) => (current === next ? current : next));
+    },
+    [],
+  );
 
   // The surah's opening, above ayah 1's card rather than inside it: in the card
   // it sat under the ayah number and bookmark row and still read as ayah 1's
@@ -261,6 +297,9 @@ export function SurahReader({
         keyExtractor={(item) => String(item.ayah.id)}
         ListHeaderComponent={
           <View
+            onLayout={(event: LayoutChangeEvent) => {
+              headerHeightRef.current = event.nativeEvent.layout.height;
+            }}
             style={{
               paddingHorizontal: 20,
               paddingVertical: 16,
@@ -292,6 +331,8 @@ export function SurahReader({
         )}
         onViewableItemsChanged={onViewableItemsChanged.current}
         onScrollToIndexFailed={onScrollToIndexFailed}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         // WordSheet sets role="dialog"/aria-modal, but accessibilityViewIsModal
         // is iOS-only -- on Android the ayah text and both card buttons stay
         // reachable by TalkBack swipe while the sheet covers them, so the

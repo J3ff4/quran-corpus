@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   onScrollToIndexFailed: null as
     | ((info: { index: number; averageItemLength: number }) => void)
     | null,
+  onScroll: null as ((event: { nativeEvent: { contentOffset: { y: number } } }) => void) | null,
+  headerLayout: null as ((height: number) => void) | null,
   scrollToIndex: vi.fn(),
   scrollToOffset: vi.fn(),
   push: vi.fn(),
@@ -79,21 +81,26 @@ vi.mock('./WordSheet', async () => {
 vi.mock('react-native', async () => {
   const React = await import('react');
   const { host } = await import('@/testing/rnHosts.js');
+  // Hoisted: host('div') built inside the render would be a new component
+  // type every pass, remounting the whole subtree on each render.
+  const Div = host('div');
   return {
     // Forwards the ref, so the imperative scroll calls the component makes on
     // mount are observable. A plain function component silently swallows it
     // and every scroll assertion would pass against a null ref.
-    FlatList: ({ data, ListHeaderComponent, renderItem, onViewableItemsChanged, onScrollToIndexFailed, importantForAccessibility, ref }: {
+    FlatList: ({ data, ListHeaderComponent, renderItem, onViewableItemsChanged, onScrollToIndexFailed, onScroll, importantForAccessibility, ref }: {
       data: unknown[];
       ListHeaderComponent?: React.ReactNode;
       renderItem: (info: { item: unknown; index: number }) => React.ReactNode;
       onViewableItemsChanged?: (info: { viewableItems: Array<{ item: unknown }> }) => void;
       onScrollToIndexFailed?: (info: { index: number; averageItemLength: number }) => void;
+      onScroll?: (event: { nativeEvent: { contentOffset: { y: number } } }) => void;
       importantForAccessibility?: string;
       ref?: React.Ref<unknown>;
     }) => {
       mocks.onViewableItemsChanged = onViewableItemsChanged ?? null;
       mocks.onScrollToIndexFailed = onScrollToIndexFailed ?? null;
+      mocks.onScroll = onScroll ?? null;
       React.useImperativeHandle(ref, () => ({
         scrollToIndex: mocks.scrollToIndex,
         scrollToOffset: mocks.scrollToOffset,
@@ -110,7 +117,14 @@ vi.mock('react-native', async () => {
     },
     Pressable: host('button'),
     Text: host('span'),
-    View: host('div'),
+    View: (props: { onLayout?: (event: { nativeEvent: { layout: { height: number } } }) => void }) => {
+      // The list header is the only View in the reader that measures itself.
+      if (props.onLayout) {
+        const { onLayout } = props;
+        mocks.headerLayout = (height: number) => onLayout({ nativeEvent: { layout: { height } } });
+      }
+      return React.createElement(Div, props);
+    },
     useWindowDimensions: () => ({ width: 400, height: 800, scale: 2, fontScale: 1 }),
   };
 });
@@ -121,6 +135,8 @@ describe('SurahReader', () => {
     mocks.scrollToOffset.mockClear();
     mocks.push.mockClear();
     mocks.setOptions.mockClear();
+    mocks.onScroll = null;
+    mocks.headerLayout = null;
   });
 
   afterEach(cleanup);
@@ -436,7 +452,13 @@ describe('SurahReader', () => {
     render(<SurahReader {...baseProps(data)} />);
 
     await waitFor(() => expect(mocks.setOptions).toHaveBeenCalled());
-    const { headerRight } = mocks.setOptions.mock.calls.at(-1)![0];
+    // The last call carrying its own key, not the last call overall: a second
+    // setOptions effect (the nav title, Task 4) fires too, and it does not
+    // carry headerRight.
+    const headerRight = mocks.setOptions.mock.calls
+      .map(([options]) => options.headerRight)
+      .filter(Boolean)
+      .at(-1);
     render(headerRight());
     fireEvent.click(screen.getByTestId('open-wbw'));
 
@@ -518,6 +540,70 @@ describe('SurahReader', () => {
 
     expect(onChangeContentLanguage).toHaveBeenCalledWith('ru');
   });
+
+  function latestTitle() {
+    return mocks.setOptions.mock.calls
+      .map(([options]) => options.title)
+      .filter((title) => title !== undefined)
+      .at(-1);
+  }
+
+  it('leaves the nav title empty while the big heading is on screen', () => {
+    render(<SurahReader {...baseProps(readerData(30))} />);
+
+    // Duplicating the 24pt heading in the app bar on the first screenful is
+    // exactly the doubled-up look CLAUDE.md §8 rules out.
+    expect(latestTitle() ?? '').toBe('');
+  });
+
+  it('fills the nav title in once the heading scrolls away', () => {
+    render(<SurahReader {...baseProps(readerData(30))} />);
+
+    act(() => {
+      mocks.headerLayout?.(180);
+      mocks.onScroll?.({ nativeEvent: { contentOffset: { y: 200 } } });
+    });
+
+    expect(latestTitle()).toBe('Al-Baqarah');
+  });
+
+  it('empties it again on the way back up', () => {
+    render(<SurahReader {...baseProps(readerData(30))} />);
+
+    act(() => {
+      mocks.headerLayout?.(180);
+      mocks.onScroll?.({ nativeEvent: { contentOffset: { y: 200 } } });
+      mocks.onScroll?.({ nativeEvent: { contentOffset: { y: 10 } } });
+    });
+
+    expect(latestTitle()).toBe('');
+  });
+
+  it('measures the threshold rather than assuming one', () => {
+    // The header grows with the Arabic size setting and the OS font scale, so
+    // a constant threshold flips the title at the wrong scroll position on any
+    // device that is not the one it was tuned on.
+    render(<SurahReader {...baseProps(readerData(30))} />);
+
+    act(() => {
+      mocks.headerLayout?.(600);
+      mocks.onScroll?.({ nativeEvent: { contentOffset: { y: 200 } } });
+    });
+
+    expect(latestTitle() ?? '').toBe('');
+  });
+
+  it('holds the title back until the header has measured', () => {
+    render(<SurahReader {...baseProps(readerData(30))} />);
+
+    act(() => {
+      mocks.onScroll?.({ nativeEvent: { contentOffset: { y: 200 } } });
+    });
+
+    // No onLayout yet: with no measured threshold, a naive `y > height` would
+    // read 200 > 0 and flip the title on at the very top of the surah.
+    expect(latestTitle() ?? '').toBe('');
+  });
 });
 
 /** readerData for one surah whose ayah 1 carries the given Uthmani text. */
@@ -568,22 +654,37 @@ function surahWords(ayahId: number) {
 }
 
 function readerData(ayahCount = 1) {
+  // 30 stands in for the header-scroll tests' "long surah" -- everything else
+  // in this file uses a count with no bearing on which surah it is, so this
+  // is the one branch allowed to diverge from al-Fatihah's own facts below.
+  const surah =
+    ayahCount === 30
+      ? {
+          id: 2,
+          name_arabic: 'البقرة',
+          name_translit: 'Al-Baqarah',
+          name_translation: 'The Cow',
+          revelation_type: 'medinan' as const,
+          ayah_count: 286,
+          order_number: 87,
+        }
+      : {
+          id: 1,
+          name_arabic: 'الفاتحة',
+          name_translit: 'Al-Fatihah',
+          name_translation: 'The Opener',
+          revelation_type: 'meccan' as const,
+          ayah_count: 7,
+          order_number: 5,
+        };
   return {
-    surah: {
-      id: 1,
-      name_arabic: 'الفاتحة',
-      name_translit: 'Al-Fatihah',
-      name_translation: 'The Opener',
-      revelation_type: 'meccan' as const,
-      ayah_count: 7,
-      order_number: 5,
-    },
+    surah,
     ayahs: Array.from({ length: ayahCount }, (_unused, index) => ({
       ayah: {
         // Offset from ayah_number on purpose: with the two equal, every test
         // below passes just as well when the code uses the wrong one.
         id: 100 + index,
-        surah_id: 1,
+        surah_id: surah.id,
         ayah_number: index + 1,
         text_uthmani: 'بسم الله',
         text_simple: 'بسم الله',
