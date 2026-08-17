@@ -3,6 +3,7 @@ import { Text } from 'react-native';
 import { alignAyahTokens, type Word } from '@quran-corpus/data/mobile';
 import { typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
+import { Bismillah } from './Bismillah';
 
 export interface AyahTextProps {
   textUthmani: string;
@@ -52,46 +53,54 @@ export function AyahText({ textUthmani, words, surahId, ayahNumber, onWordPress 
 
   // No words yet, or an ayah alignAyahTokens could not reconcile. Either way
   // the reader shows the complete Uthmani text; only the tap targets are
-  // missing, which is the right thing to lose.
+  // missing, which is the right thing to lose. No banner on this path: the
+  // basmala prefix is still inside `textUthmani`, so adding one prints it
+  // twice -- which it did on the first paint of every surah but 1 and 9,
+  // because `words` is empty until the ayah scrolls into view.
   if (!tokens) return <Text style={style}>{textUthmani}</Text>;
 
   return (
-    // Nested <Text>, not a flexWrap row of Views: only one text run gets
-    // native Arabic line breaking and justified mushaf flow.
-    <Text testID="ayah-run" style={style}>
-      {tokens.map((token, index) => {
-        // Rendered as its own banner above the card (see Bismillah), so the
-        // run drops it rather than printing it a second time. Filtered here
-        // and not in the memo so `index` still lines up with the token list
-        // the alignment produced.
-        if (token.isBasmala) return null;
-        const word = token.wordIndex === null ? null : words[token.wordIndex];
-        // The split dropped the whitespace; without this the ayah renders as
-        // one unbroken string.
-        const separator = index === 0 || tokens[index - 1]?.isBasmala ? '' : ' ';
-        if (!word) {
+    <>
+      {/* Owned here, not by AyahCard: only the alignment knows whether the
+          basmala was taken out of the run, and the banner has to appear
+          exactly when it was. */}
+      {tokens.some((token) => token.isBasmala) ? <Bismillah surahId={surahId} /> : null}
+      {/* Nested <Text>, not a flexWrap row of Views: only one text run gets
+          native Arabic line breaking and justified mushaf flow. */}
+      <Text testID="ayah-run" style={style}>
+        {tokens.map((token, index) => {
+          // Taken out of the run because the banner above prints it. Filtered
+          // here and not in the memo so `index` still lines up with the token
+          // list the alignment produced.
+          if (token.isBasmala) return null;
+          const word = token.wordIndex === null ? null : words[token.wordIndex];
+          // The split dropped the whitespace; without this the ayah renders as
+          // one unbroken string.
+          const separator = index === 0 || tokens[index - 1]?.isBasmala ? '' : ' ';
+          if (!word) {
+            return (
+              <Text key={index}>
+                {separator}
+                {token.text}
+              </Text>
+            );
+          }
           return (
-            <Text key={index}>
+            <Text
+              key={index}
+              testID="word-token"
+              accessibilityRole="button"
+              // Transliteration first: TalkBack in a non-Arabic UI locale reads
+              // the Arabic run character by character.
+              accessibilityLabel={word.transliteration ?? word.text_arabic}
+              onPress={() => onWordPress(word)}
+            >
               {separator}
               {token.text}
             </Text>
           );
-        }
-        return (
-          <Text
-            key={index}
-            testID="word-token"
-            accessibilityRole="button"
-            // Transliteration first: TalkBack in a non-Arabic UI locale reads
-            // the Arabic run character by character.
-            accessibilityLabel={word.transliteration ?? word.text_arabic}
-            onPress={() => onWordPress(word)}
-          >
-            {separator}
-            {token.text}
-          </Text>
-        );
-      })}
-    </Text>
+        })}
+      </Text>
+    </>
   );
 }

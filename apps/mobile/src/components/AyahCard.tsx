@@ -6,7 +6,6 @@ import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { AyahMedallion } from './AyahMedallion';
 import { AyahText } from './AyahText';
-import { Bismillah } from './Bismillah';
 
 const pressableStyle = {
   minHeight: touchTargets.minimum,
@@ -87,7 +86,8 @@ export function AyahCard({
           </Pressable>
         </View>
       </View>
-      {ayahNumber === 1 ? <Bismillah surahId={surahId} /> : null}
+      {/* The basmala banner is AyahText's: it renders only when the alignment
+          actually pulled the basmala out of the ayah's run. */}
       <AyahText
         textUthmani={arabicText}
         words={words}

@@ -83,7 +83,11 @@ describe('AyahCard', () => {
     expect(onToggleAudio).not.toHaveBeenCalled();
   });
 
-  it('shows the basmala banner above ayah 1 only', () => {
+  it('renders no basmala banner of its own before the words load', () => {
+    // The banner used to hang off `ayahNumber === 1` here, while AyahText only
+    // strips the basmala on the aligned path -- so every surah but 1 and 9
+    // printed it twice, banner plus inline, until the ayah's words arrived.
+    // AyahText owns the decision now; see its suite for the aligned case.
     const props = {
       ...baseProps,
       arabicText: 'Arabic text',
@@ -96,7 +100,7 @@ describe('AyahCard', () => {
     };
 
     const { rerender } = render(<AyahCard {...props} surahId={2} ayahNumber={1} />);
-    expect(screen.getByTestId('bismillah')).toBeTruthy();
+    expect(screen.queryByTestId('bismillah')).toBeNull();
 
     rerender(<AyahCard {...props} surahId={2} ayahNumber={2} />);
     expect(screen.queryByTestId('bismillah')).toBeNull();

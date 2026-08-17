@@ -137,6 +137,53 @@ describe('AyahText', () => {
     expect(screen.getByTestId('ayah-run').textContent?.startsWith(' ')).toBe(false);
   });
 
+  it('renders the basmala banner exactly once when the run drops it', () => {
+    const { container } = render(
+      <AyahText
+        textUthmani={AL_ALAQ_1}
+        words={alAlaq1Words}
+        surahId={96}
+        ayahNumber={1}
+        onWordPress={noop}
+      />,
+    );
+
+    expect(screen.getByTestId('bismillah')).toBeTruthy();
+    // Banner text and run text together, so a basmala left in both would show
+    // up here as two occurrences.
+    expect(container.textContent?.match(/ٱلرَّحِيمِ/gu)).toHaveLength(1);
+  });
+
+  it('renders no banner while the words are still loading', () => {
+    // The reader starts every ayah with an empty `words`, so this is the first
+    // paint of ayah 1 of every surah but 1 and 9. The basmala is still inside
+    // the unaligned Uthmani text, so a banner here prints it twice.
+    const { container } = render(
+      <AyahText textUthmani={AL_ALAQ_1} words={[]} surahId={96} ayahNumber={1} onWordPress={noop} />,
+    );
+
+    expect(screen.queryByTestId('bismillah')).toBeNull();
+    expect(container.textContent?.match(/ٱلرَّحِيمِ/gu)).toHaveLength(1);
+  });
+
+  it('renders no banner when alignment fails on ayah 1', () => {
+    // Same trap as the loading case: the fallback prints the whole Uthmani
+    // string, basmala included.
+    const { container } = render(
+      <AyahText
+        textUthmani={AL_ALAQ_1}
+        words={threeWords}
+        surahId={96}
+        ayahNumber={1}
+        onWordPress={noop}
+      />,
+    );
+
+    expect(screen.queryAllByTestId('word-token')).toHaveLength(0);
+    expect(screen.queryByTestId('bismillah')).toBeNull();
+    expect(container.textContent?.match(/ٱلرَّحِيمِ/gu)).toHaveLength(1);
+  });
+
   it('keeps the waqf pause marks visible', () => {
     // The whole reason the reader tokenizes Uthmani text rather than word
     // rows. If this passes with the marks missing, the phase's central
