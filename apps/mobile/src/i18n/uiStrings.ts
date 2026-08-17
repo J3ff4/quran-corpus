@@ -31,6 +31,8 @@ export type UiStringKey =
   | 'reader.play'
   | 'reader.pause'
   | 'reader.ayahLabel'
+  | 'reader.chooseLanguage'
+  | 'reader.bismillah'
   | 'word.fullAnalysis'
   | 'word.root'
   | 'word.noGloss'
@@ -103,6 +105,8 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.play': 'Play',
     'reader.pause': 'Pause',
     'reader.ayahLabel': 'Ayah',
+    'reader.chooseLanguage': 'Choose translation language',
+    'reader.bismillah': 'In the name of Allah, the Entirely Merciful, the Especially Merciful',
     'word.fullAnalysis': 'Full analysis',
     'word.root': 'Root',
     'word.noGloss': 'No translation for this word',
@@ -171,6 +175,8 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.play': 'Ijro etish',
     'reader.pause': 'To‘xtatish',
     'reader.ayahLabel': 'Oyat',
+    'reader.chooseLanguage': 'Tarjima tilini tanlang',
+    'reader.bismillah': 'Mehribon va rahmli Alloh nomi bilan',
     'word.fullAnalysis': 'To‘liq tahlil',
     'word.root': 'O‘zak',
     'word.noGloss': 'Bu so‘z uchun tarjima yo‘q',
@@ -239,6 +245,8 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.play': 'Воспроизвести',
     'reader.pause': 'Пауза',
     'reader.ayahLabel': 'Аят',
+    'reader.chooseLanguage': 'Выберите язык перевода',
+    'reader.bismillah': 'Именем Аллаха, Милостивого, Милосердного',
     'word.fullAnalysis': 'Полный разбор',
     'word.root': 'Корень',
     'word.noGloss': 'Нет перевода для этого слова',

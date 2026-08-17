@@ -1,7 +1,7 @@
 import type { ColorValue } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
-export type IconName = 'home' | 'book' | 'bookmark' | 'settings' | 'words';
+export type IconName = 'home' | 'book' | 'bookmark' | 'settings' | 'words' | 'translate';
 
 /**
  * Path data ported verbatim from web so the two products draw one glyph set:
@@ -26,6 +26,15 @@ const PATHS: Record<IconName, string[]> = {
   // Four cells, not a page of lines: the word-by-word screen is a chip grid,
   // and a lines glyph would be the `book` icon again at a smaller size.
   words: ['M4 5h6.5v5.5H4z', 'M13.5 5H20v5.5h-6.5z', 'M4 13.5h6.5V19H4z', 'M13.5 13.5H20V19h-6.5z'],
+  // A globe, not a pair of letterforms: the reader's language control picks
+  // the *translation* language, and a Latin "A" beside an Arabic glyph would
+  // read as the word-by-word toggle. Drawn here -- web's LanguageBar is a text
+  // pill row with no icon to port.
+  translate: [
+    'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z',
+    'M3.5 9h17M3.5 15h17',
+    'M12 3c2.4 2.5 3.6 5.5 3.6 9s-1.2 6.5-3.6 9c-2.4-2.5-3.6-5.5-3.6-9s1.2-6.5 3.6-9z',
+  ],
 };
 
 export function Icon({
