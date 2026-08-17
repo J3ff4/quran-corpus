@@ -130,6 +130,12 @@ export function WordSheet({ summary, uiLocale, onClose, onOpenDetail, onOpenRoot
         });
       } else {
         translateY.value = withSpring(0, SPRING);
+        // Restored, not left alone: a dismiss whose spring is interrupted by a
+        // second pan never reaches its `finished` callback, so onClose never
+        // runs and `fade` is still on its way to 0. Springing the sheet back
+        // without it leaves it fully visible over an undimmed reader, with an
+        // invisible backdrop still swallowing taps.
+        fade.value = withSpring(1, SPRING);
       }
     });
 

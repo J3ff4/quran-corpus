@@ -8,6 +8,11 @@ import { SPRING_DAMPING_RATIO, WordSheet } from './WordSheet';
 const mocks = vi.hoisted(() => ({
   backPress: null as (() => boolean) | null,
   backRemove: vi.fn(),
+  // In declaration order: translateY, fade, sheetHeight. The pan gesture is
+  // otherwise unreachable from a test -- GestureDetector is stubbed out -- and
+  // the drag-to-dismiss branch is the one place the two values move apart.
+  sharedValues: [] as Array<{ value: unknown }>,
+  panEnd: null as ((event: { translationY: number; velocityY: number }) => void) | null,
 }));
 
 vi.mock('react-native', async () => {
@@ -45,7 +50,11 @@ vi.mock('react-native-reanimated', async () => {
     },
     runOnJS: (fn: unknown) => fn,
     useAnimatedStyle: () => ({}),
-    useSharedValue: (initial: unknown) => ({ value: initial }),
+    useSharedValue: (initial: unknown) => {
+      const shared = { value: initial };
+      mocks.sharedValues.push(shared);
+      return shared;
+    },
     withSpring: (to: unknown) => to,
     withTiming: (to: unknown) => to,
   };
@@ -58,7 +67,10 @@ vi.mock('react-native-gesture-handler', () => ({
       const chain = {
         enabled: () => chain,
         onUpdate: () => chain,
-        onEnd: () => chain,
+        onEnd: (handler: (event: { translationY: number; velocityY: number }) => void) => {
+          mocks.panEnd = handler;
+          return chain;
+        },
       };
       return chain;
     },
@@ -132,6 +144,8 @@ describe('WordSheet', () => {
   beforeEach(() => {
     mocks.backPress = null;
     mocks.backRemove.mockClear();
+    mocks.sharedValues = [];
+    mocks.panEnd = null;
   });
 
   afterEach(cleanup);
@@ -142,6 +156,40 @@ describe('WordSheet', () => {
     // Not "renders hidden": an always-mounted sheet keeps a full-screen
     // backdrop in the tree and swallows every tap in the reader.
     expect(container.firstChild).toBeNull();
+  });
+
+  it('restores the backdrop dim when a drag stops short of dismissing', () => {
+    // withSpring is `(to) => to` in this mock, so these are the targets the
+    // gesture commits to, not simulated frames.
+    render(<WordSheet summary={summary()} {...handlers} />);
+    const [translateY, fade] = mocks.sharedValues;
+    expect(mocks.sharedValues).toHaveLength(3);
+
+    // The real sequence: a dismissing drag starts the fade out, its spring is
+    // interrupted by a second drag, and that one stops short. Starting from a
+    // freshly opened sheet instead would assert nothing -- the entrance effect
+    // already left `fade` at 1.
+    mocks.panEnd?.({ translationY: 300, velocityY: 0 });
+    expect(fade!.value).toBe(0);
+
+    // Under a quarter of the 800px height and slow: the sheet springs back.
+    mocks.panEnd?.({ translationY: 40, velocityY: 0 });
+
+    expect(translateY!.value).toBe(0);
+    // A dismiss whose spring is interrupted leaves `fade` heading for 0 and
+    // never fires onClose, so the cancel path has to put it back -- otherwise
+    // the sheet sits fully visible over an undimmed reader, with an invisible
+    // backdrop still eating taps.
+    expect(fade!.value).toBe(1);
+  });
+
+  it('drops the backdrop dim when the drag does dismiss', () => {
+    render(<WordSheet summary={summary()} {...handlers} />);
+    const [, fade] = mocks.sharedValues;
+
+    mocks.panEnd?.({ translationY: 300, velocityY: 0 });
+
+    expect(fade!.value).toBe(0);
   });
 
   it('announces itself as a modal dialog', () => {
