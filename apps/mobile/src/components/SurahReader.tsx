@@ -310,7 +310,7 @@ export function SurahReader({
               {data.surah.name_translit}
             </Text>
             <Text style={{ color: theme.mutedText }}>{data.surah.name_translation}</Text>
-            {basmala ? <Bismillah text={basmala} /> : null}
+            {basmala ? <Bismillah text={basmala} uiLocale={uiLocale} /> : null}
           </View>
         }
         renderItem={({ item }) => (

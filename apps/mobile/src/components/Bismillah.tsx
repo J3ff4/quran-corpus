@@ -1,6 +1,8 @@
 import { Text } from 'react-native';
 import { useThemeColors } from '@/theme/themeContext';
 import { useArabicSizes } from '@/theme/useArabicSizes';
+import type { UiLocaleCode } from '@/i18n/languages';
+import { t } from '@/i18n/uiStrings';
 
 /**
  * Basmala banner opening a surah, matching web's
@@ -13,14 +15,14 @@ import { useArabicSizes } from '@/theme/useArabicSizes';
  * basmala IS its ayah 1 and at-Tawba has none; on both, splitBasmala returns
  * null and the caller renders nothing.
  */
-export function Bismillah({ text }: { text: string }) {
+export function Bismillah({ text, uiLocale }: { text: string; uiLocale: UiLocaleCode }) {
   const theme = useThemeColors();
   const sizes = useArabicSizes();
 
   return (
     <Text
       testID="bismillah"
-      accessibilityLabel="Bismillah"
+      accessibilityLabel={t(uiLocale, 'reader.bismillah')}
       style={{
         color: theme.text,
         fontFamily: 'Hafs',

@@ -27,7 +27,7 @@ describe('Bismillah', () => {
   afterEach(cleanup);
 
   it('renders the text it is handed', () => {
-    render(<Bismillah text="بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ" />);
+    render(<Bismillah text="بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ" uiLocale="en" />);
 
     expect(screen.getByTestId('bismillah').textContent).toBe('بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ');
   });
@@ -36,8 +36,22 @@ describe('Bismillah', () => {
     // 95:1 and 97:1 carry a shadda on the ba. Held as a constant here, the
     // banner would contradict the mushaf text on those two surahs; who decides
     // is splitBasmala, and this asserts the component defers to it.
-    render(<Bismillah text="بِّسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ" />);
+    render(<Bismillah text="بِّسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ" uiLocale="en" />);
 
     expect(screen.getByTestId('bismillah').textContent).toBe('بِّسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ');
+  });
+
+  it('announces itself in the reader UI language, not always English', () => {
+    // A Russian TalkBack user hearing "Bismillah" is being read a transliterated
+    // English word. The Arabic on screen is the same in every locale; the label
+    // that describes it is not.
+    const { rerender } = render(<Bismillah text="بِسْمِ ٱللَّهِ" uiLocale="en" />);
+    const english = screen.getByTestId('bismillah').getAttribute('aria-label');
+
+    rerender(<Bismillah text="بِسْمِ ٱللَّهِ" uiLocale="ru" />);
+    const russian = screen.getByTestId('bismillah').getAttribute('aria-label');
+
+    expect(english).toBe('In the name of Allah, the Entirely Merciful, the Especially Merciful');
+    expect(russian).toBe('Именем Аллаха, Милостивого, Милосердного');
   });
 });
