@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { openCorpusDb, useCorpusFonts } from '@/data/openCorpusDb';
 import { AppSettingsProvider } from '@/settings/settingsStore';
 import { ThemeProvider } from '@/theme/ThemeProvider';
+import { useThemeColors } from '@/theme/themeContext';
 
 // Hold the native splash across the first-launch extract below. Expo hides it
 // as soon as the root component mounts, which on a cold install would flash
@@ -75,9 +76,31 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AppSettingsProvider>
         <ThemeProvider>
-          <Stack screenOptions={{ headerShown: false }} />
+          <AppStack />
         </ThemeProvider>
       </AppSettingsProvider>
     </GestureHandlerRootView>
+  );
+}
+
+// Split out of RootLayout: useThemeColors only works below ThemeProvider, and
+// this renders inside it.
+function AppStack() {
+  const theme = useThemeColors();
+  return (
+    <Stack
+      screenOptions={{
+        headerStyle: { backgroundColor: theme.background },
+        headerTintColor: theme.text,
+        headerShadowVisible: false,
+        // Every screen renders its own heading; a nav title repeating it would
+        // put the same words on screen twice. The header exists for the back
+        // affordance.
+        title: '',
+      }}
+    >
+      {/* The tab group draws its own headers via app/(tabs)/_layout. */}
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+    </Stack>
   );
 }

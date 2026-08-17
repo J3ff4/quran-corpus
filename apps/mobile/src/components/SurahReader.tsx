@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, Text, View, type ViewToken } from 'react-native';
-import { router } from 'expo-router';
+import { router, useNavigation } from 'expo-router';
 import type { Word } from '@quran-corpus/data/mobile';
 import type { ReaderAyah, SurahReaderData, WordSummary } from '@/data/corpusRepository';
 import type { UiLocaleCode } from '@/i18n/languages';
@@ -61,9 +61,33 @@ export function SurahReader({
   onReadingAyah,
 }: SurahReaderProps) {
   const theme = useThemeColors();
+  const navigation = useNavigation();
   const listRef = useRef<FlatList<SurahReaderData['ayahs'][number]>>(null);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retriesRef = useRef(0);
+
+  // Fixed, not scrolled away with the title: the nav header exists as of the
+  // M3b header pass, so the reader's one action no longer has to ride the list.
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable
+          testID="open-wbw"
+          accessibilityRole="button"
+          accessibilityLabel={t(uiLocale, 'wbw.title')}
+          onPress={() => router.push(`/surah/${data.surah.id}/words`)}
+          style={{
+            minHeight: touchTargets.minimum,
+            minWidth: touchTargets.minimum,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Icon name="words" color={theme.accent} />
+        </Pressable>
+      ),
+    });
+  }, [navigation, data.surah.id, uiLocale, theme.accent]);
 
   const initialIndex = useMemo(() => {
     if (!initialAyahNumber) return -1;
@@ -182,40 +206,15 @@ export function SurahReader({
         ListHeaderComponent={
           <View
             style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
               paddingHorizontal: 20,
               paddingVertical: 16,
-              gap: 12,
+              gap: 6,
             }}
           >
-            <View style={{ flexShrink: 1, gap: 6 }}>
-              <Text accessibilityRole="header" style={{ color: theme.text, fontSize: 24, fontWeight: '700' }}>
-                {data.surah.name_translit}
-              </Text>
-              <Text style={{ color: theme.mutedText }}>{data.surah.name_translation}</Text>
-            </View>
-            {/* ponytail: lives in the list header, so it scrolls away with the
-                surah title. The morphology tab is the persistent entry point;
-                giving the reader its own fixed top bar to hold one button means
-                either a second surah title on screen or a navigation-header
-                rewrite, and app/_layout.tsx currently runs headerShown: false
-                for every route. */}
-            <Pressable
-              testID="open-wbw"
-              accessibilityRole="button"
-              accessibilityLabel={t(uiLocale, 'wbw.title')}
-              onPress={() => router.push(`/surah/${data.surah.id}/words`)}
-              style={{
-                minHeight: touchTargets.minimum,
-                minWidth: touchTargets.minimum,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Icon name="words" color={theme.accent} />
-            </Pressable>
+            <Text accessibilityRole="header" style={{ color: theme.text, fontSize: 24, fontWeight: '700' }}>
+              {data.surah.name_translit}
+            </Text>
+            <Text style={{ color: theme.mutedText }}>{data.surah.name_translation}</Text>
           </View>
         }
         renderItem={({ item }) => (

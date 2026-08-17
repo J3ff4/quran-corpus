@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SurahReader } from './SurahReader';
 
@@ -11,9 +11,15 @@ const mocks = vi.hoisted(() => ({
   scrollToIndex: vi.fn(),
   scrollToOffset: vi.fn(),
   push: vi.fn(),
+  setOptions: vi.fn(),
 }));
 
-vi.mock('expo-router', () => ({ router: { push: mocks.push } }));
+// Not importOriginal: the real package doesn't parse under vitest (Metro-only
+// syntax), and SurahReader only ever touches these two exports.
+vi.mock('expo-router', () => ({
+  useNavigation: () => ({ setOptions: mocks.setOptions }),
+  router: { push: mocks.push },
+}));
 
 // The sheet has its own suite; stubbed here so this one covers the wiring --
 // which summary opens, and which route each action pushes -- without pulling
@@ -88,6 +94,7 @@ describe('SurahReader', () => {
     mocks.scrollToIndex.mockClear();
     mocks.scrollToOffset.mockClear();
     mocks.push.mockClear();
+    mocks.setOptions.mockClear();
   });
 
   afterEach(cleanup);
@@ -310,17 +317,20 @@ describe('SurahReader', () => {
     expect(mocks.push).toHaveBeenCalledWith('/root/r%24m');
   });
 
-  it('opens the word-by-word screen for the surah on display', async () => {
+  it('offers word-by-word from the navigation header', async () => {
     // Surah 2, not the fixture's default 1: with the id equal to the literal
     // in the route this passes just as well when the control is hardcoded.
     const base = readerData(1);
     const data = { ...base, surah: { ...base.surah, id: 2 } };
     render(<SurahReader {...baseProps(data)} />);
 
+    await waitFor(() => expect(mocks.setOptions).toHaveBeenCalled());
+    const { headerRight } = mocks.setOptions.mock.calls.at(-1)![0];
+    render(headerRight());
     fireEvent.click(screen.getByTestId('open-wbw'));
 
-    // The surah on screen, not a hardcoded one: the control lives in the list
-    // header, which every surah renders.
+    // The surah on screen, not a hardcoded one: setOptions is re-run whenever
+    // data.surah.id changes.
     expect(mocks.push).toHaveBeenCalledWith('/surah/2/words');
   });
 });
