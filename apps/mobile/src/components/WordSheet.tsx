@@ -28,7 +28,13 @@ import { SegmentPill } from './SegmentPill';
 // reanimated's withSpring defaults mass 1, so the damping ratio is
 // damping / (2 * sqrt(stiffness)). 28/320 gave 0.78 -- underdamped, and the
 // overshoot is what read as jumpy on a 120 Hz panel.
-const SPRING = { damping: 38, stiffness: 320 } as const;
+//
+// Stiffness raised 320 -> 520 on the second device run (owner, 2026-08-17:
+// "not satisfied with spring speed, make it faster"). Damping is raised with
+// it, not left alone: settle time falls out of sqrt(stiffness), so keeping
+// damping at 38 would have bought the speed by dropping the ratio back under
+// 1 and reintroducing the overshoot the first pass removed.
+const SPRING = { damping: 46, stiffness: 520 } as const;
 
 /** Exported for the test: RN's animation internals are not observable from
  *  jsdom, so the physics is asserted at the parameter instead of the frames. */
