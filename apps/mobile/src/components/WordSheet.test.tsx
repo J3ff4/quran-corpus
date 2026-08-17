@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Word, WordSegment } from '@quran-corpus/data/mobile';
 import type { WordSummary } from '@/data/corpusRepository';
-import { SPRING_DAMPING_RATIO, WordSheet } from './WordSheet';
+import { WordSheet } from './WordSheet';
 
 const mocks = vi.hoisted(() => ({
   backPress: null as (() => boolean) | null,
@@ -13,6 +13,10 @@ const mocks = vi.hoisted(() => ({
   // the drag-to-dismiss branch is the one place the two values move apart.
   sharedValues: [] as Array<{ value: unknown }>,
   panEnd: null as ((event: { translationY: number; velocityY: number }) => void) | null,
+  // Which animation primitive each move went through. The frames are not
+  // observable from jsdom, but the choice of primitive is, and that is the
+  // whole of the owner's "no spring" ruling.
+  animations: [] as string[],
 }));
 
 vi.mock('@/settings/settingsStore', () => ({
@@ -62,8 +66,19 @@ vi.mock('react-native-reanimated', async () => {
       mocks.sharedValues.push(shared);
       return shared;
     },
-    withSpring: (to: unknown) => to,
-    withTiming: (to: unknown) => to,
+    withSpring: (to: unknown) => {
+      mocks.animations.push('spring');
+      return to;
+    },
+    withTiming: (to: unknown) => {
+      mocks.animations.push('timing');
+      return to;
+    },
+    Easing: {
+      cubic: (t: number) => t,
+      in: (fn: unknown) => fn,
+      out: (fn: unknown) => fn,
+    },
   };
 });
 
@@ -153,6 +168,7 @@ describe('WordSheet', () => {
     mocks.backRemove.mockClear();
     mocks.sharedValues = [];
     mocks.panEnd = null;
+    mocks.animations = [];
   });
 
   afterEach(cleanup);
@@ -317,12 +333,16 @@ describe('WordSheet', () => {
     }
   });
 
-  it('opens without overshooting', () => {
-    // ζ >= 1 is critically damped: the sheet settles at its resting position
-    // instead of passing it and coming back. Owner report 2026-08-16 called the
-    // ported web value "too springy and jumpy" on device.
-    expect(SPRING_DAMPING_RATIO).toBeGreaterThanOrEqual(1);
-    // And not so stiff it stops reading as a spring at all.
-    expect(SPRING_DAMPING_RATIO).toBeLessThan(1.2);
+  it('moves on a timing curve, never a spring', () => {
+    // Owner ruling 2026-08-17, after two failed attempts to tune the spring:
+    // "i dont like that spring. just regular movement is fine." Both the
+    // entrance and the drag-dismiss go through withTiming.
+    render(<WordSheet summary={summary()} {...handlers} />);
+    expect(mocks.animations).not.toHaveLength(0);
+
+    mocks.panEnd?.({ translationY: 300, velocityY: 0 });
+    mocks.panEnd?.({ translationY: 40, velocityY: 0 });
+
+    expect(mocks.animations).not.toContain('spring');
   });
 });

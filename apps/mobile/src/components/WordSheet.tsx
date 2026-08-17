@@ -2,10 +2,10 @@ import { useEffect, useRef } from 'react';
 import { BackHandler, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import Animated, {
+  Easing,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -20,26 +20,17 @@ import { useArabicSizes } from '@/theme/useArabicSizes';
 import { SegmentedWord } from './SegmentedWord';
 import { SegmentPill } from './SegmentPill';
 
-// NOT web's WordPopover spring any more. Owner ruling 2026-08-16, after the M3
-// device run: web keeps its bounce, mobile softens. The port comment that used
-// to sit here said "do not retune one of them alone" -- that is now explicitly
-// overridden for this value, the same way the accent colour diverges in
-// theme/tokens.ts. Do not "fix" this back to web's numbers.
+// No spring. Owner ruling 2026-08-17, after the third device run: "i dont like
+// that spring. just regular movement is fine." Two prior passes tried to tune
+// it -- web's ported 28/320, then a critically damped 46/520 -- and neither
+// landed, so the physics is gone rather than retuned a third time. Web's
+// WordPopover keeps its own spring; this value diverges deliberately, the same
+// way the accent colour does in theme/tokens.ts. Do not port a spring back in.
 //
-// reanimated's withSpring defaults mass 1, so the damping ratio is
-// damping / (2 * sqrt(stiffness)). 28/320 gave 0.78 -- underdamped, and the
-// overshoot is what read as jumpy on a 120 Hz panel.
-//
-// Stiffness raised 320 -> 520 on the second device run (owner, 2026-08-17:
-// "not satisfied with spring speed, make it faster"). Damping is raised with
-// it, not left alone: settle time falls out of sqrt(stiffness), so keeping
-// damping at 38 would have bought the speed by dropping the ratio back under
-// 1 and reintroducing the overshoot the first pass removed.
-const SPRING = { damping: 46, stiffness: 520 } as const;
-
-/** Exported for the test: RN's animation internals are not observable from
- *  jsdom, so the physics is asserted at the parameter instead of the frames. */
-export const SPRING_DAMPING_RATIO = SPRING.damping / (2 * Math.sqrt(SPRING.stiffness));
+// Decelerating in, accelerating out: the sheet arrives under control and
+// leaves without lingering. Durations are Android's own sheet range.
+const ENTER = { duration: 220, easing: Easing.out(Easing.cubic) } as const;
+const EXIT = { duration: 180, easing: Easing.in(Easing.cubic) } as const;
 const FADE_MS = 150;
 // Fractions of the sheet's own height and dp/s, matching Android's own sheets:
 // a short flick dismisses without having to drag the whole way down.
@@ -104,8 +95,8 @@ export function WordSheet({ summary, uiLocale, onClose, onOpenDetail, onOpenRoot
       fade.value = withTiming(1, { duration: FADE_MS });
     } else {
       translateY.value = screenHeightRef.current;
-      translateY.value = withSpring(0, SPRING);
-      fade.value = withSpring(1, SPRING);
+      translateY.value = withTiming(0, ENTER);
+      fade.value = withTiming(1, { duration: FADE_MS });
     }
   }, [open, reduced, translateY, fade]);
 
@@ -130,20 +121,20 @@ export function WordSheet({ summary, uiLocale, onClose, onOpenDetail, onOpenRoot
     .onEnd((event) => {
       const height = sheetHeight.value || screenHeight;
       if (event.translationY > height * DISMISS_FRACTION || event.velocityY > DISMISS_VELOCITY) {
-        fade.value = withSpring(0, SPRING);
-        translateY.value = withSpring(height, SPRING, (finished?: boolean) => {
+        fade.value = withTiming(0, { duration: FADE_MS });
+        translateY.value = withTiming(height, EXIT, (finished?: boolean) => {
           // Only on a settled animation: unmounting mid-flight leaves the
           // sheet half-way down for the frame before it disappears.
           if (finished) runOnJS(onClose)();
         });
       } else {
-        translateY.value = withSpring(0, SPRING);
-        // Restored, not left alone: a dismiss whose spring is interrupted by a
-        // second pan never reaches its `finished` callback, so onClose never
-        // runs and `fade` is still on its way to 0. Springing the sheet back
-        // without it leaves it fully visible over an undimmed reader, with an
-        // invisible backdrop still swallowing taps.
-        fade.value = withSpring(1, SPRING);
+        translateY.value = withTiming(0, ENTER);
+        // Restored, not left alone: a dismiss interrupted by a second pan never
+        // reaches its `finished` callback, so onClose never runs and `fade` is
+        // still on its way to 0. Sliding the sheet back without it leaves it
+        // fully visible over an undimmed reader, with an invisible backdrop
+        // still swallowing taps.
+        fade.value = withTiming(1, { duration: FADE_MS });
       }
     });
 
