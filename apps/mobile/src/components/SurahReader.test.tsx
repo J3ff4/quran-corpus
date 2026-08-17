@@ -32,6 +32,22 @@ vi.mock('expo-router', () => ({
 // The sheet has its own suite; stubbed here so this one covers the wiring --
 // which summary opens, and which route each action pushes -- without pulling
 // reanimated and gesture-handler into it.
+vi.mock('./LanguageSheet', async () => {
+  const React = await import('react');
+  return {
+    LanguageSheet: ({ onChange, onClose }: {
+      onChange: (code: string) => void;
+      onClose: () => void;
+    }) =>
+      React.createElement(
+        'div',
+        { 'data-testid': 'language-sheet' },
+        React.createElement('button', { 'data-testid': 'pick-ru', onClick: () => onChange('ru') }),
+        React.createElement('button', { 'data-testid': 'close-language', onClick: onClose }),
+      ),
+  };
+});
+
 vi.mock('./WordSheet', async () => {
   const React = await import('react');
   return {
@@ -120,6 +136,8 @@ describe('SurahReader', () => {
       uiLocale: 'en' as const,
       onToggleBookmark: vi.fn(),
       onToggleAudio: vi.fn(),
+      contentLanguage: 'en' as const,
+      onChangeContentLanguage: vi.fn(),
     };
 
     const { rerender } = render(<SurahReader {...props} onReadingAyah={firstHandler} />);
@@ -457,6 +475,49 @@ describe('SurahReader', () => {
     // not a prefix, so stripping it deletes real text.
     expect(container.textContent).toContain('ٱلرَّحِيمِ');
   });
+
+  it('puts both reader actions in the nav header, not above the ayahs', () => {
+    render(<SurahReader {...baseProps(readerData(3))} />);
+
+    // Two calls or one with both children -- what matters is that the header
+    // ends up carrying a word-by-word control AND a language control. The
+    // language pills used to sit in a fixed band above the list, costing a
+    // strip of every screenful (owner ruling 2026-08-17).
+    const headerRight = mocks.setOptions.mock.calls
+      .map(([options]) => options.headerRight)
+      .filter(Boolean)
+      .at(-1);
+    expect(headerRight).toBeTypeOf('function');
+
+    render(<div>{headerRight()}</div>);
+    expect(screen.getByTestId('open-wbw')).toBeTruthy();
+    expect(screen.getByTestId('open-language')).toBeTruthy();
+  });
+
+  it('opens the language sheet from the header and routes the pick out', () => {
+    const onChangeContentLanguage = vi.fn();
+    render(
+      <SurahReader
+        {...baseProps(readerData(3))}
+        onChangeContentLanguage={onChangeContentLanguage}
+      />,
+    );
+
+    const headerRight = mocks.setOptions.mock.calls
+      .map(([options]) => options.headerRight)
+      .filter(Boolean)
+      .at(-1);
+    render(<div>{headerRight()}</div>);
+
+    // Closed until asked for: an always-mounted sheet leaves a full-screen
+    // backdrop swallowing every tap in the reader.
+    expect(screen.queryByTestId('language-sheet')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('open-language'));
+    fireEvent.click(screen.getByTestId('pick-ru'));
+
+    expect(onChangeContentLanguage).toHaveBeenCalledWith('ru');
+  });
 });
 
 /** readerData for one surah whose ayah 1 carries the given Uthmani text. */
@@ -481,6 +542,8 @@ function baseProps(data: ReturnType<typeof readerData>) {
     uiLocale: 'en' as const,
     onToggleBookmark: vi.fn(),
     onToggleAudio: vi.fn(),
+    contentLanguage: 'en' as const,
+    onChangeContentLanguage: vi.fn(),
   };
 }
 

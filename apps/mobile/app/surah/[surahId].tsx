@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 import { useAyahAudioController } from '@/audio/ayahAudio';
-import { LanguageSelector } from '@/components/LanguageSelector';
 import { SurahReader } from '@/components/SurahReader';
 import { getSurahReader, getWordsForAyah, type SurahReaderData } from '@/data/corpusRepository';
 import { createLatestReadingPositionRecorder } from '@/data/latestReadingPositionRecorder';
@@ -171,13 +170,14 @@ export default function SurahRoute() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
-      <LanguageSelector value={contentLanguage} onChange={setContentLanguage} />
       <SurahReader
         data={reader}
         bookmarkedAyahs={bookmarks}
         playingAyah={audio.playingAyah}
         audioEnabled={audio.audioEnabled}
         uiLocale={uiLocale}
+        contentLanguage={contentLanguage}
+        onChangeContentLanguage={setContentLanguage}
         initialAyahNumber={initialAyahNumber}
         loadWords={loadWords}
         loadWordSummary={loadWordSummary}

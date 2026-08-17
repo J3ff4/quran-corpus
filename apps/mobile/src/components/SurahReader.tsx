@@ -3,11 +3,12 @@ import { FlatList, Pressable, Text, View, type ViewToken } from 'react-native';
 import { router, useNavigation } from 'expo-router';
 import { splitBasmala, type Word } from '@quran-corpus/data/mobile';
 import type { ReaderAyah, SurahReaderData, WordSummary } from '@/data/corpusRepository';
-import type { UiLocaleCode } from '@/i18n/languages';
+import type { ContentLanguageCode, UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
 
 import { AyahCard } from './AyahCard';
 import { Bismillah } from './Bismillah';
+import { LanguageSheet } from './LanguageSheet';
 import { WordSheet } from './WordSheet';
 import { Icon } from './icons/Icon';
 import { touchTargets } from '@/theme/tokens';
@@ -19,6 +20,11 @@ interface SurahReaderProps {
   playingAyah: number | null;
   audioEnabled: boolean;
   uiLocale: UiLocaleCode;
+  /** The reader owns no settings state; the screen above it does. Passed down
+   *  rather than read from the store so this component stays renderable in a
+   *  test without the store's expo-sqlite import. */
+  contentLanguage: ContentLanguageCode;
+  onChangeContentLanguage: (code: ContentLanguageCode) => void;
   /** Ayah to open at, from a bookmark or the saved reading position. */
   initialAyahNumber?: number | null;
   /** Omitted leaves the reader as a plain mushaf: every ayah renders its full
@@ -54,6 +60,8 @@ export function SurahReader({
   playingAyah,
   audioEnabled,
   uiLocale,
+  contentLanguage,
+  onChangeContentLanguage,
   initialAyahNumber,
   loadWords,
   loadWordSummary,
@@ -67,25 +75,45 @@ export function SurahReader({
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retriesRef = useRef(0);
 
+  const [languageOpen, setLanguageOpen] = useState(false);
+
   // Fixed, not scrolled away with the title: the nav header exists as of the
-  // M3b header pass, so the reader's one action no longer has to ride the list.
+  // M3b header pass, so the reader's actions no longer ride the list. The
+  // language control joined them on 2026-08-17 -- it used to be a fixed pill
+  // band above the ayahs, costing a strip of every screenful.
   useEffect(() => {
     navigation.setOptions({
       headerRight: () => (
-        <Pressable
-          testID="open-wbw"
-          accessibilityRole="button"
-          accessibilityLabel={t(uiLocale, 'wbw.title')}
-          onPress={() => router.push(`/surah/${data.surah.id}/words`)}
-          style={{
-            minHeight: touchTargets.minimum,
-            minWidth: touchTargets.minimum,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Icon name="words" color={theme.accent} />
-        </Pressable>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Pressable
+            testID="open-language"
+            accessibilityRole="button"
+            accessibilityLabel={t(uiLocale, 'reader.chooseLanguage')}
+            onPress={() => setLanguageOpen(true)}
+            style={{
+              minHeight: touchTargets.minimum,
+              minWidth: touchTargets.minimum,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Icon name="translate" color={theme.accent} />
+          </Pressable>
+          <Pressable
+            testID="open-wbw"
+            accessibilityRole="button"
+            accessibilityLabel={t(uiLocale, 'wbw.title')}
+            onPress={() => router.push(`/surah/${data.surah.id}/words`)}
+            style={{
+              minHeight: touchTargets.minimum,
+              minWidth: touchTargets.minimum,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Icon name="words" color={theme.accent} />
+          </Pressable>
+        </View>
       ),
     });
   }, [navigation, data.surah.id, uiLocale, theme.accent]);
@@ -289,6 +317,14 @@ export function SurahReader({
           router.push(`/root/${encodeURIComponent(rootBuckwalter)}`);
         }}
       />
+      {languageOpen ? (
+        <LanguageSheet
+          value={contentLanguage}
+          uiLocale={uiLocale}
+          onChange={onChangeContentLanguage}
+          onClose={() => setLanguageOpen(false)}
+        />
+      ) : null}
     </View>
   );
 }
