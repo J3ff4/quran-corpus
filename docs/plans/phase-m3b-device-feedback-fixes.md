@@ -1367,7 +1367,7 @@ are declined and why. Re-run only if a fix was substantial.
 - Modify: `README.md:43-77`
 - Modify: `docs/plans/phase-m3-morphology-mvp.md` (Verification Log)
 
-- [ ] **Step 1: Fix check 8's wording**
+- [x] **Step 1: Fix check 8's wording**
 
 Replace README line 59-61:
 
@@ -1381,7 +1381,7 @@ Replace README line 59-61:
    Developer options → Animator duration scale → Animation off.
 ```
 
-- [ ] **Step 2: Add the checks this plan's fixes need**
+- [x] **Step 2: Add the checks this plan's fixes need**
 
 Append to the M3 list:
 
@@ -1401,11 +1401,11 @@ Append to the M3 list:
     the sheet hero and the root screen all change; the UI text does not.
 ```
 
-- [ ] **Step 3: Update Current Status**
+- [x] **Step 3: Update Current Status**
 
 README line 77 still describes M1/M0 only. Replace with M3's actual state.
 
-- [ ] **Step 4: Build**
+- [x] **Step 4: Build**
 
 ```bash
 npx eas-cli@latest build --platform android --profile preview
@@ -1414,14 +1414,14 @@ npx eas-cli@latest build --platform android --profile preview
 Confirm the upload is **~43 MB**. A ~5 MB upload means `.easignore` dropped the
 bundled DB and every check will fail for the wrong reason.
 
-- [ ] **Step 5: Run all 22 checks on the physical device**
+- [x] **Step 5: Run all 22 checks on the physical device**
 
 Record each as PASS / FAIL / unexercised in the M3 plan's Verification Log.
 Per the M2 log convention: **unexercised checks are recorded as unexercised,
 never implied to have passed.** A FAIL is a finding, recorded with whether its
 fix was re-verified on device or carried to the next build.
 
-- [ ] **Step 6: Commit the log**
+- [x] **Step 6: Commit the log**
 
 ```bash
 git add README.md docs/plans/phase-m3-morphology-mvp.md docs/plans/phase-m3b-device-feedback-fixes.md

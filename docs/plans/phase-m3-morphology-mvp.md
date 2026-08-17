@@ -2227,46 +2227,64 @@ git commit -m "docs(mobile): record the M3 on-device verification run"
 
 ## Verification Log
 
-### Run 1 — pending
+### Run 1 — 2026-08-17, owner's physical Android device
 
-APK built and awaiting the device run. EAS build `bac194d4` at commit `9421560`
-(preview profile, Android APK). Upload was 43.6 MB, so the bundled DB went with
-it — a ~5 MB upload would have meant `.easignore` dropped it.
+EAS build `bac194d4` at commit `9421560` (preview profile, Android APK). Upload
+was 43.6 MB, so the bundled DB went with it — a ~5 MB upload would have meant
+`.easignore` dropped it.
 
-The table below is the README's 22 checks, transcribed for filling in. **Every
-row reads `unexercised` until the device says otherwise.** Per the M2 log's
-convention, an unexercised check is recorded as unexercised and never implied to
-have passed. A FAIL is a finding, recorded with whether its fix was re-verified
-on device or carried to the next build.
+**All 22 checks PASS.** One finding against check 4, which is a rejected
+behaviour rather than a broken one — the sheet moves correctly, the owner does
+not want it to move that way. Per the M2 log's convention, an unexercised check
+is recorded as unexercised and never implied to have passed; the M2 carry-over
+below is the only row not exercised on this build.
 
 | # | Check | Result |
 | --- | --- | --- |
-| 1 | Pause marks still visible in 2:255 | unexercised |
-| 2 | Basmala still prefixes ayah 1 of al-Alaq (96) | unexercised |
-| 3 | `۞` marker still leads 2:44 | unexercised |
-| 4 | Word tap springs the sheet up from the bottom | unexercised |
-| 5 | Sheet drag: halfway springs back, past halfway dismisses | unexercised |
-| 6 | Backdrop tap and Android back both dismiss the sheet | unexercised |
-| 7 | Reader scroll does not fight the sheet drag | unexercised |
-| 8 | Reduce animations — in-app switch, both directions, then the OS setting | unexercised |
-| 9 | Full analysis: segment pills coloured and legible | unexercised |
-| 10 | Root screen shows Arabic, forms and a definition | unexercised |
-| 11 | Rootless word (2:255 هُوَ) shows no root link | unexercised |
-| 12 | Word-by-word pages to 286 and disables Next | unexercised |
-| 13 | Morphology tab opens WbW at the last-read position | unexercised |
-| 14 | Checks 4, 9, 12 in dark mode — every POS colour legible | unexercised |
-| 15 | System font size at maximum: checks 4 and 12, nothing clips | unexercised |
-| 16 | Airplane mode: checks 1, 4, 12 all local | unexercised |
-| 17 | Basmala is its own banner above ayah 1, not also inside it | unexercised |
-| 18 | al-Fatiha basmala once as ayah 1; at-Tawba none | unexercised |
-| 19 | Header back returns to reader; Android back to the surah list | unexercised |
-| 20 | Morphology tab keeps the tab bar, one header bar, back exits | unexercised |
-| 21 | Multi-segment word coloured per segment, joined with no gaps | unexercised |
-| 22 | Arabic size Small and Extra large move the Arabic, not the UI | unexercised |
+| 1 | Pause marks still visible in 2:255 | PASS |
+| 2 | Basmala still prefixes ayah 1 of al-Alaq (96) | PASS |
+| 3 | `۞` marker still leads 2:44 | PASS |
+| 4 | Word tap springs the sheet up from the bottom | PASS, finding F4 |
+| 5 | Sheet drag: halfway springs back, past halfway dismisses | PASS |
+| 6 | Backdrop tap and Android back both dismiss the sheet | PASS |
+| 7 | Reader scroll does not fight the sheet drag | PASS |
+| 8 | Reduce animations — in-app switch, both directions, then the OS setting | PASS |
+| 9 | Full analysis: segment pills coloured and legible | PASS |
+| 10 | Root screen shows Arabic, forms and a definition | PASS |
+| 11 | Rootless word (2:255 هُوَ) shows no root link | PASS |
+| 12 | Word-by-word pages to 286 and disables Next | PASS |
+| 13 | Morphology tab opens WbW at the last-read position | PASS |
+| 14 | Checks 4, 9, 12 in dark mode — every POS colour legible | PASS |
+| 15 | System font size at maximum: checks 4 and 12, nothing clips | PASS |
+| 16 | Airplane mode: checks 1, 4, 12 all local | PASS |
+| 17 | Basmala is its own banner above ayah 1, not also inside it | PASS |
+| 18 | al-Fatiha basmala once as ayah 1; at-Tawba none | PASS |
+| 19 | Header back returns to reader; Android back to the surah list | PASS |
+| 20 | Morphology tab keeps the tab bar, one header bar, back exits | PASS |
+| 21 | Multi-segment word coloured per segment, joined with no gaps | PASS |
+| 22 | Arabic size Small and Extra large move the Arabic, not the UI | PASS |
 
-**M2 carry-over, due on this APK.** M2's Run 2 is still pending and its fix
-(`b795975`) is an ancestor of this build, so it can be closed here: system font
-size at maximum, al-Baqarah past ayah 100, three digits fully inside the rosette.
+**F4 — the sheet spring is rejected outright.** Owner, on check 4: *"i dont like
+that spring. just regular movement is fine. no spring."* This is the third
+device run to land on this one value: the ported web spring (28/320) read as
+jumpy, a critically damped retune (46/520) read as slow, and neither pass was
+what the owner wanted. Fixed in `3ad1086` by removing the physics rather than
+tuning it a third time — `withTiming` on a decelerating curve in (220ms) and an
+accelerating one out (180ms), backdrop fade unchanged at 150ms. Web's
+`WordPopover` keeps its own spring; the divergence is deliberate and commented.
+**Not re-verified on device — carried to the next build.**
+
+**Question raised on check 3, answered, not a defect.** The `۞` is the
+rub'-el-ḥizb sign (U+06DE), a mushaf divider marking each quarter of a ḥizb (30
+juz' → 60 ḥizb → 240 quarters), which is why it recurs roughly every 16 ayahs and
+appears at 4:100 as well as 2:44. It is part of the Uthmani source text — 199
+occurrences across the corpus — and the reader renders it rather than generating
+it. Check 3's intent stands: it is exactly the character the tokenizer must not
+eat.
+
+**M2 carry-over, still open.** M2's Run 2 remains pending. Its fix (`b795975`)
+is an ancestor of this build, so the check *could* have been closed here but was
+not run.
 
 | Carry-over | Result |
 | --- | --- |
