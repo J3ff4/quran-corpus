@@ -1,5 +1,6 @@
 import { Text } from 'react-native';
 import { posBucket, type Word, type WordSegment } from '@quran-corpus/data/mobile';
+import { joinSegmentRuns } from '@/text/arabicJoining';
 import { useThemeColors } from '@/theme/themeContext';
 
 export interface SegmentedWordProps {
@@ -36,13 +37,18 @@ export function SegmentedWord({ word, segments, fontSize }: SegmentedWordProps) 
     );
   }
 
+  // Android shapes every nested <Text> as its own run, so the segments have to
+  // be rewritten before they can be drawn as one joined word.
+  const runs = joinSegmentRuns(segments.map((segment) => segment.form_arabic ?? ''));
+
   return (
-    // Nested <Text>, no gap, no wrapper View per segment: Arabic letters join
-    // across adjacent runs of one text node and stop joining across boxes.
-    // The whole word carries one accessible name, since TalkBack reading five
-    // segments as five strings is not the word.
+    // Nested <Text>, no gap, no wrapper View per segment: adjacent runs of one
+    // text node is the closest Android gets to a single shaped word, and a box
+    // per segment would not join at all. The whole word carries one accessible
+    // name, since TalkBack reading five segments as five strings is not the
+    // word -- and the joiners above are invisible to it either way.
     <Text testID="segmented-word" accessibilityLabel={word.text_arabic} style={style}>
-      {segments.map((segment) => {
+      {segments.map((segment, index) => {
         const bucket = posBucket(segment.pos_tag);
         return (
           <Text
@@ -53,7 +59,7 @@ export function SegmentedWord({ word, segments, fontSize }: SegmentedWordProps) 
             // would assert one. Same rule as SegmentPill.
             style={{ color: bucket ? theme.pos[bucket] : theme.text }}
           >
-            {segment.form_arabic}
+            {runs[index]}
           </Text>
         );
       })}

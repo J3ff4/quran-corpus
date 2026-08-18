@@ -32,6 +32,8 @@ const word: Word = {
   audio_url: null,
 };
 
+const ZWJ = '\u200D';
+
 const PREFIX_ARABIC = 'ٱل';
 const STEM_ARABIC = 'رَّحْمَٰنِ';
 
@@ -83,10 +85,24 @@ describe('SegmentedWord', () => {
 
   it('joins segments with no separator, so Arabic letters can join', () => {
     // Adjacent inline runs of one text node, not a space-joined or
-    // wrapper-boxed list -- a gap here breaks Arabic letter shaping.
+    // wrapper-boxed list -- a gap here breaks Arabic letter shaping. The only
+    // thing between two runs is a zero-width joiner.
     render(<SegmentedWord word={word} segments={[prefix('P'), stem('N')]} fontSize={36} />);
 
-    expect(screen.getByTestId('segmented-word').textContent).toBe(PREFIX_ARABIC + STEM_ARABIC);
+    const rendered = screen.getByTestId('segmented-word').textContent ?? '';
+
+    expect(rendered.split(ZWJ).join('')).toBe(PREFIX_ARABIC + STEM_ARABIC);
+  });
+
+  it('shapes the runs for Android instead of printing the raw segment forms', () => {
+    // Without this the lam of the prefix is drawn in its final form and the
+    // stem's first letter isolated, which is the word coming apart on screen.
+    render(<SegmentedWord word={word} segments={[prefix('P'), stem('N')]} fontSize={36} />);
+
+    const runs = screen.getAllByTestId('segment-run');
+
+    expect(runs[0]!.textContent).toBe(`${PREFIX_ARABIC}${ZWJ}`);
+    expect(runs[1]!.textContent).toBe(`${ZWJ}${STEM_ARABIC}`);
   });
 
   it('gives the whole word one accessible name instead of one per segment', () => {
