@@ -111,6 +111,26 @@ export function SurahReader({
       headerRight: () => (
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <Pressable
+            testID="open-search"
+            accessibilityRole="button"
+            accessibilityLabel={t(uiLocale, 'search.title')}
+            // Same reachability rule as the globe and the words button: close
+            // the sheet first, or it stays mounted behind the pushed screen
+            // holding the list at no-hide-descendants.
+            onPress={() => {
+              closeSheet();
+              router.push('/search');
+            }}
+            style={{
+              minHeight: touchTargets.minimum,
+              minWidth: touchTargets.minimum,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Icon name="search" color={theme.accent} />
+          </Pressable>
+          <Pressable
             testID="open-language"
             accessibilityRole="button"
             accessibilityLabel={t(uiLocale, 'reader.chooseLanguage')}

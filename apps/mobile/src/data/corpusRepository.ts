@@ -11,8 +11,10 @@ import {
   getWordDetail,
   getWordsByAyah,
   getWordsBySurahAyahRange,
+  search,
   type Ayah,
   type RootEntry,
+  type SearchResult,
   type Surah,
   type Translation,
   type Word,
@@ -308,4 +310,18 @@ export async function getM0WordDetail(
   const detail = await getWordDetail(client, wordId);
   const segments = detail ? await getSegmentsByWordIds(client, [detail.word.id]) : [];
   return { detail, segments };
+}
+
+/** Search restricted to what the reader actually shows: Arabic plus the one
+ *  translator this language is bound to. Without the translator the DB's four
+ *  Russian translations each return the same verse. */
+export async function searchCorpus(
+  client: MobileDataClient,
+  query: string,
+  languageCode: ContentLanguageCode,
+): Promise<SearchResult> {
+  return search(client, query, {
+    language: languageCode,
+    translator: translatorByLanguage[languageCode],
+  });
 }

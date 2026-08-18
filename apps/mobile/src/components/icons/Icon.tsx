@@ -1,7 +1,16 @@
 import type { ColorValue } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
-export type IconName = 'home' | 'book' | 'bookmark' | 'settings' | 'words' | 'translate' | 'dictionary' | 'menu';
+export type IconName =
+  | 'home'
+  | 'book'
+  | 'bookmark'
+  | 'settings'
+  | 'words'
+  | 'translate'
+  | 'dictionary'
+  | 'menu'
+  | 'search';
 
 /**
  * Path data ported verbatim from web so the two products draw one glyph set:
@@ -41,6 +50,10 @@ const PATHS: Record<IconName, string[]> = {
     'M12 6v14',
   ],
   menu: ['M4 6h16M4 12h16M4 18h16'],
+  // Circle plus handle, matching web's SearchTrigger (circle cx=11 cy=11 r=7,
+  // handle from 20,20). The circle is drawn as two arcs closing back on
+  // itself, the same technique `translate`'s outer ring above uses.
+  search: ['M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z', 'M20 20l-3.5-3.5'],
 };
 
 export function Icon({

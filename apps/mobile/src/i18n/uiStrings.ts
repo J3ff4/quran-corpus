@@ -79,7 +79,15 @@ export type UiStringKey =
   | 'about.sourceUzbek'
   | 'about.sourceRussian'
   | 'about.sourceHafs'
-  | 'about.sourceAudio';
+  | 'about.sourceAudio'
+  | 'search.title'
+  | 'search.placeholder'
+  | 'search.jump'
+  | 'search.verses'
+  | 'search.roots'
+  | 'search.empty'
+  | 'search.noResults'
+  | 'search.loadFailed';
 
 const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
   en: {
@@ -156,6 +164,14 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceRussian': 'Russian translation: Abu Adel. Source approval incomplete.',
     'about.sourceHafs': 'Hafs font: apps/mobile/assets/fonts/hafs.18.woff2. Source approval incomplete.',
     'about.sourceAudio': `Recitation: ${AYAH_AUDIO_ATTRIBUTION}. Source approval incomplete.`,
+    'search.title': 'Search',
+    'search.placeholder': 'Verse, word or root',
+    'search.jump': 'Go to',
+    'search.verses': 'Verses',
+    'search.roots': 'Roots',
+    'search.empty': 'Type a verse reference, a word, or a root',
+    'search.noResults': 'Nothing found',
+    'search.loadFailed': 'Unable to search',
   },
   uz: {
     'tabs.home': 'Bosh sahifa',
@@ -231,6 +247,14 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceRussian': 'Ruscha tarjima: Abu Adel. Manba tasdig‘i tugallanmagan.',
     'about.sourceHafs': 'Hafs shrifti: apps/mobile/assets/fonts/hafs.18.woff2. Manba tasdig‘i tugallanmagan.',
     'about.sourceAudio': `Qiroat: ${AYAH_AUDIO_ATTRIBUTION}. Manba tasdig‘i tugallanmagan.`,
+    'search.title': 'Qidiruv',
+    'search.placeholder': 'Oyat, so‘z yoki o‘zak',
+    'search.jump': 'O‘tish',
+    'search.verses': 'Oyatlar',
+    'search.roots': 'O‘zaklar',
+    'search.empty': 'Oyat raqami, so‘z yoki o‘zak kiriting',
+    'search.noResults': 'Hech narsa topilmadi',
+    'search.loadFailed': 'Qidirib bo‘lmadi',
   },
   ru: {
     'tabs.home': 'Главная',
@@ -306,6 +330,14 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceRussian': 'Русский перевод: Abu Adel. Подтверждение источника не завершено.',
     'about.sourceHafs': 'Шрифт Hafs: apps/mobile/assets/fonts/hafs.18.woff2. Подтверждение источника не завершено.',
     'about.sourceAudio': `Чтение: ${AYAH_AUDIO_ATTRIBUTION}. Подтверждение источника не завершено.`,
+    'search.title': 'Поиск',
+    'search.placeholder': 'Аят, слово или корень',
+    'search.jump': 'Перейти',
+    'search.verses': 'Аяты',
+    'search.roots': 'Корни',
+    'search.empty': 'Введите номер аята, слово или корень',
+    'search.noResults': 'Ничего не найдено',
+    'search.loadFailed': 'Не удалось выполнить поиск',
   },
 };
 
