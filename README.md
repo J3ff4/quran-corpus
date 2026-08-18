@@ -89,7 +89,11 @@ and every check below will fail for the wrong reason.
     verse pager sit in the one header bar rather than stacking above the grid.
     Android back exits the app from here, and from here only.
 21. Tap a multi-segment word (e.g. 2:2 بِٱلْغَيْبِ). The big Arabic in the sheet is
-    coloured per segment, joined as one word with no gaps between segments.
+    coloured per segment and every letter is still joined to its neighbour --
+    compare it against the same word in the ayah above. A letter drawn in its
+    isolated or final form mid-word is a FAIL. Then tap a word whose stem starts
+    with a hamza-alef (2:22 ٱلْأَرْضَ): the لأ must be a single ligature, not a lam
+    with a separate alef beside it.
 22. Settings → Arabic size → Small, then Extra large. The reader Arabic, the
     basmala banner, the sheet hero and the root screen all change; the UI text
     does not.
@@ -103,9 +107,12 @@ and every check below will fail for the wrong reason.
     word sheet closes before the grid opens, so Back returns to a clean reader.
 24. There is no fixed language pill row above ayah 1 any more. The first ayah
     sits directly under the surah heading.
-25. Scroll down until the big surah heading leaves the screen. The surah name
-    appears in the header bar. Scroll back to the top: it goes away again. Repeat
-    at maximum system font size — the name must appear later, not at the top.
+25. Scroll down slowly until the big surah heading leaves the screen. The surah
+    name fades up into the header bar as you go, tracking the finger — it must
+    not switch on all at once. Scroll slowly back up: it fades back out over the
+    same stretch. Repeat at maximum system font size — the fade must start
+    later, not at the top. Then Settings → **Reduce animations: on** and repeat:
+    the name steps straight in with no fade and no travel.
 26. Settings → **Reduce animations: on**. Open the language sheet: it fades, does
     not slide, and does not drag.
 27. Settings → Language → Русский, then open any surah other than 1 and 9. With
@@ -116,4 +123,13 @@ and every check below will fail for the wrong reason.
 
 M0-M2 are complete. M3 (morphology) is implemented on `feat/m3-morphology`: an offline reader over a bundled SQLite DB, per-segment coloured word morphology behind a bottom sheet, word-detail and root screens, a word-by-word grid, and Hafs font loading with English/Uzbek/Russian translations. M3b then fixed the defects found on the first two device runs — sheet spring, basmala placement, navigation headers, the word-by-word screen's chrome, a four-step Arabic size setting and an in-app reduce-animations switch.
 
-CI has no Android emulator, so the M3 smoke checklist above is the only gate this app has. Run 1 passed all 22 checks on 2026-08-17 with one finding (the word sheet's spring). M3c then removed that spring, collapsed the reader's fixed language band into a header sheet, put the surah name in the header on scroll, and localised the basmala label. Run 2 must clear all 27 checks plus the M2 rosette carry-over; results go in the Verification Log of `docs/plans/phase-m3-morphology-mvp.md`.
+CI has no Android emulator, so the M3 smoke checklist above is the only gate
+this app has. Run 1 passed all 22 checks on 2026-08-17 with one finding (the
+word sheet's spring). M3c removed that spring, collapsed the reader's fixed
+language band into a header sheet, put the surah name in the header on scroll,
+and localised the basmala label; Run 2 on 2026-08-18 cleared ten of the twelve
+checks those commits touched, left two unexercised, and found the header title
+popping in and the sheet's coloured word coming apart at its segment
+boundaries. Both are now fixed. Run 3 must clear all 27 checks plus the M2
+rosette carry-over; results go in the Verification Log of
+`docs/plans/phase-m3-morphology-mvp.md`.

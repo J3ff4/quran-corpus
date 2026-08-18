@@ -2300,45 +2300,67 @@ Tasks 7 and 8 of the M3b plan, which write the on-device user DB. The owner
 waived it on 2026-08-17. That is the third such override and it is recorded here
 rather than left implicit; the code it covers is commits `37ae2d7` and `a137e9f`.
 
-### Run 2 — pending
+### Run 2 — 2026-08-18, owner's physical Android device
 
-Carries two re-checks: **check 4** closes F4 (the sheet spring, rejected on Run
-1 and removed in `3ad1086`), and the **M2 carry-over** closes M2's Run 2 (fix
-`b795975`, an ancestor of this build).
+EAS build `76a83a9d` at commit `469abfd` (preview profile, Android APK). Upload
+was 43.8 MB, so the bundled DB went with it.
+
+**Scoped, deliberately.** Run 1 smoked everything through `1cd8a0f`; this run
+covered only the checks whose code changed after it — `3ad1086` (the spring)
+and the twelve M3c commits `d3d8318..469abfd`. Checks 1-3, 9-20 and 22 are
+recorded below as not re-run rather than as passes: their code is untouched
+since Run 1, which is a reason not to spend a device pass on them, not evidence
+about this build.
+
+Ten of the twelve scoped checks passed. Two findings, both since fixed, and one
+check the owner could not run because the instruction was unclear.
 
 | # | Check | Result |
 | --- | --- | --- |
-| 1 | Pause marks still visible in 2:255 | unexercised |
-| 2 | Basmala still prefixes ayah 1 of al-Alaq (96) | unexercised |
-| 3 | `۞` marker still leads 2:44 | unexercised |
-| 4 | Word tap raises the sheet on a timing curve — no spring, no bounce, no overshoot (closes F4) | unexercised |
-| 5 | Sheet drag: under a quarter settles back without bouncing, past a quarter or a fast flick dismisses | unexercised |
-| 6 | Backdrop tap and Android back both dismiss the sheet | unexercised |
-| 7 | Reader scroll does not fight the sheet drag | unexercised |
-| 8 | Reduce animations — in-app switch, both directions, then the OS setting | unexercised |
-| 9 | Full analysis: segment pills coloured and legible | unexercised |
-| 10 | Root screen shows Arabic, forms and a definition | unexercised |
-| 11 | Rootless word (2:255 هُوَ) shows no root link | unexercised |
-| 12 | Word-by-word pages to 286 and disables Next | unexercised |
-| 13 | Morphology tab opens WbW at the last-read position | unexercised |
-| 14 | Checks 4, 9, 12 in dark mode — every POS colour legible | unexercised |
-| 15 | System font size at maximum: checks 4 and 12, nothing clips | unexercised |
-| 16 | Airplane mode: checks 1, 4, 12 all local | unexercised |
-| 17 | Basmala is its own banner above ayah 1, not also inside it | unexercised |
-| 18 | al-Fatiha basmala once as ayah 1; at-Tawba none | unexercised |
-| 19 | Header back returns to reader; Android back to the surah list | unexercised |
-| 20 | Morphology tab keeps the tab bar, one header bar, back exits | unexercised |
-| 21 | Multi-segment word coloured per segment, joined with no gaps | unexercised |
-| 22 | Arabic size Small and Extra large move the Arabic, not the UI | unexercised |
-| 23 | Reader header. Tap the globe. The language sheet slides up; pick a different language and it closes on its own, with the translations underneath already changed. Reopen it: backdrop tap dismisses, Android back dismisses, drag down past a quarter dismisses. With a word sheet already up, both the globe and the words button replace it rather than stacking a second backdrop. | unexercised |
-| 24 | There is no fixed language pill row above ayah 1 any more. The first ayah sits directly under the surah heading. | unexercised |
-| 25 | Scroll down until the big surah heading leaves the screen. The surah name appears in the header bar. Scroll back to the top: it goes away again. Repeat at maximum system font size — the name must appear later, not at the top. | unexercised |
-| 26 | Settings → **Reduce animations: on**. Open the language sheet: it fades, does not slide, and does not drag. | unexercised |
-| 27 | Settings → Language → Русский, then open any surah other than 1 and 9. With TalkBack on, focus the basmala banner: it is announced in Russian, not as "Bismillah". | unexercised |
+| 1 | Pause marks still visible in 2:255 | not re-run — Run 1 pass, code untouched |
+| 2 | Basmala still prefixes ayah 1 of al-Alaq (96) | not re-run — Run 1 pass, code untouched |
+| 3 | `۞` marker still leads 2:44 | not re-run — Run 1 pass, code untouched |
+| 4 | Word tap raises the sheet on a timing curve — no spring, no bounce, no overshoot (closes F4) | **PASS** — "spring gone". Closes F4. |
+| 5 | Sheet drag: under a quarter settles back without bouncing, past a quarter or a fast flick dismisses | **PASS** |
+| 6 | Backdrop tap and Android back both dismiss the sheet | **PASS** |
+| 7 | Reader scroll does not fight the sheet drag | **PASS** |
+| 8 | Reduce animations — in-app switch, both directions, then the OS setting | **PASS** |
+| 9 | Full analysis: segment pills coloured and legible | not re-run — Run 1 pass, code untouched |
+| 10 | Root screen shows Arabic, forms and a definition | not re-run — Run 1 pass, code untouched |
+| 11 | Rootless word (2:255 هُوَ) shows no root link | not re-run — Run 1 pass, code untouched |
+| 12 | Word-by-word pages to 286 and disables Next | not re-run — Run 1 pass, code untouched |
+| 13 | Morphology tab opens WbW at the last-read position | not re-run — Run 1 pass, code untouched |
+| 14 | Checks 4, 9, 12 in dark mode — every POS colour legible | not re-run — Run 1 pass, code untouched |
+| 15 | System font size at maximum: checks 4 and 12, nothing clips | not re-run — Run 1 pass, code untouched |
+| 16 | Airplane mode: checks 1, 4, 12 all local | not re-run — Run 1 pass, code untouched |
+| 17 | Basmala is its own banner above ayah 1, not also inside it | not re-run — Run 1 pass, code untouched |
+| 18 | al-Fatiha basmala once as ayah 1; at-Tawba none | not re-run — Run 1 pass, code untouched |
+| 19 | Header back returns to reader; Android back to the surah list | not re-run — Run 1 pass, code untouched |
+| 20 | Morphology tab keeps the tab bar, one header bar, back exits | not re-run — Run 1 pass, code untouched |
+| 21 | Multi-segment word coloured per segment, joined with no gaps | **FAIL — F5.** Reported as not understood, then confirmed by four device screenshots: the sheet's hero word comes apart at every segment boundary. |
+| 22 | Arabic size Small and Extra large move the Arabic, not the UI | not re-run — Run 1 pass, code untouched |
+| 23 | Language sheet: slides up, closes on pick, dismisses three ways, and replaces an open word sheet rather than stacking a second backdrop | **PASS** — both halves, including the hand-off from the word sheet. |
+| 24 | There is no fixed language pill row above ayah 1 any more. The first ayah sits directly under the surah heading. | **PASS** |
+| 25 | Surah name arrives in the header bar once the heading scrolls off | **FAIL — F6.** Arrives, but switches on at a line: "whenever surah name disappears out site, it can smoothly move to top bar. not just appear out of nowhere." |
+| 26 | Settings → **Reduce animations: on**. Open the language sheet: it fades, does not slide, and does not drag. | **PASS** |
+| 27 | Русский + TalkBack: the basmala banner is announced in Russian, not as "Bismillah" | unexercised — the owner had not used TalkBack before; carried to Run 3 with the instruction spelled out. |
 
 | Carry-over | Result |
 | --- | --- |
-| M2 Run 2 — three-digit ayah number inside the rosette at max font size | unexercised |
+| M2 Run 2 — three-digit ayah number inside the rosette at max font size | unexercised — carried to Run 3 |
+
+#### Findings
+
+| # | Finding | Fix | Re-verified |
+| --- | --- | --- | --- |
+| F5 | The sheet's coloured hero word is drawn with its letters unjoined — `ٱلْكِتَٰبُ` with the lam in final form, `بِٱلْغَيْبِ` split three ways. The data is sound; React Native on Android shapes each nested `<Text>` as its own run, which the port from web's `SegmentPills` assumed it would not. | `f409ed0` — `joinSegmentRuns` rewrites each segment with a zero-width joiner on the boundaries whose letters connect, and moves a lam-alef pair into one run so its ligature can form. Checked against all 41,755 multi-segment words. | Run 3 |
+| F6 | The surah name switches into the header bar at a threshold instead of moving there. | `9dee3a5` — an animated `headerTitle` element with a scroll-linked opacity and rise, stepped rather than ramped under reduce animations. | Run 3 |
+
+### Run 3 — pending
+
+Carries F5, F6, check 27 and the M2 rosette carry-over. Everything else in the
+27 is still live: F5's fix touches the sheet hero that checks 9, 14 and 21 all
+read, and F6's touches the reader's scroll handler.
 
 ---
 
