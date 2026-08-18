@@ -2330,7 +2330,7 @@ Carries two re-checks: **check 4** closes F4 (the sheet spring, rejected on Run
 | 20 | Morphology tab keeps the tab bar, one header bar, back exits | unexercised |
 | 21 | Multi-segment word coloured per segment, joined with no gaps | unexercised |
 | 22 | Arabic size Small and Extra large move the Arabic, not the UI | unexercised |
-| 23 | Reader header. Tap the globe. The language sheet slides up; pick a different language and it closes on its own, with the translations underneath already changed. Reopen it: backdrop tap dismisses, Android back dismisses, drag down past a quarter dismisses. | unexercised |
+| 23 | Reader header. Tap the globe. The language sheet slides up; pick a different language and it closes on its own, with the translations underneath already changed. Reopen it: backdrop tap dismisses, Android back dismisses, drag down past a quarter dismisses. With a word sheet already up, both the globe and the words button replace it rather than stacking a second backdrop. | unexercised |
 | 24 | There is no fixed language pill row above ayah 1 any more. The first ayah sits directly under the surah heading. | unexercised |
 | 25 | Scroll down until the big surah heading leaves the screen. The surah name appears in the header bar. Scroll back to the top: it goes away again. Repeat at maximum system font size — the name must appear later, not at the top. | unexercised |
 | 26 | Settings → **Reduce animations: on**. Open the language sheet: it fades, does not slide, and does not drag. | unexercised |

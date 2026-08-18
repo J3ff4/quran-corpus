@@ -594,6 +594,39 @@ describe('SurahReader', () => {
     expect(screen.getByTestId('language-sheet')).toBeTruthy();
   });
 
+  it('closes an open word sheet before navigating to the word-by-word grid', async () => {
+    // The words button shares the globe's problem: it sits in the native
+    // toolbar, outside the backdrop. Navigating with the sheet still mounted
+    // means coming back lands on a stale sheet that is also still holding the
+    // ayah list at no-hide-descendants.
+    const data = readerData(1);
+    render(
+      <SurahReader
+        {...baseProps(data)}
+        loadWords={async (ayahId) => surahWords(ayahId)}
+        loadWordSummary={(async (word: { id: number }) => ({ word, segments: [], gloss: null })) as never}
+      />,
+    );
+
+    await act(async () => {
+      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getAllByTestId('word-token')[0]!);
+    });
+    expect(screen.getByTestId('word-sheet')).toBeTruthy();
+
+    const headerRight = mocks.setOptions.mock.calls
+      .map(([options]) => options.headerRight)
+      .filter(Boolean)
+      .at(-1);
+    render(<div>{headerRight()}</div>);
+    fireEvent.click(screen.getByTestId('open-wbw'));
+
+    expect(screen.queryByTestId('word-sheet')).toBeNull();
+    expect(mocks.push).toHaveBeenCalledWith('/surah/1/words');
+  });
+
   function latestTitle() {
     return mocks.setOptions.mock.calls
       .map(([options]) => options.title)

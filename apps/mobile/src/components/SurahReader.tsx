@@ -124,7 +124,14 @@ export function SurahReader({
             testID="open-wbw"
             accessibilityRole="button"
             accessibilityLabel={t(uiLocale, 'wbw.title')}
-            onPress={() => router.push(`/surah/${data.surah.id}/words`)}
+            // Same reachability problem as the globe above: this button sits in
+            // the native toolbar, outside the sheet's backdrop. Leaving the
+            // sheet mounted means coming back from the grid lands on a stale
+            // sheet still holding the list at no-hide-descendants.
+            onPress={() => {
+              closeSheet();
+              router.push(`/surah/${data.surah.id}/words`);
+            }}
             style={{
               minHeight: touchTargets.minimum,
               minWidth: touchTargets.minimum,
@@ -345,10 +352,12 @@ export function SurahReader({
         onScrollToIndexFailed={onScrollToIndexFailed}
         onScroll={onScroll}
         scrollEventThrottle={16}
-        // WordSheet sets role="dialog"/aria-modal, but accessibilityViewIsModal
-        // is iOS-only -- on Android the ayah text and both card buttons stay
-        // reachable by TalkBack swipe while the sheet covers them, so the
-        // modal is only visually modal (CLAUDE.md §8, WCAG AA).
+        // BottomSheet -- the shell under both WordSheet and LanguageSheet --
+        // sets role="dialog"/aria-modal, but accessibilityViewIsModal is
+        // iOS-only, so on Android the ayah text and both card buttons stay
+        // reachable by TalkBack swipe while either sheet covers them and the
+        // modal is only visually modal (CLAUDE.md §8, WCAG AA). The nav header
+        // is a native toolbar outside this View and is still reachable.
         importantForAccessibility={openWord || languageOpen ? 'no-hide-descendants' : 'auto'}
         style={{ flex: 1, backgroundColor: theme.background }}
         contentContainerStyle={{ paddingBottom: 24 }}

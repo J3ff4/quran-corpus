@@ -96,7 +96,11 @@ and every check below will fail for the wrong reason.
 23. Reader header. Tap the globe. The language sheet slides up; pick a different
     language and it closes on its own, with the translations underneath already
     changed. Reopen it: backdrop tap dismisses, Android back dismisses, drag
-    down past a quarter dismisses.
+    down past a quarter dismisses. Then tap a word and, with that sheet up, tap
+    the globe: the word sheet goes, the language sheet takes its place, and the
+    dim briefly lifts between the two — that hand-off flicker is expected, two
+    stacked backdrops would be the failure. Repeat with the words button: the
+    word sheet closes before the grid opens, so Back returns to a clean reader.
 24. There is no fixed language pill row above ayah 1 any more. The first ayah
     sits directly under the surah heading.
 25. Scroll down until the big surah heading leaves the screen. The surah name
