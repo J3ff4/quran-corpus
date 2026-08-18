@@ -97,11 +97,11 @@ and to each of the three locale records:
 
 ```ts
     // uz
-    'tabs.dictionary': 'Луғат',
-    'tabs.menu': 'Меню',
-    'menu.bookmarks': 'Хатчўплар',
-    'menu.settings': 'Созламалар',
-    'menu.about': 'Дастур ҳақида',
+    'tabs.dictionary': 'Lug‘at',
+    'tabs.menu': 'Menyu',
+    'menu.bookmarks': 'Xatcho‘plar',
+    'menu.settings': 'Sozlamalar',
+    'menu.about': 'Dastur haqida',
 ```
 
 ```ts
@@ -686,14 +686,14 @@ Add to `UiStringKey` and all three locale records:
 
 ```ts
     // uz
-    'search.title': 'Қидирув',
-    'search.placeholder': 'Оят, сўз ёки ўзак',
-    'search.jump': 'Ўтиш',
-    'search.verses': 'Оятлар',
-    'search.roots': 'Ўзаклар',
-    'search.empty': 'Оят рақами, сўз ёки ўзак киритинг',
-    'search.noResults': 'Ҳеч нарса топилмади',
-    'search.loadFailed': 'Қидириб бўлмади',
+    'search.title': 'Qidiruv',
+    'search.placeholder': 'Oyat, so‘z yoki o‘zak',
+    'search.jump': 'O‘tish',
+    'search.verses': 'Oyatlar',
+    'search.roots': 'O‘zaklar',
+    'search.empty': 'Oyat raqami, so‘z yoki o‘zak kiriting',
+    'search.noResults': 'Hech narsa topilmadi',
+    'search.loadFailed': 'Qidirib bo‘lmadi',
 ```
 
 ```ts
@@ -1548,9 +1548,9 @@ Expected: PASS, 2 tests.
 
 ```ts
     // uz
-    'dictionary.browse': 'Кўриш',
-    'dictionary.frequent': 'Кўп учрайдиган',
-    'dictionary.noRoots': 'Бу ҳарфда ўзак йўқ',
+    'dictionary.browse': 'Ko‘rish',
+    'dictionary.frequent': 'Ko‘p uchraydigan',
+    'dictionary.noRoots': 'Bu harfda o‘zak yo‘q',
 ```
 
 ```ts
@@ -1890,7 +1890,7 @@ This pane is where PRD items 5 (lemma frequency) and 6 (verb concordance) live.
   | 'dictionary.kindVerbs'
 ```
 
-en: `'Roots'`, `'Lemmas'`, `'Verbs'`. uz: `'Ўзаклар'`, `'Лемма'`, `'Феъллар'`. ru: `'Корни'`, `'Леммы'`, `'Глаголы'`.
+en: `'Roots'`, `'Lemmas'`, `'Verbs'`. uz: `'O‘zaklar'`, `'Lemmalar'`, `'Fe’llar'`. ru: `'Корни'`, `'Леммы'`, `'Глаголы'`.
 
 - [ ] **Step 2: Write the failing FrequencyList test**
 
@@ -2194,7 +2194,7 @@ Arabic there is the commonest spelling and routing on it opens nothing."
   | 'concordance.empty'
 ```
 
-en `'No occurrences'`; uz `'Учраш йўқ'`; ru `'Нет вхождений'`.
+en `'No occurrences'`; uz `'Uchrashlar yo‘q'`; ru `'Нет вхождений'`.
 
 - [ ] **Step 2: Write the failing ConcordanceList test**
 
@@ -2482,7 +2482,7 @@ requests the same page twice."
   | 'lemma.root'
 ```
 
-en `'This lemma is not in the corpus'` / `'Root'`; uz `'Бу лемма корпусда йўқ'` / `'Ўзак'`; ru `'Этой леммы нет в корпусе'` / `'Корень'`.
+en `'This lemma is not in the corpus'` / `'Root'`; uz `'Bu lemma korpusda yo‘q'` / `'O‘zak'`; ru `'Этой леммы нет в корпусе'` / `'Корень'`.
 
 - [ ] **Step 2: Write the failing LemmaScreen test**
 
