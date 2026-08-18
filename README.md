@@ -54,8 +54,9 @@ and every check below will fail for the wrong reason.
 4. Tap a word. The sheet rises from the bottom on an even timing curve and
    stops dead — no spring, no bounce, no overshoot past its resting height.
    This is the check that closes F4, so a bounce here is a FAIL.
-5. Drag the sheet halfway down and let go — it settles back without bouncing.
-   Drag it past halfway — it dismisses.
+5. Drag the sheet slowly down a short way — less than a quarter of its height —
+   and let go: it settles back without bouncing. Drag it slowly past a quarter,
+   or flick it down fast from anywhere — it dismisses.
 6. Tap the backdrop — it dismisses. Press Android back — it dismisses.
 7. Scroll the reader with the sheet open. The scroll must not fight the drag.
 8. Settings (in the app) → **Reduce animations: on**. Reopen the sheet: it
