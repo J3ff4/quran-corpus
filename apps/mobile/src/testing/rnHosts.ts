@@ -34,6 +34,7 @@ interface HostProps {
   accessible?: unknown;
   contentContainerStyle?: unknown;
   importantForAccessibility?: unknown;
+  numberOfLines?: unknown;
   onLayout?: unknown;
   pointerEvents?: unknown;
 }
@@ -58,6 +59,7 @@ export function host(tag: string) {
     accessible: _accessible,
     contentContainerStyle: _contentContainerStyle,
     importantForAccessibility: _importantForAccessibility,
+    numberOfLines: _numberOfLines,
     onLayout: _onLayout,
     pointerEvents: _pointerEvents,
     ...props

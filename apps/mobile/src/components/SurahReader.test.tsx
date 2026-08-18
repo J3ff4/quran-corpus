@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   scrollToOffset: vi.fn(),
   push: vi.fn(),
   setOptions: vi.fn(),
+  titleStyle: null as (() => { opacity: number; transform: [{ translateY: number }] }) | null,
+  reduceMotion: false,
 }));
 
 // Not importOriginal: the real package doesn't parse under vitest (Metro-only
@@ -23,8 +25,38 @@ vi.mock('@/settings/settingsStore', () => ({
   // Not a provider: the real store pulls expo-sqlite into the jsdom module
   // graph, and every other component test here mocks it the same way. The
   // step only has to be one useArabicSizes recognises.
-  useAppSettings: () => ({ arabicScale: 'medium' }),
+  useAppSettings: () => ({ arabicScale: 'medium', reduceMotion: mocks.reduceMotion }),
 }));
+
+// The nav title's animated style is the one worklet in this screen. Captured
+// rather than rendered: shared-value writes deliberately do not re-render, so
+// there is no committed output to read the opacity off -- the worklet has to be
+// called with whatever the scroll handler last wrote.
+vi.mock('react-native-reanimated', async () => {
+  const React = await import('react');
+  const { host } = await import('@/testing/rnHosts.js');
+  const AnimatedText = host('span');
+
+  return {
+    default: { Text: AnimatedText },
+    useSharedValue: (initial: number) => React.useRef({ value: initial }).current,
+    useAnimatedStyle: (worklet: () => never) => {
+      mocks.titleStyle = worklet as never;
+      return {};
+    },
+    // Linear between two stops with both ends clamped, which is all this
+    // screen asks of the real one.
+    interpolate: (value: number, input: number[], output: number[]) => {
+      const [inputStart, inputEnd] = input as [number, number];
+      const [outputStart, outputEnd] = output as [number, number];
+      if (value <= inputStart) return outputStart;
+      if (value >= inputEnd) return outputEnd;
+      const ratio = (value - inputStart) / (inputEnd - inputStart);
+      return outputStart + ratio * (outputEnd - outputStart);
+    },
+    Extrapolation: { CLAMP: 'clamp' },
+  };
+});
 
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ setOptions: mocks.setOptions }),
@@ -126,6 +158,12 @@ vi.mock('react-native', async () => {
       return React.createElement(Div, props);
     },
     useWindowDimensions: () => ({ width: 400, height: 800, scale: 2, fontScale: 1 }),
+    // useReducedMotion reads the OS flag. Off here, so the in-app setting is
+    // the only thing these tests vary.
+    AccessibilityInfo: {
+      isReduceMotionEnabled: () => Promise.resolve(false),
+      addEventListener: () => ({ remove: () => {} }),
+    },
   };
 });
 
@@ -137,6 +175,8 @@ describe('SurahReader', () => {
     mocks.setOptions.mockClear();
     mocks.onScroll = null;
     mocks.headerLayout = null;
+    mocks.titleStyle = null;
+    mocks.reduceMotion = false;
   });
 
   afterEach(cleanup);
@@ -627,56 +667,85 @@ describe('SurahReader', () => {
     expect(mocks.push).toHaveBeenCalledWith('/surah/1/words');
   });
 
-  function latestTitle() {
-    return mocks.setOptions.mock.calls
-      .map(([options]) => options.title)
-      .filter((title) => title !== undefined)
-      .at(-1);
+  /** The animated style the nav title would be wearing right now. */
+  function titleStyle() {
+    const style = mocks.titleStyle?.();
+    if (!style) throw new Error('the reader never registered an animated title style');
+    return { opacity: style.opacity, translateY: style.transform[0].translateY };
   }
 
-  it('leaves the nav title empty while the big heading is on screen', () => {
-    render(<SurahReader {...baseProps(readerData(30))} />);
+  /** The element the reader hands the native toolbar as its title. */
+  function renderHeaderTitle() {
+    const headerTitle = mocks.setOptions.mock.calls
+      .map(([options]) => options.headerTitle)
+      .filter((factory) => factory !== undefined)
+      .at(-1) as (() => React.ReactElement) | undefined;
+    if (!headerTitle) throw new Error('the reader never set a header title');
+    return render(headerTitle());
+  }
 
+  /** Scrolls to `y` with a header of `height` behind it. */
+  function scrollTo(height: number, ...offsets: number[]) {
+    act(() => {
+      mocks.headerLayout?.(height);
+      for (const y of offsets) mocks.onScroll?.({ nativeEvent: { contentOffset: { y } } });
+    });
+  }
+
+  it('puts the surah name in the header as an element, not a title string', () => {
+    // A title string is rendered into the native toolbar, outside this screen's
+    // view tree, and nothing there can be animated.
+    render(<SurahReader {...baseProps(readerData(30))} />);
+    const { getByTestId } = renderHeaderTitle();
+
+    expect(getByTestId('reader-title').textContent).toBe('Al-Baqarah');
+  });
+
+  it('keeps the nav title hidden while the big heading is on screen', () => {
     // Duplicating the 24pt heading in the app bar on the first screenful is
     // exactly the doubled-up look CLAUDE.md §8 rules out.
-    expect(latestTitle()).toBe('');
+    render(<SurahReader {...baseProps(readerData(30))} />);
+    scrollTo(180, 0);
+
+    expect(titleStyle().opacity).toBe(0);
   });
 
-  it('fills the nav title in once the heading scrolls away', () => {
+  it('fades the title in part-way as the heading leaves, not all at once', () => {
+    // The check that rules out a boolean swap: half way through the ramp the
+    // name is half there. Switched at a threshold it would already be whole,
+    // which is the "appears out of nowhere" the owner reported.
     render(<SurahReader {...baseProps(readerData(30))} />);
+    scrollTo(180, 180 - 4 - 20);
 
-    act(() => {
-      mocks.headerLayout?.(180);
-      mocks.onScroll?.({ nativeEvent: { contentOffset: { y: 200 } } });
-    });
+    const { opacity, translateY } = titleStyle();
 
-    expect(latestTitle()).toBe('Al-Baqarah');
+    expect(opacity).toBeGreaterThan(0);
+    expect(opacity).toBeLessThan(1);
+    expect(translateY).toBeGreaterThan(0);
   });
 
-  it('empties it again on the way back up', () => {
+  it('has the title fully arrived once the heading is gone', () => {
     render(<SurahReader {...baseProps(readerData(30))} />);
+    scrollTo(180, 200);
 
-    act(() => {
-      mocks.headerLayout?.(180);
-      mocks.onScroll?.({ nativeEvent: { contentOffset: { y: 200 } } });
-      mocks.onScroll?.({ nativeEvent: { contentOffset: { y: 10 } } });
-    });
+    expect(titleStyle()).toEqual({ opacity: 1, translateY: 0 });
+  });
 
-    expect(latestTitle()).toBe('');
+  it('fades it back out on the way up', () => {
+    render(<SurahReader {...baseProps(readerData(30))} />);
+    scrollTo(180, 200, 10);
+
+    expect(titleStyle().opacity).toBe(0);
   });
 
   it('measures the threshold rather than assuming one', () => {
     // The header grows with the Arabic size setting and the OS font scale, so
-    // a constant threshold flips the title at the wrong scroll position on any
+    // a constant threshold starts the fade at the wrong scroll position on any
     // device that is not the one it was tuned on.
     render(<SurahReader {...baseProps(readerData(30))} />);
+    scrollTo(600, 200);
 
-    act(() => {
-      mocks.headerLayout?.(600);
-      mocks.onScroll?.({ nativeEvent: { contentOffset: { y: 200 } } });
-    });
-
-    expect(latestTitle()).toBe('');
+    expect(titleStyle().opacity).toBe(0);
   });
 
   it('holds the title back until the header has measured', () => {
@@ -687,8 +756,22 @@ describe('SurahReader', () => {
     });
 
     // No onLayout yet: with no measured threshold, a naive `y > height` would
-    // read 200 > 0 and flip the title on at the very top of the surah.
-    expect(latestTitle()).toBe('');
+    // read 200 > 0 and fade the title in at the very top of the surah.
+    expect(titleStyle().opacity).toBe(0);
+  });
+
+  it('steps the title in without a ramp under reduce animations', () => {
+    // A fade is still motion. The setting is a standing instruction not to
+    // animate, so the name is either there or it is not.
+    mocks.reduceMotion = true;
+    render(<SurahReader {...baseProps(readerData(30))} />);
+    scrollTo(180, 180 - 4 - 20);
+
+    expect(titleStyle()).toEqual({ opacity: 0, translateY: 0 });
+
+    scrollTo(180, 200);
+
+    expect(titleStyle()).toEqual({ opacity: 1, translateY: 0 });
   });
 });
 

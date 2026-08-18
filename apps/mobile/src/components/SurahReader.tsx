@@ -9,6 +9,12 @@ import {
   type NativeSyntheticEvent,
   type ViewToken,
 } from 'react-native';
+import Animated, {
+  Extrapolation,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated';
 import { router, useNavigation } from 'expo-router';
 import { splitBasmala, type Word } from '@quran-corpus/data/mobile';
 import type { ReaderAyah, SurahReaderData, WordSummary } from '@/data/corpusRepository';
@@ -20,6 +26,7 @@ import { Bismillah } from './Bismillah';
 import { LanguageSheet } from './LanguageSheet';
 import { WordSheet } from './WordSheet';
 import { Icon } from './icons/Icon';
+import { useReducedMotion } from '@/motion/useReducedMotion';
 import { touchTargets } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
@@ -58,6 +65,15 @@ const SCROLL_RETRY_DELAY_MS = 120;
 // for al-Baqarah). Per-ayah with a lookahead keeps every query bounded and, on
 // a local SQLite file, lands before the ayah reaches the middle of the screen.
 const WORD_LOOKAHEAD = 3;
+
+// The nav title's fade, in dp of scroll. It finishes just before the list
+// header's last pixel leaves, so the name has arrived by the time the heading
+// it replaces is gone rather than starting from nothing at that moment.
+const TITLE_FADE_END = 4;
+const TITLE_FADE_DISTANCE = 40;
+// How far the name rises as it fades. Small enough to read as the same word
+// settling into the bar, not as a second element flying in.
+const TITLE_RISE = 10;
 
 // Shared instance: a fresh `[]` per render would change AyahText's memo key
 // for every not-yet-loaded ayah on every scroll frame.
@@ -146,31 +162,73 @@ export function SurahReader({
     });
   }, [navigation, data.surah.id, uiLocale, theme.accent]);
 
-  // The nav header's title is empty while the list header's 24pt heading is on
-  // screen and fills in once it scrolls past -- Android's own app-bar
-  // behaviour, and it keeps the surah name on screen at ayah 150 where the list
-  // header is long gone. Measured, not a constant: the header grows with the
-  // Arabic size setting and the OS font scale.
-  const [titleVisible, setTitleVisible] = useState(false);
-  const headerHeightRef = useRef(0);
+  // The nav header carries the surah name once the list header's 24pt heading
+  // has scrolled off -- Android's own app-bar behaviour, and it keeps the name
+  // on screen at ayah 150 where the list header is long gone.
+  //
+  // Scroll-linked rather than switched at a threshold: as a boolean the name
+  // arrived fully formed the instant the line was crossed, which read on the
+  // device as it "appearing out of nowhere" (owner report, 2026-08-18). Driven
+  // off the scroll offset itself, it tracks the finger and reverses exactly on
+  // the way back up. Measured, not a constant: the header grows with the Arabic
+  // size setting and the OS font scale.
+  const scrollY = useSharedValue(0);
+  const headerHeight = useSharedValue(0);
+  const reducedMotion = useReducedMotion();
+
+  const titleStyle = useAnimatedStyle(() => {
+    // Until the header has measured there is no threshold to cross, and the
+    // title stays hidden rather than fading in at the very top of the surah.
+    if (headerHeight.value <= 0) return { opacity: 0, transform: [{ translateY: 0 }] };
+
+    const end = headerHeight.value - TITLE_FADE_END;
+
+    if (reducedMotion) {
+      // No travel and no ramp: a fade is still motion, and this setting is a
+      // standing instruction not to animate.
+      return { opacity: scrollY.value > end ? 1 : 0, transform: [{ translateY: 0 }] };
+    }
+
+    const progress = interpolate(
+      scrollY.value,
+      [end - TITLE_FADE_DISTANCE, end],
+      [0, 1],
+      Extrapolation.CLAMP,
+    );
+
+    return { opacity: progress, transform: [{ translateY: (1 - progress) * TITLE_RISE }] };
+  });
 
   useEffect(() => {
-    navigation.setOptions({ title: titleVisible ? data.surah.name_translit : '' });
-  }, [navigation, titleVisible, data.surah.name_translit]);
+    navigation.setOptions({
+      // An element, not a title string: setOptions renders the title into the
+      // native toolbar, outside this screen's view tree, so nothing there can
+      // be animated by swapping the string.
+      //
+      // The text is always mounted, at opacity 0 while the heading is on
+      // screen. TalkBack therefore always has the surah name in the toolbar,
+      // which is the behaviour a screen reader wants; hiding it would need
+      // React state and a re-render per scroll frame, which is the cost this
+      // whole approach exists to avoid.
+      headerTitle: () => (
+        <Animated.Text
+          testID="reader-title"
+          numberOfLines={1}
+          style={[titleStyle, { color: theme.text, fontSize: 20, fontWeight: '600' }]}
+        >
+          {data.surah.name_translit}
+        </Animated.Text>
+      ),
+    });
+  }, [navigation, titleStyle, theme.text, data.surah.name_translit]);
 
   const onScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const height = headerHeightRef.current;
-      // Until the header has measured, there is no threshold to cross and the
-      // title stays empty rather than flipping on at offset 0.
-      if (height <= 0) return;
-      // 8dp of slack so a heading resting exactly on the boundary does not
-      // toggle the title on every scroll frame.
-      const next = event.nativeEvent.contentOffset.y > height - 8;
-      // Guarded: setOptions on every frame re-renders the whole navigator.
-      setTitleVisible((current) => (current === next ? current : next));
+      // A shared value, not state: this runs on every scroll frame and setting
+      // state here re-rendered the whole navigator.
+      scrollY.value = event.nativeEvent.contentOffset.y;
     },
-    [],
+    [scrollY],
   );
 
   // The surah's opening, above ayah 1's card rather than inside it: in the card
@@ -317,7 +375,7 @@ export function SurahReader({
         ListHeaderComponent={
           <View
             onLayout={(event: LayoutChangeEvent) => {
-              headerHeightRef.current = event.nativeEvent.layout.height;
+              headerHeight.value = event.nativeEvent.layout.height;
             }}
             style={{
               paddingHorizontal: 20,
