@@ -43,6 +43,12 @@ vi.mock('react-native', async () => {
 
 const EMPTY = { jump: null, verses: [], roots: [] };
 
+// The debounce inside SearchScreen is 200ms; anything asserting "did not
+// query" has to actually wait past it, or it is checking t=0, which is
+// vacuously true whether or not the guard it is meant to cover exists.
+const PAST_DEBOUNCE_MS = 300;
+const settle = () => new Promise((resolve) => setTimeout(resolve, PAST_DEBOUNCE_MS));
+
 describe('SearchScreen', () => {
   beforeEach(() => {
     mocks.searchCorpus.mockReset();
@@ -56,6 +62,38 @@ describe('SearchScreen', () => {
     render(<SearchScreen />);
 
     expect(screen.getByText('Type a verse reference, a word, or a root')).toBeTruthy();
+  });
+
+  it('never queries an empty box, even past the debounce window', async () => {
+    render(<SearchScreen />);
+
+    await settle();
+
+    expect(mocks.searchCorpus).not.toHaveBeenCalled();
+  });
+
+  it('clears results and returns to the empty state when the box is cleared', async () => {
+    mocks.searchCorpus.mockResolvedValue({
+      jump: null,
+      verses: [{ surah_id: 2, ayah_number: 255, source: 'ar', snippet: 'ٱللَّهُ' }],
+      roots: [],
+    });
+
+    render(<SearchScreen />);
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'x' } });
+    await waitFor(() => expect(screen.getByTestId('search-verse')).toBeTruthy());
+
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: '' } });
+
+    // The old hit list and the "type something" hint on screen together is
+    // the bug: a stale in-flight request repainting after the box emptied.
+    await waitFor(() => expect(screen.getByText('Type a verse reference, a word, or a root')).toBeTruthy());
+    expect(screen.queryByTestId('search-verse')).toBeNull();
+
+    // Past the debounce window too: nothing queued for the cleared box should
+    // still be in flight and land later.
+    mocks.searchCorpus.mockClear();
+    await settle();
     expect(mocks.searchCorpus).not.toHaveBeenCalled();
   });
 
@@ -86,8 +124,17 @@ describe('SearchScreen', () => {
     render(<SearchScreen />);
     fireEvent.change(screen.getByTestId('search-input'), { target: { value: '2:255' } });
 
-    await waitFor(() => expect(screen.getByTestId('search-jump')).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId('search-verse')).toBeTruthy());
     expect(screen.getByTestId('search-jump').textContent).toContain('2:255');
+
+    // Order, not just presence -- reordering the two sections must fail this.
+    const testIds = Array.from(document.querySelectorAll('[data-testid]')).map((el) =>
+      el.getAttribute('data-testid'),
+    );
+    const jumpIndex = testIds.indexOf('search-jump');
+    const verseIndex = testIds.indexOf('search-verse');
+    expect(jumpIndex).toBeGreaterThanOrEqual(0);
+    expect(verseIndex).toBeGreaterThan(jumpIndex);
   });
 
   it('opens the surah at the ayah when the jump is tapped', async () => {
@@ -110,6 +157,39 @@ describe('SearchScreen', () => {
     fireEvent.click(screen.getByTestId('search-jump'));
 
     expect(mocks.push).toHaveBeenCalledWith('/surah/2?ayah=255');
+  });
+
+  it('shows a surah-only jump without a fabricated ayah number', async () => {
+    mocks.searchCorpus.mockResolvedValue({
+      jump: {
+        surah_id: 2,
+        ayah_number: null,
+        text_uthmani: '',
+        words: [],
+        highlightPosition: null,
+      },
+      verses: [],
+      roots: [],
+    });
+
+    render(<SearchScreen />);
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'Al-Baqarah' } });
+
+    await waitFor(() => expect(screen.getByTestId('search-jump')).toBeTruthy());
+    // Not '2:1' -- a surah-name match carries no ayah, and openJump pushes
+    // the surah alone, so a fabricated ':1' would label a destination the
+    // tap does not reach.
+    expect(screen.getByTestId('search-jump').textContent).toBe('2');
+
+    fireEvent.click(screen.getByTestId('search-jump'));
+    expect(mocks.push).toHaveBeenCalledWith('/surah/2');
+  });
+
+  it('shows the no-results message when nothing matches', async () => {
+    render(<SearchScreen />);
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'zzz-no-match' } });
+
+    await waitFor(() => expect(screen.getByText('Nothing found')).toBeTruthy());
   });
 
   it('reports a failed search instead of an empty result', async () => {

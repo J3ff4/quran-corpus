@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
-import type { SearchResult } from '@quran-corpus/data/mobile';
+import { EMPTY_SEARCH_RESULT, type SearchResult } from '@quran-corpus/data/mobile';
 import { searchCorpus } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { t } from '@/i18n/uiStrings';
@@ -11,7 +11,6 @@ import { SnippetText } from '@/components/SnippetText';
 import { touchTargets } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
-const EMPTY: SearchResult = { jump: null, verses: [], roots: [] };
 // Long enough that a fast typist runs one query rather than six, short enough
 // that results still feel attached to the keystroke. The DB is local, so this
 // is about wasted work, not latency.
@@ -22,7 +21,7 @@ export function SearchScreen() {
   const theme = useThemeColors();
 
   const [query, setQuery] = useState('');
-  const [result, setResult] = useState<SearchResult>(EMPTY);
+  const [result, setResult] = useState<SearchResult>(EMPTY_SEARCH_RESULT);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   // Every keystroke starts a query and they can land out of order; only the
@@ -32,7 +31,11 @@ export function SearchScreen() {
   useEffect(() => {
     const trimmed = query.trim();
     if (trimmed.length === 0) {
-      setResult(EMPTY);
+      // Bump the sequence too: an in-flight debounced request from the text
+      // just cleared would otherwise still pass its own `requestRef.current
+      // !== request` check and repaint stale hits underneath the empty state.
+      requestRef.current += 1;
+      setResult(EMPTY_SEARCH_RESULT);
       setFailed(false);
       return;
     }
@@ -49,10 +52,12 @@ export function SearchScreen() {
         setFailed(false);
       } catch (cause) {
         // Distinct from "nothing found": an FTS5 build problem and an
-        // unmatched word are otherwise the same blank screen.
-        console.error('[search] failed', { query: trimmed, cause });
+        // unmatched word are otherwise the same blank screen. Query text is
+        // deliberately not logged here -- it would put search terms in
+        // release-build logs.
+        console.error('[search] failed', cause);
         if (requestRef.current !== request) return;
-        setResult(EMPTY);
+        setResult(EMPTY_SEARCH_RESULT);
         setFailed(true);
       } finally {
         if (requestRef.current === request) setLoading(false);
@@ -101,7 +106,14 @@ export function SearchScreen() {
         />
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32 }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32 }}
+        // Otherwise Android's default ("never") reads the first tap on a
+        // result -- with the autofocused input still holding the keyboard
+        // open -- as "dismiss the keyboard", not as a press on that row.
+        keyboardShouldPersistTaps="handled"
+      >
         {loading ? <ActivityIndicator /> : null}
         {failed ? (
           <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ color: theme.danger }}>
@@ -121,7 +133,13 @@ export function SearchScreen() {
               style={{ paddingVertical: 14, minHeight: touchTargets.minimum }}
             >
               <Text style={{ color: theme.accent, fontSize: 17 }}>
-                {result.jump.surah_id}:{result.jump.ayah_number ?? 1}
+                {/* A surah-name-only reference ("Al-Baqarah") has no ayah at
+                    all -- openJump pushes the surah with no `?ayah=`, so
+                    faking one here (the old `?? 1`) labelled a destination
+                    the tap would not actually land on. */}
+                {result.jump.ayah_number === null
+                  ? result.jump.surah_id
+                  : `${result.jump.surah_id}:${result.jump.ayah_number}`}
               </Text>
             </Pressable>
           </>
@@ -129,19 +147,26 @@ export function SearchScreen() {
 
         {result.verses.length > 0 ? (
           <>
-            <Text style={heading}>{t(uiLocale, 'search.verses').toUpperCase()}</Text>
+            <Text accessibilityRole="header" style={heading}>{t(uiLocale, 'search.verses').toUpperCase()}</Text>
             {result.verses.map((hit) => (
               <Pressable
                 key={`${hit.source}-${hit.surah_id}-${hit.ayah_number}`}
                 testID="search-verse"
                 accessibilityRole="button"
                 onPress={() => router.push(`/surah/${hit.surah_id}?ayah=${hit.ayah_number}`)}
-                style={{ paddingVertical: 12 }}
+                style={{ paddingVertical: 12, minHeight: touchTargets.minimum }}
               >
                 <Text style={{ color: theme.mutedText, fontSize: 12 }}>
                   {hit.surah_id}:{hit.ayah_number}
                 </Text>
-                <SnippetText snippet={hit.snippet} highlightColor={theme.accent} style={{ color: theme.text }} />
+                <SnippetText
+                  snippet={hit.snippet}
+                  highlightColor={theme.accent}
+                  // Hafs only for the Arabic body -- a Russian or Uzbek
+                  // snippet has no business in the Uthmani face, and
+                  // `hit.source` is exactly what says which this is.
+                  style={hit.source === 'ar' ? { color: theme.text, fontFamily: 'Hafs' } : { color: theme.text }}
+                />
               </Pressable>
             ))}
           </>
@@ -149,7 +174,7 @@ export function SearchScreen() {
 
         {result.roots.length > 0 ? (
           <>
-            <Text style={heading}>{t(uiLocale, 'search.roots').toUpperCase()}</Text>
+            <Text accessibilityRole="header" style={heading}>{t(uiLocale, 'search.roots').toUpperCase()}</Text>
             {result.roots.map((root) => (
               <Pressable
                 key={root.root_buckwalter}
@@ -158,7 +183,7 @@ export function SearchScreen() {
                 onPress={() => router.push(`/root/${encodeURIComponent(root.root_buckwalter)}`)}
                 style={{ paddingVertical: 12, minHeight: touchTargets.minimum }}
               >
-                <Text style={{ color: theme.accent, fontSize: 17 }}>{root.root_arabic}</Text>
+                <Text style={{ color: theme.accent, fontSize: 17, fontFamily: 'Hafs' }}>{root.root_arabic}</Text>
               </Pressable>
             ))}
           </>
