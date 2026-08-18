@@ -147,6 +147,46 @@ describe('searchVerses translator filter', () => {
 
     expect(hits.filter((h) => h.source === 'ru')).toHaveLength(2);
   });
+
+  // Review round 2, Important 1+2: sourceFilter's language-only branch (no
+  // translator) was never exercised -- all four cases above pass a translator.
+  it('restricts to Arabic + the selected language when no translator is given', async () => {
+    const ru = await searchVerses(db, 'Аллаха', { language: 'ru' });
+    expect(ru.filter((h) => h.source === 'ru')).toHaveLength(2);
+
+    // 'Allah' only matches the seeded English row's text, never the Cyrillic
+    // ru rows -- so this is the assertion that actually depends on the
+    // filter existing, not on the query text happening not to collide.
+    const excludesEnglish = await searchVerses(db, 'Allah', { language: 'ru' });
+    expect(excludesEnglish.some((h) => h.source === 'en')).toBe(false);
+  });
+
+  it('restricts the Uzbek transliteration pass to the selected translator', async () => {
+    const matching = await searchVerses(db, 'bilan', { language: 'uz', translator: 'T' });
+    expect(matching.some((h) => h.source === 'uz')).toBe(true);
+
+    const nonMatching = await searchVerses(db, 'bilan', { language: 'uz', translator: 'nope' });
+    expect(nonMatching.some((h) => h.source === 'uz')).toBe(false);
+  });
+
+  // Important 1: translator alone (no language) must be a no-op everywhere,
+  // including the Uzbek pass -- the pair identifies a translation set, and
+  // translator without language doesn't identify anything.
+  it('ignores translator without language, matching the no-options result exactly', async () => {
+    const noOpts = await searchVerses(db, 'bilan');
+    const translatorOnly = await searchVerses(db, 'bilan', { translator: 'Abu Adel' });
+
+    expect(translatorOnly).toEqual(noOpts);
+  });
+
+  // Important 1's second manifestation: '' disagreed with undefined between
+  // sourceFilter and uzWanted. hasLanguage() must treat both as "unset" in
+  // the Uzbek pass specifically -- undefined alone can't prove this, since
+  // the pre-fix `=== undefined` check also treated undefined as unset.
+  it('treats an empty-string language as unset for the Uzbek pass too', async () => {
+    const hits = await searchVerses(db, 'bilan', { language: '', translator: 'Abu Adel' });
+    expect(hits.some((h) => h.source === 'uz')).toBe(true);
+  });
 });
 
 describe('search orchestrator', () => {
