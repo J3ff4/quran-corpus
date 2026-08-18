@@ -13,6 +13,12 @@ describe('@quran-corpus/data/mobile', () => {
     expect(typeof mod.getWordDetail).toBe('function');
     expect(typeof mod.getTranslationsBySurahAndLang).toBe('function');
     expect(typeof mod.search).toBe('function');
+    expect(typeof mod.getLemmaEntry).toBe('function');
+    expect(typeof mod.getLemmaConcordancePage).toBe('function');
+    expect(typeof mod.countLemmaConcordance).toBe('function');
+    expect(typeof mod.getLemmaFrequency).toBe('function');
+    expect(typeof mod.getVerbConcordance).toBe('function');
+    expect(typeof mod.parseLemmaParam).toBe('function');
   });
 
   it('does not export node/libsql runtime helpers', async () => {

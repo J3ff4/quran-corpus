@@ -1,18 +1,28 @@
 import { selectedTranslators, type MobileDataClient } from '@quran-corpus/mobile-data';
 import {
+  countLemmaConcordance,
+  countRootConcordance,
   getAyahsBySurah,
   getAllSurahs,
   getGlossesWithFallback,
+  getLemmaConcordancePage,
+  getLemmaEntry,
+  getLemmaFrequency,
+  getRootConcordancePage,
   getRootEntry,
+  getRootsByFrequency,
   getSegmentsByWordIds,
   getSurahById,
   getTranslationsBySurahAndLang,
+  getVerbConcordance,
   getWordByLocation,
   getWordDetail,
   getWordsByAyah,
   getWordsBySurahAyahRange,
   search,
   type Ayah,
+  type ConcordanceEntry,
+  type LemmaEntry,
   type RootEntry,
   type SearchResult,
   type Surah,
@@ -301,6 +311,98 @@ export async function getRootScreen(
   rootBuckwalter: string,
 ): Promise<RootEntry | null> {
   return getRootEntry(client, rootBuckwalter);
+}
+
+/** One row of the Frequent pane, whichever of the three lists produced it. */
+export interface FrequencyRow {
+  /** Route target: a root screen for roots, a lemma screen for the other two. */
+  href: string;
+  arabic: string;
+  gloss: string | null;
+  count: number;
+}
+
+export async function getRootOccurrenceCount(
+  client: MobileDataClient,
+  bw: string,
+): Promise<number> {
+  return countRootConcordance(client, bw);
+}
+
+export async function getRootOccurrences(
+  client: MobileDataClient,
+  bw: string,
+  lang: ContentLanguageCode,
+  offset: number,
+  limit: number,
+): Promise<ConcordanceEntry[]> {
+  return getRootConcordancePage(client, bw, { lang, offset, limit });
+}
+
+export async function getLemmaScreen(
+  client: MobileDataClient,
+  lemmaBw: string,
+  lang: ContentLanguageCode,
+): Promise<{ entry: LemmaEntry | null; total: number }> {
+  const [entry, total] = await Promise.all([
+    getLemmaEntry(client, lemmaBw, lang),
+    countLemmaConcordance(client, lemmaBw),
+  ]);
+  return { entry, total };
+}
+
+export async function getLemmaOccurrences(
+  client: MobileDataClient,
+  lemmaBw: string,
+  lang: ContentLanguageCode,
+  offset: number,
+  limit: number,
+): Promise<ConcordanceEntry[]> {
+  return getLemmaConcordancePage(client, lemmaBw, { lang, offset, limit });
+}
+
+/** The Frequent pane's three lists flattened to one row shape, so the screen
+ *  renders one list rather than three that differ only in field names. */
+export async function getFrequencyRows(
+  client: MobileDataClient,
+  kind: 'roots' | 'lemmas' | 'verbs',
+): Promise<FrequencyRow[]> {
+  if (kind === 'roots') {
+    const roots = await getRootsByFrequency(client);
+    return roots.map((root) => ({
+      href: `/root/${encodeURIComponent(root.root_buckwalter)}`,
+      arabic: root.root_arabic,
+      gloss: null,
+      count: root.occurrence_count,
+    }));
+  }
+
+  if (kind === 'lemmas') {
+    const lemmas = await getLemmaFrequency(client);
+    // Both queries filter `lemma_buckwalter IS NOT NULL`, so this drops nothing
+    // today -- but the row type still allows null, and `?? ''` would build a
+    // dead `/lemma/` link rather than omit an unroutable row.
+    return lemmas
+      .filter((row) => row.lemma_buckwalter !== null)
+      .map((row) => ({
+        href: `/lemma/${encodeURIComponent(row.lemma_buckwalter!)}`,
+        arabic: row.lemma,
+        gloss: null,
+        count: row.count,
+      }));
+  }
+
+  const verbs = await getVerbConcordance(client);
+  return verbs
+    .filter((row) => row.lemma_buckwalter !== null)
+    .map((row) => ({
+      // The lemma, not the surface form the row displays: form_arabic is the
+      // commonest spelling of the verb and routing on it opens nothing.
+      href: `/lemma/${encodeURIComponent(row.lemma_buckwalter!)}`,
+      arabic: row.form_arabic,
+      gloss: row.lemma,
+      count: row.count,
+    }));
 }
 
 export async function getM0WordDetail(

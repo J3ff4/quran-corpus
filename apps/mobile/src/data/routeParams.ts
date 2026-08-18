@@ -12,7 +12,19 @@
 // caps the length and refuses double-encoded input -- which is exactly this
 // route's threat -- and CLAUDE.md §2 records what happened the last time a
 // consumer kept its own copy of those validators.
-export { parseRootParam } from '@quran-corpus/data/mobile';
+export { parseRootParam, parseLemmaParam } from '@quran-corpus/data/mobile';
+
+import { ARABIC_ALPHABET_ORDER } from '@quran-corpus/data/mobile';
+
+/** A hijāʾī bucket off a deep link. Membership, not a charset test:
+ *  `rootFirstLetter` folds أ إ آ ٱ to ا and ى to ي, so those are never buckets
+ *  and a screen for one could never have rows. The list is imported rather
+ *  than restated so this cannot drift from the folding that produces it. */
+export function parseLetterParam(value: string | string[] | undefined): string | null {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (!raw) return null;
+  return ARABIC_ALPHABET_ORDER.includes(raw) ? raw : null;
+}
 
 /** Shared shape: a 1-based corpus coordinate with an upper bound.
  *

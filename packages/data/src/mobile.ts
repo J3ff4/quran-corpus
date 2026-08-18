@@ -42,11 +42,17 @@ export {
   getRootSearchList,
   getRootNeighbors,
 } from './queries/roots.js';
+export {
+  getLemmaEntry,
+  getLemmaConcordancePage,
+  countLemmaConcordance,
+} from './queries/lemma.js';
+export { getLemmaFrequency, getVerbConcordance } from './queries/dictionary.js';
 export { buckwalterToArabic, compareRootsArabic, rootFirstLetter, ARABIC_ALPHABET_ORDER } from './text/arabic.js';
 // The root route takes a Buckwalter identifier straight off a deep link, so it
 // needs the same validator the web page routes use. buckwalter.ts has no
 // runtime imports, so this adds no edge to the Metro graph.
-export { parseRootParam, isRootBuckwalter, ROOT_BUCKWALTER_MAX } from './text/buckwalter.js';
+export { parseRootParam, parseLemmaParam, isRootBuckwalter, ROOT_BUCKWALTER_MAX } from './text/buckwalter.js';
 export { trimConcordanceVerse } from './text/concordanceTrim.js';
 export { definitionSourceLabel } from './definitionSources.js';
 export { isSajdahAyah } from './text/sajdah.js';
@@ -65,6 +71,8 @@ export type {
   RootForm,
   RootDefinition,
   RootEntry,
+  LemmaEntry,
+  LemmaSense,
   ConcordanceEntry,
   VerseWord,
   WordSegment,

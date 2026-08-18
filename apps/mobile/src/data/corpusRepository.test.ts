@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { MobileDataClient, MobileRow, SqlValue } from '@quran-corpus/mobile-data';
 import {
   getAyahReaderLocation,
+  getFrequencyRows,
   getM0WordDetail,
   getRootScreen,
   getSurahGlosses,
@@ -62,6 +63,25 @@ describe('getAyahReaderLocation', () => {
   });
 });
 
+describe('getFrequencyRows', () => {
+  it('links a verb row to its lemma, not to its surface form', async () => {
+    // A verb row's Arabic is the commonest surface form (يَقُولُ) and its
+    // identity is the lemma. Routing on the surface form opens nothing.
+    const rows = await getFrequencyRows(createFakeClient(), 'verbs');
+
+    expect(rows[0]!.href).toBe('/lemma/qAl');
+    expect(rows[0]!.arabic).toBe('يَقُولُ');
+  });
+
+  it('omits a row with no lemma identifier rather than linking to /lemma/', async () => {
+    const client = createFakeClient({
+      verbs: [{ lemma: null, lemma_buckwalter: null, count: 12, text_arabic: 'يَقُولُ' }],
+    });
+
+    expect(await getFrequencyRows(client, 'verbs')).toEqual([]);
+  });
+});
+
 interface FakeClientOptions {
   ruTranslator?: string;
   /** Replace the word fixture wholesale -- used to hand the repository rows in
@@ -69,6 +89,9 @@ interface FakeClientOptions {
   words?: MobileRow[];
   segments?: MobileRow[];
   glosses?: MobileRow[];
+  /** Rows as getVerbConcordance's SQL yields them: a lemma, its identifier, its
+   *  commonest surface form, and a count. */
+  verbs?: MobileRow[];
 }
 
 function createFakeClient({
@@ -76,6 +99,7 @@ function createFakeClient({
   words: wordFixture,
   segments: segmentFixture,
   glosses: glossFixture,
+  verbs: verbFixture,
 }: FakeClientOptions = {}): MobileDataClient {
   const surahs: MobileRow[] = [
     surahRow({
@@ -136,6 +160,9 @@ function createFakeClient({
       gloss: 'mercy',
       occurrence_count: 114,
     },
+  ];
+  const verbs: MobileRow[] = verbFixture ?? [
+    { lemma: 'قَالَ', lemma_buckwalter: 'qAl', count: 12, text_arabic: 'يَقُولُ' },
   ];
   const rootDefinitions: MobileRow[] = [
     { id: 21, root_id: 7, source: 'hanswehr', definition: 'to have mercy' },
@@ -227,6 +254,9 @@ function createFakeClient({
           });
         }
         return { rows };
+      }
+      if (sql.includes("WHERE pos_tag = 'V' AND lemma_buckwalter IS NOT NULL")) {
+        return { rows: verbs };
       }
       if (sql.includes('FROM roots WHERE root_buckwalter')) {
         return { rows: roots.filter((root) => root['root_buckwalter'] === args[0]) };
