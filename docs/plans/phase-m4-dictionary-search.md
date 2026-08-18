@@ -254,7 +254,7 @@ export default function DictionaryRoute() {
 
 - [ ] **Step 8: Rewrite the tab bar**
 
-In `app/(tabs)/_layout.tsx`, the five `<Tabs.Screen>` entries become, in order: `index` (`tabs.home`, icon `home`), `surahs` (`tabs.surahs`, icon `book`), `morphology` (`tabs.morphology`, icon `words`), `dictionary` (`tabs.dictionary`, icon `book`), `menu` (`tabs.menu`, icon `settings`). Delete the `bookmarks` and `settings` entries.
+In `app/(tabs)/_layout.tsx`, the five `<Tabs.Screen>` entries become, in order: `index` (`tabs.home`, icon `home`), `surahs` (`tabs.surahs`, icon `book`), `morphology` (`tabs.morphology`, icon `words`), `dictionary` (`tabs.dictionary`, icon `dictionary`), `menu` (`tabs.menu`, icon `menu`). Delete the `bookmarks` and `settings` entries.
 
 Icons: `dictionary` and `menu` have no glyph yet, and `book` is already the Surahs tab. Two identical glyphs in one tab bar is worse than a plain new one, so add two icons to `src/components/icons/` following the shape of the existing ones and extend the `Icon` name union. Refining them is a design task; having them is not.
 
@@ -516,7 +516,7 @@ The first thing in this phase that runs FTS5 on the device. If R4 bites — FTS5
 
 **Files:**
 - Create: `apps/mobile/src/components/SnippetText.tsx`, `apps/mobile/src/components/SnippetText.test.tsx`, `apps/mobile/src/screens/SearchScreen.tsx`, `apps/mobile/src/screens/SearchScreen.test.tsx`, `apps/mobile/app/search.tsx`
-- Modify: `apps/mobile/src/data/corpusRepository.ts`, `apps/mobile/src/i18n/uiStrings.ts`, `apps/mobile/src/components/SurahReader.tsx`
+- Modify: `apps/mobile/src/data/corpusRepository.ts`, `apps/mobile/src/i18n/uiStrings.ts`, `apps/mobile/src/components/SurahReader.tsx`, `apps/mobile/app/(tabs)/index.tsx`, `apps/mobile/src/components/icons/Icon.tsx`
 
 **Interfaces:**
 - Consumes: `search(db, q, opts)` from Task 2.
@@ -2799,6 +2799,6 @@ git commit -m "docs(mobile): record the M4 on-device verification run"
 - **Recent-search history** — writes the on-device user DB, a §5 trigger and persisted device state, for a convenience nobody asked for.
 - **Search filters by surah or part of speech.**
 - **Form-filter chips on the root concordance** (web's `FormFilterChips`). `getRootConcordancePage` already accepts `formIds`; no mobile screen passes them yet.
-- **Bespoke Dictionary and Menu tab icons** — Task 1 reuses `book` and `settings`. A glyph pair is a design task.
+- **Refined Dictionary and Menu tab glyphs.** Task 1 adds two plain ones so no glyph is shared with another tab; drawing them properly is a design task.
 - **A translator picker.** Task 2's options exist so one is cheap later, but nothing in this phase exposes them.
 - **Any treebank surface.**
