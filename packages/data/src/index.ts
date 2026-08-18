@@ -21,6 +21,7 @@ export {
   search,
   EMPTY_SEARCH_RESULT,
 } from './queries/search.js';
+export type { VerseSearchOpts } from './queries/search.js';
 export {
   getRootByBuckwalter,
   getAllRoots,

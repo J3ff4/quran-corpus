@@ -26,6 +26,7 @@ export { getTranslationsByAyah, getTranslation, getTranslationsBySurahAndLang } 
 export { getGlossesBySurahAndLang, getGlossesWithFallback } from './queries/glosses.js';
 export type { GlossWithLang } from './queries/glosses.js';
 export { parseVerseRef, searchVerses, search, EMPTY_SEARCH_RESULT } from './queries/search.js';
+export type { VerseSearchOpts } from './queries/search.js';
 export {
   getRootByBuckwalter,
   getAllRoots,

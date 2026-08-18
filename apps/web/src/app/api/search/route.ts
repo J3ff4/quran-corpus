@@ -10,5 +10,9 @@ export async function GET(request: Request): Promise<Response> {
     return NextResponse.json(EMPTY_SEARCH_RESULT);
   }
   const db = await getDatabase();
-  return NextResponse.json(await search(db, q));
+  // No selection passed: web offers every indexed translation rather than one
+  // fixed translator per language. apps/mobile passes its selectedTranslators
+  // entry -- see the comment on sourceFilter in queries/search.ts.
+  const result = await search(db, q);
+  return NextResponse.json(result);
 }

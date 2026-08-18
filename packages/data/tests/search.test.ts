@@ -104,6 +104,51 @@ describe('searchVerses', () => {
   });
 });
 
+async function seedTwoRussian(db: Client): Promise<void> {
+  await db.execute("INSERT INTO languages VALUES ('ru','Russian','Русский','ltr')");
+  await db.execute(
+    "INSERT INTO translations (ayah_id,language_code,translator,text) VALUES (1,'ru','Abu Adel','именем Аллаха милостивого')",
+  );
+  await db.execute(
+    "INSERT INTO translations (ayah_id,language_code,translator,text) VALUES (1,'ru','Elmir Kuliev','именем Аллаха милосердного')",
+  );
+}
+
+describe('searchVerses translator filter', () => {
+  beforeEach(async () => {
+    await seedTwoRussian(db);
+    await backfillSearchIndex(db);
+  });
+
+  it('returns one hit per ayah for the selected translator', async () => {
+    const hits = await searchVerses(db, 'Аллаха', { language: 'ru', translator: 'Abu Adel' });
+    const ru = hits.filter((h) => h.source === 'ru');
+
+    expect(ru).toHaveLength(1);
+    // The wording proves WHICH translator survived. A length check alone
+    // passes just as happily when Kuliev's row is the one that stayed.
+    expect(ru[0]!.snippet).toContain('милостивого');
+  });
+
+  it('still returns the Arabic row alongside the selected translation', async () => {
+    const hits = await searchVerses(db, 'الرحمن', { language: 'ru', translator: 'Abu Adel' });
+
+    expect(hits.some((h) => h.source === 'ar')).toBe(true);
+  });
+
+  it('excludes languages other than Arabic and the selected one', async () => {
+    const hits = await searchVerses(db, 'Allah', { language: 'ru', translator: 'Abu Adel' });
+
+    expect(hits.some((h) => h.source === 'en')).toBe(false);
+  });
+
+  it('searches every language when no selection is given', async () => {
+    const hits = await searchVerses(db, 'Аллаха');
+
+    expect(hits.filter((h) => h.source === 'ru')).toHaveLength(2);
+  });
+});
+
 describe('search orchestrator', () => {
   it('returns a jump verse with words for a verse ref', async () => {
     await backfillSearchIndex(db);
