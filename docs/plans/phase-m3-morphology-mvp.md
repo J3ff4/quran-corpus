@@ -2362,6 +2362,11 @@ Carries F5, F6, check 27 and the M2 rosette carry-over. Everything else in the
 27 is still live: F5's fix touches the sheet hero that checks 9, 14 and 21 all
 read, and F6's touches the reader's scroll handler.
 
+**No dedicated build.** Owner's call, 2026-08-18: Run 3 rides the next feature
+build rather than one cut for these two fixes alone. The §10 gate therefore
+stays open across the phase boundary — M3 is not complete until this run
+happens, and neither fix has been seen on hardware.
+
 ---
 
 ## Risks
