@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SearchScreen } from './SearchScreen';
 
@@ -95,6 +95,43 @@ describe('SearchScreen', () => {
     mocks.searchCorpus.mockClear();
     await settle();
     expect(mocks.searchCorpus).not.toHaveBeenCalled();
+  });
+
+  it('drops an in-flight request when the box is cleared before it lands', async () => {
+    // The sibling test above races nothing: its request has already resolved
+    // by the time it clears the box. Holding the promise open is what puts a
+    // request genuinely in flight across the clear.
+    let land!: (value: unknown) => void;
+    mocks.searchCorpus.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          land = resolve;
+        }),
+    );
+
+    render(<SearchScreen />);
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'x' } });
+
+    await waitFor(() => expect(mocks.searchCorpus).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByTestId('search-loading')).toBeTruthy());
+
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: '' } });
+    await act(async () => {
+      land({
+        jump: null,
+        verses: [{ surah_id: 2, ayah_number: 255, source: 'ar', snippet: '\u0671\u0644\u0644\u064e\u0651\u0647\u064f' }],
+        roots: [],
+      });
+      await settle();
+    });
+
+    expect(screen.getByText('Type a verse reference, a word, or a root')).toBeTruthy();
+    // Stale hits must not repaint under the empty state: that is the sequence
+    // bump on the empty branch.
+    expect(screen.queryByTestId('search-verse')).toBeNull();
+    // ...and the bump orphans the request's own `finally`, so the empty branch
+    // owes the spinner its own clear.
+    expect(screen.queryByTestId('search-loading')).toBeNull();
   });
 
   it('searches in the reader content language, not the UI locale', async () => {

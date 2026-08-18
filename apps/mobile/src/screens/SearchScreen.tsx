@@ -37,6 +37,10 @@ export function SearchScreen() {
       requestRef.current += 1;
       setResult(EMPTY_SEARCH_RESULT);
       setFailed(false);
+      // The bump above makes any in-flight request non-current, so its own
+      // `finally` will no longer clear this -- the spinner would sit forever
+      // beside the "type something" hint.
+      setLoading(false);
       return;
     }
 
@@ -114,7 +118,7 @@ export function SearchScreen() {
         // open -- as "dismiss the keyboard", not as a press on that row.
         keyboardShouldPersistTaps="handled"
       >
-        {loading ? <ActivityIndicator /> : null}
+        {loading ? <ActivityIndicator testID="search-loading" /> : null}
         {failed ? (
           <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ color: theme.danger }}>
             {t(uiLocale, 'search.loadFailed')}
@@ -125,7 +129,7 @@ export function SearchScreen() {
 
         {result.jump ? (
           <>
-            <Text style={heading}>{t(uiLocale, 'search.jump').toUpperCase()}</Text>
+            <Text accessibilityRole="header" style={heading}>{t(uiLocale, 'search.jump').toUpperCase()}</Text>
             <Pressable
               testID="search-jump"
               accessibilityRole="button"
