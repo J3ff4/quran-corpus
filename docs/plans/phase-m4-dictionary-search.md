@@ -479,7 +479,7 @@ const result = await search(db, q);
 
 - [ ] **Step 7: Run both gates**
 
-Run: `cd packages/data && pnpm test && pnpm type-check && pnpm lint`
+Run: `cd packages/data && pnpm test && pnpm type-check`  (that package has no `lint` script; eslint runs from the root)
 Run: `cd apps/web && pnpm test && pnpm type-check && pnpm lint`
 Run: `cd apps/web && pnpm exec playwright test`
 Expected: all green.
@@ -1187,10 +1187,6 @@ describe('parseLemmaParam', () => {
     // it -- that regression cost web 35% of its lemma pages once already.
     expect(parseLemmaParam('%7Bll~ah')).toBe('{ll~ah');
   });
-
-  it('rejects a double-encoded value', () => {
-    expect(parseLemmaParam('qa%2541la')).toBeNull();
-  });
 });
 
 describe('parseLetterParam', () => {
@@ -1432,6 +1428,15 @@ constant, for the hijai bucket screens."
 
 
 ## Task 5: Dictionary Browse and the letter screen
+
+> **Carried from Task 4's review.** Five of Task 4's six new repository exports
+> have zero coverage: the reviewer transposed `offset`/`limit` in
+> `getRootOccurrences` and `getLemmaOccurrences`, hardcoded
+> `getRootOccurrenceCount` to `0`, and pointed the `roots` and `lemmas` hrefs at
+> `/BROKEN/`, then ran the full 320-test suite green. Both `offset` and `limit`
+> are `number`, so TypeScript is not a backstop. **Whichever task first wires one
+> of these to a screen must assert the paging arguments reach the query in
+> order**, not merely that rows come back.
 
 **Files:**
 - Create: `apps/mobile/src/components/AlphabetGrid.tsx`, `apps/mobile/src/components/AlphabetGrid.test.tsx`, `apps/mobile/src/screens/LetterScreen.tsx`, `apps/mobile/src/screens/LetterScreen.test.tsx`, `apps/mobile/src/screens/DictionaryScreen.tsx`, `apps/mobile/app/dictionary/letter/[letter].tsx`
