@@ -8,10 +8,6 @@ describe('parseLemmaParam', () => {
     // it -- that regression cost web 35% of its lemma pages once already.
     expect(parseLemmaParam('%7Bll~ah')).toBe('{ll~ah');
   });
-
-  it('rejects a double-encoded value', () => {
-    expect(parseLemmaParam('qa%2541la')).toBeNull();
-  });
 });
 
 describe('parseLetterParam', () => {

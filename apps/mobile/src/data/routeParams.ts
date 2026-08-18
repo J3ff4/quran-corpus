@@ -8,13 +8,13 @@
  * drift.
  */
 
+import { ARABIC_ALPHABET_ORDER } from '@quran-corpus/data/mobile';
+
 // Not re-implemented here. buckwalter.ts already validates the corpus charset,
 // caps the length and refuses double-encoded input -- which is exactly this
 // route's threat -- and CLAUDE.md §2 records what happened the last time a
 // consumer kept its own copy of those validators.
 export { parseRootParam, parseLemmaParam } from '@quran-corpus/data/mobile';
-
-import { ARABIC_ALPHABET_ORDER } from '@quran-corpus/data/mobile';
 
 /** A hijāʾī bucket off a deep link. Membership, not a charset test:
  *  `rootFirstLetter` folds أ إ آ ٱ to ا and ى to ي, so those are never buckets
