@@ -3,7 +3,7 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMemoryUserClient } from '../data/userRepository.testHelpers';
 import { setBookmark } from '../data/userRepository';
-import BookmarksTab from '../../app/(tabs)/bookmarks';
+import BookmarksTab from '../../app/bookmarks';
 
 const mocks = vi.hoisted(() => ({
   userClient: null as ReturnType<typeof createMemoryUserClient> | null,

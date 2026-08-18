@@ -1,7 +1,7 @@
 import React from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import SettingsTab from '../../app/(tabs)/settings';
+import SettingsTab from '../../app/settings';
 
 const mocks = vi.hoisted(() => ({
   setArabicScale: vi.fn(),

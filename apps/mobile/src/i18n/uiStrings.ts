@@ -7,6 +7,11 @@ export type UiStringKey =
   | 'tabs.bookmarks'
   | 'tabs.morphology'
   | 'tabs.settings'
+  | 'tabs.dictionary'
+  | 'tabs.menu'
+  | 'menu.bookmarks'
+  | 'menu.settings'
+  | 'menu.about'
   | 'wbw.title'
   | 'wbw.previous'
   | 'wbw.next'
@@ -83,6 +88,11 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'tabs.bookmarks': 'Bookmarks',
     'tabs.morphology': 'Morphology',
     'tabs.settings': 'Settings',
+    'tabs.dictionary': 'Dictionary',
+    'tabs.menu': 'Menu',
+    'menu.bookmarks': 'Bookmarks',
+    'menu.settings': 'Settings',
+    'menu.about': 'About & credits',
     'wbw.title': 'Word by word',
     'wbw.previous': 'Previous ayahs',
     'wbw.next': 'Next ayahs',
@@ -153,6 +163,11 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'tabs.bookmarks': 'Xatcho‘plar',
     'tabs.morphology': 'Morfologiya',
     'tabs.settings': 'Sozlamalar',
+    'tabs.dictionary': 'Луғат',
+    'tabs.menu': 'Меню',
+    'menu.bookmarks': 'Хатчўплар',
+    'menu.settings': 'Созламалар',
+    'menu.about': 'Дастур ҳақида',
     'wbw.title': 'So‘zma-so‘z',
     'wbw.previous': 'Oldingi oyatlar',
     'wbw.next': 'Keyingi oyatlar',
@@ -223,6 +238,11 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'tabs.bookmarks': 'Закладки',
     'tabs.morphology': 'Морфология',
     'tabs.settings': 'Настройки',
+    'tabs.dictionary': 'Словарь',
+    'tabs.menu': 'Меню',
+    'menu.bookmarks': 'Закладки',
+    'menu.settings': 'Настройки',
+    'menu.about': 'О приложении',
     'wbw.title': 'Пословно',
     'wbw.previous': 'Предыдущие аяты',
     'wbw.next': 'Следующие аяты',

@@ -33,13 +33,6 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="bookmarks"
-        options={{
-          title: t(uiLocale, 'tabs.bookmarks'),
-          tabBarIcon: ({ color, size }) => <Icon name="bookmark" color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
         name="morphology"
         options={{
           title: t(uiLocale, 'tabs.morphology'),
@@ -47,10 +40,17 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="settings"
+        name="dictionary"
         options={{
-          title: t(uiLocale, 'tabs.settings'),
-          tabBarIcon: ({ color, size }) => <Icon name="settings" color={color} size={size} />,
+          title: t(uiLocale, 'tabs.dictionary'),
+          tabBarIcon: ({ color, size }) => <Icon name="dictionary" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="menu"
+        options={{
+          title: t(uiLocale, 'tabs.menu'),
+          tabBarIcon: ({ color, size }) => <Icon name="menu" color={color} size={size} />,
         }}
       />
     </Tabs>

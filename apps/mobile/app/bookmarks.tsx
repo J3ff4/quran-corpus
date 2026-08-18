@@ -6,7 +6,7 @@ import { useAppSettings } from '@/settings/settingsStore';
 import { t } from '@/i18n/uiStrings';
 import { useThemeColors } from '@/theme/themeContext';
 
-export default function BookmarksTab() {
+export default function BookmarksRoute() {
   const { uiLocale } = useAppSettings();
   const theme = useThemeColors();
   const { data, loading, error } = useUserDbOnFocus(getBookmarks, t(uiLocale, 'bookmarks.loadFailed'));

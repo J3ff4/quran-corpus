@@ -47,7 +47,7 @@ function ChoiceOption({ label, selected, onPress }: { label: string; selected: b
   );
 }
 
-export default function SettingsTab() {
+export default function SettingsRoute() {
   const settings = useAppSettings();
   const { uiLocale } = settings;
   const theme = useThemeColors();
