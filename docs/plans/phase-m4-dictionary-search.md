@@ -1098,13 +1098,28 @@ unmatched word are otherwise the same blank screen."
 
 ## Task 4: Widen the mobile entry point
 
+> **Amended 2026-08-18 after a pre-flight read of the code this task touches.**
+> Four things the original steps got wrong, all verified against the tree:
+> 1. `parseLemmaParam` **already exists** at `packages/data/src/text/buckwalter.ts:100`,
+>    decode-aware and tested against the three most frequent lemmas. The original
+>    Step 7 had us hand-write a second, weaker one in the app -- wrong cap
+>    (`ROOT_BUCKWALTER_MAX` 24 instead of `LEMMA_BUCKWALTER_MAX` 32), no decode,
+>    so `%7Bll~ah` (ٱللَّه, 2699 occurrences) would 404. That is the exact bug
+>    buckwalter.ts documents costing 35% of web's lemma pages, and a duplicate
+>    validator in a consumer is the CLAUDE.md §2 failure mode by name.
+> 2. The original `raw.includes('%')` guard was redundant -- `%` is outside
+>    `BUCKWALTER_CHAR_CLASS`, so its test passed with the line deleted.
+> 3. `apps/mobile/src/data/routeParams.test.ts` does not exist; it is created, not appended to.
+> 4. `?? ''` on a null `lemma_buckwalter` builds a dead `/lemma/` route.
+
 **Files:**
 - Modify: `packages/data/src/mobile.ts`, `packages/data/tests/mobile-entry.test.ts`, `apps/mobile/src/data/corpusRepository.ts`, `apps/mobile/src/data/routeParams.ts`
-- Test: `apps/mobile/src/data/corpusRepository.test.ts`, `apps/mobile/src/data/routeParams.test.ts`
+- Create: `apps/mobile/src/data/routeParams.test.ts`
+- Test: `apps/mobile/src/data/corpusRepository.test.ts`
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces, from `@quran-corpus/data/mobile`: `getLemmaEntry`, `getLemmaConcordancePage`, `countLemmaConcordance`, `getLemmaFrequency`, `getVerbConcordance`. From `corpusRepository`:
+- Produces, from `@quran-corpus/data/mobile`: `getLemmaEntry`, `getLemmaConcordancePage`, `countLemmaConcordance`, `getLemmaFrequency`, `getVerbConcordance`, `parseLemmaParam`. From `corpusRepository`:
   ```ts
   interface FrequencyRow { href: string; arabic: string; gloss: string | null; count: number }
   getRootOccurrenceCount(client, bw: string): Promise<number>
@@ -1113,7 +1128,7 @@ unmatched word are otherwise the same blank screen."
   getLemmaOccurrences(client, lemmaBw: string, lang: ContentLanguageCode, offset: number, limit: number): Promise<ConcordanceEntry[]>
   getFrequencyRows(client, kind: 'roots' | 'lemmas' | 'verbs'): Promise<FrequencyRow[]>
   ```
-  From `routeParams`: `parseLemmaParam(value): string | null`, `parseLetterParam(value): string | null`.
+  From `routeParams`: `parseLemmaParam` (re-export), `parseLetterParam(value): string | null`.
 
 - [ ] **Step 1: Extend the entry-point guard first**
 
@@ -1125,6 +1140,7 @@ In `packages/data/tests/mobile-entry.test.ts`, add to the first case:
     expect(typeof mod.countLemmaConcordance).toBe('function');
     expect(typeof mod.getLemmaFrequency).toBe('function');
     expect(typeof mod.getVerbConcordance).toBe('function');
+    expect(typeof mod.parseLemmaParam).toBe('function');
 ```
 
 Leave the "does not export node/libsql runtime helpers" case and the import-graph walk exactly as they are. They are the guard, not paperwork.
@@ -1147,34 +1163,33 @@ export {
 export { getLemmaFrequency, getVerbConcordance } from './queries/dictionary.js';
 ```
 
-and add `LemmaEntry`, `ConcordanceEntry`, `LemmaFrequencyEntry`, `VerbConcordanceEntry` and `RootSearchItem` to the type exports.
+Add `parseLemmaParam` to the existing `./text/buckwalter.js` export line — beside `parseRootParam`, which is already there for exactly the same reason.
+
+Add `LemmaEntry` and `LemmaSense` to the type exports. (`ConcordanceEntry`, `LemmaFrequencyEntry`, `VerbConcordanceEntry` and `RootSearchItem` are already exported — do not re-add them.)
 
 - [ ] **Step 4: Run the guard, confirm it passes**
 
 Run: `cd packages/data && npx vitest run tests/mobile-entry.test.ts --no-cache`
-Expected: PASS — including the import-graph case, which is what proves neither `lemma.ts` nor `dictionary.ts` reaches `db.ts`.
+Expected: PASS — including the import-graph case, which is what proves neither `lemma.ts` nor `dictionary.ts` reaches `db.ts`. (Both import only types plus `text/` and `morphology/` helpers, so this should hold; if it does not, stop and report rather than trimming the guard.)
 
 - [ ] **Step 5: Write the failing routeParams tests**
 
-Append to `apps/mobile/src/data/routeParams.test.ts`:
+Create `apps/mobile/src/data/routeParams.test.ts`. `parseLemmaParam`'s own behaviour is already covered by `packages/data/tests/buckwalter.test.ts` — do not restate that suite here. Assert only what this module is responsible for: that the re-export is wired and that mobile's array-or-string param shape is handled.
 
 ```ts
+import { describe, expect, it } from 'vitest';
 import { parseLemmaParam, parseLetterParam } from './routeParams';
 
 describe('parseLemmaParam', () => {
-  it('accepts a Buckwalter lemma', () => {
-    expect(parseLemmaParam('kitAb')).toBe('kitAb');
+  it('is the shared decode-aware validator, not a local copy', () => {
+    // The single most frequent lemma in the corpus (ٱللَّه, 2699 occurrences)
+    // reaches a route still percent-encoded. A charset-only validator rejects
+    // it -- that regression cost web 35% of its lemma pages once already.
+    expect(parseLemmaParam('%7Bll~ah')).toBe('{ll~ah');
   });
 
   it('rejects a double-encoded value', () => {
-    // %2F decoded once is a path separator. A value that arrives still
-    // carrying a percent has been through something that should not have
-    // touched it.
-    expect(parseLemmaParam('kit%2Fab')).toBeNull();
-  });
-
-  it('rejects an over-long value', () => {
-    expect(parseLemmaParam('k'.repeat(200))).toBeNull();
+    expect(parseLemmaParam('qa%2541la')).toBeNull();
   });
 });
 
@@ -1192,47 +1207,43 @@ describe('parseLetterParam', () => {
   it('rejects arbitrary text', () => {
     expect(parseLetterParam('../../etc')).toBeNull();
   });
+
+  it('takes the first of a repeated param', () => {
+    expect(parseLetterParam(['ب', 'ت'])).toBe('ب');
+  });
 });
 ```
 
 - [ ] **Step 6: Run them, confirm they fail**
 
 Run: `cd apps/mobile && npx vitest run src/data/routeParams.test.ts --no-cache`
-Expected: FAIL — neither function exists.
+Expected: FAIL — neither export exists yet.
 
-- [ ] **Step 7: Implement the validators**
+- [ ] **Step 7: Wire the validators**
 
-Append to `apps/mobile/src/data/routeParams.ts`:
+In `apps/mobile/src/data/routeParams.ts`, add `parseLemmaParam` to the existing re-export line:
 
 ```ts
-import {
-  ARABIC_ALPHABET_ORDER,
-  isRootBuckwalter,
-  ROOT_BUCKWALTER_MAX,
-} from '@quran-corpus/data/mobile';
+export { parseRootParam, parseLemmaParam } from '@quran-corpus/data/mobile';
+```
 
-/** A lemma identifier off a deep link. Same threat and same charset as a root
- *  identifier -- Buckwalter, bounded, never double-encoded -- so it reuses the
- *  shared predicate rather than growing a second definition of the charset. */
-export function parseLemmaParam(value: string | string[] | undefined): string | null {
-  const raw = Array.isArray(value) ? value[0] : value;
-  if (!raw) return null;
-  if (raw.length > ROOT_BUCKWALTER_MAX) return null;
-  if (raw.includes('%')) return null;
-  return isRootBuckwalter(raw) ? raw : null;
-}
+That line's comment already says why: buckwalter.ts is the single source of truth for what a corpus identifier is, and a consumer-side copy is the §2 failure mode. Note `parseLemmaParam` takes a bare `string`, so callers unwrap the array-or-string param themselves exactly as `app/root/[buckwalter].tsx` already does for `parseRootParam`.
 
-/** A hijāʾī bucket. Membership, not a charset test: rootFirstLetter folds
- *  أ إ آ ٱ to ا and ى to ي, so those are never buckets, and a letter outside
- *  the list opens a screen that can never have rows. */
+Then append `parseLetterParam`. This one has no shared original — web's letter picker is client state with no route segment, so nothing to reuse — but it must not restate the folding rules either:
+
+```ts
+import { ARABIC_ALPHABET_ORDER } from '@quran-corpus/data/mobile';
+
+/** A hijāʾī bucket off a deep link. Membership, not a charset test:
+ *  `rootFirstLetter` folds أ إ آ ٱ to ا and ى to ي, so those are never buckets
+ *  and a screen for one could never have rows. The list is imported rather
+ *  than restated so this cannot drift from the folding that produces it. */
 export function parseLetterParam(value: string | string[] | undefined): string | null {
   const raw = Array.isArray(value) ? value[0] : value;
   if (!raw) return null;
   return ARABIC_ALPHABET_ORDER.includes(raw) ? raw : null;
 }
 ```
-
-If `isRootBuckwalter` rejects a lemma the DB actually carries, widen nothing here — fix `packages/data/src/text/buckwalter.ts`, per §2.
 
 - [ ] **Step 8: Run them, confirm they pass**
 
@@ -1241,9 +1252,15 @@ Expected: PASS.
 
 - [ ] **Step 9: Mutation-check**
 
-Delete the `ARABIC_ALPHABET_ORDER.includes(raw)` check and return `raw`.
+Two mutations, each in isolation, file restored between:
 
-Run the suite. Expected: FAIL on `rejects a letter it does not` and `rejects arbitrary text`.
+(a) Delete the `ARABIC_ALPHABET_ORDER.includes(raw)` check and return `raw`.
+    Expected: FAIL on `rejects a letter it does not` and `rejects arbitrary text`.
+
+(b) Point the re-export at `isLemmaBuckwalter` instead of `parseLemmaParam`
+    (i.e. `export const parseLemmaParam = (s: string) => isLemmaBuckwalter(s) ? s : null`).
+    Expected: FAIL on `is the shared decode-aware validator, not a local copy`.
+    This is the guard against silently reintroducing the charset-only version.
 
 Restore. Re-run: PASS.
 
@@ -1331,29 +1348,36 @@ export async function getFrequencyRows(
 
   if (kind === 'lemmas') {
     const lemmas = await getLemmaFrequency(client);
-    return lemmas.map((row) => ({
-      href: `/lemma/${encodeURIComponent(row.lemma_buckwalter ?? '')}`,
-      arabic: row.lemma,
-      gloss: null,
-      count: row.count,
-    }));
+    // Both queries filter `lemma_buckwalter IS NOT NULL`, so this drops nothing
+    // today -- but the row type still allows null, and `?? ''` would build a
+    // dead `/lemma/` link rather than omit an unroutable row.
+    return lemmas
+      .filter((row) => row.lemma_buckwalter !== null)
+      .map((row) => ({
+        href: `/lemma/${encodeURIComponent(row.lemma_buckwalter!)}`,
+        arabic: row.lemma,
+        gloss: null,
+        count: row.count,
+      }));
   }
 
   const verbs = await getVerbConcordance(client);
-  return verbs.map((row) => ({
-    // The lemma, not the surface form the row displays: form_arabic is the
-    // commonest spelling of the verb and routing on it opens nothing.
-    href: `/lemma/${encodeURIComponent(row.lemma_buckwalter ?? '')}`,
-    arabic: row.form_arabic,
-    gloss: row.lemma,
-    count: row.count,
-  }));
+  return verbs
+    .filter((row) => row.lemma_buckwalter !== null)
+    .map((row) => ({
+      // The lemma, not the surface form the row displays: form_arabic is the
+      // commonest spelling of the verb and routing on it opens nothing.
+      href: `/lemma/${encodeURIComponent(row.lemma_buckwalter!)}`,
+      arabic: row.form_arabic,
+      gloss: row.lemma,
+      count: row.count,
+    }));
 }
 ```
 
 - [ ] **Step 11: Test the flattening**
 
-Append to `apps/mobile/src/data/corpusRepository.test.ts`. Follow that file's existing pattern for faking a `MobileDataClient`; if it has none, `vi.mock('@quran-corpus/data/mobile')` and return the rows directly.
+Append to `apps/mobile/src/data/corpusRepository.test.ts`, following that file's existing pattern for faking a `MobileDataClient`.
 
 ```ts
 describe('getFrequencyRows', () => {
@@ -1369,8 +1393,18 @@ describe('getFrequencyRows', () => {
     expect(rows[0]!.href).toBe('/lemma/qAl');
     expect(rows[0]!.arabic).toBe('يَقُولُ');
   });
+
+  it('omits a row with no lemma identifier rather than linking to /lemma/', async () => {
+    mocks.getVerbConcordance.mockResolvedValue([
+      { lemma: null, lemma_buckwalter: null, form_arabic: 'يَقُولُ', count: 12 },
+    ]);
+
+    expect(await getFrequencyRows(client, 'verbs')).toEqual([]);
+  });
 });
 ```
+
+Mutation-check both: restore `?? ''` in place of the filter and confirm the second test fails; point the verb `href` at `form_arabic` and confirm the first fails.
 
 - [ ] **Step 12: Full gate and commit**
 
@@ -1381,16 +1415,21 @@ Run: `cd apps/mobile && pnpm test && pnpm type-check && pnpm lint`
 git add packages/data apps/mobile/src/data
 git commit -m "feat(mobile): expose the lemma and frequency reads to mobile
 
-Widens packages/data's mobile entry point by five exports -- lemma entry,
-lemma concordance paging and count, lemma frequency, verb concordance --
-which its own contract permits: none of them reaches db.ts, migrate.ts or
-a backfill, and the import-graph guard proves it.
+Widens packages/data's mobile entry point by five query exports -- lemma
+entry, lemma concordance paging and count, lemma frequency, verb
+concordance -- plus parseLemmaParam, which is the validator the lemma
+route needs and which already exists beside parseRootParam. Its own
+contract permits all six: none reaches db.ts, migrate.ts or a backfill,
+and the import-graph guard proves it.
 
-Adds the two route-param validators the lemma and letter screens need,
-both reusing the shared predicates rather than restating the charset."
+Adds parseLetterParam, a membership test over the shared alphabet
+constant, for the hijai bucket screens."
 ```
 
----
+> **After this task: STOP.** It widens `packages/data` and adds a route-param
+> validator — two CLAUDE.md §5 triggers. The agent cannot launch `/code-review`;
+> ask the user to run it and act on the findings before Task 5 starts.
+
 
 ## Task 5: Dictionary Browse and the letter screen
 
