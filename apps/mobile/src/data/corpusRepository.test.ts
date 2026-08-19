@@ -264,7 +264,11 @@ function createFakeClient({
       if (sql.includes("WHERE pos_tag = 'V' AND lemma_buckwalter IS NOT NULL")) {
         return { rows: verbs };
       }
-      if (sql.includes('FROM roots r')) {
+      // Not `FROM roots r`: searchRoots and getLemmaEntry's definition query
+      // carry that too, and both would then silently receive this fixture
+      // instead of hitting the throw below. The GROUP_CONCAT is unique to
+      // getRootSearchList.
+      if (sql.includes("GROUP_CONCAT(f.gloss")) {
         // Fixture order is SQL's binary ORDER BY root_arabic: أ (U+0623) sorts
         // before ا (U+0627), so a seated root lands ahead of a bare one no
         // matter what the second radical is. Handing these back unsorted is
@@ -590,11 +594,5 @@ describe('getRootsForLetter', () => {
     // Order is the assertion: SQL hands them back أوب, ابل (codepoint order);
     // hijāʾī order compares the *second* radical, ب before و.
     expect(list.map((root) => root.root_arabic)).toEqual(['ابل', 'أوب']);
-  });
-
-  it('excludes roots filed under another letter', async () => {
-    const list = await getRootsForLetter(createFakeClient(), 'ا');
-
-    expect(list.map((root) => root.root_arabic)).not.toContain('رحم');
   });
 });

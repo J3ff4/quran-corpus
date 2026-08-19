@@ -90,7 +90,13 @@ export type UiStringKey =
   | 'search.loadFailed'
   | 'dictionary.browse'
   | 'dictionary.frequent'
-  | 'dictionary.noRoots';
+  | 'dictionary.noRoots'
+  // Accessible name for the hijāʾī grid: 29 sibling buttons whose own labels
+  // are bare letters.
+  | 'dictionary.alphabet'
+  // Caption above the letter screen's Arabic hero, read as "Letter — ب".
+  | 'dictionary.letterCaption'
+  | 'dictionary.loadFailed';
 
 const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
   en: {
@@ -178,6 +184,9 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'dictionary.browse': 'Browse',
     'dictionary.frequent': 'Frequent',
     'dictionary.noRoots': 'No roots under this letter',
+    'dictionary.alphabet': 'Arabic alphabet',
+    'dictionary.letterCaption': 'Letter',
+    'dictionary.loadFailed': 'Unable to load roots',
   },
   uz: {
     'tabs.home': 'Bosh sahifa',
@@ -264,6 +273,9 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'dictionary.browse': 'Ko‘rish',
     'dictionary.frequent': 'Ko‘p uchraydigan',
     'dictionary.noRoots': 'Bu harfda o‘zak yo‘q',
+    'dictionary.alphabet': 'Arab alifbosi',
+    'dictionary.letterCaption': 'Harf',
+    'dictionary.loadFailed': 'O‘zaklarni yuklab bo‘lmadi',
   },
   ru: {
     'tabs.home': 'Главная',
@@ -350,6 +362,9 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'dictionary.browse': 'Обзор',
     'dictionary.frequent': 'Частотные',
     'dictionary.noRoots': 'Под этой буквой нет корней',
+    'dictionary.alphabet': 'Арабский алфавит',
+    'dictionary.letterCaption': 'Буква',
+    'dictionary.loadFailed': 'Не удалось загрузить корни',
   },
 };
 

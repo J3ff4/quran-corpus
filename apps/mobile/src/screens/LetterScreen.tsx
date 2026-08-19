@@ -9,6 +9,7 @@ import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
 import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
+import { useArabicSizes } from '@/theme/useArabicSizes';
 
 export interface LetterScreenProps {
   /** Already validated by the route. `null` is a letter the alphabet does not
@@ -19,19 +20,23 @@ export interface LetterScreenProps {
 export function LetterScreen({ letter }: LetterScreenProps) {
   const { uiLocale } = useAppSettings();
   const theme = useThemeColors();
+  const sizes = useArabicSizes();
 
   const [roots, setRoots] = useState<RootSearchItem[]>([]);
   const [loading, setLoading] = useState(letter !== null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (letter === null) {
       setRoots([]);
+      setFailed(false);
       setLoading(false);
       return;
     }
 
     let cancelled = false;
     setLoading(true);
+    setFailed(false);
     (async () => {
       try {
         const db = await openCorpusDb();
@@ -39,10 +44,13 @@ export function LetterScreen({ letter }: LetterScreenProps) {
         const found = await getRootsForLetter(client, letter);
         if (!cancelled) setRoots(found);
       } catch (cause) {
-        // Same dead end as a letter with no roots: nothing the reader can act
-        // on either way. Logged for logcat.
+        // Distinct from a letter with no roots: this one is worth retrying, so
+        // it must not read as "this letter is empty". Logged for logcat.
         console.error('[dictionary] letter load failed', { letter, cause });
-        if (!cancelled) setRoots([]);
+        if (!cancelled) {
+          setRoots([]);
+          setFailed(true);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -53,44 +61,88 @@ export function LetterScreen({ letter }: LetterScreenProps) {
     };
   }, [letter]);
 
-  if (loading) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.background }}>
-        <ActivityIndicator />
-      </View>
-    );
-  }
+  function body() {
+    if (loading) {
+      return (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator />
+        </View>
+      );
+    }
 
-  if (roots.length === 0) {
+    if (failed) {
+      return (
+        <View style={{ flex: 1, padding: 20 }}>
+          <Text accessibilityRole="alert" style={{ color: theme.mutedText, fontSize: typography.body }}>
+            {t(uiLocale, 'dictionary.loadFailed')}
+          </Text>
+        </View>
+      );
+    }
+
+    if (roots.length === 0) {
+      return (
+        <View style={{ flex: 1, padding: 20 }}>
+          <Text style={{ color: theme.mutedText }}>{t(uiLocale, 'dictionary.noRoots')}</Text>
+        </View>
+      );
+    }
+
     return (
-      <View style={{ flex: 1, padding: 20, backgroundColor: theme.background }}>
-        <Text style={{ color: theme.mutedText }}>{t(uiLocale, 'dictionary.noRoots')}</Text>
-      </View>
+      <FlatList
+        data={roots}
+        keyExtractor={(item) => item.root_buckwalter}
+        renderItem={({ item }) => (
+          <Link
+            testID="letter-root"
+            href={`/root/${encodeURIComponent(item.root_buckwalter)}`}
+            accessibilityRole="link"
+            style={{
+              color: theme.text,
+              fontFamily: 'Hafs',
+              fontSize: typography.body,
+              paddingHorizontal: 20,
+              paddingVertical: 14,
+              minHeight: touchTargets.minimum,
+              textAlign: 'right',
+              // See AyahText: textAlign places the block, writingDirection
+              // drives the bidi resolution inside the Arabic run.
+              writingDirection: 'rtl',
+            }}
+          >
+            {item.root_arabic}
+          </Link>
+        )}
+        style={{ flex: 1 }}
+      />
     );
   }
 
   return (
-    <FlatList
-      data={roots}
-      keyExtractor={(item) => item.root_buckwalter}
-      renderItem={({ item }) => (
-        <Link
-          testID="letter-root"
-          href={`/root/${encodeURIComponent(item.root_buckwalter)}`}
-          accessibilityRole="link"
-          style={{
-            color: theme.text,
-            fontFamily: 'Hafs',
-            fontSize: typography.body,
-            paddingHorizontal: 20,
-            paddingVertical: 14,
-            minHeight: touchTargets.minimum,
-          }}
-        >
-          {item.root_arabic}
-        </Link>
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
+      {/* The root Stack sets `title: ''` on the stated assumption that every
+          screen names itself; without this the letter list has no heading at
+          all. */}
+      {letter === null ? null : (
+        <View style={{ paddingHorizontal: 20, paddingTop: 20, gap: 4 }}>
+          <Text style={{ color: theme.mutedText, fontSize: typography.caption }}>
+            {t(uiLocale, 'dictionary.letterCaption')}
+          </Text>
+          <Text
+            accessibilityRole="header"
+            style={{
+              color: theme.text,
+              fontFamily: 'Hafs',
+              fontSize: sizes.title,
+              textAlign: 'right',
+              writingDirection: 'rtl',
+            }}
+          >
+            {letter}
+          </Text>
+        </View>
       )}
-      style={{ flex: 1, backgroundColor: theme.background }}
-    />
+      {body()}
+    </View>
   );
 }

@@ -323,8 +323,12 @@ export async function getRootScreen(
  *  folds hamza seats (أ إ آ ٱ to ا) and ى to ي, so a SQL prefix match would
  *  file those under four separate letters, and SQLite's binary collation would
  *  then order the bucket by codepoint -- every seated root ahead of every bare
- *  one. Web's DictionaryBrowser does both for the same reasons. One query of
- *  1,548 rows is cheap; 28 letter-shaped queries are not. */
+ *  one. Web's DictionaryBrowser does both for the same reasons.
+ *
+ *  Nothing caches the list, so every letter tap re-reads all ~1.6k root rows
+ *  (1642 in the shipped DB) and discards all but one bucket. That is a local
+ *  SQLite file and one grouped query, so it is affordable; add a cache here if
+ *  the grid ever feels slow. */
 export async function getRootsForLetter(
   client: MobileDataClient,
   letter: string,

@@ -6,10 +6,10 @@ import { touchTargets } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
 export interface SearchHeaderButtonProps {
-  /** Passed in rather than read from the settings store, for the same reason
-   *  SurahReader takes it as a prop: this renders inside the reader's header,
-   *  and reaching into the store here would pull expo-sqlite into every test
-   *  that mounts it. */
+  /** Passed in rather than read from the settings store, because SurahReader
+   *  -- one of the two callers -- takes uiLocale as a prop by design and its
+   *  test mocks the store as `{ arabicScale, reduceMotion }` with no uiLocale.
+   *  A store read here would hand t() an undefined locale in that suite. */
   uiLocale: UiLocaleCode;
   /** The reader closes its word sheet before pushing; the dictionary tab just
    *  pushes. That difference is the only reason this takes a callback rather

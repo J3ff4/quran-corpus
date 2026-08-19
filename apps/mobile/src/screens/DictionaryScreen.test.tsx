@@ -1,9 +1,18 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DictionaryScreen } from './DictionaryScreen';
 
-const mocks = vi.hoisted(() => ({ push: vi.fn(), setOptions: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  push: vi.fn(),
+  setOptions: vi.fn(),
+  // ا and ر have roots; every other bucket is empty, ء included -- which is
+  // the shipped DB's shape and the grid's first cell.
+  rows: [
+    { id: 2, root_buckwalter: 'Abl', root_arabic: 'ابل', occurrence_count: 2, gloss_blob: 'camel' },
+    { id: 7, root_buckwalter: 'rHm', root_arabic: 'رحم', occurrence_count: 339, gloss_blob: 'mercy' },
+  ] as unknown[],
+}));
 
 vi.mock('@/settings/settingsStore', () => ({ useAppSettings: () => ({ uiLocale: 'en' }) }));
 vi.mock('expo-router', () => ({
@@ -11,10 +20,23 @@ vi.mock('expo-router', () => ({
   useNavigation: () => ({ setOptions: mocks.setOptions }),
 }));
 vi.mock('@/components/icons/Icon', () => ({ Icon: () => null }));
+vi.mock('@/data/openCorpusDb', () => ({ openCorpusDb: () => Promise.resolve({}) }));
+// The real getRootSearchList and rootFirstLetter run against this: the fold
+// from a root's spelling to its bucket is the part worth exercising, and a
+// mocked module would assert only that the screen calls something.
+vi.mock('@quran-corpus/mobile-data', () => ({
+  createExpoSqliteClient: () => ({ execute: async () => ({ rows: mocks.rows }) }),
+}));
 vi.mock('react-native', async () => {
   const { host } = await import('@/testing/rnHosts.js');
   return { Pressable: host('button'), Text: host('span'), View: host('div') };
 });
+
+/** Mounted and past the availability query, which every tap depends on. */
+async function renderLoaded() {
+  render(<DictionaryScreen />);
+  await act(async () => {});
+}
 
 describe('DictionaryScreen', () => {
   beforeEach(() => {
@@ -23,8 +45,8 @@ describe('DictionaryScreen', () => {
   });
   afterEach(cleanup);
 
-  it('opens on Browse and routes a tapped letter to its own screen', () => {
-    render(<DictionaryScreen />);
+  it('opens on Browse and routes a tapped letter to its own screen', async () => {
+    await renderLoaded();
 
     fireEvent.click(screen.getAllByTestId('alphabet-cell')[1]!);
 
@@ -34,8 +56,23 @@ describe('DictionaryScreen', () => {
     expect(mocks.push).toHaveBeenCalledWith(`/dictionary/letter/${encodeURIComponent('ا')}`);
   });
 
-  it('hides the grid on the Frequent pane', () => {
+  it('enables only the letters roots are filed under, and none before they load', async () => {
     render(<DictionaryScreen />);
+
+    // First paint: an all-enabled grid that dims a tick later is worse than a
+    // grid that arrives ready.
+    expect(screen.getAllByTestId('alphabet-cell')[1]!.getAttribute('aria-disabled')).toBe('true');
+
+    await act(async () => {});
+    const cells = screen.getAllByTestId('alphabet-cell');
+
+    // ا has ابل; ء has nothing, and it is the cell a user reaches first.
+    expect(cells[1]!.getAttribute('aria-disabled')).toBe('false');
+    expect(cells[0]!.getAttribute('aria-disabled')).toBe('true');
+  });
+
+  it('hides the grid on the Frequent pane', async () => {
+    await renderLoaded();
 
     fireEvent.click(screen.getByTestId('dictionary-pane-frequent'));
 
@@ -43,11 +80,18 @@ describe('DictionaryScreen', () => {
     expect(screen.getByTestId('dictionary-pane-frequent').getAttribute('aria-selected')).toBe('true');
   });
 
-  it('puts a search button in the header', () => {
-    render(<DictionaryScreen />);
+  it('puts a working search button in the header', async () => {
+    await renderLoaded();
 
-    expect(mocks.setOptions).toHaveBeenCalledWith(
-      expect.objectContaining({ headerRight: expect.any(Function) }),
-    );
+    const headerRight = mocks.setOptions.mock.calls
+      .map(([options]) => options.headerRight)
+      .filter(Boolean)
+      .at(-1);
+    // Rendered, not merely registered: `headerRight: expect.any(Function)`
+    // passes just as well for a function returning null.
+    render(headerRight());
+    fireEvent.click(screen.getByTestId('open-search'));
+
+    expect(mocks.push).toHaveBeenCalledWith('/search');
   });
 });
