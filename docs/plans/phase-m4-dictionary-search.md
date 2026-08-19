@@ -2163,54 +2163,113 @@ renders the same control, and only the onPress differs."
 
 ## Task 6: Dictionary Frequent pane
 
+> **Amended 2026-08-18 (controller pre-flight).** Read against the code at
+> `a0be7b3` before dispatch. Five defects in the section as written:
+>
+> 1. **`sizes.body` does not exist.** `useArabicSizes()` returns
+>    `{reader, title, banner}` only (`src/theme/useArabicSizes.ts:6-12`). RN
+>    renders `fontSize: undefined` at the default with no error and no failing
+>    test — the same dead-token defect this plan carried into Task 5. Use
+>    `typography.body`, which drops `useArabicSizes` and the settings-store mock
+>    from this component entirely.
+> 2. **`<Link>` cannot wrap the row `<View>`.** expo-router's `Link` renders a
+>    `Text` on native; a `flexDirection: 'row'` View nested in a Text does not
+>    lay out as a row. No file in `apps/mobile` nests one, and none uses
+>    `asChild`. The row is a `Pressable` + `router.push(item.href)`, matching
+>    `AlphabetGrid`. `LetterScreen`'s `Link` stays as it is — its child is text.
+> 3. **`DictionaryScreen.test.tsx` already exists** (Task 5 created it, 4 tests).
+>    Step 8 as written would overwrite it and lose the availability, routing and
+>    headerRight coverage. It is a MODIFY.
+> 4. **`FrequencyList` swallows a load failure into a blank screen** — `catch`
+>    sets `rows: []` and the empty FlatList renders nothing. Same finding
+>    Task 5's review raised as m-5 against `LetterScreen`; fixed there, so do not
+>    reintroduce it here.
+> 5. **`DictionaryScreen` imports `getRootSearchList`/`rootFirstLetter` straight
+>    from `@quran-corpus/data/mobile`** — the only non-test file in the app that
+>    does; every other screen goes through `@/data/corpusRepository`. Task 6
+>    modifies both files anyway, so the derivation moves behind a repository
+>    export here rather than becoming the precedent the next screen copies.
+
+> **Task 4's carried paging requirement is NOT dischargeable here.**
+> `getFrequencyRows(client, kind)` takes no `offset`/`limit`
+> (`corpusRepository.ts:392`); all three shared queries default to `limit = 200`
+> and mobile passes nothing. There is no argument pair to transpose. The
+> requirement moves **wholly to Task 7** — `getRootOccurrences(client, bw, lang,
+> offset, limit)` — whose test must assert those five arguments reach the query
+> **in order and by position**. Do not mark it satisfied in Task 6.
+
 **Files:**
-- Create: `apps/mobile/src/components/FrequencyList.tsx`, `apps/mobile/src/components/FrequencyList.test.tsx`, `apps/mobile/src/screens/DictionaryScreen.test.tsx`
-- Modify: `apps/mobile/src/screens/DictionaryScreen.tsx`, `apps/mobile/src/i18n/uiStrings.ts`
+- Create: `apps/mobile/src/components/FrequencyList.tsx`, `apps/mobile/src/components/FrequencyList.test.tsx`
+- Modify: `apps/mobile/src/screens/DictionaryScreen.tsx`, `apps/mobile/src/screens/DictionaryScreen.test.tsx`, `apps/mobile/src/data/corpusRepository.ts`, `apps/mobile/src/data/corpusRepository.test.ts`, `apps/mobile/src/i18n/uiStrings.ts`
 
 **Interfaces:**
 - Consumes: `getFrequencyRows`, `FrequencyRow` (Task 4).
-- Produces: `<FrequencyList kind={'roots' | 'lemmas' | 'verbs'} />`.
+- Produces: `<FrequencyList kind={'roots' | 'lemmas' | 'verbs'} />`, `getLettersWithRoots`.
 
 This pane is where PRD items 5 (lemma frequency) and 6 (verb concordance) live.
 
 - [ ] **Step 1: Add the i18n keys**
 
+In `src/i18n/uiStrings.ts`, extend the key union:
+
 ```ts
   | 'dictionary.kindRoots'
   | 'dictionary.kindLemmas'
   | 'dictionary.kindVerbs'
+  | 'dictionary.frequentFailed'
 ```
 
-en: `'Roots'`, `'Lemmas'`, `'Verbs'`. uz: `'O‘zaklar'`, `'Lemmalar'`, `'Fe’llar'`. ru: `'Корни'`, `'Леммы'`, `'Глаголы'`.
+en: `'Roots'`, `'Lemmas'`, `'Verbs'`, `'Unable to load the list'`.
+uz: `'O‘zaklar'`, `'Lemmalar'`, `'Fe’llar'`, `'Ro‘yxatni yuklab bo‘lmadi'`.
+ru: `'Корни'`, `'Леммы'`, `'Глаголы'`, `'Не удалось загрузить список'`.
 
-- [ ] **Step 2: Write the failing FrequencyList test**
+`dictionary.loadFailed` is not reused: it reads "Unable to load roots", which is
+wrong on the Lemmas and Verbs chips.
+
+- [ ] **Step 2: Move the letter derivation behind the repository**
+
+In `src/data/corpusRepository.ts`, next to `getRootsForLetter`:
+
+```ts
+/** Which hijāʾī buckets have any root at all. Folded with the same
+ *  `rootFirstLetter` getRootsForLetter buckets with — a second copy of the
+ *  hamza-seat rules would enable a letter whose screen then comes up empty. */
+export async function getLettersWithRoots(client: MobileDataClient): Promise<Set<string>> {
+  const roots = await getRootSearchList(client);
+  return new Set(roots.map((root) => rootFirstLetter(root.root_arabic)));
+}
+```
+
+In `src/data/corpusRepository.test.ts`, add one test against the existing
+`rootSearch` fixture: the returned set contains `'ا'` and `'ر'` and not `'ء'`.
+
+Then in `DictionaryScreen.tsx` drop the `@quran-corpus/data/mobile` import and
+call `getLettersWithRoots(client)`. `DictionaryScreen.test.tsx` keeps mocking
+`createExpoSqliteClient`, not the repository, so the real fold still runs.
+
+- [ ] **Step 3: Write the failing FrequencyList test**
 
 Create `apps/mobile/src/components/FrequencyList.test.tsx`:
 
 ```tsx
 import React from 'react';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FrequencyList } from './FrequencyList';
 
-const mocks = vi.hoisted(() => ({ getFrequencyRows: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getFrequencyRows: vi.fn(), push: vi.fn() }));
 
-vi.mock('@/settings/settingsStore', () => ({ useAppSettings: () => ({ arabicScale: 'medium' }) }));
+vi.mock('@/settings/settingsStore', () => ({ useAppSettings: () => ({ uiLocale: 'en' }) }));
 vi.mock('@/data/corpusRepository', () => ({ getFrequencyRows: mocks.getFrequencyRows }));
 vi.mock('@/data/openCorpusDb', () => ({ openCorpusDb: () => Promise.resolve({}) }));
 vi.mock('@quran-corpus/mobile-data', () => ({ createExpoSqliteClient: () => ({}) }));
-vi.mock('expo-router', async () => {
-  const React = await import('react');
-  return {
-    Link: ({ href, children }: { href: string; children: React.ReactNode }) =>
-      React.createElement('a', { href }, children),
-  };
-});
+vi.mock('expo-router', () => ({ router: { push: mocks.push } }));
 vi.mock('react-native', async () => {
   const React = await import('react');
   const { host } = await import('@/testing/rnHosts.js');
   return {
-    ActivityIndicator: host('div'),
+    ActivityIndicator: () => React.createElement('span', null, 'loading'),
+    Pressable: host('button'),
     Text: host('span'),
     View: host('div'),
     FlatList: ({ data, renderItem }: {
@@ -2228,6 +2287,7 @@ vi.mock('react-native', async () => {
 describe('FrequencyList', () => {
   beforeEach(() => {
     mocks.getFrequencyRows.mockReset();
+    mocks.push.mockReset();
     mocks.getFrequencyRows.mockResolvedValue([]);
   });
 
@@ -2252,54 +2312,74 @@ describe('FrequencyList', () => {
     expect(mocks.getFrequencyRows.mock.calls.at(-1)![1]).toBe('lemmas');
   });
 
-  it('renders each row with its count', async () => {
+  it('renders each row with its count and routes it', async () => {
     mocks.getFrequencyRows.mockResolvedValue([
-      { href: '/root/qwl', arabic: 'ق و ل', gloss: null, count: 1722 },
+      { href: '/root/qwl', arabic: 'قول', gloss: null, count: 1722 },
     ]);
 
     render(<FrequencyList kind="roots" />);
 
-    await waitFor(() => expect(screen.getByText('ق و ل')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('قول')).toBeTruthy());
     expect(screen.getByText('1722')).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId('frequency-row'));
+    expect(mocks.push).toHaveBeenCalledWith('/root/qwl');
+  });
+
+  it('says so when the query fails, rather than showing an empty list', async () => {
+    mocks.getFrequencyRows.mockRejectedValue(new Error('no such table'));
+
+    render(<FrequencyList kind="roots" />);
+
+    // A blank pane reads as "there is nothing here", which is wrong and not
+    // retryable-looking. Same finding Task 5 fixed on LetterScreen (m-5).
+    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
+    expect(screen.getByRole('alert').textContent).toBe('Unable to load the list');
   });
 });
 ```
 
-- [ ] **Step 3: Run it, confirm it fails**
+- [ ] **Step 4: Run it, confirm it fails**
 
 Run: `cd apps/mobile && npx vitest run src/components/FrequencyList.test.tsx --no-cache`
-Expected: FAIL — module not found.
+Expected: FAIL — module not found. Record the output verbatim.
 
-- [ ] **Step 4: Write FrequencyList**
+- [ ] **Step 5: Write FrequencyList**
 
 Create `apps/mobile/src/components/FrequencyList.tsx`:
 
 ```tsx
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Text, View } from 'react-native';
-import { Link } from 'expo-router';
+import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
+import { router } from 'expo-router';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
 import { getFrequencyRows, type FrequencyRow } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
-import { touchTargets } from '@/theme/tokens';
+import { t } from '@/i18n/uiStrings';
+import { useAppSettings } from '@/settings/settingsStore';
+import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
-import { useArabicSizes } from '@/theme/useArabicSizes';
 
 export interface FrequencyListProps {
   kind: 'roots' | 'lemmas' | 'verbs';
 }
 
 /** The Frequent pane's list. One component over three queries -- the rows
- *  differ only in where they link and whether they carry a gloss. */
+ *  differ only in where they link and whether they carry a gloss.
+ *
+ *  Not a Link: the row is a three-column layout, and expo-router's Link renders
+ *  a Text on native, inside which a flexDirection View does not lay out. */
 export function FrequencyList({ kind }: FrequencyListProps) {
+  const { uiLocale } = useAppSettings();
   const theme = useThemeColors();
-  const sizes = useArabicSizes();
   const [rows, setRows] = useState<FrequencyRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setFailed(false);
     (async () => {
       try {
         const db = await openCorpusDb();
@@ -2308,7 +2388,10 @@ export function FrequencyList({ kind }: FrequencyListProps) {
         if (!cancelled) setRows(found);
       } catch (cause) {
         console.error('[dictionary] frequency load failed', { kind, cause });
-        if (!cancelled) setRows([]);
+        if (!cancelled) {
+          setRows([]);
+          setFailed(true);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -2321,32 +2404,58 @@ export function FrequencyList({ kind }: FrequencyListProps) {
 
   if (loading) return <ActivityIndicator />;
 
+  if (failed) {
+    return (
+      <View style={{ flex: 1, padding: 20 }}>
+        <Text accessibilityRole="alert" style={{ color: theme.mutedText, fontSize: typography.body }}>
+          {t(uiLocale, 'dictionary.frequentFailed')}
+        </Text>
+      </View>
+    );
+  }
+
+  // ponytail: no empty state. All three queries are unfiltered top-200 over a
+  // bundled DB, so an empty result means the DB is broken, which is the failed
+  // branch above.
   return (
     <FlatList
       data={rows}
       keyExtractor={(item) => item.href}
       renderItem={({ item }) => (
-        <Link href={item.href} accessibilityRole="link">
-          <View
+        <Pressable
+          testID="frequency-row"
+          accessibilityRole="link"
+          onPress={() => router.push(item.href)}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: 20,
+            paddingVertical: 12,
+            minHeight: touchTargets.minimum,
+            gap: 12,
+          }}
+        >
+          <Text
             style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingHorizontal: 20,
-              paddingVertical: 12,
-              minHeight: touchTargets.minimum,
-              gap: 12,
+              color: theme.text,
+              fontFamily: 'Hafs',
+              fontSize: typography.body,
+              textAlign: 'right',
+              // See AyahText: textAlign places the block, writingDirection
+              // drives the bidi resolution inside the Arabic run.
+              writingDirection: 'rtl',
             }}
           >
-            <Text style={{ color: theme.text, fontFamily: 'Hafs', fontSize: sizes.body }}>{item.arabic}</Text>
-            {item.gloss ? (
-              <Text numberOfLines={1} style={{ color: theme.mutedText, flex: 1 }}>
-                {item.gloss}
-              </Text>
-            ) : null}
-            <Text style={{ color: theme.mutedText }}>{item.count}</Text>
-          </View>
-        </Link>
+            {item.arabic}
+          </Text>
+          {item.gloss ? (
+            <Text numberOfLines={1} style={{ color: theme.mutedText, flex: 1 }}>
+              {item.gloss}
+            </Text>
+          ) : null}
+          <Text style={{ color: theme.mutedText }}>{item.count}</Text>
+        </Pressable>
       )}
       style={{ flex: 1 }}
     />
@@ -2354,28 +2463,34 @@ export function FrequencyList({ kind }: FrequencyListProps) {
 }
 ```
 
-- [ ] **Step 5: Run it, confirm it passes**
+- [ ] **Step 6: Run it, confirm it passes**
 
 Run: `cd apps/mobile && npx vitest run src/components/FrequencyList.test.tsx --no-cache`
-Expected: PASS, 3 tests.
+Expected: PASS, 4 tests.
 
-- [ ] **Step 6: Mutation-check**
+- [ ] **Step 7: Mutation-check FrequencyList**
 
-Change the effect's dependency array from `[kind]` to `[]`.
+Each mutation runs alone, must produce a **real assertion failure on the
+expected values** — a `TypeError` or a module-resolution error is a FALSE KILL,
+redo it differently — and is restored before the next.
 
-Run the suite. Expected: FAIL on `refetches when the kind changes`.
+1. Effect deps `[kind]` → `[]`. Expect FAIL on `refetches when the kind changes`.
+2. Delete the `failed` branch (return the FlatList regardless). Expect FAIL on
+   `says so when the query fails`, on the missing `alert` role.
+3. `onPress={() => router.push(item.href)}` → `onPress={undefined}`. Expect FAIL
+   on `routes it`.
 
-Restore. Re-run: PASS.
+Record each failure verbatim. Re-run green after restoring.
 
-- [ ] **Step 7: Wire the chips into DictionaryScreen**
+- [ ] **Step 8: Wire the chips into DictionaryScreen**
 
-In `src/screens/DictionaryScreen.tsx`, add the state:
+In `src/screens/DictionaryScreen.tsx`, add:
 
 ```tsx
   const [kind, setKind] = useState<'roots' | 'lemmas' | 'verbs'>('roots');
 ```
 
-and replace the Task 5 comment with:
+and replace the `{/* Task 6 renders the Frequent pane here. */}` comment with:
 
 ```tsx
       {pane === 'frequent' ? (
@@ -2385,6 +2500,9 @@ and replace the Task 5 comment with:
               <Pressable
                 key={option}
                 testID={`frequency-kind-${option}`}
+                // A filter chip over one list, not a pane switch -- the two
+                // pills above are the tabs. Android chips are buttons that
+                // carry a selected state.
                 accessibilityRole="button"
                 accessibilityState={{ selected: kind === option }}
                 onPress={() => setKind(option)}
@@ -2416,33 +2534,39 @@ and replace the Task 5 comment with:
       ) : null}
 ```
 
-- [ ] **Step 8: Write the DictionaryScreen test**
+- [ ] **Step 9: Extend the existing DictionaryScreen test**
 
-Create `apps/mobile/src/screens/DictionaryScreen.test.tsx`. Mock the two children as stubs — `AlphabetGrid` renders `<div data-testid="alphabet-grid" />`, `FrequencyList` renders `<div data-testid="frequency-list" data-kind={kind} />` — plus `expo-router`, `@/settings/settingsStore` and `react-native` as in the other suites.
+`src/screens/DictionaryScreen.test.tsx` exists with four tests. Do not rewrite
+it. Add a `FrequencyList` stub to the mocks:
 
 ```tsx
-  it('shows Browse first and swaps to Frequent on tap', () => {
-    render(<DictionaryScreen />);
+vi.mock('@/components/FrequencyList', () => ({
+  FrequencyList: ({ kind }: { kind: string }) =>
+    React.createElement('div', { 'data-testid': 'frequency-list', 'data-kind': kind }),
+}));
+```
 
-    expect(screen.getByTestId('alphabet-grid')).toBeTruthy();
+Extend the existing `hides the grid on the Frequent pane` test with
+`expect(screen.getByTestId('frequency-list')).toBeTruthy();`, and add:
 
-    fireEvent.click(screen.getByTestId('dictionary-pane-frequent'));
-
-    expect(screen.queryByTestId('alphabet-grid')).toBeNull();
-    expect(screen.getByTestId('frequency-list')).toBeTruthy();
-  });
-
-  it('passes the selected chip down to the list', () => {
-    render(<DictionaryScreen />);
+```tsx
+  it('passes the selected chip down to the list', async () => {
+    await renderLoaded();
     fireEvent.click(screen.getByTestId('dictionary-pane-frequent'));
 
     fireEvent.click(screen.getByTestId('frequency-kind-verbs'));
 
+    // The chip is the only thing that selects the query; a chip that only
+    // repaints its own border is the failure this catches.
     expect(screen.getByTestId('frequency-list').getAttribute('data-kind')).toBe('verbs');
+    expect(screen.getByTestId('frequency-kind-verbs').getAttribute('aria-selected')).toBe('true');
   });
 ```
 
-- [ ] **Step 9: Full gate and commit**
+Mutation: `<FrequencyList kind={kind} />` → `<FrequencyList kind="roots" />`.
+Expect FAIL on `passes the selected chip down to the list`. Restore.
+
+- [ ] **Step 10: Full gate and commit**
 
 Run: `cd apps/mobile && pnpm test && pnpm type-check && pnpm lint`
 
@@ -2456,7 +2580,11 @@ variant -- so they ship as one list behind a chip rather than two screens.
 Root frequency joins them for the same reason.
 
 Verb rows link on the lemma, not on the surface form the row displays: the
-Arabic there is the commonest spelling and routing on it opens nothing."
+Arabic there is the commonest spelling and routing on it opens nothing.
+
+The letter-availability derivation moves behind getLettersWithRoots: the
+dictionary screen was the only place in the app reaching into
+@quran-corpus/data/mobile directly."
 ```
 
 ---
