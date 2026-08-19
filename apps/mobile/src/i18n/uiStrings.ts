@@ -87,7 +87,10 @@ export type UiStringKey =
   | 'search.roots'
   | 'search.empty'
   | 'search.noResults'
-  | 'search.loadFailed';
+  | 'search.loadFailed'
+  | 'dictionary.browse'
+  | 'dictionary.frequent'
+  | 'dictionary.noRoots';
 
 const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
   en: {
@@ -172,6 +175,9 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'search.empty': 'Type a verse reference, a word, or a root',
     'search.noResults': 'Nothing found',
     'search.loadFailed': 'Unable to search',
+    'dictionary.browse': 'Browse',
+    'dictionary.frequent': 'Frequent',
+    'dictionary.noRoots': 'No roots under this letter',
   },
   uz: {
     'tabs.home': 'Bosh sahifa',
@@ -255,6 +261,9 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'search.empty': 'Oyat raqami, so‘z yoki o‘zak kiriting',
     'search.noResults': 'Hech narsa topilmadi',
     'search.loadFailed': 'Qidirib bo‘lmadi',
+    'dictionary.browse': 'Ko‘rish',
+    'dictionary.frequent': 'Ko‘p uchraydigan',
+    'dictionary.noRoots': 'Bu harfda o‘zak yo‘q',
   },
   ru: {
     'tabs.home': 'Главная',
@@ -338,6 +347,9 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'search.empty': 'Введите номер аята, слово или корень',
     'search.noResults': 'Ничего не найдено',
     'search.loadFailed': 'Не удалось выполнить поиск',
+    'dictionary.browse': 'Обзор',
+    'dictionary.frequent': 'Частотные',
+    'dictionary.noRoots': 'Под этой буквой нет корней',
   },
 };
 

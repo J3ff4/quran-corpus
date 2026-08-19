@@ -1,5 +1,6 @@
 import { selectedTranslators, type MobileDataClient } from '@quran-corpus/mobile-data';
 import {
+  compareRootsArabic,
   countLemmaConcordance,
   countRootConcordance,
   getAyahsBySurah,
@@ -10,7 +11,9 @@ import {
   getLemmaFrequency,
   getRootConcordancePage,
   getRootEntry,
+  getRootSearchList,
   getRootsByFrequency,
+  rootFirstLetter,
   getSegmentsByWordIds,
   getSurahById,
   getTranslationsBySurahAndLang,
@@ -24,6 +27,7 @@ import {
   type ConcordanceEntry,
   type LemmaEntry,
   type RootEntry,
+  type RootSearchItem,
   type SearchResult,
   type Surah,
   type Translation,
@@ -311,6 +315,24 @@ export async function getRootScreen(
   rootBuckwalter: string,
 ): Promise<RootEntry | null> {
   return getRootEntry(client, rootBuckwalter);
+}
+
+/** Roots filed under one hijāʾī letter, in dictionary order.
+ *
+ *  Filtered and sorted in JS, not in SQL, and deliberately so: rootFirstLetter
+ *  folds hamza seats (أ إ آ ٱ to ا) and ى to ي, so a SQL prefix match would
+ *  file those under four separate letters, and SQLite's binary collation would
+ *  then order the bucket by codepoint -- every seated root ahead of every bare
+ *  one. Web's DictionaryBrowser does both for the same reasons. One query of
+ *  1,548 rows is cheap; 28 letter-shaped queries are not. */
+export async function getRootsForLetter(
+  client: MobileDataClient,
+  letter: string,
+): Promise<RootSearchItem[]> {
+  const roots = await getRootSearchList(client);
+  return roots
+    .filter((root) => rootFirstLetter(root.root_arabic) === letter)
+    .sort((a, b) => compareRootsArabic(a.root_arabic, b.root_arabic));
 }
 
 /** One row of the Frequent pane, whichever of the three lists produced it. */

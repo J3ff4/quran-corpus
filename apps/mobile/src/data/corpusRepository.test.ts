@@ -5,6 +5,7 @@ import {
   getFrequencyRows,
   getM0WordDetail,
   getRootScreen,
+  getRootsForLetter,
   getSurahGlosses,
   getSurahList,
   getSurahReader,
@@ -149,6 +150,11 @@ function createFakeClient({
     { id: 703, word_id: 2002, language_code: 'ru', gloss_text: 'это' },
   ];
   const roots: MobileRow[] = [{ id: 7, root_buckwalter: 'rHm', root_arabic: 'رحم', occurrence_count: 339 }];
+  const rootSearch: MobileRow[] = [
+    { id: 1, root_buckwalter: '>wb', root_arabic: 'أوب', occurrence_count: 18, gloss_blob: 'to return' },
+    { id: 2, root_buckwalter: 'Abl', root_arabic: 'ابل', occurrence_count: 2, gloss_blob: 'camel' },
+    { id: 7, root_buckwalter: 'rHm', root_arabic: 'رحم', occurrence_count: 339, gloss_blob: 'mercy' },
+  ];
   const rootForms: MobileRow[] = [
     {
       id: 11,
@@ -257,6 +263,13 @@ function createFakeClient({
       }
       if (sql.includes("WHERE pos_tag = 'V' AND lemma_buckwalter IS NOT NULL")) {
         return { rows: verbs };
+      }
+      if (sql.includes('FROM roots r')) {
+        // Fixture order is SQL's binary ORDER BY root_arabic: أ (U+0623) sorts
+        // before ا (U+0627), so a seated root lands ahead of a bare one no
+        // matter what the second radical is. Handing these back unsorted is
+        // what puts getRootsForLetter's own sort under test.
+        return { rows: rootSearch };
       }
       if (sql.includes('FROM roots WHERE root_buckwalter')) {
         return { rows: roots.filter((root) => root['root_buckwalter'] === args[0]) };
@@ -566,5 +579,22 @@ describe('getM0WordDetail', () => {
       expect.objectContaining({ id: 501, word_id: 1001, segment_index: 1, pos_tag: 'P' }),
       expect.objectContaining({ id: 502, word_id: 1001, segment_index: 2, pos_tag: 'N' }),
     ]);
+  });
+});
+
+describe('getRootsForLetter', () => {
+  it('files hamza seats under ا and orders the bucket hijāʾī, not by codepoint', async () => {
+    const list = await getRootsForLetter(createFakeClient(), 'ا');
+
+    // Both roots belong to the ا bucket because rootFirstLetter folds the seat.
+    // Order is the assertion: SQL hands them back أوب, ابل (codepoint order);
+    // hijāʾī order compares the *second* radical, ب before و.
+    expect(list.map((root) => root.root_arabic)).toEqual(['ابل', 'أوب']);
+  });
+
+  it('excludes roots filed under another letter', async () => {
+    const list = await getRootsForLetter(createFakeClient(), 'ا');
+
+    expect(list.map((root) => root.root_arabic)).not.toContain('رحم');
   });
 });
