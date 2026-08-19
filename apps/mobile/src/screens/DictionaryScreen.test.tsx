@@ -20,11 +20,19 @@ vi.mock('expo-router', () => ({
   useNavigation: () => ({ setOptions: mocks.setOptions }),
 }));
 vi.mock('@/components/icons/Icon', () => ({ Icon: () => null }));
+vi.mock('@/components/FrequencyList', () => ({
+  FrequencyList: ({ kind }: { kind: string }) =>
+    React.createElement('div', { 'data-testid': 'frequency-list', 'data-kind': kind }),
+}));
 vi.mock('@/data/openCorpusDb', () => ({ openCorpusDb: () => Promise.resolve({}) }));
 // The real getRootSearchList and rootFirstLetter run against this: the fold
 // from a root's spelling to its bucket is the part worth exercising, and a
 // mocked module would assert only that the screen calls something.
-vi.mock('@quran-corpus/mobile-data', () => ({
+// Spread rather than replaced: the screen now reaches the fold through
+// corpusRepository, which imports selectedTranslators from this same barrel,
+// and a factory listing only createExpoSqliteClient makes that import undefined.
+vi.mock('@quran-corpus/mobile-data', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   createExpoSqliteClient: () => ({ execute: async () => ({ rows: mocks.rows }) }),
 }));
 vi.mock('react-native', async () => {
@@ -78,6 +86,19 @@ describe('DictionaryScreen', () => {
 
     expect(screen.queryAllByTestId('alphabet-cell')).toHaveLength(0);
     expect(screen.getByTestId('dictionary-pane-frequent').getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByTestId('frequency-list')).toBeTruthy();
+  });
+
+  it('passes the selected chip down to the list', async () => {
+    await renderLoaded();
+    fireEvent.click(screen.getByTestId('dictionary-pane-frequent'));
+
+    fireEvent.click(screen.getByTestId('frequency-kind-verbs'));
+
+    // The chip is the only thing that selects the query; a chip that only
+    // repaints its own border is the failure this catches.
+    expect(screen.getByTestId('frequency-list').getAttribute('data-kind')).toBe('verbs');
+    expect(screen.getByTestId('frequency-kind-verbs').getAttribute('aria-selected')).toBe('true');
   });
 
   it('puts a working search button in the header', async () => {

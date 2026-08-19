@@ -339,6 +339,14 @@ export async function getRootsForLetter(
     .sort((a, b) => compareRootsArabic(a.root_arabic, b.root_arabic));
 }
 
+/** Which hijāʾī buckets have any root at all. Folded with the same
+ *  `rootFirstLetter` getRootsForLetter buckets with -- a second copy of the
+ *  hamza-seat rules would enable a letter whose screen then comes up empty. */
+export async function getLettersWithRoots(client: MobileDataClient): Promise<Set<string>> {
+  const roots = await getRootSearchList(client);
+  return new Set(roots.map((root) => rootFirstLetter(root.root_arabic)));
+}
+
 /** One row of the Frequent pane, whichever of the three lists produced it. */
 export interface FrequencyRow {
   /** Route target: a root screen for roots, a lemma screen for the other two. */

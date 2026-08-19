@@ -96,7 +96,13 @@ export type UiStringKey =
   | 'dictionary.alphabet'
   // Caption above the letter screen's Arabic hero, read as "Letter — ب".
   | 'dictionary.letterCaption'
-  | 'dictionary.loadFailed';
+  | 'dictionary.loadFailed'
+  // Frequent-pane chips. Not reusing 'dictionary.loadFailed' for the failure:
+  // it reads "Unable to load roots", which is wrong on Lemmas and Verbs.
+  | 'dictionary.kindRoots'
+  | 'dictionary.kindLemmas'
+  | 'dictionary.kindVerbs'
+  | 'dictionary.frequentFailed';
 
 const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
   en: {
@@ -187,6 +193,10 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'dictionary.alphabet': 'Arabic alphabet',
     'dictionary.letterCaption': 'Letter',
     'dictionary.loadFailed': 'Unable to load roots',
+    'dictionary.kindRoots': 'Roots',
+    'dictionary.kindLemmas': 'Lemmas',
+    'dictionary.kindVerbs': 'Verbs',
+    'dictionary.frequentFailed': 'Unable to load the list',
   },
   uz: {
     'tabs.home': 'Bosh sahifa',
@@ -276,6 +286,10 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'dictionary.alphabet': 'Arab alifbosi',
     'dictionary.letterCaption': 'Harf',
     'dictionary.loadFailed': 'O‘zaklarni yuklab bo‘lmadi',
+    'dictionary.kindRoots': 'O‘zaklar',
+    'dictionary.kindLemmas': 'Lemmalar',
+    'dictionary.kindVerbs': 'Fe’llar',
+    'dictionary.frequentFailed': 'Ro‘yxatni yuklab bo‘lmadi',
   },
   ru: {
     'tabs.home': 'Главная',
@@ -365,6 +379,10 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'dictionary.alphabet': 'Арабский алфавит',
     'dictionary.letterCaption': 'Буква',
     'dictionary.loadFailed': 'Не удалось загрузить корни',
+    'dictionary.kindRoots': 'Корни',
+    'dictionary.kindLemmas': 'Леммы',
+    'dictionary.kindVerbs': 'Глаголы',
+    'dictionary.frequentFailed': 'Не удалось загрузить список',
   },
 };
 

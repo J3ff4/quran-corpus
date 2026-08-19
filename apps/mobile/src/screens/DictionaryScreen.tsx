@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { router, useNavigation } from 'expo-router';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
-import { getRootSearchList, rootFirstLetter } from '@quran-corpus/data/mobile';
 import { AlphabetGrid } from '@/components/AlphabetGrid';
+import { FrequencyList } from '@/components/FrequencyList';
 import { SearchHeaderButton } from '@/components/SearchHeaderButton';
+import { getLettersWithRoots } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
@@ -22,22 +23,21 @@ export function DictionaryScreen() {
   const theme = useThemeColors();
   const navigation = useNavigation();
   const [pane, setPane] = useState<Pane>('browse');
+  const [kind, setKind] = useState<'roots' | 'lemmas' | 'verbs'>('roots');
   // null while loading. The grid renders every cell disabled until this
   // arrives, rather than flashing an all-enabled alphabet that then dims.
   const [available, setAvailable] = useState<ReadonlySet<string> | null>(null);
 
-  // Which letters have roots at all. Folded with the shared rootFirstLetter,
-  // the same function getRootsForLetter buckets with -- a second copy of the
-  // hamza-seat rules here would enable a letter whose screen then comes up
-  // empty.
+  // Which letters have roots at all. The fold lives in the repository, next to
+  // the getRootsForLetter that has to agree with it.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const db = await openCorpusDb();
         const client = createExpoSqliteClient(db as ExpoSqliteLike);
-        const roots = await getRootSearchList(client);
-        if (!cancelled) setAvailable(new Set(roots.map((root) => rootFirstLetter(root.root_arabic))));
+        const letters = await getLettersWithRoots(client);
+        if (!cancelled) setAvailable(letters);
       } catch (cause) {
         // Empty set, so every cell stays disabled. Safe in the sense that
         // matters here: a dead grid is inert, whereas enabling all 29 sends
@@ -97,7 +97,45 @@ export function DictionaryScreen() {
           onSelect={(letter) => router.push(`/dictionary/letter/${encodeURIComponent(letter)}`)}
         />
       ) : null}
-      {/* Task 6 renders the Frequent pane here. */}
+      {pane === 'frequent' ? (
+        <>
+          <View style={{ flexDirection: 'row', paddingHorizontal: 16, gap: 8 }}>
+            {(['roots', 'lemmas', 'verbs'] as const).map((option) => (
+              <Pressable
+                key={option}
+                testID={`frequency-kind-${option}`}
+                // A filter chip over one list, not a pane switch -- the two
+                // pills above are the tabs. Android chips are buttons that
+                // carry a selected state.
+                accessibilityRole="button"
+                accessibilityState={{ selected: kind === option }}
+                onPress={() => setKind(option)}
+                style={{
+                  paddingHorizontal: 14,
+                  minHeight: touchTargets.minimum,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: 999,
+                  borderWidth: 1,
+                  borderColor: kind === option ? theme.accent : theme.border,
+                }}
+              >
+                <Text style={{ color: kind === option ? theme.accent : theme.mutedText }}>
+                  {t(
+                    uiLocale,
+                    option === 'roots'
+                      ? 'dictionary.kindRoots'
+                      : option === 'lemmas'
+                        ? 'dictionary.kindLemmas'
+                        : 'dictionary.kindVerbs',
+                  )}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <FrequencyList kind={kind} />
+        </>
+      ) : null}
     </View>
   );
 }

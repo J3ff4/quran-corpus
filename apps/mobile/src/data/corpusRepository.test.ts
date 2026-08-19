@@ -3,6 +3,7 @@ import type { MobileDataClient, MobileRow, SqlValue } from '@quran-corpus/mobile
 import {
   getAyahReaderLocation,
   getFrequencyRows,
+  getLettersWithRoots,
   getM0WordDetail,
   getRootScreen,
   getRootsForLetter,
@@ -583,6 +584,22 @@ describe('getM0WordDetail', () => {
       expect.objectContaining({ id: 501, word_id: 1001, segment_index: 1, pos_tag: 'P' }),
       expect.objectContaining({ id: 502, word_id: 1001, segment_index: 2, pos_tag: 'N' }),
     ]);
+  });
+});
+
+describe('getLettersWithRoots', () => {
+  it('folds hamza seats into the bucket the letter screen will actually query', async () => {
+    const letters = await getLettersWithRoots(createFakeClient());
+
+    // أوب and ابل both land under ا, so ء stays out -- enabling it would send
+    // the user to a letter screen that then comes up empty.
+    expect(letters.has('ا')).toBe(true);
+    expect(letters.has('ر')).toBe(true);
+    expect(letters.has('ء')).toBe(false);
+    // The one that bites: 'ء' is absent whether or not the seat is folded,
+    // because no fixture root starts with it. أوب is what distinguishes the
+    // two -- unfolded it opens a أ bucket the grid has no cell for.
+    expect(letters.has('أ')).toBe(false);
   });
 });
 
