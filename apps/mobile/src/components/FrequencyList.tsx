@@ -51,7 +51,15 @@ export function FrequencyList({ kind }: FrequencyListProps) {
     };
   }, [kind]);
 
-  if (loading) return <ActivityIndicator />;
+  if (loading) {
+    // Same container LetterScreen uses: a bare indicator paints small and
+    // left-aligned, then the pane snaps to a full-height list on every tap.
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator />
+      </View>
+    );
+  }
 
   if (failed) {
     return (
@@ -68,15 +76,25 @@ export function FrequencyList({ kind }: FrequencyListProps) {
   // branch above.
   return (
     <FlatList
+      // Refetching on a chip tap does not reset the content offset, so without
+      // this you land mid-list in the new kind with no sign it changed.
+      key={kind}
       data={rows}
       keyExtractor={(item) => item.href}
       renderItem={({ item }) => (
         <Pressable
           testID="frequency-row"
           accessibilityRole="link"
+          // Without a name the row announces as the bare concatenation of its
+          // three children, with nothing to say the trailing number is a
+          // count. t() has no interpolation, hence the concatenation here.
+          accessibilityLabel={`${item.arabic}${item.gloss ? ` ${item.gloss}` : ''}, ${item.count} ${t(uiLocale, 'dictionary.occurrences')}`}
           onPress={() => router.push(item.href)}
           style={{
-            flexDirection: 'row',
+            // RTL, as in AlphabetGrid: the Arabic takes the start (right) edge
+            // and the count the end. textAlign cannot do it -- the Arabic is a
+            // content-sized flex child here, not LetterScreen's full-width row.
+            flexDirection: 'row-reverse',
             alignItems: 'center',
             justifyContent: 'space-between',
             paddingHorizontal: 20,
@@ -90,16 +108,26 @@ export function FrequencyList({ kind }: FrequencyListProps) {
               color: theme.text,
               fontFamily: 'Hafs',
               fontSize: typography.body,
-              textAlign: 'right',
-              // See AyahText: textAlign places the block, writingDirection
-              // drives the bidi resolution inside the Arabic run.
+              // See AyahText: writingDirection drives the bidi resolution
+              // inside the Arabic run.
               writingDirection: 'rtl',
             }}
           >
             {item.arabic}
           </Text>
           {item.gloss ? (
-            <Text numberOfLines={1} style={{ color: theme.mutedText, flex: 1 }}>
+            // The gloss is the verb's lemma -- Arabic, not Latin -- so it takes
+            // the Uthmani face at body size like every other Arabic run.
+            <Text
+              numberOfLines={1}
+              style={{
+                color: theme.mutedText,
+                flex: 1,
+                fontFamily: 'Hafs',
+                fontSize: typography.body,
+                writingDirection: 'rtl',
+              }}
+            >
               {item.gloss}
             </Text>
           ) : null}

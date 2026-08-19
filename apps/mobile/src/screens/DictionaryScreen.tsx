@@ -99,7 +99,13 @@ export function DictionaryScreen() {
       ) : null}
       {pane === 'frequent' ? (
         <>
-          <View style={{ flexDirection: 'row', paddingHorizontal: 16, gap: 8 }}>
+          <View
+            // Three sibling chips with nothing saying they filter the list
+            // below, the same gap AlphabetGrid names its container for.
+            accessibilityRole="radiogroup"
+            accessibilityLabel={t(uiLocale, 'dictionary.kindFilter')}
+            style={{ flexDirection: 'row', paddingHorizontal: 16, gap: 8 }}
+          >
             {(['roots', 'lemmas', 'verbs'] as const).map((option) => (
               <Pressable
                 key={option}

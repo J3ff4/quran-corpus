@@ -72,6 +72,34 @@ describe('FrequencyList', () => {
     expect(mocks.push).toHaveBeenCalledWith('/root/qwl');
   });
 
+  it('renders the verb gloss in the Arabic face', async () => {
+    // The gloss column is the verb's lemma, which is Arabic script. Left to
+    // RN's default it renders in the Android system fallback at 14px beside
+    // the same verb's surface form in Hafs at 16px.
+    mocks.getFrequencyRows.mockResolvedValue([
+      { href: '/lemma/qAla', arabic: 'يَقُولُ', gloss: 'قَالَ', count: 1722 },
+    ]);
+
+    render(<FrequencyList kind="verbs" />);
+
+    await waitFor(() => expect(screen.getByText('قَالَ')).toBeTruthy());
+    expect(screen.getByText('قَالَ').style.fontFamily).toBe('Hafs');
+  });
+
+  it('names the row so the count is announced as a count', async () => {
+    mocks.getFrequencyRows.mockResolvedValue([
+      { href: '/root/qwl', arabic: 'قول', gloss: null, count: 1722 },
+    ]);
+
+    render(<FrequencyList kind="roots" />);
+
+    // Unlabelled, the row announces "قول 1722, link" -- nothing says what the
+    // number counts.
+    await waitFor(() => expect(screen.getByTestId('frequency-row')).toBeTruthy());
+    const label = screen.getByTestId('frequency-row').getAttribute('aria-label') ?? '';
+    expect(label).toContain('1722 occurrences');
+  });
+
   it('says so when the query fails, rather than showing an empty list', async () => {
     mocks.getFrequencyRows.mockRejectedValue(new Error('no such table'));
 

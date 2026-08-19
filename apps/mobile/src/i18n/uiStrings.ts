@@ -102,7 +102,13 @@ export type UiStringKey =
   | 'dictionary.kindRoots'
   | 'dictionary.kindLemmas'
   | 'dictionary.kindVerbs'
-  | 'dictionary.frequentFailed';
+  | 'dictionary.frequentFailed'
+  // Accessible name for the chip row: three sibling buttons with nothing to
+  // say they filter the list below.
+  | 'dictionary.kindFilter'
+  // Trails the count in a frequency row's accessible name, read as
+  // "1722 occurrences". t() has no interpolation, so it is a bare word.
+  | 'dictionary.occurrences';
 
 const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
   en: {
@@ -197,6 +203,8 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'dictionary.kindLemmas': 'Lemmas',
     'dictionary.kindVerbs': 'Verbs',
     'dictionary.frequentFailed': 'Unable to load the list',
+    'dictionary.kindFilter': 'Filter by kind',
+    'dictionary.occurrences': 'occurrences',
   },
   uz: {
     'tabs.home': 'Bosh sahifa',
@@ -290,6 +298,8 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'dictionary.kindLemmas': 'Lemmalar',
     'dictionary.kindVerbs': 'Fe’llar',
     'dictionary.frequentFailed': 'Ro‘yxatni yuklab bo‘lmadi',
+    'dictionary.kindFilter': 'Turi bo‘yicha filtr',
+    'dictionary.occurrences': 'marta uchraydi',
   },
   ru: {
     'tabs.home': 'Главная',
@@ -383,6 +393,8 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'dictionary.kindLemmas': 'Леммы',
     'dictionary.kindVerbs': 'Глаголы',
     'dictionary.frequentFailed': 'Не удалось загрузить список',
+    'dictionary.kindFilter': 'Фильтр по типу',
+    'dictionary.occurrences': 'вхождений',
   },
 };
 
