@@ -1429,54 +1429,156 @@ constant, for the hijai bucket screens."
 
 ## Task 5: Dictionary Browse and the letter screen
 
-> **Carried from Task 4's review.** Five of Task 4's six new repository exports
-> have zero coverage: the reviewer transposed `offset`/`limit` in
-> `getRootOccurrences` and `getLemmaOccurrences`, hardcoded
-> `getRootOccurrenceCount` to `0`, and pointed the `roots` and `lemmas` hrefs at
-> `/BROKEN/`, then ran the full 320-test suite green. Both `offset` and `limit`
-> are `number`, so TypeScript is not a backstop. **Whichever task first wires one
-> of these to a screen must assert the paging arguments reach the query in
-> order**, not merely that rows come back.
+> **Amended 2026-08-18 (controller pre-flight).** Read the code this task
+> touches before dispatch. Four defects in the original section:
+>
+> 1. **`sizes.body` does not exist.** `useArabicSizes()` returns
+>    `{reader, title, banner}` only. Both snippets read `sizes.body`, which is
+>    `undefined` — RN would have rendered at the default size with no error.
+>    Swapped to `typography.body`, which is what `app/root/[buckwalter].tsx`
+>    already uses for Arabic rows inside a list. That removes `useArabicSizes`
+>    from both components and the `arabicScale` mock from their tests.
+> 2. **`getRootsForLetter` did not sort.** Web's `DictionaryBrowser` filters on
+>    `rootFirstLetter` *and* sorts on `compareRootsArabic`; the plan's own
+>    comment claimed parity while copying only the filter. Verified against the
+>    live DB: today all 28 buckets are already in hijāʾī order under SQL's
+>    binary `ORDER BY root_arabic` (0 reorderings; no root carries ة, ؤ, ئ or
+>    ى), so this is not a live bug — but every root in the ا bucket currently
+>    carries the أ seat, and the scheduled 930-root re-scrape levels hamza
+>    seats UP into `root_arabic`. On that data binary order files every
+>    أ-initial root ahead of every ا-initial one regardless of second radical.
+>    One line now, with a test that fails without it.
+> 3. **§3 violation.** The headerRight magnifier was a second verbatim copy of
+>    `SurahReader.tsx:111-131` — same testID, label, style block and Icon, only
+>    the `onPress` differs. Extracted to `SearchHeaderButton`, used by both.
+> 4. **The pane toggle and the letter→route push had no test.** Added
+>    `DictionaryScreen.test.tsx`; the `router.push` href is the wiring that
+>    makes the grid do anything.
+
+> **Still carried from Task 4's review — NOT discharged here.** Five of Task
+> 4's six new repository exports have zero coverage: the reviewer transposed
+> `offset`/`limit` in `getRootOccurrences` and `getLemmaOccurrences`,
+> hardcoded `getRootOccurrenceCount` to `0`, and pointed the `roots` and
+> `lemmas` hrefs at `/BROKEN/`, then ran the full suite green. Both `offset`
+> and `limit` are `number`, so TypeScript is not a backstop. **Task 5 wires
+> none of them** — `getRootsForLetter` is a new wrapper with no paging. The
+> requirement moves intact to **Task 6** (`getFrequencyRows`) and **Task 7**
+> (`getRootOccurrences`, `getRootOccurrenceCount`): whichever first wires one
+> to a screen must assert the paging arguments reach the query *in order*, not
+> merely that rows come back.
 
 **Files:**
-- Create: `apps/mobile/src/components/AlphabetGrid.tsx`, `apps/mobile/src/components/AlphabetGrid.test.tsx`, `apps/mobile/src/screens/LetterScreen.tsx`, `apps/mobile/src/screens/LetterScreen.test.tsx`, `apps/mobile/src/screens/DictionaryScreen.tsx`, `apps/mobile/app/dictionary/letter/[letter].tsx`
-- Modify: `apps/mobile/src/data/corpusRepository.ts`, `apps/mobile/app/(tabs)/dictionary.tsx`, `apps/mobile/src/i18n/uiStrings.ts`
+- Create: `apps/mobile/src/components/AlphabetGrid.tsx`, `apps/mobile/src/components/AlphabetGrid.test.tsx`, `apps/mobile/src/components/SearchHeaderButton.tsx`, `apps/mobile/src/screens/LetterScreen.tsx`, `apps/mobile/src/screens/LetterScreen.test.tsx`, `apps/mobile/src/screens/DictionaryScreen.tsx`, `apps/mobile/src/screens/DictionaryScreen.test.tsx`, `apps/mobile/app/dictionary/letter/[letter].tsx`
+- Modify: `apps/mobile/src/data/corpusRepository.ts`, `apps/mobile/src/data/corpusRepository.test.ts`, `apps/mobile/src/components/SurahReader.tsx`, `apps/mobile/app/(tabs)/dictionary.tsx`, `apps/mobile/src/i18n/uiStrings.ts`
 
 **Interfaces:**
-- Consumes: `parseLetterParam` (Task 4).
+- Consumes: `parseLetterParam` (Task 4); `ARABIC_ALPHABET_ORDER`, `rootFirstLetter`, `compareRootsArabic`, `getRootSearchList`, `RootSearchItem` (all already exported from `@quran-corpus/data/mobile` — verified).
 - Produces:
   ```ts
   getRootsForLetter(client, letter: string): Promise<RootSearchItem[]>
   <AlphabetGrid onSelect={(letter: string) => void} />
+  <SearchHeaderButton onPress={() => void} />
   <LetterScreen letter={string | null} />
   ```
 
-- [ ] **Step 1: Add the repository wrapper**
+- [ ] **Step 1: Write the failing repository test**
 
-In `corpusRepository.ts`:
+Append to `apps/mobile/src/data/corpusRepository.test.ts`. The fake client
+needs a branch for `getRootSearchList` — its SQL is the only one in the graph
+matching `FROM roots r`:
 
 ```ts
-import { getRootSearchList, rootFirstLetter, type RootSearchItem } from '@quran-corpus/data/mobile';
+      if (sql.includes('FROM roots r')) {
+        // Fixture order is SQL's binary ORDER BY root_arabic: أ (U+0623) sorts
+        // before ا (U+0627), so a seated root lands ahead of a bare one no
+        // matter what the second radical is. Handing these back unsorted is
+        // what puts getRootsForLetter's own sort under test.
+        return { rows: rootSearch };
+      }
+```
 
-/** Roots filed under one hijāʾī letter.
+with the fixture beside the other `const` fixtures:
+
+```ts
+  const rootSearch: MobileRow[] = [
+    { id: 1, root_buckwalter: '>wb', root_arabic: 'أوب', occurrence_count: 18, gloss_blob: 'to return' },
+    { id: 2, root_buckwalter: 'Abl', root_arabic: 'ابل', occurrence_count: 2, gloss_blob: 'camel' },
+    { id: 7, root_buckwalter: 'rHm', root_arabic: 'رحم', occurrence_count: 339, gloss_blob: 'mercy' },
+  ];
+```
+
+and the test:
+
+```ts
+describe('getRootsForLetter', () => {
+  it('files hamza seats under ا and orders the bucket hijāʾī, not by codepoint', async () => {
+    const list = await getRootsForLetter(createFakeClient(), 'ا');
+
+    // Both roots belong to the ا bucket because rootFirstLetter folds the seat.
+    // Order is the assertion: SQL hands them back أوب, ابل (codepoint order);
+    // hijāʾī order compares the *second* radical, ب before و.
+    expect(list.map((root) => root.root_arabic)).toEqual(['ابل', 'أوب']);
+  });
+
+  it('excludes roots filed under another letter', async () => {
+    const list = await getRootsForLetter(createFakeClient(), 'ا');
+
+    expect(list.map((root) => root.root_arabic)).not.toContain('رحم');
+  });
+});
+```
+
+- [ ] **Step 2: Run it, confirm it fails**
+
+Run: `cd apps/mobile && npx vitest run src/data/corpusRepository.test.ts --no-cache`
+Expected: FAIL — `getRootsForLetter` is not exported.
+
+- [ ] **Step 3: Add the repository wrapper**
+
+In `corpusRepository.ts`. **Merge the new names into the existing
+`@quran-corpus/data/mobile` import block** — a second import statement from the
+same module trips `no-duplicate-imports`:
+
+```ts
+  compareRootsArabic,
+  getRootSearchList,
+  rootFirstLetter,
+  type RootSearchItem,
+```
+
+```ts
+/** Roots filed under one hijāʾī letter, in dictionary order.
  *
- *  Filtered in JS, not in SQL, and deliberately so: rootFirstLetter folds hamza
- *  seats (أ إ آ ٱ to ا) and ى to ي, and a SQL prefix match would file those
- *  under four separate letters. Web's DictionaryBrowser does the same thing for
- *  the same reason. One query of 1,548 rows is cheap; 28 letter-shaped queries
- *  are not. */
+ *  Filtered and sorted in JS, not in SQL, and deliberately so: rootFirstLetter
+ *  folds hamza seats (أ إ آ ٱ to ا) and ى to ي, so a SQL prefix match would
+ *  file those under four separate letters, and SQLite's binary collation would
+ *  then order the bucket by codepoint — every seated root ahead of every bare
+ *  one. Web's DictionaryBrowser does both for the same reasons. One query of
+ *  1,548 rows is cheap; 28 letter-shaped queries are not. */
 export async function getRootsForLetter(
   client: MobileDataClient,
   letter: string,
 ): Promise<RootSearchItem[]> {
   const roots = await getRootSearchList(client);
-  return roots.filter((root) => rootFirstLetter(root.root_arabic) === letter);
+  return roots
+    .filter((root) => rootFirstLetter(root.root_arabic) === letter)
+    .sort((a, b) => compareRootsArabic(a.root_arabic, b.root_arabic));
 }
 ```
 
-- [ ] **Step 2: Write the failing AlphabetGrid test**
+- [ ] **Step 4: Run it, confirm it passes**
 
-Create `apps/mobile/src/components/AlphabetGrid.test.tsx`:
+Run: `cd apps/mobile && npx vitest run src/data/corpusRepository.test.ts --no-cache`
+Expected: PASS.
+
+**Mutation-check (§4 step 4):** delete the `.sort(...)` line. The first test
+must fail on `['أوب','ابل']`. Restore.
+
+- [ ] **Step 5: Write the failing AlphabetGrid test**
+
+Create `apps/mobile/src/components/AlphabetGrid.test.tsx`. No settings mock:
+the grid reads `typography.body` and `useThemeColors`, and themeContext
+defaults to the light palette without a provider.
 
 ```tsx
 import React from 'react';
@@ -1484,8 +1586,6 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ARABIC_ALPHABET_ORDER } from '@quran-corpus/data/mobile';
 import { AlphabetGrid } from './AlphabetGrid';
-
-vi.mock('@/settings/settingsStore', () => ({ useAppSettings: () => ({ arabicScale: 'medium' }) }));
 
 vi.mock('react-native', async () => {
   const { host } = await import('@/testing/rnHosts.js');
@@ -1514,21 +1614,20 @@ describe('AlphabetGrid', () => {
 });
 ```
 
-- [ ] **Step 3: Run it, confirm it fails**
+- [ ] **Step 6: Run it, confirm it fails**
 
 Run: `cd apps/mobile && npx vitest run src/components/AlphabetGrid.test.tsx --no-cache`
 Expected: FAIL — module not found.
 
-- [ ] **Step 4: Write AlphabetGrid**
+- [ ] **Step 7: Write AlphabetGrid**
 
 Create `apps/mobile/src/components/AlphabetGrid.tsx`:
 
 ```tsx
 import { Pressable, Text, View } from 'react-native';
 import { ARABIC_ALPHABET_ORDER } from '@quran-corpus/data/mobile';
-import { touchTargets } from '@/theme/tokens';
+import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
-import { useArabicSizes } from '@/theme/useArabicSizes';
 
 export interface AlphabetGridProps {
   onSelect: (letter: string) => void;
@@ -1538,7 +1637,6 @@ export interface AlphabetGridProps {
  *  the ones rootFirstLetter actually assigns. */
 export function AlphabetGrid({ onSelect }: AlphabetGridProps) {
   const theme = useThemeColors();
-  const sizes = useArabicSizes();
 
   return (
     <View
@@ -1562,7 +1660,9 @@ export function AlphabetGrid({ onSelect }: AlphabetGridProps) {
             borderColor: theme.border,
           }}
         >
-          <Text style={{ color: theme.text, fontFamily: 'Hafs', fontSize: sizes.body }}>{letter}</Text>
+          <Text style={{ color: theme.text, fontFamily: 'Hafs', fontSize: typography.body }}>
+            {letter}
+          </Text>
         </Pressable>
       ))}
     </View>
@@ -1570,12 +1670,12 @@ export function AlphabetGrid({ onSelect }: AlphabetGridProps) {
 }
 ```
 
-- [ ] **Step 5: Run it, confirm it passes**
+- [ ] **Step 8: Run it, confirm it passes**
 
 Run: `cd apps/mobile && npx vitest run src/components/AlphabetGrid.test.tsx --no-cache`
 Expected: PASS, 2 tests.
 
-- [ ] **Step 6: Add the i18n keys**
+- [ ] **Step 9: Add the i18n keys**
 
 ```ts
   | 'dictionary.browse'
@@ -1604,9 +1704,10 @@ Expected: PASS, 2 tests.
     'dictionary.noRoots': 'Под этой буквой нет корней',
 ```
 
-- [ ] **Step 7: Write the failing LetterScreen test**
+- [ ] **Step 10: Write the failing LetterScreen test**
 
-Create `apps/mobile/src/screens/LetterScreen.test.tsx`:
+Create `apps/mobile/src/screens/LetterScreen.test.tsx`. Fixtures use
+space-free `root_arabic`, which is the live column's shape (`رحم`, not `ر ح م`).
 
 ```tsx
 import React from 'react';
@@ -1616,9 +1717,7 @@ import { LetterScreen } from './LetterScreen';
 
 const mocks = vi.hoisted(() => ({ getRootsForLetter: vi.fn() }));
 
-vi.mock('@/settings/settingsStore', () => ({
-  useAppSettings: () => ({ uiLocale: 'en', arabicScale: 'medium' }),
-}));
+vi.mock('@/settings/settingsStore', () => ({ useAppSettings: () => ({ uiLocale: 'en' }) }));
 vi.mock('@/data/corpusRepository', () => ({ getRootsForLetter: mocks.getRootsForLetter }));
 vi.mock('@/data/openCorpusDb', () => ({ openCorpusDb: () => Promise.resolve({}) }));
 vi.mock('@quran-corpus/mobile-data', () => ({ createExpoSqliteClient: () => ({}) }));
@@ -1656,29 +1755,47 @@ describe('LetterScreen', () => {
     render(<LetterScreen letter={null} />);
 
     expect(screen.getByText('No roots under this letter')).toBeTruthy();
-    // Validated before the DB is opened: an invalid bucket has no business
-    // reaching SQLite at all.
+    // Validated before the DB is opened: an identifier that is not a bucket has
+    // no business reaching SQLite at all.
     expect(mocks.getRootsForLetter).not.toHaveBeenCalled();
   });
 
-  it('lists the letter roots', async () => {
+  it('lists the letter roots in the order the repository returns them', async () => {
     mocks.getRootsForLetter.mockResolvedValue([
-      { id: 1, root_buckwalter: 'ktb', root_arabic: 'ك ت ب', occurrence_count: 319, gloss_blob: 'to write' },
+      { id: 2, root_buckwalter: 'Abl', root_arabic: 'ابل', occurrence_count: 2, gloss_blob: 'camel' },
+      { id: 1, root_buckwalter: '>wb', root_arabic: 'أوب', occurrence_count: 18, gloss_blob: 'to return' },
     ]);
 
-    render(<LetterScreen letter="ك" />);
+    render(<LetterScreen letter="ا" />);
 
-    await waitFor(() => expect(screen.getByText('ك ت ب')).toBeTruthy());
+    // Both the rows and their order: the repository already sorted these, and a
+    // screen that re-sorts or reverses them would still render two roots.
+    await waitFor(() => expect(screen.getAllByTestId('letter-root')).toHaveLength(2));
+    expect(screen.getAllByTestId('letter-root').map((node) => node.textContent)).toEqual(['ابل', 'أوب']);
+  });
+
+  it('links each root to its own encoded route', async () => {
+    mocks.getRootsForLetter.mockResolvedValue([
+      { id: 3, root_buckwalter: '>wb', root_arabic: 'أوب', occurrence_count: 18, gloss_blob: null },
+    ]);
+
+    render(<LetterScreen letter="ا" />);
+
+    // `>` is a Buckwalter letter and an unsafe path character; the href must
+    // carry it percent-encoded or the root route 404s.
+    await waitFor(() =>
+      expect(screen.getAllByTestId('letter-root')[0]!.getAttribute('href')).toBe('/root/%3Ewb'),
+    );
   });
 });
 ```
 
-- [ ] **Step 8: Run it, confirm it fails**
+- [ ] **Step 11: Run it, confirm it fails**
 
 Run: `cd apps/mobile && npx vitest run src/screens/LetterScreen.test.tsx --no-cache`
 Expected: FAIL — module not found.
 
-- [ ] **Step 9: Write LetterScreen and its route**
+- [ ] **Step 12: Write LetterScreen and its route**
 
 Create `apps/mobile/src/screens/LetterScreen.tsx`:
 
@@ -1692,9 +1809,8 @@ import { getRootsForLetter } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
-import { touchTargets } from '@/theme/tokens';
+import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
-import { useArabicSizes } from '@/theme/useArabicSizes';
 
 export interface LetterScreenProps {
   /** Already validated by the route. `null` is a letter the alphabet does not
@@ -1705,7 +1821,6 @@ export interface LetterScreenProps {
 export function LetterScreen({ letter }: LetterScreenProps) {
   const { uiLocale } = useAppSettings();
   const theme = useThemeColors();
-  const sizes = useArabicSizes();
 
   const [roots, setRoots] = useState<RootSearchItem[]>([]);
   const [loading, setLoading] = useState(letter !== null);
@@ -1762,12 +1877,13 @@ export function LetterScreen({ letter }: LetterScreenProps) {
       keyExtractor={(item) => item.root_buckwalter}
       renderItem={({ item }) => (
         <Link
+          testID="letter-root"
           href={`/root/${encodeURIComponent(item.root_buckwalter)}`}
           accessibilityRole="link"
           style={{
             color: theme.text,
             fontFamily: 'Hafs',
-            fontSize: sizes.body,
+            fontSize: typography.body,
             paddingHorizontal: 20,
             paddingVertical: 14,
             minHeight: touchTargets.minimum,
@@ -1781,6 +1897,11 @@ export function LetterScreen({ letter }: LetterScreenProps) {
   );
 }
 ```
+
+The `expo-router` mock in Step 10 maps `href` onto an `<a>` but drops
+`testID`; extend that mock's `Link` to pass `data-testid={testID}` so the
+queries above resolve. Keep the extension inside the mock, not in the
+component.
 
 Create `apps/mobile/app/dictionary/letter/[letter].tsx`:
 
@@ -1798,20 +1919,151 @@ export default function LetterRoute() {
 }
 ```
 
-- [ ] **Step 10: Run it, confirm it passes**
+- [ ] **Step 13: Run it, confirm it passes**
 
 Run: `cd apps/mobile && npx vitest run src/screens/LetterScreen.test.tsx --no-cache`
-Expected: PASS, 2 tests.
+Expected: PASS, 3 tests.
 
-- [ ] **Step 11: Write DictionaryScreen with the Browse pane only**
+**Mutation-check (§4 step 4):** drop `encodeURIComponent` from the `href`. The
+third test must fail on `/root/>wb`. Restore.
+
+- [ ] **Step 14: Extract SearchHeaderButton**
+
+`SurahReader.tsx` already renders this exact Pressable (testID `open-search`,
+`search.title` label, 4-prop style block, accent Icon). The dictionary header
+would be the second copy — CLAUDE.md §3. Create
+`apps/mobile/src/components/SearchHeaderButton.tsx`:
+
+```tsx
+import { Pressable } from 'react-native';
+import { Icon } from '@/components/icons/Icon';
+import { t } from '@/i18n/uiStrings';
+import { useAppSettings } from '@/settings/settingsStore';
+import { touchTargets } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/themeContext';
+
+export interface SearchHeaderButtonProps {
+  /** The reader closes its word sheet before pushing; the dictionary tab just
+   *  pushes. That difference is the only reason this takes a callback rather
+   *  than routing itself. */
+  onPress: () => void;
+}
+
+/** The header magnifier, two of the spec's three search entry points. (Home's
+ *  is a full-width pill with placeholder text, a different control.) */
+export function SearchHeaderButton({ onPress }: SearchHeaderButtonProps) {
+  const { uiLocale } = useAppSettings();
+  const theme = useThemeColors();
+
+  return (
+    <Pressable
+      testID="open-search"
+      accessibilityRole="button"
+      accessibilityLabel={t(uiLocale, 'search.title')}
+      onPress={onPress}
+      style={{
+        minHeight: touchTargets.minimum,
+        minWidth: touchTargets.minimum,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <Icon name="search" color={theme.accent} />
+    </Pressable>
+  );
+}
+```
+
+Replace the block in `SurahReader.tsx`'s `headerRight` with:
+
+```tsx
+          <SearchHeaderButton
+            onPress={() => {
+              closeSheet();
+              router.push('/search');
+            }}
+          />
+```
+
+keeping the surrounding comment about closing the sheet first. `SurahReader`'s
+existing `open-search` test must still pass untouched — if it does not, the
+extraction changed behaviour and is wrong.
+
+- [ ] **Step 15: Write the failing DictionaryScreen test**
+
+Create `apps/mobile/src/screens/DictionaryScreen.test.tsx`:
+
+```tsx
+import React from 'react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { DictionaryScreen } from './DictionaryScreen';
+
+const mocks = vi.hoisted(() => ({ push: vi.fn(), setOptions: vi.fn() }));
+
+vi.mock('@/settings/settingsStore', () => ({ useAppSettings: () => ({ uiLocale: 'en' }) }));
+vi.mock('expo-router', () => ({
+  router: { push: mocks.push },
+  useNavigation: () => ({ setOptions: mocks.setOptions }),
+}));
+vi.mock('@/components/icons/Icon', () => ({ Icon: () => null }));
+vi.mock('react-native', async () => {
+  const { host } = await import('@/testing/rnHosts.js');
+  return { Pressable: host('button'), Text: host('span'), View: host('div') };
+});
+
+describe('DictionaryScreen', () => {
+  beforeEach(() => {
+    mocks.push.mockReset();
+    mocks.setOptions.mockReset();
+  });
+  afterEach(cleanup);
+
+  it('opens on Browse and routes a tapped letter to its own screen', () => {
+    render(<DictionaryScreen />);
+
+    fireEvent.click(screen.getAllByTestId('alphabet-cell')[1]!);
+
+    // The second cell is ا. Encoded, like every other Arabic path segment this
+    // app builds -- an unencoded Arabic letter in a route is what parseLetterParam
+    // would then have to un-guess.
+    expect(mocks.push).toHaveBeenCalledWith(`/dictionary/letter/${encodeURIComponent('ا')}`);
+  });
+
+  it('hides the grid on the Frequent pane', () => {
+    render(<DictionaryScreen />);
+
+    fireEvent.click(screen.getByTestId('dictionary-pane-frequent'));
+
+    expect(screen.queryAllByTestId('alphabet-cell')).toHaveLength(0);
+    expect(screen.getByTestId('dictionary-pane-frequent').getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('puts a search button in the header', () => {
+    render(<DictionaryScreen />);
+
+    expect(mocks.setOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ headerRight: expect.any(Function) }),
+    );
+  });
+});
+```
+
+- [ ] **Step 16: Run it, confirm it fails**
+
+Run: `cd apps/mobile && npx vitest run src/screens/DictionaryScreen.test.tsx --no-cache`
+Expected: FAIL — module not found.
+
+- [ ] **Step 17: Write DictionaryScreen and point the tab at it**
 
 Create `apps/mobile/src/screens/DictionaryScreen.tsx`:
 
 ```tsx
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useNavigation } from 'expo-router';
 import { AlphabetGrid } from '@/components/AlphabetGrid';
+import { SearchHeaderButton } from '@/components/SearchHeaderButton';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
 import { touchTargets } from '@/theme/tokens';
@@ -1822,7 +2074,16 @@ type Pane = 'browse' | 'frequent';
 export function DictionaryScreen() {
   const { uiLocale } = useAppSettings();
   const theme = useThemeColors();
+  const navigation = useNavigation();
   const [pane, setPane] = useState<Pane>('browse');
+
+  // The third of the spec's three search entry points; the reader's and Home's
+  // landed in Task 3.
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => <SearchHeaderButton onPress={() => router.push('/search')} />,
+    });
+  }, [navigation]);
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
@@ -1861,33 +2122,6 @@ export function DictionaryScreen() {
 }
 ```
 
-Give the tab a header magnifier, which is the third of the spec's three search entry points (the reader's and Home's land in Task 3):
-
-```tsx
-  const navigation = useNavigation();
-
-  useEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <Pressable
-          testID="open-search"
-          accessibilityRole="button"
-          accessibilityLabel={t(uiLocale, 'search.title')}
-          onPress={() => router.push('/search')}
-          style={{
-            minHeight: touchTargets.minimum,
-            minWidth: touchTargets.minimum,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Icon name="search" color={theme.accent} />
-        </Pressable>
-      ),
-    });
-  }, [navigation, uiLocale, theme.accent]);
-```
-
 Point `app/(tabs)/dictionary.tsx` at it, replacing the Task 1 stub:
 
 ```tsx
@@ -1898,7 +2132,15 @@ export default function DictionaryRoute() {
 }
 ```
 
-- [ ] **Step 12: Full gate and commit**
+- [ ] **Step 18: Run it, confirm it passes**
+
+Run: `cd apps/mobile && npx vitest run src/screens/DictionaryScreen.test.tsx --no-cache`
+Expected: PASS, 3 tests.
+
+**Mutation-check (§4 step 4):** change the `pane === 'browse'` guard to `true`.
+The second test must fail on 29 cells. Restore.
+
+- [ ] **Step 19: Full gate and commit**
 
 Run: `cd apps/mobile && pnpm test && pnpm type-check && pnpm lint`
 
@@ -1907,9 +2149,14 @@ git add apps/mobile
 git commit -m "feat(mobile): dictionary browse by hijāʾī letter
 
 The grid is driven off ARABIC_ALPHABET_ORDER and the letter screen filters
-getRootSearchList through rootFirstLetter in JS, matching web's
-DictionaryBrowser. Not a SQL prefix match: rootFirstLetter folds hamza
-seats, and prefix matching would file أ, إ, آ and ٱ under four letters."
+getRootSearchList through rootFirstLetter and sorts it with
+compareRootsArabic, matching web's DictionaryBrowser. Not a SQL prefix
+match with SQLite's binary collation: rootFirstLetter folds hamza seats, so
+prefix matching would file أ, إ, آ and ٱ under four letters, and codepoint
+order would then put every seated root ahead of every bare one.
+
+The header magnifier is extracted rather than copied -- SurahReader already
+renders the same control, and only the onPress differs."
 ```
 
 ---
