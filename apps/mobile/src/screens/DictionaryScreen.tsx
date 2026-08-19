@@ -102,7 +102,10 @@ export function DictionaryScreen() {
           <View
             // Three sibling chips with nothing saying they filter the list
             // below, the same gap AlphabetGrid names its container for.
-            accessibilityRole="radiogroup"
+            // toolbar, not radiogroup: the chips are Material filter chips --
+            // buttons carrying a selected state, per Android convention -- and
+            // radiogroup would claim radio children they deliberately are not.
+            accessibilityRole="toolbar"
             accessibilityLabel={t(uiLocale, 'dictionary.kindFilter')}
             style={{ flexDirection: 'row', paddingHorizontal: 16, gap: 8 }}
           >
