@@ -183,14 +183,25 @@ export function ConcordanceList({ total, loadPage, header }: ConcordanceListProp
                   // to join runs by hand (f409ed0): Arabic does not shape
                   // across a space, so a word boundary breaks nothing.
                   //
-                  // Wash as well as tint: hue alone is ~1.26:1 against the
-                  // surrounding muted text, so the match is unfindable with a
-                  // colour-vision deficiency. No bold (Hafs is single-weight
-                  // and Android fakes it) and no underline (it collides with
-                  // the sub-baseline diacritics).
+                  // Three signals, because one is not enough for either
+                  // standard. Hue alone is 1.26:1 light / 1.15:1 dark against
+                  // the surrounding muted text, so the match is unfindable
+                  // with a colour-vision deficiency (1.4.11); wash and tint
+                  // are both still colour, so WCAG 1.4.1 needs a signal that
+                  // is not (weight).
+                  //
+                  // Weight matches web's `font-semibold` exactly: both
+                  // products load the same single-weight hafs.18.woff2 with no
+                  // bold face, so web's signal is the browser synthesising one
+                  // and this is Android doing the same. No underline -- it
+                  // collides with the sub-baseline diacritics.
                   style={
                     word.id === item.word_id
-                      ? { color: theme.accent, backgroundColor: theme.accentWash }
+                      ? {
+                          color: theme.accent,
+                          backgroundColor: theme.accentWash,
+                          fontWeight: '700',
+                        }
                       : undefined
                   }
                 >

@@ -277,6 +277,14 @@ describe('ConcordanceList', () => {
     // Hue alone is ~1.26:1 against the surrounding muted text, so a colour-blind
     // reader gets no match at all. The wash is what carries the distinction.
     expect(match.style.backgroundColor).toBe(rgb(themeColors.light.accentWash));
+    // Wash and tint are both colour, so WCAG 1.4.1 wants one signal that is
+    // not. Weight is web's (font-semibold) on the same single-weight face.
+    // Asserted against the verse's own weight so a globally bold verse -- which
+    // would signal nothing -- cannot pass this.
+    expect(match.style.fontWeight).toBe('700');
+    expect(match.style.fontWeight).not.toBe(
+      screen.getByTestId('concordance-verse').style.fontWeight,
+    );
   });
 
   it('reads the verse out as part of the row', async () => {
