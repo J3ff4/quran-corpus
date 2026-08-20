@@ -1,19 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { posBucket, type PosBucket } from '@quran-corpus/data/mobile';
+import { contrast } from '@/testing/contrast';
 import { themeColors } from './tokens';
 
 const BUCKETS: PosBucket[] = ['noun', 'verb', 'prep', 'pron', 'other'];
-
-function contrast(hex: string, bg: string): number {
-  const channel = (h: string, i: number) => {
-    const v = parseInt(h.slice(i, i + 2), 16) / 255;
-    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-  };
-  const lum = (h: string) =>
-    0.2126 * channel(h, 1) + 0.7152 * channel(h, 3) + 0.0722 * channel(h, 5);
-  const [hi, lo] = [lum(hex), lum(bg)].sort((a, b) => b - a);
-  return (hi! + 0.05) / (lo! + 0.05);
-}
 
 describe('mobile POS colours', () => {
   it('covers every bucket posBucket can return, in both themes', () => {

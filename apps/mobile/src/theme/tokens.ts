@@ -36,6 +36,9 @@ export const themeColors = {
     mutedText: colors.muted,
     border: colors.border,
     accent: colors.accent,
+    // The accent at 12% over the page. Carries the tint that hue alone cannot:
+    // accent on it is 4.82:1, so a tinted match clears AA for body text.
+    accentWash: '#e0e8e1',
     danger: colors.danger, // 6.9:1 on paper
     onAccent: '#ffffff', // 6.0:1 on accent
     // Same hexes web uses, and the same background (#faf8f3 = paper-50), so
@@ -50,6 +53,9 @@ export const themeColors = {
     mutedText: '#aaa196',
     border: '#39342f',
     accent: '#5aa58d',
+    // The night accent at 18% over night -- a heavier mix than light's 12%,
+    // which is what it takes to be visible on #151412. Accent on it is 4.85:1.
+    accentWash: '#212e28',
     // Not colors.danger: #9f2d2d on night is 2.5:1, well under AA. Error text
     // is exactly the text a user must be able to read, so the night palette
     // takes a lighter red rather than reusing the brand one.
