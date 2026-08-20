@@ -7,7 +7,7 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-08-16
+Updated: 2026-08-20
 
 ## Now
 
@@ -2745,11 +2745,91 @@ forked `packages/data` + `packages/config`; both forks deleted, canonical copies
 PR **#5** on `J3ff4/quran-corpus` — **MERGED** `da9a694` (this file said "open" until
 2026-08-15; re-verified against `git log` before correcting, per §14).
 
-**Nothing here has run on a physical device.** Every green number below is a local
-transcript. Neither repo has ever had CI. Treat accordingly.
+**Only M3 has run on a physical device** (Runs 1 and 2, 2026-08-17/18; Run 3 still
+owed). M2 and M4 are local transcripts only. Neither repo has ever had CI, so the
+smoke checklists in `README.md` are the sole device gate — CLAUDE.md §10.
 
-Gate as of 2026-08-16: type-check 6/6 (mobile is two tsc programs now), lint 2/2,
-test 6/6 uncached, 879 tests (data 287, web 483, mobile 97, mobile-data 12).
+Gate as of 2026-08-20 at `9a47500`: type-check 6/6, lint 2/2, test 6/6 uncached,
+**1198 tests** across 165 files (data 329, web 481, mobile 376, mobile-data 12).
+
+### M4 dictionary + search — CODE COMPLETE, DEVICE GATE UNRUN (2026-08-20)
+
+Branch `feat/m3-morphology` (M3 and M4 share it), **92 commits ahead of `main`, not
+merged, no PR opened.** M4 is `1d9a6ed..9a47500`, 26 commits. Plan
+`docs/plans/phase-m4-dictionary-search.md`, spec
+`docs/superpowers/specs/2026-08-18-m4-dictionary-search-design.md`.
+
+🔴 **M4 IS NOT DONE.** Its Verification Log records every check 28-38 as
+`unexercised`. Nine tasks of code have never run on hardware.
+
+What landed, task by task:
+1. `ecc163f` — five tabs (Home · Read · Morphology · Dictionary · Menu); Bookmarks
+   and Settings moved out of the tab bar into a Menu screen.
+2. `1c6826f`/`bdefa56` — `packages/data` verse search gained language + translator
+   options. This is what fixed the four-copies-of-one-verse defect: an unfiltered
+   search returned one row per translation.
+3. `6f031ab`/`f13aa72`/`a070e99` — offline FTS5 search over the bundled DB, with a
+   `parseVerseRef` "Go to" row above the hits.
+4. `0b96752`/`cc61f60` — lemma and frequency reads exposed on `@quran-corpus/data/mobile`.
+5. `47a7d90`/`a0be7b3` — dictionary browse by hijāʾī letter.
+6. `6dda5ce`/`f8e0fea`/`2d41084` — Frequent pane: roots, lemmas, verbs.
+7. `95af9e4`/`1172bc0`/`95dc6fe` — the root screen's paged concordance.
+8. `be8f0f2`/`9a47500` — the lemma screen and its concordance.
+
+**§5 review debt, three stretches, carried to the whole-branch review:** the waived
+gate over `0b96752..cc61f60` (a `packages/data` widening AND a route-param
+validator — two triggers), Task 5's fix round, and Task 6's fix round plus its role
+correction. Recorded here rather than left implicit.
+
+**Process finding worth keeping.** Task 8's review caught a defect that seventeen
+combined mutations had missed: the test's `ConcordanceList` mock destructured
+`total` and `header` but not `loadPage`, so the screen's paged query was never
+called and its whole call contract was untested. Every mutation on both sides
+targeted rendered output, and `loadPage` renders nothing. **A component mock that
+drops a function prop silently deletes that prop's coverage.** Sweep the other
+component mocks in `apps/mobile/src` at the branch review.
+
+**Also worth keeping:** `pnpm test` can print full pass counts off a `FULL TURBO`
+cache replay. Only `--force` (`Cached: 0 cached`) proves a run happened.
+
+Parked as issues on `J3ff4/quran-corpus`: **#12** (mobile fallback-language glosses
+unmarked, plus a gloss-cache miss), **#13** (snippet sentinels duplicated across the
+SQL and both renderers). Not filed yet: the `openCorpusDb` + `createExpoSqliteClient`
++ `cancelled`-flag effect is copy-pasted verbatim at seven call sites; a
+`useCorpusQuery(fn, deps)` hook would delete ~25 lines each (m-6).
+
+Deliberately **not** in M4: recent-search history (writes the on-device user DB — a
+§5 trigger and persisted device state, for a convenience nobody asked for), search
+filters by surah or POS, form-filter chips on the root concordance, a translator
+picker, and any treebank surface.
+
+### M3 morphology MVP — DEVICE GATE PART-RUN, RUN 3 OWED (2026-08-18)
+
+Same branch. Plan `docs/plans/phase-m3-morphology-mvp.md`, which holds the log.
+
+- **Run 1**, 2026-08-17, build `bac194d4` at `9421560`: all 22 checks PASS, one
+  finding — the word sheet's spring, rejected outright by the owner rather than
+  broken. Fixed in `3ad1086` by deleting the physics, not retuning it a third time.
+- **Run 2**, 2026-08-18, build `76a83a9d` at `469abfd`: cleared ten of the twelve
+  checks those commits touched, left two unexercised, found F5 and F6.
+  - **F5** — RN on Android shapes each nested `<Text>` as its own run, so the
+    sheet's coloured hero word came apart at every segment boundary. Web's
+    inline-span colouring does not port. Fixed `f409ed0` (`joinSegmentRuns`: ZWJ on
+    connecting boundaries, lam-alef pairs kept in one run), checked against all
+    41,755 multi-segment words.
+  - **F6** — the surah name switched into the header at a threshold instead of
+    moving there. Fixed `9dee3a5`.
+- **Run 3 is owed** and now folded into M4's build (owner's decision 2026-08-18):
+  F5, F6, check 27 (Русский basmala under TalkBack) and the M2 rosette carry-over
+  ride along with checks 28-38.
+
+**§5 override on this phase:** the owner waived the `/code-review` pass over M3b
+Tasks 7 and 8 (`37ae2d7`, `a137e9f`), which write the on-device user DB. Third such
+override; recorded in the M3 plan's log.
+
+Known build warning, not a finding: the `preview` profile names channel `preview`
+while `expo-updates` is not installed. OTA is out of scope; adding the package is a
+§12 dependency decision nobody has taken.
 
 ### M2 design foundation — CODE COMPLETE, DEVICE GATE UNRUN (2026-08-15)
 
@@ -2846,6 +2926,10 @@ DONE (`e1c305a`): both link forms pass the ayah, the route validates it, and
 
 ### Blocked on user
 - APK: needs interactive `eas login`, then `eas build -p android --profile preview`.
+  🔴 **Build at `9a47500` or later.** Anything older has no `app/lemma/[lemma].tsx`,
+  so M4 check 35's Lemmas and Verbs rows dead-end for a reason unrelated to the code
+  under test. Confirm the EAS upload is ~43 MB — ~5 MB means `.easignore` dropped the
+  bundled DB and every check fails for the wrong reason.
 - `docs/data-sources-m1.md`: every row "Needs release sign-off"; About screen says so
   6×. Blocks Play Store release, not development. Owner = Codex.
 

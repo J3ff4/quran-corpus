@@ -119,17 +119,61 @@ and every check below will fail for the wrong reason.
     TalkBack on, focus the basmala banner: it is announced in Russian, not as
     "Bismillah".
 
+## M4 Dictionary + Search Smoke Test
+
+Run on a physical Android device, on a `preview` profile APK built at `9a47500`
+or later — an older build has no `app/lemma/[lemma].tsx`, so check 35's Lemmas
+and Verbs rows route nowhere. Confirm the EAS upload is ~43 MB — a ~5 MB upload
+means `.easignore` dropped the bundled DB and every check below fails for the
+wrong reason. Run these alongside M3's outstanding checks (F5, F6, check 27 and
+the M2 rosette carry-over).
+
+28. Tab bar reads Home · Read · Morphology · Dictionary · Menu. Menu opens
+    Bookmarks, Settings and About & credits, and all three open.
+29. Reader header → magnifier. Type `2:255`. A "Go to" row appears above the
+    verse hits; tapping it opens al-Baqarah at 255.
+30. Type `Al-Baqarah 255`, then an Arabic surah name. Both jump the same way.
+31. Settings → Language → Русский. Search a Russian word. Each ayah appears
+    **once**, and its wording matches what the reader shows for that ayah.
+    Four copies of one verse is the defect this phase fixed.
+32. Search an Arabic word. Matched words are tinted inside each snippet, and no
+    box glyph or stray control character is visible.
+33. Search nonsense. "Nothing found" — not a spinner that never stops, and not
+    "Unable to search", which means FTS5 is missing from the build.
+34. Dictionary → Browse. Tap ق. The list shows that letter's roots; tap one and
+    the root screen opens.
+35. Dictionary → Frequent. Roots, Lemmas and Verbs each load a different list.
+    Tap a verb row: it opens a lemma screen, not a dead end.
+36. Root screen for a common root (قول). Scroll: occurrences keep loading, the
+    same verse never appears twice, and the header scrolls with the list rather
+    than fighting it. The matched word in each snippet must be **bold in the
+    Hafs face** — same glyph shapes as the words around it, only heavier. If it
+    turns into system sans, Android is not synthesising a weight for a
+    single-variant family and the non-colour signal has to become a size bump.
+37. Airplane mode: repeat 29, 31, 34 and 36. All of it is local.
+38. Repeat 29 and 36 in dark mode and at maximum system font size. Nothing
+    clips and the snippet highlight is still legible.
+
 ## Current Status
 
 M0-M2 are complete. M3 (morphology) is implemented on `feat/m3-morphology`: an offline reader over a bundled SQLite DB, per-segment coloured word morphology behind a bottom sheet, word-detail and root screens, a word-by-word grid, and Hafs font loading with English/Uzbek/Russian translations. M3b then fixed the defects found on the first two device runs — sheet spring, basmala placement, navigation headers, the word-by-word screen's chrome, a four-step Arabic size setting and an in-app reduce-animations switch.
 
-CI has no Android emulator, so the M3 smoke checklist above is the only gate
+CI has no Android emulator, so the smoke checklists above are the only gate
 this app has. Run 1 passed all 22 checks on 2026-08-17 with one finding (the
 word sheet's spring). M3c removed that spring, collapsed the reader's fixed
 language band into a header sheet, put the surah name in the header on scroll,
 and localised the basmala label; Run 2 on 2026-08-18 cleared ten of the twelve
 checks those commits touched, left two unexercised, and found the header title
 popping in and the sheet's coloured word coming apart at its segment
-boundaries. Both are now fixed. Run 3 must clear all 27 checks plus the M2
-rosette carry-over; results go in the Verification Log of
-`docs/plans/phase-m3-morphology-mvp.md`.
+boundaries. Both are now fixed, but neither has been seen on
+hardware: Run 3 is still owed, and it is now folded into M4's build.
+
+M4 (dictionary + search) is implemented on the same branch: five tabs with
+Bookmarks and Settings behind a Menu, offline FTS5 verse search with a `2:255`
+"Go to" row, translation search filtered to one language so an ayah appears once,
+dictionary browse by hijāʾī letter, frequency lists for roots/lemmas/verbs, and
+paged concordances on the root and lemma screens. **None of it has run on a
+device.** One build clears both: checks 1-27 (F5, F6 and check 27 outstanding)
+plus the M2 rosette carry-over go in the Verification Log of
+`docs/plans/phase-m3-morphology-mvp.md`, and checks 28-38 go in that of
+`docs/plans/phase-m4-dictionary-search.md`.

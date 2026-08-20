@@ -3410,7 +3410,7 @@ groups occurrences away, and paging off that number truncates the list."
 
 **Interfaces:** consumes everything. Produces the §10 exit criterion.
 
-- [ ] **Step 1: Add the M4 checks to `README.md`**
+- [x] **Step 1: Add the M4 checks to `README.md`**
 
 Append after the M3 section, numbered 28 onward so M3's numbering is untouched:
 
@@ -3444,7 +3444,7 @@ outstanding M3 checks (F5, F6, check 27 and the M2 rosette carry-over).
     clips and the snippet highlight is still legible.
 ```
 
-- [ ] **Step 2: Add the Verification Log skeleton to this plan**
+- [x] **Step 2: Add the Verification Log skeleton to this plan**
 
 Append a `## Verification Log` section with `### Run 1 — pending`, a table of checks 28–38 all marked `unexercised`, and four carry-over rows for M3's F5, F6, check 27 and the M2 rosette. Per the M3 log's convention: **an unexercised check is recorded as unexercised, never implied to have passed.**
 
@@ -3456,7 +3456,7 @@ M4 is code-complete but not verified. Ask the owner for a `preview` build. Confi
 
 Fill the table with the real results. A FAIL is a finding: record it, fix it, and note whether the fix was re-verified on device or carried to the next build.
 
-- [ ] **Step 5: Update `STATUS.md` and commit**
+- [x] **Step 5: Update `STATUS.md` and commit**
 
 Verify against `git log --oneline` before writing anything into `STATUS.md` (§14).
 
@@ -3487,3 +3487,58 @@ git commit -m "docs(mobile): record the M4 on-device verification run"
 - **Refined Dictionary and Menu tab glyphs.** Task 1 adds two plain ones so no glyph is shared with another tab; drawing them properly is a design task.
 - **A translator picker.** Task 2's options exist so one is cheap later, but nothing in this phase exposes them.
 - **Any treebank surface.**
+
+---
+
+## Verification Log
+
+### Run 1 — pending
+
+Not yet built. M4 is code-complete on `feat/m3-morphology` at `9a47500`; nothing
+below has been exercised on hardware. Per the M3 log's convention, an
+unexercised check is recorded as unexercised and never implied to have passed —
+CI has no Android emulator, so this table is the only gate this app has.
+
+The build must be cut at `9a47500` or later. Anything older lacks
+`app/lemma/[lemma].tsx`, which makes check 35's Lemmas and Verbs rows dead ends
+for a reason that has nothing to do with the code under test.
+
+| # | Check | Result |
+| --- | --- | --- |
+| 28 | Five tabs; Menu opens Bookmarks, Settings, About & credits | unexercised |
+| 29 | `2:255` produces a "Go to" row above the verse hits | unexercised |
+| 30 | `Al-Baqarah 255` and an Arabic surah name jump the same way | unexercised |
+| 31 | Russian search: each ayah once, wording matches the reader | unexercised |
+| 32 | Arabic search: matches tinted, no box glyph or control character | unexercised |
+| 33 | Nonsense search says "Nothing found", not "Unable to search" | unexercised |
+| 34 | Browse → ق lists that letter's roots; a row opens the root screen | unexercised |
+| 35 | Frequent: Roots, Lemmas, Verbs differ; a verb opens a lemma screen | unexercised |
+| 36 | قول concordance pages without duplicates; match is bold in Hafs | unexercised |
+| 37 | Airplane mode: 29, 31, 34, 36 all local | unexercised |
+| 38 | 29 and 36 in dark mode at maximum font size: no clipping | unexercised |
+
+**Carry-over from M3's Run 3, all still open.** Their fixes are ancestors of
+this build, so they can be closed here.
+
+| Carry-over | Result |
+| --- | --- |
+| M3 F5 — sheet hero word joined across segment boundaries (`f409ed0`) | unexercised |
+| M3 F6 — surah name rises into the header bar rather than switching on (`9dee3a5`) | unexercised |
+| M3 check 27 — Русский basmala banner announced in Russian under TalkBack | unexercised |
+| M2 Run 2 — three-digit ayah number inside the rosette at max font size | unexercised |
+
+**Watch item on check 36, not yet a finding.** The concordance match carries
+three signals — accent colour, `accentWash` background and `fontWeight: '700'`
+(`95dc6fe`). The weight is the only non-colour one, and WCAG 1.4.1 is why it is
+there. No mobile site combined `fontFamily: 'Hafs'` with a `fontWeight` before
+that commit, so weight synthesis on a single-variant family is unproven on
+device: `hafs.18.woff2` ships one weight, and web's `font-semibold` is the
+browser synthesising a bold from it. If RN 0.86 instead falls back to the system
+sans, the match will read as a different typeface rather than a heavier one.
+The fallback is a size bump, which needs no family resolution.
+
+**Review debt carried into this branch.** CLAUDE.md §5 calls for a
+`/code-review` pass that has not been run on three stretches of this work: the
+waived gate over `0b96752..cc61f60`, Task 5's fix round, and Task 6's fix round
+and role correction. Recorded here rather than left implicit; the whole-branch
+review is where it gets settled.
