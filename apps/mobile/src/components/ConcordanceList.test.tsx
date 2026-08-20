@@ -20,11 +20,15 @@ vi.mock('react-native', async () => {
     Text: host('span'),
     View: host('div'),
     // Exposes onEndReached as a button so a test can page without a viewport.
-    FlatList: ({ data, renderItem, ListHeaderComponent, ListEmptyComponent, onEndReached }: {
+    // ListFooterComponent is rendered, not dropped: a prop a mock omits is a
+    // prop no test in this file can ever see, and the mid-list failure notice
+    // lives there (F1 -- the same class of hole that hid LemmaScreen's loadPage).
+    FlatList: ({ data, renderItem, ListHeaderComponent, ListEmptyComponent, ListFooterComponent, onEndReached }: {
       data: unknown[];
       renderItem: (info: { item: unknown; index: number }) => React.ReactNode;
       ListHeaderComponent?: React.ReactNode;
       ListEmptyComponent?: React.ReactNode;
+      ListFooterComponent?: React.ReactNode;
       onEndReached?: () => void;
     }) =>
       React.createElement(
@@ -36,6 +40,7 @@ vi.mock('react-native', async () => {
           ? ListEmptyComponent
           : data.map((item, index) =>
               React.createElement('div', { key: index }, renderItem({ item, index }))),
+        ListFooterComponent,
       ),
   };
 });
@@ -326,5 +331,39 @@ describe('ConcordanceList', () => {
     // The node appears after mount, so the role alone announces nothing --
     // TalkBack only speaks a subtree it was already watching.
     expect(screen.getByTestId('concordance-status').getAttribute('aria-live')).toBe('polite');
+  });
+
+  it('says so when a page fails after the first, not only on an empty list', async () => {
+    // The empty state is unreachable once a page has landed, so a failure here
+    // used to set `failed` with nowhere to render it: the list simply stopped
+    // growing, which is exactly what reaching the end looks like. 40 of these
+    // 60 occurrences are now unreachable and the reader is never told.
+    loadPage.mockResolvedValueOnce(fullPage());
+    loadPage.mockRejectedValueOnce(new Error('no such table'));
+
+    render(<ConcordanceList total={60} loadPage={loadPage} header={<span />} />);
+    await waitFor(() => expect(screen.getAllByTestId('concordance-row')).toHaveLength(20));
+
+    screen.getByTestId('end-reached').click();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('concordance-status').textContent).toBe(
+        'Unable to load occurrences',
+      ),
+    );
+    expect(screen.getByTestId('concordance-status').getAttribute('role')).toBe('alert');
+    // The 20 rows that did load stay on screen -- the notice sits under them.
+    expect(screen.getAllByTestId('concordance-row')).toHaveLength(20);
+  });
+
+  it('shows no status under a list that loaded cleanly', async () => {
+    // The footer notice must be gated on `failed`, not on "paging stopped":
+    // a complete list also stops paging, and telling that reader the load
+    // broke is the same defect pointed the other way.
+    loadPage.mockResolvedValueOnce(fullPage());
+    render(<ConcordanceList total={20} loadPage={loadPage} header={<span />} />);
+    await waitFor(() => expect(screen.getAllByTestId('concordance-row')).toHaveLength(20));
+
+    expect(screen.queryByTestId('concordance-status')).toBeNull();
   });
 });

@@ -217,6 +217,24 @@ export function ConcordanceList({ total, loadPage, header }: ConcordanceListProp
     [theme],
   );
 
+  // One node, two slots. An empty list renders it as the empty state; a list
+  // that loaded some pages and then broke renders it under the last row, where
+  // the reader is looking. It cannot appear in both at once -- the footer branch
+  // requires rows and ListEmptyComponent renders only without them.
+  const status = (
+    <Text
+      testID="concordance-status"
+      accessibilityRole={failed ? 'alert' : undefined}
+      // Without the live region the alert role announces nothing: the
+      // node appears after mount, and TalkBack only speaks a subtree it
+      // is already watching. Same pairing as SearchScreen and WbwScreen.
+      accessibilityLiveRegion={failed ? 'polite' : undefined}
+      style={{ color: theme.mutedText, padding: 20, fontSize: typography.body }}
+    >
+      {t(uiLocale, failed ? 'concordance.loadFailed' : 'concordance.empty')}
+    </Text>
+  );
+
   return (
     <FlatList
       data={entries}
@@ -224,22 +242,14 @@ export function ConcordanceList({ total, loadPage, header }: ConcordanceListProp
       ListHeaderComponent={header}
       onEndReached={loadMore}
       onEndReachedThreshold={0.5}
-      ListFooterComponent={loading ? <ActivityIndicator /> : null}
-      ListEmptyComponent={
-        loading ? null : (
-          <Text
-            testID="concordance-status"
-            accessibilityRole={failed ? 'alert' : undefined}
-            // Without the live region the alert role announces nothing: the
-            // node appears after mount, and TalkBack only speaks a subtree it
-            // is already watching. Same pairing as SearchScreen and WbwScreen.
-            accessibilityLiveRegion={failed ? 'polite' : undefined}
-            style={{ color: theme.mutedText, padding: 20, fontSize: typography.body }}
-          >
-            {t(uiLocale, failed ? 'concordance.loadFailed' : 'concordance.empty')}
-          </Text>
-        )
+      // A page that fails after the first one leaves the rest of the root
+      // unreachable -- paging is stopped for good (offsetRef is pinned to
+      // total). Without this the list just stops growing, which is
+      // indistinguishable from having reached the end (m-5, second half).
+      ListFooterComponent={
+        loading ? <ActivityIndicator /> : failed && entries.length > 0 ? status : null
       }
+      ListEmptyComponent={loading ? null : status}
       renderItem={renderItem}
       style={{ flex: 1, backgroundColor: theme.background }}
     />
