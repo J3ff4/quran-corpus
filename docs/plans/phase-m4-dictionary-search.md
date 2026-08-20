@@ -2592,11 +2592,11 @@ dictionary screen was the only place in the app reaching into
 ## Task 7: Root screen concordance
 
 **Files:**
-- Create: `apps/mobile/src/components/ConcordanceList.tsx`, `apps/mobile/src/components/ConcordanceList.test.tsx`
-- Modify: `apps/mobile/app/root/[buckwalter].tsx`, `apps/mobile/src/i18n/uiStrings.ts`
+- Create: `apps/mobile/src/components/ConcordanceList.tsx`, `apps/mobile/src/components/ConcordanceList.test.tsx`, `apps/mobile/src/screens/RootRoute.test.tsx`
+- Modify: `apps/mobile/app/root/[buckwalter].tsx`, `apps/mobile/src/i18n/uiStrings.ts`, `apps/mobile/src/data/corpusRepository.test.ts`
 
 **Interfaces:**
-- Consumes: `getRootOccurrences`, `getRootOccurrenceCount` (Task 4).
+- Consumes: `getRootOccurrences`, `getRootOccurrenceCount` (Task 4); `trimConcordanceVerse` from `@quran-corpus/data/mobile`.
 - Produces:
   ```ts
   <ConcordanceList
@@ -2607,69 +2607,161 @@ dictionary screen was the only place in the app reaching into
   ```
   Task 8 reuses it with the lemma loaders.
 
-- [ ] **Step 1: Add the i18n keys**
+**Pre-flight corrections (2026-08-19).** Six defects were found in this section
+against real code before dispatch. Each is now folded in; they are listed so a
+reader does not "restore" one:
+
+1. `sizes.body` does not exist. `useArabicSizes()` returns `{reader, title,
+   banner}` only, and RN renders `fontSize: undefined` silently. This section
+   uses `typography` and never calls `useArabicSizes`.
+2. Task 4 carried a paging-coverage requirement that Task 6 did not discharge:
+   `getRootOccurrences` has no test at all. Step 1 below discharges it.
+3. `Link` renders a `Text` on native, so a `View` nested inside it does not lay
+   out (the defect Task 6 hit). Rows are `Pressable` + `router.push`, as
+   `SearchScreen.tsx:160` and `FrequencyList` already do with this same href.
+4. A failed page must not fall through to the empty state. That is the m-5
+   class, already fixed twice (LetterScreen Task 5, FrequencyList Task 6).
+5. `entry.text_arabic` is the matched WORD, not the verse -- on a root with 60
+   occurrences the plan's row rendered the same word 60 times. Owner decision
+   2026-08-19: match web and show the verse windowed around the match with the
+   matched word tinted, reusing `trimConcordanceVerse`.
+6. Routes are testable without lifting them out: `src/screens/SurahRoute.test.tsx`
+   imports `../../app/surah/[surahId]`. Step 8 follows that precedent.
+
+- [ ] **Step 1: Discharge Task 4's carried paging test**
+
+`getRootOccurrences(client, bw, lang, offset, limit)` takes five positional
+arguments and forwards them into an options object
+(`getRootConcordancePage(client, bw, { lang, offset, limit })`). Nothing asserts
+they arrive intact, and a swapped `offset`/`limit` is silent: the list still
+renders, just with the wrong rows.
+
+`getRootConcordancePage` pushes its paging args as `args.push(limit, offset)`
+(`packages/data/src/queries/roots.ts:409`) and returns `[]` on an empty first
+result set, so a recording stub sees exactly one statement.
+
+Add to `apps/mobile/src/data/corpusRepository.test.ts` (import
+`getRootOccurrences` alongside the existing imports, and `vi` from vitest):
+
+```ts
+describe('getRootOccurrences', () => {
+  it('passes the root, language, offset and limit through to the query', async () => {
+    // Five positional arguments folded into an options object. A swapped
+    // offset/limit renders a plausible page of the wrong occurrences, so the
+    // assertion is on position, not on presence.
+    const statements: { sql: string; args: unknown[] }[] = [];
+    const client: MobileDataClient = {
+      execute: async (statement) => {
+        if (typeof statement !== 'string') statements.push(statement);
+        return { rows: [] };
+      },
+    };
+
+    await getRootOccurrences(client, 'qwl', 'ru', 40, 20);
+
+    expect(statements).toHaveLength(1);
+    const { sql, args } = statements[0]!;
+    // roots.ts builds args as [bw, bw, lang, ...]: the CTE takes the root and
+    // the word_segments scan takes it again, then the gloss join takes lang.
+    expect(args[0]).toBe('qwl');
+    expect(args[2]).toBe('ru');
+    // roots.ts pushes the paging args as (limit, offset), in that order.
+    expect(sql).toContain('LIMIT ? OFFSET ?');
+    expect(args.slice(-2)).toEqual([20, 40]);
+  });
+});
+```
+
+- [ ] **Step 2: Run it, confirm it passes; then mutation-check it**
+
+Run: `cd apps/mobile && npx vitest run src/data/corpusRepository.test.ts`
+Expected: PASS.
+
+Mutation: in `corpusRepository.ts`, change `getRootOccurrences`' forward to
+`getRootConcordancePage(client, bw, { lang, offset: limit, limit: offset })`.
+Re-run. Expected: FAIL on `args.slice(-2)` with `[40, 20]` against `[20, 40]`.
+Restore (by re-editing the line -- **never `git checkout <file>`**, which
+destroys uncommitted work) and re-run: PASS.
+
+- [ ] **Step 3: Add the i18n keys**
+
+Two keys, in all three locales, in the same three places the file already
+requires (union type, `en`, `uz`, `ru`):
 
 ```ts
   | 'concordance.empty'
+  // A failed page must not read as "no occurrences" -- same finding as m-5.
+  | 'concordance.loadFailed'
 ```
 
-en `'No occurrences'`; uz `'Uchrashlar yo‘q'`; ru `'Нет вхождений'`.
+| key | en | uz | ru |
+| --- | --- | --- | --- |
+| `concordance.empty` | `No occurrences` | `Uchrashlar yo‘q` | `Нет вхождений` |
+| `concordance.loadFailed` | `Unable to load occurrences` | `Uchrashlarni yuklab bo‘lmadi` | `Не удалось загрузить вхождения` |
 
-- [ ] **Step 2: Write the failing ConcordanceList test**
+Uzbek in Latin script (see `f1098a9`). Use the typographic apostrophe U+2018
+that the file's other Uzbek strings use, not ASCII `'` -- the table above already carries it.
+
+- [ ] **Step 4: Write the failing ConcordanceList test**
 
 Create `apps/mobile/src/components/ConcordanceList.test.tsx`:
 
 ```tsx
 import React from 'react';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConcordanceList } from './ConcordanceList';
 
-vi.mock('@/settings/settingsStore', () => ({
-  useAppSettings: () => ({ uiLocale: 'en', arabicScale: 'medium' }),
-}));
-vi.mock('expo-router', async () => {
-  const React = await import('react');
-  return {
-    Link: ({ href, children }: { href: string; children: React.ReactNode }) =>
-      React.createElement('a', { href }, children),
-  };
-});
+const mocks = vi.hoisted(() => ({ push: vi.fn() }));
+
+vi.mock('@/settings/settingsStore', () => ({ useAppSettings: () => ({ uiLocale: 'en' }) }));
+vi.mock('expo-router', () => ({ router: { push: mocks.push } }));
 vi.mock('react-native', async () => {
   const React = await import('react');
   const { host } = await import('@/testing/rnHosts.js');
   return {
-    ActivityIndicator: host('div'),
+    ActivityIndicator: () => React.createElement('span', null, 'loading'),
+    Pressable: host('button'),
     Text: host('span'),
     View: host('div'),
     // Exposes onEndReached as a button so a test can page without a viewport.
-    FlatList: ({ data, renderItem, ListHeaderComponent, onEndReached }: {
+    FlatList: ({ data, renderItem, ListHeaderComponent, ListEmptyComponent }: {
       data: unknown[];
       renderItem: (info: { item: unknown; index: number }) => React.ReactNode;
       ListHeaderComponent?: React.ReactNode;
+      ListEmptyComponent?: React.ReactNode;
       onEndReached?: () => void;
-    }) =>
+    } & { onEndReached?: () => void }) =>
       React.createElement(
         'div',
         null,
         ListHeaderComponent,
         React.createElement('button', { 'data-testid': 'end-reached', onClick: onEndReached }),
-        data.map((item, index) => React.createElement('div', { key: index }, renderItem({ item, index }))),
+        data.length === 0
+          ? ListEmptyComponent
+          : data.map((item, index) =>
+              React.createElement('div', { key: index }, renderItem({ item, index }))),
       ),
   };
 });
 
-function entry(surah: number, ayah: number) {
+/** One occurrence. `verse_words` is the whole ayah; `word_id` names the match
+ *  inside it, which is what trimConcordanceVerse centres the window on. */
+function entry(surah: number, ayah: number, wordId = surah * 1000 + ayah) {
   return {
     surah_id: surah,
     ayah_number: ayah,
-    position: 1,
-    word_id: surah * 1000 + ayah,
+    position: 2,
+    word_id: wordId,
     text_arabic: 'ٱلْغَيْبِ',
     transliteration: null,
-    gloss: null,
-    verse_words: [],
+    gloss: 'the unseen',
     form_id: null,
+    verse_words: [
+      { id: wordId - 1, position: 1, text_arabic: 'يُؤْمِنُونَ', starts_clause: false },
+      { id: wordId, position: 2, text_arabic: 'ٱلْغَيْبِ', starts_clause: false },
+      { id: wordId + 1, position: 3, text_arabic: 'وَيُقِيمُونَ', starts_clause: false },
+    ],
   };
 }
 
@@ -2678,6 +2770,7 @@ describe('ConcordanceList', () => {
 
   beforeEach(() => {
     loadPage.mockReset();
+    mocks.push.mockReset();
     loadPage.mockResolvedValue([entry(2, 3)]);
   });
 
@@ -2709,28 +2802,72 @@ describe('ConcordanceList', () => {
 
     expect(loadPage).toHaveBeenCalledTimes(1);
   });
+
+  it('shows the verse around the match, not the matched word alone', async () => {
+    render(<ConcordanceList total={1} loadPage={loadPage} header={<span />} />);
+
+    // Without the verse, every row on a root with 60 occurrences carries the
+    // same Arabic word and the concordance is a list of verse numbers.
+    await waitFor(() => expect(screen.getByTestId('concordance-verse')).toBeTruthy());
+    const verse = screen.getByTestId('concordance-verse').textContent ?? '';
+    expect(verse).toContain('يُؤْمِنُونَ');
+    expect(verse).toContain('وَيُقِيمُونَ');
+  });
+
+  it('tints the matched word inside the verse', async () => {
+    render(<ConcordanceList total={1} loadPage={loadPage} header={<span />} />);
+
+    // The point of the verse is locating the match in it. Untinted, the reader
+    // has to find the word by eye in a right-to-left run.
+    await waitFor(() => expect(screen.getByTestId('concordance-match')).toBeTruthy());
+    const match = screen.getByTestId('concordance-match');
+    expect(match.textContent).toBe('ٱلْغَيْبِ');
+    expect(match.style.color).not.toBe('');
+    expect(match.style.color).not.toBe(
+      screen.getByTestId('concordance-verse').style.color,
+    );
+  });
+
+  it('opens the verse it names', async () => {
+    render(<ConcordanceList total={1} loadPage={loadPage} header={<span />} />);
+    await waitFor(() => expect(screen.getByTestId('concordance-row')).toBeTruthy());
+
+    fireEvent.click(screen.getByTestId('concordance-row'));
+
+    expect(mocks.push).toHaveBeenCalledWith('/surah/2?ayah=3');
+  });
+
+  it('says so when a page fails, rather than showing an empty list', async () => {
+    loadPage.mockRejectedValue(new Error('no such table'));
+
+    render(<ConcordanceList total={60} loadPage={loadPage} header={<span />} />);
+
+    // "No occurrences" on a failed read is a lie, and a root that has none is
+    // indistinguishable from a broken DB. Same finding as m-5.
+    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
+    expect(screen.getByRole('alert').textContent).toBe('Unable to load occurrences');
+  });
 });
 ```
 
-- [ ] **Step 3: Run it, confirm it fails**
+- [ ] **Step 5: Run it, confirm it fails**
 
 Run: `cd apps/mobile && npx vitest run src/components/ConcordanceList.test.tsx --no-cache`
 Expected: FAIL — module not found.
 
-- [ ] **Step 4: Write ConcordanceList**
+- [ ] **Step 6: Write ConcordanceList**
 
 Create `apps/mobile/src/components/ConcordanceList.tsx`:
 
 ```tsx
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
-import { ActivityIndicator, FlatList, Text, View } from 'react-native';
-import { Link } from 'expo-router';
-import type { ConcordanceEntry } from '@quran-corpus/data/mobile';
+import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { trimConcordanceVerse, type ConcordanceEntry } from '@quran-corpus/data/mobile';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
-import { touchTargets } from '@/theme/tokens';
+import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
-import { useArabicSizes } from '@/theme/useArabicSizes';
 
 // One screenful and a bit: large enough that a scroll rarely waits, small
 // enough that the first page lands immediately on a hot root.
@@ -2743,14 +2880,17 @@ export interface ConcordanceListProps {
 }
 
 /** Paged occurrences under a screen's own header. Shared by the root and lemma
- *  screens, which differ only in header and loader. */
+ *  screens, which differ only in header and loader.
+ *
+ *  Rows are Pressable, not Link: expo-router's Link renders a Text on native,
+ *  and the row is a two-line layout whose Views would not lay out inside one. */
 export function ConcordanceList({ total, loadPage, header }: ConcordanceListProps) {
   const { uiLocale } = useAppSettings();
   const theme = useThemeColors();
-  const sizes = useArabicSizes();
 
   const [entries, setEntries] = useState<ConcordanceEntry[]>([]);
   const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
   // Refs, not state: onEndReached fires repeatedly while the list settles, and
   // a state read there is a frame behind, which requests the same page twice.
   const busyRef = useRef(false);
@@ -2770,7 +2910,10 @@ export function ConcordanceList({ total, loadPage, header }: ConcordanceListProp
       if (page.length === 0) offsetRef.current = total;
     } catch (cause) {
       console.error('[concordance] page load failed', { offset: offsetRef.current, cause });
+      // Stop paging AND say so. Falling through to the empty state would
+      // render a broken read as "this root has no occurrences" (m-5).
       offsetRef.current = total;
+      setFailed(true);
     } finally {
       busyRef.current = false;
       setLoading(false);
@@ -2781,6 +2924,7 @@ export function ConcordanceList({ total, loadPage, header }: ConcordanceListProp
     offsetRef.current = 0;
     busyRef.current = false;
     setEntries([]);
+    setFailed(false);
     void loadMore();
     // loadMore changes with the loader, which is what a new root or lemma is.
   }, [loadMore]);
@@ -2795,58 +2939,138 @@ export function ConcordanceList({ total, loadPage, header }: ConcordanceListProp
       ListFooterComponent={loading ? <ActivityIndicator /> : null}
       ListEmptyComponent={
         loading ? null : (
-          <Text style={{ color: theme.mutedText, padding: 20 }}>{t(uiLocale, 'concordance.empty')}</Text>
+          <Text
+            accessibilityRole={failed ? 'alert' : undefined}
+            style={{ color: theme.mutedText, padding: 20, fontSize: typography.body }}
+          >
+            {t(uiLocale, failed ? 'concordance.loadFailed' : 'concordance.empty')}
+          </Text>
         )
       }
-      renderItem={({ item }) => (
-        <Link href={`/surah/${item.surah_id}?ayah=${item.ayah_number}`} accessibilityRole="link">
-          <View style={{ paddingHorizontal: 20, paddingVertical: 12, minHeight: touchTargets.minimum }}>
-            <Text style={{ color: theme.mutedText, fontSize: 12 }}>
-              {item.surah_id}:{item.ayah_number}
-            </Text>
-            <Text
+      renderItem={({ item }) => {
+        // Same window web shows: the clause around the match, capped, with the
+        // flags saying which side was cut.
+        const trimmed = trimConcordanceVerse(item.verse_words, item.word_id);
+        return (
+          <Pressable
+            testID="concordance-row"
+            accessibilityRole="link"
+            // The row's Arabic reads as one long run to TalkBack; the reference
+            // and gloss are what identify it. t() has no interpolation.
+            accessibilityLabel={`${item.surah_id}:${item.ayah_number}${item.gloss ? `, ${item.gloss}` : ''}`}
+            onPress={() => router.push(`/surah/${item.surah_id}?ayah=${item.ayah_number}`)}
+            style={{
+              paddingHorizontal: 20,
+              paddingVertical: 12,
+              minHeight: touchTargets.minimum,
+              gap: 4,
+            }}
+          >
+            <View
+              // RTL, as in AlphabetGrid and FrequencyList: the Arabic takes the
+              // start (right) edge, the reference the end.
               style={{
-                color: theme.text,
+                flexDirection: 'row-reverse',
+                alignItems: 'baseline',
+                justifyContent: 'space-between',
+                gap: 12,
+              }}
+            >
+              <Text
+                style={{
+                  color: theme.text,
+                  fontFamily: 'Hafs',
+                  fontSize: typography.body,
+                  writingDirection: 'rtl',
+                }}
+              >
+                {item.text_arabic}
+              </Text>
+              <Text style={{ color: theme.mutedText, fontSize: typography.caption }}>
+                {item.surah_id}:{item.ayah_number}
+              </Text>
+            </View>
+
+            {item.gloss ? (
+              <Text style={{ color: theme.mutedText, fontSize: typography.caption }}>
+                {item.gloss}
+              </Text>
+            ) : null}
+
+            <Text
+              testID="concordance-verse"
+              style={{
+                color: theme.mutedText,
                 fontFamily: 'Hafs',
-                fontSize: sizes.body,
+                // typography.body, not useArabicSizes: this is a list row, not
+                // reading text -- sizes.reader is 28px and would make one
+                // occurrence fill the screen. The reader's own size setting
+                // governs the reader.
+                fontSize: typography.body,
                 writingDirection: 'rtl',
+                // Full-width block child of a column Pressable, so textAlign
+                // places it (unlike FrequencyList's content-sized flex child).
                 textAlign: 'right',
               }}
             >
-              {item.text_arabic}
+              {trimmed.truncatedBefore ? '… ' : ''}
+              {trimmed.words.map((word, index) => (
+                <Text
+                  key={word.id}
+                  testID={word.id === item.word_id ? 'concordance-match' : undefined}
+                  // Nesting Text per word is safe here where SegmentedWord had
+                  // to join runs by hand (f409ed0): Arabic does not shape
+                  // across a space, so a word boundary breaks nothing.
+                  style={word.id === item.word_id ? { color: theme.accent } : undefined}
+                >
+                  {index > 0 ? ' ' : ''}
+                  {word.text_arabic}
+                </Text>
+              ))}
+              {trimmed.truncatedAfter ? ' …' : ''}
             </Text>
-            {item.gloss ? <Text style={{ color: theme.mutedText }}>{item.gloss}</Text> : null}
-          </View>
-        </Link>
-      )}
+          </Pressable>
+        );
+      }}
       style={{ flex: 1, backgroundColor: theme.background }}
     />
   );
 }
 ```
 
-- [ ] **Step 5: Run it, confirm it passes**
+Note on the match `testID`: `rnHosts.ts` maps `testID` to `data-testid`, and a
+`undefined` value renders no attribute, so only the matched word carries it.
+
+- [ ] **Step 7: Run it, confirm it passes, then mutation-check**
 
 Run: `cd apps/mobile && npx vitest run src/components/ConcordanceList.test.tsx --no-cache`
-Expected: PASS, 3 tests.
+Expected: PASS, 7 tests.
 
-- [ ] **Step 6: Mutation-check**
+Four mutations, each restored by re-editing the line (**never `git checkout
+<file>`**) and re-run to PASS before the next:
 
-Change `loadPage(offsetRef.current, PAGE)` to `loadPage(0, PAGE)`.
+| # | Mutation | Must fail |
+| --- | --- | --- |
+| M1 | `loadPage(offsetRef.current, PAGE)` → `loadPage(0, PAGE)` | `pages from the offset it has reached` |
+| M2 | render `{item.text_arabic}` in place of the `trimmed.words.map(...)` run | `shows the verse around the match` |
+| M3 | drop the match tint: `style={undefined}` on the per-word Text | `tints the matched word inside the verse` |
+| M4 | delete `setFailed(true)` from the catch | `says so when a page fails` |
 
-Run the suite. Expected: FAIL on `pages from the offset it has reached, not from zero`.
+A `TypeError`, a module-resolution error or a matcher-argument error is a FALSE
+KILL, not a pass. Tighten the assertion and re-run until the failure is a real
+value mismatch on the expected values.
 
-Restore. Re-run: PASS.
+- [ ] **Step 8: Rebuild the root route around it**
 
-- [ ] **Step 7: Rebuild the root route around it**
+In `apps/mobile/app/root/[buckwalter].tsx`:
 
-In `apps/mobile/app/root/[buckwalter].tsx`: keep the param validation and the entry load exactly as they are; add a `total` from `getRootOccurrenceCount` alongside the entry load; move the existing header, forms and definitions markup into a `header` element built from plain `View`s; and return
-
-```tsx
-  return <ConcordanceList total={total} loadPage={loadPage} header={header} />;
-```
-
-where
+- Keep `parseRootParam` and its `useMemo` **exactly** as they are. It is the
+  trust boundary for a deep-link path segment; nothing about paging touches it.
+- Load the total alongside the entry in the existing effect:
+  `const [found, count] = await Promise.all([getRootScreen(client, buckwalter), getRootOccurrenceCount(client, buckwalter)]);`
+  Reset `total` to 0 on the `!buckwalter` and `catch` paths, next to the
+  existing `setEntry(null)`.
+- Add the loader:
 
 ```tsx
   const loadPage = useCallback(
@@ -2860,13 +3084,44 @@ where
   );
 ```
 
-`contentLanguage` comes from `useAppSettings()`, which the route already calls for `uiLocale`.
+  `contentLanguage` comes from `useAppSettings()`, which the route already calls
+  for `uiLocale`. Both hooks must sit above the early `return`s, or the render
+  path changes hook order.
+- Move today's header, forms and definitions markup into a `header` element:
+  same JSX, with the outer `ScrollView` replaced by
+  `<View style={{ padding: 20, gap: 18 }}>`. The header must contain **no**
+  scroll view. A scroll view inside a `FlatList` header is a nested
+  VirtualizedList: it warns, and it breaks the scroll rather than nesting it (R2).
+- Return `<ConcordanceList total={total} loadPage={loadPage} header={header} />`.
 
-The header must contain **no** `ScrollView`. A scroll view inside a `FlatList` header is a nested VirtualizedList: it warns, and it breaks the scroll rather than nesting it (R2). The route's current outer `ScrollView` is what goes.
+- [ ] **Step 9: Test the route's wiring**
 
-- [ ] **Step 8: Full gate and commit**
+Create `apps/mobile/src/screens/RootRoute.test.tsx`, following
+`src/screens/SurahRoute.test.tsx` for shape (it imports the route from
+`../../app/...`; test files must not live in the expo-router `app/` directory,
+see `6a6963e`). Mock `ConcordanceList` to a stub that calls the `loadPage` it
+was handed, so the assertion is on what the route forwards:
+
+```tsx
+  it('pages the validated root in the chosen content language', async () => {
+    // The two silent failures here are forwarding the raw param instead of the
+    // parsed one, and hardcoding 'en' instead of the reader's language.
+    // Both still render a plausible list.
+    ...
+    await waitFor(() => expect(mocks.getRootOccurrences).toHaveBeenCalledWith(
+      expect.anything(), 'qwl', 'ru', 0, 20,
+    ));
+  });
+```
+
+Mutation: change the route's `loadPage` to pass `'en'` in place of
+`contentLanguage`. Re-run. Expected: FAIL on the language argument. Restore.
+
+- [ ] **Step 10: Full gate and commit**
 
 Run: `cd apps/mobile && pnpm test && pnpm type-check && pnpm lint`
+
+All three must pass with zero errors. Report the test count.
 
 ```bash
 git add apps/mobile
@@ -2877,9 +3132,20 @@ definitions it already showed, with the concordance paging in beneath. The
 outer ScrollView goes: a scroll view inside a list header is a nested
 VirtualizedList, which breaks the scroll rather than nesting it.
 
+Each row carries the verse windowed around the match with the matched word
+tinted, as web does, reusing trimConcordanceVerse. text_arabic alone is the
+matched word, so a root with 60 occurrences rendered the same Arabic 60
+times and the concordance read as a list of verse numbers.
+
 Paging state lives in refs, not state -- onEndReached fires repeatedly
 while the list settles, and a state read there is a frame behind, which
-requests the same page twice."
+requests the same page twice. A failed page says so rather than falling
+through to the empty state, which would render a broken read as 'this root
+has no occurrences'.
+
+Also adds the test Task 4 carried forward: getRootOccurrences folds five
+positional arguments into an options object, and a swapped offset/limit
+was silent."
 ```
 
 ---
