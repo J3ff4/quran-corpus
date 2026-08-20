@@ -108,7 +108,10 @@ export type UiStringKey =
   | 'dictionary.kindFilter'
   // Trails the count in a frequency row's accessible name, read as
   // "1722 occurrences". t() has no interpolation, so it is a bare word.
-  | 'dictionary.occurrences';
+  | 'dictionary.occurrences'
+  | 'concordance.empty'
+  // A failed page must not read as "no occurrences" -- same finding as m-5.
+  | 'concordance.loadFailed';
 
 const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
   en: {
@@ -205,6 +208,8 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'dictionary.frequentFailed': 'Unable to load the list',
     'dictionary.kindFilter': 'Filter by kind',
     'dictionary.occurrences': 'occurrences',
+    'concordance.empty': 'No occurrences',
+    'concordance.loadFailed': 'Unable to load occurrences',
   },
   uz: {
     'tabs.home': 'Bosh sahifa',
@@ -300,6 +305,8 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'dictionary.frequentFailed': 'Ro‘yxatni yuklab bo‘lmadi',
     'dictionary.kindFilter': 'Turi bo‘yicha filtr',
     'dictionary.occurrences': 'marta uchraydi',
+    'concordance.empty': 'Uchrashlar yo‘q',
+    'concordance.loadFailed': 'Uchrashlarni yuklab bo‘lmadi',
   },
   ru: {
     'tabs.home': 'Главная',
@@ -395,6 +402,8 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'dictionary.frequentFailed': 'Не удалось загрузить список',
     'dictionary.kindFilter': 'Фильтр по типу',
     'dictionary.occurrences': 'вхождений',
+    'concordance.empty': 'Нет вхождений',
+    'concordance.loadFailed': 'Не удалось загрузить вхождения',
   },
 };
 

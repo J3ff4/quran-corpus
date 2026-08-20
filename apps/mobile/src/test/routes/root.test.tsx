@@ -25,6 +25,16 @@ vi.mock('@/data/openCorpusDb', () => ({
 
 vi.mock('@/data/corpusRepository', () => ({
   getRootScreen: (...args: unknown[]) => mocks.getRootScreen(...args),
+  // The route loads the occurrence count alongside the entry. This suite is
+  // about the header the route builds, so the concordance is stubbed empty and
+  // the list itself mocked to its header below; ConcordanceList has its own
+  // suite and RootRoute.test.tsx covers what the route forwards to it.
+  getRootOccurrenceCount: async () => 0,
+  getRootOccurrences: async () => [],
+}));
+
+vi.mock('@/components/ConcordanceList', () => ({
+  ConcordanceList: ({ header }: { header: React.ReactElement }) => header,
 }));
 
 vi.mock('@/settings/settingsStore', () => ({

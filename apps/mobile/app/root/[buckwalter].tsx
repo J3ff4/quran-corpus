@@ -1,9 +1,10 @@
 import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Text, View } from 'react-native';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
 import { definitionSourceLabel, type RootEntry } from '@quran-corpus/data/mobile';
-import { getRootScreen } from '@/data/corpusRepository';
+import { ConcordanceList } from '@/components/ConcordanceList';
+import { getRootOccurrenceCount, getRootOccurrences, getRootScreen } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { parseRootParam } from '@/data/routeParams';
 import { t } from '@/i18n/uiStrings';
@@ -12,14 +13,14 @@ import { typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useArabicSizes } from '@/theme/useArabicSizes';
 
-/** One root: its Arabic form, the derived forms the corpus records for it, and
- *  the lexicon definitions. Reached from the reader sheet's root link or from a
- *  deep link. */
+/** One root: its Arabic form, the derived forms the corpus records for it, the
+ *  lexicon definitions, and every occurrence in the corpus paging in beneath.
+ *  Reached from the reader sheet's root link or from a deep link. */
 export default function RootRoute() {
   const params = useLocalSearchParams<{ buckwalter: string }>();
   const theme = useThemeColors();
   const sizes = useArabicSizes();
-  const { uiLocale } = useAppSettings();
+  const { contentLanguage, uiLocale } = useAppSettings();
 
   // Untrusted: a path segment off a deep link. parseRootParam is the same
   // validator the web root page uses -- charset, length cap, and a refusal of
@@ -31,6 +32,7 @@ export default function RootRoute() {
   }, [params.buckwalter]);
 
   const [entry, setEntry] = useState<RootEntry | null>(null);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -41,6 +43,7 @@ export default function RootRoute() {
       // not a root has no business reaching SQLite at all.
       if (!buckwalter) {
         setEntry(null);
+        setTotal(0);
         setLoading(false);
         return;
       }
@@ -49,13 +52,22 @@ export default function RootRoute() {
       try {
         const db = await openCorpusDb();
         const client = createExpoSqliteClient(db as ExpoSqliteLike);
-        const found = await getRootScreen(client, buckwalter);
-        if (!cancelled) setEntry(found);
+        const [found, count] = await Promise.all([
+          getRootScreen(client, buckwalter),
+          getRootOccurrenceCount(client, buckwalter),
+        ]);
+        if (!cancelled) {
+          setEntry(found);
+          setTotal(count);
+        }
       } catch (cause) {
         // Same dead end as a root the corpus does not carry: nothing the
         // reader can act on either way. Logged for logcat.
         console.error('[root] load failed', { buckwalter, cause });
-        if (!cancelled) setEntry(null);
+        if (!cancelled) {
+          setEntry(null);
+          setTotal(0);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -66,6 +78,18 @@ export default function RootRoute() {
       cancelled = true;
     };
   }, [buckwalter]);
+
+  // Above the early returns, as every hook here must be: a render that bails
+  // early would otherwise change the hook order.
+  const loadPage = useCallback(
+    async (offset: number, limit: number) => {
+      if (!buckwalter) return [];
+      const db = await openCorpusDb();
+      const client = createExpoSqliteClient(db as ExpoSqliteLike);
+      return getRootOccurrences(client, buckwalter, contentLanguage, offset, limit);
+    },
+    [buckwalter, contentLanguage],
+  );
 
   if (loading) {
     return (
@@ -87,11 +111,11 @@ export default function RootRoute() {
 
   const { root, forms, definitions } = entry;
 
-  return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: theme.background }}
-      contentContainerStyle={{ padding: 20, gap: 18 }}
-    >
+  // A plain View, not a ScrollView: this is the concordance list's header, and
+  // a scroll view inside a FlatList header is a nested VirtualizedList, which
+  // breaks the scroll rather than nesting it.
+  const header = (
+    <View style={{ padding: 20, gap: 18 }}>
       <Text style={{ color: theme.mutedText, fontSize: typography.caption }}>
         {t(uiLocale, 'word.root')}
       </Text>
@@ -183,6 +207,8 @@ export default function RootRoute() {
           </Text>
         )}
       </View>
-    </ScrollView>
+    </View>
   );
+
+  return <ConcordanceList total={total} loadPage={loadPage} header={header} />;
 }

@@ -5,6 +5,7 @@ import {
   getFrequencyRows,
   getLettersWithRoots,
   getM0WordDetail,
+  getRootOccurrences,
   getRootScreen,
   getRootsForLetter,
   getSurahGlosses,
@@ -611,5 +612,32 @@ describe('getRootsForLetter', () => {
     // Order is the assertion: SQL hands them back أوب, ابل (codepoint order);
     // hijāʾī order compares the *second* radical, ب before و.
     expect(list.map((root) => root.root_arabic)).toEqual(['ابل', 'أوب']);
+  });
+});
+
+describe('getRootOccurrences', () => {
+  it('passes the root, language, offset and limit through to the query', async () => {
+    // Five positional arguments folded into an options object. A swapped
+    // offset/limit renders a plausible page of the wrong occurrences, so the
+    // assertion is on position, not on presence.
+    const statements: { sql: string; args: unknown[] }[] = [];
+    const client: MobileDataClient = {
+      execute: async (statement) => {
+        if (typeof statement !== 'string') statements.push(statement);
+        return { rows: [] };
+      },
+    };
+
+    await getRootOccurrences(client, 'qwl', 'ru', 40, 20);
+
+    expect(statements).toHaveLength(1);
+    const { sql, args } = statements[0]!;
+    // roots.ts builds args as [bw, bw, lang, ...]: the CTE takes the root and
+    // the word_segments scan takes it again, then the gloss join takes lang.
+    expect(args[0]).toBe('qwl');
+    expect(args[2]).toBe('ru');
+    // roots.ts pushes the paging args as (limit, offset), in that order.
+    expect(sql).toContain('LIMIT ? OFFSET ?');
+    expect(args.slice(-2)).toEqual([20, 40]);
   });
 });
