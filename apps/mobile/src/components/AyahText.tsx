@@ -52,9 +52,14 @@ export function AyahText({ textUthmani, words, surahId, ayahNumber, onWordPress 
     fontFamily: 'Hafs',
     fontSize: sizes.reader,
     textAlign: 'right' as const,
-    // textAlign only aligns the block. writingDirection drives the bidi
-    // resolution, which orders markers, digits and punctuation correctly
-    // inside the Arabic run on Android.
+    // textAlign aligns the block. writingDirection is a no-op on Android --
+    // RN 0.86 consumes it only on iOS (no reference to it anywhere under
+    // ReactAndroid/ or textlayoutmanager/platform/android), and Android
+    // resolves paragraph direction from the content instead, via
+    // TextDirectionHeuristics.FIRSTSTRONG_LTR. Arabic is first-strong RTL, so
+    // markers, digits and punctuation come out right regardless; it is kept
+    // for iOS parity and for text that does not start with a strong character.
+    // Do NOT add it expecting it to fix an Android bidi bug.
     writingDirection: 'rtl' as const,
   };
 

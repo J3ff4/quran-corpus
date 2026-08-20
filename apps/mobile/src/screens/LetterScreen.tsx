@@ -105,8 +105,8 @@ export function LetterScreen({ letter }: LetterScreenProps) {
               paddingVertical: 14,
               minHeight: touchTargets.minimum,
               textAlign: 'right',
-              // See AyahText: textAlign places the block, writingDirection
-              // drives the bidi resolution inside the Arabic run.
+              // textAlign places the block; writingDirection is iOS-only
+              // (see AyahText). Android resolves direction from the content.
               writingDirection: 'rtl',
             }}
           >

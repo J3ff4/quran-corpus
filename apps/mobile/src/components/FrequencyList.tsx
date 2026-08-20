@@ -108,8 +108,8 @@ export function FrequencyList({ kind }: FrequencyListProps) {
               color: theme.text,
               fontFamily: 'Hafs',
               fontSize: typography.body,
-              // See AyahText: writingDirection drives the bidi resolution
-              // inside the Arabic run.
+              // writingDirection is iOS-only (see AyahText); Android resolves
+              // direction from the content.
               writingDirection: 'rtl',
             }}
           >

@@ -22,8 +22,8 @@ export function SegmentedWord({ word, segments, fontSize }: SegmentedWordProps) 
     fontFamily: 'Hafs',
     fontSize,
     textAlign: 'right' as const,
-    // See AyahText: textAlign places the block, writingDirection drives the
-    // bidi resolution inside the Arabic run.
+    // textAlign places the block; writingDirection is iOS-only (see AyahText).
+    // Android resolves direction from the content.
     writingDirection: 'rtl' as const,
   };
 

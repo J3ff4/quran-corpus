@@ -66,8 +66,8 @@ export function WbwGrid({ page, uiLocale, onWordPress }: WbwGridProps) {
                 color: theme.text,
                 fontFamily: 'Hafs',
                 fontSize: typography.body * 1.5,
-                // See AyahText: textAlign places the block, writingDirection
-                // drives the bidi resolution inside the Arabic run.
+                // textAlign places the block; writingDirection is iOS-only
+                // (see AyahText). Android resolves direction from content.
                 writingDirection: 'rtl',
               }}
             >
