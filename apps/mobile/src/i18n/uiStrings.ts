@@ -53,6 +53,11 @@ export type UiStringKey =
   | 'root.definitions'
   | 'root.noDefinition'
   | 'root.notFound'
+  | 'lemma.notFound'
+  // Caption above a lemma's top glosses: contextual word-by-word
+  // translations, not a definition -- see LemmaScreen and text/gloss.ts.
+  // No 'lemma.root': 'word.root' is already "Root" in all three locales.
+  | 'lemma.translatedAs'
   | 'surahList.ayahsSuffix'
   | 'surahList.loadFailed'
   | 'settings.language'
@@ -161,6 +166,8 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'root.definitions': 'Definitions',
     'root.noDefinition': 'No definition for this root yet',
     'root.notFound': 'That root is not in the corpus',
+    'lemma.notFound': 'This lemma is not in the corpus',
+    'lemma.translatedAs': 'Translated as',
     'surahList.ayahsSuffix': 'ayahs',
     'surahList.loadFailed': 'Unable to load surahs',
     'settings.language': 'Language',
@@ -258,6 +265,8 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'root.definitions': 'Ta‘riflar',
     'root.noDefinition': 'Bu o‘zak uchun hali ta‘rif yo‘q',
     'root.notFound': 'Bu o‘zak korpusda yo‘q',
+    'lemma.notFound': 'Bu lemma korpusda yo‘q',
+    'lemma.translatedAs': 'Tarjimasi',
     'surahList.ayahsSuffix': 'oyat',
     'surahList.loadFailed': 'Suralarni yuklab bo‘lmadi',
     'settings.language': 'Til',
@@ -355,6 +364,8 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'root.definitions': 'Определения',
     'root.noDefinition': 'Для этого корня пока нет определения',
     'root.notFound': 'Этого корня нет в корпусе',
+    'lemma.notFound': 'Этой леммы нет в корпусе',
+    'lemma.translatedAs': 'Переводится как',
     'surahList.ayahsSuffix': 'аятов',
     'surahList.loadFailed': 'Не удалось загрузить суры',
     'settings.language': 'Язык',
