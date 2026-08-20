@@ -1796,7 +1796,10 @@ Evidence differs per claim; none of it is carried over from prior narrative.
   route handlers keep validating raw, since Next decodes query strings but not
   path segments. `%` is outside the Buckwalter charset, which is what makes the
   single decode provably non-aliasing. **§5 passed on its own merits, no
-  override.** Three rounds: `e49e67a` generated no findings but failed the
+  override.** ⚠️ **This rule is web-only and does not port.** expo-router decodes
+  every param before a route sees it, so mobile validates the raw segment with the
+  charset predicates instead — see M4's `e9ee9fc`, where copying web's rule across
+  had made `/root/qa%2541la` resolve to `qaAla`. Three rounds: `e49e67a` generated no findings but failed the
   `Client Bundle Stays Clean` pre-merge check on seven pre-existing `'use
   client'` files the PR never touched (fixed separately in #66, then rebased);
   `0d6a327` cleared that check and returned CHANGES_REQUESTED on this file's own
@@ -2749,18 +2752,27 @@ PR **#5** on `J3ff4/quran-corpus` — **MERGED** `da9a694` (this file said "open
 owed). M2 and M4 are local transcripts only. Neither repo has ever had CI, so the
 smoke checklists in `README.md` are the sole device gate — CLAUDE.md §10.
 
-Gate as of 2026-08-20 at `9a47500`: type-check 6/6, lint 2/2, test 6/6 uncached,
-**1198 tests** across 165 files (data 329, web 481, mobile 376, mobile-data 12).
+Gate as of 2026-08-20 on `main` at `e8d43e7`: type-check 6/6, lint 2/2, test 6/6
+uncached, **1207 tests** across 165 files (data 329, web 481, mobile 385,
+mobile-data 12).
 
-### M4 dictionary + search — CODE COMPLETE, DEVICE GATE UNRUN (2026-08-20)
+### M4 dictionary + search — MERGED TO MAIN, DEVICE GATE UNRUN (2026-08-20)
 
-Branch `feat/m3-morphology` (M3 and M4 share it), **92 commits ahead of `main`, not
-merged, no PR opened.** M4 is `1d9a6ed..9a47500`, 26 commits. Plan
+**PR #14 MERGED** 2026-08-20 20:55Z, merge commit `e8d43e7` (a merge commit, not a
+squash — 98 commits across two milestones, and squashing would have discarded the
+per-task rationale in their bodies). Branch `feat/m3-morphology` deleted local and
+remote. Verified with `gh pr view 14 --json mergedAt,mergeCommit`,
+`git merge-base --is-ancestor f82cfa9 main` and
+`git cat-file -e main:apps/mobile/app/lemma/[lemma].tsx` — not from the PR
+narrative (§14). M4 is `1d9a6ed..9a47500` plus Task 9 and the review fixes. Plan
 `docs/plans/phase-m4-dictionary-search.md`, spec
 `docs/superpowers/specs/2026-08-18-m4-dictionary-search-design.md`.
 
-🔴 **M4 IS NOT DONE.** Its Verification Log records every check 28-38 as
-`unexercised`. Nine tasks of code have never run on hardware.
+🔴 **M4 IS STILL NOT DONE, and merging did not make it done.** Its Verification Log
+records every check 28-38 as `unexercised`. Nine tasks of code have never run on
+hardware. The owner chose "merge now, gate after" on 2026-08-20 with §10's conflict
+stated first; any device defect is now a fix commit on `main`, not a change to a
+branch.
 
 What landed, task by task:
 1. `ecc163f` — five tabs (Home · Read · Morphology · Dictionary · Menu); Bookmarks
@@ -2775,19 +2787,70 @@ What landed, task by task:
 6. `6dda5ce`/`f8e0fea`/`2d41084` — Frequent pane: roots, lemmas, verbs.
 7. `95af9e4`/`1172bc0`/`95dc6fe` — the root screen's paged concordance.
 8. `be8f0f2`/`9a47500` — the lemma screen and its concordance.
+9. `4220ded` — README checks 28-38, both Verification Logs, this file. Titled "add
+   the verification log", not the plan's "record the run": no run happened, and the
+   alternative wording is the exact §14 failure mode.
 
-**§5 review debt, three stretches, carried to the whole-branch review:** the waived
-gate over `0b96752..cc61f60` (a `packages/data` widening AND a route-param
-validator — two triggers), Task 5's fix round, and Task 6's fix round plus its role
-correction. Recorded here rather than left implicit.
+**Whole-branch review, `main...4220ded`, 2026-08-20.** Ran inline by the controller,
+not dispatched. Nine findings, **each proven by a runnable probe or a real source
+mutation, never by a read.** Five fixed in `e9ee9fc..f82cfa9`, every fix
+mutation-checked (delete the fix, watch a named test fail, restore from a scratchpad
+copy — never `git checkout`):
+- `e9ee9fc` — **route params were decoded twice.** expo-router runs
+  `decodeURIComponent` over every `useLocalSearchParams` value (expo-router 57,
+  `build/hooks/useLocalSearchParams.js:26,36`), and the routes then called
+  `packages/data`'s decode-then-validate parsers, so `/root/qa%2541la` resolved to
+  `qaAla` and served a real root under a segment web answers 404 for.
+  `buckwalter.ts` documents that refusal as a property of the validator; it did not
+  hold on mobile. `./mobile` now exports the charset predicates and **not** the
+  parsers; `routeParams.ts` wraps them and folds in the array/undefined guard, so
+  every validator there takes the same `string | string[] | undefined`. Both route
+  suites had been pinning percent-encoded fixtures — a path production cannot
+  produce — and are repointed, with the still-encoded case asserted as a rejection.
+  Mutation: 4 tests fail.
+- `290ba08` — **a concordance page failing after the first was silent.** `failed`
+  was reachable only through `ListEmptyComponent`, which renders only on an empty
+  list, so a mid-list break just stopped the list growing — indistinguishable from
+  reaching the end. 40 of 60 occurrences unreachable, no signal. Status node now
+  fills the footer slot too. Mutation: 1 fails.
+- `80c49f4` — **`2d41084`'s `accessibilityRole="toolbar"` was unprotected.**
+  Mutating it back to `radiogroup` passed all 376 mobile tests; the suite had zero
+  role assertions, and `toolbar`, `link`, `list` and `tab` were unasserted anywhere
+  in `apps/mobile`. Mutation now: 1 fails.
+- `5179fc5` — `SurahRoute`'s mock dropped `loadWords`, leaving real route logic
+  uncovered. Mutation: 1 fails.
+- `f82cfa9` — six `writingDirection` comments claimed Android behaviour RN 0.86 does
+  not have (iOS-only prop; Android uses `TextDirectionHeuristics.FIRSTSTRONG_LTR`,
+  `TextLayoutManager.kt:194`). Comments only, no runtime change.
+
+**Declined, with cost-if-wrong:** `encodeURIComponent` duplicated at 9 link sites
+(real §3 DRY, but a 9-file refactor with no defect behind it; cost = a future link
+site forgets to encode and one root 404s) · two suites mounting
+`app/root/[buckwalter]` (deleting either loses assertions the other lacks) · three
+pass-through wrappers in `corpusRepository` (deletion touches every caller and their
+suites to remove three lines; cost = nil).
+
+**§5 review debt, WAIVED BY THE OWNER for this branch** (2026-08-20: 98 commits is
+too large to be a useful review unit). Three stretches carry it: the waived gate
+over `0b96752..cc61f60` (a `packages/data` widening AND a route-param validator —
+two triggers), Task 5's fix round, and Task 6's fix round plus its role correction.
+`e9ee9fc` adds a fourth: it edits `packages/data/src/mobile.ts`, a §5 trigger,
+though it changes an entry point's export list rather than schema or a query. All
+four are on `main` now, unreviewed. Recorded rather than left implicit.
 
 **Process finding worth keeping.** Task 8's review caught a defect that seventeen
 combined mutations had missed: the test's `ConcordanceList` mock destructured
 `total` and `header` but not `loadPage`, so the screen's paged query was never
 called and its whole call contract was untested. Every mutation on both sides
 targeted rendered output, and `loadPage` renders nothing. **A component mock that
-drops a function prop silently deletes that prop's coverage.** Sweep the other
-component mocks in `apps/mobile/src` at the branch review.
+drops a function prop silently deletes that prop's coverage.** Swept at the branch
+review: the class was **not** confined to that one mock. `SurahRoute`'s
+`SurahReader` mock dropped six props including `loadWords` (fixed `5179fc5`);
+`ConcordanceList`'s `FlatList` mock dropped `ListFooterComponent`, which is why no
+test in that file could have caught the mid-list failure (fixed `290ba08`);
+`SurahsTab`'s `SurahList` mock drops `uiLocale` (left); and `SurahRoute.test.tsx`
+mocked `@/components/LanguageSelector`, which the route does not import at all
+(deleted).
 
 **Also worth keeping:** `pnpm test` can print full pass counts off a `FULL TURBO`
 cache replay. Only `--force` (`Cached: 0 cached`) proves a run happened.
@@ -2805,7 +2868,8 @@ picker, and any treebank surface.
 
 ### M3 morphology MVP — DEVICE GATE PART-RUN, RUN 3 OWED (2026-08-18)
 
-Same branch. Plan `docs/plans/phase-m3-morphology-mvp.md`, which holds the log.
+Same branch, merged in the same PR #14 / `e8d43e7`. Plan
+`docs/plans/phase-m3-morphology-mvp.md`, which holds the log.
 
 - **Run 1**, 2026-08-17, build `bac194d4` at `9421560`: all 22 checks PASS, one
   finding — the word sheet's spring, rejected outright by the owner rather than
@@ -2821,7 +2885,8 @@ Same branch. Plan `docs/plans/phase-m3-morphology-mvp.md`, which holds the log.
     moving there. Fixed `9dee3a5`.
 - **Run 3 is owed** and now folded into M4's build (owner's decision 2026-08-18):
   F5, F6, check 27 (Русский basmala under TalkBack) and the M2 rosette carry-over
-  ride along with checks 28-38.
+  ride along with checks 28-38. All of it is on `main` as of `e8d43e7`, so the build
+  comes off `main`, not a branch.
 
 **§5 override on this phase:** the owner waived the `/code-review` pass over M3b
 Tasks 7 and 8 (`37ae2d7`, `a137e9f`), which write the on-device user DB. Third such
@@ -2926,7 +2991,8 @@ DONE (`e1c305a`): both link forms pass the ayah, the route validates it, and
 
 ### Blocked on user
 - APK: needs interactive `eas login`, then `eas build -p android --profile preview`.
-  🔴 **Build at `9a47500` or later.** Anything older has no `app/lemma/[lemma].tsx`,
+  Cut it from **`main` at `e8d43e7` or later** now that PR #14 has merged.
+  🔴 **Build at `f82cfa9` or later.** Anything older has no `app/lemma/[lemma].tsx`,
   so M4 check 35's Lemmas and Verbs rows dead-end for a reason unrelated to the code
   under test. Confirm the EAS upload is ~43 MB — ~5 MB means `.easignore` dropped the
   bundled DB and every check fails for the wrong reason.
