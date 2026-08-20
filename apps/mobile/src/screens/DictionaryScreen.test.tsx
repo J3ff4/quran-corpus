@@ -101,6 +101,25 @@ describe('DictionaryScreen', () => {
     expect(screen.getByTestId('frequency-kind-verbs').getAttribute('aria-selected')).toBe('true');
   });
 
+  it('announces the chips as a labelled toolbar of buttons, not a radio group', async () => {
+    await renderLoaded();
+    fireEvent.click(screen.getByTestId('dictionary-pane-frequent'));
+
+    // These are Material filter chips: buttons carrying a selected state.
+    // `radiogroup` claims radio children they deliberately are not, and it was
+    // the shipped role until 2d41084 -- which no test could have caught, since
+    // nothing in this suite asserted a role at all.
+    const toolbar = screen.getByRole('toolbar');
+    expect(toolbar.getAttribute('aria-label')).toBe('Filter by kind');
+    expect(screen.queryAllByRole('radio')).toHaveLength(0);
+    for (const kind of ['roots', 'lemmas', 'verbs']) {
+      expect(screen.getByTestId(`frequency-kind-${kind}`).getAttribute('role')).toBe('button');
+    }
+    // The two pills above are the tabs. The chips filtering one list must not
+    // also read as tabs, or TalkBack announces five tabs across two groupings.
+    expect(screen.getAllByRole('tab')).toHaveLength(2);
+  });
+
   it('puts a working search button in the header', async () => {
     await renderLoaded();
 
