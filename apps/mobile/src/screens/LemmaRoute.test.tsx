@@ -57,5 +57,7 @@ describe('LemmaRoute', () => {
     // parseLemmaParam(['qAl','mA'] as unknown as string) joins to "qAl,mA",
     // which also passes the Buckwalter charset test (',' is in it).
     expect(forwarded).not.toBe('qAl,mA');
+    // The array guard must take the first segment, not just avoid the join.
+    expect(forwarded).toBe('qAl');
   });
 });

@@ -14,22 +14,39 @@ vi.mock('@/data/corpusRepository', () => ({
 }));
 vi.mock('@/data/openCorpusDb', () => ({ openCorpusDb: () => Promise.resolve({}) }));
 vi.mock('@quran-corpus/mobile-data', () => ({ createExpoSqliteClient: () => ({}) }));
+// contentLanguage deliberately not 'en': loadPage takes a hardcoded 'en' and
+// every assertion below still passes, so this pins down that the value
+// actually came from settings. uiLocale stays 'en' -- other tests assert
+// English UI strings.
 vi.mock('@/settings/settingsStore', () => ({
-  useAppSettings: () => ({ uiLocale: 'en', contentLanguage: 'en', arabicScale: 'medium' }),
+  useAppSettings: () => ({ uiLocale: 'en', contentLanguage: 'ru', arabicScale: 'medium' }),
 }));
 
 // Stubbed to the props LemmaScreen hands it: this suite is about what the
 // screen renders and forwards, and ConcordanceList's own paging has its own
-// suite.
+// suite. loadPage is driven from an effect, same as RootRoute.test.tsx, so
+// LemmaScreen's paged query actually runs instead of sitting unexercised.
 vi.mock('@/components/ConcordanceList', async () => {
   const React = await import('react');
   return {
-    ConcordanceList: ({ total, header }: { total: number; header: React.ReactElement }) =>
-      React.createElement(
+    ConcordanceList: ({
+      total,
+      loadPage,
+      header,
+    }: {
+      total: number;
+      loadPage: (offset: number, limit: number) => Promise<unknown[]>;
+      header: React.ReactElement;
+    }) => {
+      React.useEffect(() => {
+        void loadPage(0, 20);
+      }, [loadPage]);
+      return React.createElement(
         'div',
         { 'data-testid': 'concordance', 'data-total': String(total) },
         header,
-      ),
+      );
+    },
   };
 });
 
@@ -98,6 +115,42 @@ describe('LemmaScreen', () => {
       expect(node).not.toBeNull();
       expect(node?.getAttribute('data-total')).toBe('1722');
     });
+
+    // The root Stack renders a blank nav title (see app/_layout.tsx), so this
+    // heading is the only thing on screen that names the lemma for TalkBack's
+    // heading navigation. `header` is RN's spelling of the heading role.
+    expect(screen.getByText('قَالَ').getAttribute('role')).toBe('header');
+  });
+
+  it('loads the concordance page in the reader\'s content language', async () => {
+    mocks.getLemmaScreen.mockResolvedValue({
+      entry: {
+        lemma: 'قَالَ',
+        lemma_buckwalter: 'qAl',
+        transliteration: null,
+        root_buckwalter: 'qwl',
+        count: 3,
+        senses: [],
+        top_glosses: [],
+        root_definition: null,
+        root_definition_source: null,
+      },
+      total: 1722,
+    });
+
+    render(<LemmaScreen lemmaBuckwalter="qAl" />);
+
+    // Settings mocks 'ru', not 'en': a loadPage that hardcodes 'en' would
+    // still pass a version of this assertion pinned to 'en'.
+    await waitFor(() =>
+      expect(mocks.getLemmaOccurrences).toHaveBeenCalledWith(
+        expect.anything(),
+        'qAl',
+        'ru',
+        0,
+        20,
+      ),
+    );
   });
 
   it('labels the top glosses as translations, not as the lemma meaning', async () => {

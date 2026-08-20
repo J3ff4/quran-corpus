@@ -101,6 +101,7 @@ export function LemmaScreen({ lemmaBuckwalter }: LemmaScreenProps) {
   const header = (
     <View style={{ padding: 20, gap: 12 }}>
       <Text
+        accessibilityRole="header"
         style={{
           color: theme.text,
           fontFamily: 'Hafs',
