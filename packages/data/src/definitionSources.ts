@@ -2,9 +2,12 @@
  * Names for `root_definitions.source` tags, as credited on /about.
  *
  * The tag is a database identifier; the label is a licence obligation (§11),
- * and both the root page and the lemma page render the same definition text,
- * so the two must credit it identically. Shared for that reason — when a new
- * source is imported it needs one entry here, not one per page.
+ * and the web root page, the web lemma page and the mobile root screen all
+ * render the same definition text, so all three must credit it identically.
+ * Shared for that reason — when a new source is imported it needs one entry
+ * here, not one per page. It lives in packages/data rather than in either app
+ * because it is the credit for a `root_definitions` column, and CLAUDE.md §2
+ * is explicit about what a second copy costs.
  */
 /* A Map, not an object literal: `source` is a DB column, so `constructor`,
    `toString` and `__proto__` are reachable keys, and a plain index lookup

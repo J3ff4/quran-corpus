@@ -4,7 +4,7 @@ import { ConcordanceSection } from './ConcordanceSection';
 import { EntryHeader } from './EntryHeader';
 import { ClampedText } from '../ui/ClampedText';
 import { rootPath } from '../../lib/routes';
-import { definitionSourceLabel } from '../../lib/definitionSources';
+import { definitionSourceLabel } from '@quran-corpus/data/client';
 
 interface RootEntryProps {
   entry: RootEntryT;

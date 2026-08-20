@@ -4,7 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MobileDataClient } from '@quran-corpus/mobile-data';
 import { createMemoryUserClient } from '../data/userRepository.testHelpers';
 import { getSetting, saveSetting } from '../data/userRepository';
-import { AppSettingsProvider, useAppSettings, type AppSettingsContextValue } from './settingsStore';
+import {
+  AppSettingsProvider,
+  loadPersistedAppSettings,
+  useAppSettings,
+  type AppSettingsContextValue,
+} from './settingsStore';
 import { deferred } from '../testing/deferred';
 
 const mocks = vi.hoisted(() => ({
@@ -363,6 +368,55 @@ describe('AppSettingsProvider', () => {
       await expect(getSetting(userClient, 'theme')).resolves.toBe('dark');
     });
     expect(flakyClient.settingWriteAttempts()).toBe(2);
+  });
+});
+
+describe('loadPersistedAppSettings', () => {
+  beforeEach(() => {
+    mocks.userClient = createMemoryUserClient();
+  });
+
+  it('round-trips a chosen Arabic step', async () => {
+    const userClient = requireSettingsClient();
+    await saveSetting(userClient, 'arabicScale', 'large');
+
+    const settings = await loadPersistedAppSettings(userClient);
+
+    expect(settings.arabicScale).toBe('large');
+  });
+
+  it('rejects a stored arabicScale that is not a step', async () => {
+    // Straight into a font size if it got through, and RN throws on NaN.
+    const userClient = requireSettingsClient();
+    await saveSetting(userClient, 'arabicScale', 'enormous');
+
+    const settings = await loadPersistedAppSettings(userClient);
+
+    expect(settings.arabicScale).toBe('medium');
+  });
+
+  it('reads reduceMotion as on only for the exact stored "true"', async () => {
+    // String(false) is 'false', which is truthy. This setting gates every
+    // animation in the app, so a stored off must not read as on.
+    const userClient = requireSettingsClient();
+    await saveSetting(userClient, 'reduceMotion', 'false');
+
+    await expect(loadPersistedAppSettings(userClient)).resolves.toMatchObject({ reduceMotion: false });
+
+    await saveSetting(userClient, 'reduceMotion', 'true');
+
+    await expect(loadPersistedAppSettings(userClient)).resolves.toMatchObject({ reduceMotion: true });
+  });
+
+  it('rejects an arabicScale that only names a property of Object.prototype', async () => {
+    // `value in arabicScales` would accept this and hand `toString` to the
+    // multiply, which is NaN. Object.hasOwn is why it does not.
+    const userClient = requireSettingsClient();
+    await saveSetting(userClient, 'arabicScale', 'toString');
+
+    const settings = await loadPersistedAppSettings(userClient);
+
+    expect(settings.arabicScale).toBe('medium');
   });
 });
 

@@ -732,15 +732,15 @@ pnpm test
 
 Expected: all pass across every package.
 
-- [ ] **Step 2: Build the APK**
+- [x] **Step 2: Build the APK**
 
 EAS build, Expo account `ihorsherbyna`, project `quran-corpus-mobile`. `apps/mobile/assets/db/quran.db` must be present before the build — it is generated, not committed. A ~43 MB upload confirms the DB went with it; ~5 MB means `.easignore` dropped it.
 
-- [ ] **Step 3: Install as a fresh sideload**
+- [x] **Step 3: Install as a fresh sideload**
 
 **Uninstall the M1 build first.** `react-native-svg` is a native module — this is not an OTA, and leftover app storage from the previous APK can make a clean build look broken.
 
-- [ ] **Step 4: Run the checklist**
+- [x] **Step 4: Run the checklist**
 
 The README M1 smoke checklist, plus the M2-specific items:
 
@@ -761,11 +761,11 @@ The README M1 smoke checklist, plus the M2-specific items:
   pass and every icon renders wrong. Static review cannot close this one.
 - The two checks still unrun from M1, which this build finally closes: reader in airplane mode, and switching UI locale independently of content language.
 
-- [ ] **Step 5: Record the result**
+- [x] **Step 5: Record the result**
 
 Fill in the verification log below — build ID, commit SHA, and per-item PASS/FAIL. A FAIL means a fix and a new build, not a footnote.
 
-- [ ] **Step 6: Commit the log**
+- [x] **Step 6: Commit the log**
 
 ```bash
 git add docs/plans/phase-m2-design-foundation.md
@@ -776,7 +776,52 @@ git commit -m "docs(mobile): record the M2 on-device verification run"
 
 ## Verification Log (on-device)
 
-_To be filled in by Task 6. Format follows `docs/plans/phase-m1-real-offline-reader.md`: one block per run, with build ID, commit, and a PASS/FAIL line per checklist item. Unexercised checks are stated as unexercised, never implied to have passed._
+### Run 1 — 2026-08-16, EAS build `49e4a81f` at commit `ade3e80` (preview APK, physical Android)
+
+Upload was 43.3 MB, so the bundled DB went with it. Installed as a fresh sideload
+over an uninstalled M1 build, per step 3.
+
+| Check | Result |
+| --- | --- |
+| `react-native-svg` renders at all (no blank boxes) | PASS |
+| All four tabs show an icon, not tofu — light mode | PASS |
+| All four tabs show an icon, not tofu — dark mode | PASS |
+| Icons follow the theme: active in accent, inactive in muted | PASS |
+| Ayah numbers render the rosette in the reader, both themes | PASS |
+| Rosette outline and tab strokes inherit correctly under real `react-native-svg` | PASS — the inheritance the mocked DOM `<svg>` could not prove |
+| Reader in airplane mode (M1 carry-over) | PASS |
+| UI locale switches independently of content language (M1 carry-over) | PASS |
+| **System font size at maximum, Al-Baqarah past ayah 100** | **FAIL** — three digits touch the rosette border |
+
+Everything M2 added rendered. The one failure is the item the plan flagged as
+"the only real guard" on `d27a17f`, and it failed exactly where predicted: the
+box scales with `fontScale`, but the notched star has no flat side for the digits
+to grow into, so at maximum system font size a three-digit number ran into the
+border. Al-Baqarah reaches 286, so three digits is the widest case there is.
+
+Fixed in `b795975`: the number shrinks 10% for `n >= 100` and every other verse
+keeps full size. Growing the box was rejected — it pushes the marker into the
+ayah text beside it. A unit test now pins both halves of that branch
+(`AyahMedallion.test.tsx`), mutation-checked in each direction; jsdom still has
+no layout engine, so the test guards the rule, not the pixels.
+
+**Not exercised on device.** Nothing below has been run on hardware for M2, and
+none of it may be read as passing:
+
+- The three-digit fix itself. A second build was started and **cancelled** — the
+  owner's call, 2026-08-16: one cosmetic fix does not justify a build cycle. It
+  rides the next APK and re-checks there.
+- README steps 11 and 13–14 — bookmark persistence across a restart, ayah audio
+  online, and the offline Play-tap message. Untouched by M2 and last verified in
+  M1 Run 2; not re-run here.
+- Web. M2 changed `apps/web` only through the shared palette import, and the web
+  medallion was deliberately left alone: its box and its number are both
+  rem-based, so they scale together and it has no equivalent failure mode.
+
+### Run 2 — pending
+
+Re-check on the next APK built from `b795975` or later: system font size to
+maximum, Al-Baqarah past ayah 100, three digits fully inside the rosette.
 
 ---
 

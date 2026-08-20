@@ -13,6 +13,17 @@ describe('@quran-corpus/data/mobile', () => {
     expect(typeof mod.getWordDetail).toBe('function');
     expect(typeof mod.getTranslationsBySurahAndLang).toBe('function');
     expect(typeof mod.search).toBe('function');
+    expect(typeof mod.getLemmaEntry).toBe('function');
+    expect(typeof mod.getLemmaConcordancePage).toBe('function');
+    expect(typeof mod.countLemmaConcordance).toBe('function');
+    expect(typeof mod.getLemmaFrequency).toBe('function');
+    expect(typeof mod.getVerbConcordance).toBe('function');
+    expect(typeof mod.isLemmaBuckwalter).toBe('function');
+    expect(typeof mod.isRootBuckwalter).toBe('function');
+    // Deliberately absent: they decode, and expo-router has already decoded.
+    // See the note on the buckwalter re-export in src/mobile.ts.
+    expect('parseLemmaParam' in mod).toBe(false);
+    expect('parseRootParam' in mod).toBe(false);
   });
 
   it('does not export node/libsql runtime helpers', async () => {

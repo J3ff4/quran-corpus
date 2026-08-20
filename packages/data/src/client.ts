@@ -7,6 +7,7 @@
 export { EMPTY_SEARCH_RESULT } from './constants.js';
 export { ayahAudioUrl, AYAH_AUDIO_ATTRIBUTION, AYAH_AUDIO_ORIGIN, AYAH_AUDIO_RECITER } from './audio.js';
 export { CONCORDANCE_PAGE_SIZE } from './queries/concordance.js';
+export { definitionSourceLabel } from './definitionSources.js';
 export {
   buckwalterToArabic,
   compareRootsArabic,
@@ -17,6 +18,8 @@ export {
 export { trimConcordanceVerse } from './text/concordanceTrim.js';
 export type { TrimmedVerse } from './text/concordanceTrim.js';
 export { isSajdahAyah } from './text/sajdah.js';
+export { alignAyahTokens, splitBasmala, type AyahToken } from './text/ayahTokens.js';
+export { posBucket, type PosBucket } from './morphology/buckets.js';
 export { decodeSegment, posLabelEn } from './morphology/decode.js';
 
 // All of them, not a curated subset. `types.ts` is a pure declaration file with

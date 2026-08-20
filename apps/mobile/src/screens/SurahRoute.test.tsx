@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   recordReadingPosition: vi.fn(),
   uiLocale: 'en',
   getSurahReader: vi.fn(),
+  getWordsForAyah: vi.fn(),
 }));
 
 vi.mock('expo-router', () => ({
@@ -28,20 +29,17 @@ vi.mock('@/audio/ayahAudio', () => ({
   }),
 }));
 
-vi.mock('@/components/LanguageSelector', async () => {
-  const React = await import('react');
-  return {
-    LanguageSelector: () => React.createElement('div', null, 'language-selector'),
-  };
-});
-
 vi.mock('@/components/SurahReader', async () => {
   const React = await import('react');
   return {
-    SurahReader: ({ onToggleBookmark, onReadingAyah, bookmarkedAyahs }: {
+    // `loadWords` is destructured and driven, not dropped: a function prop a
+    // mock omits renders nothing, so no assertion in this file could ever see
+    // it and the route's own loader would sit unexercised (F1).
+    SurahReader: ({ onToggleBookmark, onReadingAyah, bookmarkedAyahs, loadWords }: {
       onToggleBookmark: (ayahNumber: number) => void;
       onReadingAyah?: (ayahNumber: number) => void;
       bookmarkedAyahs: Set<number>;
+      loadWords: (ayahId: number) => Promise<unknown[]>;
     }) =>
       React.createElement(
         'div',
@@ -51,6 +49,7 @@ vi.mock('@/components/SurahReader', async () => {
         React.createElement('button', { onClick: () => onToggleBookmark(255) }, 'bookmark'),
         React.createElement('button', { onClick: () => onToggleBookmark(257) }, 'bookmark other'),
         React.createElement('button', { onClick: () => onReadingAyah?.(256) }, 'read ayah'),
+        React.createElement('button', { onClick: () => void loadWords(8) }, 'open word sheet'),
       ),
   };
 });
@@ -75,6 +74,7 @@ const readerFixture = {
 
 vi.mock('@/data/corpusRepository', () => ({
   getSurahReader: (...args: unknown[]) => mocks.getSurahReader(...args),
+  getWordsForAyah: (...args: unknown[]) => mocks.getWordsForAyah(...args),
 }));
 
 vi.mock('@/data/userRepository', () => ({
@@ -111,6 +111,8 @@ describe('SurahRoute', () => {
     mocks.uiLocale = 'en';
     mocks.getSurahReader.mockReset();
     mocks.getSurahReader.mockResolvedValue(readerFixture);
+    mocks.getWordsForAyah.mockReset();
+    mocks.getWordsForAyah.mockResolvedValue([]);
   });
 
   it('retranslates a load failure when the UI language changes', async () => {
@@ -208,5 +210,17 @@ describe('SurahRoute', () => {
     fireEvent.click(screen.getByText('read ayah'));
     await waitFor(() => expect(screen.getByText('Unable to save reading position')).toBeTruthy());
     expect(screen.getByText('Unable to update bookmark')).toBeTruthy();
+  });
+
+  it('loads a tapped ayah\'s words through the corpus client it opened', async () => {
+    render(<SurahRoute />);
+    await screen.findByText('reader-content');
+
+    fireEvent.click(screen.getByText('open word sheet'));
+
+    // The client, not undefined: `loadWords` closes over the client the reader
+    // effect opened, and a route that hands the sheet a loader with no client
+    // returns an empty word list on every tap -- an ayah that opens to nothing.
+    await waitFor(() => expect(mocks.getWordsForAyah).toHaveBeenCalledWith({}, 8));
   });
 });

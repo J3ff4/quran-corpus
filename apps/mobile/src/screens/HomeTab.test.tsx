@@ -43,6 +43,15 @@ vi.mock('react-native', async () => {
   const React = await import('react');
   return {
     ActivityIndicator: () => React.createElement('span', null, 'loading'),
+    Pressable: ({
+      children,
+      onPress,
+      testID,
+    }: {
+      children?: React.ReactNode;
+      onPress?: () => void;
+      testID?: string;
+    }) => React.createElement('button', { onClick: onPress, 'data-testid': testID }, children),
     Text: ({ children }: { children?: React.ReactNode }) => React.createElement('span', null, children),
     View: ({ children }: { children?: React.ReactNode }) => React.createElement('div', null, children),
   };

@@ -1,9 +1,11 @@
 import { Pressable, Text, View } from 'react-native';
+import type { Word } from '@quran-corpus/data/mobile';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
 import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { AyahMedallion } from './AyahMedallion';
+import { AyahText } from './AyahText';
 
 const pressableStyle = {
   minHeight: touchTargets.minimum,
@@ -13,8 +15,11 @@ const pressableStyle = {
 } as const;
 
 export interface AyahCardProps {
+  surahId: number;
   ayahNumber: number;
   arabicText: string;
+  /** Empty until the reader has fetched this ayah's words; see AyahText. */
+  words: Word[];
   translationText: string | null;
   bookmarked: boolean;
   playing: boolean;
@@ -22,11 +27,14 @@ export interface AyahCardProps {
   audioDisabled?: boolean;
   onToggleBookmark: (ayahNumber: number) => void;
   onToggleAudio: (ayahNumber: number) => void;
+  onWordPress: (word: Word) => void;
 }
 
 export function AyahCard({
+  surahId,
   ayahNumber,
   arabicText,
+  words,
   translationText,
   bookmarked,
   playing,
@@ -34,6 +42,7 @@ export function AyahCard({
   audioDisabled = false,
   onToggleBookmark,
   onToggleAudio,
+  onWordPress,
 }: AyahCardProps) {
   const theme = useThemeColors();
   return (
@@ -77,20 +86,15 @@ export function AyahCard({
           </Pressable>
         </View>
       </View>
-      <Text
-        style={{
-          color: theme.text,
-          fontFamily: 'Hafs',
-          fontSize: typography.arabicReader,
-          textAlign: 'right',
-          // textAlign only aligns the block. writingDirection drives the bidi
-          // resolution, which is what orders ayah markers, digits and
-          // punctuation correctly inside the Arabic run on Android.
-          writingDirection: 'rtl',
-        }}
-      >
-        {arabicText}
-      </Text>
+      {/* The basmala banner is AyahText's: it renders only when the alignment
+          actually pulled the basmala out of the ayah's run. */}
+      <AyahText
+        textUthmani={arabicText}
+        words={words}
+        surahId={surahId}
+        ayahNumber={ayahNumber}
+        onWordPress={onWordPress}
+      />
       {translationText ? <Text style={{ color: theme.text, fontSize: typography.body }}>{translationText}</Text> : null}
     </View>
   );

@@ -3,6 +3,7 @@ import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } fr
 import { contentLanguages, uiLocales, type ContentLanguageCode, type UiLocaleCode } from '../i18n/languages';
 import { openUserDb } from '../data/userDb';
 import { getSetting, saveSetting } from '../data/userRepository';
+import { arabicScales, type ArabicScale } from '../theme/tokens';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 
@@ -11,6 +12,8 @@ export interface AppSettings {
   contentLanguage: ContentLanguageCode;
   theme: ThemePreference;
   analyticsEnabled: boolean;
+  arabicScale: ArabicScale;
+  reduceMotion: boolean;
 }
 
 export interface AppSettingsContextValue extends AppSettings {
@@ -18,6 +21,8 @@ export interface AppSettingsContextValue extends AppSettings {
   setContentLanguage: (language: ContentLanguageCode) => void;
   setTheme: (theme: ThemePreference) => void;
   setAnalyticsEnabled: (enabled: boolean) => void;
+  setArabicScale: (scale: ArabicScale) => void;
+  setReduceMotion: (reduce: boolean) => void;
   /** Set while the settings database cannot be opened, so a screen can say so
    *  instead of letting changes look saved when nothing is being persisted. */
   storageError: string | null;
@@ -28,6 +33,8 @@ const defaultSettings: AppSettings = {
   contentLanguage: 'en',
   theme: 'system',
   analyticsEnabled: false,
+  arabicScale: 'medium',
+  reduceMotion: false,
 };
 
 const AppSettingsContext = createContext<AppSettingsContextValue | null>(null);
@@ -37,7 +44,14 @@ const AppSettingsContext = createContext<AppSettingsContextValue | null>(null);
 // second source of truth for the same thing. It was persisted but read by
 // nothing and never surfaced in Settings, so no installed build can have a
 // stored value to migrate.
-const settingKeys = ['uiLocale', 'contentLanguage', 'theme', 'analyticsEnabled'] as const;
+//
+// arabicScale is NOT that setting coming back. fontScale duplicated the OS
+// control, which scales every <Text> alike. This one scales the Arabic
+// *relative to* the UI text, which is the one ratio the OS control cannot
+// change -- the owner's report was that the Arabic dominated the card at any
+// system size. System scaling still composes on top; nothing here sets
+// allowFontScaling.
+const settingKeys = ['uiLocale', 'contentLanguage', 'theme', 'analyticsEnabled', 'arabicScale', 'reduceMotion'] as const;
 
 function isUiLocale(value: string | null): value is UiLocaleCode {
   return uiLocales.some((locale) => locale.code === value);
@@ -49,6 +63,10 @@ function isContentLanguage(value: string | null): value is ContentLanguageCode {
 
 function isTheme(value: string | null): value is ThemePreference {
   return value === 'system' || value === 'light' || value === 'dark';
+}
+
+function isArabicScale(value: string | null): value is ArabicScale {
+  return value !== null && Object.hasOwn(arabicScales, value);
 }
 
 export async function loadPersistedAppSettings(client: MobileDataClient): Promise<AppSettings> {
@@ -66,12 +84,16 @@ export async function loadPersistedAppSettings(client: MobileDataClient): Promis
   const persistedContentLanguage = persisted.contentLanguage;
   const persistedTheme = persisted.theme;
   const analyticsEnabled = persisted.analyticsEnabled;
+  const persistedArabicScale = persisted.arabicScale;
+  const reduceMotion = persisted.reduceMotion;
 
   return {
     uiLocale: isUiLocale(persistedUiLocale) ? persistedUiLocale : defaultSettings.uiLocale,
     contentLanguage: isContentLanguage(persistedContentLanguage) ? persistedContentLanguage : defaultSettings.contentLanguage,
     theme: isTheme(persistedTheme) ? persistedTheme : defaultSettings.theme,
     analyticsEnabled: analyticsEnabled === 'true',
+    arabicScale: isArabicScale(persistedArabicScale) ? persistedArabicScale : defaultSettings.arabicScale,
+    reduceMotion: reduceMotion === 'true',
   };
 }
 
@@ -270,6 +292,8 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       setContentLanguage: (contentLanguage) => updateSetting('contentLanguage', contentLanguage),
       setTheme: (theme) => updateSetting('theme', theme),
       setAnalyticsEnabled: (analyticsEnabled) => updateSetting('analyticsEnabled', analyticsEnabled),
+      setArabicScale: (arabicScale) => updateSetting('arabicScale', arabicScale),
+      setReduceMotion: (reduceMotion) => updateSetting('reduceMotion', reduceMotion),
     }),
     [settings, storageError, userClient],
   );

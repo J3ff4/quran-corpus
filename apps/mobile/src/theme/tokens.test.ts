@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { paper } from '@quran-corpus/config/theme/palette';
+import { contrast } from '@/testing/contrast';
 import { colors, themeColors } from './tokens';
 
 describe('themeColors', () => {
@@ -27,5 +28,14 @@ describe('themeColors', () => {
     // Owner ruling 2026-08-16: the two products keep separate accents.
     expect(colors.accent).toBe('#1f6f5b');
     expect(themeColors.dark.accent).toBe('#5aa58d');
+  });
+
+  it('keeps the accent readable on its own wash', () => {
+    // accentWash exists so a tinted match is distinguished by more than hue --
+    // the accent against surrounding muted text is ~1.26:1, invisible with a
+    // colour-vision deficiency. The tint then has to clear AA on the wash it
+    // sits on, which is a different background from the page.
+    expect(contrast(themeColors.light.accent, themeColors.light.accentWash)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(themeColors.dark.accent, themeColors.dark.accentWash)).toBeGreaterThanOrEqual(4.5);
   });
 });

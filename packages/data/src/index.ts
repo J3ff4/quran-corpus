@@ -21,6 +21,7 @@ export {
   search,
   EMPTY_SEARCH_RESULT,
 } from './queries/search.js';
+export type { VerseSearchOpts } from './queries/search.js';
 export {
   getRootByBuckwalter,
   getAllRoots,
@@ -50,6 +51,7 @@ export {
   parseConcordancePaging,
   assertPagingBounds,
 } from './queries/concordance.js';
+export { definitionSourceLabel } from './definitionSources.js';
 export { buckwalterToArabic, compareRootsArabic, rootFirstLetter, ARABIC_ALPHABET_ORDER } from './text/arabic.js';
 export {
   isBuckwalter,
@@ -62,6 +64,8 @@ export {
 } from './text/buckwalter.js';
 export { trimConcordanceVerse } from './text/concordanceTrim.js';
 export { isSajdahAyah } from './text/sajdah.js';
+export { alignAyahTokens, splitBasmala, type AyahToken } from './text/ayahTokens.js';
+export { posBucket, type PosBucket } from './morphology/buckets.js';
 export { decodeSegment, posLabelEn } from './morphology/decode.js';
 export type {
   Surah,

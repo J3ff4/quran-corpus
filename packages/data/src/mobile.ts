@@ -26,6 +26,7 @@ export { getTranslationsByAyah, getTranslation, getTranslationsBySurahAndLang } 
 export { getGlossesBySurahAndLang, getGlossesWithFallback } from './queries/glosses.js';
 export type { GlossWithLang } from './queries/glosses.js';
 export { parseVerseRef, searchVerses, search, EMPTY_SEARCH_RESULT } from './queries/search.js';
+export type { VerseSearchOpts } from './queries/search.js';
 export {
   getRootByBuckwalter,
   getAllRoots,
@@ -41,9 +42,28 @@ export {
   getRootSearchList,
   getRootNeighbors,
 } from './queries/roots.js';
+export {
+  getLemmaEntry,
+  getLemmaConcordancePage,
+  countLemmaConcordance,
+} from './queries/lemma.js';
+export { getLemmaFrequency, getVerbConcordance } from './queries/dictionary.js';
 export { buckwalterToArabic, compareRootsArabic, rootFirstLetter, ARABIC_ALPHABET_ORDER } from './text/arabic.js';
+// The root and lemma routes take a Buckwalter identifier straight off a deep
+// link, so they need the same charset and length caps the web routes use.
+// buckwalter.ts has no runtime imports, so this adds no edge to the Metro graph.
+//
+// The charset predicates, NOT `parseRootParam`/`parseLemmaParam`: those decode
+// first, and expo-router has already decoded every param by the time a route
+// sees it, so a second decode would accept `qa%2541la` as `qaAla`. Mobile wraps
+// these in apps/mobile/src/data/routeParams.ts, the same way web's route
+// handlers (which also receive a decoded segment) call them directly.
+export { isRootBuckwalter, isLemmaBuckwalter, ROOT_BUCKWALTER_MAX } from './text/buckwalter.js';
 export { trimConcordanceVerse } from './text/concordanceTrim.js';
+export { definitionSourceLabel } from './definitionSources.js';
 export { isSajdahAyah } from './text/sajdah.js';
+export { alignAyahTokens, splitBasmala, type AyahToken } from './text/ayahTokens.js';
+export { posBucket, type PosBucket } from './morphology/buckets.js';
 export { decodeSegment, posLabelEn } from './morphology/decode.js';
 export type {
   Surah,
@@ -57,6 +77,8 @@ export type {
   RootForm,
   RootDefinition,
   RootEntry,
+  LemmaEntry,
+  LemmaSense,
   ConcordanceEntry,
   VerseWord,
   WordSegment,

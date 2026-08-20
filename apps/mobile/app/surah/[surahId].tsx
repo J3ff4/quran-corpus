@@ -1,14 +1,15 @@
 import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
-import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
+import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 import { useAyahAudioController } from '@/audio/ayahAudio';
-import { LanguageSelector } from '@/components/LanguageSelector';
 import { SurahReader } from '@/components/SurahReader';
-import { getSurahReader, type SurahReaderData } from '@/data/corpusRepository';
+import { getSurahReader, getWordsForAyah, type SurahReaderData } from '@/data/corpusRepository';
 import { createLatestReadingPositionRecorder } from '@/data/latestReadingPositionRecorder';
 import { openCorpusDb } from '@/data/openCorpusDb';
+import { parseAyahNumber, parseSurahId } from '@/data/routeParams';
 import { openUserDb } from '@/data/userDb';
+import { useWordSummaryLoader } from '@/data/useWordSummaryLoader';
 import { getBookmarks, recordReadingPosition, setBookmark } from '@/data/userRepository';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
@@ -16,24 +17,6 @@ import { useThemeColors } from '@/theme/themeContext';
 
 function errorTextStyle(danger: string) {
   return { color: danger, padding: 20 };
-}
-
-function parseSurahId(value: string | string[] | undefined): number | null {
-  const raw = Array.isArray(value) ? value[0] : value;
-  if (!raw) return null;
-  const parsed = Number(raw);
-  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 114) return null;
-  return parsed;
-}
-
-// 286 is al-Baqarah, the longest surah; a row that does not exist in this
-// surah simply resolves to no index and the reader opens at the top.
-function parseAyahNumber(value: string | string[] | undefined): number | null {
-  const raw = Array.isArray(value) ? value[0] : value;
-  if (!raw) return null;
-  const parsed = Number(raw);
-  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 286) return null;
-  return parsed;
 }
 
 export default function SurahRoute() {
@@ -47,6 +30,9 @@ export default function SurahRoute() {
   const theme = useThemeColors();
   const audio = useAyahAudioController(process.env.EXPO_PUBLIC_AUDIO_API_BASE_URL, surahId);
   const [reader, setReader] = useState<SurahReaderData | null>(null);
+  // Kept so the reader can query words for the ayahs scrolling into view,
+  // rather than reopening the database on every tap.
+  const [corpusClient, setCorpusClient] = useState<MobileDataClient | null>(null);
   const [bookmarks, setBookmarks] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -83,14 +69,17 @@ export default function SurahRoute() {
 
       try {
         const [corpusDb, userDb] = await Promise.all([openCorpusDb(), openUserDb()]);
-        const corpusClient = createExpoSqliteClient(corpusDb as ExpoSqliteLike);
+        // Not named corpusClient: that is the state this assigns to, and a
+        // shadowing local here is a rename away from a silent no-op.
+        const client = createExpoSqliteClient(corpusDb as ExpoSqliteLike);
         const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
         const [data, savedBookmarks] = await Promise.all([
-          getSurahReader(corpusClient, surahId, contentLanguage),
+          getSurahReader(client, surahId, contentLanguage),
           getBookmarks(userClient),
         ]);
 
         if (!cancelled) {
+          setCorpusClient(client);
           setReader(data);
           setBookmarks(
             new Set(
@@ -117,6 +106,18 @@ export default function SurahRoute() {
     // locale it captured, so without this a language switch after a failure
     // leaves the old language on screen.
   }, [contentLanguage, surahId, uiLocale]);
+
+  // One gloss query per surah, not per word tap. Shared with the word-by-word
+  // screen, which opens the same sheet off the same database.
+  const loadWordSummary = useWordSummaryLoader(corpusClient, surahId, contentLanguage);
+
+  const loadWords = useCallback(
+    async (ayahId: number) => {
+      if (!corpusClient) return [];
+      return getWordsForAyah(corpusClient, ayahId);
+    },
+    [corpusClient],
+  );
 
   async function toggleBookmark(ayahNumber: number) {
     if (!surahId) return;
@@ -169,14 +170,17 @@ export default function SurahRoute() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
-      <LanguageSelector value={contentLanguage} onChange={setContentLanguage} />
       <SurahReader
         data={reader}
         bookmarkedAyahs={bookmarks}
         playingAyah={audio.playingAyah}
         audioEnabled={audio.audioEnabled}
         uiLocale={uiLocale}
+        contentLanguage={contentLanguage}
+        onChangeContentLanguage={setContentLanguage}
         initialAyahNumber={initialAyahNumber}
+        loadWords={loadWords}
+        loadWordSummary={loadWordSummary}
         onToggleBookmark={toggleBookmark}
         onToggleAudio={audio.toggleAyah}
         onReadingAyah={(ayahNumber) => {

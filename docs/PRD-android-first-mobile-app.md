@@ -382,6 +382,9 @@ Decision: create fresh Android mobile mockups before implementation. They should
 
 ## 10. Milestones
 
+> Numbering follows `docs/plans/`. The design-foundation phase was inserted as
+> M2 on 2026-08-16 and everything below it shifted by one.
+
 ### Phase M0: Mobile Technical Spike
 
 Status: implementation complete; Android emulator/device smoke verification pending.
@@ -414,7 +417,14 @@ Status: in progress.
 - Basic ayah audio streaming through our thin audio endpoint, defaulting to Abdul Rashid Sufi.
 - Privacy-safe crash reporting and analytics instrumentation.
 
-### Phase M2: Morphology MVP
+### Phase M2: Design Foundation
+
+- Shared colour palette in `packages/config`.
+- Mobile theme tokens and provider.
+- Custom tab-bar icon set.
+- Mushaf ayah-marker rosette.
+
+### Phase M3: Morphology MVP
 
 - Word-by-word view.
 - Word bottom sheet.
@@ -422,7 +432,7 @@ Status: in progress.
 - Root navigation.
 - Segment display.
 
-### Phase M3: Dictionary + Search
+### Phase M4: Dictionary + Search
 
 - Dictionary browse/search.
 - Root detail.
@@ -431,7 +441,7 @@ Status: in progress.
 - Verb concordance.
 - Offline search.
 
-### Phase M4: Android Release Hardening
+### Phase M5: Android Release Hardening
 
 - Accessibility pass.
 - Performance pass on target devices.
@@ -440,13 +450,13 @@ Status: in progress.
 - Legal/source attribution review.
 - Release candidate QA.
 
-### Phase M5: Post-V1 Treebank Readiness
+### Phase M6: Post-V1 Treebank Readiness
 
 - Track web/data treebank implementation.
 - Add native treebank viewer after treebank exists in the shared data layer.
 - Validate touch pan/zoom rendering and performance.
 
-### Phase M6: iOS Readiness
+### Phase M7: iOS Readiness
 
 - Audit platform-specific code.
 - Enable iOS build.

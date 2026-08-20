@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { definitionSourceLabel } from '../lib/definitionSources';
+import { definitionSourceLabel } from '../src/definitionSources.js';
 
 // The label is a licence obligation (§11): every definition rendered on the
 // root and lemma pages carries the credit this returns, so both the mapped and
