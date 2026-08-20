@@ -25,14 +25,24 @@ describe('LemmaRoute', () => {
   });
   afterEach(cleanup);
 
-  it('decodes a percent-encoded raw param before forwarding it', () => {
-    // Raw and parsed MUST differ here, or this test cannot distinguish
-    // "forwarded the raw param" from "forwarded the parsed one".
-    mocks.lemma = '%7Bll~ah';
+  it('forwards the identifier expo-router already decoded', () => {
+    // `{` is not path-safe, so the link site encodes it; expo-router decodes it
+    // back before useLocalSearchParams returns. This is the value a route sees.
+    mocks.lemma = '{ll~ah';
 
     render(<LemmaRoute />);
 
     expect(screen.getByTestId('lemma-screen').getAttribute('data-lemma')).toBe('{ll~ah');
+  });
+
+  it('refuses a still-encoded segment rather than decoding it a second time', () => {
+    // A second decode here would resolve `%7Bll~ah` to `{ll~ah` and serve a real
+    // lemma under a non-canonical segment the web product answers 404 for.
+    mocks.lemma = '%7Bll~ah';
+
+    render(<LemmaRoute />);
+
+    expect(screen.getByTestId('lemma-screen').getAttribute('data-lemma')).toBe('null');
   });
 
   it('forwards null, not the string "undefined", for a missing param', () => {

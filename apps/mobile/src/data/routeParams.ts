@@ -6,24 +6,59 @@
  * live in one module because both the reader route and the word-detail route
  * need the same bounds, and a second copy is a second place for a bound to
  * drift.
+ *
+ * Every one of them takes `string | string[] | undefined` — the exact type
+ * `useLocalSearchParams` returns — so the array/undefined guard lives here once
+ * instead of at each route. A validator taking a bare `string` is a trap: an
+ * array param joins to `'a,b'` and a missing one stringifies to `'undefined'`,
+ * both of which pass a Buckwalter charset test and reach SQLite.
  */
 
-import { ARABIC_ALPHABET_ORDER } from '@quran-corpus/data/mobile';
+import {
+  ARABIC_ALPHABET_ORDER,
+  isLemmaBuckwalter,
+  isRootBuckwalter,
+} from '@quran-corpus/data/mobile';
 
-// Not re-implemented here. buckwalter.ts already validates the corpus charset,
-// caps the length and refuses double-encoded input -- which is exactly this
-// route's threat -- and CLAUDE.md §2 records what happened the last time a
-// consumer kept its own copy of those validators.
-export { parseRootParam, parseLemmaParam } from '@quran-corpus/data/mobile';
+/** Shared shape: first-of-array, reject empty, then the caller's predicate. */
+function parseParam(
+  value: string | string[] | undefined,
+  isValid: (raw: string) => boolean,
+): string | null {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (!raw) return null;
+  return isValid(raw) ? raw : null;
+}
+
+// Charset and length caps come from packages/data, not restated here --
+// CLAUDE.md §2 records what happened the last time a consumer kept its own copy.
+//
+// What is deliberately NOT shared is web's `parseRootParam`/`parseLemmaParam`,
+// which decode before validating. expo-router already ran `decodeURIComponent`
+// over every value `useLocalSearchParams` hands back (expo-router 57,
+// build/hooks/useLocalSearchParams.js), so decoding again here would resolve
+// `/root/qa%2541la` to `qaAla` and serve a real root under a segment the web
+// product answers 404 for. This is the same split web already has internally:
+// its *page* routes parse (Next hands a Server Component the raw segment) while
+// its *route handlers* call `isRootBuckwalter` directly (Next decodes first).
+// Expo Router routes are on the handler side of that line.
+
+/** A `root_buckwalter` path segment, or null if it is not one. */
+export function parseRootParam(value: string | string[] | undefined): string | null {
+  return parseParam(value, isRootBuckwalter);
+}
+
+/** A `lemma_buckwalter` path segment, or null if it is not one. */
+export function parseLemmaParam(value: string | string[] | undefined): string | null {
+  return parseParam(value, isLemmaBuckwalter);
+}
 
 /** A hijāʾī bucket off a deep link. Membership, not a charset test:
  *  `rootFirstLetter` folds أ إ آ ٱ to ا and ى to ي, so those are never buckets
  *  and a screen for one could never have rows. The list is imported rather
  *  than restated so this cannot drift from the folding that produces it. */
 export function parseLetterParam(value: string | string[] | undefined): string | null {
-  const raw = Array.isArray(value) ? value[0] : value;
-  if (!raw) return null;
-  return ARABIC_ALPHABET_ORDER.includes(raw) ? raw : null;
+  return parseParam(value, (raw) => ARABIC_ALPHABET_ORDER.includes(raw));
 }
 
 /** Shared shape: a 1-based corpus coordinate with an upper bound.

@@ -89,6 +89,10 @@ describe('root route', () => {
     // Not `r%48m` -- that decodes to the valid `rHm`. Double-encoding is the
     // real case: it decodes to `r%24m`, which still holds a `%`.
     ['r%2524m', 'double-encoded'],
+    // Already decoded once by expo-router. A route that decoded a second time
+    // would resolve this to `r$m` and serve a real root under a segment the
+    // web product answers 404 for.
+    ['r%24m', 'still percent-encoded'],
     ['r m', 'whitespace'],
     ['', 'empty'],
     ['rHm%zz', 'a malformed escape'],
@@ -104,11 +108,11 @@ describe('root route', () => {
     expect(mocks.getRootScreen).not.toHaveBeenCalled();
   });
 
-  it('queries the decoded identifier, not the raw segment', async () => {
+  it('queries the identifier expo-router decoded, and does not decode it again', async () => {
     // Buckwalter carries `$`, `<` and `'`, none of which survive a raw path
-    // segment -- the sheet encodes them, so this route has to decode them back
-    // or every root with one in it resolves to nothing.
-    mocks.params = { buckwalter: 'r%24m' };
+    // segment -- the sheet encodes them and expo-router decodes them back, so
+    // `r$m` is what this route receives.
+    mocks.params = { buckwalter: 'r$m' };
     mocks.getRootScreen.mockResolvedValue(null);
 
     render(<RootRoute />);

@@ -22,14 +22,11 @@ export default function RootRoute() {
   const sizes = useArabicSizes();
   const { contentLanguage, uiLocale } = useAppSettings();
 
-  // Untrusted: a path segment off a deep link. parseRootParam is the same
-  // validator the web root page uses -- charset, length cap, and a refusal of
-  // double-encoded input -- so the two products cannot disagree about what a
-  // root identifier is.
-  const buckwalter = useMemo(() => {
-    const raw = Array.isArray(params.buckwalter) ? params.buckwalter[0] : params.buckwalter;
-    return raw ? parseRootParam(raw) : null;
-  }, [params.buckwalter]);
+  // Untrusted: a path segment off a deep link. parseRootParam applies the same
+  // charset and length cap the web root page does, and takes the raw
+  // useLocalSearchParams value (array and undefined cases included) so the
+  // guard lives in one place. useMemo because it feeds an effect dependency.
+  const buckwalter = useMemo(() => parseRootParam(params.buckwalter), [params.buckwalter]);
 
   const [entry, setEntry] = useState<RootEntry | null>(null);
   const [total, setTotal] = useState(0);
@@ -126,8 +123,8 @@ export default function RootRoute() {
           fontFamily: 'Hafs',
           fontSize: sizes.title,
           textAlign: 'right',
-          // See AyahText: textAlign places the block, writingDirection drives
-          // the bidi resolution inside the Arabic run.
+          // textAlign places the block; writingDirection is iOS-only
+          // (see AyahText). Android resolves direction from the content.
           writingDirection: 'rtl',
         }}
       >

@@ -4,9 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import RootRoute from '../../app/root/[buckwalter]';
 
 const mocks = vi.hoisted(() => ({
-  // Percent-encoded on purpose: parseRootParam decodes before it validates, so
-  // a raw param that is already a valid identifier cannot tell the two apart.
-  buckwalter: '%7Bqwl',
+  // Decoded, because expo-router decodes every param before a route sees it.
+  // `{` is not path-safe, so the link site encodes it and the router undoes
+  // that -- an encoded fixture here would pin a value production never emits.
+  buckwalter: '{qwl',
   contentLanguage: 'ru',
   getRootScreen: vi.fn(),
   getRootOccurrenceCount: vi.fn(),
@@ -80,7 +81,7 @@ const rootEntry = {
 
 describe('RootRoute', () => {
   beforeEach(() => {
-    mocks.buckwalter = '%7Bqwl';
+    mocks.buckwalter = '{qwl';
     mocks.contentLanguage = 'ru';
     mocks.getRootScreen.mockReset();
     mocks.getRootOccurrenceCount.mockReset();
