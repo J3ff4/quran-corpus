@@ -70,8 +70,8 @@ export function FrequencyList({ kind }: FrequencyListProps) {
   }
 
   // ponytail: no empty state. All three queries are unfiltered over a bundled
-  // DB, so an empty result means the DB is broken, which is the failed branch
-  // above.
+  // DB -- capped, but never narrowed -- so an empty result means the DB is
+  // broken, which is the failed branch above.
   return (
     <View style={{ flex: 1 }}>
       <View
