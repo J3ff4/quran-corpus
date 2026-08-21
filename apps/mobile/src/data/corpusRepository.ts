@@ -11,6 +11,7 @@ import {
   getLemmaFrequency,
   getRootConcordancePage,
   getRootEntry,
+  getRootNeighbors,
   getRootSearchList,
   getRootsByFrequency,
   rootFirstLetter,
@@ -315,6 +316,19 @@ export async function getRootScreen(
   rootBuckwalter: string,
 ): Promise<RootEntry | null> {
   return getRootEntry(client, rootBuckwalter);
+}
+
+/** Hijāʾī-adjacent roots for the root screen's Previous/Next.
+ *
+ *  Indexed O(1) on roots.sort_order, which the bundled DB ships populated
+ *  (1642 rows, 0 NULL, verified 2026-08-21). If a future rebuild ships it NULL
+ *  the shared query degrades to a full compareRootsArabic sort -- slower, still
+ *  correct -- so this needs no fallback of its own. */
+export async function getAdjacentRoots(
+  client: MobileDataClient,
+  bw: string,
+): Promise<{ prev: string | null; next: string | null }> {
+  return getRootNeighbors(client, bw);
 }
 
 /** Roots filed under one hijāʾī letter, in dictionary order.

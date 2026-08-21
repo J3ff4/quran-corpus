@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import RootRoute from '../../app/root/[buckwalter]';
 
@@ -12,10 +12,13 @@ const mocks = vi.hoisted(() => ({
   getRootScreen: vi.fn(),
   getRootOccurrenceCount: vi.fn(),
   getRootOccurrences: vi.fn(),
+  getAdjacentRoots: vi.fn(),
+  push: vi.fn(),
 }));
 
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ buckwalter: mocks.buckwalter }),
+  router: { push: mocks.push },
 }));
 
 vi.mock('@quran-corpus/mobile-data', () => ({
@@ -30,6 +33,7 @@ vi.mock('@/data/corpusRepository', () => ({
   getRootScreen: (...args: unknown[]) => mocks.getRootScreen(...args),
   getRootOccurrenceCount: (...args: unknown[]) => mocks.getRootOccurrenceCount(...args),
   getRootOccurrences: (...args: unknown[]) => mocks.getRootOccurrences(...args),
+  getAdjacentRoots: (...args: unknown[]) => mocks.getAdjacentRoots(...args),
 }));
 
 vi.mock('@/settings/settingsStore', () => ({
@@ -63,13 +67,16 @@ vi.mock('@/components/ConcordanceList', async () => {
   };
 });
 
+// reactNativeTextMock, not the bare `host` factory: the header now renders
+// EntryHeader and DefinitionCard, both of which mount ClampedText, and
+// Pressable for the Previous/Next arrows -- see reactNativeTextMock's doc
+// comment in rnHosts.ts.
 vi.mock('react-native', async () => {
   const React = await import('react');
-  const { host } = await import('@/testing/rnHosts.js');
+  const { reactNativeTextMock } = await import('@/testing/rnHosts.js');
   return {
     ActivityIndicator: () => React.createElement('span', null, 'loading'),
-    Text: host('span'),
-    View: host('div'),
+    ...reactNativeTextMock(),
   };
 });
 
@@ -86,9 +93,12 @@ describe('RootRoute', () => {
     mocks.getRootScreen.mockReset();
     mocks.getRootOccurrenceCount.mockReset();
     mocks.getRootOccurrences.mockReset();
+    mocks.getAdjacentRoots.mockReset();
+    mocks.push.mockReset();
     mocks.getRootScreen.mockResolvedValue(rootEntry);
     mocks.getRootOccurrenceCount.mockResolvedValue(1722);
     mocks.getRootOccurrences.mockResolvedValue([]);
+    mocks.getAdjacentRoots.mockResolvedValue({ prev: null, next: null });
   });
 
   afterEach(cleanup);
@@ -127,5 +137,74 @@ describe('RootRoute', () => {
     await screen.findByText('That root is not in the corpus');
     expect(mocks.getRootScreen).not.toHaveBeenCalled();
     expect(mocks.getRootOccurrences).not.toHaveBeenCalled();
+  });
+
+  it('spells the root out as one pill per letter', async () => {
+    mocks.getRootScreen.mockResolvedValue({
+      root: { id: 1, root_buckwalter: 'qwl', root_arabic: 'ق و ل', occurrence_count: 1722 },
+      forms: [],
+      definitions: [],
+    });
+    render(<RootRoute />);
+    // Three letters, and the inter-letter spaces are not pills of their own.
+    expect(await screen.findAllByTestId('root-letter')).toHaveLength(3);
+  });
+
+  it('says how often the root occurs', async () => {
+    render(<RootRoute />);
+    // .textContent, not the jest-dom toHaveTextContent matcher: jest-dom is
+    // an apps/web dependency only.
+    expect((await screen.findByTestId('entry-count')).textContent).toBe('1722 occurrences');
+  });
+
+  it('links Previous and Next to the hijāʾī neighbours', async () => {
+    mocks.getAdjacentRoots.mockResolvedValue({ prev: 'qtl', next: 'qwm' });
+    render(<RootRoute />);
+    fireEvent.click(await screen.findByTestId('root-next'));
+    expect(mocks.push).toHaveBeenCalledWith('/root/qwm');
+  });
+
+  it('disables the arrow at the end of the list rather than hiding it', async () => {
+    // A vanishing control moves the other one under the thumb mid-scroll;
+    // TalkBack gets the disabled state instead.
+    mocks.getAdjacentRoots.mockResolvedValue({ prev: 'qtl', next: null });
+    render(<RootRoute />);
+    const next = await screen.findByTestId('root-next');
+    await waitFor(() => expect(next.getAttribute('aria-disabled')).toBe('true'));
+    fireEvent.click(next);
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it('renders one card per definition, each credited', async () => {
+    mocks.getRootScreen.mockResolvedValue({
+      root: { id: 1, root_buckwalter: 'qwl', root_arabic: 'قول', occurrence_count: 5 },
+      forms: [],
+      definitions: [
+        { id: 1, root_id: 1, source: 'hanswehr', definition: 'to say' },
+        { id: 2, root_id: 1, source: 'lane', definition: 'he said' },
+      ],
+    });
+    render(<RootRoute />);
+    expect(await screen.findAllByTestId('definition-card')).toHaveLength(2);
+  });
+
+  it('says the lexicon has no entry rather than rendering an empty section', async () => {
+    // 24 roots still carry no definition (hw_gap_24.tsv). Silence reads as a
+    // bug.
+    mocks.getRootScreen.mockResolvedValue({
+      root: { id: 1, root_buckwalter: 'qwl', root_arabic: 'قول', occurrence_count: 5 },
+      forms: [],
+      definitions: [],
+    });
+    render(<RootRoute />);
+    expect(await screen.findByTestId('root-no-definition')).toBeTruthy();
+  });
+
+  it('counts the concordance in its heading', async () => {
+    mocks.getRootOccurrenceCount.mockResolvedValue(1722);
+    render(<RootRoute />);
+    expect((await screen.findByTestId('concordance-heading')).textContent).toBe(
+      'Concordance (1722)',
+    );
   });
 });

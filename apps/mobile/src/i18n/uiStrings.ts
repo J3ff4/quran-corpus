@@ -53,6 +53,14 @@ export type UiStringKey =
   | 'root.definitions'
   | 'root.noDefinition'
   | 'root.notFound'
+  | 'root.previous'
+  | 'root.next'
+  // Accessible name for the Previous/Next row: two sibling buttons with
+  // nothing on their own to say they navigate the hijāʾī root list.
+  | 'root.adjacent'
+  // Root screen's concordance heading, read as "Concordance (1722)". t() has
+  // no interpolation, so the count is concatenated at the call site.
+  | 'concordance.heading'
   | 'lemma.notFound'
   // Caption above a lemma's top glosses: contextual word-by-word
   // translations, not a definition -- see LemmaScreen and text/gloss.ts.
@@ -168,6 +176,9 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'root.definitions': 'Definitions',
     'root.noDefinition': 'No definition for this root yet',
     'root.notFound': 'That root is not in the corpus',
+    'root.previous': 'Previous',
+    'root.next': 'Next',
+    'root.adjacent': 'Adjacent roots',
     'lemma.notFound': 'This lemma is not in the corpus',
     'lemma.translatedAs': 'Translated as',
     'surahList.ayahsSuffix': 'ayahs',
@@ -217,6 +228,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'dictionary.frequentFailed': 'Unable to load the list',
     'dictionary.kindFilter': 'Filter by kind',
     'dictionary.occurrences': 'occurrences',
+    'concordance.heading': 'Concordance',
     'concordance.empty': 'No occurrences',
     'concordance.loadFailed': 'Unable to load occurrences',
     'text.showMore': 'Show more',
@@ -269,6 +281,9 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'root.definitions': 'Ta‘riflar',
     'root.noDefinition': 'Bu o‘zak uchun hali ta‘rif yo‘q',
     'root.notFound': 'Bu o‘zak korpusda yo‘q',
+    'root.previous': 'Oldingi',
+    'root.next': 'Keyingi',
+    'root.adjacent': 'Qo‘shni o‘zaklar',
     'lemma.notFound': 'Bu lemma korpusda yo‘q',
     'lemma.translatedAs': 'Tarjimasi',
     'surahList.ayahsSuffix': 'oyat',
@@ -318,6 +333,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'dictionary.frequentFailed': 'Ro‘yxatni yuklab bo‘lmadi',
     'dictionary.kindFilter': 'Turi bo‘yicha filtr',
     'dictionary.occurrences': 'marta uchraydi',
+    'concordance.heading': 'Uchrashuvlar',
     'concordance.empty': 'Uchrashlar yo‘q',
     'concordance.loadFailed': 'Uchrashlarni yuklab bo‘lmadi',
     'text.showMore': 'Ko‘proq ko‘rsatish',
@@ -370,6 +386,9 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'root.definitions': 'Определения',
     'root.noDefinition': 'Для этого корня пока нет определения',
     'root.notFound': 'Этого корня нет в корпусе',
+    'root.previous': 'Предыдущий',
+    'root.next': 'Следующий',
+    'root.adjacent': 'Соседние корни',
     'lemma.notFound': 'Этой леммы нет в корпусе',
     'lemma.translatedAs': 'Переводится как',
     'surahList.ayahsSuffix': 'аятов',
@@ -419,6 +438,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'dictionary.frequentFailed': 'Не удалось загрузить список',
     'dictionary.kindFilter': 'Фильтр по типу',
     'dictionary.occurrences': 'вхождений',
+    'concordance.heading': 'Конкорданс',
     'concordance.empty': 'Нет вхождений',
     'concordance.loadFailed': 'Не удалось загрузить вхождения',
     'text.showMore': 'Показать больше',
