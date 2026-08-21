@@ -21,7 +21,7 @@
 - `t()` has no interpolation. Compose counts by concatenation at the call site, as `FrequencyList` already does.
 - WCAG AA: colour never carries meaning alone. Selection = tint **and** border **and** weight. Contrast is measured against the surface the text actually sits on.
 - One logical change per commit. Commit only after §4's loop closes for that task.
-- Run from repo root: `pnpm --filter @quran-corpus/mobile test`, `pnpm --filter @quran-corpus/data test`, `pnpm -r lint`, `pnpm -r typecheck`.
+- Run from repo root: `pnpm --filter @quran-corpus/mobile test`, `pnpm --filter @quran-corpus/data test`, `pnpm -r lint`, `pnpm -r type-check`.
 
 ---
 
@@ -315,7 +315,7 @@ Delete the `if (s.includes('adverb')) return 'noun';` line in `formCategory.ts` 
 
 - [ ] **Step 8: Full gate + commit**
 
-Run: `pnpm -r lint && pnpm -r typecheck && pnpm --filter @quran-corpus/data test && pnpm --filter web test`
+Run: `pnpm -r lint && pnpm -r type-check && pnpm --filter @quran-corpus/data test && pnpm --filter web test`
 Expected: all pass.
 
 ```bash
@@ -964,7 +964,7 @@ export function DefinitionCard({ definition, source, uiLocale }: DefinitionCardP
 
 - [ ] **Step 8: Run tests, then commit**
 
-Run: `pnpm --filter @quran-corpus/mobile test ClampedText DefinitionCard && pnpm -r lint && pnpm -r typecheck`
+Run: `pnpm --filter @quran-corpus/mobile test ClampedText DefinitionCard && pnpm -r lint && pnpm -r type-check`
 Expected: all pass.
 
 ```bash
@@ -2119,7 +2119,7 @@ Remove `src/screens/LetterScreen.tsx`, `src/screens/LetterScreen.test.tsx`, `app
 
 - [ ] **Step 5: Run tests to verify they pass**
 
-Run: `pnpm --filter @quran-corpus/mobile test && pnpm -r typecheck`
+Run: `pnpm --filter @quran-corpus/mobile test && pnpm -r type-check`
 Expected: PASS, with no dangling import of `LetterScreen` or `parseLetterParam`.
 
 - [ ] **Step 6: Mutation-check**
@@ -2323,7 +2323,7 @@ Each task is one commit and none of them migrate data or touch the on-device use
 
 ## Acceptance criteria
 
-- [ ] `pnpm -r lint`, `pnpm -r typecheck`, `pnpm --filter @quran-corpus/data test`, `pnpm --filter web test` and `pnpm --filter @quran-corpus/mobile test` all pass.
+- [ ] `pnpm -r lint`, `pnpm -r type-check`, `pnpm --filter @quran-corpus/data test`, `pnpm --filter web test` and `pnpm --filter @quran-corpus/mobile test` all pass.
 - [ ] `packages/data/tests/mobile-entry.test.ts` and `tests/client-entry.test.ts` pass unmodified except for the two added export assertions.
 - [ ] `git grep -n "categorizeFormLabel" apps/web/src` shows only the re-export in `formCategoryColor.ts`.
 - [ ] No file under `packages/data/src/queries/` and no `.sql` file is modified by this phase (`git diff --stat main -- packages/data/src/queries packages/data/src/schema.sql` is empty). If that stops being true, §5 applies and the user must be asked to run `/code-review`.
