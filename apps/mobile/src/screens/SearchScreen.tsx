@@ -14,14 +14,14 @@ import { useThemeColors } from '@/theme/themeContext';
 // Long enough that a fast typist runs one query rather than six, short enough
 // that results still feel attached to the keystroke. The DB is local, so this
 // is about wasted work, not latency.
-const DEBOUNCE_MS = 200;
+export const DEBOUNCE_MS = 200;
 
 // How long a query may run before it is allowed to show a spinner. The DB is
 // local, so a query that beats this never flashes an indicator at all -- which
 // is the whole point: at 200ms debounce + an instant result, the old
 // unconditional spinner was a dot that appeared and vanished on every
 // keystroke.
-const SPINNER_DELAY_MS = 300;
+export const SPINNER_DELAY_MS = 300;
 
 export function SearchScreen() {
   const { uiLocale, contentLanguage } = useAppSettings();
