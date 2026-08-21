@@ -154,7 +154,7 @@ the M2 rosette carry-over).
     occurrences", Previous/Next. Tap Next twice, then Previous twice — you land
     back on قول. On the first and last root of the alphabet the arrow is dimmed
     and does nothing rather than disappearing.
-37. Airplane mode: repeat 29, 31, 34, 36, 39 and 40. All of it is local — the
+37. Airplane mode: repeat 29, 31, 34, 36, 39, 40 and 41. All of it is local — the
     paged concordance loading that used to be check 36's own concern now lives
     in the occurrence rows those two exercise.
 38. Repeat 29, 39 and 40 in dark mode and at maximum system font size. Nothing
@@ -197,5 +197,8 @@ dictionary browse by hijāʾī letter, frequency lists for roots/lemmas/verbs, a
 paged concordances on the root and lemma screens. **None of it has run on a
 device.** One build clears both: checks 1-27 (F5, F6 and check 27 outstanding)
 plus the M2 rosette carry-over go in the Verification Log of
-`docs/plans/phase-m3-morphology-mvp.md`, and checks 28-38 go in that of
-`docs/plans/phase-m4-dictionary-search.md`.
+`docs/plans/phase-m3-morphology-mvp.md`, and checks 28-33 go in that of
+`docs/plans/phase-m4-dictionary-search.md`. Checks 34-41 were rewritten by M5
+and go in the Verification Log of `docs/plans/phase-m5-dictionary-parity.md` —
+the M4 plan's log still describes the versions of 34-38 that only checked a
+screen opened.

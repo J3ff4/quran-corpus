@@ -16,13 +16,17 @@ const ALLOWED_COLLISIONS: Partial<Record<UiStringKey, readonly ('uz' | 'ru')[]>>
 // app/ holds route files (e.g. app/(tabs)/index.tsx, app/about.tsx) that
 // call t() directly rather than through a src/screens component -- src/
 // alone false-flags every key those routes are the only user of.
+//
+// Test files are excluded too: a key only a test names is still dead in the
+// app, and counting it as live is how a deleted screen's strings survive.
+// No key depends on this today -- it is here so that stops being luck.
 function collectSourceText(dir: string): string {
   let text = '';
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.isDirectory()) {
       if (entry.name === 'i18n') continue;
       text += collectSourceText(join(dir, entry.name));
-    } else if (/\.(ts|tsx)$/.test(entry.name)) {
+    } else if (/\.(ts|tsx)$/.test(entry.name) && !entry.name.includes('.test.')) {
       text += readFileSync(join(dir, entry.name), 'utf8');
     }
   }

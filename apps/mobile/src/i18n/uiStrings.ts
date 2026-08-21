@@ -74,9 +74,8 @@ export type UiStringKey =
   // The info sheet's one paragraph: glosses are word-by-word translations,
   // not dictionary definitions.
   | 'lemma.translationsNote'
-  // Caption above the lemma's root-definition card. Distinct from the root
-  // screen's own definitions heading (plural, shows every definition) -- a
-  // lemma links to one root and shows that root's own DefinitionCard.
+  // Caption above the lemma's root-definition card: a lemma links to one root
+  // and shows that root's own DefinitionCard.
   | 'lemma.rootDefinition'
   // The lemma screen's root link, relabelled from 'word.root' ("Root"): the
   // link now sits below a DefinitionCard/lemma-no-definition line, and a bare
