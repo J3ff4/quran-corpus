@@ -6,6 +6,20 @@ import type { Client } from '@libsql/client';
 
 async function seed(db: Client): Promise<void> {
   await db.execute("INSERT INTO surahs VALUES (1,'الفاتحة','Al-Fatiha','The Opener','meccan',7,1)");
+  // Name-only rows (no ayahs) so parseVerseRef has something to disambiguate
+  // against: An-Nas is a whole name AND a prefix of An-Nasr, and Al-Muminun /
+  // Al-Mumtahina share a three-letter prefix without sharing a name.
+  await db.execute("INSERT INTO surahs VALUES (2,'البقرة','Al-Baqara','The Cow','medinan',286,87)");
+  await db.execute("INSERT INTO surahs VALUES (23,'المؤمنون','Al-Muminun','The Believers','meccan',118,74)");
+  await db.execute("INSERT INTO surahs VALUES (54,'القمر','Al-Qamar','The Moon','meccan',55,37)");
+  await db.execute("INSERT INTO surahs VALUES (55,'الرحمن','Ar-Rahman','The Beneficent','medinan',78,97)");
+  await db.execute("INSERT INTO surahs VALUES (71,'نوح','Nuh','Noah','meccan',28,71)");
+  await db.execute("INSERT INTO surahs VALUES (76,'الإنسان','Al-Insan','The Man','medinan',31,98)");
+  await db.execute("INSERT INTO surahs VALUES (87,'الأعلى','Al-Ala','The Most High','meccan',19,8)");
+  await db.execute("INSERT INTO surahs VALUES (60,'الممتحنة','Al-Mumtahina','She That Is To Be Examined','medinan',13,91)");
+  await db.execute("INSERT INTO surahs VALUES (110,'النصر','An-Nasr','The Divine Support','medinan',3,114)");
+  await db.execute("INSERT INTO surahs VALUES (112,'الإخلاص','Al-Ikhlas','Sincerity','meccan',4,22)");
+  await db.execute("INSERT INTO surahs VALUES (114,'الناس','An-Nas','Mankind','meccan',6,21)");
   await db.execute(
     "INSERT INTO ayahs (id,surah_id,ayah_number,text_uthmani) VALUES (1,1,1,'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ')",
   );
@@ -67,6 +81,66 @@ describe('parseVerseRef', () => {
   });
   it('returns null for free-text', async () => {
     expect(await parseVerseRef(db, 'mercy of god')).toBeNull();
+  });
+
+  it('resolves a name typed without its article, with an ayah', async () => {
+    // Device check 30: "Al-Baqara 255" resolved and "baqara 255" did not.
+    expect(await parseVerseRef(db, 'baqara 255')).toEqual({ surah: 2, ayah: 255, position: null });
+    expect(await parseVerseRef(db, 'najm')).toBeNull(); // not seeded -- guards the fixture
+  });
+
+  it('resolves an Uzbek or Turkish spelling of a name', async () => {
+    expect(await parseVerseRef(db, 'rahmon')).toEqual({ surah: 55, ayah: null, position: null });
+    expect(await parseVerseRef(db, 'ihlos')).toEqual({ surah: 112, ayah: null, position: null });
+    expect(await parseVerseRef(db, 'bakarah 2')).toEqual({ surah: 2, ayah: 2, position: null });
+  });
+
+  it('prefers a whole name over the longer name it prefixes', async () => {
+    // "nas" IS An-Nas (114) and also a prefix of An-Nasr (110). Ranking the
+    // prefix first would send every reader typing "nas" to the wrong surah.
+    expect(await parseVerseRef(db, 'nas')).toEqual({ surah: 114, ayah: null, position: null });
+  });
+
+  it('resolves an unambiguous prefix', async () => {
+    expect(await parseVerseRef(db, 'baqar')).toEqual({ surah: 2, ayah: null, position: null });
+  });
+
+  it('declines to guess when a prefix fits more than one surah', async () => {
+    // Al-Muminun and Al-Mumtahina both start "mum". No jump row is better
+    // than a jump row that lands on a coin toss; the search hits still show.
+    expect(await parseVerseRef(db, 'mum')).toBeNull();
+  });
+
+  it('does not fold an English name through the transliteration rules', async () => {
+    // Folded like a transliteration ("o" reads as both a and u), "moon" lands
+    // on surah 76's "The Man" and Al-Qamar becomes unreachable by its own name.
+    expect(await parseVerseRef(db, 'moon')).toEqual({ surah: 54, ayah: null, position: null });
+    expect(await parseVerseRef(db, 'man')).toEqual({ surah: 76, ayah: null, position: null });
+  });
+
+  it('does not answer a search for "allah" with Al-Ala', async () => {
+    expect(await parseVerseRef(db, 'allah')).toBeNull();
+    // The name itself still resolves -- the guard is on the -h strip, not on
+    // the article strip that produces this key.
+    expect(await parseVerseRef(db, 'ala')).toEqual({ surah: 87, ayah: null, position: null });
+  });
+
+  it('does not resolve a three-letter name by its first two letters', async () => {
+    expect(await parseVerseRef(db, 'nuh')).toEqual({ surah: 71, ayah: null, position: null });
+    // Under three characters nothing prefix-matches, so only an over-eager -h
+    // strip could turn "nu" into a jump -- and "nu" prefixes eight surahs.
+    expect(await parseVerseRef(db, 'nu')).toBeNull();
+  });
+
+  it('jumps on a whole English name but not on a fragment of one', async () => {
+    expect(await parseVerseRef(db, 'sincerity')).toEqual({ surah: 112, ayah: null, position: null });
+    // "sin" prefixes surah 112's "Sincerity" and is also an ordinary English
+    // word; the verse hits serve that reader better than a jump row does.
+    expect(await parseVerseRef(db, 'sin')).toBeNull();
+  });
+
+  it('still resolves the stored Arabic name', async () => {
+    expect(await parseVerseRef(db, 'الرحمن')).toEqual({ surah: 55, ayah: null, position: null });
   });
 });
 
