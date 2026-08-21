@@ -14,30 +14,14 @@ vi.mock('@quran-corpus/data/mobile', () => ({
   // assertion here, but its absence from this mock throws at import time.
   AYAH_AUDIO_ATTRIBUTION: 'test attribution',
 }));
+// See reactNativeTextMock's doc comment in rnHosts.ts for why Text is built
+// on host('span') plus a layout-handler registry rather than a bare mock: it
+// is what makes this suite exercise the same testID/aria mapping as the
+// component under test, and DefinitionCard renders its definition through
+// ClampedText.
 vi.mock('react-native', async () => {
-  const React = await import('react');
-  const { host } = await import('@/testing/rnHosts.js');
-  // See ClampedText.test.tsx for why Text is built on host('span') plus a
-  // layout-handler registry rather than a bare mock: it is what makes this
-  // suite exercise the same testID/aria mapping as the component under test,
-  // and DefinitionCard renders its definition through ClampedText.
-  const layoutHandlers = new Map<
-    string,
-    (event: { nativeEvent: { lines: { text: string }[] } }) => void
-  >();
-  const HostText = host('span');
-  const Text = ({
-    onTextLayout,
-    ...rest
-  }: Record<string, unknown> & {
-    onTextLayout?: (event: { nativeEvent: { lines: { text: string }[] } }) => void;
-    testID?: string;
-  }) => {
-    const testID = rest.testID as string | undefined;
-    if (testID && onTextLayout) layoutHandlers.set(testID, onTextLayout);
-    return React.createElement(HostText, rest);
-  };
-  return { Text, View: host('div'), Pressable: host('button'), __layoutHandlers: layoutHandlers };
+  const { reactNativeTextMock } = await import('@/testing/rnHosts.js');
+  return reactNativeTextMock();
 });
 
 describe('DefinitionCard', () => {

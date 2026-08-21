@@ -8,51 +8,24 @@ vi.mock('@/theme/themeContext', () => ({
   useThemeColors: () => ({ text: '#000', mutedText: '#666', accent: '#1f6f5b' }),
 }));
 vi.mock('@/settings/settingsStore', () => ({ useAppSettings: () => ({ uiLocale: 'en' }) }));
+// Text is built on rnHosts' host('span') plus its onTextLayout-aware wrapper,
+// which is what routes it through rnHosts' testID/accessibilityState mapping
+// (including the aria-expanded fix this task adds) and gives us `layout()`
+// below to simulate Android's text measurement. See reactNativeTextMock's
+// doc comment in rnHosts.ts for why the registry exists and why this factory
+// reaches it via a dynamic import.
 vi.mock('react-native', async () => {
-  const React = await import('react');
-  const { host } = await import('@/testing/rnHosts.js');
-  // Text is built on host('span'), not a standalone mock: that is what routes
-  // it through rnHosts' testID/accessibilityState mapping (including the
-  // aria-expanded fix this task adds), same as every other suite's
-  // Text/View/Pressable.
-  //
-  // jsdom's MouseEvent constructor silently drops init keys it doesn't
-  // recognise, so a `fireEvent.click(node, { nativeEvent: {...} })` never
-  // makes it to `event.nativeEvent` the way it would on a real synthetic
-  // click -- there is no DOM channel for RN's onTextLayout payload. This
-  // registry is the substitute: `layout()` below looks a component's current
-  // onTextLayout up by the same testID it rendered with and calls it
-  // directly, still inside `act()` so the resulting setState flushes.
-  const layoutHandlers = new Map<
-    string,
-    (event: { nativeEvent: { lines: { text: string }[] } }) => void
-  >();
-  const HostText = host('span');
-  const Text = ({
-    onTextLayout,
-    ...rest
-  }: Record<string, unknown> & {
-    onTextLayout?: (event: { nativeEvent: { lines: { text: string }[] } }) => void;
-    testID?: string;
-  }) => {
-    const testID = rest.testID as string | undefined;
-    if (testID && onTextLayout) layoutHandlers.set(testID, onTextLayout);
-    return React.createElement(HostText, rest);
-  };
-  return { Text, View: host('div'), Pressable: host('button'), __layoutHandlers: layoutHandlers };
+  const { reactNativeTextMock } = await import('@/testing/rnHosts.js');
+  return reactNativeTextMock();
 });
 
 /** Fire onTextLayout with the lines Android would report for a clamp that DID
  *  truncate: six rendered lines whose joined text is shorter than the source. */
 function layout(node: HTMLElement, shown: string[]) {
-  const handlers = (
-    RN as unknown as {
-      __layoutHandlers: Map<string, (event: { nativeEvent: { lines: { text: string }[] } }) => void>;
-    }
-  ).__layoutHandlers;
-  handlers.get(node.dataset.testid ?? '')?.({
-    nativeEvent: { lines: shown.map((text) => ({ text })) },
-  });
+  (RN as unknown as { __fireLayout: (node: HTMLElement, shown: string[]) => void }).__fireLayout(
+    node,
+    shown,
+  );
 }
 
 const LONG = 'a'.repeat(400);
