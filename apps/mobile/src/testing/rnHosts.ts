@@ -21,7 +21,7 @@ interface HostProps {
   accessibilityLabel?: string;
   accessibilityLiveRegion?: 'none' | 'polite' | 'assertive';
   accessibilityRole?: string;
-  accessibilityState?: { disabled?: boolean; selected?: boolean };
+  accessibilityState?: { disabled?: boolean; selected?: boolean; expanded?: boolean };
   children?: React.ReactNode;
   onPress?: () => void;
   role?: string;
@@ -29,13 +29,14 @@ interface HostProps {
   testID?: string;
   // Native-only props with no DOM equivalent. Destructured so they never reach
   // createElement: React logs "Unknown event handler property" for onLayout and
-  // a non-boolean-attribute warning for `accessible` and pointerEvents, on
-  // every render.
+  // onTextLayout, and a non-boolean-attribute warning for `accessible` and
+  // pointerEvents, on every render.
   accessible?: unknown;
   contentContainerStyle?: unknown;
   importantForAccessibility?: unknown;
   numberOfLines?: unknown;
   onLayout?: unknown;
+  onTextLayout?: unknown;
   pointerEvents?: unknown;
 }
 
@@ -61,6 +62,7 @@ export function host(tag: string) {
     importantForAccessibility: _importantForAccessibility,
     numberOfLines: _numberOfLines,
     onLayout: _onLayout,
+    onTextLayout: _onTextLayout,
     pointerEvents: _pointerEvents,
     ...props
   }: HostProps) {
@@ -80,6 +82,7 @@ export function host(tag: string) {
         // lets a test see the state a control announces.
         'aria-disabled': accessibilityState?.disabled,
         'aria-selected': accessibilityState?.selected,
+        'aria-expanded': accessibilityState?.expanded,
         // `role` wins: it is the cross-platform prop, and components that set
         // it (role="dialog") leave accessibilityRole undefined, which would
         // otherwise overwrite it with nothing.

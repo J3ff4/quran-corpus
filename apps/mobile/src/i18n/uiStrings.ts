@@ -116,7 +116,9 @@ export type UiStringKey =
   | 'dictionary.occurrences'
   | 'concordance.empty'
   // A failed page must not read as "no occurrences" -- same finding as m-5.
-  | 'concordance.loadFailed';
+  | 'concordance.loadFailed'
+  | 'text.showMore'
+  | 'text.showLess';
 
 const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
   en: {
@@ -217,6 +219,8 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'dictionary.occurrences': 'occurrences',
     'concordance.empty': 'No occurrences',
     'concordance.loadFailed': 'Unable to load occurrences',
+    'text.showMore': 'Show more',
+    'text.showLess': 'Show less',
   },
   uz: {
     'tabs.home': 'Bosh sahifa',
@@ -316,6 +320,8 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'dictionary.occurrences': 'marta uchraydi',
     'concordance.empty': 'Uchrashlar yo‘q',
     'concordance.loadFailed': 'Uchrashlarni yuklab bo‘lmadi',
+    'text.showMore': 'Ko‘proq ko‘rsatish',
+    'text.showLess': 'Kamroq ko‘rsatish',
   },
   ru: {
     'tabs.home': 'Главная',
@@ -415,6 +421,8 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'dictionary.occurrences': 'вхождений',
     'concordance.empty': 'Нет вхождений',
     'concordance.loadFailed': 'Не удалось загрузить вхождения',
+    'text.showMore': 'Показать больше',
+    'text.showLess': 'Свернуть',
   },
 };
 
