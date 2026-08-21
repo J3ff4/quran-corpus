@@ -82,7 +82,10 @@ vi.mock('react-native', async () => {
 
 const rootEntry = {
   root: { id: 7, root_buckwalter: '{qwl', root_arabic: 'قول', occurrence_count: 1722 },
-  forms: [],
+  forms: [
+    { id: 1, root_id: 7, sort_order: 0, pos_label: 'Form I verb', form_arabic: 'قَالَ',
+      form_translit: 'qāla', gloss: 'to say', occurrence_count: 1618 },
+  ],
   definitions: [],
 };
 
@@ -116,6 +119,9 @@ describe('RootRoute', () => {
         'ru',
         0,
         20,
+        // Trailing formIds: no chip is selected in this test, so the route
+        // passes it through explicitly as undefined rather than omitting it.
+        undefined,
       ),
     );
   });
@@ -126,7 +132,7 @@ describe('RootRoute', () => {
     // The list stops paging at `total`; a wrong one truncates the concordance
     // at whatever number reached it.
     await waitFor(() => expect(screen.getByTestId('concordance-total').textContent).toBe('1722'));
-    expect(mocks.getRootOccurrenceCount).toHaveBeenCalledWith(expect.anything(), '{qwl');
+    expect(mocks.getRootOccurrenceCount).toHaveBeenCalledWith(expect.anything(), '{qwl', undefined);
   });
 
   it('never queries an identifier that is not a root', async () => {
@@ -205,6 +211,53 @@ describe('RootRoute', () => {
     render(<RootRoute />);
     expect((await screen.findByTestId('concordance-heading')).textContent).toBe(
       'Concordance (1722)',
+    );
+  });
+
+  it('narrows the concordance to the selected forms', async () => {
+    render(<RootRoute />);
+    fireEvent.click((await screen.findAllByTestId('form-chip'))[0]!);
+    await waitFor(() =>
+      expect(mocks.getRootOccurrences).toHaveBeenLastCalledWith(
+        expect.anything(), '{qwl', 'ru', 0, expect.any(Number), [1],
+      ),
+    );
+  });
+
+  it('recounts the total for the filtered set', async () => {
+    // Filtering the rows but not the count renders "Concordance (1722)" over 92
+    // occurrences -- the heading would be a lie about what is on screen.
+    mocks.getRootOccurrenceCount.mockResolvedValueOnce(1722).mockResolvedValueOnce(92);
+    render(<RootRoute />);
+    fireEvent.click((await screen.findAllByTestId('form-chip'))[0]!);
+    await waitFor(() =>
+      expect(screen.getByTestId('concordance-heading').textContent).toBe('Concordance (92)'),
+    );
+  });
+
+  it('goes back to every occurrence when the last chip is cleared', async () => {
+    render(<RootRoute />);
+    const chip = (await screen.findAllByTestId('form-chip'))[0]!;
+    fireEvent.click(chip);
+    fireEvent.click(chip);
+    await waitFor(() =>
+      expect(mocks.getRootOccurrences).toHaveBeenLastCalledWith(
+        expect.anything(), '{qwl', 'ru', 0, expect.any(Number), undefined,
+      ),
+    );
+  });
+
+  it('clears the form filter when a neighbour root is opened', async () => {
+    // Form ids are per-root. Carrying one across Previous/Next filters the new
+    // root by an id that belongs to a form it does not have.
+    const { rerender } = render(<RootRoute />);
+    fireEvent.click((await screen.findAllByTestId('form-chip'))[0]!);
+    mocks.buckwalter = 'qwm';
+    rerender(<RootRoute />);
+    await waitFor(() =>
+      expect(mocks.getRootOccurrences).toHaveBeenLastCalledWith(
+        expect.anything(), 'qwm', 'ru', 0, expect.any(Number), undefined,
+      ),
     );
   });
 });

@@ -373,8 +373,9 @@ export interface FrequencyRow {
 export async function getRootOccurrenceCount(
   client: MobileDataClient,
   bw: string,
+  formIds?: number[],
 ): Promise<number> {
-  return countRootConcordance(client, bw);
+  return countRootConcordance(client, bw, formIds);
 }
 
 export async function getRootOccurrences(
@@ -383,8 +384,13 @@ export async function getRootOccurrences(
   lang: ContentLanguageCode,
   offset: number,
   limit: number,
+  formIds?: number[],
 ): Promise<ConcordanceEntry[]> {
-  return getRootConcordancePage(client, bw, { lang, offset, limit });
+  // Not `{ ..., formIds }`: apps/mobile's tsconfig sets
+  // exactOptionalPropertyTypes, which rejects an explicit `undefined` against
+  // ConcordancePageOpts's optional `formIds?: number[]` -- the key has to be
+  // absent, not present-with-undefined.
+  return getRootConcordancePage(client, bw, { lang, offset, limit, ...(formIds && { formIds }) });
 }
 
 export async function getLemmaScreen(

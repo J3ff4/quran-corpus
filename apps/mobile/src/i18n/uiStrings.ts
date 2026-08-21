@@ -58,6 +58,10 @@ export type UiStringKey =
   // Accessible name for the Previous/Next row: two sibling buttons with
   // nothing on their own to say they navigate the hijāʾī root list.
   | 'root.adjacent'
+  // Accessible name for the derived-form filter toolbar above the
+  // concordance heading. Same toolbar-not-radiogroup reasoning as the
+  // Frequent pane's kind chips: the chips multi-select.
+  | 'root.formsFilter'
   // Root screen's concordance heading, read as "Concordance (1722)". t() has
   // no interpolation, so the count is concatenated at the call site.
   | 'concordance.heading'
@@ -180,6 +184,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'root.previous': 'Previous',
     'root.next': 'Next',
     'root.adjacent': 'Adjacent roots',
+    'root.formsFilter': 'Filter by form',
     'lemma.notFound': 'This lemma is not in the corpus',
     'lemma.translatedAs': 'Translated as',
     'surahList.ayahsSuffix': 'ayahs',
@@ -286,6 +291,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'root.previous': 'Oldingi',
     'root.next': 'Keyingi',
     'root.adjacent': 'Qo‘shni o‘zaklar',
+    'root.formsFilter': 'Shakl bo‘yicha filtr',
     'lemma.notFound': 'Bu lemma korpusda yo‘q',
     'lemma.translatedAs': 'Tarjimasi',
     'surahList.ayahsSuffix': 'oyat',
@@ -392,6 +398,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'root.previous': 'Предыдущий',
     'root.next': 'Следующий',
     'root.adjacent': 'Соседние корни',
+    'root.formsFilter': 'Фильтр по форме',
     'lemma.notFound': 'Этой леммы нет в корпусе',
     'lemma.translatedAs': 'Переводится как',
     'surahList.ayahsSuffix': 'аятов',

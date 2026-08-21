@@ -6,6 +6,7 @@ import type { RootEntry } from '@quran-corpus/data/mobile';
 import { ConcordanceList } from '@/components/ConcordanceList';
 import { DefinitionCard } from '@/components/DefinitionCard';
 import { EntryHeader } from '@/components/EntryHeader';
+import { FormFilterChips } from '@/components/FormFilterChips';
 import {
   getAdjacentRoots,
   getRootOccurrenceCount,
@@ -44,6 +45,24 @@ export default function RootRoute() {
   const [total, setTotal] = useState(0);
   const [neighbors, setNeighbors] = useState<Neighbors>(NO_NEIGHBORS);
   const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<number[]>([]);
+
+  // Form ids are per-root: an id from one root's forms means a different form
+  // on the next root, so carrying the selection across an in-app
+  // Previous/Next would filter the new root by a stale id.
+  useEffect(() => {
+    setSelected([]);
+  }, [buckwalter]);
+
+  // Stable string, not the array itself, as the effect/callback dependency
+  // below: `selected` only changes identity via setSelected, but deriving
+  // `formIds` from it fresh every render (and passing that derived value
+  // around) is safer against a future refactor that copies the array -- a
+  // fresh array identity every render would read as "the filter changed" and
+  // restart the concordance from page 0 on every parent render, not only on a
+  // real change. Matches web's reason for the same guard.
+  const selectedKey = selected.slice().sort().join(',');
+  const formIds = selected.length > 0 ? selected : undefined;
 
   useEffect(() => {
     let cancelled = false;
@@ -53,7 +72,6 @@ export default function RootRoute() {
       // not a root has no business reaching SQLite at all.
       if (!buckwalter) {
         setEntry(null);
-        setTotal(0);
         setNeighbors(NO_NEIGHBORS);
         setLoading(false);
         return;
@@ -63,14 +81,12 @@ export default function RootRoute() {
       try {
         const db = await openCorpusDb();
         const client = createExpoSqliteClient(db as ExpoSqliteLike);
-        const [found, count, adjacent] = await Promise.all([
+        const [found, adjacent] = await Promise.all([
           getRootScreen(client, buckwalter),
-          getRootOccurrenceCount(client, buckwalter),
           getAdjacentRoots(client, buckwalter),
         ]);
         if (!cancelled) {
           setEntry(found);
-          setTotal(count);
           setNeighbors(adjacent);
         }
       } catch (cause) {
@@ -79,7 +95,6 @@ export default function RootRoute() {
         console.error('[root] load failed', { buckwalter, cause });
         if (!cancelled) {
           setEntry(null);
-          setTotal(0);
           setNeighbors(NO_NEIGHBORS);
         }
       } finally {
@@ -93,6 +108,30 @@ export default function RootRoute() {
     };
   }, [buckwalter]);
 
+  // Separate from loadRoot: the occurrence count depends on the form filter,
+  // which changes far more often than the root itself and must not re-run
+  // the whole-page loading gate above (a chip tap must recount, not flash a
+  // full-screen spinner over the chips the reader is looking at).
+  useEffect(() => {
+    if (!buckwalter) {
+      setTotal(0);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const db = await openCorpusDb();
+      const client = createExpoSqliteClient(db as ExpoSqliteLike);
+      const count = await getRootOccurrenceCount(client, buckwalter, formIds);
+      if (!cancelled) setTotal(count);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // formIds is omitted: it is derived from `selected` every render, and
+    // `selectedKey` is its stable stand-in for exactly the reason explained
+    // above `selectedKey`'s declaration.
+  }, [buckwalter, selectedKey]);
+
   // Above the early returns, as every hook here must be: a render that bails
   // early would otherwise change the hook order.
   const loadPage = useCallback(
@@ -100,10 +139,21 @@ export default function RootRoute() {
       if (!buckwalter) return [];
       const db = await openCorpusDb();
       const client = createExpoSqliteClient(db as ExpoSqliteLike);
-      return getRootOccurrences(client, buckwalter, contentLanguage, offset, limit);
+      return getRootOccurrences(client, buckwalter, contentLanguage, offset, limit, formIds);
     },
-    [buckwalter, contentLanguage],
+    // formIds omitted for the same reason as the effect above: selectedKey is
+    // its stable stand-in, so this only recreates loadPage on a real change --
+    // ConcordanceList reads a changed loadPage as "a new list" and resets to
+    // page 0, which is exactly what a filter change should do and exactly
+    // what a fresh array identity on every render would do for no reason.
+    [buckwalter, contentLanguage, selectedKey],
   );
+
+  const toggleForm = useCallback((formId: number) => {
+    setSelected((current) =>
+      current.includes(formId) ? current.filter((id) => id !== formId) : [...current, formId],
+    );
+  }, []);
 
   if (loading) {
     return (
@@ -123,7 +173,7 @@ export default function RootRoute() {
     );
   }
 
-  const { root, definitions } = entry;
+  const { root, definitions, forms } = entry;
 
   // A plain View, not a ScrollView: this is the concordance list's header, and
   // a scroll view inside a FlatList header is a nested VirtualizedList, which
@@ -215,6 +265,8 @@ export default function RootRoute() {
         )}
       </View>
 
+      <FormFilterChips forms={forms} selected={selected} onToggle={toggleForm} uiLocale={uiLocale} />
+
       <Text
         testID="concordance-heading"
         role="heading"
@@ -225,5 +277,5 @@ export default function RootRoute() {
     </View>
   );
 
-  return <ConcordanceList total={total} loadPage={loadPage} header={header} />;
+  return <ConcordanceList total={total} loadPage={loadPage} header={header} forms={forms} />;
 }
