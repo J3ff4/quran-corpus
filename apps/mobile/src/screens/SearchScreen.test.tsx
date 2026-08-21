@@ -2,6 +2,7 @@ import React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SearchScreen } from './SearchScreen';
+import { deferred } from '../testing/deferred';
 
 const mocks = vi.hoisted(() => ({
   searchCorpus: vi.fn(),
@@ -227,6 +228,48 @@ describe('SearchScreen', () => {
     fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'zzz-no-match' } });
 
     await waitFor(() => expect(screen.getByText('Nothing found')).toBeTruthy());
+  });
+
+  it('does not flash the no-results message before a query has run', async () => {
+    render(<SearchScreen />);
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'z' } });
+
+    // The verdict belongs to a finished query. Judging it from the box paints
+    // "Nothing found" here, inside the debounce window, on every keystroke --
+    // which is the flicker device check 33 caught.
+    expect(screen.queryByText('Nothing found')).toBeNull();
+    await waitFor(() => expect(screen.getByText('Nothing found')).toBeTruthy());
+  });
+
+  it('keeps the previous verdict on screen while the next query runs', async () => {
+    render(<SearchScreen />);
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'zz' } });
+    await waitFor(() => expect(screen.getByText('Nothing found')).toBeTruthy());
+
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'zzq' } });
+
+    // Still there through the next debounce: blinking it out and back is the
+    // same flicker seen from the other side.
+    expect(screen.getByText('Nothing found')).toBeTruthy();
+  });
+
+  it('holds the spinner back until a query is actually slow', async () => {
+    const inFlight = deferred<unknown>();
+    mocks.searchCorpus.mockReturnValue(inFlight.promise);
+
+    render(<SearchScreen />);
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'x' } });
+    await waitFor(() => expect(mocks.searchCorpus).toHaveBeenCalled());
+
+    // Running, but not yet slow: a local query that answers in single-digit
+    // milliseconds must never paint an indicator at all.
+    expect(screen.queryByTestId('search-loading')).toBeNull();
+
+    await waitFor(() => expect(screen.getByTestId('search-loading')).toBeTruthy());
+    await act(async () => {
+      inFlight.resolve(EMPTY);
+      await inFlight.promise;
+    });
   });
 
   it('reports a failed search instead of an empty result', async () => {
