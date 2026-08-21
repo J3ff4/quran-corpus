@@ -63,6 +63,13 @@ describe('InfoSheet', () => {
     // apps/web dependency only (see DefinitionCard.test.tsx).
     expect(screen.getByTestId('info-body').textContent).toBe('Some note.');
     expect(screen.getByTestId('sheet').getAttribute('data-close-label')).toBe('Close');
+    // getByRole('heading'), not a role-attribute read: it is the query a
+    // screen reader's heading navigation models, and it is exactly what
+    // accessibilityRole="header" fails -- that prop lands as role="header",
+    // the ARIA banner landmark, which this query cannot match. Without this
+    // line the deliberate role="heading" here is untested and silently
+    // revertible.
+    expect(screen.getByRole('heading').textContent).toBe('About these translations');
   });
 
   it('closes when the sheet reports a dismissal', () => {
