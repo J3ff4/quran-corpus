@@ -49,8 +49,6 @@ export type UiStringKey =
   // No 'root.title': the sheet's 'word.root' is already the word "Root" in all
   // three locales, and a second key for the same string is a second place for
   // a translation to drift.
-  | 'root.forms'
-  | 'root.definitions'
   | 'root.noDefinition'
   | 'root.notFound'
   | 'root.previous'
@@ -76,9 +74,9 @@ export type UiStringKey =
   // The info sheet's one paragraph: glosses are word-by-word translations,
   // not dictionary definitions.
   | 'lemma.translationsNote'
-  // Caption above the lemma's root-definition card. Not 'root.definitions'
-  // (plural, root screen shows every definition) -- a lemma links to one root
-  // and shows that root's own DefinitionCard.
+  // Caption above the lemma's root-definition card. Distinct from the root
+  // screen's own definitions heading (plural, shows every definition) -- a
+  // lemma links to one root and shows that root's own DefinitionCard.
   | 'lemma.rootDefinition'
   // The lemma screen's root link, relabelled from 'word.root' ("Root"): the
   // link now sits below a DefinitionCard/lemma-no-definition line, and a bare
@@ -161,7 +159,7 @@ export type UiStringKey =
   | 'text.showMore'
   | 'text.showLess';
 
-const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
+export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
   en: {
     'tabs.home': 'Home',
     'tabs.surahs': 'Surahs',
@@ -205,8 +203,6 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'word.grammar': 'Grammar',
     'word.notFound': 'That word is not in the corpus',
     'word.transliteration': 'Transliteration',
-    'root.forms': 'Forms',
-    'root.definitions': 'Definitions',
     'root.noDefinition': 'No definition for this root yet',
     'root.notFound': 'That root is not in the corpus',
     'root.previous': 'Previous',
@@ -324,8 +320,6 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'word.grammar': 'Grammatika',
     'word.notFound': 'Bu so‘z korpusda yo‘q',
     'word.transliteration': 'Transliteratsiya',
-    'root.forms': 'Shakllar',
-    'root.definitions': 'Ta‘riflar',
     'root.noDefinition': 'Bu o‘zak uchun hali ta‘rif yo‘q',
     'root.notFound': 'Bu o‘zak korpusda yo‘q',
     'root.previous': 'Oldingi',
@@ -443,8 +437,6 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'word.grammar': 'Грамматика',
     'word.notFound': 'Этого слова нет в корпусе',
     'word.transliteration': 'Транслитерация',
-    'root.forms': 'Формы',
-    'root.definitions': 'Определения',
     'root.noDefinition': 'Для этого корня пока нет определения',
     'root.notFound': 'Этого корня нет в корпусе',
     'root.previous': 'Предыдущий',

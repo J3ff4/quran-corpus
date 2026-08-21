@@ -121,9 +121,9 @@ and every check below will fail for the wrong reason.
 
 ## M4 Dictionary + Search Smoke Test
 
-Run on a physical Android device, on a `preview` profile APK built at `9a47500`
-or later — an older build has no `app/lemma/[lemma].tsx`, so check 35's Lemmas
-and Verbs rows route nowhere. Confirm the EAS upload is ~43 MB — a ~5 MB upload
+Run on a physical Android device, on a `preview` profile APK built at `8e23d80`
+or later — an older build has no Dictionary → Browse search box, so check 34
+cannot be run against it. Confirm the EAS upload is ~43 MB — a ~5 MB upload
 means `.easignore` dropped the bundled DB and every check below fails for the
 wrong reason. Run these alongside M3's outstanding checks (F5, F6, check 27 and
 the M2 rosette carry-over).
@@ -140,19 +140,41 @@ the M2 rosette carry-over).
     box glyph or stray control character is visible.
 33. Search nonsense. "Nothing found" — not a spinner that never stops, and not
     "Unable to search", which means FTS5 is missing from the build.
-34. Dictionary → Browse. Tap ق. The list shows that letter's roots; tap one and
-    the root screen opens.
-35. Dictionary → Frequent. Roots, Lemmas and Verbs each load a different list.
-    Tap a verb row: it opens a lemma screen, not a dead end.
-36. Root screen for a common root (قول). Scroll: occurrences keep loading, the
-    same verse never appears twice, and the header scrolls with the list rather
-    than fighting it. The matched word in each snippet must be **bold in the
-    Hafs face** — same glyph shapes as the words around it, only heavier. If it
-    turns into system sans, Android is not synthesising a weight for a
-    single-variant family and the non-colour signal has to become a size bump.
-37. Airplane mode: repeat 29, 31, 34 and 36. All of it is local.
-38. Repeat 29 and 36 in dark mode and at maximum system font size. Nothing
-    clips and the snippet highlight is still legible.
+34. Dictionary → Browse. The full root list is there with no letter tap. Type
+    `ارض` — the stored `أرض` comes back (hamza seats fold). Type `to say` — the
+    meaning search finds قول. Tap ق: the list narrows and the ق cell is visibly
+    marked; tap it again and the list is whole. **Keep typing after the first
+    letter** — if the keyboard closes or the caret jumps, the search box has
+    ended up inside the list header.
+35. Dictionary → Frequent. Roots, Lemmas and Verbs each load a different ranked
+    list, numbered from 1, under a #/Form/Count header. Scroll past row 200 —
+    the list keeps going. Tap a verb row: it opens a lemma screen, not a dead
+    end.
+36. Root screen for قول. The header is centred: three letter pills, "1722
+    occurrences", Previous/Next. Tap Next twice, then Previous twice — you land
+    back on قول. On the first and last root of the alphabet the arrow is dimmed
+    and does nothing rather than disappearing.
+37. Airplane mode: repeat 29, 31, 34, 36, 39 and 40. All of it is local — the
+    paged concordance loading that used to be check 36's own concern now lives
+    in the occurrence rows those two exercise.
+38. Repeat 29, 39 and 40 in dark mode and at maximum system font size. Nothing
+    clips and the form chip and occurrence pill colours are still legible —
+    check 36 no longer carries a snippet highlight of its own to repeat.
+39. Same screen: the derived-form chips wrap over several lines and do not
+    stretch across the row. Tap one — the chip fills with its own colour, the
+    heading recounts (`Concordance (N)` matches the rows below), and the list
+    restarts from the top. Tap it again for the whole list back. Then tap Next:
+    the new root opens with **no chip selected**.
+40. Any occurrence row: it reads `2:3:6` (three parts), carries the form's
+    transliteration in a coloured pill, the word's transliteration and its
+    translation. Tap **Show full verse** — the whole ayah appears and the button
+    reads Show less; the row itself still opens the reader. With TalkBack on,
+    the toggle is reachable as its own control.
+41. Lemma screen for قَالَ: transliteration, sense chips with counts, TRANSLATED
+    AS with a ⓘ that opens a sheet, and the root definition in a card with its
+    credit. A long Lane definition is clamped to six lines with **Show more**;
+    tapping it reveals the rest and the button becomes Show less. Repeat in dark
+    mode at maximum system font size — nothing clips.
 
 ## Current Status
 
