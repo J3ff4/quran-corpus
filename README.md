@@ -121,9 +121,11 @@ and every check below will fail for the wrong reason.
 
 ## M4 Dictionary + Search Smoke Test
 
-Run on a physical Android device, on a `preview` profile APK built at `8e23d80`
-or later — an older build has no Dictionary → Browse search box, so check 34
-cannot be run against it. Confirm the EAS upload is ~43 MB — a ~5 MB upload
+Run on a physical Android device, on a `preview` profile APK built at `9c42fe0`
+or later. Older builds fail these for the wrong reasons: before `8e23d80` there
+is no Dictionary → Browse search box at all (check 34), and before `9c42fe0`
+the lemma ⓘ sheet lays out inside its own header row rather than over the
+screen (check 41) and a form-chip tap restarts the concordance twice (check 39). Confirm the EAS upload is ~43 MB — a ~5 MB upload
 means `.easignore` dropped the bundled DB and every check below fails for the
 wrong reason. Run these alongside M3's outstanding checks (F5, F6, check 27 and
 the M2 rosette carry-over).
