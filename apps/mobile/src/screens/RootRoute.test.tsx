@@ -247,6 +247,20 @@ describe('RootRoute', () => {
     );
   });
 
+  it('drops the total to zero when the recount fails', async () => {
+    // Not a cosmetic fallback: keeping the pre-filter total would caption the
+    // list with a number the failed query never returned. The count runs in a
+    // bare effect nothing awaits, so without its own catch a DB failure is an
+    // unhandled promise rejection rather than a degraded heading.
+    mocks.getRootOccurrenceCount
+      .mockResolvedValueOnce(1722)
+      .mockRejectedValueOnce(new Error('no such table: word_segments'));
+    render(<RootRoute />);
+    await waitFor(() => expect(screen.getByTestId('concordance-total').textContent).toBe('1722'));
+    fireEvent.click((await screen.findAllByTestId('form-chip'))[0]!);
+    await waitFor(() => expect(screen.getByTestId('concordance-total').textContent).toBe('0'));
+  });
+
   it('clears the form filter when a neighbour root is opened', async () => {
     // Form ids are per-root. Carrying one across Previous/Next filters the new
     // root by an id that belongs to a form it does not have.

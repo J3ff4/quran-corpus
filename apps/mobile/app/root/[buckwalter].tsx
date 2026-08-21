@@ -119,10 +119,19 @@ export default function RootRoute() {
     }
     let cancelled = false;
     (async () => {
-      const db = await openCorpusDb();
-      const client = createExpoSqliteClient(db as ExpoSqliteLike);
-      const count = await getRootOccurrenceCount(client, buckwalter, formIds);
-      if (!cancelled) setTotal(count);
+      try {
+        const db = await openCorpusDb();
+        const client = createExpoSqliteClient(db as ExpoSqliteLike);
+        const count = await getRootOccurrenceCount(client, buckwalter, formIds);
+        if (!cancelled) setTotal(count);
+      } catch (cause) {
+        // Same handling as loadRoot: logged for logcat, and the heading falls
+        // back to zero rather than keeping a count from the previous filter,
+        // which would claim rows the failed query never returned. Unhandled
+        // here it would be a bare promise rejection, since nothing awaits it.
+        console.error('[root] count failed', { buckwalter, cause });
+        if (!cancelled) setTotal(0);
+      }
     })();
     return () => {
       cancelled = true;
