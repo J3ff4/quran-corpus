@@ -1,5 +1,5 @@
-import { paper as paperScale, posColors } from '@quran-corpus/config/theme/palette';
-import type { PosBucket } from '@quran-corpus/data/mobile';
+import { paper as paperScale, posColors, formColors } from '@quran-corpus/config/theme/palette';
+import type { FormCategory, PosBucket } from '@quran-corpus/data/mobile';
 
 // Widened out of the palette's `as const` literal types on purpose. Two
 // reasons: ThemeProvider types its context as `typeof themeColors.light`, and
@@ -7,6 +7,12 @@ import type { PosBucket } from '@quran-corpus/data/mobile';
 // annotation is what makes the compiler check that the palette covers every
 // bucket posBucket can return, rather than leaving it to the runtime test.
 const pos: { light: Record<PosBucket, string>; dark: Record<PosBucket, string> } = posColors;
+
+// Widened out of the palette's `as const`, same two reasons as `pos` above:
+// ThemeProvider types its context off the light theme, and this annotation is
+// what makes the compiler check the palette covers every category
+// categorizeFormLabel can return.
+const form: { light: Record<FormCategory, string>; dark: Record<FormCategory, string> } = formColors;
 
 export const colors = {
   paper: paperScale[50],
@@ -45,6 +51,12 @@ export const themeColors = {
     // the light-mode ratios in packages/config/theme/palette.ts carry over
     // unchanged. Lowest is 5.79:1 on the page, 6.05:1 on a card.
     pos: pos.light,
+    // Same hexes web uses, and the same page (#faf8f3 = paper-50), so the
+    // light-mode ratios carry over unchanged: verb 5.90/4.61, verbal-noun
+    // 6.09/4.84, active-participle 5.82/4.63, passive-participle 5.80/4.62,
+    // noun 5.79/4.60, adjective 5.79/4.64, other 7.02/5.55 (page / on its own
+    // 16% tint over the page). Measured 2026-08-21.
+    form: form.light,
   },
   dark: {
     background: colors.night,
@@ -67,6 +79,12 @@ export const themeColors = {
     // noun 8.38, verb 9.00, prep 10.78, pron 9.90, other 7.92:1. All clear AA
     // on the #1d1b18 card surface too, where the lowest is 7.4:1.
     pos: pos.dark,
+    // Re-measured against mobile's warm #151412, not web's neutral #141414:
+    // verb 9.00/6.73, verbal-noun 9.38/6.88, active-participle 10.78/7.68,
+    // passive-participle 9.30/6.83, noun 8.38/6.31, adjective 11.04/7.83,
+    // other 7.92/6.01 (page / on its own 16% tint over the page). Measured
+    // 2026-08-21.
+    form: form.dark,
   },
 };
 
