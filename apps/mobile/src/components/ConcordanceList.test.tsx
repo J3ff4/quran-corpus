@@ -45,30 +45,48 @@ vi.mock('react-native', async () => {
   };
 });
 
-/** One occurrence. `verse_words` is the whole ayah; `word_id` names the match
- *  inside it, which is what trimConcordanceVerse centres the window on. */
-function entry(surah: number, ayah: number, wordId = surah * 1000 + ayah) {
+/** One occurrence, surah 2 ayah 3 by default. `verse_words` is the whole ayah;
+ *  `word_id` names the match inside it, which is what trimConcordanceVerse
+ *  centres the window on -- overriding it without `verse_words` re-centres the
+ *  default 3-word verse on the new id. Any field can be overridden directly. */
+function entry(overrides: Partial<ConcordanceEntry> = {}): ConcordanceEntry {
+  const surah_id = overrides.surah_id ?? 2;
+  const ayah_number = overrides.ayah_number ?? 3;
+  const word_id = overrides.word_id ?? surah_id * 1000 + ayah_number;
   return {
-    surah_id: surah,
-    ayah_number: ayah,
+    surah_id,
+    ayah_number,
     position: 2,
-    word_id: wordId,
+    word_id,
     text_arabic: 'ٱلْغَيْبِ',
     transliteration: null,
     gloss: 'the unseen',
     form_id: null,
     verse_words: [
-      { id: wordId - 1, position: 1, text_arabic: 'يُؤْمِنُونَ', starts_clause: false },
-      { id: wordId, position: 2, text_arabic: 'ٱلْغَيْبِ', starts_clause: false },
-      { id: wordId + 1, position: 3, text_arabic: 'وَيُقِيمُونَ', starts_clause: false },
+      { id: word_id - 1, position: 1, text_arabic: 'يُؤْمِنُونَ', starts_clause: false },
+      { id: word_id, position: 2, text_arabic: 'ٱلْغَيْبِ', starts_clause: false },
+      { id: word_id + 1, position: 3, text_arabic: 'وَيُقِيمُونَ', starts_clause: false },
     ],
+    ...overrides,
   };
+}
+
+/** `n` bare verse words, wide enough (n > 10) for trimConcordanceVerse to have
+ *  something to cut. No `starts_clause` on any of them, so the trim falls back
+ *  to its position-window branch rather than clause-hunting. */
+function words(n: number) {
+  return Array.from({ length: n }, (_, i) => ({ id: i + 1, position: i + 1, text_arabic: `w${i + 1}` }));
+}
+
+/** Wraps a fixed array of entries as a one-shot `loadPage`. */
+function page(entries: ConcordanceEntry[]) {
+  return async () => entries;
 }
 
 /** A full page (PAGE = 20). A short page means "exhausted", so any test about
  *  what happens *after* a page has to hand back a full one. */
 function fullPage(startId = 3000) {
-  return Array.from({ length: 20 }, (_, i) => entry(2, 3 + i, startId + i * 10));
+  return Array.from({ length: 20 }, (_, i) => entry({ ayah_number: 3 + i, word_id: startId + i * 10 }));
 }
 
 /** The DOM of the first committed frame. A layout effect runs in the commit
@@ -98,7 +116,7 @@ describe('ConcordanceList', () => {
   beforeEach(() => {
     loadPage.mockReset();
     mocks.push.mockReset();
-    loadPage.mockResolvedValue([entry(2, 3)]);
+    loadPage.mockResolvedValue([entry()]);
   });
 
   afterEach(cleanup);
@@ -134,7 +152,7 @@ describe('ConcordanceList', () => {
   it('stops on a short page rather than probing for an empty one', async () => {
     // `total` can overstate what the query returns. A page short of the limit
     // is already the end -- asking again costs a round trip to learn nothing.
-    loadPage.mockResolvedValue([entry(2, 3), entry(2, 4), entry(2, 5)]);
+    loadPage.mockResolvedValue([entry(), entry({ ayah_number: 4 }), entry({ ayah_number: 5 })]);
     render(<ConcordanceList total={60} loadPage={loadPage} header={<span />} />);
     await waitFor(() => expect(screen.getAllByTestId('concordance-row')).toHaveLength(3));
 
@@ -162,7 +180,7 @@ describe('ConcordanceList', () => {
     await waitFor(() => expect(screen.getAllByTestId('concordance-row')).toHaveLength(20));
 
     await act(async () => {
-      inFlight.resolve([entry(9, 9, 9999)]);
+      inFlight.resolve([entry({ surah_id: 9, ayah_number: 9, word_id: 9999 })]);
       await inFlight.promise;
     });
 
@@ -230,7 +248,7 @@ describe('ConcordanceList', () => {
 
     rerender(<ConcordanceList total={0} loadPage={empty} header={<span />} />);
     await act(async () => {
-      inFlight.resolve([entry(9, 9, 9999)]);
+      inFlight.resolve([entry({ surah_id: 9, ayah_number: 9, word_id: 9999 })]);
       await inFlight.promise;
     });
 
@@ -301,7 +319,7 @@ describe('ConcordanceList', () => {
     const label = screen.getByTestId('concordance-row').getAttribute('aria-label') ?? '';
     expect(label).toContain('يُؤْمِنُونَ');
     expect(label).toContain('وَيُقِيمُونَ');
-    expect(label.startsWith('2:3, the unseen')).toBe(true);
+    expect(label.startsWith('2:3:2, the unseen')).toBe(true);
   });
 
   it('opens the verse it names', async () => {
@@ -365,5 +383,83 @@ describe('ConcordanceList', () => {
     await waitFor(() => expect(screen.getAllByTestId('concordance-row')).toHaveLength(20));
 
     expect(screen.queryByTestId('concordance-status')).toBeNull();
+  });
+
+  it('names the word by surah, ayah and position', async () => {
+    // Two-part "2:3" names an ayah, not an occurrence -- a verse with the same
+    // root twice produced two identical-looking rows.
+    render(<ConcordanceList total={1} loadPage={page([entry({ position: 6 })])} header={<div />} />);
+    expect((await screen.findByTestId('concordance-ref')).textContent).toBe('2:3:6');
+  });
+
+  it('tags the occurrence with its derived form', async () => {
+    const forms = [{ id: 7, root_id: 1, sort_order: 0, pos_label: 'Form IV verb',
+      form_arabic: 'أقول', form_translit: 'aqāla', gloss: 'to say', occurrence_count: 3 }];
+    render(<ConcordanceList total={1} forms={forms}
+      loadPage={page([entry({ form_id: 7 })])} header={<div />} />);
+    expect((await screen.findByTestId('concordance-form')).textContent).toBe('aqāla');
+  });
+
+  it('renders no tag when the entry matched no form', async () => {
+    render(<ConcordanceList total={1} forms={[]} loadPage={page([entry({ form_id: null })])} header={<div />} />);
+    await screen.findByTestId('concordance-row');
+    expect(screen.queryByTestId('concordance-form')).toBeNull();
+  });
+
+  it('renders no tag when the caller supplied no forms', async () => {
+    // The lemma screen has no derived forms; a form_id it cannot resolve must
+    // print nothing rather than a raw id.
+    render(<ConcordanceList total={1} loadPage={page([entry({ form_id: 7 })])} header={<div />} />);
+    await screen.findByTestId('concordance-row');
+    expect(screen.queryByTestId('concordance-form')).toBeNull();
+  });
+
+  it('shows the word transliteration and its translation', async () => {
+    render(<ConcordanceList total={1}
+      loadPage={page([entry({ transliteration: 'qāla', gloss: 'he said' })])} header={<div />} />);
+    expect((await screen.findByTestId('concordance-translit')).textContent).toBe('qāla');
+    expect(screen.getByTestId('concordance-gloss').textContent).toBe('he said');
+  });
+
+  it('offers the full verse only when the trim actually cut it', async () => {
+    const long = entry({ verse_words: words(12), word_id: 6 });
+    render(<ConcordanceList total={1} loadPage={page([long])} header={<div />} />);
+    expect((await screen.findByTestId('concordance-expand')).textContent).toBe('Show full verse');
+
+    cleanup();
+    const short = entry({ verse_words: words(3), word_id: 2 });
+    render(<ConcordanceList total={1} loadPage={page([short])} header={<div />} />);
+    await screen.findByTestId('concordance-row');
+    expect(screen.queryByTestId('concordance-expand')).toBeNull();
+  });
+
+  it('expands to every word of the verse and back', async () => {
+    const long = entry({ verse_words: words(12), word_id: 6 });
+    render(<ConcordanceList total={1} loadPage={page([long])} header={<div />} />);
+    const toggle = await screen.findByTestId('concordance-expand');
+    fireEvent.click(toggle);
+    expect(screen.getByTestId('concordance-verse').textContent).toContain('w12');
+    expect(toggle.textContent).toBe('Show less');
+    fireEvent.click(toggle);
+    // Not a negated matcher (jest-dom isn't installed): assert on textContent.
+    expect(screen.getByTestId('concordance-verse').textContent).not.toContain('w12');
+  });
+
+  it('keeps the expand toggle out of the row so it is reachable', async () => {
+    // The row is one accessibility node whose label replaces its subtree; a
+    // toggle nested inside it announces as nothing.
+    const long = entry({ verse_words: words(12), word_id: 6 });
+    render(<ConcordanceList total={1} loadPage={page([long])} header={<div />} />);
+    const toggle = await screen.findByTestId('concordance-expand');
+    expect(screen.getByTestId('concordance-row').contains(toggle)).toBe(false);
+  });
+
+  it('opens the reader from the row, not from the toggle', async () => {
+    const long = entry({ verse_words: words(12), word_id: 6 });
+    render(<ConcordanceList total={1} loadPage={page([long])} header={<div />} />);
+    fireEvent.click(await screen.findByTestId('concordance-expand'));
+    expect(mocks.push).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('concordance-row'));
+    expect(mocks.push).toHaveBeenCalledWith('/surah/2?ayah=3');
   });
 });

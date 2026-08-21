@@ -1,9 +1,11 @@
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
-import { trimConcordanceVerse, type ConcordanceEntry } from '@quran-corpus/data/mobile';
+import { trimConcordanceVerse, type ConcordanceEntry, type RootForm } from '@quran-corpus/data/mobile';
 import { t } from '@/i18n/uiStrings';
+import type { UiLocaleCode } from '@/i18n/languages';
 import { useAppSettings } from '@/settings/settingsStore';
+import { formColorFor } from '@/theme/formTint';
 import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
@@ -21,14 +23,204 @@ export interface ConcordanceListProps {
    *  loaded, so an inline arrow silently refetches on every parent render. */
   loadPage: (offset: number, limit: number) => Promise<ConcordanceEntry[]>;
   header: ReactElement;
+  /** Derived forms to tag occurrences with, by `form_id`. Optional by design:
+   *  the lemma screen has no derived forms to pass, and an entry whose
+   *  `form_id` cannot be resolved (undefined here, or absent from the list)
+   *  renders no tag rather than a raw id. */
+  forms?: RootForm[];
+}
+
+function ConcordanceRow({
+  item,
+  forms,
+  uiLocale,
+}: {
+  item: ConcordanceEntry;
+  forms: RootForm[] | undefined;
+  uiLocale: UiLocaleCode;
+}) {
+  const theme = useThemeColors();
+  // Per-row, not lifted: each row's expansion is independent, and this only
+  // works because the row is its own component -- a renderItem closure can't
+  // hold hook state across FlatList's re-renders.
+  const [expanded, setExpanded] = useState(false);
+
+  // Same window web shows: the clause around the match, capped, with the
+  // flags saying which side was cut.
+  const trimmed = trimConcordanceVerse(item.verse_words, item.word_id);
+  const shown = expanded ? item.verse_words : trimmed.words;
+  // Only when the trim really cut something: a short ayah must not carry a
+  // control that does nothing.
+  const canExpand = trimmed.words.length < item.verse_words.length;
+  const form = item.form_id === null ? undefined : forms?.find((f) => f.id === item.form_id);
+  const formStyle = form ? formColorFor(theme, form.pos_label) : null;
+
+  return (
+    <View style={{ paddingHorizontal: 20, paddingVertical: 12, gap: 4 }}>
+      <Pressable
+        testID="concordance-row"
+        accessibilityRole="link"
+        // Pressable is one accessibility node, so this label replaces the
+        // subtree's text rather than adding to it -- the verse has to be in
+        // here or it is unreachable without opening every row. Reference and
+        // gloss lead because they identify the row; the Arabic reads as one
+        // long run and belongs last. t() has no interpolation. Transliteration
+        // and the form tag are left out: both are already visible text next to
+        // the Arabic they annotate, and a longer label buys nothing here.
+        accessibilityLabel={`${item.surah_id}:${item.ayah_number}:${item.position}${item.gloss ? `, ${item.gloss}` : ''}, ${shown.map((word) => word.text_arabic).join(' ')}`}
+        onPress={() => router.push(`/surah/${item.surah_id}?ayah=${item.ayah_number}`)}
+        style={{ gap: 4, minHeight: touchTargets.minimum }}
+      >
+        <View
+          // RTL, as in AlphabetGrid and FrequencyList: the Arabic takes the
+          // start (right) edge, the reference the end.
+          style={{
+            flexDirection: 'row-reverse',
+            alignItems: 'baseline',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}
+        >
+          <View
+            // Word, form tag and transliteration travel together at the start
+            // edge -- they all describe the same occurrence -- leaving the
+            // 3-part reference alone at the end.
+            style={{ flexDirection: 'row-reverse', alignItems: 'baseline', gap: 6, flexShrink: 1 }}
+          >
+            <Text
+              style={{
+                color: theme.text,
+                fontFamily: 'Hafs',
+                fontSize: typography.body,
+                writingDirection: 'rtl',
+              }}
+            >
+              {item.text_arabic}
+            </Text>
+            {form && formStyle ? (
+              <View
+                testID="concordance-form"
+                style={{
+                  backgroundColor: formStyle.tint,
+                  borderRadius: 999,
+                  paddingHorizontal: 6,
+                  paddingVertical: 2,
+                }}
+              >
+                {/* form_translit is the readable name of the form; pos_label is
+                    the fallback for the ~none that lack one. */}
+                <Text style={{ color: formStyle.color, fontSize: typography.caption, fontWeight: '600' }}>
+                  {form.form_translit ?? form.pos_label}
+                </Text>
+              </View>
+            ) : null}
+            {item.transliteration ? (
+              <Text testID="concordance-translit" style={{ color: theme.mutedText, fontSize: typography.caption }}>
+                {item.transliteration}
+              </Text>
+            ) : null}
+          </View>
+          <Text testID="concordance-ref" style={{ color: theme.mutedText, fontSize: typography.caption }}>
+            {item.surah_id}:{item.ayah_number}:{item.position}
+          </Text>
+        </View>
+
+        {item.gloss ? (
+          <Text testID="concordance-gloss" style={{ color: theme.mutedText, fontSize: typography.caption }}>
+            {item.gloss}
+          </Text>
+        ) : null}
+
+        <Text
+          testID="concordance-verse"
+          style={{
+            color: theme.mutedText,
+            fontFamily: 'Hafs',
+            // typography.body, not useArabicSizes: this is a list row, not
+            // reading text -- sizes.reader is 28px and would make one
+            // occurrence fill the screen. The reader's own size setting
+            // governs the reader.
+            fontSize: typography.body,
+            writingDirection: 'rtl',
+            // Full-width block child of a column Pressable, so textAlign
+            // places it (unlike FrequencyList's content-sized flex child).
+            textAlign: 'right',
+          }}
+        >
+          {/* Dimmed like web's text-paper-400: the sentinels mark a cut, they
+              are not part of the verse and must not read as its words. Hidden
+              once expanded -- the whole verse is showing, there is nothing
+              left to mark as cut. */}
+          {trimmed.truncatedBefore && !expanded ? <Text style={{ color: theme.border }}>… </Text> : ''}
+          {shown.map((word, index) => (
+            // The separator sits outside the word's own Text so the tinted
+            // node is exactly the match -- a leading space inside it widens
+            // the tint and makes the match unassertable by its text.
+            <Fragment key={word.id}>
+              {index > 0 ? ' ' : ''}
+              <Text
+                testID={word.id === item.word_id ? 'concordance-match' : undefined}
+                // Nesting Text per word is safe here where SegmentedWord had
+                // to join runs by hand (f409ed0): Arabic does not shape
+                // across a space, so a word boundary breaks nothing.
+                //
+                // Three signals, because one is not enough for either
+                // standard. Hue alone is 1.26:1 light / 1.15:1 dark against
+                // the surrounding muted text, so the match is unfindable
+                // with a colour-vision deficiency (1.4.11); wash and tint
+                // are both still colour, so WCAG 1.4.1 needs a signal that
+                // is not (weight).
+                //
+                // Weight matches web's `font-semibold` exactly: both
+                // products load the same single-weight hafs.18.woff2 with no
+                // bold face, so web's signal is the browser synthesising one
+                // and this is Android doing the same. No underline -- it
+                // collides with the sub-baseline diacritics.
+                style={
+                  word.id === item.word_id
+                    ? {
+                        color: theme.accent,
+                        backgroundColor: theme.accentWash,
+                        fontWeight: '700',
+                      }
+                    : undefined
+                }
+              >
+                {word.text_arabic}
+              </Text>
+            </Fragment>
+          ))}
+          {trimmed.truncatedAfter && !expanded ? <Text style={{ color: theme.border }}> …</Text> : ''}
+        </Text>
+      </Pressable>
+
+      {/* Outside the Pressable above, deliberately: the row is one
+          accessibility node whose label replaces its subtree, so a nested
+          toggle announces as nothing -- and a press target inside a press
+          target is ambiguous on Android. */}
+      {canExpand ? (
+        <Pressable
+          testID="concordance-expand"
+          accessibilityRole="button"
+          accessibilityState={{ expanded }}
+          onPress={() => setExpanded((value) => !value)}
+          style={{ minHeight: touchTargets.compact, justifyContent: 'center', alignSelf: 'flex-start' }}
+        >
+          <Text style={{ color: theme.accent, fontSize: typography.caption }}>
+            {t(uiLocale, expanded ? 'text.showLess' : 'concordance.showFullVerse')}
+          </Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
 }
 
 /** Paged occurrences under a screen's own header. Shared by the root and lemma
- *  screens, which differ only in header and loader.
+ *  screens, which differ only in header, loader and (root only) forms.
  *
  *  Rows are Pressable, not Link: expo-router's Link renders a Text on native,
  *  and the row is a two-line layout whose Views would not lay out inside one. */
-export function ConcordanceList({ total, loadPage, header }: ConcordanceListProps) {
+export function ConcordanceList({ total, loadPage, header, forms }: ConcordanceListProps) {
   const { uiLocale } = useAppSettings();
   const theme = useThemeColors();
 
@@ -99,122 +291,10 @@ export function ConcordanceList({ total, loadPage, header }: ConcordanceListProp
   }, [loadMore, total]);
 
   const renderItem = useCallback(
-    ({ item }: { item: ConcordanceEntry }) => {
-      // Same window web shows: the clause around the match, capped, with the
-      // flags saying which side was cut.
-      const trimmed = trimConcordanceVerse(item.verse_words, item.word_id);
-      return (
-        <Pressable
-          testID="concordance-row"
-          accessibilityRole="link"
-          // Pressable is one accessibility node, so this label replaces the
-          // subtree's text rather than adding to it -- the verse has to be in
-          // here or it is unreachable without opening every row. Reference and
-          // gloss lead because they identify the row; the Arabic reads as one
-          // long run and belongs last. t() has no interpolation.
-          accessibilityLabel={`${item.surah_id}:${item.ayah_number}${item.gloss ? `, ${item.gloss}` : ''}, ${trimmed.words.map((word) => word.text_arabic).join(' ')}`}
-          onPress={() => router.push(`/surah/${item.surah_id}?ayah=${item.ayah_number}`)}
-          style={{
-            paddingHorizontal: 20,
-            paddingVertical: 12,
-            minHeight: touchTargets.minimum,
-            gap: 4,
-          }}
-        >
-          <View
-            // RTL, as in AlphabetGrid and FrequencyList: the Arabic takes the
-            // start (right) edge, the reference the end.
-            style={{
-              flexDirection: 'row-reverse',
-              alignItems: 'baseline',
-              justifyContent: 'space-between',
-              gap: 12,
-            }}
-          >
-            <Text
-              style={{
-                color: theme.text,
-                fontFamily: 'Hafs',
-                fontSize: typography.body,
-                writingDirection: 'rtl',
-              }}
-            >
-              {item.text_arabic}
-            </Text>
-            <Text style={{ color: theme.mutedText, fontSize: typography.caption }}>
-              {item.surah_id}:{item.ayah_number}
-            </Text>
-          </View>
-
-          {item.gloss ? (
-            <Text style={{ color: theme.mutedText, fontSize: typography.caption }}>
-              {item.gloss}
-            </Text>
-          ) : null}
-
-          <Text
-            testID="concordance-verse"
-            style={{
-              color: theme.mutedText,
-              fontFamily: 'Hafs',
-              // typography.body, not useArabicSizes: this is a list row, not
-              // reading text -- sizes.reader is 28px and would make one
-              // occurrence fill the screen. The reader's own size setting
-              // governs the reader.
-              fontSize: typography.body,
-              writingDirection: 'rtl',
-              // Full-width block child of a column Pressable, so textAlign
-              // places it (unlike FrequencyList's content-sized flex child).
-              textAlign: 'right',
-            }}
-          >
-            {/* Dimmed like web's text-paper-400: the sentinels mark a cut, they
-                are not part of the verse and must not read as its words. */}
-            {trimmed.truncatedBefore ? <Text style={{ color: theme.border }}>… </Text> : ''}
-            {trimmed.words.map((word, index) => (
-              // The separator sits outside the word's own Text so the tinted
-              // node is exactly the match -- a leading space inside it widens
-              // the tint and makes the match unassertable by its text.
-              <Fragment key={word.id}>
-                {index > 0 ? ' ' : ''}
-                <Text
-                  testID={word.id === item.word_id ? 'concordance-match' : undefined}
-                  // Nesting Text per word is safe here where SegmentedWord had
-                  // to join runs by hand (f409ed0): Arabic does not shape
-                  // across a space, so a word boundary breaks nothing.
-                  //
-                  // Three signals, because one is not enough for either
-                  // standard. Hue alone is 1.26:1 light / 1.15:1 dark against
-                  // the surrounding muted text, so the match is unfindable
-                  // with a colour-vision deficiency (1.4.11); wash and tint
-                  // are both still colour, so WCAG 1.4.1 needs a signal that
-                  // is not (weight).
-                  //
-                  // Weight matches web's `font-semibold` exactly: both
-                  // products load the same single-weight hafs.18.woff2 with no
-                  // bold face, so web's signal is the browser synthesising one
-                  // and this is Android doing the same. No underline -- it
-                  // collides with the sub-baseline diacritics.
-                  style={
-                    word.id === item.word_id
-                      ? {
-                          color: theme.accent,
-                          backgroundColor: theme.accentWash,
-                          fontWeight: '700',
-                        }
-                      : undefined
-                  }
-                >
-                  {word.text_arabic}
-                </Text>
-              </Fragment>
-            ))}
-            {trimmed.truncatedAfter ? <Text style={{ color: theme.border }}> …</Text> : ''}
-          </Text>
-        </Pressable>
-      );
-    },
-    [theme],
+    ({ item }: { item: ConcordanceEntry }) => (
+      <ConcordanceRow item={item} forms={forms} uiLocale={uiLocale} />
+    ),
+    [forms, uiLocale],
   );
 
   // One node, two slots. An empty list renders it as the empty state; a list

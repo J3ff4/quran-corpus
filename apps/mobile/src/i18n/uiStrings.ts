@@ -125,6 +125,7 @@ export type UiStringKey =
   | 'concordance.empty'
   // A failed page must not read as "no occurrences" -- same finding as m-5.
   | 'concordance.loadFailed'
+  | 'concordance.showFullVerse'
   | 'text.showMore'
   | 'text.showLess';
 
@@ -231,6 +232,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'concordance.heading': 'Concordance',
     'concordance.empty': 'No occurrences',
     'concordance.loadFailed': 'Unable to load occurrences',
+    'concordance.showFullVerse': 'Show full verse',
     'text.showMore': 'Show more',
     'text.showLess': 'Show less',
   },
@@ -336,6 +338,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'concordance.heading': 'Uchrashuvlar',
     'concordance.empty': 'Uchrashlar yo‘q',
     'concordance.loadFailed': 'Uchrashlarni yuklab bo‘lmadi',
+    'concordance.showFullVerse': 'To‘liq oyatni ko‘rsatish',
     'text.showMore': 'Ko‘proq ko‘rsatish',
     'text.showLess': 'Kamroq ko‘rsatish',
   },
@@ -441,6 +444,7 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'concordance.heading': 'Конкорданс',
     'concordance.empty': 'Нет вхождений',
     'concordance.loadFailed': 'Не удалось загрузить вхождения',
+    'concordance.showFullVerse': 'Показать весь аят',
     'text.showMore': 'Показать больше',
     'text.showLess': 'Свернуть',
   },
