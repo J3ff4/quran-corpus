@@ -53,24 +53,17 @@ vi.mock('@/components/ConcordanceList', async () => {
 
 // InfoSheet has its own suite (InfoSheet.test.tsx). Stubbed here to a bare
 // button/body pair so this suite covers only what LemmaScreen hands it --
-// the label and body strings -- without pulling BottomSheet's reanimated and
-// gesture-handler dependencies into a screen suite that isn't about them.
+// the label and body strings, and where in the tree each one lands -- without
+// pulling BottomSheet's reanimated and gesture-handler dependencies into a
+// screen suite that isn't about them. Neither stub holds state: the open state
+// is the screen's, which is the whole reason the two are separate components.
 vi.mock('@/components/InfoSheet', async () => {
   const React = await import('react');
   return {
-    InfoSheet: ({ label, body }: { label: string; body: string }) => {
-      const [open, setOpen] = React.useState(false);
-      return React.createElement(
-        React.Fragment,
-        null,
-        React.createElement(
-          'button',
-          { 'data-testid': 'info-button', onClick: () => setOpen(true) },
-          label,
-        ),
-        open ? React.createElement('div', { 'data-testid': 'info-body' }, body) : null,
-      );
-    },
+    InfoButton: ({ label, onPress }: { label: string; onPress: () => void }) =>
+      React.createElement('button', { 'data-testid': 'info-button', onClick: onPress }, label),
+    InfoSheet: ({ body }: { body: string }) =>
+      React.createElement('div', { 'data-testid': 'info-body' }, body),
   };
 });
 
@@ -319,6 +312,30 @@ describe('LemmaScreen', () => {
     render(<LemmaScreen lemmaBuckwalter="qaAla" />);
     fireEvent.click(await screen.findByTestId('info-button'));
     expect(screen.getByTestId('info-body').textContent).toContain('not dictionary definitions');
+  });
+
+  it('mounts the sheet outside the concordance, not in its scrolling header', async () => {
+    // BottomSheet is StyleSheet.absoluteFill with no Modal or portal, so it
+    // fills its PARENT. Mounted where the button is -- inside the FlatList
+    // header, inside a 20dp row -- the backdrop and panel lay out inside that
+    // row and scroll away with the list. Only the button belongs in the header.
+    render(<LemmaScreen lemmaBuckwalter="qaAla" />);
+    fireEvent.click(await screen.findByTestId('info-button'));
+
+    const concordance = screen.getByTestId('concordance');
+    expect(concordance.contains(screen.getByTestId('info-button'))).toBe(true);
+    expect(concordance.contains(screen.getByTestId('info-body'))).toBe(false);
+  });
+
+  it('hides the list from TalkBack while the sheet is up', async () => {
+    // accessibilityViewIsModal is iOS-only; without this the reader can swipe
+    // straight past the sheet into the rows behind it.
+    render(<LemmaScreen lemmaBuckwalter="qaAla" />);
+    const wrapper = () => screen.getByTestId('concordance').parentElement!;
+    await waitFor(() => expect(wrapper().getAttribute('data-hidden-from-a11y')).toBeNull());
+
+    fireEvent.click(screen.getByTestId('info-button'));
+    expect(wrapper().getAttribute('data-hidden-from-a11y')).toBe('true');
   });
 
   it('carries the root definition with its credit', async () => {

@@ -28,6 +28,10 @@ export interface ConcordanceListProps {
    *  `form_id` cannot be resolved (undefined here, or absent from the list)
    *  renders no tag rather than a raw id. */
   forms?: RootForm[];
+  /** The caller's own occurrence count failed, so `total` is 0 for a reason
+   *  that is not "there are none". Without it the list renders its empty state
+   *  and a root with 1722 occurrences reads as having none (m-5). */
+  countFailed?: boolean;
 }
 
 function ConcordanceRow({
@@ -220,7 +224,13 @@ function ConcordanceRow({
  *
  *  Rows are Pressable, not Link: expo-router's Link renders a Text on native,
  *  and the row is a two-line layout whose Views would not lay out inside one. */
-export function ConcordanceList({ total, loadPage, header, forms }: ConcordanceListProps) {
+export function ConcordanceList({
+  total,
+  loadPage,
+  header,
+  forms,
+  countFailed = false,
+}: ConcordanceListProps) {
   const { uiLocale } = useAppSettings();
   const theme = useThemeColors();
 
@@ -301,17 +311,20 @@ export function ConcordanceList({ total, loadPage, header, forms }: ConcordanceL
   // that loaded some pages and then broke renders it under the last row, where
   // the reader is looking. It cannot appear in both at once -- the footer branch
   // requires rows and ListEmptyComponent renders only without them.
+  // Either half is a broken read, and both render the same sentence: a page
+  // that threw, or a total that never arrived.
+  const broken = failed || countFailed;
   const status = (
     <Text
       testID="concordance-status"
-      accessibilityRole={failed ? 'alert' : undefined}
+      accessibilityRole={broken ? 'alert' : undefined}
       // Without the live region the alert role announces nothing: the
       // node appears after mount, and TalkBack only speaks a subtree it
       // is already watching. Same pairing as SearchScreen and WbwScreen.
-      accessibilityLiveRegion={failed ? 'polite' : undefined}
+      accessibilityLiveRegion={broken ? 'polite' : undefined}
       style={{ color: theme.mutedText, padding: 20, fontSize: typography.body }}
     >
-      {t(uiLocale, failed ? 'concordance.loadFailed' : 'concordance.empty')}
+      {t(uiLocale, broken ? 'concordance.loadFailed' : 'concordance.empty')}
     </Text>
   );
 

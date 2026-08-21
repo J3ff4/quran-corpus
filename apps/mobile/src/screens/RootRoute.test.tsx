@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import RootRoute from '../../app/root/[buckwalter]';
 
@@ -14,6 +14,9 @@ const mocks = vi.hoisted(() => ({
   getRootOccurrences: vi.fn(),
   getAdjacentRoots: vi.fn(),
   push: vi.fn(),
+  /** The `total` in force each time ConcordanceList is handed a new loadPage,
+   *  i.e. each time it would restart the list. */
+  listResets: [] as number[],
 }));
 
 vi.mock('expo-router', () => ({
@@ -49,17 +52,24 @@ vi.mock('@/settings/settingsStore', () => ({
 vi.mock('@/components/ConcordanceList', async () => {
   const React = await import('react');
   return {
-    ConcordanceList: ({ total, loadPage, header }: {
+    ConcordanceList: ({ total, loadPage, header, countFailed }: {
       total: number;
       loadPage: (offset: number, limit: number) => Promise<unknown[]>;
       header: React.ReactElement;
+      countFailed?: boolean;
     }) => {
+      // The real component resets on a change to EITHER loadPage or total, so
+      // recording the total that arrives with each new loadPage is what shows
+      // whether the two are handed over together.
+      const totalRef = React.useRef(total);
+      totalRef.current = total;
       React.useEffect(() => {
+        mocks.listResets.push(totalRef.current);
         void loadPage(0, 20);
       }, [loadPage]);
       return React.createElement(
         'div',
-        null,
+        { 'data-count-failed': countFailed ? 'true' : 'false' },
         header,
         React.createElement('span', { 'data-testid': 'concordance-total' }, String(total)),
       );
@@ -98,6 +108,7 @@ describe('RootRoute', () => {
     mocks.getRootOccurrences.mockReset();
     mocks.getAdjacentRoots.mockReset();
     mocks.push.mockReset();
+    mocks.listResets.length = 0;
     mocks.getRootScreen.mockResolvedValue(rootEntry);
     mocks.getRootOccurrenceCount.mockResolvedValue(1722);
     mocks.getRootOccurrences.mockResolvedValue([]);
@@ -247,11 +258,16 @@ describe('RootRoute', () => {
     );
   });
 
-  it('drops the total to zero when the recount fails', async () => {
+  it('drops the total to zero when the recount fails, and says the read broke', async () => {
     // Not a cosmetic fallback: keeping the pre-filter total would caption the
     // list with a number the failed query never returned. The count runs in a
     // bare effect nothing awaits, so without its own catch a DB failure is an
     // unhandled promise rejection rather than a degraded heading.
+    //
+    // The zero alone is not enough. `total` is also the list's stop condition,
+    // so a zero it cannot explain renders the empty state -- "no occurrences"
+    // for a root with 1722 of them, which is exactly the m-5 failure this
+    // phase already fixed on the paging path.
     mocks.getRootOccurrenceCount
       .mockResolvedValueOnce(1722)
       .mockRejectedValueOnce(new Error('no such table: word_segments'));
@@ -259,6 +275,53 @@ describe('RootRoute', () => {
     await waitFor(() => expect(screen.getByTestId('concordance-total').textContent).toBe('1722'));
     fireEvent.click((await screen.findAllByTestId('form-chip'))[0]!);
     await waitFor(() => expect(screen.getByTestId('concordance-total').textContent).toBe('0'));
+    expect(
+      screen.getByTestId('concordance-total').parentElement!.getAttribute('data-count-failed'),
+    ).toBe('true');
+  });
+
+  it('waits for the new root count rather than captioning it with the old one', async () => {
+    // getRootScreen is three round trips and the count is one, so the count
+    // usually wins -- but not always. Whichever order they land in, a header
+    // rendered on the entry alone captions the new root with the previous
+    // root's total, and loadPage pages the wrong root under it.
+    let releaseCount: (count: number) => void = () => {};
+    mocks.getRootOccurrenceCount
+      .mockResolvedValueOnce(1722)
+      .mockImplementationOnce(
+        () =>
+          new Promise<number>((resolve) => {
+            releaseCount = resolve;
+          }),
+      );
+    const { rerender } = render(<RootRoute />);
+    await waitFor(() => expect(screen.getByTestId('concordance-total').textContent).toBe('1722'));
+
+    mocks.buckwalter = 'qwm';
+    rerender(<RootRoute />);
+
+    await waitFor(() => expect(mocks.getRootScreen).toHaveBeenCalledTimes(2));
+    expect(screen.queryByTestId('concordance-total')).toBeNull();
+
+    await act(async () => {
+      releaseCount(3);
+    });
+    await waitFor(() => expect(screen.getByTestId('concordance-total').textContent).toBe('3'));
+  });
+
+  it('restarts the list once per filter change, against the count taken for it', async () => {
+    // ConcordanceList reads both `total` and `loadPage` as list identity. Hand
+    // it the new filter before its count lands and it resets against the old
+    // total, fetches page 0, then resets and fetches page 0 again when the
+    // count arrives -- two queries and a visible flash of rows appearing and
+    // vanishing. [1722, 1722] here is that bug; [1722, 92] is the fix.
+    mocks.getRootOccurrenceCount.mockResolvedValueOnce(1722).mockResolvedValueOnce(92);
+    render(<RootRoute />);
+    await waitFor(() => expect(mocks.listResets).toEqual([1722]));
+
+    fireEvent.click((await screen.findAllByTestId('form-chip'))[0]!);
+
+    await waitFor(() => expect(mocks.listResets).toEqual([1722, 92]));
   });
 
   it('clears the form filter when a neighbour root is opened', async () => {

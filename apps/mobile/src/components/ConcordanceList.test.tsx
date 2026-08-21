@@ -274,6 +274,22 @@ describe('ConcordanceList', () => {
     expect(html).toContain('No occurrences');
   });
 
+  it('says the read broke when the caller could not count, not that there are none', async () => {
+    // A failed count arrives here as total 0, which is otherwise
+    // indistinguishable from a root that really has no occurrences -- and
+    // captioning 1722 occurrences "No occurrences" is the m-5 failure this
+    // component already guards on the paging path.
+    render(<ConcordanceList total={0} loadPage={loadPage} header={<span />} countFailed />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('concordance-status').textContent).toBe(
+        'Unable to load occurrences',
+      ),
+    );
+    expect(screen.getByTestId('concordance-status').getAttribute('role')).toBe('alert');
+    expect(screen.getByTestId('concordance-status').getAttribute('aria-live')).toBe('polite');
+  });
+
   it('shows the verse around the match, not the matched word alone', async () => {
     render(<ConcordanceList total={1} loadPage={loadPage} header={<span />} />);
 

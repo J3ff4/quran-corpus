@@ -110,7 +110,7 @@ export function host(tag: string) {
     testID,
     accessible: _accessible,
     contentContainerStyle: _contentContainerStyle,
-    importantForAccessibility: _importantForAccessibility,
+    importantForAccessibility,
     numberOfLines: _numberOfLines,
     onLayout: _onLayout,
     onTextLayout: _onTextLayout,
@@ -139,6 +139,11 @@ export function host(tag: string) {
         // otherwise overwrite it with nothing.
         role: role ?? accessibilityRole,
         'data-testid': testID,
+        // A data- attribute, not the camelCase prop: React warns about an
+        // unknown DOM attribute. It is Android's only way to take a subtree
+        // away from TalkBack behind a sheet (accessibilityViewIsModal is
+        // iOS-only), so a test has to be able to see it.
+        'data-hidden-from-a11y': importantForAccessibility === 'no-hide-descendants' ? 'true' : undefined,
         onClick: onPress,
         style: flattenStyle(style),
       },

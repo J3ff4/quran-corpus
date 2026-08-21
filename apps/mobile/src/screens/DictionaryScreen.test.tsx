@@ -96,6 +96,7 @@ vi.mock('react-native', async () => {
     );
 
   return {
+    ActivityIndicator: () => React.createElement('span', { 'data-testid': 'spinner' }),
     FlatList: List,
     Pressable: host('button'),
     Text: host('span'),
@@ -163,12 +164,26 @@ describe('DictionaryScreen', () => {
     expect(screen.getAllByTestId('dictionary-row')).toHaveLength(1);
   });
 
-  it('says so when nothing matched', async () => {
+  it('spins while the root list loads rather than claiming there are none', () => {
+    // getAllRootsForBrowse is a 1642-row GROUP_CONCAT join. Rendering the
+    // empty state for that stretch tells the reader the dictionary is empty,
+    // which is indistinguishable from a broken build.
     render(<DictionaryScreen />);
 
-    fireEvent.change(await screen.findByTestId('dictionary-search'), { target: { value: 'zzzz' } });
+    expect(screen.getByTestId('spinner')).toBeTruthy();
+    expect(screen.queryByTestId('dictionary-empty')).toBeNull();
+  });
+
+  it('says so when nothing matched', async () => {
+    // renderLoaded, not a bare render: before the roots land the empty slot is
+    // a spinner, so a bare render would pass this whether or not the no-match
+    // state exists.
+    await renderLoaded();
+
+    fireEvent.change(screen.getByTestId('dictionary-search'), { target: { value: 'zzzz' } });
 
     expect(screen.getByTestId('dictionary-empty')).toBeTruthy();
+    expect(screen.queryByTestId('spinner')).toBeNull();
   });
 
   it('sorts by frequency and drops the letter filter with it', async () => {

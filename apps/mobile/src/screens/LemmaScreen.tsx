@@ -6,7 +6,7 @@ import { posBucket, type LemmaEntry } from '@quran-corpus/data/mobile';
 import { ConcordanceList } from '@/components/ConcordanceList';
 import { DefinitionCard } from '@/components/DefinitionCard';
 import { EntryHeader } from '@/components/EntryHeader';
-import { InfoSheet } from '@/components/InfoSheet';
+import { InfoButton, InfoSheet } from '@/components/InfoSheet';
 import { getLemmaOccurrences, getLemmaScreen } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { t } from '@/i18n/uiStrings';
@@ -35,6 +35,9 @@ export function LemmaScreen({ lemmaBuckwalter }: LemmaScreenProps) {
   const [entry, setEntry] = useState<LemmaEntry | null>(null);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(lemmaBuckwalter !== null);
+  // Owned here, not by InfoSheet: BottomSheet fills its parent, and the button
+  // that opens it lives in the FlatList header. See InfoButton's docstring.
+  const [infoOpen, setInfoOpen] = useState(false);
 
   useEffect(() => {
     if (lemmaBuckwalter === null) {
@@ -161,10 +164,10 @@ export function LemmaScreen({ lemmaBuckwalter }: LemmaScreenProps) {
             <Text style={{ color: theme.mutedText, fontSize: typography.caption }}>
               {t(uiLocale, 'lemma.translatedAs')}
             </Text>
-            <InfoSheet
-              uiLocale={uiLocale}
+            <InfoButton
               label={t(uiLocale, 'lemma.aboutTranslations')}
-              body={t(uiLocale, 'lemma.translationsNote')}
+              expanded={infoOpen}
+              onPress={() => setInfoOpen(true)}
             />
           </View>
           <Text style={{ color: theme.text, fontSize: typography.body }}>
@@ -216,5 +219,22 @@ export function LemmaScreen({ lemmaBuckwalter }: LemmaScreenProps) {
     </View>
   );
 
-  return <ConcordanceList total={total} loadPage={loadPage} header={header} />;
+  return (
+    <View style={{ flex: 1 }}>
+      {/* accessibilityViewIsModal is iOS-only, so on Android this is what stops
+          TalkBack swiping into the list behind the sheet -- same pairing as
+          WbwScreen. */}
+      <View style={{ flex: 1 }} importantForAccessibility={infoOpen ? 'no-hide-descendants' : 'auto'}>
+        <ConcordanceList total={total} loadPage={loadPage} header={header} />
+      </View>
+      {infoOpen ? (
+        <InfoSheet
+          uiLocale={uiLocale}
+          label={t(uiLocale, 'lemma.aboutTranslations')}
+          body={t(uiLocale, 'lemma.translationsNote')}
+          onClose={() => setInfoOpen(false)}
+        />
+      ) : null}
+    </View>
+  );
 }

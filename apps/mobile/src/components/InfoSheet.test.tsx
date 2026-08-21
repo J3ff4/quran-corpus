@@ -1,7 +1,7 @@
 import React from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { InfoSheet } from './InfoSheet';
+import { InfoButton, InfoSheet } from './InfoSheet';
 
 // The shell has its own suite (BottomSheet.test.tsx). Stubbed here so this one
 // covers the wiring -- accessible name, open/close state, what body reaches
@@ -38,11 +38,14 @@ vi.mock('react-native', async () => {
   };
 });
 
-describe('InfoSheet', () => {
+describe('InfoButton', () => {
   afterEach(cleanup);
 
-  it('names the info button with the given label and starts closed', () => {
-    render(<InfoSheet label="About these translations" body="Some note." uiLocale="en" />);
+  it('names the info button with the given label and reports its state', () => {
+    const onPress = vi.fn();
+    const { rerender } = render(
+      <InfoButton label="About these translations" expanded={false} onPress={onPress} />,
+    );
 
     const button = screen.getByTestId('info-button');
     expect(button.getAttribute('aria-label')).toBe('About these translations');
@@ -50,15 +53,37 @@ describe('InfoSheet', () => {
     // only, not .pressed -- see LemmaScreen.test.tsx's note on the same
     // mapping.
     expect(button.getAttribute('aria-expanded')).toBe('false');
-    expect(screen.queryByTestId('info-body')).toBeNull();
+
+    fireEvent.click(button);
+    expect(onPress).toHaveBeenCalledTimes(1);
+
+    rerender(<InfoButton label="About these translations" expanded onPress={onPress} />);
+    expect(screen.getByTestId('info-button').getAttribute('aria-expanded')).toBe('true');
   });
 
-  it('opens the sheet with the given body on tap', () => {
-    render(<InfoSheet label="About these translations" body="Some note." uiLocale="en" />);
+  it('renders no sheet of its own', () => {
+    // The whole point of the split: a sheet mounted beside this button would
+    // lay out inside whatever short row the button sits in, because
+    // BottomSheet fills its parent rather than the window.
+    render(<InfoButton label="About these translations" expanded onPress={() => {}} />);
 
-    fireEvent.click(screen.getByTestId('info-button'));
+    expect(screen.queryByTestId('sheet')).toBeNull();
+  });
+});
 
-    expect(screen.getByTestId('info-button').getAttribute('aria-expanded')).toBe('true');
+describe('InfoSheet', () => {
+  afterEach(cleanup);
+
+  it('renders the given body under the label as a heading', () => {
+    render(
+      <InfoSheet
+        label="About these translations"
+        body="Some note."
+        uiLocale="en"
+        onClose={() => {}}
+      />,
+    );
+
     // .textContent, not the jest-dom toHaveTextContent matcher: jest-dom is an
     // apps/web dependency only (see DefinitionCard.test.tsx).
     expect(screen.getByTestId('info-body').textContent).toBe('Some note.');
@@ -72,13 +97,13 @@ describe('InfoSheet', () => {
     expect(screen.getByRole('heading').textContent).toBe('About these translations');
   });
 
-  it('closes when the sheet reports a dismissal', () => {
-    render(<InfoSheet label="About these translations" body="Some note." uiLocale="en" />);
-
-    fireEvent.click(screen.getByTestId('info-button'));
-    expect(screen.getByTestId('info-body')).toBeTruthy();
+  it('passes a dismissal straight through to its owner', () => {
+    const onClose = vi.fn();
+    render(
+      <InfoSheet label="About these translations" body="Some note." uiLocale="en" onClose={onClose} />,
+    );
 
     fireEvent.click(screen.getByTestId('close-sheet'));
-    expect(screen.queryByTestId('info-body')).toBeNull();
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

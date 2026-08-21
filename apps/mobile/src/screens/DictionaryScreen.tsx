@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from 'react-native';
 import { router, useNavigation } from 'expo-router';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
 import {
@@ -243,11 +243,21 @@ export function DictionaryScreen() {
                 </>
               }
               ListEmptyComponent={
-                <View style={{ padding: 20 }}>
-                  <Text testID="dictionary-empty" style={{ color: theme.mutedText }}>
-                    {t(uiLocale, 'dictionary.noRootsFound')}
-                  </Text>
-                </View>
+                // getAllRootsForBrowse is a 1642-row GROUP_CONCAT join, so the
+                // gap before it settles is real. `roots` is null for exactly
+                // that stretch, and "No roots found" over an empty corpus reads
+                // as a broken build rather than as a list on its way.
+                roots === null ? (
+                  <View style={{ padding: 20 }}>
+                    <ActivityIndicator />
+                  </View>
+                ) : (
+                  <View style={{ padding: 20 }}>
+                    <Text testID="dictionary-empty" style={{ color: theme.mutedText }}>
+                      {t(uiLocale, 'dictionary.noRootsFound')}
+                    </Text>
+                  </View>
+                )
               }
               renderItem={({ item }) => (
                 <DictionaryRow

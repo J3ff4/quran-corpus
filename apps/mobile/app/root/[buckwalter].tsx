@@ -27,6 +27,20 @@ interface Neighbors {
 
 const NO_NEIGHBORS: Neighbors = { prev: null, next: null };
 
+/** A form filter together with the occurrence count taken for it. The two are
+ *  one value because ConcordanceList reads both as list identity: handing it a
+ *  filter whose count has not landed yet resets the list twice. */
+interface AppliedFilter {
+  /** `${root}|${sorted form ids}` this count was taken for. */
+  key: string;
+  root: string;
+  /** Empty means no filter -- every occurrence of the root. */
+  ids: number[];
+  total: number;
+  /** The count query threw, so `total` is 0 for a reason that is not "none". */
+  failed: boolean;
+}
+
 /** One root: its Arabic form, hijāʾī-adjacent roots to page between, the
  *  lexicon definitions, and every occurrence in the corpus paging in beneath.
  *  Reached from the reader sheet's root link or from a deep link. */
@@ -42,10 +56,10 @@ export default function RootRoute() {
   const buckwalter = useMemo(() => parseRootParam(params.buckwalter), [params.buckwalter]);
 
   const [entry, setEntry] = useState<RootEntry | null>(null);
-  const [total, setTotal] = useState(0);
   const [neighbors, setNeighbors] = useState<Neighbors>(NO_NEIGHBORS);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<number[]>([]);
+  const [applied, setApplied] = useState<AppliedFilter | null>(null);
 
   // Form ids are per-root: an id from one root's forms means a different form
   // on the next root, so carrying the selection across an in-app
@@ -54,15 +68,13 @@ export default function RootRoute() {
     setSelected([]);
   }, [buckwalter]);
 
-  // Stable string, not the array itself, as the effect/callback dependency
-  // below: `selected` only changes identity via setSelected, but deriving
-  // `formIds` from it fresh every render (and passing that derived value
-  // around) is safer against a future refactor that copies the array -- a
-  // fresh array identity every render would read as "the filter changed" and
-  // restart the concordance from page 0 on every parent render, not only on a
-  // real change. Matches web's reason for the same guard.
-  const selectedKey = selected.slice().sort().join(',');
-  const formIds = selected.length > 0 ? selected : undefined;
+  // Stable string, not the array itself, as the effect dependency below:
+  // `selected` only changes identity via setSelected, but deriving a value
+  // from it fresh every render (and depending on that) would read as "the
+  // filter changed" on every parent render. Matches web's reason for the same
+  // guard. Scoped by root as well, because a form id means a different form on
+  // the next root.
+  const countKey = `${buckwalter ?? ''}|${selected.slice().sort((a, b) => a - b).join(',')}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -112,50 +124,74 @@ export default function RootRoute() {
   // which changes far more often than the root itself and must not re-run
   // the whole-page loading gate above (a chip tap must recount, not flash a
   // full-screen spinner over the chips the reader is looking at).
+  //
+  // It publishes the filter and its count in one state, and nothing below
+  // reads `selected` directly. ConcordanceList treats a change in EITHER
+  // `total` or `loadPage` as "this is a different list", so applying the new
+  // filter the instant a chip is tapped resets the list against the previous
+  // filter's total and then resets it again when the count lands -- two page-0
+  // queries and a visible flash of rows appearing and vanishing. The chips
+  // still show the tap immediately; only the list waits for its own count.
   useEffect(() => {
     if (!buckwalter) {
-      setTotal(0);
+      setApplied(null);
       return;
     }
     let cancelled = false;
+    const ids = selected.slice().sort((a, b) => a - b);
     (async () => {
       try {
         const db = await openCorpusDb();
         const client = createExpoSqliteClient(db as ExpoSqliteLike);
-        const count = await getRootOccurrenceCount(client, buckwalter, formIds);
-        if (!cancelled) setTotal(count);
+        const count = await getRootOccurrenceCount(
+          client,
+          buckwalter,
+          ids.length > 0 ? ids : undefined,
+        );
+        if (!cancelled) {
+          setApplied({ key: countKey, root: buckwalter, ids, total: count, failed: false });
+        }
       } catch (cause) {
         // Same handling as loadRoot: logged for logcat, and the heading falls
         // back to zero rather than keeping a count from the previous filter,
         // which would claim rows the failed query never returned. Unhandled
         // here it would be a bare promise rejection, since nothing awaits it.
+        // `failed` travels with it because a zero total alone renders the
+        // list's empty state -- "no occurrences" for a root with 1722 (m-5).
         console.error('[root] count failed', { buckwalter, cause });
-        if (!cancelled) setTotal(0);
+        if (!cancelled) {
+          setApplied({ key: countKey, root: buckwalter, ids, total: 0, failed: true });
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-    // formIds is omitted: it is derived from `selected` every render, and
-    // `selectedKey` is its stable stand-in for exactly the reason explained
-    // above `selectedKey`'s declaration.
-  }, [buckwalter, selectedKey]);
+    // `selected` is read but not listed: countKey is its stable stand-in, for
+    // exactly the reason explained above countKey's declaration.
+  }, [buckwalter, countKey]);
 
   // Above the early returns, as every hook here must be: a render that bails
   // early would otherwise change the hook order.
   const loadPage = useCallback(
     async (offset: number, limit: number) => {
-      if (!buckwalter) return [];
+      if (!applied) return [];
       const db = await openCorpusDb();
       const client = createExpoSqliteClient(db as ExpoSqliteLike);
-      return getRootOccurrences(client, buckwalter, contentLanguage, offset, limit, formIds);
+      return getRootOccurrences(
+        client,
+        applied.root,
+        contentLanguage,
+        offset,
+        limit,
+        applied.ids.length > 0 ? applied.ids : undefined,
+      );
     },
-    // formIds omitted for the same reason as the effect above: selectedKey is
-    // its stable stand-in, so this only recreates loadPage on a real change --
+    // `applied`, not buckwalter + the raw selection: its identity changes once
+    // per settled count, in the same commit as the `total` that goes with it.
     // ConcordanceList reads a changed loadPage as "a new list" and resets to
-    // page 0, which is exactly what a filter change should do and exactly
-    // what a fresh array identity on every render would do for no reason.
-    [buckwalter, contentLanguage, selectedKey],
+    // page 0, which is what a filter change should do -- once.
+    [applied, contentLanguage],
   );
 
   const toggleForm = useCallback((formId: number) => {
@@ -164,12 +200,14 @@ export default function RootRoute() {
     );
   }, []);
 
+  const spinner = (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.background }}>
+      <ActivityIndicator />
+    </View>
+  );
+
   if (loading) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.background }}>
-        <ActivityIndicator />
-      </View>
-    );
+    return spinner;
   }
 
   if (!entry) {
@@ -180,6 +218,16 @@ export default function RootRoute() {
         </Text>
       </View>
     );
+  }
+
+  // The entry query is three round trips and the count is one, so the count
+  // usually wins -- but not always, and a header rendered before it lands
+  // shows the previous root's total over the new root's rows. Both gate the
+  // same first frame. A chip tap does NOT come through here: `applied` still
+  // holds the previous filter for this same root, so the list stays put
+  // instead of flashing a full-screen spinner over the chips.
+  if (applied === null || applied.root !== buckwalter) {
+    return spinner;
   }
 
   const { root, definitions, forms } = entry;
@@ -281,10 +329,18 @@ export default function RootRoute() {
         role="heading"
         style={{ color: theme.mutedText, fontSize: typography.caption }}
       >
-        {t(uiLocale, 'concordance.heading')} ({total})
+        {t(uiLocale, 'concordance.heading')} ({applied.total})
       </Text>
     </View>
   );
 
-  return <ConcordanceList total={total} loadPage={loadPage} header={header} forms={forms} />;
+  return (
+    <ConcordanceList
+      total={applied.total}
+      loadPage={loadPage}
+      header={header}
+      forms={forms}
+      countFailed={applied.failed}
+    />
+  );
 }
