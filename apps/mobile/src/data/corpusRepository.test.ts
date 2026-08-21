@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { MobileDataClient, MobileRow, SqlValue } from '@quran-corpus/mobile-data';
 import {
+  FREQUENCY_LIMIT,
   getAllRootsForBrowse,
   getAyahReaderLocation,
   getFrequencyRows,
@@ -74,6 +75,24 @@ describe('getFrequencyRows', () => {
 
     expect(rows[0]!.href).toBe('/lemma/qAl');
     expect(rows[0]!.arabic).toBe('يَقُولُ');
+  });
+
+  it('asks the shared query for its own limit rather than taking the 200 default', async () => {
+    // The shared queries default to 200 rows. Dropping the argument here is
+    // invisible -- the list still renders, just truncated a fifth of the way
+    // in, with the bottom of the data reading as the end of it.
+    const limits: SqlValue[][] = [];
+    const client: MobileDataClient = {
+      async execute(statement) {
+        limits.push(typeof statement === 'string' ? [] : (statement.args ?? []));
+        return { rows: [] };
+      },
+    };
+
+    await getFrequencyRows(client, 'verbs', FREQUENCY_LIMIT);
+
+    expect(FREQUENCY_LIMIT).toBeGreaterThan(200);
+    expect(limits[0]).toEqual([FREQUENCY_LIMIT]);
   });
 
   it('omits a row with no lemma identifier rather than linking to /lemma/', async () => {

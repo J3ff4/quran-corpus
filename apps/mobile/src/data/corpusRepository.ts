@@ -401,14 +401,21 @@ export async function getLemmaOccurrences(
   return getLemmaConcordancePage(client, lemmaBw, { lang, offset, limit });
 }
 
+/** Rows per Frequent list. The shared queries default to 200, which is a page
+ *  and a half of scrolling -- short enough that a reader hits the bottom and
+ *  reads it as the end of the data. 1000 rows of three columns is ~40KB across
+ *  the bridge from a local file, once per chip tap. */
+export const FREQUENCY_LIMIT = 1000;
+
 /** The Frequent pane's three lists flattened to one row shape, so the screen
  *  renders one list rather than three that differ only in field names. */
 export async function getFrequencyRows(
   client: MobileDataClient,
   kind: 'roots' | 'lemmas' | 'verbs',
+  limit = FREQUENCY_LIMIT,
 ): Promise<FrequencyRow[]> {
   if (kind === 'roots') {
-    const roots = await getRootsByFrequency(client);
+    const roots = await getRootsByFrequency(client, limit);
     return roots.map((root) => ({
       href: `/root/${encodeURIComponent(root.root_buckwalter)}`,
       arabic: root.root_arabic,
@@ -418,7 +425,7 @@ export async function getFrequencyRows(
   }
 
   if (kind === 'lemmas') {
-    const lemmas = await getLemmaFrequency(client);
+    const lemmas = await getLemmaFrequency(client, limit);
     // Both queries filter `lemma_buckwalter IS NOT NULL`, so this drops nothing
     // today -- but the row type still allows null, and `?? ''` would build a
     // dead `/lemma/` link rather than omit an unroutable row.
@@ -432,7 +439,7 @@ export async function getFrequencyRows(
       }));
   }
 
-  const verbs = await getVerbConcordance(client);
+  const verbs = await getVerbConcordance(client, limit);
   return verbs
     .filter((row) => row.lemma_buckwalter !== null)
     .map((row) => ({

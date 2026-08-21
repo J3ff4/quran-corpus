@@ -6,7 +6,13 @@ import { FrequencyList } from './FrequencyList';
 const mocks = vi.hoisted(() => ({ getFrequencyRows: vi.fn(), push: vi.fn() }));
 
 vi.mock('@/settings/settingsStore', () => ({ useAppSettings: () => ({ uiLocale: 'en' }) }));
-vi.mock('@/data/corpusRepository', () => ({ getFrequencyRows: mocks.getFrequencyRows }));
+// FREQUENCY_LIMIT mirrors the real export: the list imports it, so a mock that
+// omits it fails the module load. That the constant itself is above the shared
+// 200 default is asserted against the real module in corpusRepository.test.ts.
+vi.mock('@/data/corpusRepository', () => ({
+  getFrequencyRows: mocks.getFrequencyRows,
+  FREQUENCY_LIMIT: 1000,
+}));
 vi.mock('@/data/openCorpusDb', () => ({ openCorpusDb: () => Promise.resolve({}) }));
 vi.mock('@quran-corpus/mobile-data', () => ({ createExpoSqliteClient: () => ({}) }));
 vi.mock('expo-router', () => ({ router: { push: mocks.push } }));
@@ -68,7 +74,7 @@ describe('FrequencyList', () => {
     await waitFor(() => expect(screen.getByText('قول')).toBeTruthy());
     expect(screen.getByText('1722')).toBeTruthy();
 
-    fireEvent.click(screen.getByTestId('frequency-row'));
+    fireEvent.click(screen.getByTestId('dictionary-row'));
     expect(mocks.push).toHaveBeenCalledWith('/root/qwl');
   });
 
@@ -95,9 +101,53 @@ describe('FrequencyList', () => {
 
     // Unlabelled, the row announces "قول 1722, link" -- nothing says what the
     // number counts.
-    await waitFor(() => expect(screen.getByTestId('frequency-row')).toBeTruthy());
-    const label = screen.getByTestId('frequency-row').getAttribute('aria-label') ?? '';
+    await waitFor(() => expect(screen.getByTestId('dictionary-row')).toBeTruthy());
+    const label = screen.getByTestId('dictionary-row').getAttribute('aria-label') ?? '';
     expect(label).toContain('1722 occurrences');
+  });
+
+  it('numbers the rows from one', async () => {
+    mocks.getFrequencyRows.mockResolvedValue([
+      { href: '/root/qwl', arabic: 'قول', gloss: null, count: 1722 },
+      { href: '/root/kwn', arabic: 'كون', gloss: null, count: 1390 },
+      { href: '/root/rbb', arabic: 'رب', gloss: null, count: 980 },
+    ]);
+
+    render(<FrequencyList kind="roots" />);
+
+    // A frequency list whose rows carry no position makes the reader count
+    // down the screen to answer "how far into the top is this".
+    const ranks = await screen.findAllByTestId('dictionary-rank');
+    expect(ranks[0]!.textContent).toBe('1');
+    expect(ranks[2]!.textContent).toBe('3');
+  });
+
+  it('heads the columns so the trailing number is not a bare integer', async () => {
+    render(<FrequencyList kind="roots" />);
+
+    expect((await screen.findByTestId('frequency-header')).textContent).toContain('Count');
+  });
+
+  it('asks for more than the top 200', async () => {
+    // The shared queries default to 200; the table is the surface where a
+    // reader actually scrolls past it.
+    render(<FrequencyList kind="lemmas" />);
+
+    await waitFor(() =>
+      expect(mocks.getFrequencyRows).toHaveBeenCalledWith(expect.anything(), 'lemmas', 1000),
+    );
+  });
+
+  it('reuses the browse row rather than a second row layout', async () => {
+    mocks.getFrequencyRows.mockResolvedValue([
+      { href: '/lemma/qAl', arabic: 'يَقُولُ', gloss: 'قَالَ', count: 1722 },
+      { href: '/lemma/kAn', arabic: 'كَانَ', gloss: 'كَانَ', count: 1390 },
+      { href: '/lemma/qAla', arabic: 'قَالُوا', gloss: 'قَالَ', count: 980 },
+    ]);
+
+    render(<FrequencyList kind="verbs" />);
+
+    expect(await screen.findAllByTestId('dictionary-row')).toHaveLength(3);
   });
 
   it('says so when the query fails, rather than showing an empty list', async () => {

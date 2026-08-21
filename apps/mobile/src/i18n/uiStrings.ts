@@ -148,6 +148,12 @@ export type UiStringKey =
   // Trails the count in a frequency row's accessible name, read as
   // "1722 occurrences". t() has no interpolation, so it is a bare word.
   | 'dictionary.occurrences'
+  // Column labels above the Frequent list. Without them the trailing number is
+  // a bare integer beside an Arabic word, which reads as anything from a verse
+  // number to a page reference.
+  | 'dictionary.columnRank'
+  | 'dictionary.columnForm'
+  | 'dictionary.columnCount'
   | 'concordance.empty'
   // A failed page must not read as "no occurrences" -- same finding as m-5.
   | 'concordance.loadFailed'
@@ -265,6 +271,9 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'dictionary.frequentFailed': 'Unable to load the list',
     'dictionary.kindFilter': 'Filter by kind',
     'dictionary.occurrences': 'occurrences',
+    'dictionary.columnRank': '#',
+    'dictionary.columnForm': 'Form',
+    'dictionary.columnCount': 'Count',
     'concordance.heading': 'Concordance',
     'concordance.empty': 'No occurrences',
     'concordance.loadFailed': 'Unable to load occurrences',
@@ -381,6 +390,9 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'dictionary.frequentFailed': 'Ro‘yxatni yuklab bo‘lmadi',
     'dictionary.kindFilter': 'Turi bo‘yicha filtr',
     'dictionary.occurrences': 'marta uchraydi',
+    'dictionary.columnRank': '#',
+    'dictionary.columnForm': 'Shakl',
+    'dictionary.columnCount': 'Soni',
     'concordance.heading': 'Uchrashuvlar',
     'concordance.empty': 'Uchrashlar yo‘q',
     'concordance.loadFailed': 'Uchrashlarni yuklab bo‘lmadi',
@@ -497,6 +509,9 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'dictionary.frequentFailed': 'Не удалось загрузить список',
     'dictionary.kindFilter': 'Фильтр по типу',
     'dictionary.occurrences': 'вхождений',
+    'dictionary.columnRank': '№',
+    'dictionary.columnForm': 'Форма',
+    'dictionary.columnCount': 'Кол-во',
     'concordance.heading': 'Конкорданс',
     'concordance.empty': 'Нет вхождений',
     'concordance.loadFailed': 'Не удалось загрузить вхождения',
