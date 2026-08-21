@@ -231,9 +231,8 @@ describe('LemmaScreen', () => {
         lemma: 'آبَ',
         lemma_buckwalter: '>Ab',
         transliteration: null,
-        // '>' is a Buckwalter letter and an unsafe path character (see
-        // LetterScreen's equivalent case): the href must carry it
-        // percent-encoded or the root route 404s.
+        // '>' is a Buckwalter letter and an unsafe path character: the href
+        // must carry it percent-encoded or the root route 404s.
         root_buckwalter: '>wb',
         count: 1,
         senses: [],

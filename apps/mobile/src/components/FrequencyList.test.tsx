@@ -156,7 +156,8 @@ describe('FrequencyList', () => {
     render(<FrequencyList kind="roots" />);
 
     // A blank pane reads as "there is nothing here", which is wrong and not
-    // retryable-looking. Same finding Task 5 fixed on LetterScreen (m-5).
+    // retryable-looking. Same finding m-5 raised against the letter screen
+    // Task 9 replaced.
     await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
     expect(screen.getByRole('alert').textContent).toBe('Unable to load the list');
   });

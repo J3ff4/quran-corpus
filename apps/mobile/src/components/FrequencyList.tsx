@@ -50,7 +50,7 @@ export function FrequencyList({ kind }: FrequencyListProps) {
   }, [kind]);
 
   if (loading) {
-    // Same container LetterScreen uses: a bare indicator paints small and
+    // Full-height container, not a bare indicator: that paints small and
     // left-aligned, then the pane snaps to a full-height list on every tap.
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
