@@ -1,6 +1,5 @@
 import { selectedTranslators, type MobileDataClient } from '@quran-corpus/mobile-data';
 import {
-  compareRootsArabic,
   countLemmaConcordance,
   countRootConcordance,
   getAyahsBySurah,
@@ -331,31 +330,18 @@ export async function getAdjacentRoots(
   return getRootNeighbors(client, bw);
 }
 
-/** Roots filed under one hijāʾī letter, in dictionary order.
- *
- *  Filtered and sorted in JS, not in SQL, and deliberately so: rootFirstLetter
- *  folds hamza seats (أ إ آ ٱ to ا) and ى to ي, so a SQL prefix match would
- *  file those under four separate letters, and SQLite's binary collation would
- *  then order the bucket by codepoint -- every seated root ahead of every bare
- *  one. Web's DictionaryBrowser does both for the same reasons.
- *
- *  Nothing caches the list, so every letter tap re-reads all ~1.6k root rows
- *  (1642 in the shipped DB) and discards all but one bucket. That is a local
- *  SQLite file and one grouped query, so it is affordable; add a cache here if
- *  the grid ever feels slow. */
-export async function getRootsForLetter(
-  client: MobileDataClient,
-  letter: string,
-): Promise<RootSearchItem[]> {
-  const roots = await getRootSearchList(client);
-  return roots
-    .filter((root) => rootFirstLetter(root.root_arabic) === letter)
-    .sort((a, b) => compareRootsArabic(a.root_arabic, b.root_arabic));
+/** Every root, unfiltered and unsorted beyond `getRootSearchList`'s own
+ *  `ORDER BY root_arabic`. Browse does its own filter (search text, active
+ *  letter) and sort (alpha/freq) over this in JS -- see DictionaryScreen --
+ *  the same split web's DictionaryBrowser uses over its own static payload. */
+export async function getAllRootsForBrowse(client: MobileDataClient): Promise<RootSearchItem[]> {
+  return getRootSearchList(client);
 }
 
 /** Which hijāʾī buckets have any root at all. Folded with the same
- *  `rootFirstLetter` getRootsForLetter buckets with -- a second copy of the
- *  hamza-seat rules would enable a letter whose screen then comes up empty. */
+ *  `rootFirstLetter` Browse's own letter filter buckets with -- a second copy
+ *  of the hamza-seat rules would enable a letter whose filter then comes up
+ *  empty. */
 export async function getLettersWithRoots(client: MobileDataClient): Promise<Set<string>> {
   const roots = await getRootSearchList(client);
   return new Set(roots.map((root) => rootFirstLetter(root.root_arabic)));

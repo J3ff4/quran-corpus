@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { MobileDataClient, MobileRow, SqlValue } from '@quran-corpus/mobile-data';
 import {
+  getAllRootsForBrowse,
   getAyahReaderLocation,
   getFrequencyRows,
   getLettersWithRoots,
   getM0WordDetail,
   getRootOccurrences,
   getRootScreen,
-  getRootsForLetter,
   getSurahGlosses,
   getSurahList,
   getSurahReader,
@@ -274,7 +274,8 @@ function createFakeClient({
         // Fixture order is SQL's binary ORDER BY root_arabic: أ (U+0623) sorts
         // before ا (U+0627), so a seated root lands ahead of a bare one no
         // matter what the second radical is. Handing these back unsorted is
-        // what puts getRootsForLetter's own sort under test.
+        // what proves getAllRootsForBrowse passes getRootSearchList through
+        // rather than re-sorting it.
         return { rows: rootSearch };
       }
       if (sql.includes('FROM roots WHERE root_buckwalter')) {
@@ -604,14 +605,14 @@ describe('getLettersWithRoots', () => {
   });
 });
 
-describe('getRootsForLetter', () => {
-  it('files hamza seats under ا and orders the bucket hijāʾī, not by codepoint', async () => {
-    const list = await getRootsForLetter(createFakeClient(), 'ا');
+describe('getAllRootsForBrowse', () => {
+  it('passes getRootSearchList through unfiltered, in its own order', async () => {
+    const list = await getAllRootsForBrowse(createFakeClient());
 
-    // Both roots belong to the ا bucket because rootFirstLetter folds the seat.
-    // Order is the assertion: SQL hands them back أوب, ابل (codepoint order);
-    // hijāʾī order compares the *second* radical, ب before و.
-    expect(list.map((root) => root.root_arabic)).toEqual(['ابل', 'أوب']);
+    // All three fixture roots come back, in SQL's binary ORDER BY root_arabic
+    // -- Browse itself does the filtering (search, active letter) and the
+    // hijāʾī sort, over this list, in JS.
+    expect(list.map((root) => root.root_arabic)).toEqual(['أوب', 'ابل', 'رحم']);
   });
 });
 

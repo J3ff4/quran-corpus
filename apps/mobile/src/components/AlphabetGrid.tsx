@@ -15,12 +15,17 @@ export interface AlphabetGridProps {
    *  is the grid's first cell, so an enabled one makes the first thing a user
    *  taps in Browse a dead end that TalkBack still announces as a button. */
   available: ReadonlySet<string>;
+  /** The letter Browse is currently filtering to, or null/undefined for none.
+   *  The grid is a live filter now, not just a router to another screen -- with
+   *  nothing marking the current letter the list silently disagrees with the
+   *  grid. */
+  activeLetter?: string | null;
   onSelect: (letter: string) => void;
 }
 
 /** The hijāʾī grid. Letters come from the shared order, so these buckets are
  *  the ones rootFirstLetter actually assigns. */
-export function AlphabetGrid({ uiLocale, available, onSelect }: AlphabetGridProps) {
+export function AlphabetGrid({ uiLocale, available, activeLetter, onSelect }: AlphabetGridProps) {
   const theme = useThemeColors();
 
   return (
@@ -34,13 +39,14 @@ export function AlphabetGrid({ uiLocale, available, onSelect }: AlphabetGridProp
     >
       {ARABIC_ALPHABET_ORDER.map((letter) => {
         const enabled = available.has(letter);
+        const selected = letter === activeLetter;
         return (
           <Pressable
             key={letter}
             testID="alphabet-cell"
             accessibilityRole="button"
             accessibilityLabel={letter}
-            accessibilityState={{ disabled: !enabled }}
+            accessibilityState={{ disabled: !enabled, selected }}
             disabled={!enabled}
             onPress={enabled ? () => onSelect(letter) : undefined}
             style={{
@@ -49,8 +55,8 @@ export function AlphabetGrid({ uiLocale, available, onSelect }: AlphabetGridProp
               alignItems: 'center',
               justifyContent: 'center',
               borderRadius: 10,
-              borderWidth: 1,
-              borderColor: theme.border,
+              borderWidth: selected ? 2 : 1,
+              borderColor: selected ? theme.accent : theme.border,
             }}
           >
             <Text

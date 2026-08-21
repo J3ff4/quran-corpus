@@ -123,13 +123,19 @@ export type UiStringKey =
   | 'search.loadFailed'
   | 'dictionary.browse'
   | 'dictionary.frequent'
-  | 'dictionary.noRoots'
   // Accessible name for the hijāʾī grid: 29 sibling buttons whose own labels
   // are bare letters.
   | 'dictionary.alphabet'
-  // Caption above the letter screen's Arabic hero, read as "Letter — ب".
-  | 'dictionary.letterCaption'
   | 'dictionary.loadFailed'
+  // Browse's search box.
+  | 'dictionary.searchPlaceholder'
+  | 'dictionary.searchLabel'
+  // Sort toggle: alphabetical vs. by frequency.
+  | 'dictionary.sortAlpha'
+  | 'dictionary.sortFreq'
+  // Accessible name for the sort toggle's toolbar.
+  | 'dictionary.sortFilter'
+  | 'dictionary.noRootsFound'
   // Frequent-pane chips. Not reusing 'dictionary.loadFailed' for the failure:
   // it reads "Unable to load roots", which is wrong on Lemmas and Verbs.
   | 'dictionary.kindRoots'
@@ -245,10 +251,14 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'search.loadFailed': 'Unable to search',
     'dictionary.browse': 'Browse',
     'dictionary.frequent': 'Frequent',
-    'dictionary.noRoots': 'No roots under this letter',
     'dictionary.alphabet': 'Arabic alphabet',
-    'dictionary.letterCaption': 'Letter',
     'dictionary.loadFailed': 'Unable to load roots',
+    'dictionary.searchPlaceholder': 'Search roots or meaning…',
+    'dictionary.searchLabel': 'Search roots or meaning',
+    'dictionary.sortAlpha': 'Alphabetical',
+    'dictionary.sortFreq': 'By frequency',
+    'dictionary.sortFilter': 'Sort order',
+    'dictionary.noRootsFound': 'No roots found',
     'dictionary.kindRoots': 'Roots',
     'dictionary.kindLemmas': 'Lemmas',
     'dictionary.kindVerbs': 'Verbs',
@@ -357,10 +367,14 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'search.loadFailed': 'Qidirib bo‘lmadi',
     'dictionary.browse': 'Ko‘rish',
     'dictionary.frequent': 'Ko‘p uchraydigan',
-    'dictionary.noRoots': 'Bu harfda o‘zak yo‘q',
     'dictionary.alphabet': 'Arab alifbosi',
-    'dictionary.letterCaption': 'Harf',
     'dictionary.loadFailed': 'O‘zaklarni yuklab bo‘lmadi',
+    'dictionary.searchPlaceholder': 'O‘zak yoki ma’noni qidirish…',
+    'dictionary.searchLabel': 'O‘zak yoki ma’noni qidirish',
+    'dictionary.sortAlpha': 'Alifbo bo‘yicha',
+    'dictionary.sortFreq': 'Chastota bo‘yicha',
+    'dictionary.sortFilter': 'Tartiblash',
+    'dictionary.noRootsFound': 'O‘zak topilmadi',
     'dictionary.kindRoots': 'O‘zaklar',
     'dictionary.kindLemmas': 'Lemmalar',
     'dictionary.kindVerbs': 'Fe’llar',
@@ -469,10 +483,14 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'search.loadFailed': 'Не удалось выполнить поиск',
     'dictionary.browse': 'Обзор',
     'dictionary.frequent': 'Частотные',
-    'dictionary.noRoots': 'Под этой буквой нет корней',
     'dictionary.alphabet': 'Арабский алфавит',
-    'dictionary.letterCaption': 'Буква',
     'dictionary.loadFailed': 'Не удалось загрузить корни',
+    'dictionary.searchPlaceholder': 'Поиск корня или значения…',
+    'dictionary.searchLabel': 'Поиск корня или значения',
+    'dictionary.sortAlpha': 'По алфавиту',
+    'dictionary.sortFreq': 'По частоте',
+    'dictionary.sortFilter': 'Сортировка',
+    'dictionary.noRootsFound': 'Корни не найдены',
     'dictionary.kindRoots': 'Корни',
     'dictionary.kindLemmas': 'Леммы',
     'dictionary.kindVerbs': 'Глаголы',

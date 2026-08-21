@@ -14,11 +14,7 @@
  * both of which pass a Buckwalter charset test and reach SQLite.
  */
 
-import {
-  ARABIC_ALPHABET_ORDER,
-  isLemmaBuckwalter,
-  isRootBuckwalter,
-} from '@quran-corpus/data/mobile';
+import { isLemmaBuckwalter, isRootBuckwalter } from '@quran-corpus/data/mobile';
 
 /** Shared shape: first-of-array, reject empty, then the caller's predicate. */
 function parseParam(
@@ -51,14 +47,6 @@ export function parseRootParam(value: string | string[] | undefined): string | n
 /** A `lemma_buckwalter` path segment, or null if it is not one. */
 export function parseLemmaParam(value: string | string[] | undefined): string | null {
   return parseParam(value, isLemmaBuckwalter);
-}
-
-/** A hijāʾī bucket off a deep link. Membership, not a charset test:
- *  `rootFirstLetter` folds أ إ آ ٱ to ا and ى to ي, so those are never buckets
- *  and a screen for one could never have rows. The list is imported rather
- *  than restated so this cannot drift from the folding that produces it. */
-export function parseLetterParam(value: string | string[] | undefined): string | null {
-  return parseParam(value, (raw) => ARABIC_ALPHABET_ORDER.includes(raw));
 }
 
 /** Shared shape: a 1-based corpus coordinate with an upper bound.

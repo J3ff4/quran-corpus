@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseLemmaParam, parseLetterParam, parseRootParam } from './routeParams';
+import { parseLemmaParam, parseRootParam } from './routeParams';
 
 describe('parseLemmaParam / parseRootParam', () => {
   it('accepts the decoded identifier expo-router hands a route', () => {
@@ -26,25 +26,5 @@ describe('parseLemmaParam / parseRootParam', () => {
 
   it('applies the shared length cap', () => {
     expect(parseRootParam('r'.repeat(25))).toBeNull();
-  });
-});
-
-describe('parseLetterParam', () => {
-  it('accepts a letter the alphabet carries', () => {
-    expect(parseLetterParam('ب')).toBe('ب');
-  });
-
-  it('rejects a letter it does not', () => {
-    // rootFirstLetter folds hamza seats into ا, so أ is never a bucket of its
-    // own and a screen for it could never have rows.
-    expect(parseLetterParam('أ')).toBeNull();
-  });
-
-  it('rejects arbitrary text', () => {
-    expect(parseLetterParam('../../etc')).toBeNull();
-  });
-
-  it('takes the first of a repeated param', () => {
-    expect(parseLetterParam(['ب', 'ت'])).toBe('ب');
   });
 });

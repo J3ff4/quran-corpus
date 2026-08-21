@@ -51,4 +51,14 @@ describe('AlphabetGrid', () => {
     expect(cells[1]!.getAttribute('aria-disabled')).toBe('false');
     expect(onSelect).toHaveBeenCalledWith(ARABIC_ALPHABET_ORDER[1]);
   });
+
+  it('marks the active letter selected, and only that letter', () => {
+    render(
+      <AlphabetGrid uiLocale="en" available={ALL} activeLetter={ARABIC_ALPHABET_ORDER[1]!} onSelect={() => {}} />,
+    );
+    const cells = screen.getAllByTestId('alphabet-cell');
+
+    expect(cells[1]!.getAttribute('aria-selected')).toBe('true');
+    expect(cells[0]!.getAttribute('aria-selected')).toBe('false');
+  });
 });
