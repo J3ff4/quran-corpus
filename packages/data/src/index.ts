@@ -67,6 +67,7 @@ export { isSajdahAyah } from './text/sajdah.js';
 export { alignAyahTokens, splitBasmala, type AyahToken } from './text/ayahTokens.js';
 export { posBucket, type PosBucket } from './morphology/buckets.js';
 export { decodeSegment, posLabelEn } from './morphology/decode.js';
+export { categorizeFormLabel, type FormCategory } from './morphology/formCategory.js';
 export type {
   Surah,
   Ayah,

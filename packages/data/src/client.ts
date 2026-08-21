@@ -21,6 +21,7 @@ export { isSajdahAyah } from './text/sajdah.js';
 export { alignAyahTokens, splitBasmala, type AyahToken } from './text/ayahTokens.js';
 export { posBucket, type PosBucket } from './morphology/buckets.js';
 export { decodeSegment, posLabelEn } from './morphology/decode.js';
+export { categorizeFormLabel, type FormCategory } from './morphology/formCategory.js';
 
 // All of them, not a curated subset. `types.ts` is a pure declaration file with
 // no imports of its own, and `export type *` emits no runtime import at all — so

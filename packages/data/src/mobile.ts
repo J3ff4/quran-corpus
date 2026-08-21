@@ -48,7 +48,13 @@ export {
   countLemmaConcordance,
 } from './queries/lemma.js';
 export { getLemmaFrequency, getVerbConcordance } from './queries/dictionary.js';
-export { buckwalterToArabic, compareRootsArabic, rootFirstLetter, ARABIC_ALPHABET_ORDER } from './text/arabic.js';
+export {
+  buckwalterToArabic,
+  compareRootsArabic,
+  foldRootArabic,
+  rootFirstLetter,
+  ARABIC_ALPHABET_ORDER,
+} from './text/arabic.js';
 // The root and lemma routes take a Buckwalter identifier straight off a deep
 // link, so they need the same charset and length caps the web routes use.
 // buckwalter.ts has no runtime imports, so this adds no edge to the Metro graph.
@@ -65,6 +71,7 @@ export { isSajdahAyah } from './text/sajdah.js';
 export { alignAyahTokens, splitBasmala, type AyahToken } from './text/ayahTokens.js';
 export { posBucket, type PosBucket } from './morphology/buckets.js';
 export { decodeSegment, posLabelEn } from './morphology/decode.js';
+export { categorizeFormLabel, type FormCategory } from './morphology/formCategory.js';
 export type {
   Surah,
   Ayah,
