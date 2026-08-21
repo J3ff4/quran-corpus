@@ -70,6 +70,22 @@ export type UiStringKey =
   // translations, not a definition -- see LemmaScreen and text/gloss.ts.
   // No 'lemma.root': 'word.root' is already "Root" in all three locales.
   | 'lemma.translatedAs'
+  // Accessible name + sheet heading for the info button beside
+  // 'lemma.translatedAs'.
+  | 'lemma.aboutTranslations'
+  // The info sheet's one paragraph: glosses are word-by-word translations,
+  // not dictionary definitions.
+  | 'lemma.translationsNote'
+  // Caption above the lemma's root-definition card. Not 'root.definitions'
+  // (plural, root screen shows every definition) -- a lemma links to one root
+  // and shows that root's own DefinitionCard.
+  | 'lemma.rootDefinition'
+  // The lemma screen's root link, relabelled from 'word.root' ("Root"): the
+  // link now sits below a DefinitionCard/lemma-no-definition line, and a bare
+  // "Root" there reads as a repeat of the caption above it.
+  | 'lemma.viewRoot'
+  // Accessible name for the info sheet's backdrop/dismiss control.
+  | 'lemma.close'
   | 'surahList.ayahsSuffix'
   | 'surahList.loadFailed'
   | 'settings.language'
@@ -187,6 +203,11 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'root.formsFilter': 'Filter by form',
     'lemma.notFound': 'This lemma is not in the corpus',
     'lemma.translatedAs': 'Translated as',
+    'lemma.aboutTranslations': 'About these translations',
+    'lemma.translationsNote': 'From word-by-word translations, ordered by frequency — not dictionary definitions.',
+    'lemma.rootDefinition': 'Definition of root',
+    'lemma.viewRoot': 'View root',
+    'lemma.close': 'Close',
     'surahList.ayahsSuffix': 'ayahs',
     'surahList.loadFailed': 'Unable to load surahs',
     'settings.language': 'Language',
@@ -294,6 +315,11 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'root.formsFilter': 'Shakl bo‘yicha filtr',
     'lemma.notFound': 'Bu lemma korpusda yo‘q',
     'lemma.translatedAs': 'Tarjimasi',
+    'lemma.aboutTranslations': 'Bu tarjimalar haqida',
+    'lemma.translationsNote': 'So‘zma-so‘z tarjimalardan olingan, chastota bo‘yicha tartiblangan — lug‘at ta’riflari emas.',
+    'lemma.rootDefinition': 'O‘zak ta’rifi',
+    'lemma.viewRoot': 'O‘zakni ko‘rish',
+    'lemma.close': 'Yopish',
     'surahList.ayahsSuffix': 'oyat',
     'surahList.loadFailed': 'Suralarni yuklab bo‘lmadi',
     'settings.language': 'Til',
@@ -401,6 +427,11 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'root.formsFilter': 'Фильтр по форме',
     'lemma.notFound': 'Этой леммы нет в корпусе',
     'lemma.translatedAs': 'Переводится как',
+    'lemma.aboutTranslations': 'Об этих переводах',
+    'lemma.translationsNote': 'Из пословных переводов, упорядочены по частоте — это не словарные определения.',
+    'lemma.rootDefinition': 'Определение корня',
+    'lemma.viewRoot': 'Открыть корень',
+    'lemma.close': 'Закрыть',
     'surahList.ayahsSuffix': 'аятов',
     'surahList.loadFailed': 'Не удалось загрузить суры',
     'settings.language': 'Язык',
