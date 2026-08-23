@@ -47,7 +47,12 @@ export {
   getLemmaConcordancePage,
   countLemmaConcordance,
 } from './queries/lemma.js';
-export { getLemmaFrequency, getVerbConcordance } from './queries/dictionary.js';
+export {
+  getLemmaFrequency,
+  getLemmaFrequencyNeighbors,
+  getVerbConcordance,
+  type LemmaFrequencyKind,
+} from './queries/dictionary.js';
 export {
   buckwalterToArabic,
   compareRootsArabic,
