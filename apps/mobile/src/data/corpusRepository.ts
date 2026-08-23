@@ -14,7 +14,6 @@ import {
   getRootNeighbors,
   getRootSearchList,
   getRootsByFrequency,
-  rootFirstLetter,
   getSegmentsByWordIds,
   getSurahById,
   getTranslationsBySurahAndLang,
@@ -353,15 +352,6 @@ export async function getAdjacentLemmas(
  *  the same split web's DictionaryBrowser uses over its own static payload. */
 export async function getAllRootsForBrowse(client: MobileDataClient): Promise<RootSearchItem[]> {
   return getRootSearchList(client);
-}
-
-/** Which hijāʾī buckets have any root at all. Folded with the same
- *  `rootFirstLetter` Browse's own letter filter buckets with -- a second copy
- *  of the hamza-seat rules would enable a letter whose filter then comes up
- *  empty. */
-export async function getLettersWithRoots(client: MobileDataClient): Promise<Set<string>> {
-  const roots = await getRootSearchList(client);
-  return new Set(roots.map((root) => rootFirstLetter(root.root_arabic)));
 }
 
 /** One row of the Frequent pane, whichever of the three lists produced it. */

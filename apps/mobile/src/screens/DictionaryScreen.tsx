@@ -12,7 +12,7 @@ import { AlphabetGrid } from '@/components/AlphabetGrid';
 import { DictionaryRow } from '@/components/DictionaryRow';
 import { FrequencyList } from '@/components/FrequencyList';
 import { SearchHeaderButton } from '@/components/SearchHeaderButton';
-import { getAllRootsForBrowse, getLettersWithRoots } from '@/data/corpusRepository';
+import { getAllRootsForBrowse } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
@@ -22,9 +22,6 @@ import { useThemeColors } from '@/theme/themeContext';
 type Pane = 'browse' | 'frequent';
 type DictionarySort = 'alpha' | 'freq';
 
-/** Stable identity: `available ?? new Set()` would hand AlphabetGrid a fresh
- *  set on every render. */
-const NO_LETTERS: ReadonlySet<string> = new Set();
 const NO_ROOTS: RootSearchItem[] = [];
 
 export function DictionaryScreen() {
@@ -33,9 +30,6 @@ export function DictionaryScreen() {
   const navigation = useNavigation();
   const [pane, setPane] = useState<Pane>('browse');
   const [kind, setKind] = useState<'roots' | 'lemmas' | 'verbs'>('roots');
-  // null while loading. The grid renders every cell disabled until this
-  // arrives, rather than flashing an all-enabled alphabet that then dims.
-  const [available, setAvailable] = useState<ReadonlySet<string> | null>(null);
   // null while loading; a bare TextInput/list must not read as "no roots" for
   // the tick before the query settles.
   const [roots, setRoots] = useState<RootSearchItem[] | null>(null);
@@ -43,31 +37,6 @@ export function DictionaryScreen() {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<DictionarySort>('alpha');
   const [letter, setLetter] = useState<string | null>(null);
-
-  // Which letters have roots at all. The fold lives in the repository, next to
-  // the getAllRootsForBrowse list that Browse's own letter filter has to agree
-  // with.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const db = await openCorpusDb();
-        const client = createExpoSqliteClient(db as ExpoSqliteLike);
-        const letters = await getLettersWithRoots(client);
-        if (!cancelled) setAvailable(letters);
-      } catch (cause) {
-        // Empty set, so every cell stays disabled. Safe in the sense that
-        // matters here: a dead grid is inert, whereas enabling all 29 cells
-        // filters to a letter that then comes up empty.
-        console.error('[dictionary] letter availability failed', cause);
-        if (!cancelled) setAvailable(NO_LETTERS);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // Browse's whole payload, fetched once: search/sort/letter all run over
   // this in JS afterwards (the `visible` memo below), the same split web's
@@ -104,7 +73,20 @@ export function DictionaryScreen() {
     });
   }, [navigation, uiLocale]);
 
-  // One flag, two effects: the grid is not worth the screen it takes while a
+  // Which letters have any root at all, folded out of the list already in
+  // hand rather than fetched: both came from the same 1642-row GROUP_CONCAT
+  // join, so a second query paid for it twice and shipped two copies of the
+  // payload over the bridge. Derived state also cannot disagree with the list
+  // Browse filters -- the grid enables exactly the cells `visible` can produce,
+  // because both fold with the same rootFirstLetter. Empty until the list
+  // lands, so every cell renders disabled rather than flashing an all-enabled
+  // alphabet that then dims.
+  const available = useMemo(
+    () => new Set((roots ?? NO_ROOTS).map((root) => rootFirstLetter(root.root_arabic))),
+    [roots],
+  );
+
+  // One flag, one derivation: the grid is not worth the screen it takes while a
   // query is running (the results sat below the fold until the keyboard was
   // dismissed), and intersecting a query with a letter the reader can no longer
   // see filters invisibly. The letter is bypassed, not cleared, so emptying the
@@ -246,7 +228,7 @@ export function DictionaryScreen() {
                   {searching ? null : (
                     <AlphabetGrid
                       uiLocale={uiLocale}
-                      available={available ?? NO_LETTERS}
+                      available={available}
                       activeLetter={letter}
                       onSelect={(picked) => setLetter((prev) => (prev === picked ? null : picked))}
                     />
