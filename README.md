@@ -121,13 +121,14 @@ and every check below will fail for the wrong reason.
 
 ## M4 Dictionary + Search Smoke Test
 
-Run on a physical Android device, on a `preview` profile APK built at `9c42fe0`
+Run on a physical Android device, on a `preview` profile APK built at `7d5f7b3`
 or later. Older builds fail these for the wrong reasons: before `8e23d80` there
-is no Dictionary → Browse search box at all (check 34), and before `9c42fe0`
-the lemma ⓘ sheet lays out inside its own header row rather than over the
-screen (check 41) and a form-chip tap restarts the concordance twice (check 39). Confirm the EAS upload is ~43 MB — a ~5 MB upload
-means `.easignore` dropped the bundled DB and every check below fails for the
-wrong reason. Run these alongside M3's outstanding checks (F5, F6, check 27 and
+is no Dictionary → Browse search box at all (check 34), and before `7d5f7b3`
+there is no clear button and no lemma paging (checks 34 and 42), and typing in
+Browse leaves the alphabet grid covering the results, so nothing is visible
+until the keyboard is dismissed (check 34). Confirm the EAS upload is ~36–43 MB
+— a ~5 MB upload means `.easignore` dropped the bundled DB and every check
+below fails for the wrong reason. Run these alongside M3's outstanding checks (F5, F6, check 27 and
 the M2 rosette carry-over).
 
 28. Tab bar reads Home · Read · Morphology · Dictionary · Menu. Menu opens
@@ -147,11 +148,16 @@ the M2 rosette carry-over).
     meaning search finds قول. Tap ق: the list narrows and the ق cell is visibly
     marked; tap it again and the list is whole. **Keep typing after the first
     letter** — if the keyboard closes or the caret jumps, the search box has
-    ended up inside the list header.
-35. Dictionary → Frequent. Roots, Lemmas and Verbs each load a different ranked
+    ended up inside the list header. Typing also **hides the alphabet grid**, so
+    the first result is visible without dismissing the keyboard, and an ✕
+    appears inside the box — tap it and the whole list is back. Tap ق first,
+    *then* type `to say`: قول comes back even though it is not under ق, and
+    clearing the box puts you back in ق.
+35. Dictionary → Most used. Roots, Lemmas and Verbs each load a different ranked
     list, numbered from 1, under a #/Form/Count header. Scroll past row 200 —
     the list keeps going. Tap a verb row: it opens a lemma screen, not a dead
-    end.
+    end. Then tap Next: you move down the **verb** ranking, not the lemma one.
+    The tab above these lists reads **Most used**, not "Frequent".
 36. Root screen for قول. The header is centred: three letter pills, "1722
     occurrences", Previous/Next. Tap Next twice, then Previous twice — you land
     back on قول. On the first and last root of the alphabet the arrow is dimmed
@@ -164,8 +170,10 @@ the M2 rosette carry-over).
     check 36 no longer carries a snippet highlight of its own to repeat.
 39. Same screen: the derived-form chips wrap over several lines and do not
     stretch across the row. Tap one — the chip fills with its own colour, the
-    heading recounts (`Concordance (N)` matches the rows below), and the list
-    restarts from the top. Tap it again for the whole list back. Then tap Next:
+    heading recounts (`Concordance (N)` matches the rows below) and the rows
+    fade while the new ones load — **the screen does not jump to the top**.
+    Scroll a few rows down before tapping a chip: you stay where you were. Tap
+    it again for the whole list back. Then tap Next:
     the new root opens with **no chip selected**.
 40. Any occurrence row: it reads `2:3:6` (three parts), carries the form's
     transliteration in a coloured pill, the word's transliteration and its
@@ -180,6 +188,13 @@ the M2 rosette carry-over).
     قَالَ, a long Lane definition is clamped to six lines with **Show more**;
     tapping it reveals the rest and the button becomes Show less. Repeat in dark
     mode at maximum system font size — nothing clips.
+42. Lemma screen reached from Most used → Lemmas: Previous/Next page down the
+    ranking, and the arrows are dimmed and inert at rank 1. Open the same lemma
+    from a link inside another screen (View root, then back) — with no ranking
+    to page through, both arrows are dimmed rather than missing.
+43. Repeat 34 and 42 in dark mode at maximum system font size, and once in
+    airplane mode. Nothing clips, the ✕ stays inside the search box, and the
+    paging still works — all of it is local.
 
 ## Current Status
 
