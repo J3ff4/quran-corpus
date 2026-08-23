@@ -164,6 +164,24 @@ describe('DictionaryScreen', () => {
     expect(screen.getAllByTestId('dictionary-row')).toHaveLength(1);
   });
 
+  it('clears the search box from the button, which only exists when there is text', async () => {
+    await renderLoaded();
+    const box = screen.getByTestId('dictionary-search');
+    expect(screen.queryByTestId('dictionary-search-clear')).toBeNull();
+
+    fireEvent.change(box, { target: { value: 'ارض' } });
+    expect(screen.getAllByTestId('dictionary-row')).toHaveLength(1);
+
+    fireEvent.click(screen.getByTestId('dictionary-search-clear'));
+
+    expect((screen.getByTestId('dictionary-search') as HTMLInputElement).value).toBe('');
+    expect(screen.queryByTestId('dictionary-search-clear')).toBeNull();
+    // The whole list is back, not the one-root result: the fixture has four
+    // roots and 'ارض' isolates exactly one, so this tells cleared apart from
+    // still-filtered. An assertion that passed either way would assert nothing.
+    expect(screen.getAllByTestId('dictionary-row')).toHaveLength(4);
+  });
+
   it('spins while the root list loads rather than claiming there are none', () => {
     // getAllRootsForBrowse is a 1642-row GROUP_CONCAT join. Rendering the
     // empty state for that stretch tells the reader the dictionary is empty,

@@ -127,6 +127,7 @@ export type UiStringKey =
   // Browse's search box.
   | 'dictionary.searchPlaceholder'
   | 'dictionary.searchLabel'
+  | 'dictionary.clearSearch'
   // Sort toggle: alphabetical vs. by frequency.
   | 'dictionary.sortAlpha'
   | 'dictionary.sortFreq'
@@ -256,6 +257,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'dictionary.loadFailed': 'Unable to load roots',
     'dictionary.searchPlaceholder': 'Search roots or meaning…',
     'dictionary.searchLabel': 'Search roots or meaning',
+    'dictionary.clearSearch': 'Clear search',
     'dictionary.sortAlpha': 'Alphabetical',
     'dictionary.sortFreq': 'By frequency',
     'dictionary.sortFilter': 'Sort order',
@@ -373,6 +375,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'dictionary.loadFailed': 'O‘zaklarni yuklab bo‘lmadi',
     'dictionary.searchPlaceholder': 'O‘zak yoki ma’noni qidirish…',
     'dictionary.searchLabel': 'O‘zak yoki ma’noni qidirish',
+    'dictionary.clearSearch': 'Qidiruvni tozalash',
     'dictionary.sortAlpha': 'Alifbo bo‘yicha',
     'dictionary.sortFreq': 'Chastota bo‘yicha',
     'dictionary.sortFilter': 'Tartiblash',
@@ -490,6 +493,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'dictionary.loadFailed': 'Не удалось загрузить корни',
     'dictionary.searchPlaceholder': 'Поиск корня или значения…',
     'dictionary.searchLabel': 'Поиск корня или значения',
+    'dictionary.clearSearch': 'Очистить поиск',
     'dictionary.sortAlpha': 'По алфавиту',
     'dictionary.sortFreq': 'По частоте',
     'dictionary.sortFilter': 'Сортировка',

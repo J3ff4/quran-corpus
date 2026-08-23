@@ -171,22 +171,52 @@ export function DictionaryScreen() {
               render, so the input remounts. This has to be a sibling of the
               list, not inside it. */}
           <View style={{ paddingHorizontal: 16 }}>
-            <TextInput
-              testID="dictionary-search"
-              value={query}
-              onChangeText={setQuery}
-              placeholder={t(uiLocale, 'dictionary.searchPlaceholder')}
-              placeholderTextColor={theme.mutedText}
-              accessibilityLabel={t(uiLocale, 'dictionary.searchLabel')}
+            {/* The border sits on the row, not the input, so the clear button
+                reads as being inside the field. clearButtonMode is not an
+                option -- it is iOS-only and this app ships Android first. */}
+            <View
               style={{
-                color: theme.text,
+                flexDirection: 'row',
+                alignItems: 'center',
                 borderColor: theme.border,
                 borderWidth: 1,
                 borderRadius: 12,
-                paddingHorizontal: 14,
-                minHeight: touchTargets.minimum,
+                paddingRight: 4,
               }}
-            />
+            >
+              <TextInput
+                testID="dictionary-search"
+                value={query}
+                onChangeText={setQuery}
+                placeholder={t(uiLocale, 'dictionary.searchPlaceholder')}
+                placeholderTextColor={theme.mutedText}
+                accessibilityLabel={t(uiLocale, 'dictionary.searchLabel')}
+                style={{
+                  flex: 1,
+                  color: theme.text,
+                  paddingHorizontal: 14,
+                  minHeight: touchTargets.minimum,
+                }}
+              />
+              {query.length > 0 ? (
+                <Pressable
+                  testID="dictionary-search-clear"
+                  accessibilityRole="button"
+                  accessibilityLabel={t(uiLocale, 'dictionary.clearSearch')}
+                  onPress={() => setQuery('')}
+                  // A bare ✕ glyph is a ~14pt target; the minimums are what
+                  // keep it above the 48dp floor the rest of the app holds to.
+                  style={{
+                    minHeight: touchTargets.minimum,
+                    minWidth: touchTargets.minimum,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ color: theme.mutedText, fontSize: typography.body }}>✕</Text>
+                </Pressable>
+              ) : null}
+            </View>
           </View>
 
           {rootsFailed ? (
