@@ -249,6 +249,13 @@ export function ConcordanceList({
   // to the new list, double-advances the offset (so a range is skipped and then
   // re-requested under duplicate keys) and frees busyRef under the live request.
   const genRef = useRef(0);
+  // The next page to arrive replaces the list rather than appending to it.
+  // Set when a new list is published, cleared by whichever of the three
+  // outcomes lands first (page, empty list, failure).
+  const replaceRef = useRef(false);
+  // State, not a ref: the held rows are dimmed while they are known to be
+  // stale, so this has to drive a render.
+  const [stale, setStale] = useState(false);
 
   const loadMore = useCallback(async () => {
     if (busyRef.current) return;
@@ -262,7 +269,13 @@ export function ConcordanceList({
       const page = await loadPage(offsetRef.current, PAGE);
       if (gen !== genRef.current) return;
       offsetRef.current += page.length;
-      setEntries((current) => [...current, ...page]);
+      if (replaceRef.current) {
+        replaceRef.current = false;
+        setStale(false);
+        setEntries(page);
+      } else {
+        setEntries((current) => [...current, ...page]);
+      }
       // A short page means the source is exhausted whatever `total` claims --
       // the query is LIMIT-bound, so it can only come up short at the end.
       // Without this the list retries the same tail offset forever.
@@ -270,6 +283,13 @@ export function ConcordanceList({
     } catch (cause) {
       if (gen !== genRef.current) return;
       console.error('[concordance] page load failed', { offset: offsetRef.current, cause });
+      // The held rows belong to the previous filter. Keeping them under a
+      // failure notice would claim this filter returned them.
+      if (replaceRef.current) {
+        replaceRef.current = false;
+        setStale(false);
+        setEntries([]);
+      }
       // Stop paging AND say so. Falling through to the empty state would
       // render a broken read as "this root has no occurrences" (m-5).
       offsetRef.current = total;
@@ -288,23 +308,40 @@ export function ConcordanceList({
     genRef.current += 1;
     offsetRef.current = 0;
     busyRef.current = false;
-    setEntries([]);
     setFailed(false);
     // The same value the first mount starts on, for the same reason -- and it
     // has to be set here rather than left to loadMore, because on an empty list
     // loadMore returns before its `finally`, and the superseded request's
     // `finally` is guarded, so nothing else would ever clear the spinner.
     setLoading(total > 0);
+    if (total === 0) {
+      // Nothing is coming to replace them, and loadMore returns at its own
+      // `offsetRef >= total` guard, so this is the only place they can go.
+      replaceRef.current = false;
+      setStale(false);
+      setEntries([]);
+    } else {
+      // NOT setEntries([]): emptying the list collapses its content height and
+      // Android clamps the scroll to 0, throwing the reader to the top of the
+      // screen on every form-chip tap. The previous rows stay, dimmed, until
+      // the new first page replaces them.
+      replaceRef.current = true;
+      setStale(true);
+    }
     void loadMore();
     // loadMore changes with the loader, which is what a new root or lemma is;
     // `total` is listed only because loadMore already folds it in.
   }, [loadMore, total]);
 
   const renderItem = useCallback(
+    // The rows dim, not the whole list: the header carries the form chip the
+    // reader just tapped, and dimming that reads as the tap having failed.
     ({ item }: { item: ConcordanceEntry }) => (
-      <ConcordanceRow item={item} forms={forms} uiLocale={uiLocale} />
+      <View style={{ opacity: stale ? 0.45 : 1 }}>
+        <ConcordanceRow item={item} forms={forms} uiLocale={uiLocale} />
+      </View>
     ),
-    [forms, uiLocale],
+    [forms, uiLocale, stale],
   );
 
   // One node, two slots. An empty list renders it as the empty state; a list

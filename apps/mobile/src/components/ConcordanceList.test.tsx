@@ -234,6 +234,69 @@ describe('ConcordanceList', () => {
     await waitFor(() => expect(fresh).toHaveBeenCalledWith(20, 20));
   });
 
+  it('holds the previous rows on screen until the new list has its first page', async () => {
+    // A form-chip tap publishes a new loadPage. Emptying the list on that
+    // collapses its content height and Android clamps the scroll to 0, which
+    // throws the reader to the top of the screen on every tap.
+    const first = deferred<ConcordanceEntry[]>();
+    const second = deferred<ConcordanceEntry[]>();
+    const stale = vi.fn(() => first.promise);
+    const fresh = vi.fn(() => second.promise);
+
+    const { rerender } = render(
+      <ConcordanceList total={1} loadPage={stale} header={<span />} />,
+    );
+    await act(async () => {
+      first.resolve([entry({ surah_id: 2, ayah_number: 255, word_id: 1 })]);
+      await first.promise;
+    });
+    expect(screen.getByTestId('concordance-ref').textContent).toContain('2:255');
+
+    rerender(<ConcordanceList total={1} loadPage={fresh} header={<span />} />);
+    await waitFor(() => expect(fresh).toHaveBeenCalledTimes(1));
+    // Still there: this is the fix.
+    expect(screen.getByTestId('concordance-ref').textContent).toContain('2:255');
+
+    await act(async () => {
+      second.resolve([entry({ surah_id: 9, ayah_number: 9, word_id: 2 })]);
+      await second.promise;
+    });
+    // Replaced, not appended.
+    expect(screen.getAllByTestId('concordance-row')).toHaveLength(1);
+    expect(screen.getByTestId('concordance-ref').textContent).toContain('9:9');
+  });
+
+  it('empties the list when the new filter matches nothing', async () => {
+    // Holding rows here would show occurrences the current filter never
+    // returned, under a heading that counts zero.
+    const { rerender } = render(
+      <ConcordanceList total={1} loadPage={page([entry()])} header={<span />} />,
+    );
+    await waitFor(() => expect(screen.getAllByTestId('concordance-row')).toHaveLength(1));
+
+    rerender(<ConcordanceList total={0} loadPage={page([])} header={<span />} />);
+
+    await waitFor(() => expect(screen.queryAllByTestId('concordance-row')).toHaveLength(0));
+    expect(screen.getByTestId('concordance-status').textContent).toBe('No occurrences');
+  });
+
+  it('empties the list when the first page of the new filter fails', async () => {
+    // Same reason: rows from the previous filter under a failure notice claim
+    // this filter returned them.
+    const { rerender } = render(
+      <ConcordanceList total={1} loadPage={page([entry()])} header={<span />} />,
+    );
+    await waitFor(() => expect(screen.getAllByTestId('concordance-row')).toHaveLength(1));
+
+    const broken = vi.fn(async () => {
+      throw new Error('boom');
+    });
+    rerender(<ConcordanceList total={1} loadPage={broken} header={<span />} />);
+
+    await waitFor(() => expect(screen.queryAllByTestId('concordance-row')).toHaveLength(0));
+    expect(screen.getByTestId('concordance-status').getAttribute('role')).toBe('alert');
+  });
+
   it('drops an in-flight page when the new list has nothing to load', async () => {
     // The one swap loadMore cannot supersede by itself: it returns at the
     // offset guard before it can claim a generation, so the effect has to.
