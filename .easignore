@@ -33,9 +33,7 @@ venv/
 /apps/mobile/ios/
 
 # --- Secrets -----------------------------------------------------------------
-.env
-.env.*
-!.env.example
+.env*
 *.jks
 *.p8
 *.p12
@@ -59,7 +57,37 @@ venv/
 *.db.bak*
 /packages/data/*.db
 
+# --- Working copies and scrape artefacts -------------------------------------
+# .worktrees/ is a second checkout of this repo (16 MB as of 2026-08-23) and was
+# the largest thing this file was silently uploading. The checkpoints are the
+# scraper's resume state -- CLAUDE.md §11 artefacts, never ours to ship.
+.worktrees/
+.gstack/
+*checkpoint*.json
+raw-scrape/
+data-snapshots/
+.snapshots/
+quran-data/
+quran-corpus-pwa/
+quran-corpus-pwa-main.zip
+
+# --- Tooling caches and editor state -----------------------------------------
+.pnpm-store/
+out/
+*.egg-info/
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.idea/
+.vscode/settings.json
+
+# --- Generated web output ----------------------------------------------------
+apps/web/public/sw.js
+apps/web/public/sw.js.map
+
 # --- Local scratch ----------------------------------------------------------
+*.stale.bak
+*.orig.*
 .DS_Store
 Thumbs.db
 *.log
