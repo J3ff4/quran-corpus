@@ -32,8 +32,6 @@ const NO_NEIGHBORS: Neighbors = { prev: null, next: null };
  *  one value because ConcordanceList reads both as list identity: handing it a
  *  filter whose count has not landed yet resets the list twice. */
 interface AppliedFilter {
-  /** `${root}|${sorted form ids}` this count was taken for. */
-  key: string;
   root: string;
   /** Empty means no filter -- every occurrence of the root. */
   ids: number[];
@@ -150,7 +148,7 @@ export default function RootRoute() {
           ids.length > 0 ? ids : undefined,
         );
         if (!cancelled) {
-          setApplied({ key: countKey, root: buckwalter, ids, total: count, failed: false });
+          setApplied({ root: buckwalter, ids, total: count, failed: false });
         }
       } catch (cause) {
         // Same handling as loadRoot: logged for logcat, and the heading falls
@@ -161,7 +159,7 @@ export default function RootRoute() {
         // list's empty state -- "no occurrences" for a root with 1722 (m-5).
         console.error('[root] count failed', { buckwalter, cause });
         if (!cancelled) {
-          setApplied({ key: countKey, root: buckwalter, ids, total: 0, failed: true });
+          setApplied({ root: buckwalter, ids, total: 0, failed: true });
         }
       }
     })();

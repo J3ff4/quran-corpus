@@ -172,9 +172,12 @@ the M2 rosette carry-over).
     translation. Tap **Show full verse** — the whole ayah appears and the button
     reads Show less; the row itself still opens the reader. With TalkBack on,
     the toggle is reachable as its own control.
-41. Lemma screen for قَالَ: transliteration, sense chips with counts, TRANSLATED
-    AS with a ⓘ that opens a sheet, and the root definition in a card with its
-    credit. A long Lane definition is clamped to six lines with **Show more**;
+41. Lemma screen for قَالَ: transliteration, a single sense chip (Verb) carrying
+    **no** count — with one sense the count would only repeat the occurrence
+    line above it — TRANSLATED AS with a ⓘ that opens a sheet, and the root
+    definition in a card with its credit. For the counted case open مَا from
+    Most used → Lemmas: six sense chips, each with its own count. Back on
+    قَالَ, a long Lane definition is clamped to six lines with **Show more**;
     tapping it reveals the rest and the button becomes Show less. Repeat in dark
     mode at maximum system font size — nothing clips.
 
