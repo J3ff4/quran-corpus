@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DictionaryScreen } from './DictionaryScreen';
 
@@ -112,6 +112,23 @@ async function renderLoaded() {
   await act(async () => {});
 }
 
+/** Mounted, past the browse-roots query AND past the letter-availability one,
+ *  returning the ق cell. The two are separate effects with separate await
+ *  chains, so a single act() flush settles only one of them reliably: a test
+ *  that clicks a letter cell before availability lands clicks a *disabled*
+ *  cell, the filter never applies, and the assertion after it fails for a
+ *  reason that has nothing to do with what it is testing. That raced about one
+ *  run in three. */
+async function renderLoadedWithLetters() {
+  await renderLoaded();
+  await waitFor(() => expect(screen.getAllByTestId('dictionary-row')).toHaveLength(4));
+  const qaf = screen
+    .getAllByTestId('alphabet-cell')
+    .find((cell) => cell.getAttribute('aria-label') === 'ق')!;
+  await waitFor(() => expect(qaf.getAttribute('aria-disabled')).toBe('false'));
+  return qaf;
+}
+
 describe('DictionaryScreen', () => {
   beforeEach(() => {
     mocks.push.mockReset();
@@ -185,11 +202,8 @@ describe('DictionaryScreen', () => {
   });
 
   it('searches the whole list while an active letter is only bypassed, not cleared', async () => {
-    await renderLoaded();
     // Filter to ق first. قول is the only root under ق in the fixture.
-    const qaf = screen
-      .getAllByTestId('alphabet-cell')
-      .find((cell) => cell.textContent === 'ق')!;
+    const qaf = await renderLoadedWithLetters();
     fireEvent.click(qaf);
     expect(screen.getAllByTestId('dictionary-row')).toHaveLength(1);
 
@@ -247,10 +261,7 @@ describe('DictionaryScreen', () => {
   it('sorts by frequency and drops the letter filter with it', async () => {
     // Matches web: switching sort clears the letter, so the list the reader
     // sees is the whole corpus ordered by frequency, not one letter of it.
-    render(<DictionaryScreen />);
-    const qaf = (await screen.findAllByTestId('alphabet-cell')).find(
-      (cell) => cell.getAttribute('aria-label') === 'ق',
-    )!;
+    const qaf = await renderLoadedWithLetters();
 
     // Prove the filter actually took effect before switching sort -- clicking
     // the disabled first cell (ء) would be a no-op and the assertion below
