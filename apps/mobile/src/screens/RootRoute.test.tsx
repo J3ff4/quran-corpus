@@ -167,6 +167,19 @@ describe('RootRoute', () => {
     expect(await screen.findAllByTestId('root-letter')).toHaveLength(3);
   });
 
+  it('lays the root letters out right to left', async () => {
+    render(<RootRoute />);
+    const row = await screen.findByTestId('root-letters');
+    expect(row.style.flexDirection).toBe('row-reverse');
+    // Tree order stays logical, because TalkBack reads the tree, not the
+    // layout -- reversing the array instead would announce the root backwards.
+    expect(screen.getAllByTestId('root-letter').map((pill) => pill.textContent)).toEqual([
+      'ق',
+      'و',
+      'ل',
+    ]);
+  });
+
   it('says how often the root occurs', async () => {
     render(<RootRoute />);
     // .textContent, not the jest-dom toHaveTextContent matcher: jest-dom is

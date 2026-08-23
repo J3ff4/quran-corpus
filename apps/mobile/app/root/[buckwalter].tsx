@@ -242,24 +242,37 @@ export default function RootRoute() {
             ("ق و ل") are separators, not letters, so they are stripped before
             splitting -- otherwise a three-letter root renders five pills, two
             of them blank. */}
-        {Array.from(root.root_arabic.replace(/\s+/g, '')).map((letter, index) => (
-          <View
-            key={`${letter}-${index}`}
-            testID="root-letter"
-            style={{
-              backgroundColor: theme.surface,
-              borderWidth: 1,
-              borderColor: theme.border,
-              borderRadius: 8,
-              paddingHorizontal: 10,
-              paddingVertical: 4,
-            }}
-          >
-            <Text style={{ color: theme.text, fontFamily: 'Hafs', fontSize: typography.body }}>
-              {letter}
-            </Text>
-          </View>
-        ))}
+        {/* row-reverse, not a reversed array: the pills stay in tree order
+            (ق و ل) so TalkBack reads the root forwards, and only the layout
+            flips. Same treatment AlphabetGrid gives the alphabet. */}
+        <View
+          testID="root-letters"
+          style={{
+            flexDirection: 'row-reverse',
+            flexWrap: 'wrap',
+            justifyContent: 'center',
+            gap: 6,
+          }}
+        >
+          {Array.from(root.root_arabic.replace(/\s+/g, '')).map((letter, index) => (
+            <View
+              key={`${letter}-${index}`}
+              testID="root-letter"
+              style={{
+                backgroundColor: theme.surface,
+                borderWidth: 1,
+                borderColor: theme.border,
+                borderRadius: 8,
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+              }}
+            >
+              <Text style={{ color: theme.text, fontFamily: 'Hafs', fontSize: typography.body }}>
+                {letter}
+              </Text>
+            </View>
+          ))}
+        </View>
       </EntryHeader>
 
       <View
