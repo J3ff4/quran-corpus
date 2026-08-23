@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { Pressable, Text, View, type NativeSyntheticEvent, type TextLayoutEventData } from 'react-native';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
@@ -32,6 +32,19 @@ export function ClampedText({ children, lines = DEFAULT_LINES, footer, uiLocale 
   const theme = useThemeColors();
   const [expanded, setExpanded] = useState(false);
   const [overflows, setOverflows] = useState(false);
+
+  // Different text is a different measurement. Neither state survives the swap:
+  // `overflows` is sticky by design (see onTextLayout) and would otherwise keep
+  // a Show more button over text that now fits, and a carried-over `expanded`
+  // would lock out the re-measure as well. Adjusted during render rather than
+  // in an effect so the new text never paints under the old verdict -- React's
+  // documented pattern for state that depends on a prop.
+  const measured = useRef(children);
+  if (measured.current !== children) {
+    measured.current = children;
+    setExpanded(false);
+    setOverflows(false);
+  }
 
   const onTextLayout = useCallback(
     (event: NativeSyntheticEvent<TextLayoutEventData>) => {

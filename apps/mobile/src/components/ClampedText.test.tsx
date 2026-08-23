@@ -77,6 +77,25 @@ describe('ClampedText', () => {
     expect(screen.getByTestId('clamp-toggle').textContent).toBe('Show less');
   });
 
+  it('re-measures when the text itself changes', () => {
+    // The lemma screen renders this with the root definition and does NOT key
+    // it, so switching content language swaps `children` in place on a mounted
+    // instance. Without a reset the sticky `overflows` keeps a Show more button
+    // over text that now fits, and it expands to the same text.
+    const { rerender } = render(<ClampedText uiLocale="en">{LONG}</ClampedText>);
+    act(() => layout(screen.getByTestId('clamp-body'), ['a'.repeat(50)]));
+    fireEvent.click(screen.getByTestId('clamp-toggle'));
+
+    rerender(<ClampedText uiLocale="en">short</ClampedText>);
+    expect(screen.queryByTestId('clamp-toggle')).toBeNull();
+    expect(screen.getByTestId('clamp-body').getAttribute('aria-expanded')).toBe('false');
+
+    // And the fresh text is measured on its own terms rather than being locked
+    // out by the previous one's verdict.
+    act(() => layout(screen.getByTestId('clamp-body'), ['short']));
+    expect(screen.queryByTestId('clamp-toggle')).toBeNull();
+  });
+
   it('renders a footer beside the toggle', () => {
     render(
       <ClampedText uiLocale="en" footer={<span>Lane</span>}>short</ClampedText>,
