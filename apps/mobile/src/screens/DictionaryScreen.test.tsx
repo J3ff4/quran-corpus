@@ -164,6 +164,12 @@ describe('DictionaryScreen', () => {
     expect(screen.getAllByTestId('dictionary-row')).toHaveLength(1);
   });
 
+  it('labels the ranked pane "Most used", not a sort order', async () => {
+    // "Frequent" read as a sort order next to Browse's own "By frequency" chip.
+    await renderLoaded();
+    expect(screen.getByTestId('dictionary-pane-frequent').textContent).toBe('Most used');
+  });
+
   it('hides the alphabet grid while there is search text, and brings it back', async () => {
     // The grid lives in the list header, so on a phone it covers the first
     // results until the keyboard is dismissed and the list scrolled.

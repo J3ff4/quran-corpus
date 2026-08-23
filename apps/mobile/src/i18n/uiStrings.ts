@@ -252,7 +252,10 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'search.noResults': 'Nothing found',
     'search.loadFailed': 'Unable to search',
     'dictionary.browse': 'Browse',
-    'dictionary.frequent': 'Frequent',
+    // The key predates the label. It stayed 'frequent' because the testID
+    // and every call site are named after it; the *label* changed because
+    // "Frequent" read as a sort order next to Browse's own "By frequency" chip.
+    'dictionary.frequent': 'Most used',
     'dictionary.alphabet': 'Arabic alphabet',
     'dictionary.loadFailed': 'Unable to load roots',
     'dictionary.searchPlaceholder': 'Search roots or meaning…',
@@ -370,7 +373,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'search.noResults': 'Hech narsa topilmadi',
     'search.loadFailed': 'Qidirib bo‘lmadi',
     'dictionary.browse': 'Ko‘rish',
-    'dictionary.frequent': 'Ko‘p uchraydigan',
+    'dictionary.frequent': 'Eng ko‘p ishlatiladigan',
     'dictionary.alphabet': 'Arab alifbosi',
     'dictionary.loadFailed': 'O‘zaklarni yuklab bo‘lmadi',
     'dictionary.searchPlaceholder': 'O‘zak yoki ma’noni qidirish…',
@@ -488,7 +491,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'search.noResults': 'Ничего не найдено',
     'search.loadFailed': 'Не удалось выполнить поиск',
     'dictionary.browse': 'Обзор',
-    'dictionary.frequent': 'Частотные',
+    'dictionary.frequent': 'Самые частые',
     'dictionary.alphabet': 'Арабский алфавит',
     'dictionary.loadFailed': 'Не удалось загрузить корни',
     'dictionary.searchPlaceholder': 'Поиск корня или значения…',
