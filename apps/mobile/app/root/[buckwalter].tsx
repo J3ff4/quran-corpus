@@ -1,8 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
 import type { RootEntry } from '@quran-corpus/data/mobile';
+import { AdjacentNav } from '@/components/AdjacentNav';
 import { ConcordanceList } from '@/components/ConcordanceList';
 import { DefinitionCard } from '@/components/DefinitionCard';
 import { EntryHeader } from '@/components/EntryHeader';
@@ -17,7 +18,7 @@ import { openCorpusDb } from '@/data/openCorpusDb';
 import { parseRootParam } from '@/data/routeParams';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
-import { touchTargets, typography } from '@/theme/tokens';
+import { typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
 interface Neighbors {
@@ -275,43 +276,13 @@ export default function RootRoute() {
         </View>
       </EntryHeader>
 
-      <View
-        accessibilityRole="toolbar"
-        accessibilityLabel={t(uiLocale, 'root.adjacent')}
-        style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}
-      >
-        {(['prev', 'next'] as const).map((side) => {
-          const target = side === 'prev' ? neighbors.prev : neighbors.next;
-          return (
-            <Pressable
-              key={side}
-              testID={side === 'prev' ? 'root-previous' : 'root-next'}
-              accessibilityRole="button"
-              // Disabled, not hidden: an arrow that vanishes at the ends of the
-              // list slides the other one under the thumb, and TalkBack is left
-              // with nothing to announce where a control used to be.
-              accessibilityState={{ disabled: target === null }}
-              disabled={target === null}
-              onPress={target ? () => router.push(`/root/${encodeURIComponent(target)}`) : undefined}
-              style={{
-                minHeight: touchTargets.compact,
-                justifyContent: 'center',
-                paddingHorizontal: 14,
-                borderRadius: 10,
-                borderWidth: 1,
-                borderColor: theme.border,
-                opacity: target === null ? 0.4 : 1,
-              }}
-            >
-              <Text style={{ color: target === null ? theme.mutedText : theme.text }}>
-                {side === 'prev'
-                  ? `← ${t(uiLocale, 'root.previous')}`
-                  : `${t(uiLocale, 'root.next')} →`}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      <AdjacentNav
+        prev={neighbors.prev}
+        next={neighbors.next}
+        onNavigate={(target) => router.push(`/root/${encodeURIComponent(target)}`)}
+        label={t(uiLocale, 'root.adjacent')}
+        uiLocale={uiLocale}
+      />
 
       <View style={{ gap: 10 }}>
         {definitions.length > 0 ? (
