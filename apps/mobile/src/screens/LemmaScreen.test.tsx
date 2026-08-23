@@ -396,6 +396,32 @@ describe('LemmaScreen', () => {
     expect(mocks.push).toHaveBeenCalledWith('/lemma/ktb?from=verbs');
   });
 
+  it('drops the old neighbours while the new lemma is still resolving', async () => {
+    // A lemma change in place -- router.replace, or a deep link landing on the
+    // mounted route -- refetches, and the verb aggregate is the slowest query
+    // on this screen. Held-over arrows would point at the PREVIOUS lemma's
+    // neighbours, so Next would navigate somewhere the reader never was.
+    mocks.getAdjacentLemmas.mockResolvedValue({ prev: 'qwl', next: 'ktb' });
+    const { rerender } = render(<LemmaScreen lemmaBuckwalter="brk" source="verbs" />);
+    await waitFor(() =>
+      expect((screen.getByTestId('lemma-next') as HTMLButtonElement).disabled).toBe(false),
+    );
+
+    let settle: (value: { prev: string | null; next: string | null }) => void = () => {};
+    mocks.getAdjacentLemmas.mockReturnValue(
+      new Promise<{ prev: string | null; next: string | null }>((resolve) => {
+        settle = resolve;
+      }),
+    );
+    rerender(<LemmaScreen lemmaBuckwalter="qaAla" source="verbs" />);
+
+    await waitFor(() =>
+      expect((screen.getByTestId('lemma-next') as HTMLButtonElement).disabled).toBe(true),
+    );
+    settle({ prev: null, next: 'kaAna' });
+    await waitFor(() => expect(mocks.getAdjacentLemmas).toHaveBeenCalledTimes(2));
+  });
+
   it('dims both arrows for a deep link that names no ranking', async () => {
     render(<LemmaScreen lemmaBuckwalter="brk" source={null} />);
 

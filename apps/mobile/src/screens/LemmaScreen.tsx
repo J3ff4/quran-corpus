@@ -99,6 +99,13 @@ export function LemmaScreen({ lemmaBuckwalter, source }: LemmaScreenProps) {
       return;
     }
 
+    // Cleared before the refetch, not left holding the last lemma's answer: if
+    // the route's params change in place the verb aggregate is the slowest
+    // query here, and stale arrows would page somewhere the reader never was.
+    // Dimmed for that window is the same state a deep link with no ranking
+    // shows, which the reader already understands.
+    setNeighbors(NO_NEIGHBORS);
+
     let cancelled = false;
     (async () => {
       try {
