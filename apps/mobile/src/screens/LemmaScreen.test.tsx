@@ -7,11 +7,14 @@ import { LemmaScreen } from './LemmaScreen';
 const mocks = vi.hoisted(() => ({
   getLemmaScreen: vi.fn(),
   getLemmaOccurrences: vi.fn(),
+  getAdjacentLemmas: vi.fn(),
+  push: vi.fn(),
 }));
 
 vi.mock('@/data/corpusRepository', () => ({
   getLemmaScreen: (...args: unknown[]) => mocks.getLemmaScreen(...args),
   getLemmaOccurrences: (...args: unknown[]) => mocks.getLemmaOccurrences(...args),
+  getAdjacentLemmas: (...args: unknown[]) => mocks.getAdjacentLemmas(...args),
 }));
 vi.mock('@/data/openCorpusDb', () => ({ openCorpusDb: () => Promise.resolve({}) }));
 vi.mock('@quran-corpus/mobile-data', () => ({ createExpoSqliteClient: () => ({}) }));
@@ -72,6 +75,7 @@ vi.mock('expo-router', async () => {
   return {
     Link: ({ href, testID, children }: { href: string; testID?: string; children: React.ReactNode }) =>
       React.createElement('a', { href, 'data-testid': testID }, children),
+    router: { push: mocks.push },
   };
 });
 
@@ -107,7 +111,10 @@ describe('LemmaScreen', () => {
   beforeEach(() => {
     mocks.getLemmaScreen.mockReset();
     mocks.getLemmaOccurrences.mockReset();
+    mocks.getAdjacentLemmas.mockReset();
+    mocks.push.mockReset();
     mocks.getLemmaOccurrences.mockResolvedValue([]);
+    mocks.getAdjacentLemmas.mockResolvedValue({ prev: null, next: null });
     // Default resolution so a test that only cares about the info button (or
     // any other fixed part of the header) doesn't also have to stub the load.
     // Tests that care about the loaded entry override this explicitly.
@@ -116,7 +123,7 @@ describe('LemmaScreen', () => {
   afterEach(cleanup);
 
   it('renders the not-found state for an invalid identifier', () => {
-    render(<LemmaScreen lemmaBuckwalter={null} />);
+    render(<LemmaScreen lemmaBuckwalter={null} source={null} />);
 
     // queryBy, not getBy: getBy throws on a miss, which would fail this test
     // the same way for "wrong text" and for "unrelated render crash" -- the
@@ -144,7 +151,7 @@ describe('LemmaScreen', () => {
       total: 1722,
     });
 
-    render(<LemmaScreen lemmaBuckwalter="qAl" />);
+    render(<LemmaScreen lemmaBuckwalter="qAl" source={null} />);
 
     // From countLemmaConcordance (1722), not from the entry's own count (3):
     // the entry query groups occurrences away, and paging off that number
@@ -180,7 +187,7 @@ describe('LemmaScreen', () => {
       total: 1722,
     });
 
-    render(<LemmaScreen lemmaBuckwalter="qAl" />);
+    render(<LemmaScreen lemmaBuckwalter="qAl" source={null} />);
 
     // Settings mocks 'ru', not 'en': a loadPage that hardcodes 'en' would
     // still pass a version of this assertion pinned to 'en'.
@@ -211,7 +218,7 @@ describe('LemmaScreen', () => {
       total: 5,
     });
 
-    render(<LemmaScreen lemmaBuckwalter="Darab" />);
+    render(<LemmaScreen lemmaBuckwalter="Darab" source={null} />);
 
     await waitFor(() => expect(screen.queryByTestId('concordance')).not.toBeNull());
     expect(screen.queryByText('Translated as')).not.toBeNull();
@@ -236,7 +243,7 @@ describe('LemmaScreen', () => {
       total: 1,
     });
 
-    render(<LemmaScreen lemmaBuckwalter=">Ab" />);
+    render(<LemmaScreen lemmaBuckwalter=">Ab" source={null} />);
 
     await waitFor(() => expect(screen.queryByTestId('lemma-root')).not.toBeNull());
     const link = screen.queryByTestId('lemma-root');
@@ -263,7 +270,7 @@ describe('LemmaScreen', () => {
       total: 1,
     });
 
-    render(<LemmaScreen lemmaBuckwalter="mA" />);
+    render(<LemmaScreen lemmaBuckwalter="mA" source={null} />);
 
     await waitFor(() => expect(screen.queryByTestId('concordance')).not.toBeNull());
     expect(screen.queryByTestId('lemma-root')).toBeNull();
@@ -271,7 +278,7 @@ describe('LemmaScreen', () => {
 
   it('shows the headword, its reading and how often it occurs', async () => {
     mocks.getLemmaScreen.mockResolvedValue({ entry: LEMMA, total: 1722 });
-    render(<LemmaScreen lemmaBuckwalter="qaAla" />);
+    render(<LemmaScreen lemmaBuckwalter="qaAla" source={null} />);
     // .textContent, not the jest-dom toHaveTextContent matcher: jest-dom is
     // an apps/web dependency only (see DefinitionCard.test.tsx).
     expect((await screen.findByTestId('entry-translit')).textContent).toContain('qāla');
@@ -291,7 +298,7 @@ describe('LemmaScreen', () => {
       },
       total: 2177,
     });
-    render(<LemmaScreen lemmaBuckwalter="mA" />);
+    render(<LemmaScreen lemmaBuckwalter="mA" source={null} />);
     const chips = await screen.findAllByTestId('sense-chip');
     expect(chips).toHaveLength(2);
     // noUncheckedIndexedAccess: array indexing widens to T | undefined.
@@ -304,12 +311,12 @@ describe('LemmaScreen', () => {
       entry: { ...LEMMA, senses: [{ pos_tag: 'V', pos_label: 'Verb', count: 1722 }] },
       total: 1722,
     });
-    render(<LemmaScreen lemmaBuckwalter="qaAla" />);
+    render(<LemmaScreen lemmaBuckwalter="qaAla" source={null} />);
     expect((await screen.findByTestId('sense-chip')).textContent).not.toContain('1722');
   });
 
   it('explains the glosses behind an info button rather than in body text', async () => {
-    render(<LemmaScreen lemmaBuckwalter="qaAla" />);
+    render(<LemmaScreen lemmaBuckwalter="qaAla" source={null} />);
     fireEvent.click(await screen.findByTestId('info-button'));
     expect(screen.getByTestId('info-body').textContent).toContain('not dictionary definitions');
   });
@@ -319,7 +326,7 @@ describe('LemmaScreen', () => {
     // fills its PARENT. Mounted where the button is -- inside the FlatList
     // header, inside a 20dp row -- the backdrop and panel lay out inside that
     // row and scroll away with the list. Only the button belongs in the header.
-    render(<LemmaScreen lemmaBuckwalter="qaAla" />);
+    render(<LemmaScreen lemmaBuckwalter="qaAla" source={null} />);
     fireEvent.click(await screen.findByTestId('info-button'));
 
     const concordance = screen.getByTestId('concordance');
@@ -330,7 +337,7 @@ describe('LemmaScreen', () => {
   it('hides the list from TalkBack while the sheet is up', async () => {
     // accessibilityViewIsModal is iOS-only; without this the reader can swipe
     // straight past the sheet into the rows behind it.
-    render(<LemmaScreen lemmaBuckwalter="qaAla" />);
+    render(<LemmaScreen lemmaBuckwalter="qaAla" source={null} />);
     const wrapper = () => screen.getByTestId('concordance').parentElement!;
     await waitFor(() => expect(wrapper().getAttribute('data-hidden-from-a11y')).toBeNull());
 
@@ -343,7 +350,7 @@ describe('LemmaScreen', () => {
       entry: { ...LEMMA, root_definition: 'to say', root_definition_source: 'lane' },
       total: 5,
     });
-    render(<LemmaScreen lemmaBuckwalter="qaAla" />);
+    render(<LemmaScreen lemmaBuckwalter="qaAla" source={null} />);
     expect((await screen.findByTestId('definition-card')).textContent).toContain('to say');
     expect(screen.getByTestId('definition-source').textContent).toContain("Lane's Lexicon");
   });
@@ -353,7 +360,7 @@ describe('LemmaScreen', () => {
       entry: { ...LEMMA, root_definition: null, root_definition_source: null },
       total: 5,
     });
-    render(<LemmaScreen lemmaBuckwalter="qaAla" />);
+    render(<LemmaScreen lemmaBuckwalter="qaAla" source={null} />);
     expect(await screen.findByTestId('lemma-no-definition')).toBeTruthy();
   });
 
@@ -362,7 +369,7 @@ describe('LemmaScreen', () => {
       entry: { ...LEMMA, root_buckwalter: null, root_definition: null },
       total: 5,
     });
-    render(<LemmaScreen lemmaBuckwalter="qaAla" />);
+    render(<LemmaScreen lemmaBuckwalter="qaAla" source={null} />);
     await screen.findByTestId('entry-count');
     expect(screen.queryByTestId('lemma-root')).toBeNull();
     expect(screen.queryByTestId('lemma-no-definition')).toBeNull();
@@ -370,7 +377,32 @@ describe('LemmaScreen', () => {
 
   it('counts the concordance in its heading', async () => {
     mocks.getLemmaScreen.mockResolvedValue({ entry: LEMMA, total: 1722 });
-    render(<LemmaScreen lemmaBuckwalter="qaAla" />);
+    render(<LemmaScreen lemmaBuckwalter="qaAla" source={null} />);
     expect((await screen.findByTestId('concordance-heading')).textContent).toContain('Concordance (1722)');
+  });
+
+  it('pages through the ranking it was entered from', async () => {
+    mocks.getAdjacentLemmas.mockResolvedValue({ prev: 'qwl', next: 'ktb' });
+
+    render(<LemmaScreen lemmaBuckwalter="brk" source="verbs" />);
+
+    // The ranking travels with the request: a verb sits at a different rank in
+    // the verb list than in the lemma list, so a hardcoded 'lemmas' here would
+    // page somewhere the reader never was.
+    await waitFor(() => expect(mocks.getAdjacentLemmas).toHaveBeenCalled());
+    expect(mocks.getAdjacentLemmas.mock.calls[0]!.slice(1)).toEqual(['brk', 'verbs']);
+
+    fireEvent.click(await screen.findByTestId('lemma-next'));
+    expect(mocks.push).toHaveBeenCalledWith('/lemma/ktb?from=verbs');
+  });
+
+  it('dims both arrows for a deep link that names no ranking', async () => {
+    render(<LemmaScreen lemmaBuckwalter="brk" source={null} />);
+
+    const previous = (await screen.findByTestId('lemma-previous')) as HTMLButtonElement;
+    expect(previous.disabled).toBe(true);
+    expect((screen.getByTestId('lemma-next') as HTMLButtonElement).disabled).toBe(true);
+    // No ranking means there is no query to run.
+    expect(mocks.getAdjacentLemmas).not.toHaveBeenCalled();
   });
 });

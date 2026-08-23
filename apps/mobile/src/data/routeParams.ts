@@ -14,7 +14,11 @@
  * both of which pass a Buckwalter charset test and reach SQLite.
  */
 
-import { isLemmaBuckwalter, isRootBuckwalter } from '@quran-corpus/data/mobile';
+import {
+  isLemmaBuckwalter,
+  isRootBuckwalter,
+  type LemmaFrequencyKind,
+} from '@quran-corpus/data/mobile';
 
 /** Shared shape: first-of-array, reject empty, then the caller's predicate. */
 function parseParam(
@@ -47,6 +51,20 @@ export function parseRootParam(value: string | string[] | undefined): string | n
 /** A `lemma_buckwalter` path segment, or null if it is not one. */
 export function parseLemmaParam(value: string | string[] | undefined): string | null {
   return parseParam(value, isLemmaBuckwalter);
+}
+
+/** Which frequency ranking the lemma screen's Previous/Next walks, off the
+ *  `?from` query param.
+ *
+ *  Not built on `parseParam`: that takes the first element of an array, which
+ *  is the right rule for a path segment and the wrong one here -- two `?from`
+ *  values in one link is a malformed link, not a preference. Anything that is
+ *  not one of the two literals returns null, which the screen renders as both
+ *  arrows dimmed. */
+export function parseFrequencySourceParam(
+  value: string | string[] | undefined,
+): LemmaFrequencyKind | null {
+  return value === 'lemmas' || value === 'verbs' ? value : null;
 }
 
 /** Shared shape: a 1-based corpus coordinate with an upper bound.

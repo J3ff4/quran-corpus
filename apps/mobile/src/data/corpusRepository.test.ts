@@ -73,7 +73,9 @@ describe('getFrequencyRows', () => {
     // identity is the lemma. Routing on the surface form opens nothing.
     const rows = await getFrequencyRows(createFakeClient(), 'verbs');
 
-    expect(rows[0]!.href).toBe('/lemma/qAl');
+    // The ranking rides along, so the lemma screen's Previous/Next walks the
+    // list the row was tapped in.
+    expect(rows[0]!.href).toBe('/lemma/qAl?from=verbs');
     expect(rows[0]!.arabic).toBe('يَقُولُ');
   });
 

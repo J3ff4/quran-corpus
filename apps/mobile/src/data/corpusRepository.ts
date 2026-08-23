@@ -8,6 +8,7 @@ import {
   getLemmaConcordancePage,
   getLemmaEntry,
   getLemmaFrequency,
+  getLemmaFrequencyNeighbors,
   getRootConcordancePage,
   getRootEntry,
   getRootNeighbors,
@@ -18,6 +19,7 @@ import {
   getSurahById,
   getTranslationsBySurahAndLang,
   getVerbConcordance,
+  type LemmaFrequencyKind,
   getWordByLocation,
   getWordDetail,
   getWordsByAyah,
@@ -330,6 +332,21 @@ export async function getAdjacentRoots(
   return getRootNeighbors(client, bw);
 }
 
+/** The lemmas either side of this one in the ranking the reader entered from.
+ *
+ *  Frequency rank, not alphabetical, because that is the only order a lemma
+ *  screen is ever reached in -- the Most-used lists. `lemmas` and `verbs` are
+ *  different rankings over overlapping sets (a verb lemma sits at a different
+ *  rank in each), which is why the ranking travels in the route rather than
+ *  being guessed here. */
+export async function getAdjacentLemmas(
+  client: MobileDataClient,
+  lemmaBuckwalter: string,
+  kind: LemmaFrequencyKind,
+): Promise<{ prev: string | null; next: string | null }> {
+  return getLemmaFrequencyNeighbors(client, lemmaBuckwalter, kind);
+}
+
 /** Every root, unfiltered and unsorted beyond `getRootSearchList`'s own
  *  `ORDER BY root_arabic`. Browse does its own filter (search text, active
  *  letter) and sort (alpha/freq) over this in JS -- see DictionaryScreen --
@@ -432,7 +449,9 @@ export async function getFrequencyRows(
     return lemmas
       .filter((row) => row.lemma_buckwalter !== null)
       .map((row) => ({
-        href: `/lemma/${encodeURIComponent(row.lemma_buckwalter!)}`,
+        // The ranking travels with the row: the lemma screen's Previous/Next
+        // walks whichever list the reader opened it from.
+        href: `/lemma/${encodeURIComponent(row.lemma_buckwalter!)}?from=lemmas`,
         arabic: row.lemma,
         gloss: null,
         count: row.count,
@@ -445,7 +464,7 @@ export async function getFrequencyRows(
     .map((row) => ({
       // The lemma, not the surface form the row displays: form_arabic is the
       // commonest spelling of the verb and routing on it opens nothing.
-      href: `/lemma/${encodeURIComponent(row.lemma_buckwalter!)}`,
+      href: `/lemma/${encodeURIComponent(row.lemma_buckwalter!)}?from=verbs`,
       arabic: row.form_arabic,
       gloss: row.lemma,
       count: row.count,

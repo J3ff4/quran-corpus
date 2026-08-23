@@ -1,23 +1,41 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
-import { posBucket, type LemmaEntry } from '@quran-corpus/data/mobile';
+import {
+  posBucket,
+  type LemmaEntry,
+  type LemmaFrequencyKind,
+} from '@quran-corpus/data/mobile';
+import { AdjacentNav } from '@/components/AdjacentNav';
 import { ConcordanceList } from '@/components/ConcordanceList';
 import { DefinitionCard } from '@/components/DefinitionCard';
 import { EntryHeader } from '@/components/EntryHeader';
 import { InfoButton, InfoSheet } from '@/components/InfoSheet';
-import { getLemmaOccurrences, getLemmaScreen } from '@/data/corpusRepository';
+import { getAdjacentLemmas, getLemmaOccurrences, getLemmaScreen } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
 import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
+interface Neighbors {
+  prev: string | null;
+  next: string | null;
+}
+
+/** Module scope: a fresh literal inside the effect would be a new identity on
+ *  every run. */
+const NO_NEIGHBORS: Neighbors = { prev: null, next: null };
+
 export interface LemmaScreenProps {
   /** Already validated by the route. `null` is an identifier that is not a
    *  lemma, which renders the not-found state without touching the DB. */
   lemmaBuckwalter: string | null;
+  /** Which Most-used ranking Previous/Next walks, already validated by the
+   *  route. `null` is a deep link that named no ranking (or named one that is
+   *  not a ranking), which renders both arrows dimmed rather than guessing. */
+  source: LemmaFrequencyKind | null;
 }
 
 /** One lemma: its Arabic form and reading, the grammatical senses it is
@@ -28,11 +46,12 @@ export interface LemmaScreenProps {
  *  link. A verb page reached from Frequent is a destination, not a waypoint:
  *  full parity with web's lemma page, not deferred to the root screen this
  *  links to. */
-export function LemmaScreen({ lemmaBuckwalter }: LemmaScreenProps) {
+export function LemmaScreen({ lemmaBuckwalter, source }: LemmaScreenProps) {
   const { uiLocale, contentLanguage } = useAppSettings();
   const theme = useThemeColors();
 
   const [entry, setEntry] = useState<LemmaEntry | null>(null);
+  const [neighbors, setNeighbors] = useState<Neighbors>(NO_NEIGHBORS);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(lemmaBuckwalter !== null);
   // Owned here, not by InfoSheet: BottomSheet fills its parent, and the button
@@ -73,6 +92,32 @@ export function LemmaScreen({ lemmaBuckwalter }: LemmaScreenProps) {
       cancelled = true;
     };
   }, [lemmaBuckwalter, contentLanguage]);
+
+  useEffect(() => {
+    if (lemmaBuckwalter === null || source === null) {
+      setNeighbors(NO_NEIGHBORS);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const db = await openCorpusDb();
+        const client = createExpoSqliteClient(db as ExpoSqliteLike);
+        const adjacent = await getAdjacentLemmas(client, lemmaBuckwalter, source);
+        if (!cancelled) setNeighbors(adjacent);
+      } catch (cause) {
+        // Dimmed arrows, not a broken screen: paging is a convenience and the
+        // entry itself has already loaded. Logged for logcat.
+        console.error('[lemma] neighbours failed', { lemmaBuckwalter, source, cause });
+        if (!cancelled) setNeighbors(NO_NEIGHBORS);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [lemmaBuckwalter, source]);
 
   const loadPage = useCallback(
     async (offset: number, limit: number) => {
@@ -152,6 +197,22 @@ export function LemmaScreen({ lemmaBuckwalter }: LemmaScreenProps) {
             })
           : null}
       </EntryHeader>
+
+      <AdjacentNav
+        prev={neighbors.prev}
+        next={neighbors.next}
+        // Guarded rather than assumed non-null: a null source yields no
+        // neighbours, so this cannot fire -- but a future caller that changes
+        // that must not be able to emit the string '?from=null'.
+        onNavigate={
+          source
+            ? (target) => router.push(`/lemma/${encodeURIComponent(target)}?from=${source}`)
+            : () => {}
+        }
+        label={t(uiLocale, 'lemma.adjacent')}
+        uiLocale={uiLocale}
+        testIDPrefix="lemma"
+      />
 
       {entry.top_glosses.length > 0 ? (
         <View style={{ gap: 4 }}>

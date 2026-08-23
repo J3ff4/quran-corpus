@@ -81,6 +81,7 @@ export type UiStringKey =
   // link now sits below a DefinitionCard/lemma-no-definition line, and a bare
   // "Root" there reads as a repeat of the caption above it.
   | 'lemma.viewRoot'
+  | 'lemma.adjacent'
   // Accessible name for the info sheet's backdrop/dismiss control.
   | 'lemma.close'
   | 'surahList.ayahsSuffix'
@@ -215,6 +216,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'lemma.translationsNote': 'From word-by-word translations, ordered by frequency — not dictionary definitions.',
     'lemma.rootDefinition': 'Definition of root',
     'lemma.viewRoot': 'View root',
+    'lemma.adjacent': 'Adjacent lemmas',
     'lemma.close': 'Close',
     'surahList.ayahsSuffix': 'ayahs',
     'surahList.loadFailed': 'Unable to load surahs',
@@ -336,6 +338,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'lemma.translationsNote': 'So‘zma-so‘z tarjimalardan olingan, chastota bo‘yicha tartiblangan — lug‘at ta’riflari emas.',
     'lemma.rootDefinition': 'O‘zak ta’rifi',
     'lemma.viewRoot': 'O‘zakni ko‘rish',
+    'lemma.adjacent': 'Qo‘shni lemmalar',
     'lemma.close': 'Yopish',
     'surahList.ayahsSuffix': 'oyat',
     'surahList.loadFailed': 'Suralarni yuklab bo‘lmadi',
@@ -454,6 +457,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'lemma.translationsNote': 'Из пословных переводов, упорядочены по частоте — это не словарные определения.',
     'lemma.rootDefinition': 'Определение корня',
     'lemma.viewRoot': 'Открыть корень',
+    'lemma.adjacent': 'Соседние леммы',
     'lemma.close': 'Закрыть',
     'surahList.ayahsSuffix': 'аятов',
     'surahList.loadFailed': 'Не удалось загрузить суры',

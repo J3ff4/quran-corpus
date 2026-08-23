@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseLemmaParam, parseRootParam } from './routeParams';
+import { parseFrequencySourceParam, parseLemmaParam, parseRootParam } from './routeParams';
 
 describe('parseLemmaParam / parseRootParam', () => {
   it('accepts the decoded identifier expo-router hands a route', () => {
@@ -26,5 +26,20 @@ describe('parseLemmaParam / parseRootParam', () => {
 
   it('applies the shared length cap', () => {
     expect(parseRootParam('r'.repeat(25))).toBeNull();
+  });
+});
+
+describe('parseFrequencySourceParam', () => {
+  it('accepts exactly the two rankings', () => {
+    expect(parseFrequencySourceParam('lemmas')).toBe('lemmas');
+    expect(parseFrequencySourceParam('verbs')).toBe('verbs');
+  });
+
+  it('rejects everything else, including the shapes useLocalSearchParams returns', () => {
+    // The array case differs from parseParam's first-of-array rule on purpose:
+    // two ?from values in one link is a malformed link, not a preference.
+    for (const value of ['roots', 'LEMMAS', '', 'lemmas;--', undefined, ['verbs', 'lemmas']]) {
+      expect(parseFrequencySourceParam(value as string | string[] | undefined)).toBeNull();
+    }
   });
 });
