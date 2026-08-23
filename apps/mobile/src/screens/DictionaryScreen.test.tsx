@@ -164,6 +164,40 @@ describe('DictionaryScreen', () => {
     expect(screen.getAllByTestId('dictionary-row')).toHaveLength(1);
   });
 
+  it('hides the alphabet grid while there is search text, and brings it back', async () => {
+    // The grid lives in the list header, so on a phone it covers the first
+    // results until the keyboard is dismissed and the list scrolled.
+    await renderLoaded();
+    const box = screen.getByTestId('dictionary-search');
+    expect(screen.getAllByTestId('alphabet-cell').length).toBeGreaterThan(0);
+
+    fireEvent.change(box, { target: { value: 'ا' } });
+    expect(screen.queryAllByTestId('alphabet-cell')).toHaveLength(0);
+
+    fireEvent.change(box, { target: { value: '' } });
+    expect(screen.getAllByTestId('alphabet-cell').length).toBeGreaterThan(0);
+  });
+
+  it('searches the whole list while an active letter is only bypassed, not cleared', async () => {
+    await renderLoaded();
+    // Filter to ق first. قول is the only root under ق in the fixture.
+    const qaf = screen
+      .getAllByTestId('alphabet-cell')
+      .find((cell) => cell.textContent === 'ق')!;
+    fireEvent.click(qaf);
+    expect(screen.getAllByTestId('dictionary-row')).toHaveLength(1);
+
+    // A query for a root filed under a DIFFERENT letter still finds it.
+    fireEvent.change(screen.getByTestId('dictionary-search'), { target: { value: 'ارض' } });
+    expect(screen.getAllByTestId('dictionary-row').map((row) => row.textContent).join('')).toContain(
+      'أرض',
+    );
+
+    // Emptying the box restores the ق filter -- it was never cleared.
+    fireEvent.change(screen.getByTestId('dictionary-search'), { target: { value: '' } });
+    expect(screen.getAllByTestId('dictionary-row')).toHaveLength(1);
+  });
+
   it('clears the search box from the button, which only exists when there is text', async () => {
     await renderLoaded();
     const box = screen.getByTestId('dictionary-search');

@@ -104,10 +104,17 @@ export function DictionaryScreen() {
     });
   }, [navigation, uiLocale]);
 
+  // One flag, two effects: the grid is not worth the screen it takes while a
+  // query is running (the results sat below the fold until the keyboard was
+  // dismissed), and intersecting a query with a letter the reader can no longer
+  // see filters invisibly. The letter is bypassed, not cleared, so emptying the
+  // box puts the reader back where they were.
+  const searching = query.trim().length > 0;
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     let list = roots ?? NO_ROOTS;
-    if (letter) list = list.filter((root) => rootFirstLetter(root.root_arabic) === letter);
+    if (letter && !q) list = list.filter((root) => rootFirstLetter(root.root_arabic) === letter);
     if (q) {
       // The Arabic arm folds both sides (hamza seat + inter-letter spaces) so
       // `ارض` finds the stored `أرض` -- the same normalization searchRoots
@@ -236,12 +243,14 @@ export function DictionaryScreen() {
               keyboardShouldPersistTaps="handled"
               ListHeaderComponent={
                 <>
-                  <AlphabetGrid
-                    uiLocale={uiLocale}
-                    available={available ?? NO_LETTERS}
-                    activeLetter={letter}
-                    onSelect={(picked) => setLetter((prev) => (prev === picked ? null : picked))}
-                  />
+                  {searching ? null : (
+                    <AlphabetGrid
+                      uiLocale={uiLocale}
+                      available={available ?? NO_LETTERS}
+                      activeLetter={letter}
+                      onSelect={(picked) => setLetter((prev) => (prev === picked ? null : picked))}
+                    />
+                  )}
                   <View
                     accessibilityRole="toolbar"
                     accessibilityLabel={t(uiLocale, 'dictionary.sortFilter')}
