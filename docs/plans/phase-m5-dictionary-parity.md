@@ -2344,3 +2344,1383 @@ Each task is one commit and none of them migrate data or touch the on-device use
 | 39 |  |  |  |
 | 40 |  |  |  |
 | 41 |  |  |  |
+
+---
+
+# Addendum: M5b Dictionary UX Fixes
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax.
+
+**Goal:** Six owner-reported defects on the shipped M5 dictionary surfaces, fixed on this same branch before the device gate is run.
+
+**Architecture:** Tasks 12–16 are `apps/mobile` only — layout direction, one new control, one render condition, one string, and one list-reset rule. Tasks 17–19 add lemma Previous/Next: a new frequency-rank neighbour query in `packages/data`, a validator for the `?from` query param it is driven by, and one shared `AdjacentNav` component so the root screen and the lemma screen do not carry two copies of the same toolbar.
+
+**Tech Stack:** unchanged from M5 — Expo Router, React Native 0.86, expo-sqlite 57, vitest + `@testing-library/react` with `vi.mock('react-native')`.
+
+**Spec:** none. Owner reported six items in-session on 2026-08-23; every ambiguous one was put back to the owner and answered. The answers are **Addendum decisions** below, and they are not to be re-litigated.
+
+## Addendum global constraints
+
+Everything in the phase's own **Global Constraints** still applies, plus:
+
+- **§5 independent review IS triggered by this addendum**, unlike the phase body. Task 17 adds a query under `packages/data/src/queries/`, and Task 19 reads a value off a deep link. Both are §5 triggers (`packages/data` queries; input validation / trust boundary). After Task 19 is committed the agent **stops and asks the owner to run `/code-review`** (§4 step 5, user-triggered — the agent cannot launch it). `/code-review ultra` bills $5–25 and is never launched without asking.
+- The phase's acceptance criterion *"No file under `packages/data/src/queries/` … is modified by this phase"* is **superseded** by this addendum. The replacement criterion is in **Addendum acceptance criteria**.
+- No new dependency (§12). `@/testing/deferred` already exists and is used by `ConcordanceList.test.tsx`.
+- Uzbek and Russian strings are implementer-written (R7). They ship in all three locales so nothing falls back silently; wording is correctable later without touching code.
+
+## Addendum decisions
+
+Owner-answered 2026-08-23. Locked.
+
+1. **Land on `feat/m5-dictionary-parity`**, not a new phase branch. The device gate has not been run yet, so all of this is smoked in one pass on one new APK.
+2. **Root letter pills read right-to-left.** Same `row-reverse` treatment `AlphabetGrid` already uses.
+3. **A form-chip tap freezes the scroll.** The previous rows stay mounted, dimmed, until the filtered page lands. Rejected: scrolling to the chips row; letting the list empty and clamp.
+4. **"Frequent" is renamed "Most used."** Rejected: "Rankings", "Top words", and removing Browse's frequency sort instead.
+5. **Query text hides the alphabet grid**, restored when the box is emptied. Rejected: moving the grid below the results; collapsing it to a strip.
+6. **Query text bypasses an active letter filter** — the letter is *not* cleared, and comes back when the box is emptied. Rejected: clearing it on the first keystroke; keeping it silently filtering.
+7. **The search box carries a clear (✕) button**, shown only when there is text.
+8. **Lemma Previous/Next walks frequency-rank order**, and the ranking it walks is carried in the route: `?from=lemmas` or `?from=verbs`. A lemma reached **without** a valid `from` (any deep link) renders both arrows dimmed and inert — the same treatment the root screen gives the ends of the alphabet. Rejected: hijāʾī order over all lemmas (no `sort_order` column exists on lemmas); POS-bucket order; a single canonical ranking regardless of entry point.
+
+## Addendum file structure
+
+| File | Responsibility | Task |
+| --- | --- | --- |
+| `apps/mobile/app/root/[buckwalter].tsx` | Root screen. Gains an RTL pill row; loses its inline prev/next toolbar to `AdjacentNav` | 12, 18 |
+| `apps/mobile/src/screens/DictionaryScreen.tsx` | Browse + Most used. Gains the clear button and the grid/letter suppression | 13, 14, 15 |
+| `apps/mobile/src/components/ConcordanceList.tsx` | Owns list identity. Gains "hold the old rows until the new first page lands" | 16 |
+| `apps/mobile/src/i18n/uiStrings.ts` | Three locales. Gains `dictionary.clearSearch`, `lemma.adjacent`; `dictionary.frequent`'s **value** changes | 13, 15, 19 |
+| `packages/data/src/queries/dictionary.ts` | The two frequency list queries. Gains the neighbour query that must mirror their `ORDER BY` exactly | 17 |
+| `packages/data/src/mobile.ts` | Mobile entry point. Gains one export | 17 |
+| `apps/mobile/src/data/routeParams.ts` | Trust boundary for every route value | 19 |
+| `apps/mobile/src/data/corpusRepository.ts` | Mobile's thin wrapper over the shared queries; also builds the Most-used row `href`s | 19 |
+| `apps/mobile/src/components/AdjacentNav.tsx` | **New.** The Previous/Next toolbar, used by both entry screens | 18 |
+| `apps/mobile/src/screens/LemmaScreen.tsx` | Lemma/verb screen. Gains the toolbar and its neighbour fetch | 19 |
+| `README.md` | The device checklist | 20 |
+
+---
+
+### Task 12: Root letter pills read right-to-left
+
+**Files:**
+- Modify: `apps/mobile/app/root/[buckwalter].tsx:240-262` (the `EntryHeader` children)
+- Test: `apps/mobile/src/screens/RootRoute.test.tsx`
+
+**Interfaces:**
+- Consumes: nothing new.
+- Produces: a container with `testID="root-letters"` around the existing `testID="root-letter"` pills. Nothing else reads it.
+
+Why a wrapper and not a reversed array: `EntryHeader`'s `entry-chips` row is shared with the lemma screen's sense chips, which are Latin-labelled and must stay left-to-right. Reversing the array instead would put the pills in the wrong order for TalkBack, which reads tree order, not visual order — the pills must stay ق, و, ل in the tree and be laid out right-to-left, exactly as `AlphabetGrid.tsx:38` already does it.
+
+- [ ] **Step 1: Write the failing test**
+
+Add to `RootRoute.test.tsx`, inside the existing top-level `describe`:
+
+```tsx
+it('lays the root letters out right to left', async () => {
+  // Same mock setup the neighbouring tests use; the default fixture root is
+  // `root_arabic: 'قول'` (RootRoute.test.tsx:94), three letters, no spaces.
+  render(<RootRoute />);
+  const row = await screen.findByTestId('root-letters');
+  expect(row.style.flexDirection).toBe('row-reverse');
+  // Tree order stays logical, because TalkBack reads the tree, not the layout.
+  const letters = screen.getAllByTestId('root-letter').map((pill) => pill.textContent);
+  expect(letters).toEqual(['ق', 'و', 'ل']);
+});
+```
+
+This suite has no shared render helper — each test calls `render(<RootRoute />)` after priming `mocks.getRootScreen` / `getRootOccurrenceCount` / `getAdjacentRoots`. Do the same.
+
+- [ ] **Step 2: Run it and watch it fail**
+
+Run: `pnpm --filter @quran-corpus/mobile test -- RootRoute`
+Expected: FAIL — `Unable to find an element by: [data-testid="root-letters"]`.
+
+- [ ] **Step 3: Wrap the pills**
+
+In `app/root/[buckwalter].tsx`, wrap the `Array.from(...).map(...)` pill list in a single container:
+
+```tsx
+{/* row-reverse, not a reversed array: the pills stay in tree order (ق و ل)
+    so TalkBack reads them correctly, and only the layout flips. Same
+    treatment AlphabetGrid gives the alphabet. */}
+<View
+  testID="root-letters"
+  style={{ flexDirection: 'row-reverse', flexWrap: 'wrap', justifyContent: 'center', gap: 6 }}
+>
+  {Array.from(root.root_arabic.replace(/\s+/g, '')).map((letter, index) => (
+    <View
+      key={`${letter}-${index}`}
+      testID="root-letter"
+      style={{
+        backgroundColor: theme.surface,
+        borderWidth: 1,
+        borderColor: theme.border,
+        borderRadius: 8,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+      }}
+    >
+      <Text style={{ color: theme.text, fontFamily: 'Hafs', fontSize: typography.body }}>
+        {letter}
+      </Text>
+    </View>
+  ))}
+</View>
+```
+
+Keep the existing comment about compound roots ("ق و ل") above the `Array.from`.
+
+- [ ] **Step 4: Run it and watch it pass**
+
+Run: `pnpm --filter @quran-corpus/mobile test -- RootRoute`
+Expected: PASS, and every pre-existing test in the file still passes.
+
+- [ ] **Step 5: Mutation-check (§4 step 4)**
+
+Change `flexDirection: 'row-reverse'` to `'row'`. Re-run: the new test **must** fail on the `flexDirection` assertion. Reverse the edit **by re-editing** — never `git checkout` / `git restore` (that has destroyed uncommitted work on this repo before).
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add apps/mobile/app/root/'[buckwalter]'.tsx apps/mobile/src/screens/RootRoute.test.tsx
+git commit -m "fix(mobile): lay root letter pills out right to left"
+```
+
+---
+
+### Task 13: Clear button in the dictionary search box
+
+**Files:**
+- Modify: `apps/mobile/src/screens/DictionaryScreen.tsx` (the `TextInput` block under `pane === 'browse'`)
+- Modify: `apps/mobile/src/i18n/uiStrings.ts` (one key, three locales)
+- Test: `apps/mobile/src/screens/DictionaryScreen.test.tsx`
+
+**Interfaces:**
+- Consumes: nothing new.
+- Produces: `testID="dictionary-search-clear"`; new `UiStringKey` `'dictionary.clearSearch'`.
+
+`clearButtonMode` is not an option — it is iOS-only, and this app ships Android first.
+
+- [ ] **Step 1: Write the failing test**
+
+```tsx
+it('clears the search box from the button, which only exists when there is text', async () => {
+  await renderLoaded();
+  const box = screen.getByTestId('dictionary-search');
+  expect(screen.queryByTestId('dictionary-search-clear')).toBeNull();
+
+  fireEvent.change(box, { target: { value: 'ارض' } });
+  fireEvent.click(await screen.findByTestId('dictionary-search-clear'));
+
+  expect((screen.getByTestId('dictionary-search') as HTMLInputElement).value).toBe('');
+  expect(screen.queryByTestId('dictionary-search-clear')).toBeNull();
+  // The whole list is back, not the one-root result: the fixture has four
+  // roots and 'ارض' isolates exactly one, so this distinguishes cleared from
+  // filtered. An assertion that passed either way would assert nothing.
+  expect(screen.getAllByTestId('dictionary-row')).toHaveLength(4);
+});
+```
+
+`renderLoaded()` is this suite's existing helper (`DictionaryScreen.test.tsx:110`) — it renders and flushes both startup queries. `dictionary-row` is `DictionaryRow`'s testID. The fixture is four roots: ابل, رحم, قول (the only ق, gloss `to say`, count 1722) and أرض (the only hit for a folded `ارض`).
+
+- [ ] **Step 2: Run it and watch it fail**
+
+Run: `pnpm --filter @quran-corpus/mobile test -- DictionaryScreen`
+Expected: FAIL — no `dictionary-search-clear`.
+
+- [ ] **Step 3: Add the key in all three locales**
+
+In `uiStrings.ts`, add to the `UiStringKey` union next to `'dictionary.searchLabel'`:
+
+```ts
+  | 'dictionary.clearSearch'
+```
+
+and to each locale table:
+
+```ts
+    'dictionary.clearSearch': 'Clear search',     // en
+    'dictionary.clearSearch': 'Qidiruvni tozalash', // uz
+    'dictionary.clearSearch': 'Очистить поиск',   // ru
+```
+
+- [ ] **Step 4: Add the button**
+
+Replace the bordered `TextInput` with a bordered row that holds a borderless input and the button. The border moves to the wrapper so the button sits *inside* the field:
+
+```tsx
+<View style={{ paddingHorizontal: 16 }}>
+  <View
+    style={{
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderColor: theme.border,
+      borderWidth: 1,
+      borderRadius: 12,
+      paddingRight: 4,
+    }}
+  >
+    <TextInput
+      testID="dictionary-search"
+      value={query}
+      onChangeText={setQuery}
+      placeholder={t(uiLocale, 'dictionary.searchPlaceholder')}
+      placeholderTextColor={theme.mutedText}
+      accessibilityLabel={t(uiLocale, 'dictionary.searchLabel')}
+      style={{
+        flex: 1,
+        color: theme.text,
+        paddingHorizontal: 14,
+        minHeight: touchTargets.minimum,
+      }}
+    />
+    {query.length > 0 ? (
+      <Pressable
+        testID="dictionary-search-clear"
+        accessibilityRole="button"
+        accessibilityLabel={t(uiLocale, 'dictionary.clearSearch')}
+        onPress={() => setQuery('')}
+        style={{
+          minHeight: touchTargets.minimum,
+          minWidth: touchTargets.minimum,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Text style={{ color: theme.mutedText, fontSize: typography.body }}>✕</Text>
+      </Pressable>
+    ) : null}
+  </View>
+</View>
+```
+
+The `minWidth`/`minHeight` are not decoration: a bare glyph is a ~14pt tap target, and `touchTargets.minimum` is what the rest of this app uses to stay above the 48dp floor (§8 accessibility).
+
+- [ ] **Step 5: Run it and watch it pass**
+
+Run: `pnpm --filter @quran-corpus/mobile test -- DictionaryScreen`
+Expected: PASS. Also re-run the whole mobile suite — the search box moved inside a wrapper, and `DictionaryScreen.test.tsx` has an existing assertion that the box is **not** inside the FlatList (`list.contains(...)` is `false`). It must still hold; if it broke, the wrapper was put in the wrong place (R1).
+
+- [ ] **Step 6: Mutation-check (§4 step 4)**
+
+Drop the `query.length > 0 ?` guard so the button always renders. Re-run: the test **must** fail on the first `queryByTestId(...)).toBeNull()`. Reverse by re-editing.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add apps/mobile/src/screens/DictionaryScreen.tsx apps/mobile/src/screens/DictionaryScreen.test.tsx apps/mobile/src/i18n/uiStrings.ts
+git commit -m "feat(mobile): clear button inside the dictionary search box"
+```
+
+---
+
+### Task 14: Typing hides the alphabet grid and bypasses the active letter
+
+**Files:**
+- Modify: `apps/mobile/src/screens/DictionaryScreen.tsx` (the `visible` memo and `ListHeaderComponent`)
+- Test: `apps/mobile/src/screens/DictionaryScreen.test.tsx`
+
+**Interfaces:**
+- Consumes: nothing new.
+- Produces: nothing new. `letter` state is unchanged in shape — it is *bypassed* while there is query text, never cleared, so emptying the box restores the filter.
+
+The defect: the grid lives in the FlatList's `ListHeaderComponent`, so on a phone it occupies the screen and the first search results sit below the fold, invisible until the keyboard is dismissed and the list scrolled.
+
+- [ ] **Step 1: Write the two failing tests**
+
+```tsx
+it('hides the alphabet grid while there is search text, and brings it back', async () => {
+  await renderLoaded();
+  const box = screen.getByTestId('dictionary-search');
+  expect(screen.getAllByTestId('alphabet-cell').length).toBeGreaterThan(0);
+
+  fireEvent.change(box, { target: { value: 'ا' } });
+  await waitFor(() => expect(screen.queryAllByTestId('alphabet-cell')).toHaveLength(0));
+
+  fireEvent.change(box, { target: { value: '' } });
+  await waitFor(() => expect(screen.queryAllByTestId('alphabet-cell').length).toBeGreaterThan(0));
+});
+
+it('searches the whole list while an active letter is only bypassed, not cleared', async () => {
+  await renderLoaded();
+  // Filter to ق first. قول is the only root under ق in the fixture.
+  const qaf = screen.getAllByTestId('alphabet-cell').find(
+    (cell) => cell.textContent === 'ق',
+  )!;
+  fireEvent.click(qaf);
+  await waitFor(() => expect(screen.getAllByTestId('dictionary-row')).toHaveLength(1));
+
+  // A query for a root filed under a DIFFERENT letter still finds it.
+  fireEvent.change(screen.getByTestId('dictionary-search'), { target: { value: 'ارض' } });
+  await waitFor(() => {
+    expect(screen.getAllByTestId('dictionary-row').map((r) => r.textContent).join(''))
+      .toContain('أرض');
+  });
+
+  // Emptying the box restores the ق filter — it was never cleared.
+  fireEvent.change(screen.getByTestId('dictionary-search'), { target: { value: '' } });
+  await waitFor(() => expect(screen.getAllByTestId('dictionary-row')).toHaveLength(1));
+});
+```
+
+Both counts are the fixture's real ones: ق holds exactly one root (قول) and `ارض` folds to exactly one (أرض). Do not soften either to `toBeGreaterThan` — the point of the second test is that a root *outside* ق shows up while ق is still selected.
+
+- [ ] **Step 2: Run them and watch them fail**
+
+Run: `pnpm --filter @quran-corpus/mobile test -- DictionaryScreen`
+Expected: FAIL — the grid is still rendered; the query is still intersected with the letter.
+
+- [ ] **Step 3: Suppress the grid and bypass the letter**
+
+In `DictionaryScreen.tsx`, above the `visible` memo:
+
+```tsx
+// One flag, two effects: the grid is not worth the screen it takes while a
+// query is running (results sat below the fold until the keyboard was
+// dismissed), and intersecting a query with a letter the reader can no longer
+// see filters invisibly. The letter is bypassed, not cleared, so emptying the
+// box puts the reader back where they were.
+const searching = query.trim().length > 0;
+```
+
+In the memo, gate the letter filter on it:
+
+```tsx
+const visible = useMemo(() => {
+  const q = query.trim().toLowerCase();
+  let list = roots ?? NO_ROOTS;
+  if (letter && !q) list = list.filter((root) => rootFirstLetter(root.root_arabic) === letter);
+  if (q) {
+    // ... unchanged
+  }
+  // ... unchanged sort
+}, [roots, query, sort, letter]);
+```
+
+In `ListHeaderComponent`, render the grid conditionally:
+
+```tsx
+ListHeaderComponent={
+  <>
+    {searching ? null : (
+      <AlphabetGrid
+        uiLocale={uiLocale}
+        available={available ?? NO_LETTERS}
+        activeLetter={letter}
+        onSelect={(picked) => setLetter((prev) => (prev === picked ? null : picked))}
+      />
+    )}
+    {/* sort toolbar unchanged — it still applies while searching */}
+  </>
+}
+```
+
+- [ ] **Step 4: Run them and watch them pass**
+
+Run: `pnpm --filter @quran-corpus/mobile test -- DictionaryScreen`
+Expected: PASS, and every pre-existing test in the file still passes. Pay attention to the existing "sorts by frequency and drops the letter filter with it" test — it taps a letter without typing, so it is unaffected; if it broke, the `!q` guard was put on the wrong filter.
+
+- [ ] **Step 5: Two mutation-checks (§4 step 4)**
+
+1. Remove the `searching ? null :` guard so the grid always renders. The **first** test must fail. Reverse by re-editing.
+2. Change `if (letter && !q)` back to `if (letter)`. The **second** test must fail on the `toContain('أرض')` assertion. Reverse by re-editing.
+
+Both are required. A single check would leave half the task unverified.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add apps/mobile/src/screens/DictionaryScreen.tsx apps/mobile/src/screens/DictionaryScreen.test.tsx
+git commit -m "fix(mobile): hide the alphabet grid while searching and bypass the letter filter"
+```
+
+---
+
+### Task 15: "Frequent" becomes "Most used"
+
+**Files:**
+- Modify: `apps/mobile/src/i18n/uiStrings.ts` (three values, no key rename)
+- Test: `apps/mobile/src/screens/DictionaryScreen.test.tsx`
+
+**Interfaces:**
+- Consumes: nothing new.
+- Produces: nothing new. The key stays `'dictionary.frequent'` and the testID stays `dictionary-pane-frequent`, so nothing else in the tree or in any test moves.
+
+The confusion being fixed: the tab said "Frequent" while Browse's own sort chip said "By frequency", so the tab read as a sort order rather than as a different, ranked list.
+
+- [ ] **Step 1: Write the failing test**
+
+Assert on what a user sees, not on the string table — a test that reads the same constant the code reads passes whatever the label is:
+
+```tsx
+it('labels the ranked pane "Most used", not a sort order', async () => {
+  await renderLoaded();
+  expect(screen.getByTestId('dictionary-pane-frequent').textContent).toBe('Most used');
+});
+```
+
+- [ ] **Step 2: Run it and watch it fail**
+
+Run: `pnpm --filter @quran-corpus/mobile test -- DictionaryScreen`
+Expected: FAIL — received `'Frequent'`.
+
+- [ ] **Step 3: Change the three values**
+
+In `uiStrings.ts` — values only, and leave a note on the key so the next reader is not confused by the mismatch:
+
+```ts
+  // The key predates the label. It stayed 'frequent' because the testID and
+  // every call site are named after it; the *label* changed because "Frequent"
+  // read as a sort order next to Browse's own "By frequency" chip.
+  'dictionary.frequent': 'Most used',          // en
+  'dictionary.frequent': 'Eng ko‘p ishlatiladigan', // uz
+  'dictionary.frequent': 'Самые частые',        // ru
+```
+
+- [ ] **Step 4: Run it and watch it pass**
+
+Run: `pnpm --filter @quran-corpus/mobile test -- DictionaryScreen && pnpm --filter @quran-corpus/mobile test -- uiStrings`
+Expected: PASS both — the locale-parity test must stay green (all three locales still carry the key).
+
+- [ ] **Step 5: Mutation-check (§4 step 4)**
+
+Set the `en` value back to `'Frequent'`. The new test must fail. Reverse by re-editing.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add apps/mobile/src/i18n/uiStrings.ts apps/mobile/src/screens/DictionaryScreen.test.tsx
+git commit -m "fix(mobile): rename the Frequent pane to Most used"
+```
+
+---
+
+### Task 16: A filter change holds the old rows instead of emptying the list
+
+**Files:**
+- Modify: `apps/mobile/src/components/ConcordanceList.tsx` (the reset effect, `loadMore`, `renderItem`)
+- Test: `apps/mobile/src/components/ConcordanceList.test.tsx`
+
+**Interfaces:**
+- Consumes: nothing new.
+- Produces: nothing new. `ConcordanceListProps` is unchanged; both call sites (`app/root/[buckwalter].tsx`, `src/screens/LemmaScreen.tsx`) are untouched by this task.
+
+The defect: tapping a form chip publishes a new `loadPage`, the reset effect calls `setEntries([])`, the list's content height collapses to the header, and Android clamps the scroll offset to 0 — so the reader is thrown to the top of the screen. Holding the previous rows until the new first page arrives keeps the content height, and the scroll position with it.
+
+- [ ] **Step 1: Write the three failing tests**
+
+```tsx
+it('holds the previous rows on screen until the new list has its first page', async () => {
+  const first = deferred<ConcordanceEntry[]>();
+  const second = deferred<ConcordanceEntry[]>();
+  const { rerender } = render(
+    <ConcordanceList total={1} loadPage={() => first.promise} header={<span />} />,
+  );
+  await act(async () => {
+    first.resolve([entry({ surah_id: 2, ayah_number: 255, word_id: 1 })]);
+  });
+  expect(screen.getByText(/2:255/)).toBeTruthy();
+
+  // A form-chip tap: a new loadPage identity, whose page has not landed yet.
+  rerender(<ConcordanceList total={1} loadPage={() => second.promise} header={<span />} />);
+  expect(screen.getByText(/2:255/)).toBeTruthy(); // still there — this is the fix
+
+  await act(async () => {
+    second.resolve([entry({ surah_id: 9, ayah_number: 9, word_id: 2 })]);
+  });
+  expect(screen.queryByText(/2:255/)).toBeNull(); // replaced, not appended
+  expect(screen.getByText(/9:9/)).toBeTruthy();
+});
+
+it('empties the list when the new filter matches nothing', async () => {
+  const first = deferred<ConcordanceEntry[]>();
+  const { rerender } = render(
+    <ConcordanceList total={1} loadPage={() => first.promise} header={<span />} />,
+  );
+  await act(async () => {
+    first.resolve([entry({ surah_id: 2, ayah_number: 255, word_id: 1 })]);
+  });
+  rerender(<ConcordanceList total={0} loadPage={async () => []} header={<span />} />);
+  await waitFor(() => expect(screen.queryByText(/2:255/)).toBeNull());
+  expect(screen.getByTestId('concordance-status')).toBeTruthy();
+});
+
+it('empties the list when the new filter’s first page fails', async () => {
+  const first = deferred<ConcordanceEntry[]>();
+  const { rerender } = render(
+    <ConcordanceList total={1} loadPage={() => first.promise} header={<span />} />,
+  );
+  await act(async () => {
+    first.resolve([entry({ surah_id: 2, ayah_number: 255, word_id: 1 })]);
+  });
+  rerender(
+    <ConcordanceList total={1} loadPage={async () => { throw new Error('boom'); }} header={<span />} />,
+  );
+  await waitFor(() => expect(screen.queryByText(/2:255/)).toBeNull());
+  expect(screen.getByTestId('concordance-status').getAttribute('role')).toBe('alert');
+});
+```
+
+`entry()` is this suite's existing factory (`ConcordanceList.test.tsx:52`) and `deferred` is already imported there. The failure test will print `[concordance] page load failed` to stderr, exactly as the suite's existing failure tests do — leave it; silencing it here and nowhere else would be noise. The last two tests are not optional decoration: holding stale rows under an empty result, or under a failure notice, would render rows that the current filter did not return — the list would be lying about what it holds.
+
+- [ ] **Step 2: Run them and watch them fail**
+
+Run: `pnpm --filter @quran-corpus/mobile test -- ConcordanceList`
+Expected: the first test FAILS (rows vanish on rerender); the other two pass already — they are the regression guard on the fix, and they are what stops the naive version of it.
+
+- [ ] **Step 3: Hold the rows**
+
+In `ConcordanceList.tsx`, add next to the other refs:
+
+```tsx
+// The next page to arrive replaces the list rather than appending to it.
+// Set when a new list is published, cleared by whichever of the three
+// outcomes lands first.
+const replaceRef = useRef(false);
+// State, not a ref: the rows are dimmed while they are known to be stale, so
+// this has to drive a render.
+const [stale, setStale] = useState(false);
+```
+
+In `loadMore`'s `try`, replace the append with:
+
+```tsx
+const page = await loadPage(offsetRef.current, PAGE);
+if (gen !== genRef.current) return;
+offsetRef.current += page.length;
+if (replaceRef.current) {
+  replaceRef.current = false;
+  setStale(false);
+  setEntries(page);
+} else {
+  setEntries((current) => [...current, ...page]);
+}
+```
+
+In `loadMore`'s `catch`, before `setFailed(true)`:
+
+```tsx
+// The held rows belong to the previous filter. Keeping them under a failure
+// notice would show rows this filter never returned.
+if (replaceRef.current) {
+  replaceRef.current = false;
+  setStale(false);
+  setEntries([]);
+}
+```
+
+Rewrite the reset effect:
+
+```tsx
+useEffect(() => {
+  genRef.current += 1;
+  offsetRef.current = 0;
+  busyRef.current = false;
+  setFailed(false);
+  setLoading(total > 0);
+  if (total === 0) {
+    // Nothing is coming to replace them, and loadMore returns at its own
+    // `offsetRef >= total` guard, so this is the only place they can go.
+    replaceRef.current = false;
+    setStale(false);
+    setEntries([]);
+  } else {
+    // NOT setEntries([]): emptying the list collapses its content height and
+    // Android clamps the scroll to 0, throwing the reader to the top of the
+    // screen on every form-chip tap. The old rows stay, dimmed, until the new
+    // first page replaces them.
+    replaceRef.current = true;
+    setStale(true);
+  }
+  void loadMore();
+}, [loadMore, total]);
+```
+
+Dim the rows — not the whole list, or the chip the reader just tapped dims with them:
+
+```tsx
+const renderItem = useCallback(
+  ({ item }: { item: ConcordanceEntry }) => (
+    <View style={{ opacity: stale ? 0.45 : 1 }}>
+      <ConcordanceRow item={item} forms={forms} uiLocale={uiLocale} />
+    </View>
+  ),
+  [forms, uiLocale, stale],
+);
+```
+
+- [ ] **Step 4: Run them and watch them pass**
+
+Run: `pnpm --filter @quran-corpus/mobile test -- ConcordanceList`
+Expected: PASS, all three, and every pre-existing test in the file still passes — especially the content-language-swap generation test, which shares this reset path.
+
+- [ ] **Step 5: Mutation-check (§4 step 4)**
+
+Put `setEntries([])` back in the `else` branch of the reset effect. The first test **must** fail. Reverse by re-editing.
+
+Then, separately: delete the `if (replaceRef.current)` block from the `catch`. The third test **must** fail. Reverse by re-editing. Two mutations, because the naive fix passes the first test and fails the third.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add apps/mobile/src/components/ConcordanceList.tsx apps/mobile/src/components/ConcordanceList.test.tsx
+git commit -m "fix(mobile): hold concordance rows across a filter change so the scroll stays put"
+```
+
+---
+
+### Task 17: Frequency-rank neighbours in `packages/data`
+
+**§5 applies from here on.** This task edits a file under `packages/data/src/queries/`.
+
+**Files:**
+- Modify: `packages/data/src/queries/dictionary.ts`
+- Modify: `packages/data/src/mobile.ts:50`
+- Test: `packages/data/tests/dictionary.test.ts`
+
+**Interfaces:**
+- Consumes: `QueryClient` from `../queryClient.js` (already imported by this file).
+- Produces:
+  ```ts
+  export type LemmaFrequencyKind = 'lemmas' | 'verbs';
+  export async function getLemmaFrequencyNeighbors(
+    db: QueryClient,
+    lemmaBuckwalter: string,
+    kind: LemmaFrequencyKind,
+  ): Promise<{ prev: string | null; next: string | null }>;
+  ```
+  Task 19 consumes both the type and the function through `@quran-corpus/data/mobile`.
+
+Two things this query must get right, and both are load-bearing:
+
+1. **Its ordering must be byte-identical to the list it pages through.** `getLemmaFrequency` and `getVerbConcordance` both order `count DESC, lemma_buckwalter` — so must this, tie-break included, or Next skips or repeats rows.
+2. **It must carry no `LIMIT`.** Both list queries take `limit = 200`, but device check 35 requires scrolling past row 200, so a neighbour lookup built on the truncated list would return nothing for exactly the rows a reader had to work hardest to reach.
+
+`kind` selects between two **literal** SQL fragments. The caller's value never reaches the SQL text — it is compared, not interpolated (§3, OWASP).
+
+- [ ] **Step 1: Extend the fixture**
+
+`beforeAll` in `dictionary.test.ts` currently inserts `qwl` ×3 (2 verb, 1 noun) and `ktb` ×1 (verb). Add a third lemma so a tie-break is observable:
+
+```ts
+  await db.execute({
+    sql: `INSERT INTO words (ayah_id,position,text_arabic,lemma,lemma_buckwalter,pos_tag) VALUES
+          (?,5,'بَرَكَة','بركة','brk','N')`,
+    args: [ayahId],
+  });
+```
+
+Now the lemma ranking is `qwl` (3), then `brk` (1) and `ktb` (1) tied and broken alphabetically — `brk` before `ktb`.
+
+- [ ] **Step 2: Write the failing tests**
+
+```ts
+describe('getLemmaFrequencyNeighbors', () => {
+  it('walks the same order the lemma list is rendered in', async () => {
+    expect(await getLemmaFrequencyNeighbors(db, 'qwl', 'lemmas')).toEqual({
+      prev: null,
+      next: 'brk',
+    });
+    expect(await getLemmaFrequencyNeighbors(db, 'ktb', 'lemmas')).toEqual({
+      prev: 'brk',
+      next: null,
+    });
+  });
+
+  it('breaks a count tie alphabetically, in both directions', async () => {
+    // brk and ktb both have 1. The list renders brk first, so brk's next is
+    // ktb and ktb's prev is brk -- a symmetric pair, which is what catches a
+    // comparison flipped in only one of the two queries.
+    expect((await getLemmaFrequencyNeighbors(db, 'brk', 'lemmas')).next).toBe('ktb');
+    expect((await getLemmaFrequencyNeighbors(db, 'ktb', 'lemmas')).prev).toBe('brk');
+  });
+
+  it('counts only verb occurrences for the verb list', async () => {
+    // qwl is 3 as a lemma but 2 as a verb, and brk is not a verb at all, so
+    // the verb ranking is qwl(2) then ktb(1) -- brk must not appear.
+    expect(await getLemmaFrequencyNeighbors(db, 'qwl', 'verbs')).toEqual({
+      prev: null,
+      next: 'ktb',
+    });
+    expect((await getLemmaFrequencyNeighbors(db, 'ktb', 'verbs')).prev).toBe('qwl');
+  });
+
+  it('has no neighbours for a lemma the corpus does not carry', async () => {
+    expect(await getLemmaFrequencyNeighbors(db, 'zzzz', 'lemmas')).toEqual({
+      prev: null,
+      next: null,
+    });
+  });
+
+  it('resolves neighbours past rank 200, which the list query truncates at', async () => {
+    // The list queries default to LIMIT 200. A neighbour lookup built on that
+    // truncation returns nothing here, and device check 35 requires scrolling
+    // past row 200.
+    const values = Array.from({ length: 210 }, (_, i) => {
+      const bw = `zz${String(i).padStart(3, '0')}`;
+      return `(${ayahId},${100 + i},'x','x','${bw}','N')`;
+    }).join(',');
+    await db.execute(
+      `INSERT INTO words (ayah_id,position,text_arabic,lemma,lemma_buckwalter,pos_tag) VALUES ${values}`,
+    );
+    expect(await getLemmaFrequencyNeighbors(db, 'zz205', 'lemmas')).toEqual({
+      prev: 'zz204',
+      next: 'zz206',
+    });
+  });
+});
+```
+
+`ayahId` has to be reachable from the test body — promote it to a module-level `let` assigned in `beforeAll` if it is currently a local. The 210 synthetic lemmas all have count 1, so they sort alphabetically after `brk`/`ktb`, which keeps the earlier tests' expectations intact **only because they run first** — if the suite is ever reordered, move the bulk insert into its own `describe` with its own database.
+
+- [ ] **Step 3: Run them and watch them fail**
+
+Run: `pnpm --filter @quran-corpus/data test -- dictionary`
+Expected: FAIL — `getLemmaFrequencyNeighbors is not a function`.
+
+- [ ] **Step 4: Write the query**
+
+Append to `packages/data/src/queries/dictionary.ts`:
+
+```ts
+/** Which of the two frequency rankings a lemma is being paged through. The
+ *  same lemma sits at a different rank in each, because the verb list counts
+ *  only its verb occurrences. */
+export type LemmaFrequencyKind = 'lemmas' | 'verbs';
+
+/** The lemmas either side of `lemmaBuckwalter` in one of the two frequency
+ *  rankings, for the lemma screen's Previous/Next.
+ *
+ *  Two things here are load-bearing:
+ *
+ *  1. The ordering is byte-identical to `getLemmaFrequency` /
+ *     `getVerbConcordance` (`count DESC, lemma_buckwalter`), tie-break
+ *     included. A different tie-break makes Next skip or repeat rows.
+ *  2. There is deliberately no LIMIT. Both list queries default to 200 rows,
+ *     but the list scrolls past that, and a neighbour lookup built on the
+ *     truncated list would return nothing for exactly the rows a reader had to
+ *     scroll furthest to reach.
+ *
+ *  `kind` picks between two literal fragments; it is never interpolated into
+ *  SQL, so a caller passing a hostile value gets a type error, not a query. */
+export async function getLemmaFrequencyNeighbors(
+  db: QueryClient,
+  lemmaBuckwalter: string,
+  kind: LemmaFrequencyKind,
+): Promise<{ prev: string | null; next: string | null }> {
+  const agg =
+    kind === 'verbs'
+      ? `SELECT lemma_buckwalter AS bw, COUNT(*) AS count FROM words
+         WHERE pos_tag = 'V' AND lemma_buckwalter IS NOT NULL GROUP BY lemma_buckwalter`
+      : `SELECT lemma_buckwalter AS bw, COUNT(*) AS count FROM words
+         WHERE lemma_buckwalter IS NOT NULL GROUP BY lemma_buckwalter`;
+
+  const cur = await db.execute({
+    sql: `WITH agg AS (${agg}) SELECT count FROM agg WHERE bw = ?`,
+    args: [lemmaBuckwalter],
+  });
+  // Not in this ranking at all: a noun reached with ?from=verbs, or a lemma
+  // that is not in the corpus. Both arrive here from a deep link.
+  if (cur.rows.length === 0) return { prev: null, next: null };
+  const count = cur.rows[0]!['count'] as number;
+
+  const [prev, next] = await Promise.all([
+    // One row EARLIER in `count DESC, bw ASC`: a higher count, or the same
+    // count and an earlier bw. Read back nearest-first, hence the reversed
+    // ORDER BY.
+    db.execute({
+      sql: `WITH agg AS (${agg})
+            SELECT bw FROM agg
+            WHERE count > ? OR (count = ? AND bw < ?)
+            ORDER BY count ASC, bw DESC LIMIT 1`,
+      args: [count, count, lemmaBuckwalter],
+    }),
+    db.execute({
+      sql: `WITH agg AS (${agg})
+            SELECT bw FROM agg
+            WHERE count < ? OR (count = ? AND bw > ?)
+            ORDER BY count DESC, bw ASC LIMIT 1`,
+      args: [count, count, lemmaBuckwalter],
+    }),
+  ]);
+
+  return {
+    prev: (prev.rows[0]?.['bw'] as string) ?? null,
+    next: (next.rows[0]?.['bw'] as string) ?? null,
+  };
+}
+```
+
+- [ ] **Step 5: Export it from the mobile entry point**
+
+`packages/data/src/mobile.ts:50`:
+
+```ts
+export {
+  getLemmaFrequency,
+  getVerbConcordance,
+  getLemmaFrequencyNeighbors,
+  type LemmaFrequencyKind,
+} from './queries/dictionary.js';
+```
+
+- [ ] **Step 6: Run everything and watch it pass**
+
+Run: `pnpm --filter @quran-corpus/data test`
+Expected: PASS, including `tests/mobile-entry.test.ts` **unmodified** — this adds an export from a module the entry point already pulls, so the module graph does not move. If that test fails, stop: something reached `db.ts`, `migrate.ts` or a backfill, which is exactly what it exists to prevent.
+
+- [ ] **Step 7: Two mutation-checks (§4 step 4)**
+
+1. In the `prev` query, change `bw < ?` to `bw > ?`. The tie-break test **must** fail. Reverse by re-editing.
+2. Add ` LIMIT 200` to the end of both `agg` fragments. The past-rank-200 test **must** fail. Reverse by re-editing.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add packages/data/src/queries/dictionary.ts packages/data/src/mobile.ts packages/data/tests/dictionary.test.ts
+git commit -m "feat(data): frequency-rank lemma neighbours for entry-screen paging"
+```
+
+---
+
+### Task 18: Extract the Previous/Next toolbar
+
+**Files:**
+- Create: `apps/mobile/src/components/AdjacentNav.tsx`
+- Create: `apps/mobile/src/components/AdjacentNav.test.tsx`
+- Modify: `apps/mobile/app/root/[buckwalter].tsx:264-300` (replace the inline toolbar)
+
+**Interfaces:**
+- Consumes: nothing new.
+- Produces:
+  ```tsx
+  export interface AdjacentNavProps {
+    prev: string | null;
+    next: string | null;
+    /** Called with the non-null target of whichever side was pressed. */
+    onNavigate: (target: string) => void;
+    /** Names the toolbar for TalkBack: 'root.adjacent' or 'lemma.adjacent'. */
+    label: string;
+    uiLocale: UiLocaleCode;
+    /** Distinguishes the two screens' controls in tests. Defaults to 'root'. */
+    testIDPrefix?: string;
+  }
+  export function AdjacentNav(props: AdjacentNavProps): ReactElement;
+  ```
+  Task 19 renders it on the lemma screen with `testIDPrefix="lemma"`.
+
+Pure refactor: the root screen's behaviour does not change, and its existing tests must pass **untouched**. This exists because Task 19 would otherwise paste a second copy of a toolbar whose disabled-not-hidden rule and 48dp target are both deliberate (§3 DRY).
+
+- [ ] **Step 1: Write the failing test**
+
+```tsx
+it('routes each side to its own target and disables an end of the list', () => {
+  const onNavigate = vi.fn();
+  render(
+    <AdjacentNav prev={null} next="ktb" onNavigate={onNavigate} label="Adjacent" uiLocale="en" />,
+  );
+  const previous = screen.getByTestId('root-previous');
+  // Disabled, not hidden: a vanishing arrow slides the other one under the
+  // thumb, and TalkBack is left with nothing where a control used to be.
+  expect(previous).toBeTruthy();
+  expect(previous.getAttribute('aria-disabled')).toBe('true');
+  fireEvent.click(previous);
+  expect(onNavigate).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByTestId('root-next'));
+  expect(onNavigate).toHaveBeenCalledWith('ktb');
+});
+
+it('names its controls from the prefix so two screens can both use it', () => {
+  render(
+    <AdjacentNav prev="a" next="b" onNavigate={vi.fn()} label="Adjacent" uiLocale="en" testIDPrefix="lemma" />,
+  );
+  expect(screen.getByTestId('lemma-previous')).toBeTruthy();
+  expect(screen.getByTestId('lemma-next')).toBeTruthy();
+});
+```
+
+Mock `react-native` with `rnHosts` the way the neighbouring component suites do.
+
+- [ ] **Step 2: Run it and watch it fail**
+
+Run: `pnpm --filter @quran-corpus/mobile test -- AdjacentNav`
+Expected: FAIL — module not found.
+
+- [ ] **Step 3: Create the component**
+
+`apps/mobile/src/components/AdjacentNav.tsx` — lift the body verbatim from `app/root/[buckwalter].tsx`, changing only what the props parameterise:
+
+```tsx
+import { Pressable, Text, View } from 'react-native';
+import type { UiLocaleCode } from '@/i18n/languages';
+import { t } from '@/i18n/uiStrings';
+import { touchTargets } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/themeContext';
+
+export interface AdjacentNavProps {
+  prev: string | null;
+  next: string | null;
+  onNavigate: (target: string) => void;
+  label: string;
+  uiLocale: UiLocaleCode;
+  testIDPrefix?: string;
+}
+
+/** Previous/Next between two entries of the same kind. Shared by the root
+ *  screen (hijāʾī order) and the lemma screen (frequency-rank order) -- the
+ *  order is the caller's business; the disabled-at-the-ends rule and the tap
+ *  target are not, which is why this is one component and not two. */
+export function AdjacentNav({
+  prev,
+  next,
+  onNavigate,
+  label,
+  uiLocale,
+  testIDPrefix = 'root',
+}: AdjacentNavProps) {
+  const theme = useThemeColors();
+
+  return (
+    <View
+      accessibilityRole="toolbar"
+      accessibilityLabel={label}
+      style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}
+    >
+      {(['prev', 'next'] as const).map((side) => {
+        const target = side === 'prev' ? prev : next;
+        return (
+          <Pressable
+            key={side}
+            testID={side === 'prev' ? `${testIDPrefix}-previous` : `${testIDPrefix}-next`}
+            accessibilityRole="button"
+            // Disabled, not hidden: an arrow that vanishes at the ends of the
+            // list slides the other one under the thumb, and TalkBack is left
+            // with nothing to announce where a control used to be.
+            accessibilityState={{ disabled: target === null }}
+            disabled={target === null}
+            onPress={target ? () => onNavigate(target) : undefined}
+            style={{
+              minHeight: touchTargets.compact,
+              justifyContent: 'center',
+              paddingHorizontal: 14,
+              borderRadius: 10,
+              borderWidth: 1,
+              borderColor: theme.border,
+              opacity: target === null ? 0.4 : 1,
+            }}
+          >
+            <Text style={{ color: target === null ? theme.mutedText : theme.text }}>
+              {side === 'prev'
+                ? `← ${t(uiLocale, 'root.previous')}`
+                : `${t(uiLocale, 'root.next')} →`}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+```
+
+`root.previous` / `root.next` are reused as-is on both screens: they are the bare words "Previous"/"Next" in all three locales, exactly as `word.root` is already reused across screens (see the note at `uiStrings.ts:49`).
+
+- [ ] **Step 4: Use it on the root screen**
+
+In `app/root/[buckwalter].tsx`, replace the inline toolbar `View` with:
+
+```tsx
+<AdjacentNav
+  prev={neighbors.prev}
+  next={neighbors.next}
+  onNavigate={(target) => router.push(`/root/${encodeURIComponent(target)}`)}
+  label={t(uiLocale, 'root.adjacent')}
+  uiLocale={uiLocale}
+/>
+```
+
+Add the import; drop `Pressable` from the `react-native` import if nothing else on the page uses it (the linter will say).
+
+- [ ] **Step 5: Run everything and watch it pass**
+
+Run: `pnpm --filter @quran-corpus/mobile test`
+Expected: PASS. `RootRoute.test.tsx` must pass **with no edits** — its `root-previous` / `root-next` testIDs and its push assertions are the proof the refactor changed no behaviour. Editing that suite to make it pass defeats the point of the task.
+
+- [ ] **Step 6: Mutation-check (§4 step 4)**
+
+Change `disabled={target === null}` to `disabled={false}`. The first new test **must** fail on `onNavigate).not.toHaveBeenCalled()`. Reverse by re-editing.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add apps/mobile/src/components/AdjacentNav.tsx apps/mobile/src/components/AdjacentNav.test.tsx apps/mobile/app/root/'[buckwalter]'.tsx
+git commit -m "refactor(mobile): extract the entry Previous/Next toolbar"
+```
+
+---
+
+### Task 19: Previous/Next on the lemma screen
+
+**§5 applies: this task reads an untrusted deep-link value.**
+
+**Files:**
+- Modify: `apps/mobile/src/data/routeParams.ts`
+- Modify: `apps/mobile/src/data/corpusRepository.ts` (`getFrequencyRows` hrefs, ~lines 435 and 448; new `getAdjacentLemmas`)
+- Modify: `apps/mobile/app/lemma/[lemma].tsx`
+- Modify: `apps/mobile/src/screens/LemmaScreen.tsx`
+- Modify: `apps/mobile/src/i18n/uiStrings.ts` (one key, three locales)
+- Test: `apps/mobile/src/data/routeParams.test.ts` (or wherever this repo's validator tests live — check before creating a file), `apps/mobile/src/screens/LemmaScreen.test.tsx`, `apps/mobile/src/screens/LemmaRoute.test.tsx`
+
+**Interfaces:**
+- Consumes: `getLemmaFrequencyNeighbors`, `LemmaFrequencyKind` from `@quran-corpus/data/mobile` (Task 17); `AdjacentNav` (Task 18).
+- Produces:
+  ```ts
+  // routeParams.ts
+  export function parseFrequencySourceParam(
+    value: string | string[] | undefined,
+  ): LemmaFrequencyKind | null;
+
+  // corpusRepository.ts
+  export async function getAdjacentLemmas(
+    client: MobileDataClient,
+    lemmaBuckwalter: string,
+    kind: LemmaFrequencyKind,
+  ): Promise<{ prev: string | null; next: string | null }>;
+
+  // LemmaScreen.tsx -- a NEW required prop
+  export interface LemmaScreenProps {
+    lemmaBuckwalter: string | null;
+    source: LemmaFrequencyKind | null;
+  }
+  ```
+
+The trust boundary: `?from` arrives on a deep link, so it is untrusted even though the app writes its own links (§3, OWASP). It is validated in `routeParams.ts` with every other route value, using the same `string | string[] | undefined` signature — a validator taking a bare `string` is the trap that module's header already documents, because an array param joins to `'a,b'` and a missing one stringifies to `'undefined'`.
+
+- [ ] **Step 1: Write the failing validator test**
+
+```ts
+describe('parseFrequencySourceParam', () => {
+  it('accepts exactly the two rankings', () => {
+    expect(parseFrequencySourceParam('lemmas')).toBe('lemmas');
+    expect(parseFrequencySourceParam('verbs')).toBe('verbs');
+  });
+
+  it('rejects everything else, including the shapes useLocalSearchParams can hand back', () => {
+    for (const value of ['roots', 'LEMMAS', '', 'lemmas;--', undefined, ['verbs', 'lemmas']]) {
+      expect(parseFrequencySourceParam(value as string | string[] | undefined)).toBeNull();
+    }
+  });
+});
+```
+
+`['verbs','lemmas']` returning null rather than `'verbs'` is deliberate and differs from `parseParam`'s first-of-array rule: two `?from=` values in one URL is a malformed link, not a preference.
+
+- [ ] **Step 2: Run it and watch it fail**
+
+Run: `pnpm --filter @quran-corpus/mobile test -- routeParams`
+Expected: FAIL — not exported.
+
+- [ ] **Step 3: Write the validator**
+
+In `routeParams.ts`:
+
+```ts
+import type { LemmaFrequencyKind } from '@quran-corpus/data/mobile';
+
+/** Which frequency ranking the lemma screen's Previous/Next walks, off the
+ *  `?from` query param.
+ *
+ *  Not built on `parseParam`: that takes the first element of an array, which
+ *  is the right rule for a path segment and the wrong one here -- two `?from`
+ *  values in one link is a malformed link, not a preference. Anything that is
+ *  not one of the two literals returns null, which the screen renders as both
+ *  arrows dimmed. */
+export function parseFrequencySourceParam(
+  value: string | string[] | undefined,
+): LemmaFrequencyKind | null {
+  return value === 'lemmas' || value === 'verbs' ? value : null;
+}
+```
+
+- [ ] **Step 4: Run it and watch it pass**
+
+Run: `pnpm --filter @quran-corpus/mobile test -- routeParams`
+Expected: PASS.
+
+- [ ] **Step 5: Write the failing screen tests**
+
+In `LemmaScreen.test.tsx`:
+
+```tsx
+it('pages through the ranking it was entered from', async () => {
+  mocks.getAdjacentLemmas.mockResolvedValue({ prev: 'qwl', next: 'ktb' });
+  render(<LemmaScreen lemmaBuckwalter="brk" source="verbs" />);
+
+  await waitFor(() => expect(mocks.getAdjacentLemmas).toHaveBeenCalled());
+  // The ranking travels with the request -- a verb's Next must come from the
+  // verb list, where it sits at a different rank than in the lemma list.
+  expect(mocks.getAdjacentLemmas.mock.calls[0]!.slice(1)).toEqual(['brk', 'verbs']);
+
+  fireEvent.click(await screen.findByTestId('lemma-next'));
+  expect(mocks.push).toHaveBeenCalledWith('/lemma/ktb?from=verbs');
+});
+
+it('dims both arrows for a deep link that names no ranking', async () => {
+  render(<LemmaScreen lemmaBuckwalter="brk" source={null} />);
+  const previous = await screen.findByTestId('lemma-previous');
+  expect(previous.getAttribute('aria-disabled')).toBe('true');
+  expect(screen.getByTestId('lemma-next').getAttribute('aria-disabled')).toBe('true');
+  // No ranking means no query to run.
+  expect(mocks.getAdjacentLemmas).not.toHaveBeenCalled();
+});
+```
+
+In `LemmaRoute.test.tsx`:
+
+```tsx
+it('validates ?from before the screen sees it', () => {
+  mocks.params = { lemma: 'qwl', from: 'roots' };
+  render(<LemmaRoute />);
+  expect(mocks.lemmaScreenProps.source).toBeNull();
+
+  mocks.params = { lemma: 'qwl', from: 'verbs' };
+  render(<LemmaRoute />);
+  expect(mocks.lemmaScreenProps.source).toBe('verbs');
+});
+```
+
+Two mock edits this needs, neither optional:
+- `LemmaScreen.test.tsx`'s `@/data/corpusRepository` factory lists its mocks explicitly, so `getAdjacentLemmas` has to be added to it or the screen's import is `undefined` at call time.
+- The same file's `expo-router` factory currently returns only `Link` (line 70). Add `router: { push: mocks.push }`, and a `push: vi.fn()` to the `vi.hoisted` block.
+
+In `LemmaRoute.test.tsx`, mock `LemmaScreen` to capture its props, the way `RootRoute.test.tsx` stubs `ConcordanceList`.
+
+- [ ] **Step 6: Run them and watch them fail**
+
+Run: `pnpm --filter @quran-corpus/mobile test -- Lemma`
+Expected: FAIL — no `source` prop, no `lemma-next`.
+
+- [ ] **Step 7: Add the string in all three locales**
+
+`uiStrings.ts` — union next to `'lemma.viewRoot'`, then each table:
+
+```ts
+  | 'lemma.adjacent'
+```
+```ts
+    'lemma.adjacent': 'Adjacent lemmas',      // en
+    'lemma.adjacent': 'Qo‘shni lemmalar',     // uz
+    'lemma.adjacent': 'Соседние леммы',       // ru
+```
+
+- [ ] **Step 8: Wire the repository**
+
+In `corpusRepository.ts`, next to `getAdjacentRoots`:
+
+```ts
+/** The lemmas either side of this one in the ranking the reader entered from.
+ *
+ *  Frequency rank, not alphabetical, because that is the only order a lemma
+ *  screen is ever reached in: the Most-used lists. `lemmas` and `verbs` are
+ *  different rankings over overlapping sets -- a verb lemma sits at a
+ *  different rank in each -- which is why the ranking travels in the route
+ *  rather than being inferred here. */
+export async function getAdjacentLemmas(
+  client: MobileDataClient,
+  lemmaBuckwalter: string,
+  kind: LemmaFrequencyKind,
+): Promise<{ prev: string | null; next: string | null }> {
+  return getLemmaFrequencyNeighbors(client, lemmaBuckwalter, kind);
+}
+```
+
+Add both to the existing `@quran-corpus/data/mobile` import block. Then append the ranking to the two lemma hrefs in `getFrequencyRows` so a row hands the screen its own ranking:
+
+```ts
+        href: `/lemma/${encodeURIComponent(row.lemma_buckwalter!)}?from=lemmas`,
+```
+```ts
+      href: `/lemma/${encodeURIComponent(row.lemma_buckwalter!)}?from=verbs`,
+```
+
+Leave the root href alone. Leave `LemmaScreen`'s "View root" link alone — it crosses into a different kind of entry, so it carries no ranking.
+
+- [ ] **Step 9: Wire the route**
+
+`app/lemma/[lemma].tsx`:
+
+```tsx
+import { useLocalSearchParams } from 'expo-router';
+import { LemmaScreen } from '@/screens/LemmaScreen';
+import { parseFrequencySourceParam, parseLemmaParam } from '@/data/routeParams';
+
+export default function LemmaRoute() {
+  const params = useLocalSearchParams<{ lemma: string; from?: string }>();
+
+  return (
+    <LemmaScreen
+      lemmaBuckwalter={parseLemmaParam(params.lemma)}
+      // Untrusted, same as the path segment: `?from` is whatever a deep link
+      // carried. Anything but the two rankings resolves to null, which renders
+      // both arrows dimmed rather than guessing a ranking for the reader.
+      source={parseFrequencySourceParam(params.from)}
+    />
+  );
+}
+```
+
+- [ ] **Step 10: Wire the screen**
+
+In `LemmaScreen.tsx`: add `source: LemmaFrequencyKind | null` to `LemmaScreenProps` (documented as already-validated by the route, like `lemmaBuckwalter`), add `neighbors` state defaulting to `{ prev: null, next: null }`, and an effect beside the entry effect:
+
+```tsx
+useEffect(() => {
+  if (lemmaBuckwalter === null || source === null) {
+    setNeighbors(NO_NEIGHBORS);
+    return;
+  }
+  let cancelled = false;
+  (async () => {
+    try {
+      const db = await openCorpusDb();
+      const client = createExpoSqliteClient(db as ExpoSqliteLike);
+      const adjacent = await getAdjacentLemmas(client, lemmaBuckwalter, source);
+      if (!cancelled) setNeighbors(adjacent);
+    } catch (cause) {
+      // Dimmed arrows, not a broken screen: paging is a convenience and the
+      // entry itself has already loaded. Logged for logcat.
+      console.error('[lemma] neighbours failed', { lemmaBuckwalter, source, cause });
+      if (!cancelled) setNeighbors(NO_NEIGHBORS);
+    }
+  })();
+  return () => {
+    cancelled = true;
+  };
+}, [lemmaBuckwalter, source]);
+```
+
+Declare `const NO_NEIGHBORS = { prev: null, next: null };` at module scope — a fresh object literal in the effect would be a new identity on every run.
+
+Render it in the header, directly under `EntryHeader`, matching the root screen's placement:
+
+```tsx
+<AdjacentNav
+  prev={neighbors.prev}
+  next={neighbors.next}
+  onNavigate={(target) => router.push(`/lemma/${encodeURIComponent(target)}?from=${source}`)}
+  label={t(uiLocale, 'lemma.adjacent')}
+  uiLocale={uiLocale}
+  testIDPrefix="lemma"
+/>
+```
+
+`source` is non-null wherever a target exists — a null source yields no neighbours — but write the callback so a null source cannot produce the string `'?from=null'`: guard with `source ? ... : undefined` on `onNavigate`, or early-return. This screen currently imports `Link`, not `router`; add the `router` import.
+
+- [ ] **Step 11: Run everything and watch it pass**
+
+Run: `pnpm --filter @quran-corpus/mobile test && pnpm -r lint && pnpm -r type-check`
+Expected: PASS. `LemmaScreen` gained a **required** prop, so every existing render of it in the suites needs `source={null}` — that is a real edit, not a workaround, and `type-check` names each site.
+
+- [ ] **Step 12: Two mutation-checks (§4 step 4)**
+
+1. In `parseFrequencySourceParam`, return `value as LemmaFrequencyKind` unconditionally. The validator's reject test **must** fail. Reverse by re-editing.
+2. In `LemmaScreen`, hard-code `'lemmas'` in place of `source` in the `getAdjacentLemmas` call. The "pages through the ranking it was entered from" test **must** fail on the `['brk', 'verbs']` assertion. Reverse by re-editing.
+
+- [ ] **Step 13: Commit**
+
+```bash
+git add apps/mobile/src/data/routeParams.ts apps/mobile/src/data/corpusRepository.ts apps/mobile/app/lemma/'[lemma]'.tsx apps/mobile/src/screens/LemmaScreen.tsx apps/mobile/src/i18n/uiStrings.ts apps/mobile/src/screens/LemmaScreen.test.tsx apps/mobile/src/screens/LemmaRoute.test.tsx apps/mobile/src/data/routeParams.test.ts
+git commit -m "feat(mobile): page between lemmas in the ranking they were opened from"
+```
+
+- [ ] **Step 14: STOP and ask the owner to run `/code-review`**
+
+§4 step 5 and §5. Tasks 17 and 19 hit two triggers: a `packages/data` query, and a trust boundary. The agent cannot launch it. Ask for plain `/code-review` (Pro plan, local) — **never** `/code-review ultra` without permission, it bills $5–25.
+
+One pass, not a loop to green: fix what is real, say plainly which findings are declined and why, and re-run only if a fix was substantial enough to plausibly introduce a new defect.
+
+---
+
+### Task 20: Device checks for the six fixes
+
+**Files:**
+- Modify: `README.md` (`## M4 Dictionary + Search Smoke Test`)
+- Modify: `docs/plans/phase-m5-dictionary-parity.md` (the verification log below)
+
+Checks 34–41 already exist and three of them now describe behaviour that changed. Rather than growing a second list, amend the three and add two.
+
+- [ ] **Step 1: Amend the build floor**
+
+The preamble pins `9c42fe0`. Repin it to the commit from Task 19 (`git rev-parse --short HEAD`), and replace the "older builds fail for the wrong reasons" sentence's contents with the new ones: before this commit there is no clear button and no lemma paging, and typing in Browse leaves the alphabet grid covering the results.
+
+- [ ] **Step 2: Amend checks 34, 35 and 39**
+
+Check 34, append:
+
+> Typing also **hides the alphabet grid**, so the first result is visible without dismissing the keyboard, and an ✕ appears inside the box — tap it and the whole list is back. Tap ق first, *then* type `to say`: قول comes back even though it is not under ق, and clearing the box puts you back in ق.
+
+Check 35, append:
+
+> Tap a verb row, then Next: you move down the **verb** ranking, not the lemma one. The tab above these lists reads **Most used**, not "Frequent".
+
+Check 39, replace the "the list restarts from the top" clause with:
+
+> …the heading recounts (`Concordance (N)` matches the rows below) and the rows fade while the new ones load — **the screen does not jump to the top**. Scroll a few rows down before tapping a chip: you stay where you were.
+
+- [ ] **Step 3: Add checks 42 and 43**
+
+```
+42. Lemma screen reached from Most used → Lemmas: Previous/Next page down the
+    ranking, and the arrows are dimmed and inert at rank 1. Open the same lemma
+    from a link inside another screen (View root, then back) — with no ranking
+    to page through, both arrows are dimmed rather than missing.
+43. Repeat 34 and 42 in dark mode at maximum system font size, and once in
+    airplane mode. Nothing clips, the ✕ stays inside the search box, and the
+    paging still works — all of it is local.
+```
+
+- [ ] **Step 4: Add the rows to the verification log**
+
+Add `| 42 |` and `| 43 |` rows to the table at the end of this plan.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add README.md docs/plans/phase-m5-dictionary-parity.md
+git commit -m "docs(mobile): device checks for the dictionary UX fixes"
+```
+
+- [ ] **Step 6: Build the APK and hand it over**
+
+```bash
+cd apps/mobile && eas build --platform android --profile preview --non-interactive
+```
+
+Confirm the upload is ~36–43 MB. A ~5 MB upload means `.easignore` dropped the bundled DB and every check fails for the wrong reason. Then give the owner the install link and the full check list — **34–43, plus M4's 28–33 and M3's F5, F6, check 27 and the M2 rosette carry-over**, which this same APK also clears.
+
+---
+
+## Addendum risks
+
+| # | Risk | Mitigation |
+| --- | --- | --- |
+| R9 | Holding stale rows across a filter change shows rows the new filter never returned | Task 16 clears them on both non-replacement outcomes (empty result, failed first page), each with its own test and its own mutation-check |
+| R10 | The neighbour query's ordering drifts from the list query's, so Next skips or repeats | Task 17 mirrors `count DESC, lemma_buckwalter` including the tie-break, asserted symmetrically (brk→ktb and ktb→brk) |
+| R11 | A neighbour lookup built on the `LIMIT 200` list returns nothing past rank 200 — exactly where device check 35 scrolls | Task 17 carries no LIMIT, asserted by a 210-row fixture whose mutation-check adds the LIMIT back |
+| R12 | `?from` is a deep-link value reaching a query | Task 19 validates it to two literals in `routeParams.ts`; `kind` picks between literal SQL fragments and is never interpolated |
+| R13 | Wrapping the search box in a bordered row puts it back inside the FlatList header (R1 all over again) | Task 13 keeps the wrapper a sibling of the list; the suite's existing `list.contains(searchBox) === false` assertion is the guard |
+| R14 | Bypassing rather than clearing the letter filter leaves a reader filtered by a letter they can no longer see | Deliberate, owner-chosen: the bypass means the *search* ignores it entirely, so nothing filters invisibly while there is text; the letter only returns when the box is empty |
+| R15 | `LemmaScreen` gains a required prop, silently breaking renders in other suites | Task 19 step 11 runs `type-check`, which names every site |
+
+## Addendum rollback
+
+Each task is one commit; none migrate data or touch the on-device user DB, so `git revert <sha>` is the rollback for any single one. Couplings: Task 18 → Task 19 (`AdjacentNav`) — reverting 18 alone breaks the lemma screen, revert both or neither. Task 17 → Task 19 (the query) — same rule. Tasks 12–16 are independent of everything, including each other.
+
+## Addendum acceptance criteria
+
+- [ ] `pnpm -r lint`, `pnpm -r type-check`, `pnpm --filter @quran-corpus/data test`, `pnpm --filter web test` and `pnpm --filter @quran-corpus/mobile test` all pass.
+- [ ] `packages/data/tests/mobile-entry.test.ts` and `tests/client-entry.test.ts` pass **unmodified** — Task 17 exports from a module the mobile entry point already pulls, so the module graph does not move.
+- [ ] `RootRoute.test.tsx` passes unmodified after Task 18. (Task 12 adds a test to it; Task 18 must not need to change one.)
+- [ ] **§5 has been satisfied:** `/code-review` was run by the owner after Task 19, and every finding is either fixed or declined in writing with a reason.
+- [ ] Each of Tasks 12–19 has a recorded mutation-check — the named edit made the named test fail, and the test passed again after the edit was reversed **by re-editing** (never `git checkout` / `git restore`).
+- [ ] Device checks 34–43 run on real hardware from one `preview` APK and recorded below.
