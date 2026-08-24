@@ -569,6 +569,23 @@ describe('ConcordanceList', () => {
     expect(screen.getByTestId('concordance-row').contains(toggle)).toBe(false);
   });
 
+  it('gives the expand toggle a box that cannot re-measure', async () => {
+    // On the owner's device (2026-08-23) this control hopped 2dp when a form
+    // chip refiltered the list, with every pixel above it unmoved. A minHeight
+    // box with the label centred inside it puts the label's position at the
+    // mercy of two measurements; a fixed box whose line fills it has neither.
+    const long = entry({ verse_words: words(12), word_id: 6 });
+    render(<ConcordanceList total={1} loadPage={page([long])} header={<div />} />);
+    const toggle = await screen.findByTestId('concordance-expand');
+
+    expect(toggle.style.height).toBe('40px');
+    expect(toggle.style.minHeight).toBe('');
+    expect(toggle.style.justifyContent).toBe('');
+    // Unitless, unlike height: React only appends px to properties that take a
+    // length, and lineHeight is not one of them.
+    expect((toggle.firstElementChild as HTMLElement).style.lineHeight).toBe('40');
+  });
+
   it('opens the reader from the row, not from the toggle', async () => {
     const long = entry({ verse_words: words(12), word_id: 6 });
     render(<ConcordanceList total={1} loadPage={page([long])} header={<div />} />);

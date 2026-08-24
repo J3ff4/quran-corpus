@@ -209,9 +209,26 @@ function ConcordanceRow({
           accessibilityRole="button"
           accessibilityState={{ expanded }}
           onPress={() => setExpanded((value) => !value)}
-          style={{ minHeight: touchTargets.compact, justifyContent: 'center', alignSelf: 'flex-start' }}
+          // Fixed height and a line box that fills it, rather than a minHeight
+          // with the label centred in whatever the box came out as. Centring
+          // puts the label's position at the mercy of two measurements -- the
+          // box's and the text's -- and on the owner's device (2026-08-23) this
+          // control hopped 2dp when a form chip refiltered the list while every
+          // pixel above it stayed put. Nothing here can move now: the box is
+          // one number and the label fills it.
+          style={{ height: touchTargets.compact, alignSelf: 'flex-start' }}
         >
-          <Text style={{ color: theme.accent, fontSize: typography.caption }}>
+          <Text
+            style={{
+              color: theme.accent,
+              fontSize: typography.caption,
+              lineHeight: touchTargets.compact,
+              // Android pads a text box by the font's own ascent/descent on top
+              // of the line height, which is exactly the second measurement
+              // this is trying to remove.
+              includeFontPadding: false,
+            }}
+          >
             {t(uiLocale, expanded ? 'text.showLess' : 'concordance.showFullVerse')}
           </Text>
         </Pressable>
