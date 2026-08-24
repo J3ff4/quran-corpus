@@ -99,6 +99,19 @@ export const typography = {
   caption: 13,
 };
 
+/** Font family names, as registered by useCorpusFonts.
+ *
+ *  Newsreader is the display serif from the M6 mockups; the UI face stays the
+ *  platform sans (no fontFamily at all, which is what RN already does). Only
+ *  two weights are loaded -- Android resolves `fontWeight` against the loaded
+ *  family and a weight with no file falls back to the system face mid-screen,
+ *  so headings name the SemiBold family directly rather than asking for 600. */
+export const fonts = {
+  arabic: 'Hafs',
+  display: 'Newsreader',
+  displaySemiBold: 'Newsreader-SemiBold',
+} as const;
+
 /** Reader-Arabic size steps. Multipliers, not absolute sizes, so Android's own
  *  font scaling composes with this rather than being overridden by it. */
 export const arabicScales = {

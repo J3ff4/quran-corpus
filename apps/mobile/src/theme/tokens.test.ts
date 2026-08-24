@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { paper } from '@quran-corpus/config/theme/palette';
 import { contrast } from '@/testing/contrast';
-import { colors, themeColors } from './tokens';
+import { colors, fonts, themeColors } from './tokens';
 
 describe('themeColors', () => {
   it('takes its light neutrals from the shared paper scale', () => {
@@ -37,5 +37,19 @@ describe('themeColors', () => {
     // sits on, which is a different background from the page.
     expect(contrast(themeColors.light.accent, themeColors.light.accentWash)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(themeColors.dark.accent, themeColors.dark.accentWash)).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+describe('fonts', () => {
+  it('names every family the app loads', () => {
+    // The strings here must match useCorpusFonts' keys exactly. RN resolves a
+    // fontFamily by name at render time and silently falls back to the system
+    // face when it misses, so a typo shows up as "the serif never applied" on a
+    // device and as nothing at all in a test that only checks the token exists.
+    expect(fonts).toEqual({
+      arabic: 'Hafs',
+      display: 'Newsreader',
+      displaySemiBold: 'Newsreader-SemiBold',
+    });
   });
 });

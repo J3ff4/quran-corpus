@@ -118,5 +118,7 @@ export function useCorpusFonts(): [boolean, Error | null] {
 
   return useFonts({
     Hafs: require('../../assets/fonts/hafs.18.woff2'),
+    Newsreader: require('../../assets/fonts/Newsreader-Regular.ttf'),
+    'Newsreader-SemiBold': require('../../assets/fonts/Newsreader-SemiBold.ttf'),
   });
 }
