@@ -87,7 +87,24 @@ async function createCorpusDb(): Promise<SQLite.SQLiteDatabase> {
   const FileSystem = require('expo-file-system/legacy') as typeof ExpoFileSystemLegacy;
   const SQLiteRuntime = require('expo-sqlite') as typeof ExpoSQLite;
 
-  extraction ??= ensureCorpusDbFile(FileSystem, `${FileSystem.documentDirectory}SQLite`, async () => {
+  // One directory, handed to both the writer and the reader. Passing a bare
+  // filename to openDatabaseSync resolves it against expo-sqlite's own default
+  // directory instead, which is not where expo-file-system just wrote: under
+  // Expo Go the file system is scoped per experience
+  // (files/ExperienceData/<scope>/) while expo-sqlite is not, so the extract
+  // landed somewhere SQLite never looked and it silently opened a fresh empty
+  // database -- surfacing much later as "no such table: surahs". Extracting
+  // into expo-sqlite's directory instead is not an option either; Expo Go
+  // refuses writes outside the experience sandbox.
+  const sqliteDirUri = `${FileSystem.documentDirectory}SQLite`;
+  // openDatabaseSync goes straight to native and wants a path, not a URI, so
+  // the scheme comes off -- but nothing more. Native percent-decodes the rest
+  // itself, and decoding here as well turns Expo Go's escaped scope key into a
+  // directory that does not exist, where SQLite then creates a blank database
+  // rather than failing.
+  const sqliteDirPath = sqliteDirUri.replace(/^file:\/\//, '');
+
+  extraction ??= ensureCorpusDbFile(FileSystem, sqliteDirUri, async () => {
     const asset = Asset.fromModule(require('../../assets/db/quran.db'));
     await asset.downloadAsync();
     if (!asset.localUri) throw new Error('Bundled corpus DB asset did not resolve to a local URI');
@@ -101,7 +118,7 @@ async function createCorpusDb(): Promise<SQLite.SQLiteDatabase> {
 
   await extraction;
 
-  const db = SQLiteRuntime.openDatabaseSync(corpusDbFileName);
+  const db = SQLiteRuntime.openDatabaseSync(corpusDbFileName, undefined, sqliteDirPath);
   // Enforced by SQLite on the connection, not by inspecting SQL strings before
   // we hand them over. The corpus is shipped content and nothing in the app has
   // any business writing to it, but the query client is the same one the
