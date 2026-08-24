@@ -2336,16 +2336,16 @@ Each task is one commit and none of them migrate data or touch the on-device use
 
 | Check | Device / build | Date | Result |
 | --- | --- | --- | --- |
-| 34 |  |  |  |
-| 35 |  |  |  |
-| 36 |  |  |  |
-| 37 |  |  |  |
-| 38 |  |  |  |
-| 39 |  |  |  |
-| 40 |  |  |  |
-| 41 |  |  |  |
-| 42 |  |  |  |
-| 43 |  |  |  |
+| 34 | owner device / preview `354f3e09` (`60ff6a5`) | 2026-08-23 | pass |
+| 35 | owner device / preview `354f3e09` (`60ff6a5`) | 2026-08-23 | pass |
+| 36 | owner device / preview `354f3e09` (`60ff6a5`) | 2026-08-23 | pass |
+| 37 | owner device / preview `354f3e09` (`60ff6a5`) | 2026-08-23 | pass |
+| 38 | owner device / preview `354f3e09` (`60ff6a5`) | 2026-08-23 | pass |
+| 39 | owner device / preview `354f3e09` (`60ff6a5`) | 2026-08-23 | pass |
+| 40 | owner device / preview `354f3e09` (`60ff6a5`) | 2026-08-23 | pass |
+| 41 | owner device / preview `354f3e09` (`60ff6a5`) | 2026-08-23 | pass |
+| 42 | owner device / preview `354f3e09` (`60ff6a5`) | 2026-08-23 | pass |
+| 43 | owner device / preview `354f3e09` (`60ff6a5`) | 2026-08-23 | pass |
 
 ---
 

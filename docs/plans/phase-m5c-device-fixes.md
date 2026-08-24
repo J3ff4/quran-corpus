@@ -844,10 +844,10 @@ ordering, and resets the implementation in its own `finally` (the suite's
 
 | Check | Device / build | Date | Result |
 | --- | --- | --- | --- |
-| 44 | pending | | |
-| 45 | pending | | |
-| 46 | pending | | |
-| 47 | pending | | |
+| 44 | owner device / preview `354f3e09` (`60ff6a5`) | 2026-08-23 | pass |
+| 45 | owner device / preview `354f3e09` (`60ff6a5`) | 2026-08-23 | pass |
+| 46 | owner device / preview `354f3e09` (`60ff6a5`) | 2026-08-23 | pass |
+| 47 | owner device / preview `354f3e09` (`60ff6a5`) | 2026-08-23 | pass |
 
 ## Mutation-check log
 
