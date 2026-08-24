@@ -8,10 +8,22 @@ import { vi } from 'vitest';
 // instead of anything that names the cause.
 vi.mock('react-native-svg', async () => {
   const React = await import('react');
-  const Svg = ({ children, ...props }: { children?: React.ReactNode }) =>
-    React.createElement('svg', props, children);
-  const Path = (props: { d: string }) => React.createElement('path', props);
-  return { default: Svg, Svg, Path };
+  const el = (tag: string) =>
+    ({ children, ...props }: { children?: React.ReactNode }) =>
+      React.createElement(tag, props, children);
+  const Svg = el('svg');
+  return {
+    default: Svg,
+    Svg,
+    Path: (props: { d: string }) => React.createElement('path', props),
+    // Added for <Bloom> (M6a). Without them the gradient elements render as
+    // undefined, which fails on a value rather than on anything naming the
+    // cause -- the exact reason this mock lives here and not per suite.
+    Defs: el('defs'),
+    RadialGradient: el('radialGradient'),
+    Stop: el('stop'),
+    Rect: el('rect'),
+  };
 });
 
 // useSafeAreaInsets throws outside a SafeAreaProvider, and no suite renders

@@ -92,10 +92,29 @@ export function reactNativeTextMock() {
     Text,
     View: host('div'),
     Pressable: host('button'),
+    StyleSheet,
     __layoutHandlers: layoutHandlers,
     __fireLayout: fireLayout,
   };
 }
+
+/**
+ * The three StyleSheet members components actually reach for.
+ *
+ * Here rather than in one suite because the alternative is a component being
+ * rewritten to avoid `StyleSheet.absoluteFill` for the sake of a test -- the
+ * shim exists so the app can be written the way React Native is written. Both
+ * `create` and `flatten` are identity-ish on purpose: RN returns opaque style
+ * IDs, `host` above flattens arrays itself, and nothing here asserts on a
+ * registry handle.
+ */
+export const StyleSheet = {
+  absoluteFill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as const,
+  absoluteFillObject: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as const,
+  create: <T extends Record<string, unknown>>(styles: T): T => styles,
+  flatten: flattenStyle,
+  hairlineWidth: 1,
+};
 
 export function host(tag: string) {
   return function Host({
