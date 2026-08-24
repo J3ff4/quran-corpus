@@ -7,7 +7,12 @@ export async function getLemmaFrequency(
   limit = 200,
 ): Promise<LemmaFrequencyEntry[]> {
   const res = await db.execute({
-    sql: `SELECT lemma, lemma_buckwalter, COUNT(*) AS count
+    // MIN(lemma), not a bare `lemma`: under GROUP BY lemma_buckwalter a bare
+    // column resolves to an arbitrary row of the group, so a lemma written two
+    // ways in the corpus could label its row with a spelling that is not the
+    // one on the page the row opens. Same rule getVerbConcordance below
+    // documents; these rows are links on mobile too now.
+    sql: `SELECT MIN(lemma) AS lemma, lemma_buckwalter, COUNT(*) AS count
           FROM words
           WHERE lemma_buckwalter IS NOT NULL
           GROUP BY lemma_buckwalter

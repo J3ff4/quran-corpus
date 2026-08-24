@@ -21,10 +21,14 @@ beforeAll(async () => {
     `INSERT INTO ayahs (surah_id,ayah_number,text_uthmani) VALUES (1,1,'x') RETURNING id`,
   );
   ayahId = a.rows[0]!['id'] as number;
-  // lemma 'qwl' appears 3x, 'ktb' 1x; two verbs, one noun.
+  // lemma 'qwl' appears 3x, 'ktb' 1x; two verbs, one noun. The FIRST 'qwl' row
+  // spells the lemma 'قولٌ' and the other two spell it 'قول' -- one buckwalter
+  // key, two surface spellings. First, because a bare column under GROUP BY
+  // resolves to the row the group scan opened on, so a deviant spelling
+  // anywhere else is invisible to the test.
   await db.execute({
     sql: `INSERT INTO words (ayah_id,position,text_arabic,lemma,lemma_buckwalter,pos_tag) VALUES
-          (?,1,'قَالَ','قول','qwl','V'),
+          (?,1,'قَالَ','قولٌ','qwl','V'),
           (?,2,'يَقُولُ','قول','qwl','V'),
           (?,3,'قَوْل','قول','qwl','N'),
           (?,4,'كَتَبَ','كتب','ktb','V'),
@@ -39,6 +43,14 @@ describe('getLemmaFrequency', () => {
     const rows = await getLemmaFrequency(db);
     expect(rows[0]?.lemma_buckwalter).toBe('qwl');
     expect(rows[0]?.count).toBe(3);
+  });
+
+  it('labels a multi-spelling lemma by rule, not by scan order', async () => {
+    // The fixture spells 'qwl' both 'قول' and 'قولٌ'. A bare `lemma` column
+    // under GROUP BY hands back the row the group scan opened on -- here the
+    // 'قولٌ' one -- and the row would then link to a page headed 'قول'.
+    const rows = await getLemmaFrequency(db);
+    expect(rows.find((r) => r.lemma_buckwalter === 'qwl')?.lemma).toBe('قول');
   });
 });
 
