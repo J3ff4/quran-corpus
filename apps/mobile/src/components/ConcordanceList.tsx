@@ -8,6 +8,7 @@ import { useAppSettings } from '@/settings/settingsStore';
 import { formColorFor } from '@/theme/formTint';
 import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
+import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
 // One screenful and a bit: large enough that a scroll rarely waits, small
 // enough that the first page lands immediately on a hot root.
@@ -233,6 +234,7 @@ export function ConcordanceList({
 }: ConcordanceListProps) {
   const { uiLocale } = useAppSettings();
   const theme = useThemeColors();
+  const paddingBottom = useListBottomPadding();
 
   const [entries, setEntries] = useState<ConcordanceEntry[]>([]);
   // Starts true when there is anything to load: `loading` is what suppresses
@@ -382,6 +384,7 @@ export function ConcordanceList({
       ListEmptyComponent={loading ? null : status}
       renderItem={renderItem}
       style={{ flex: 1, backgroundColor: theme.background }}
+      contentContainerStyle={{ paddingBottom }}
     />
   );
 }

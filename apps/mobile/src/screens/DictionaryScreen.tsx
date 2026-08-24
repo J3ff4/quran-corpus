@@ -18,6 +18,7 @@ import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
 import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
+import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
 type Pane = 'browse' | 'frequent';
 type DictionarySort = 'alpha' | 'freq';
@@ -27,6 +28,7 @@ const NO_ROOTS: RootSearchItem[] = [];
 export function DictionaryScreen() {
   const { uiLocale } = useAppSettings();
   const theme = useThemeColors();
+  const paddingBottom = useListBottomPadding();
   const navigation = useNavigation();
   const [pane, setPane] = useState<Pane>('browse');
   const [kind, setKind] = useState<'roots' | 'lemmas' | 'verbs'>('roots');
@@ -289,6 +291,7 @@ export function DictionaryScreen() {
                 />
               )}
               style={{ flex: 1 }}
+              contentContainerStyle={{ paddingBottom }}
             />
           )}
         </>

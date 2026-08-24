@@ -8,6 +8,7 @@ import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
 import { typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
+import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
 export interface FrequencyListProps {
   kind: 'roots' | 'lemmas' | 'verbs';
@@ -19,6 +20,7 @@ export interface FrequencyListProps {
 export function FrequencyList({ kind }: FrequencyListProps) {
   const { uiLocale } = useAppSettings();
   const theme = useThemeColors();
+  const paddingBottom = useListBottomPadding();
   const [rows, setRows] = useState<FrequencyRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -127,6 +129,7 @@ export function FrequencyList({ kind }: FrequencyListProps) {
           />
         )}
         style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom }}
       />
     </View>
   );

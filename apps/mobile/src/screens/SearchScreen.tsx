@@ -10,6 +10,7 @@ import { useAppSettings } from '@/settings/settingsStore';
 import { SnippetText } from '@/components/SnippetText';
 import { touchTargets } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
+import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
 // Long enough that a fast typist runs one query rather than six, short enough
 // that results still feel attached to the keystroke. The DB is local, so this
@@ -26,6 +27,7 @@ export const SPINNER_DELAY_MS = 300;
 export function SearchScreen() {
   const { uiLocale, contentLanguage } = useAppSettings();
   const theme = useThemeColors();
+  const paddingBottom = useListBottomPadding();
 
   const [query, setQuery] = useState('');
   const [result, setResult] = useState<SearchResult>(EMPTY_SEARCH_RESULT);
@@ -134,7 +136,7 @@ export function SearchScreen() {
 
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom }}
         // Otherwise Android's default ("never") reads the first tap on a
         // result -- with the autofocused input still holding the keyboard
         // open -- as "dismiss the keyboard", not as a press on that row.

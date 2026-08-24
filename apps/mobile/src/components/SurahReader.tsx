@@ -30,6 +30,7 @@ import { Icon } from './icons/Icon';
 import { useReducedMotion } from '@/motion/useReducedMotion';
 import { touchTargets } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
+import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
 interface SurahReaderProps {
   data: SurahReaderData;
@@ -96,6 +97,7 @@ export function SurahReader({
   onReadingAyah,
 }: SurahReaderProps) {
   const theme = useThemeColors();
+  const paddingBottom = useListBottomPadding();
   const navigation = useNavigation();
   const listRef = useRef<FlatList<SurahReaderData['ayahs'][number]>>(null);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -429,7 +431,7 @@ export function SurahReader({
         // is a native toolbar outside this View and is still reachable.
         importantForAccessibility={openWord || languageOpen ? 'no-hide-descendants' : 'auto'}
         style={{ flex: 1, backgroundColor: theme.background }}
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom }}
       />
       <WordSheet
         summary={openWord}

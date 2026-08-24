@@ -12,6 +12,7 @@ import { useAppSettings } from '@/settings/settingsStore';
 import { typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useArabicSizes } from '@/theme/useArabicSizes';
+import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
 /** The full morphological analysis of one word, reached from the reader sheet's
  *  "Full analysis" link or from a deep link. */
@@ -22,6 +23,7 @@ export default function WordDetailRoute() {
   const position = useMemo(() => parsePosition(params.position), [params.position]);
   const { contentLanguage, uiLocale } = useAppSettings();
   const theme = useThemeColors();
+  const paddingBottom = useListBottomPadding();
   const sizes = useArabicSizes();
   const [summary, setSummary] = useState<WordSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -84,7 +86,7 @@ export default function WordDetailRoute() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: theme.background }}
-      contentContainerStyle={{ padding: 20, gap: 18 }}
+      contentContainerStyle={{ padding: 20, gap: 18, paddingBottom }}
     >
       <Text accessibilityRole="header" style={{ color: theme.mutedText, fontSize: typography.caption }}>
         {`${t(uiLocale, 'reader.ayahLabel')} ${surahId}:${ayahNumber} · ${position}`}
