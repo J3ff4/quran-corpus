@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { paper } from '@quran-corpus/config/theme/palette';
 import { contrast } from '@/testing/contrast';
-import { colors, fonts, themeColors } from './tokens';
+import { bloom, colors, fonts, glass, themeColors } from './tokens';
+import { composite } from '@/testing/rgb';
 
 describe('themeColors', () => {
   it('takes its light neutrals from the shared paper scale', () => {
@@ -52,4 +53,40 @@ describe('fonts', () => {
       displaySemiBold: 'Newsreader-SemiBold',
     });
   });
+});
+
+describe('glass surfaces', () => {
+  // The worst call site, not the page. A translucent card over the bloom's hot
+  // stop is a different backdrop from theme.background, and it is the one the
+  // eye actually reads text on. Measuring against the flat page is how a token
+  // passes here and fails on the device.
+  const worstBackdrop = {
+    light: composite(bloom.light.stops[0], themeColors.light.background),
+    dark: composite(bloom.dark.stops[0], themeColors.dark.background),
+  } as const;
+
+  for (const mode of ['light', 'dark'] as const) {
+    const surface = composite(glass[mode].fill, worstBackdrop[mode]);
+
+    it(`keeps ${mode} body text above AA on glass`, () => {
+      expect(contrast(themeColors[mode].text, surface)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it(`keeps ${mode} muted text above AA on glass`, () => {
+      expect(contrast(themeColors[mode].mutedText, surface)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it(`keeps ${mode} accent above AA on glass`, () => {
+      // The tab bar's active label and every card link.
+      expect(contrast(themeColors[mode].accent, surface)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it(`draws the ${mode} hairline visibly against its own fill`, () => {
+      // Not an AA rule -- a 1px border is a non-text element, and a hairline
+      // that vanishes is the single thing that makes fake glass read as a flat
+      // rectangle.
+      const border = composite(glass[mode].border, surface);
+      expect(contrast(border, surface)).toBeGreaterThanOrEqual(1.2);
+    });
+  }
 });
