@@ -837,7 +837,7 @@ ordering, and resets the implementation in its own `finally` (the suite's
 - [ ] `SurahReader.test.tsx`'s `does not scroll for an ayah it is already showing` passes unmodified.
 - [ ] `LemmaScreen.test.tsx`'s `drops the old neighbours while the new lemma is still resolving` passes unmodified.
 - [ ] Each of Tasks 2, 3 and 4 has a recorded mutation-check: the named edit made the named test fail, and the test passed again after the edit was reversed **by re-editing**.
-- [ ] **§5 satisfied:** `/code-review` run by the owner after Task 5, every finding fixed or declined in writing.
+- [x] **§5 satisfied:** `/code-review` run by the owner after Task 5, every finding fixed or declined in writing. Four findings; two fixed in `42a32ad`, two declined on PR #17. R1's cap stays as designed -- capping `initialNumToRender` breaks the landing it exists to make exact; the follow-up is re-running device check 45 on 2:286, not a cap.
 - [ ] Device checks 44-47 run on real hardware from one `preview` APK and recorded below.
 
 ## Verification log
