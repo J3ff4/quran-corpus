@@ -121,12 +121,15 @@ and every check below will fail for the wrong reason.
 
 ## M4 Dictionary + Search Smoke Test
 
-Run on a physical Android device, on a `preview` profile APK built at `7d5f7b3`
+Run on a physical Android device, on a `preview` profile APK built at `fb64236`
 or later. Older builds fail these for the wrong reasons: before `8e23d80` there
 is no Dictionary → Browse search box at all (check 34), and before `7d5f7b3`
 there is no clear button and no lemma paging (checks 34 and 42), and typing in
 Browse leaves the alphabet grid covering the results, so nothing is visible
-until the keyboard is dismissed (check 34). Confirm the EAS upload is ~36–43 MB
+until the keyboard is dismissed (check 34); before `fb64236` the last row of
+every list sits under the gesture bar (check 44), a concordance tap lands on
+the wrong ayah in the second half of a long surah (check 45), and Previous/Next
+stacks a screen per tap (check 47). Confirm the EAS upload is ~36–43 MB
 — a ~5 MB upload means `.easignore` dropped the bundled DB and every check
 below fails for the wrong reason. Run these alongside M3's outstanding checks (F5, F6, check 27 and
 the M2 rosette carry-over).
@@ -195,6 +198,24 @@ the M2 rosette carry-over).
 43. Repeat 34 and 42 in dark mode at maximum system font size, and once in
     airplane mode. Nothing clips, the ✕ stays inside the search box, and the
     paging still works — all of it is local.
+44. Open a root with a long concordance and scroll to the last row: there is
+    clear space under it, above the gesture bar. Same at the end of Dictionary
+    → Browse, Search results, the word-by-word screen, About and a word-detail
+    screen. Repeat with 3-button navigation turned on — the space shrinks but
+    never becomes an overlap, and no list ends with an absurd gap.
+45. Root قول → any occurrence in the second half of a long surah (16:90:6 and
+    21:73:11 are the two that failed): the reader opens **on that ayah**, with
+    no scrolling seen on the way and no intermediate ayah flashing past. Check
+    2:38:6 and 2:85:16 the same way. Then go Home: the continue-reading card
+    names the ayah you actually read, not one the landing passed over.
+46. Root ملء (one occurrence, five forms) → tap Form VIII: the rows do not dim,
+    no spinner appears under them, and nothing on screen moves except the rows
+    swapping. Tap it again for the whole list back. Repeat on قول scrolled a few
+    rows down — still no dim, still no jump.
+47. Dictionary → any root → Next five times → press back **once**: you are in
+    Dictionary, not four roots back. Same from Most used → Lemmas with the lemma
+    arrows. Each new root opens at the top of its own concordance, not at the
+    scroll offset of the one before it.
 
 ## Current Status
 

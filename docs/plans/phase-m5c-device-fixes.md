@@ -815,6 +815,17 @@ Confirm the upload is ~36-43 MB. A ~5 MB upload means `.easignore` dropped the b
 
 Each task is one commit; none migrate data or change the schema, so `git revert <sha>` is the rollback for any single one. No couplings — the four are independent of each other and of M5b. Task 2 is the only one that changes device-visible persisted behaviour, and reverting it restores the old (wrong-ayah) landing rather than leaving anything inconsistent.
 
+## Corrections made during execution
+
+Task 2's `shows the reader anyway once the retries are spent` was specified
+firing `onScrollToIndexFailed` *before* each retry and advancing 150 ms per
+iteration. FlatList reports the miss synchronously *from* `scrollToIndex`, so
+under the plan's ordering a timer fired in a window where nothing had failed
+yet and the reader revealed after 3 attempts, not 12. The test now drives the
+failure off `mocks.scrollToIndex.mockImplementation`, which is the real
+ordering, and resets the implementation in its own `finally` (the suite's
+`beforeEach` only clears calls).
+
 ## Out of scope, found while planning
 
 `app/bookmarks.tsx` renders its rows in a plain `View`, not a `FlatList` or `ScrollView`, so a reader with more bookmarks than fit on screen cannot reach the last ones. Unrelated to defects 7-10 and not fixed here. Worth an issue.
@@ -833,15 +844,21 @@ Each task is one commit; none migrate data or change the schema, so `git revert 
 
 | Check | Device / build | Date | Result |
 | --- | --- | --- | --- |
-| 44 |  |  |  |
-| 45 |  |  |  |
-| 46 |  |  |  |
-| 47 |  |  |  |
+| 44 | pending | | |
+| 45 | pending | | |
+| 46 | pending | | |
+| 47 | pending | | |
 
 ## Mutation-check log
 
 | Task | Mutation | Test that failed | Restored |
 | --- | --- | --- | --- |
-| 2 |  |  |  |
-| 3 |  |  |  |
-| 4 |  |  |  |
+| 2 | dropped `positionedRef.current &&` from the viewability gate | `does not record a reading position before the deep-link scroll lands` — `expected "spy" to not be called at all, but actually been called 1 times` | re-edited, file diffed identical |
+| 2 | `initialNumToRender={DEFAULT_INITIAL_RENDER}` unconditionally | `renders far enough down the list for the deep-linked ayah to exist` — `expected '10' to be '255'` | re-edited |
+| 2 | deleted the `attemptsRef.current >= MAX_SCROLL_ATTEMPTS` branch | `shows the reader anyway once the retries are spent` — `expected <div …(2)><span></span></div> to be null` | re-edited |
+| 2 | `if (!failedRef.current) return reveal();` -> `return;` | `keeps the reader hidden until the deep-link scroll lands` (and the reading-position test) — `expected <div …(2)><span></span></div> to be null` | re-edited |
+| 3 | put the `opacity: replacing ? 0.45 : 1` wrapper back | `holds the previous rows at full opacity, not dimmed` — `expected <div style="opacity: 0.45;">…(1)</div> to be null` | re-edited, file diffed identical |
+| 3 | `loading && !replacing` -> `loading` | `shows no footer spinner over rows it is holding` — `expected <span></span> to be null` | re-edited |
+| 3 | deleted `setReplacing(true)` from the reset effect's `else` branch | `shows no footer spinner over rows it is holding` — same failure, so the renamed state is wired, not just declared | re-edited |
+| 4 | `router.replace` -> `router.push` in the root route | `links Previous and Next to the hijāʾī neighbours` — `expected "spy" to be called with arguments: [ '/root/qwm' ]` | re-edited |
+| 4 | same swap in `LemmaScreen` | `pages through the ranking it was entered from` — `expected "spy" to be called with arguments: [ '/lemma/ktb?from=verbs' ]` | re-edited |
