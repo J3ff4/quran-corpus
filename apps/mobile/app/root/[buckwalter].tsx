@@ -277,7 +277,11 @@ export default function RootRoute() {
       <AdjacentNav
         prev={neighbors.prev}
         next={neighbors.next}
-        onNavigate={(target) => router.push(`/root/${encodeURIComponent(target)}`)}
+        // replace, not push: paging is a pager, not a trail. Pushing left one
+        // screen per Next on a stack the reader can only leave by backing out
+        // of every root they passed, and root screens are outside the tab
+        // group, so there is no tab bar to escape to either.
+        onNavigate={(target) => router.replace(`/root/${encodeURIComponent(target)}`)}
         label={t(uiLocale, 'root.adjacent')}
         uiLocale={uiLocale}
       />

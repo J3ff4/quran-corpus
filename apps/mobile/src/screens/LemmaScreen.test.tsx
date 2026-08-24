@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   getLemmaOccurrences: vi.fn(),
   getAdjacentLemmas: vi.fn(),
   push: vi.fn(),
+  replace: vi.fn(),
 }));
 
 vi.mock('@/data/corpusRepository', () => ({
@@ -75,7 +76,7 @@ vi.mock('expo-router', async () => {
   return {
     Link: ({ href, testID, children }: { href: string; testID?: string; children: React.ReactNode }) =>
       React.createElement('a', { href, 'data-testid': testID }, children),
-    router: { push: mocks.push },
+    router: { push: mocks.push, replace: mocks.replace },
   };
 });
 
@@ -113,6 +114,7 @@ describe('LemmaScreen', () => {
     mocks.getLemmaOccurrences.mockReset();
     mocks.getAdjacentLemmas.mockReset();
     mocks.push.mockReset();
+    mocks.replace.mockReset();
     mocks.getLemmaOccurrences.mockResolvedValue([]);
     mocks.getAdjacentLemmas.mockResolvedValue({ prev: null, next: null });
     // Default resolution so a test that only cares about the info button (or
@@ -393,7 +395,7 @@ describe('LemmaScreen', () => {
     expect(mocks.getAdjacentLemmas.mock.calls[0]!.slice(1)).toEqual(['brk', 'verbs']);
 
     fireEvent.click(await screen.findByTestId('lemma-next'));
-    expect(mocks.push).toHaveBeenCalledWith('/lemma/ktb?from=verbs');
+    expect(mocks.replace).toHaveBeenCalledWith('/lemma/ktb?from=verbs');
   });
 
   it('drops the old neighbours while the new lemma is still resolving', async () => {

@@ -213,7 +213,7 @@ export function LemmaScreen({ lemmaBuckwalter, source }: LemmaScreenProps) {
         // that must not be able to emit the string '?from=null'.
         onNavigate={
           source
-            ? (target) => router.push(`/lemma/${encodeURIComponent(target)}?from=${source}`)
+            ? (target) => router.replace(`/lemma/${encodeURIComponent(target)}?from=${source}`)
             : () => {}
         }
         label={t(uiLocale, 'lemma.adjacent')}

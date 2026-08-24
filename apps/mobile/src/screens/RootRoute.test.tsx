@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   getRootOccurrences: vi.fn(),
   getAdjacentRoots: vi.fn(),
   push: vi.fn(),
+  replace: vi.fn(),
   /** The `total` in force each time ConcordanceList is handed a new loadPage,
    *  i.e. each time it would restart the list. */
   listResets: [] as number[],
@@ -21,7 +22,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ buckwalter: mocks.buckwalter }),
-  router: { push: mocks.push },
+  router: { push: mocks.push, replace: mocks.replace },
 }));
 
 vi.mock('@quran-corpus/mobile-data', () => ({
@@ -108,6 +109,7 @@ describe('RootRoute', () => {
     mocks.getRootOccurrences.mockReset();
     mocks.getAdjacentRoots.mockReset();
     mocks.push.mockReset();
+    mocks.replace.mockReset();
     mocks.listResets.length = 0;
     mocks.getRootScreen.mockResolvedValue(rootEntry);
     mocks.getRootOccurrenceCount.mockResolvedValue(1722);
@@ -191,7 +193,11 @@ describe('RootRoute', () => {
     mocks.getAdjacentRoots.mockResolvedValue({ prev: 'qtl', next: 'qwm' });
     render(<RootRoute />);
     fireEvent.click(await screen.findByTestId('root-next'));
-    expect(mocks.push).toHaveBeenCalledWith('/root/qwm');
+    // replace, not push: five taps of Next used to leave six screens on the
+    // stack, and root screens are outside the tab group -- back was the only
+    // way out, six times over.
+    expect(mocks.replace).toHaveBeenCalledWith('/root/qwm');
+    expect(mocks.push).not.toHaveBeenCalled();
   });
 
   it('disables the arrow at the end of the list rather than hiding it', async () => {
@@ -202,7 +208,7 @@ describe('RootRoute', () => {
     const next = await screen.findByTestId('root-next');
     await waitFor(() => expect(next.getAttribute('aria-disabled')).toBe('true'));
     fireEvent.click(next);
-    expect(mocks.push).not.toHaveBeenCalled();
+    expect(mocks.replace).not.toHaveBeenCalled();
   });
 
   it('renders one card per definition, each credited', async () => {
