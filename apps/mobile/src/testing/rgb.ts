@@ -30,3 +30,21 @@ export function composite(layer: string, backdrop: string): string {
   const mix = [r, g, b].map((channel, i) => Math.round(channel * a + back[i]! * (1 - a)));
   return `#${mix.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
 }
+
+/**
+ * The `rgba(r, g, b, a)` spelling jsdom normalizes a token to.
+ *
+ * Same trap as `rgb()` above, one layer along: the tokens are written without
+ * spaces and with a trailing zero (`rgba(255,255,255,0.20)`), and jsdom returns
+ * `rgba(255, 255, 255, 0.2)`. Comparing a token straight against `style.*`
+ * never matches -- including when the colour is wrong, which is the failure
+ * that matters.
+ */
+export function rgba(token: string): string {
+  const match = /^rgba?\(([^)]+)\)$/.exec(token.trim());
+  if (!match?.[1]) throw new Error(`rgba expects rgba(), got ${token}`);
+
+  const parts = match[1].split(',').map((part) => Number(part.trim()));
+  const [r, g, b, a = 1] = parts;
+  return a === 1 ? `rgb(${r}, ${g}, ${b})` : `rgba(${r}, ${g}, ${b}, ${a})`;
+}
