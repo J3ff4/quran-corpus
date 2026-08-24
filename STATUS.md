@@ -7,9 +7,28 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-08-20
+Updated: 2026-08-24
 
 ## Now
+
+### 🎨 M6 GLASS REDESIGN — planned, M6a implemented, device run owed (2026-08-24)
+Spec + 9 sub-phase plans: `docs/plans/phase-m6-glass-redesign.md` (+ `phase-m6a..i`).
+40 owner decisions recorded there. §5 fires on M6b, M6c, M6f, M6h.
+
+**M6a on `feat/m6a-design-system`, not merged.** Bloom backdrop, GlassSurface,
+Newsreader, press-scale hook, floating tab pill; 506 tests green. **Checks 48-54
+not run.** Check 48 is the gate on fake glass — if it reads flat, `expo-blur` is
+a §12 dependency question for the owner.
+
+Two calls made in-flight, both in commit bodies:
+- Dark glass fill is the night page colour at 45%, NOT the mockup's white .075.
+  The mockup value is 3.35:1 on the accent over the bloom. Alternative was
+  cutting the dark bloom .62 -> .12; two-value flip either way.
+- M6c triggers §5 after all (browse needs new `packages/data` queries).
+
+Awaiting owner: ayah-of-the-day strike-through
+(`docs/design/m6/ayah-of-the-day-draft.md`, 118 candidates).
+
 
 ### 🔀 REPO MIGRATED — `quran-corpus-pwa` → `quran-corpus` (2026-08-13)
 The orphaned-object blocker is **gone**, and no support ticket was ever filed.
