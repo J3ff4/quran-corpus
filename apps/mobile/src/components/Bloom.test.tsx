@@ -14,13 +14,26 @@ import { bloom, themeColors } from '@/theme/tokens';
 /** React DOM emits the SVG `stopColor` prop as the `stop-color` attribute, and
  *  react-native-svg's own Stop takes it as `stopColor`. Read both so the
  *  assertion is about the colour, not about which spelling survived. */
-function stopColorsOf(container: Element): (string | null)[] {
+function stopsOf(container: Element): { color: string | null; opacity: string | null }[] {
   // Array.from, not a spread: the app tsconfig targets a level where
   // NodeListOf has no [Symbol.iterator] declared, so a spread is a type error
   // even though it runs.
-  return Array.from(container.querySelectorAll('stop')).map(
-    (stop) => stop.getAttribute('stop-color') ?? stop.getAttribute('stopColor'),
-  );
+  return Array.from(container.querySelectorAll('stop')).map((stop) => ({
+    color: stop.getAttribute('stop-color') ?? stop.getAttribute('stopColor'),
+    opacity: stop.getAttribute('stop-opacity') ?? stop.getAttribute('stopOpacity'),
+  }));
+}
+
+/** What the token must arrive as: a colour with no alpha in it, and the alpha
+ *  carried alongside. Asserting the raw `rgba()` token instead is what let a
+ *  wash of undiluted accent ship -- react-native-svg drops alpha inside
+ *  `stopColor`, so that assertion passes whether or not the stop is
+ *  transparent on device. */
+function expectedStops(stops: readonly string[]) {
+  return stops.map((stop) => {
+    const [r, g, b, a] = /rgba\(([\d.]+),([\d.]+),([\d.]+),([\d.]+)\)/.exec(stop)!.slice(1);
+    return { color: `rgb(${r}, ${g}, ${b})`, opacity: String(Number(a)) };
+  });
 }
 
 function renderIn(theme: ThemeColors) {
@@ -37,7 +50,7 @@ describe('Bloom', () => {
   it('draws the dark bloom stops when the dark theme is active', () => {
     const { container } = renderIn(themeColors.dark);
 
-    expect(stopColorsOf(container)).toEqual([...bloom.dark.stops]);
+    expect(stopsOf(container)).toEqual(expectedStops(bloom.dark.stops));
   });
 
   it('draws the light bloom stops when the light theme is active', () => {
@@ -46,6 +59,6 @@ describe('Bloom', () => {
     // paper -- which looks deliberate enough that a screenshot would not catch it.
     const { container } = renderIn(themeColors.light);
 
-    expect(stopColorsOf(container)).toEqual([...bloom.light.stops]);
+    expect(stopsOf(container)).toEqual(expectedStops(bloom.light.stops));
   });
 });
