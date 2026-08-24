@@ -266,6 +266,42 @@ describe('ConcordanceList', () => {
     expect(screen.getByTestId('concordance-ref').textContent).toContain('9:9');
   });
 
+  it('holds the previous rows at full opacity, not dimmed', async () => {
+    // The dim was this phase's own idea and the owner rejected it on sight:
+    // on a one-row root the whole list blinks for a filter that cannot change
+    // the result. The freeze it came with stays -- only the dim goes.
+    const second = deferred<ConcordanceEntry[]>();
+    const { rerender } = render(
+      <ConcordanceList total={1} loadPage={page([entry()])} header={<span />} />,
+    );
+    await waitFor(() => expect(screen.getAllByTestId('concordance-row')).toHaveLength(1));
+
+    rerender(
+      <ConcordanceList total={1} loadPage={() => second.promise} header={<span />} />,
+    );
+
+    expect(screen.getAllByTestId('concordance-row')).toHaveLength(1);
+    // Nothing in this list sets opacity for any other reason.
+    expect(document.querySelector('[style*="opacity"]')).toBeNull();
+  });
+
+  it('shows no footer spinner over rows it is holding', async () => {
+    // The spinner appears below the last row, so on a short list it pushes the
+    // content and reads as a jump. Rows that are already on screen are not
+    // waiting on anything the reader can see.
+    const second = deferred<ConcordanceEntry[]>();
+    const { rerender } = render(
+      <ConcordanceList total={1} loadPage={page([entry()])} header={<span />} />,
+    );
+    await waitFor(() => expect(screen.getAllByTestId('concordance-row')).toHaveLength(1));
+
+    rerender(
+      <ConcordanceList total={1} loadPage={() => second.promise} header={<span />} />,
+    );
+
+    expect(screen.queryByText('loading')).toBeNull();
+  });
+
   it('empties the list when the new filter matches nothing', async () => {
     // Holding rows here would show occurrences the current filter never
     // returned, under a heading that counts zero.

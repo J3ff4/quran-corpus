@@ -255,9 +255,9 @@ export function ConcordanceList({
   // Set when a new list is published, cleared by whichever of the three
   // outcomes lands first (page, empty list, failure).
   const replaceRef = useRef(false);
-  // State, not a ref: the held rows are dimmed while they are known to be
-  // stale, so this has to drive a render.
-  const [stale, setStale] = useState(false);
+  // State, not a ref: the footer spinner is suppressed while rows are being
+  // replaced, so this has to drive a render.
+  const [replacing, setReplacing] = useState(false);
 
   const loadMore = useCallback(async () => {
     if (busyRef.current) return;
@@ -273,7 +273,7 @@ export function ConcordanceList({
       offsetRef.current += page.length;
       if (replaceRef.current) {
         replaceRef.current = false;
-        setStale(false);
+        setReplacing(false);
         setEntries(page);
       } else {
         setEntries((current) => [...current, ...page]);
@@ -289,7 +289,7 @@ export function ConcordanceList({
       // failure notice would claim this filter returned them.
       if (replaceRef.current) {
         replaceRef.current = false;
-        setStale(false);
+        setReplacing(false);
         setEntries([]);
       }
       // Stop paging AND say so. Falling through to the empty state would
@@ -320,15 +320,15 @@ export function ConcordanceList({
       // Nothing is coming to replace them, and loadMore returns at its own
       // `offsetRef >= total` guard, so this is the only place they can go.
       replaceRef.current = false;
-      setStale(false);
+      setReplacing(false);
       setEntries([]);
     } else {
       // NOT setEntries([]): emptying the list collapses its content height and
       // Android clamps the scroll to 0, throwing the reader to the top of the
-      // screen on every form-chip tap. The previous rows stay, dimmed, until
+      // screen on every form-chip tap. The previous rows stay, unchanged, until
       // the new first page replaces them.
       replaceRef.current = true;
-      setStale(true);
+      setReplacing(true);
     }
     void loadMore();
     // loadMore changes with the loader, which is what a new root or lemma is;
@@ -336,14 +336,10 @@ export function ConcordanceList({
   }, [loadMore, total]);
 
   const renderItem = useCallback(
-    // The rows dim, not the whole list: the header carries the form chip the
-    // reader just tapped, and dimming that reads as the tap having failed.
     ({ item }: { item: ConcordanceEntry }) => (
-      <View style={{ opacity: stale ? 0.45 : 1 }}>
-        <ConcordanceRow item={item} forms={forms} uiLocale={uiLocale} />
-      </View>
+      <ConcordanceRow item={item} forms={forms} uiLocale={uiLocale} />
     ),
-    [forms, uiLocale, stale],
+    [forms, uiLocale],
   );
 
   // One node, two slots. An empty list renders it as the empty state; a list
@@ -379,7 +375,9 @@ export function ConcordanceList({
       // total). Without this the list just stops growing, which is
       // indistinguishable from having reached the end (m-5, second half).
       ListFooterComponent={
-        loading ? <ActivityIndicator /> : failed && entries.length > 0 ? status : null
+        // Not while replacing: the rows above are already on screen, and a
+        // spinner appearing under them shifts the content for no information.
+        loading && !replacing ? <ActivityIndicator /> : failed && entries.length > 0 ? status : null
       }
       ListEmptyComponent={loading ? null : status}
       renderItem={renderItem}
