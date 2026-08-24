@@ -41,17 +41,28 @@ Inherited from the umbrella plan. Sub-phase specifics:
 
 ---
 
-### Task 1: Confirm the three tabs
+### Task 1: The three tabs (settled)
 
-The owner chose "three tabs" for this screen. The plan's reading is
-**Bookmarks / Notes / History** — saved ayahs, the subset that carries a note,
-and reading history. Ask before building: three tabs is a layout decision the
-owner already engaged with, and rebuilding it later is the expensive kind of
-rework.
+Owner ruling 2026-08-24, and mockup `1k` is the authority — its segmented
+control reads **Recent · By surah · With notes**:
 
-- [ ] **Step 1: Ask**, with this default named as the recommendation.
-- [ ] **Step 2: Record the answer** in this plan under Spec above, and in the
-  umbrella decision table if it changes anything there.
+| Tab | Contents | Ordering |
+| --- | --- | --- |
+| Recent | Every bookmark | `created_at` DESC — most recently saved first |
+| By surah | Every bookmark | Grouped by surah, mushaf order, ayah order inside each group |
+| With notes | Only bookmarks whose note is non-null | `created_at` DESC |
+
+Not "History" — reading history is the home tab's continue-reading card and does
+not belong here. All three tabs list the same rows; only the order and the
+filter differ.
+
+`1k`'s header caption reads "23 ayahs · 5 surahs · synced offline". Render the
+two counts, but **not the word "synced"** — nothing syncs, nothing leaves the
+device (decision 34), and a caption claiming otherwise is a promise the app does
+not keep. Use the locale's equivalent of "on this device".
+
+This changes `getBookmarks`: Recent needs `created_at`, which the table already
+stores but the query does not return. Task 2 adds it.
 
 ---
 
@@ -67,12 +78,16 @@ rework.
 
 ```ts
 export const NOTE_MAX_LENGTH: 500;
-export interface Bookmark { surahId: number; ayahNumber: number; note: string | null }
+export interface Bookmark { surahId: number; ayahNumber: number; note: string | null; createdAt: string }
 export function normalizeNote(raw: unknown): string | null;
 export async function setBookmarkNote(client: QueryClient, surahId: number, ayahNumber: number, note: string | null): Promise<void>;
 ```
 
-`getBookmarks` grows a `note` field. `setBookmark`'s signature is unchanged.
+`getBookmarks` grows `note` and `createdAt` (the existing `created_at` column,
+never returned before — Task 1's Recent tab needs it). Its `ORDER BY surah_id,
+ayah_number` stays: that is exactly the By-surah tab's order, and the Recent tab
+sorts the same rows in the screen rather than paying for a second query.
+`setBookmark`'s signature is unchanged.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -127,7 +142,7 @@ describe('setBookmarkNote', () => {
     await setBookmarkNote(client, 2, 255, '  the throne verse  ');
 
     expect(await getBookmarks(client)).toEqual([
-      { surahId: 2, ayahNumber: 255, note: 'the throne verse' },
+      { surahId: 2, ayahNumber: 255, note: 'the throne verse', createdAt: expect.any(String) },
     ]);
   });
 
@@ -137,7 +152,7 @@ describe('setBookmarkNote', () => {
     await setBookmarkNote(client, 2, 255, null);
 
     expect(await getBookmarks(client)).toEqual([
-      { surahId: 2, ayahNumber: 255, note: null },
+      { surahId: 2, ayahNumber: 255, note: null, createdAt: expect.any(String) },
     ]);
   });
 });
@@ -153,7 +168,9 @@ describe('migration 3', () => {
 
     // The whole point of versioning it: this ALTER throws if it runs twice, and
     // the row must survive.
-    expect(await getBookmarks(client)).toEqual([{ surahId: 2, ayahNumber: 255, note: null }]);
+    expect(await getBookmarks(client)).toEqual([
+      { surahId: 2, ayahNumber: 255, note: null, createdAt: expect.any(String) },
+    ]);
     await expect(migrateUserDb(client)).resolves.toBe(USER_DB_VERSION);
   });
 });
@@ -262,10 +279,10 @@ git commit -m "feat(data): add a validated note to a bookmark"
   `useListBottomPadding`, `getBookmarks`, `getLastReadingPosition`.
 - Produces: `<BookmarksScreen />`; `app/bookmarks.tsx` becomes a one-line route.
 
-New `uiStrings` keys: `bookmarks.tabAll`, `bookmarks.tabNotes`,
-`bookmarks.tabHistory`, `bookmarks.noNotes`, `bookmarks.addNote`,
-`bookmarks.editNote`, `bookmarks.noteFailed`, `bookmarks.noteCounter`
-(all three locales).
+New `uiStrings` keys: `bookmarks.tabRecent`, `bookmarks.tabBySurah`,
+`bookmarks.tabWithNotes`, `bookmarks.countCaption`, `bookmarks.noNotes`,
+`bookmarks.addNote`, `bookmarks.editNote`, `bookmarks.noteFailed`,
+`bookmarks.noteCounter` (all three locales).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -280,14 +297,38 @@ it('scrolls past the first screenful', async () => {
   expect(screen.queryByTestId('bookmarks-static-view')).toBeNull();
 });
 
-it('shows only noted bookmarks under the Notes tab', async () => {
+it('shows only noted bookmarks under the With-notes tab', async () => {
   renderBookmarks({ bookmarks: [
     { surahId: 2, ayahNumber: 255, note: 'throne' },
     { surahId: 1, ayahNumber: 1, note: null },
   ] });
 
-  fireEvent.click(screen.getByLabelText('Notes'));
+  fireEvent.click(screen.getByLabelText('With notes'));
   expect(await screen.findAllByTestId(/bookmark-row-/)).toHaveLength(1);
+});
+
+it('orders Recent by when the bookmark was saved, not by surah', async () => {
+  renderBookmarks({ bookmarks: [
+    { surahId: 1, ayahNumber: 1, note: null, createdAt: '2026-08-20T10:00:00Z' },
+    { surahId: 2, ayahNumber: 255, note: null, createdAt: '2026-08-24T10:00:00Z' },
+  ] });
+
+  // getBookmarks returns mushaf order, which is the By-surah tab's order. A
+  // Recent tab that forgets to re-sort is indistinguishable from it until the
+  // user saves something out of order -- which is the normal case.
+  const rows = await screen.findAllByTestId(/bookmark-row-/);
+  expect(rows[0]?.getAttribute('data-testid')).toBe('bookmark-row-2-255');
+});
+
+it('groups the By-surah tab under surah headers', async () => {
+  renderBookmarks({ bookmarks: [
+    { surahId: 1, ayahNumber: 1, note: null, createdAt: '2026-08-20T10:00:00Z' },
+    { surahId: 2, ayahNumber: 255, note: null, createdAt: '2026-08-24T10:00:00Z' },
+  ] });
+
+  fireEvent.click(screen.getByLabelText('By surah'));
+  const headers = await screen.findAllByRole('header');
+  expect(headers.map((h) => h.textContent)).toEqual(['Al-Fatiha', 'Al-Baqara']);
 });
 
 it('counts down the remaining characters while editing', async () => {
@@ -316,9 +357,12 @@ it('keeps the bookmark when a note is cleared', async () => {
 
 - [ ] **Step 2: Run them, watch them fail, implement, re-run**
 
-- Three tabs via `SegmentedControl`, per Task 1's confirmed answer.
-- One `FlatList` per tab, `keyExtractor` including the tab so a switch cannot
-  reuse rows, `contentContainerStyle.paddingBottom = useListBottomPadding()`.
+- Three tabs via `SegmentedControl`: Recent, By surah, With notes (Task 1).
+- Recent and With notes are `FlatList`s; By surah is a `SectionList` with a
+  surah-name header per group. `keyExtractor` includes the tab so a switch
+  cannot reuse rows; `contentContainerStyle.paddingBottom = useListBottomPadding()`.
+- The header caption shows the ayah and surah counts, and says the data is on
+  this device -- never "synced" (Task 1).
 - Each row is a `GlassSurface` card: coordinate, the ayah's opening words, and
   the note beneath in the muted colour, clamped to three lines with the existing
   `ClampedText`.
@@ -409,7 +453,7 @@ cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --prof
 | 99 | Add, edit and clear a note | Persists across an app restart; clearing keeps the bookmark |
 | 100 | Type past 500 characters | Input stops at 500; the counter reaches 0; nothing is silently lost |
 | 101 | A note in Arabic, Uzbek and Russian | Stored and redisplayed intact, correct direction |
-| 102 | Notes tab | Lists only noted bookmarks; History tab shows the last reading position |
+| 102 | All three tabs | Recent is newest-first; By surah is grouped under surah headers; With notes lists only noted bookmarks |
 
 ## Verification Log
 

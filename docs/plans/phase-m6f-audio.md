@@ -88,11 +88,12 @@ Ten reciters, inside decision 39's 8–12 band. Muallim and Minshawy-Murattal ar
 40's "highest available" fallback, resolved at authoring time rather than at
 runtime, because the answer is a fixed property of the host.
 
-**Owner question, ask before Step 2:** `ayahAudioUrl` is shared with the web
-reader, which plays `Abdul_Basit_Murattal_64kbps` today. Defaulting the shared
-helper to Husary changes web's reciter too. Either is defensible — confirm which
-the owner wants. If web must not change, pin `'abdul-basit'` explicitly at web's
-call site rather than splitting the helper.
+**Owner ruling 2026-08-24: Husary is the default on both products.**
+`ayahAudioUrl` is shared, so the web reader's recitation changes from
+`Abdul_Basit_Murattal_64kbps` to `Husary_64kbps` with it. That is intended — do
+not pin the old reciter at web's call site to "keep web unchanged", and do not
+split the helper in two. This is the one deliberate web-visible change in all of
+M6; note it in the PR body so it is not read as an accident.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -173,7 +174,9 @@ export function ayahAudioUrl(surahId: number, ayahNumber: number, reciterId: str
 ```
 
 Keep `AYAH_AUDIO_ORIGIN`. Replace `AYAH_AUDIO_RECITER` / `AYAH_AUDIO_ATTRIBUTION`
-with per-reciter values — `uiStrings.ts` imports `AYAH_AUDIO_ATTRIBUTION`, so
+with per-reciter values. Grep for both across `apps/web` as well as
+`apps/mobile` — web's reader and its credits copy both name Abdul Basit today,
+and per the ruling above both must now say Husary — `uiStrings.ts` imports `AYAH_AUDIO_ATTRIBUTION`, so
 update that call site to build the attribution from the active reciter.
 
 - [ ] **Step 4: Re-probe the folders**

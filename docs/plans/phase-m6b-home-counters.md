@@ -736,14 +736,15 @@ Lives in `apps/mobile`, not `packages/data`: it is a curated editorial list for
 one screen of one product, with no web counterpart. Move it to `packages/data`
 the day web wants the same block, not before.
 
-- [ ] **Step 1: Draft the shortlist and get it approved**
+- [ ] **Step 1: Get the drafted shortlist approved**
 
-Draft 60–100 candidates as a plain table (surah:ayah + the first few words of
-the English gloss) and put it in front of the owner to strike from. Do **not**
-proceed to Step 2 with an agent-chosen list — decision 24 makes this theirs.
+The draft is written: `docs/design/m6/ayah-of-the-day-draft.md`, 118 candidates.
+Every coordinate was validated against `surahs.ayah_count` in the live corpus DB
+and every one has an English translation row, so none can render blank.
 
-Every entry must be a real coordinate: cross-check each against
-`SURAH_AYAH_COUNTS` in `packages/data/src/userData.ts` before writing it down.
+Take the owner's strike-through and use exactly what survives. Do **not** add to
+it — decision 24 makes the list theirs. If an entry is added later, validate the
+coordinate the same way first.
 
 - [ ] **Step 2: Write the failing test**
 

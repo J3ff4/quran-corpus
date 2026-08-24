@@ -42,7 +42,7 @@ wins and the plan is wrong.
 | 2 | Phase is **M6**. PRD §10 renumbers: hardening → M7, treebank → M8, iOS → M9. |
 | 3 | Nine sub-phases, one plan file, one branch, one PR, one preview APK each. |
 | 4 | `main` may sit half-redesigned between merges. Accepted — nothing is public. |
-| 5 | Plan first. Mockups for unmocked screens are drawn **inside** the sub-phase that ships them, and the agent builds them as HTML for owner review. |
+| 5 | Plan first. Mockups for unmocked screens are drawn **inside** the sub-phase that ships them, and the agent builds them as HTML for owner review. That means M6g Task 1 (lemma, frequency, dictionary browse, concordance) and M6i Task 0 (menu, settings, about) — confirmed 2026-08-24. |
 | 6 | Out of scope: release hardening, iOS, treebank, the web app, analytics/crash providers. |
 
 ### Visual system
@@ -55,7 +55,7 @@ wins and the plan is wrong.
 | 10 | Newsreader serif for display type, existing sans for UI. Hafs stays the Arabic face. |
 | 11 | Theme default stays `system`. Light and dark both get the full glass treatment. |
 | 12 | Motion restrained: sheets, tab transitions, presses. No decorative animation. `useReducedMotion` respected everywhere. |
-| 13 | Mobile-only. `packages/config` palette untouched; the web product does not change. |
+| 13 | Mobile-only re-skin. `packages/config` palette untouched and no web UI changes. The single exception is decision 38's shared reciter default. |
 | 14 | Palette is already correct (`tokens.ts` accent `#1f6f5b`/`#5aa58d`, night `#151412`). No token rewrite — glass tokens are **added**, existing hexes stay. |
 
 ### Information architecture
@@ -76,7 +76,7 @@ wins and the plan is wrong.
 | 21 | All four blocks ship: continue-reading, day streak, roots studied, ayah of the day. |
 | 22 | Streak counts **any reading**, on the device's local date. |
 | 23 | Roots studied = distinct roots opened. All-time total plus a weekly log. |
-| 24 | Ayah of the day = curated shortlist, date-seeded. Agent drafts ~60–100, owner strikes. |
+| 24 | Ayah of the day = curated shortlist, date-seeded. Draft of 118 verified candidates at `docs/design/m6/ayah-of-the-day-draft.md`, awaiting the owner's strike-through. |
 
 ### Word-by-word
 
@@ -95,7 +95,7 @@ wins and the plan is wrong.
 | 30 | Bookmark notes: one note per bookmark, 500 characters, plain text. |
 | 31 | Stripped and capped at the write boundary in `packages/data`, not in the screen. |
 | 32 | A real versioned migration. Existing rows preserved — this file lives on the owner's phone and survives app updates. |
-| 33 | Bookmarks screen gets the full treatment: three tabs, notes, and the scroll fix (`app/bookmarks.tsx` renders rows in a plain `View` today, so rows past the first screenful are unreachable). |
+| 33 | Bookmarks screen gets the full treatment: three tabs — **Recent · By surah · With notes**, per mockup `1k` — notes, and the scroll fix (`app/bookmarks.tsx` renders rows in a plain `View` today, so rows past the first screenful are unreachable). No History tab; reading history lives on the home card. |
 | 34 | Nothing new leaves the device. The telemetry allowlist is not widened for streaks, roots or notes. |
 
 ### Audio
@@ -105,7 +105,7 @@ wins and the plan is wrong.
 | 35 | In scope, and no longer cosmetic: scrub bar, continuous play, background playback with lock-screen controls, reciter picker. |
 | 36 | No new dependency. `expo-audio@57`'s own config plugin adds `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK` and `MediaSessionService`; `shouldPlayInBackground` + `interruptionMode: 'doNotMix'` give the lock-screen controls. `app.json` change plus prebuild. |
 | 37 | **Alafasy is excluded outright.** Not in the shortlist, not as a fallback. |
-| 38 | Default reciter is **Husary**. Abdur-Rashid Sufi exists only as whole-surah mp3s and the entire playback path is per-ayah; the PRD's "defaulting to Abdul Rashid Sufi" line was never true in code and gets corrected. |
+| 38 | Default reciter is **Husary**, on **both products**. Abdur-Rashid Sufi exists only as whole-surah mp3s and the entire playback path is per-ayah; the PRD's "defaulting to Abdul Rashid Sufi" line was never true in code and gets corrected. `ayahAudioUrl` is shared, so the web reader changes from Abdul Basit to Husary with it — the one deliberate web-visible change in M6 (owner ruling 2026-08-24). |
 | 39 | Shortlist (8–12, owner-approved in M6f Task 1): Husary ×3 (Murattal / Muallim / Mujawwad), Minshawy, Abdul Basit, Sudais, Shuraym, Shatri, Ayyoub. |
 | 40 | Prefer 64 kbps; fall back to the highest available. No caching this phase. |
 

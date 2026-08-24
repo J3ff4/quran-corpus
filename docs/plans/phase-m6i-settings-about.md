@@ -29,14 +29,48 @@ Inherited from the umbrella plan. Sub-phase specifics:
   feature.
 - Decision 11: the theme default stays `system`. Do not change it, and do not
   reorder the picker so that another option reads as the default.
-- **No mockup exists for these three screens** and none is drawn. The handoff
-  bundle covers `1a`-`1k` and `2a`-`2d`, none of which is Menu, Settings or
-  About. By this sub-phase the glass system is fully specified by M6a's tokens
-  and primitives and is visible in eight shipped screens, so these three are
-  composed from it rather than designed afresh. If the owner wants them mocked
-  first (decision 5), ask before Task 1 -- it is a cheap question and an
-  expensive assumption.
+- **No mockup exists for these three screens.** The handoff bundle covers
+  `1a`-`1k` and `2a`-`2d`; none is Menu, Settings or About. Owner ruling
+  2026-08-24: draw them first. Task 0 below is that, and it gates everything
+  after it.
 - Branch: `feat/m6i-settings-about`. Device checks 103-107.
+
+---
+
+### Task 0: Mockups
+
+Decision 5, applied to the three screens the bundle never covered.
+
+**Files:**
+- Create: `docs/design/m6/menu.html`
+- Create: `docs/design/m6/settings.html`
+- Create: `docs/design/m6/about.html`
+
+- [ ] **Step 1: Read the source of truth**
+
+Read `~/quran-data/corpus-design-files/Quran Corpus Glass.dc.html` in full. Do
+not render or screenshot it. Match its 390x844 frame, its glass recipe and its
+type scale exactly -- and match `1k`'s list-and-segmented-control anatomy, since
+Settings is closer to that screen than to anything else in the bundle.
+
+- [ ] **Step 2: Draw the three screens**
+
+Self-contained HTML, inline styles, night theme. Real content, not lorem: the
+actual settings groups from Task 2's table, the actual credits from Task 3's
+list, the three real menu rows. Settings is the one worth care -- it is five
+groups of controls and it is where a glass system either holds together or
+turns into a wall of pills.
+
+- [ ] **Step 3: Show the owner and get approval**
+
+Do not start Task 1 until they have been seen.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add docs/design/m6
+git commit -m "docs(design): mock menu, settings and about"
+```
 
 ---
 
@@ -210,7 +244,7 @@ cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --prof
 
 | # | Check | Pass condition |
 | --- | --- | --- |
-| 103 | Menu, both themes | Three rows, each opening the right screen |
+| 103 | Menu, both themes | Three rows, each opening the right screen; matches the Task 0 mockup |
 | 104 | Change every setting, kill the app, reopen | Every one persisted |
 | 105 | Switch UI locale to Uzbek, then Russian | No English strings anywhere in Menu, Settings or About |
 | 106 | About | Every source named; the OFL notice present; nothing truncated |
