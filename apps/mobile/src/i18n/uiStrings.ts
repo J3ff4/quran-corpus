@@ -84,6 +84,8 @@ export type UiStringKey =
   | 'lemma.adjacent'
   // Accessible name for the info sheet's backdrop/dismiss control.
   | 'lemma.close'
+  | 'lemma.previous'
+  | 'lemma.next'
   | 'surahList.ayahsSuffix'
   | 'surahList.loadFailed'
   | 'settings.language'
@@ -218,6 +220,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'lemma.viewRoot': 'View root',
     'lemma.adjacent': 'Adjacent lemmas',
     'lemma.close': 'Close',
+    'lemma.previous': 'Previous',
+    'lemma.next': 'Next',
     'surahList.ayahsSuffix': 'ayahs',
     'surahList.loadFailed': 'Unable to load surahs',
     'settings.language': 'Language',
@@ -340,6 +344,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'lemma.viewRoot': 'O‘zakni ko‘rish',
     'lemma.adjacent': 'Qo‘shni lemmalar',
     'lemma.close': 'Yopish',
+    'lemma.previous': 'Oldingi',
+    'lemma.next': 'Keyingi',
     'surahList.ayahsSuffix': 'oyat',
     'surahList.loadFailed': 'Suralarni yuklab bo‘lmadi',
     'settings.language': 'Til',
@@ -459,6 +465,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'lemma.viewRoot': 'Открыть корень',
     'lemma.adjacent': 'Соседние леммы',
     'lemma.close': 'Закрыть',
+    'lemma.previous': 'Предыдущая',
+    'lemma.next': 'Следующая',
     'surahList.ayahsSuffix': 'аятов',
     'surahList.loadFailed': 'Не удалось загрузить суры',
     'settings.language': 'Язык',

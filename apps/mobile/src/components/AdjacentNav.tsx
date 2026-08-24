@@ -12,8 +12,9 @@ export interface AdjacentNavProps {
   /** Names the toolbar for TalkBack: 'root.adjacent' or 'lemma.adjacent'. */
   label: string;
   uiLocale: UiLocaleCode;
-  /** Distinguishes the two screens' controls in tests. */
-  testIDPrefix?: string;
+  /** Which of the two screens this is: names the controls in tests, and picks
+   *  the locale keys for the labels. */
+  testIDPrefix?: 'root' | 'lemma';
 }
 
 /** Previous/Next between two entries of the same kind. Shared by the root
@@ -22,9 +23,18 @@ export interface AdjacentNavProps {
  *  the tap target are the same on both, which is why this is one component and
  *  not two.
  *
- *  'root.previous' / 'root.next' are reused verbatim on the lemma screen --
- *  they are the bare words "Previous"/"Next" in all three locales, the same
- *  way 'word.root' is already reused across screens. */
+ *  The labels are keyed per screen rather than shared, because Russian
+ *  inflects them: "Предыдущий" agrees with корень (m.) and "Предыдущая" with
+ *  лемма (f.), so one pair of strings cannot serve both. English and Uzbek
+ *  carry the same words in both. */
+/** Written out per screen rather than built from `testIDPrefix`: a key
+ *  assembled at runtime is invisible to the dead-key check in
+ *  uiStrings.test.ts, which greps the sources for the literal. */
+const LABEL_KEYS = {
+  root: { prev: 'root.previous', next: 'root.next' },
+  lemma: { prev: 'lemma.previous', next: 'lemma.next' },
+} as const;
+
 export function AdjacentNav({
   prev,
   next,
@@ -66,8 +76,8 @@ export function AdjacentNav({
           >
             <Text style={{ color: target === null ? theme.mutedText : theme.text }}>
               {side === 'prev'
-                ? `← ${t(uiLocale, 'root.previous')}`
-                : `${t(uiLocale, 'root.next')} →`}
+                ? `← ${t(uiLocale, LABEL_KEYS[testIDPrefix].prev)}`
+                : `${t(uiLocale, LABEL_KEYS[testIDPrefix].next)} →`}
             </Text>
           </Pressable>
         );

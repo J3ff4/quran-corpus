@@ -48,4 +48,28 @@ describe('AdjacentNav', () => {
     expect(screen.getByTestId('lemma-previous')).toBeTruthy();
     expect(screen.getByTestId('lemma-next')).toBeTruthy();
   });
+
+  it('inflects the Russian labels for the screen it is on', () => {
+    // Russian agrees the adjective with the noun: корень is masculine, лемма is
+    // feminine. Sharing one pair of strings put "Предыдущий" over a toolbar
+    // labelled "Соседние леммы".
+    render(
+      <AdjacentNav prev="a" next="b" onNavigate={vi.fn()} label="Соседние корни" uiLocale="ru" />,
+    );
+    expect(screen.getByTestId('root-previous').textContent).toContain('Предыдущий');
+
+    cleanup();
+    render(
+      <AdjacentNav
+        prev="a"
+        next="b"
+        onNavigate={vi.fn()}
+        label="Соседние леммы"
+        uiLocale="ru"
+        testIDPrefix="lemma"
+      />,
+    );
+    expect(screen.getByTestId('lemma-previous').textContent).toContain('Предыдущая');
+    expect(screen.getByTestId('lemma-next').textContent).toContain('Следующая');
+  });
 });
