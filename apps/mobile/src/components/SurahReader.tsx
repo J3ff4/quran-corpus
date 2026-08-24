@@ -69,7 +69,16 @@ interface SurahReaderProps {
 // (2026-08-23) 16:90 landed on 16:49, and every jump on the way fired
 // onViewableItemsChanged, writing an ayah the reader never saw into the saved
 // reading position.
-const MAX_SCROLL_ATTEMPTS = 12;
+//
+// "FlatList reported no failure" is not the same as "the row is at the top".
+// scrollToIndex computes its offset from the row heights measured so far, so a
+// card above the target that has rendered but not finished laying out measures
+// short, the jump lands short, and the target slides further down as those
+// cards settle. So every attempt re-scrolls, and only a scroll that both missed
+// nothing and left the content height unchanged counts as the landing. (Owner
+// device, 2026-08-23: 6:87 opened from a concordance row two cards below the
+// top, and the same from search and bookmarks.)
+const MAX_SCROLL_ATTEMPTS = 25;
 const SCROLL_RETRY_DELAY_MS = 100;
 // React Native's own default. Restated because the deep-link case overrides it
 // and a bare 10 in the JSX reads as a number someone chose.
@@ -119,6 +128,12 @@ export function SurahReader({
   // state: FlatList reports the failure synchronously during a scroll and a
   // re-render per attempt would remount nothing useful.
   const failedRef = useRef(false);
+  // The list's content height, and the height the previous attempt scrolled
+  // over. Equal means nothing above the target grew in that window, which is
+  // the only evidence available here that the offset the scroll used is the
+  // offset the row actually sits at.
+  const contentHeightRef = useRef(0);
+  const settledHeightRef = useRef(-1);
   // The same value as `positioned` below. onViewableItemsChanged is called by
   // FlatList from outside the React tree off a ref that never re-reads props,
   // so it cannot see the state.
@@ -293,6 +308,10 @@ export function SurahReader({
 
     let cancelled = false;
     attemptsRef.current = 0;
+    // -1, not the live height: a re-run must scroll at least twice before it
+    // can call anything settled, or the first tick reveals on a comparison
+    // against a height nothing has scrolled over yet.
+    settledHeightRef.current = -1;
 
     const reveal = () => {
       if (cancelled) return;
@@ -307,8 +326,10 @@ export function SurahReader({
       listRef.current?.scrollToIndex({ index: initialIndex, animated: false });
       retryTimerRef.current = setTimeout(() => {
         if (cancelled) return;
-        // No failure reported in that window means the scroll landed.
-        if (!failedRef.current) return reveal();
+        // Both halves: no miss, and no growth under the jump.
+        const landed = !failedRef.current && contentHeightRef.current === settledHeightRef.current;
+        settledHeightRef.current = contentHeightRef.current;
+        if (landed) return reveal();
         // Capped: a row that never measures has to settle. Showing the reader
         // in the wrong place is bad; leaving it behind a spinner for as long
         // as the screen is open is worse.
@@ -328,6 +349,11 @@ export function SurahReader({
   // for what the offset estimate that used to live here cost.
   const onScrollToIndexFailed = useCallback(() => {
     failedRef.current = true;
+  }, []);
+  // Read by the landing loop above, one tick later -- not state: it changes on
+  // every layout pass while the surah settles and none of them is a render.
+  const onContentSizeChange = useCallback((_width: number, height: number) => {
+    contentHeightRef.current = height;
   }, []);
   const onReadingAyahRef = useRef(onReadingAyah);
   const loadWordsRef = useRef(loadWords);
@@ -471,6 +497,7 @@ export function SurahReader({
         )}
         onViewableItemsChanged={onViewableItemsChanged.current}
         onScrollToIndexFailed={onScrollToIndexFailed}
+        onContentSizeChange={onContentSizeChange}
         onScroll={onScroll}
         scrollEventThrottle={16}
         // BottomSheet -- the shell under both WordSheet and LanguageSheet --

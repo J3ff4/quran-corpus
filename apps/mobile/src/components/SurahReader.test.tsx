@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
     | ((info: { index: number; averageItemLength: number }) => void)
     | null,
   onScroll: null as ((event: { nativeEvent: { contentOffset: { y: number } } }) => void) | null,
+  onContentSizeChange: null as ((width: number, height: number) => void) | null,
   headerLayout: null as ((height: number) => void) | null,
   scrollToIndex: vi.fn(),
   scrollToOffset: vi.fn(),
@@ -120,13 +121,14 @@ vi.mock('react-native', async () => {
     // Forwards the ref, so the imperative scroll calls the component makes on
     // mount are observable. A plain function component silently swallows it
     // and every scroll assertion would pass against a null ref.
-    FlatList: ({ data, ListHeaderComponent, renderItem, onViewableItemsChanged, onScrollToIndexFailed, onScroll, importantForAccessibility, initialNumToRender, ref }: {
+    FlatList: ({ data, ListHeaderComponent, renderItem, onViewableItemsChanged, onScrollToIndexFailed, onScroll, onContentSizeChange, importantForAccessibility, initialNumToRender, ref }: {
       data: unknown[];
       ListHeaderComponent?: React.ReactNode;
       renderItem: (info: { item: unknown; index: number }) => React.ReactNode;
       onViewableItemsChanged?: (info: { viewableItems: Array<{ item: unknown }> }) => void;
       onScrollToIndexFailed?: (info: { index: number; averageItemLength: number }) => void;
       onScroll?: (event: { nativeEvent: { contentOffset: { y: number } } }) => void;
+      onContentSizeChange?: (width: number, height: number) => void;
       importantForAccessibility?: string;
       initialNumToRender?: number;
       ref?: React.Ref<unknown>;
@@ -134,6 +136,7 @@ vi.mock('react-native', async () => {
       mocks.onViewableItemsChanged = onViewableItemsChanged ?? null;
       mocks.onScrollToIndexFailed = onScrollToIndexFailed ?? null;
       mocks.onScroll = onScroll ?? null;
+      mocks.onContentSizeChange = onContentSizeChange ?? null;
       React.useImperativeHandle(ref, () => ({
         scrollToIndex: mocks.scrollToIndex,
         scrollToOffset: mocks.scrollToOffset,
@@ -273,12 +276,52 @@ describe('SurahReader', () => {
       render(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />);
       expect(screen.queryByTestId('reader-positioning')).not.toBeNull();
 
-      // No failure reported means the scroll landed.
+      // Two ticks: a scroll that missed nothing, over a content height the
+      // previous scroll already ran against.
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(150);
+        await vi.advanceTimersByTimeAsync(250);
       });
 
       expect(screen.queryByTestId('reader-positioning')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('re-scrolls while the cards above the target are still growing', async () => {
+    // The defect this covers: FlatList reports no failure as soon as the target
+    // row is measured, but the offset it jumped to was summed over cards above
+    // it that had not finished laying out. They grow, the target slides down,
+    // and the reader is revealed two cards short of it (owner device, 6:87 from
+    // a concordance row). A growing content height means the jump is stale.
+    vi.useFakeTimers();
+    try {
+      render(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
+      act(() => {
+        mocks.onContentSizeChange?.(400, 90000);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
+
+      // Still hidden, and scrolled again -- against the taller content.
+      expect(screen.queryByTestId('reader-positioning')).not.toBeNull();
+      const attemptsWhileGrowing = mocks.scrollToIndex.mock.calls.length;
+      expect(attemptsWhileGrowing).toBeGreaterThanOrEqual(3);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
+
+      // Revealed on a tick that scrolled nothing: the last jump already ran
+      // against the settled height, so the row it landed on is the row it stays
+      // on.
+      expect(screen.queryByTestId('reader-positioning')).toBeNull();
+      expect(mocks.scrollToIndex).toHaveBeenCalledTimes(attemptsWhileGrowing);
     } finally {
       vi.useRealTimers();
     }
@@ -299,11 +342,11 @@ describe('SurahReader', () => {
       // spinner for as long as the screen is open is worse than showing it in
       // the wrong place.
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(100 * 20);
+        await vi.advanceTimersByTimeAsync(100 * 30);
       });
 
       expect(screen.queryByTestId('reader-positioning')).toBeNull();
-      expect(mocks.scrollToIndex).toHaveBeenCalledTimes(12);
+      expect(mocks.scrollToIndex).toHaveBeenCalledTimes(25);
     } finally {
       // mockClear in beforeEach would leave the implementation behind for
       // every later test in the file.
@@ -331,7 +374,7 @@ describe('SurahReader', () => {
       expect(onReadingAyah).not.toHaveBeenCalled();
 
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(150);
+        await vi.advanceTimersByTimeAsync(250);
       });
       act(() => {
         mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[254] }] });
