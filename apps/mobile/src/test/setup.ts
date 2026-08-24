@@ -35,3 +35,29 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
   SafeAreaProvider: ({ children }: { children?: unknown }) => children,
 }));
+
+// react-native-reanimated is a native module whose JS entry pulls in a worklets
+// runtime jsdom has no counterpart for, so importing it fails collection
+// outright. Declared here rather than per suite for the same reason the two
+// mocks above are: every M6 component that reacts to a press reaches
+// usePressScale, and the suite that forgets this fails on a module-resolution
+// error that names reanimated rather than the component under test.
+//
+// The shared value is a plain mutable box and withTiming resolves instantly:
+// nothing here asserts on a frame, and the timing branch that *is* worth
+// testing (reduced motion) lives in the pure nextPressScale.
+vi.mock('react-native-reanimated', async () => {
+  const React = await import('react');
+  return {
+    default: {
+      createAnimatedComponent: (Component: unknown) => Component,
+      View: ({ children, ...props }: { children?: React.ReactNode }) =>
+        React.createElement('div', props, children),
+    },
+    useSharedValue: (initial: number) => ({ value: initial }),
+    useAnimatedStyle: (factory: () => unknown) => factory(),
+    withTiming: (toValue: number) => toValue,
+    withSpring: (toValue: number) => toValue,
+    Easing: { bezier: () => undefined, out: (fn: unknown) => fn, ease: undefined },
+  };
+});
