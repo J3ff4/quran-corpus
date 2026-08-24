@@ -61,7 +61,7 @@ one font asset today (`assets/fonts/hafs.18.woff2`, 88 KB) and loads it in
 here — each later sub-phase swaps the files it is already rewriting. A
 17-file rename in the design-system PR is churn that hides the real change.
 
-- [ ] **Step 1: Fetch the fonts**
+- [x] **Step 1: Fetch the fonts**
 
 Static TTFs, Regular + SemiBold only (two weights is what the mockups use):
 
@@ -91,7 +91,7 @@ If either file lands over ~400 KB, subset it to Latin + Latin-1 with
 Record the OFL licence text location for M6i's credits screen; do **not** write
 the About copy here.
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 `apps/mobile/src/theme/tokens.test.ts`:
 
@@ -114,12 +114,12 @@ describe('fonts', () => {
 });
 ```
 
-- [ ] **Step 3: Run it and watch it fail**
+- [x] **Step 3: Run it and watch it fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test -t 'names every family'`
 Expected: FAIL — `fonts` is not exported.
 
-- [ ] **Step 4: Add the token**
+- [x] **Step 4: Add the token**
 
 `apps/mobile/src/theme/tokens.ts`, after `typography`:
 
@@ -138,7 +138,7 @@ export const fonts = {
 } as const;
 ```
 
-- [ ] **Step 5: Register them**
+- [x] **Step 5: Register them**
 
 `apps/mobile/src/data/openCorpusDb.ts`:
 
@@ -157,12 +157,12 @@ export function useCorpusFonts(): [boolean, Error | null] {
 The splash is already held until this resolves (`app/_layout.tsx`), so the
 serif can never flash in unstyled.
 
-- [ ] **Step 6: Run the gates**
+- [x] **Step 6: Run the gates**
 
 Run: `pnpm --filter @quran-corpus/mobile test && pnpm -r type-check && pnpm -r lint`
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add apps/mobile/assets/fonts apps/mobile/src/theme/tokens.ts \
@@ -190,7 +190,7 @@ The values below are read off the mockups, not invented: dark fill
 `radial-gradient(120% 66% at 18% -6%, rgba(31,111,91,.62), transparent)` over
 `#151412`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `apps/mobile/src/theme/tokens.test.ts`:
 
@@ -236,12 +236,12 @@ describe('glass surfaces', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test -t 'glass surfaces'`
 Expected: FAIL — no `glass`, `bloom`, or `composite` export.
 
-- [ ] **Step 3: Add the compositor**
+- [x] **Step 3: Add the compositor**
 
 `apps/mobile/src/testing/rgb.ts`:
 
@@ -268,7 +268,7 @@ export function composite(layer: string, backdrop: string): string {
 }
 ```
 
-- [ ] **Step 4: Add the tokens**
+- [x] **Step 4: Add the tokens**
 
 `apps/mobile/src/theme/tokens.ts`, after `themeColors`:
 
@@ -323,20 +323,20 @@ export const glass = {
 export const radii = { chip: 12, card: 20, pill: 28 } as const;
 ```
 
-- [ ] **Step 5: Run the test**
+- [x] **Step 5: Run the test**
 
 Run: `pnpm --filter @quran-corpus/mobile test -t 'glass surfaces'`
 Expected: PASS. If the light fill fails AA, raise its alpha — do **not** lower
 the threshold and do not change `themeColors`.
 
-- [ ] **Step 6: Mutation-check the gate (§4)**
+- [x] **Step 6: Mutation-check the gate (§4)**
 
 Drop the light fill to `rgba(255,253,248,0.10)` and re-run. Expected: the light
 body-text assertion FAILS. Restore by re-editing the value back to `0.72` — do
 **not** `git checkout` the file (`[[never-git-checkout-to-undo-a-mutation]]`).
 Then re-run and confirm green.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add apps/mobile/src/theme/tokens.ts apps/mobile/src/theme/tokens.test.ts \
@@ -358,7 +358,7 @@ git commit -m "feat(mobile): add glass and bloom tokens with an AA gate"
   positioned, `pointerEvents="none"`, fills its parent. Mounted once in
   `app/_layout.tsx` (Task 6).
 
-- [ ] **Step 1: Extend the react-native-svg mock**
+- [x] **Step 1: Extend the react-native-svg mock**
 
 `src/test/setup.ts` stubs only `Svg` and `Path` today, so `<Defs>` would render
 as `undefined`. Add the four elements the bloom needs:
@@ -382,7 +382,7 @@ vi.mock('react-native-svg', async () => {
 });
 ```
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 `apps/mobile/src/components/Bloom.test.tsx`:
 
@@ -425,12 +425,12 @@ describe('Bloom', () => {
 });
 ```
 
-- [ ] **Step 3: Run it and watch it fail**
+- [x] **Step 3: Run it and watch it fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test Bloom`
 Expected: FAIL — module not found.
 
-- [ ] **Step 4: Write the component**
+- [x] **Step 4: Write the component**
 
 ```tsx
 import { StyleSheet, View } from 'react-native';
@@ -477,17 +477,17 @@ export function Bloom() {
 }
 ```
 
-- [ ] **Step 5: Run the test**
+- [x] **Step 5: Run the test**
 
 Run: `pnpm --filter @quran-corpus/mobile test Bloom`
 Expected: PASS (both cases).
 
-- [ ] **Step 6: Mutation-check (§4)**
+- [x] **Step 6: Mutation-check (§4)**
 
 Replace `isDark ? bloom.dark : bloom.light` with `bloom.dark`. Expected: the
 light test FAILS. Restore by re-editing.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add apps/mobile/src/components/Bloom.tsx apps/mobile/src/components/Bloom.test.tsx \
@@ -521,7 +521,7 @@ export function GlassSurface(props: GlassSurfaceProps): JSX.Element;
 Every M6 sub-phase builds its cards, sheets and bars out of this. Nothing else
 may hand-roll the fill/border/highlight triple.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```tsx
 import React from 'react';
@@ -575,12 +575,12 @@ describe('GlassSurface', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test GlassSurface`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Write the component**
+- [x] **Step 3: Write the component**
 
 ```tsx
 import type { ReactNode } from 'react';
@@ -646,17 +646,17 @@ export function GlassSurface({ children, radius = 'card', style, testID }: Glass
 }
 ```
 
-- [ ] **Step 4: Run the test**
+- [x] **Step 4: Run the test**
 
 Run: `pnpm --filter @quran-corpus/mobile test GlassSurface`
 Expected: PASS (three cases).
 
-- [ ] **Step 5: Mutation-check (§4)**
+- [x] **Step 5: Mutation-check (§4)**
 
 Change `radii[radius]` to the literal `radii.card`. Expected: the pill test
 FAILS. Restore by re-editing.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/mobile/src/components/GlassSurface.tsx apps/mobile/src/components/GlassSurface.test.tsx
@@ -686,7 +686,7 @@ export function usePressScale(): {
 };
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 import { describe, expect, it, vi } from 'vitest';
@@ -708,12 +708,12 @@ describe('nextPressScale', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test usePressScale`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Write the hook**
+- [x] **Step 3: Write the hook**
 
 ```ts
 import { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
@@ -752,17 +752,17 @@ export function usePressScale() {
 }
 ```
 
-- [ ] **Step 4: Run the test**
+- [x] **Step 4: Run the test**
 
 Run: `pnpm --filter @quran-corpus/mobile test usePressScale`
 Expected: PASS.
 
-- [ ] **Step 5: Mutation-check (§4)**
+- [x] **Step 5: Mutation-check (§4)**
 
 Delete the `if (reduceMotion)` line. Expected: the reduced-motion test FAILS on
 both assertions. Restore by re-editing.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/mobile/src/motion/usePressScale.ts apps/mobile/src/motion/usePressScale.test.ts
@@ -788,7 +788,7 @@ git commit -m "feat(mobile): add the shared press-scale motion hook"
 The tab bar becomes a floating pill over the bloom (mockups `1a`, `1d`). Screen
 backgrounds go transparent so the single bloom shows through everywhere.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```tsx
 import React from 'react';
@@ -847,12 +847,12 @@ describe('GlassTabBar', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test GlassTabBar`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Write the tab bar**
+- [x] **Step 3: Write the tab bar**
 
 ```tsx
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
@@ -932,7 +932,7 @@ export function GlassTabBar({ state, navigation }: BottomTabBarProps) {
 }
 ```
 
-- [ ] **Step 4: Wire it into the navigators**
+- [x] **Step 4: Wire it into the navigators**
 
 `apps/mobile/app/(tabs)/_layout.tsx` — the whole `screenOptions` block collapses,
 because the bar draws itself and the bloom draws the background:
@@ -994,7 +994,7 @@ function AppStack() {
 
 Import `Bloom` and RN's `View` at the top of the file.
 
-- [ ] **Step 5: Fix the list padding**
+- [x] **Step 5: Fix the list padding**
 
 `useListBottomPadding` currently adds `insets.bottom`. The tab pill now floats
 `insets.bottom + 12` up and stands ~64pt tall, so every tab-hosted list needs
@@ -1014,18 +1014,18 @@ const TAB_PILL_CLEARANCE = 88;
 …and add it to the returned sum. Keep the existing comment; this one goes above
 the new constant.
 
-- [ ] **Step 6: Run everything**
+- [x] **Step 6: Run everything**
 
 Run: `pnpm --filter @quran-corpus/mobile test && pnpm -r type-check && pnpm -r lint`
 Expected: PASS. Route tests under `src/test/routes/` render these layouts —
 expect to update their assertions where they asserted the old header options.
 
-- [ ] **Step 7: Mutation-check (§4)**
+- [x] **Step 7: Mutation-check (§4)**
 
 In `GlassTabBar`, change `state.index === index` to `false`. Expected: the
 selected/accent test FAILS. Restore by re-editing.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add apps/mobile/app/_layout.tsx 'apps/mobile/app/(tabs)/_layout.tsx' \
@@ -1062,13 +1062,13 @@ below. Do not tick any device check yet.
 - Modify: `README.md` ("Current Status" and the device checklist)
 - Modify: `STATUS.md`
 
-- [ ] **Step 1: Renumber the PRD**
+- [x] **Step 1: Renumber the PRD**
 
 Apply umbrella §"PRD renumbering" exactly: insert **M6: Glass Redesign**, shift
 hardening → M7, treebank → M8, iOS → M9, and correct M1's audio line to Husary
 streamed per-ayah from the public source.
 
-- [ ] **Step 2: Mark the superseded device checks**
+- [x] **Step 2: Mark the superseded device checks**
 
 In `README.md`, against the M2 rosette carry-over, M3 Run 3 (F5, F6, 27) and M4
 Run 1 (28–33), write:
@@ -1078,7 +1078,7 @@ Run 1 (28–33), write:
 
 Do not delete the rows. The record of what was never verified is the point.
 
-- [ ] **Step 3: Add device checks 48–54**
+- [x] **Step 3: Add device checks 48–54**
 
 Append to `README.md`'s checklist:
 
@@ -1092,12 +1092,12 @@ Append to `README.md`'s checklist:
 | 53 | Newsreader renders | Headings are the serif, not the system face; no tofu, no mid-screen fallback |
 | 54 | Reduced motion on (system setting) | Press-scale does not fire; nothing else animates on tap |
 
-- [ ] **Step 4: Update STATUS.md**
+- [x] **Step 4: Update STATUS.md**
 
 One line: M6a implementation complete, device run pending. Keep it short —
 `[[ledger-prose-feeds-review-rounds]]`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add docs/PRD-android-first-mobile-app.md README.md STATUS.md
@@ -1117,6 +1117,30 @@ git commit -m "docs: renumber PRD milestones for M6 and open the M6a checklist"
   want it — §5 does not require one here.
 
 ## Verification Log
+
+Implementation complete at `c978b79` (Tasks 1-6) and `c1e242e` (Task 8);
+506 tests, type-check and lint green. Tasks 7 and 9 are the owner's: the EAS
+build and the device run.
+
+Two decisions taken during execution, both beyond what the plan specified:
+
+- **Task 2 rejected the mockup's dark glass fill.** `rgba(255,255,255,.075)`
+  over the .62 bloom composites to #1b4c3f, where mutedText is 3.83:1 and the
+  accent 3.35:1 -- both under AA, and a whiter fill makes it worse rather than
+  better. The dark card is filled with the night page colour at 45% instead:
+  it smokes over the bloom (accent 4.65:1) and is invisible on unbloomed
+  ground, so it never reads as a recess. The alternative was cutting the dark
+  bloom from .62 to .12, which also passes but removes the wash the design is
+  built around. Both are two-value flips; the tests hold either way.
+- **Task 6's `useListBottomPadding` replaces its `+ 24` rather than adding to
+  it.** inset + 24 + 88 would leave an eighth of the screen empty under the
+  last row of every stack screen.
+
+Three shared test shims grew, each once rather than per suite: `StyleSheet` in
+`rnHosts`, the SVG gradient elements in `setup.ts`, and a reanimated mock. The
+last one matters beyond M6a -- suites had been steering around reanimated by
+never rendering `BottomSheet`, and from here every pressable component reaches
+it.
 
 | Check | Build | Date | Result | Notes |
 | --- | --- | --- | --- | --- |
