@@ -367,6 +367,18 @@ describe('ConcordanceList', () => {
     expect(html).not.toContain('No occurrences');
   });
 
+  it('spins while the first page loads, with no rows yet to hold', async () => {
+    // The hold that keeps rows on screen across a filter change is armed on
+    // every reset, first mount included -- so on the first page of a root
+    // there is nothing to hold, and suppressing the spinner there leaves the
+    // screen blank: the empty state is suppressed too while loading.
+    loadPage.mockReturnValue(new Promise(() => {}));
+
+    render(<ConcordanceList total={60} loadPage={loadPage} header={<span />} />);
+
+    await waitFor(() => expect(screen.getByText('loading')).toBeTruthy());
+  });
+
   it('says a root with no occurrences is empty on the first frame', () => {
     const html = firstFrame(<ConcordanceList total={0} loadPage={loadPage} header={<span />} />);
 

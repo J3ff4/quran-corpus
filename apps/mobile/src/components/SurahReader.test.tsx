@@ -288,6 +288,29 @@ describe('SurahReader', () => {
     }
   });
 
+  it('hides the reader again when a second deep link arrives on the same surah', async () => {
+    // An `ayah` param change on a reader that is already mounted re-runs the
+    // landing without remounting. Left revealed, the second jump is seen as
+    // motion and every ayah it passes over is written to the saved reading
+    // position -- the pair of defects the landing loop exists to prevent.
+    vi.useFakeTimers();
+    try {
+      const { rerender } = render(
+        <SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />,
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
+      expect(screen.queryByTestId('reader-positioning')).toBeNull();
+
+      rerender(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={286} />);
+
+      expect(screen.queryByTestId('reader-positioning')).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('re-scrolls while the cards above the target are still growing', async () => {
     // The defect this covers: FlatList reports no failure as soon as the target
     // row is measured, but the offset it jumped to was summed over cards above

@@ -392,9 +392,16 @@ export function ConcordanceList({
       // total). Without this the list just stops growing, which is
       // indistinguishable from having reached the end (m-5, second half).
       ListFooterComponent={
-        // Not while replacing: the rows above are already on screen, and a
+        // Not while replacing held rows: they are already on screen, and a
         // spinner appearing under them shifts the content for no information.
-        loading && !replacing ? <ActivityIndicator /> : failed && entries.length > 0 ? status : null
+        // The `entries.length` half is load-bearing -- `replacing` is set on
+        // every reset, first mount included, and without it a first page with
+        // no rows to hold renders neither the spinner nor the empty state.
+        loading && !(replacing && entries.length > 0) ? (
+          <ActivityIndicator />
+        ) : failed && entries.length > 0 ? (
+          status
+        ) : null
       }
       ListEmptyComponent={loading ? null : status}
       renderItem={renderItem}

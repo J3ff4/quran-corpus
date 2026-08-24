@@ -306,6 +306,14 @@ export function SurahReader({
       return;
     }
 
+    // Reset, not left from the previous landing: an `ayah` param change on an
+    // already-mounted reader (an external deep link into the surah on screen)
+    // re-runs this effect without remounting, and a stale `true` reveals the
+    // list mid-scroll and lets onViewableItemsChanged write every ayah the
+    // jump passes over into the saved reading position.
+    positionedRef.current = false;
+    setPositioned(false);
+
     let cancelled = false;
     attemptsRef.current = 0;
     // -1, not the live height: a re-run must scroll at least twice before it
