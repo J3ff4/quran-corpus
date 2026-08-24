@@ -1,58 +1,29 @@
 import { Tabs } from 'expo-router';
-import { Icon } from '@/components/icons/Icon';
-import { t } from '@/i18n/uiStrings';
-import { useAppSettings } from '@/settings/settingsStore';
-import { useThemeColors } from '@/theme/themeContext';
+import { GlassTabBar } from '@/components/GlassTabBar';
 
 export default function TabsLayout() {
-  const { uiLocale } = useAppSettings();
-  const theme = useThemeColors();
-
   return (
     <Tabs
+      tabBar={(props) => <GlassTabBar {...props} />}
       screenOptions={{
-        headerStyle: { backgroundColor: theme.background },
-        headerTintColor: theme.text,
-        tabBarActiveTintColor: theme.accent,
-        tabBarInactiveTintColor: theme.mutedText,
-        tabBarStyle: { backgroundColor: theme.background, borderTopColor: theme.border },
+        // Each tab screen draws its own heading from M6b onward; a native
+        // header above the bloom would be an opaque strip across the top of the
+        // one gradient the design is built around.
+        headerShown: false,
+        // The bloom in app/_layout.tsx is the background for every screen. An
+        // opaque scene covers it and leaves the tab pill floating over a flat
+        // rectangle.
+        sceneStyle: { backgroundColor: 'transparent' },
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: t(uiLocale, 'tabs.home'),
-          tabBarIcon: ({ color, size }) => <Icon name="home" color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="surahs"
-        options={{
-          title: t(uiLocale, 'tabs.surahs'),
-          tabBarIcon: ({ color, size }) => <Icon name="book" color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="morphology"
-        options={{
-          title: t(uiLocale, 'tabs.morphology'),
-          tabBarIcon: ({ color, size }) => <Icon name="words" color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="dictionary"
-        options={{
-          title: t(uiLocale, 'tabs.dictionary'),
-          tabBarIcon: ({ color, size }) => <Icon name="dictionary" color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="menu"
-        options={{
-          title: t(uiLocale, 'tabs.menu'),
-          tabBarIcon: ({ color, size }) => <Icon name="menu" color={color} size={size} />,
-        }}
-      />
+      {/* Titles and icons live in GlassTabBar's own TABS map -- one place, not
+          two. The screens are still listed so the navigator's route order is
+          declared here rather than inferred from the filesystem. */}
+      <Tabs.Screen name="index" />
+      <Tabs.Screen name="surahs" />
+      <Tabs.Screen name="morphology" />
+      <Tabs.Screen name="dictionary" />
+      <Tabs.Screen name="menu" />
     </Tabs>
   );
 }

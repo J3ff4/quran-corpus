@@ -13,6 +13,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
  *  invisible, under-padding it is the defect this fixes, and one rule beats a
  *  per-screen judgement about which navigator is hosting a shared component
  *  (WbwScreen renders under both). */
+/** Clearance for the floating tab pill (M6a).
+ *
+ *  The pill stands about 60pt tall (6pt padding each side of a 22pt icon, a 2pt
+ *  gap and an 11pt label) and floats 12pt above the safe-area inset, so a list
+ *  that cleared only the inset now ends underneath it. 88 is that plus the same
+ *  breathing room the old `+ 24` gave.
+ *
+ *  Replaces the 24 rather than stacking on it: inset + 24 + 88 would leave an
+ *  eighth of the screen empty under the last row on every stack screen. */
+const TAB_PILL_CLEARANCE = 88;
+
 export function useListBottomPadding(): number {
-  return useSafeAreaInsets().bottom + 24;
+  return useSafeAreaInsets().bottom + TAB_PILL_CLEARANCE;
 }
