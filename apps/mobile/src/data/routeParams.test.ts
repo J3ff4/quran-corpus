@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseLemmaParam, parseLetterParam, parseRootParam } from './routeParams';
+import { parseFrequencySourceParam, parseLemmaParam, parseRootParam } from './routeParams';
 
 describe('parseLemmaParam / parseRootParam', () => {
   it('accepts the decoded identifier expo-router hands a route', () => {
@@ -29,22 +29,17 @@ describe('parseLemmaParam / parseRootParam', () => {
   });
 });
 
-describe('parseLetterParam', () => {
-  it('accepts a letter the alphabet carries', () => {
-    expect(parseLetterParam('ب')).toBe('ب');
+describe('parseFrequencySourceParam', () => {
+  it('accepts exactly the two rankings', () => {
+    expect(parseFrequencySourceParam('lemmas')).toBe('lemmas');
+    expect(parseFrequencySourceParam('verbs')).toBe('verbs');
   });
 
-  it('rejects a letter it does not', () => {
-    // rootFirstLetter folds hamza seats into ا, so أ is never a bucket of its
-    // own and a screen for it could never have rows.
-    expect(parseLetterParam('أ')).toBeNull();
-  });
-
-  it('rejects arbitrary text', () => {
-    expect(parseLetterParam('../../etc')).toBeNull();
-  });
-
-  it('takes the first of a repeated param', () => {
-    expect(parseLetterParam(['ب', 'ت'])).toBe('ب');
+  it('rejects everything else, including the shapes useLocalSearchParams returns', () => {
+    // The array case differs from parseParam's first-of-array rule on purpose:
+    // two ?from values in one link is a malformed link, not a preference.
+    for (const value of ['roots', 'LEMMAS', '', 'lemmas;--', undefined, ['verbs', 'lemmas']]) {
+      expect(parseFrequencySourceParam(value as string | string[] | undefined)).toBeNull();
+    }
   });
 });

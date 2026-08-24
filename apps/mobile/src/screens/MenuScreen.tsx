@@ -4,6 +4,7 @@ import { t, type UiStringKey } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
 import { touchTargets } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
+import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
 const ROWS: { href: string; label: UiStringKey }[] = [
   { href: '/bookmarks', label: 'menu.bookmarks' },
@@ -16,9 +17,13 @@ const ROWS: { href: string; label: UiStringKey }[] = [
 export function MenuScreen() {
   const { uiLocale } = useAppSettings();
   const theme = useThemeColors();
+  const paddingBottom = useListBottomPadding();
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: theme.background }}>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: theme.background }}
+      contentContainerStyle={{ paddingBottom }}
+    >
       <View style={{ padding: 20 }}>
         {ROWS.map((row) => (
           <Link

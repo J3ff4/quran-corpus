@@ -15,9 +15,9 @@
  */
 
 import {
-  ARABIC_ALPHABET_ORDER,
   isLemmaBuckwalter,
   isRootBuckwalter,
+  type LemmaFrequencyKind,
 } from '@quran-corpus/data/mobile';
 
 /** Shared shape: first-of-array, reject empty, then the caller's predicate. */
@@ -53,12 +53,18 @@ export function parseLemmaParam(value: string | string[] | undefined): string | 
   return parseParam(value, isLemmaBuckwalter);
 }
 
-/** A hijāʾī bucket off a deep link. Membership, not a charset test:
- *  `rootFirstLetter` folds أ إ آ ٱ to ا and ى to ي, so those are never buckets
- *  and a screen for one could never have rows. The list is imported rather
- *  than restated so this cannot drift from the folding that produces it. */
-export function parseLetterParam(value: string | string[] | undefined): string | null {
-  return parseParam(value, (raw) => ARABIC_ALPHABET_ORDER.includes(raw));
+/** Which frequency ranking the lemma screen's Previous/Next walks, off the
+ *  `?from` query param.
+ *
+ *  Not built on `parseParam`: that takes the first element of an array, which
+ *  is the right rule for a path segment and the wrong one here -- two `?from`
+ *  values in one link is a malformed link, not a preference. Anything that is
+ *  not one of the two literals returns null, which the screen renders as both
+ *  arrows dimmed. */
+export function parseFrequencySourceParam(
+  value: string | string[] | undefined,
+): LemmaFrequencyKind | null {
+  return value === 'lemmas' || value === 'verbs' ? value : null;
 }
 
 /** Shared shape: a 1-based corpus coordinate with an upper bound.

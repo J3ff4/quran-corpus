@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   Pressable,
   Text,
@@ -30,6 +31,7 @@ import { Icon } from './icons/Icon';
 import { useReducedMotion } from '@/motion/useReducedMotion';
 import { touchTargets } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
+import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
 interface SurahReaderProps {
   data: SurahReaderData;
@@ -53,13 +55,34 @@ interface SurahReaderProps {
   onReadingAyah?: (ayahNumber: number) => void;
 }
 
-// Cards are variable height (Arabic runs wrap differently per ayah), so there
-// is no getItemLayout to give FlatList and scrollToIndex fails for any row it
-// has not measured yet. The documented recovery is to jump to an estimated
-// offset, let the list render there, and retry. Capped so a persistently
-// failing scroll settles instead of looping.
-const MAX_SCROLL_RETRIES = 5;
-const SCROLL_RETRY_DELAY_MS = 120;
+// Ayah cards are variable height (Arabic runs wrap differently per ayah), so
+// there is no getItemLayout to give FlatList and scrollToIndex fails for any
+// row it has not measured yet. Two halves make a deep-link landing exact
+// instead of approximate: initialNumToRender is widened to cover the target,
+// so the row is rendered and therefore measurable on the first commit; and the
+// list stays hidden until the scroll lands, so no attempt is ever seen as
+// motion.
+//
+// The recovery this replaces jumped to averageItemLength * index -- an average
+// taken over the short cards near the top, so it landed short, retried from
+// there and kept wherever the fifth try left it. On the owner's device
+// (2026-08-23) 16:90 landed on 16:49, and every jump on the way fired
+// onViewableItemsChanged, writing an ayah the reader never saw into the saved
+// reading position.
+//
+// "FlatList reported no failure" is not the same as "the row is at the top".
+// scrollToIndex computes its offset from the row heights measured so far, so a
+// card above the target that has rendered but not finished laying out measures
+// short, the jump lands short, and the target slides further down as those
+// cards settle. So every attempt re-scrolls, and only a scroll that both missed
+// nothing and left the content height unchanged counts as the landing. (Owner
+// device, 2026-08-23: 6:87 opened from a concordance row two cards below the
+// top, and the same from search and bookmarks.)
+const MAX_SCROLL_ATTEMPTS = 25;
+const SCROLL_RETRY_DELAY_MS = 100;
+// React Native's own default. Restated because the deep-link case overrides it
+// and a bare 10 in the JSX reads as a number someone chose.
+const DEFAULT_INITIAL_RENDER = 10;
 
 // Ayahs fetched ahead of the one scrolling into view. The whole-surah fetch is
 // deliberately not restored -- corpusRepository.ts records why (6,116 word rows
@@ -96,10 +119,26 @@ export function SurahReader({
   onReadingAyah,
 }: SurahReaderProps) {
   const theme = useThemeColors();
+  const paddingBottom = useListBottomPadding();
   const navigation = useNavigation();
   const listRef = useRef<FlatList<SurahReaderData['ayahs'][number]>>(null);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const retriesRef = useRef(0);
+  const attemptsRef = useRef(0);
+  // Set by onScrollToIndexFailed, read by the attempt loop below. A ref, not
+  // state: FlatList reports the failure synchronously during a scroll and a
+  // re-render per attempt would remount nothing useful.
+  const failedRef = useRef(false);
+  // The list's content height, and the height the previous attempt scrolled
+  // over. Equal means nothing above the target grew in that window, which is
+  // the only evidence available here that the offset the scroll used is the
+  // offset the row actually sits at.
+  const contentHeightRef = useRef(0);
+  const settledHeightRef = useRef(-1);
+  // The same value as `positioned` below. onViewableItemsChanged is called by
+  // FlatList from outside the React tree off a ref that never re-reads props,
+  // so it cannot see the state.
+  const positionedRef = useRef(false);
+  const [positioned, setPositioned] = useState(false);
 
   const [languageOpen, setLanguageOpen] = useState(false);
 
@@ -258,32 +297,72 @@ export function SurahReader({
     return data.ayahs.findIndex((item) => item.ayah.ayah_number === initialAyahNumber);
   }, [data.ayahs, initialAyahNumber]);
 
-  // Index 0 needs no scroll, and -1 means the ayah is not in this surah.
   useEffect(() => {
-    if (initialIndex <= 0) return;
-    retriesRef.current = 0;
-    listRef.current?.scrollToIndex({ index: initialIndex, animated: false });
-  }, [initialIndex]);
+    // -1 means the ayah is not in this surah; 0 means the list already opens
+    // on it. Neither is a landing, and both must reveal the reader at once.
+    if (initialIndex <= 0) {
+      positionedRef.current = true;
+      setPositioned(true);
+      return;
+    }
 
-  useEffect(() => {
+    // Reset, not left from the previous landing: an `ayah` param change on an
+    // already-mounted reader (an external deep link into the surah on screen)
+    // re-runs this effect without remounting, and a stale `true` reveals the
+    // list mid-scroll and lets onViewableItemsChanged write every ayah the
+    // jump passes over into the saved reading position.
+    positionedRef.current = false;
+    setPositioned(false);
+
+    let cancelled = false;
+    attemptsRef.current = 0;
+    // -1, not the live height: a re-run must scroll at least twice before it
+    // can call anything settled, or the first tick reveals on a comparison
+    // against a height nothing has scrolled over yet.
+    settledHeightRef.current = -1;
+
+    const reveal = () => {
+      if (cancelled) return;
+      positionedRef.current = true;
+      setPositioned(true);
+    };
+
+    const attempt = () => {
+      if (cancelled) return;
+      failedRef.current = false;
+      attemptsRef.current += 1;
+      listRef.current?.scrollToIndex({ index: initialIndex, animated: false });
+      retryTimerRef.current = setTimeout(() => {
+        if (cancelled) return;
+        // Both halves: no miss, and no growth under the jump.
+        const landed = !failedRef.current && contentHeightRef.current === settledHeightRef.current;
+        settledHeightRef.current = contentHeightRef.current;
+        if (landed) return reveal();
+        // Capped: a row that never measures has to settle. Showing the reader
+        // in the wrong place is bad; leaving it behind a spinner for as long
+        // as the screen is open is worse.
+        if (attemptsRef.current >= MAX_SCROLL_ATTEMPTS) return reveal();
+        attempt();
+      }, SCROLL_RETRY_DELAY_MS);
+    };
+
+    attempt();
     return () => {
+      cancelled = true;
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
     };
-  }, []);
+  }, [initialIndex]);
 
-  const onScrollToIndexFailed = useCallback(
-    ({ index, averageItemLength }: { index: number; averageItemLength: number }) => {
-      if (retriesRef.current >= MAX_SCROLL_RETRIES) return;
-      retriesRef.current += 1;
-      listRef.current?.scrollToOffset({ offset: averageItemLength * index, animated: false });
-      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
-      retryTimerRef.current = setTimeout(() => {
-        retryTimerRef.current = null;
-        listRef.current?.scrollToIndex({ index, animated: false });
-      }, SCROLL_RETRY_DELAY_MS);
-    },
-    [],
-  );
+  // Records the miss and nothing else -- see the note above MAX_SCROLL_ATTEMPTS
+  // for what the offset estimate that used to live here cost.
+  const onScrollToIndexFailed = useCallback(() => {
+    failedRef.current = true;
+  }, []);
+  // Read by the landing loop above, one tick later -- not state: it changes on
+  // every layout pass while the surah settles and none of them is a render.
+  const onContentSizeChange = useCallback((_width: number, height: number) => {
+    contentHeightRef.current = height;
+  }, []);
   const onReadingAyahRef = useRef(onReadingAyah);
   const loadWordsRef = useRef(loadWords);
   const ayahsRef = useRef(data.ayahs);
@@ -333,9 +412,16 @@ export function SurahReader({
 
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     const firstVisibleAyah = viewableItems[0]?.item as ReaderAyah | undefined;
-    if (firstVisibleAyah) onReadingAyahRef.current?.(firstVisibleAyah.ayah.ayah_number);
+    // Not until the deep-link scroll has landed: the rows visible mid-landing
+    // are wherever the list happens to be, and recording one overwrites the
+    // saved reading position with an ayah nobody read.
+    if (positionedRef.current && firstVisibleAyah) {
+      onReadingAyahRef.current?.(firstVisibleAyah.ayah.ayah_number);
+    }
     for (const token of viewableItems) {
       const item = token.item as ReaderAyah | undefined;
+      // Prefetching is not gated: it is a read, it is idempotent, and the rows
+      // around the target are exactly the ones about to be needed.
       if (item) void fetchWordsRef.current(item.ayah.id);
     }
   });
@@ -419,6 +505,7 @@ export function SurahReader({
         )}
         onViewableItemsChanged={onViewableItemsChanged.current}
         onScrollToIndexFailed={onScrollToIndexFailed}
+        onContentSizeChange={onContentSizeChange}
         onScroll={onScroll}
         scrollEventThrottle={16}
         // BottomSheet -- the shell under both WordSheet and LanguageSheet --
@@ -428,9 +515,30 @@ export function SurahReader({
         // modal is only visually modal (CLAUDE.md §8, WCAG AA). The nav header
         // is a native toolbar outside this View and is still reachable.
         importantForAccessibility={openWord || languageOpen ? 'no-hide-descendants' : 'auto'}
-        style={{ flex: 1, backgroundColor: theme.background }}
-        contentContainerStyle={{ paddingBottom: 24 }}
+        initialNumToRender={initialIndex > 0 ? initialIndex + 1 : DEFAULT_INITIAL_RENDER}
+        style={{ flex: 1, backgroundColor: theme.background, opacity: positioned ? 1 : 0 }}
+        contentContainerStyle={{ paddingBottom }}
       />
+      {/* Over the list rather than instead of it: the list has to be mounted
+          and laid out for the scroll to have anything to land on. Opacity, not
+          a conditional render, for the same reason. */}
+      {positioned ? null : (
+        <View
+          testID="reader-positioning"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: theme.background,
+          }}
+        >
+          <ActivityIndicator />
+        </View>
+      )}
       <WordSheet
         summary={openWord}
         uiLocale={uiLocale}

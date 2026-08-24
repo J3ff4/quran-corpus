@@ -121,11 +121,17 @@ and every check below will fail for the wrong reason.
 
 ## M4 Dictionary + Search Smoke Test
 
-Run on a physical Android device, on a `preview` profile APK built at `9a47500`
-or later — an older build has no `app/lemma/[lemma].tsx`, so check 35's Lemmas
-and Verbs rows route nowhere. Confirm the EAS upload is ~43 MB — a ~5 MB upload
-means `.easignore` dropped the bundled DB and every check below fails for the
-wrong reason. Run these alongside M3's outstanding checks (F5, F6, check 27 and
+Run on a physical Android device, on a `preview` profile APK built at `fb64236`
+or later. Older builds fail these for the wrong reasons: before `8e23d80` there
+is no Dictionary → Browse search box at all (check 34), and before `7d5f7b3`
+there is no clear button and no lemma paging (checks 34 and 42), and typing in
+Browse leaves the alphabet grid covering the results, so nothing is visible
+until the keyboard is dismissed (check 34); before `fb64236` the last row of
+every list sits under the gesture bar (check 44), a concordance tap lands on
+the wrong ayah in the second half of a long surah (check 45), and Previous/Next
+stacks a screen per tap (check 47). Confirm the EAS upload is ~36–43 MB
+— a ~5 MB upload means `.easignore` dropped the bundled DB and every check
+below fails for the wrong reason. Run these alongside M3's outstanding checks (F5, F6, check 27 and
 the M2 rosette carry-over).
 
 28. Tab bar reads Home · Read · Morphology · Dictionary · Menu. Menu opens
@@ -140,19 +146,76 @@ the M2 rosette carry-over).
     box glyph or stray control character is visible.
 33. Search nonsense. "Nothing found" — not a spinner that never stops, and not
     "Unable to search", which means FTS5 is missing from the build.
-34. Dictionary → Browse. Tap ق. The list shows that letter's roots; tap one and
-    the root screen opens.
-35. Dictionary → Frequent. Roots, Lemmas and Verbs each load a different list.
-    Tap a verb row: it opens a lemma screen, not a dead end.
-36. Root screen for a common root (قول). Scroll: occurrences keep loading, the
-    same verse never appears twice, and the header scrolls with the list rather
-    than fighting it. The matched word in each snippet must be **bold in the
-    Hafs face** — same glyph shapes as the words around it, only heavier. If it
-    turns into system sans, Android is not synthesising a weight for a
-    single-variant family and the non-colour signal has to become a size bump.
-37. Airplane mode: repeat 29, 31, 34 and 36. All of it is local.
-38. Repeat 29 and 36 in dark mode and at maximum system font size. Nothing
-    clips and the snippet highlight is still legible.
+34. Dictionary → Browse. The full root list is there with no letter tap. Type
+    `ارض` — the stored `أرض` comes back (hamza seats fold). Type `to say` — the
+    meaning search finds قول. Tap ق: the list narrows and the ق cell is visibly
+    marked; tap it again and the list is whole. **Keep typing after the first
+    letter** — if the keyboard closes or the caret jumps, the search box has
+    ended up inside the list header. Typing also **hides the alphabet grid**, so
+    the first result is visible without dismissing the keyboard, and an ✕
+    appears inside the box — tap it and the whole list is back. Tap ق first,
+    *then* type `to say`: قول comes back even though it is not under ق, and
+    clearing the box puts you back in ق.
+35. Dictionary → Most used. Roots, Lemmas and Verbs each load a different ranked
+    list, numbered from 1, under a #/Form/Count header. Scroll past row 200 —
+    the list keeps going. Tap a verb row: it opens a lemma screen, not a dead
+    end. Then tap Next: you move down the **verb** ranking, not the lemma one.
+    The tab above these lists reads **Most used**, not "Frequent".
+36. Root screen for قول. The header is centred: three letter pills, "1722
+    occurrences", Previous/Next. Tap Next twice, then Previous twice — you land
+    back on قول. On the first and last root of the alphabet the arrow is dimmed
+    and does nothing rather than disappearing.
+37. Airplane mode: repeat 29, 31, 34, 36, 39, 40 and 41. All of it is local — the
+    paged concordance loading that used to be check 36's own concern now lives
+    in the occurrence rows those two exercise.
+38. Repeat 29, 39 and 40 in dark mode and at maximum system font size. Nothing
+    clips and the form chip and occurrence pill colours are still legible —
+    check 36 no longer carries a snippet highlight of its own to repeat.
+39. Same screen: the derived-form chips wrap over several lines and do not
+    stretch across the row. Tap one — the chip fills with its own colour, the
+    heading recounts (`Concordance (N)` matches the rows below) and the rows
+    fade while the new ones load — **the screen does not jump to the top**.
+    Scroll a few rows down before tapping a chip: you stay where you were. Tap
+    it again for the whole list back. Then tap Next:
+    the new root opens with **no chip selected**.
+40. Any occurrence row: it reads `2:3:6` (three parts), carries the form's
+    transliteration in a coloured pill, the word's transliteration and its
+    translation. Tap **Show full verse** — the whole ayah appears and the button
+    reads Show less; the row itself still opens the reader. With TalkBack on,
+    the toggle is reachable as its own control.
+41. Lemma screen for قَالَ: transliteration, a single sense chip (Verb) carrying
+    **no** count — with one sense the count would only repeat the occurrence
+    line above it — TRANSLATED AS with a ⓘ that opens a sheet, and the root
+    definition in a card with its credit. For the counted case open مَا from
+    Most used → Lemmas: six sense chips, each with its own count. Back on
+    قَالَ, a long Lane definition is clamped to six lines with **Show more**;
+    tapping it reveals the rest and the button becomes Show less. Repeat in dark
+    mode at maximum system font size — nothing clips.
+42. Lemma screen reached from Most used → Lemmas: Previous/Next page down the
+    ranking, and the arrows are dimmed and inert at rank 1. Open the same lemma
+    from a link inside another screen (View root, then back) — with no ranking
+    to page through, both arrows are dimmed rather than missing.
+43. Repeat 34 and 42 in dark mode at maximum system font size, and once in
+    airplane mode. Nothing clips, the ✕ stays inside the search box, and the
+    paging still works — all of it is local.
+44. Open a root with a long concordance and scroll to the last row: there is
+    clear space under it, above the gesture bar. Same at the end of Dictionary
+    → Browse, Search results, the word-by-word screen, About and a word-detail
+    screen. Repeat with 3-button navigation turned on — the space shrinks but
+    never becomes an overlap, and no list ends with an absurd gap.
+45. Root قول → any occurrence in the second half of a long surah (16:90:6 and
+    21:73:11 are the two that failed): the reader opens **on that ayah**, with
+    no scrolling seen on the way and no intermediate ayah flashing past. Check
+    2:38:6 and 2:85:16 the same way. Then go Home: the continue-reading card
+    names the ayah you actually read, not one the landing passed over.
+46. Root ملء (one occurrence, five forms) → tap Form VIII: the rows do not dim,
+    no spinner appears under them, and nothing on screen moves except the rows
+    swapping. Tap it again for the whole list back. Repeat on قول scrolled a few
+    rows down — still no dim, still no jump.
+47. Dictionary → any root → Next five times → press back **once**: you are in
+    Dictionary, not four roots back. Same from Most used → Lemmas with the lemma
+    arrows. Each new root opens at the top of its own concordance, not at the
+    scroll offset of the one before it.
 
 ## Current Status
 
@@ -175,5 +238,8 @@ dictionary browse by hijāʾī letter, frequency lists for roots/lemmas/verbs, a
 paged concordances on the root and lemma screens. **None of it has run on a
 device.** One build clears both: checks 1-27 (F5, F6 and check 27 outstanding)
 plus the M2 rosette carry-over go in the Verification Log of
-`docs/plans/phase-m3-morphology-mvp.md`, and checks 28-38 go in that of
-`docs/plans/phase-m4-dictionary-search.md`.
+`docs/plans/phase-m3-morphology-mvp.md`, and checks 28-33 go in that of
+`docs/plans/phase-m4-dictionary-search.md`. Checks 34-41 were rewritten by M5
+and go in the Verification Log of `docs/plans/phase-m5-dictionary-parity.md` —
+the M4 plan's log still describes the versions of 34-38 that only checked a
+screen opened.

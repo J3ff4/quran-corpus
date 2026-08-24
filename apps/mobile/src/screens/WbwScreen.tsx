@@ -12,6 +12,7 @@ import { useWordSummaryLoader } from '@/data/useWordSummaryLoader';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
 import { useThemeColors } from '@/theme/themeContext';
+import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
 interface OpenWord {
   summary: WordSummary;
@@ -29,6 +30,7 @@ export interface WbwScreenProps {
 export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
   const { contentLanguage, uiLocale } = useAppSettings();
   const theme = useThemeColors();
+  const paddingBottom = useListBottomPadding();
   const navigation = useNavigation();
 
   // Keyed on the raw params, and reset during render when they change.
@@ -178,7 +180,7 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
             />
           )}
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingBottom: 24 }}
+          contentContainerStyle={{ paddingBottom }}
         />
       </View>
       <WordSheet

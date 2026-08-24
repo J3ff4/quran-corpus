@@ -49,15 +49,43 @@ export type UiStringKey =
   // No 'root.title': the sheet's 'word.root' is already the word "Root" in all
   // three locales, and a second key for the same string is a second place for
   // a translation to drift.
-  | 'root.forms'
-  | 'root.definitions'
   | 'root.noDefinition'
   | 'root.notFound'
+  | 'root.previous'
+  | 'root.next'
+  // Accessible name for the Previous/Next row: two sibling buttons with
+  // nothing on their own to say they navigate the hijāʾī root list.
+  | 'root.adjacent'
+  // Accessible name for the derived-form filter toolbar above the
+  // concordance heading. Same toolbar-not-radiogroup reasoning as the
+  // Frequent pane's kind chips: the chips multi-select.
+  | 'root.formsFilter'
+  // Root screen's concordance heading, read as "Concordance (1722)". t() has
+  // no interpolation, so the count is concatenated at the call site.
+  | 'concordance.heading'
   | 'lemma.notFound'
   // Caption above a lemma's top glosses: contextual word-by-word
   // translations, not a definition -- see LemmaScreen and text/gloss.ts.
   // No 'lemma.root': 'word.root' is already "Root" in all three locales.
   | 'lemma.translatedAs'
+  // Accessible name + sheet heading for the info button beside
+  // 'lemma.translatedAs'.
+  | 'lemma.aboutTranslations'
+  // The info sheet's one paragraph: glosses are word-by-word translations,
+  // not dictionary definitions.
+  | 'lemma.translationsNote'
+  // Caption above the lemma's root-definition card: a lemma links to one root
+  // and shows that root's own DefinitionCard.
+  | 'lemma.rootDefinition'
+  // The lemma screen's root link, relabelled from 'word.root' ("Root"): the
+  // link now sits below a DefinitionCard/lemma-no-definition line, and a bare
+  // "Root" there reads as a repeat of the caption above it.
+  | 'lemma.viewRoot'
+  | 'lemma.adjacent'
+  // Accessible name for the info sheet's backdrop/dismiss control.
+  | 'lemma.close'
+  | 'lemma.previous'
+  | 'lemma.next'
   | 'surahList.ayahsSuffix'
   | 'surahList.loadFailed'
   | 'settings.language'
@@ -95,13 +123,20 @@ export type UiStringKey =
   | 'search.loadFailed'
   | 'dictionary.browse'
   | 'dictionary.frequent'
-  | 'dictionary.noRoots'
   // Accessible name for the hijāʾī grid: 29 sibling buttons whose own labels
   // are bare letters.
   | 'dictionary.alphabet'
-  // Caption above the letter screen's Arabic hero, read as "Letter — ب".
-  | 'dictionary.letterCaption'
   | 'dictionary.loadFailed'
+  // Browse's search box.
+  | 'dictionary.searchPlaceholder'
+  | 'dictionary.searchLabel'
+  | 'dictionary.clearSearch'
+  // Sort toggle: alphabetical vs. by frequency.
+  | 'dictionary.sortAlpha'
+  | 'dictionary.sortFreq'
+  // Accessible name for the sort toggle's toolbar.
+  | 'dictionary.sortFilter'
+  | 'dictionary.noRootsFound'
   // Frequent-pane chips. Not reusing 'dictionary.loadFailed' for the failure:
   // it reads "Unable to load roots", which is wrong on Lemmas and Verbs.
   | 'dictionary.kindRoots'
@@ -114,11 +149,20 @@ export type UiStringKey =
   // Trails the count in a frequency row's accessible name, read as
   // "1722 occurrences". t() has no interpolation, so it is a bare word.
   | 'dictionary.occurrences'
+  // Column labels above the Frequent list. Without them the trailing number is
+  // a bare integer beside an Arabic word, which reads as anything from a verse
+  // number to a page reference.
+  | 'dictionary.columnRank'
+  | 'dictionary.columnForm'
+  | 'dictionary.columnCount'
   | 'concordance.empty'
   // A failed page must not read as "no occurrences" -- same finding as m-5.
-  | 'concordance.loadFailed';
+  | 'concordance.loadFailed'
+  | 'concordance.showFullVerse'
+  | 'text.showMore'
+  | 'text.showLess';
 
-const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
+export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
   en: {
     'tabs.home': 'Home',
     'tabs.surahs': 'Surahs',
@@ -162,12 +206,22 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'word.grammar': 'Grammar',
     'word.notFound': 'That word is not in the corpus',
     'word.transliteration': 'Transliteration',
-    'root.forms': 'Forms',
-    'root.definitions': 'Definitions',
     'root.noDefinition': 'No definition for this root yet',
     'root.notFound': 'That root is not in the corpus',
+    'root.previous': 'Previous',
+    'root.next': 'Next',
+    'root.adjacent': 'Adjacent roots',
+    'root.formsFilter': 'Filter by form',
     'lemma.notFound': 'This lemma is not in the corpus',
     'lemma.translatedAs': 'Translated as',
+    'lemma.aboutTranslations': 'About these translations',
+    'lemma.translationsNote': 'From word-by-word translations, ordered by frequency — not dictionary definitions.',
+    'lemma.rootDefinition': 'Definition of root',
+    'lemma.viewRoot': 'View root',
+    'lemma.adjacent': 'Adjacent lemmas',
+    'lemma.close': 'Close',
+    'lemma.previous': 'Previous',
+    'lemma.next': 'Next',
     'surahList.ayahsSuffix': 'ayahs',
     'surahList.loadFailed': 'Unable to load surahs',
     'settings.language': 'Language',
@@ -204,19 +258,34 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'search.noResults': 'Nothing found',
     'search.loadFailed': 'Unable to search',
     'dictionary.browse': 'Browse',
-    'dictionary.frequent': 'Frequent',
-    'dictionary.noRoots': 'No roots under this letter',
+    // The key predates the label. It stayed 'frequent' because the testID
+    // and every call site are named after it; the *label* changed because
+    // "Frequent" read as a sort order next to Browse's own "By frequency" chip.
+    'dictionary.frequent': 'Most used',
     'dictionary.alphabet': 'Arabic alphabet',
-    'dictionary.letterCaption': 'Letter',
     'dictionary.loadFailed': 'Unable to load roots',
+    'dictionary.searchPlaceholder': 'Search roots or meaning…',
+    'dictionary.searchLabel': 'Search roots or meaning',
+    'dictionary.clearSearch': 'Clear search',
+    'dictionary.sortAlpha': 'Alphabetical',
+    'dictionary.sortFreq': 'By frequency',
+    'dictionary.sortFilter': 'Sort order',
+    'dictionary.noRootsFound': 'No roots found',
     'dictionary.kindRoots': 'Roots',
     'dictionary.kindLemmas': 'Lemmas',
     'dictionary.kindVerbs': 'Verbs',
     'dictionary.frequentFailed': 'Unable to load the list',
     'dictionary.kindFilter': 'Filter by kind',
     'dictionary.occurrences': 'occurrences',
+    'dictionary.columnRank': '#',
+    'dictionary.columnForm': 'Form',
+    'dictionary.columnCount': 'Count',
+    'concordance.heading': 'Concordance',
     'concordance.empty': 'No occurrences',
     'concordance.loadFailed': 'Unable to load occurrences',
+    'concordance.showFullVerse': 'Show full verse',
+    'text.showMore': 'Show more',
+    'text.showLess': 'Show less',
   },
   uz: {
     'tabs.home': 'Bosh sahifa',
@@ -261,12 +330,22 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'word.grammar': 'Grammatika',
     'word.notFound': 'Bu so‘z korpusda yo‘q',
     'word.transliteration': 'Transliteratsiya',
-    'root.forms': 'Shakllar',
-    'root.definitions': 'Ta‘riflar',
     'root.noDefinition': 'Bu o‘zak uchun hali ta‘rif yo‘q',
     'root.notFound': 'Bu o‘zak korpusda yo‘q',
+    'root.previous': 'Oldingi',
+    'root.next': 'Keyingi',
+    'root.adjacent': 'Qo‘shni o‘zaklar',
+    'root.formsFilter': 'Shakl bo‘yicha filtr',
     'lemma.notFound': 'Bu lemma korpusda yo‘q',
     'lemma.translatedAs': 'Tarjimasi',
+    'lemma.aboutTranslations': 'Bu tarjimalar haqida',
+    'lemma.translationsNote': 'So‘zma-so‘z tarjimalardan olingan, chastota bo‘yicha tartiblangan — lug‘at ta’riflari emas.',
+    'lemma.rootDefinition': 'O‘zak ta’rifi',
+    'lemma.viewRoot': 'O‘zakni ko‘rish',
+    'lemma.adjacent': 'Qo‘shni lemmalar',
+    'lemma.close': 'Yopish',
+    'lemma.previous': 'Oldingi',
+    'lemma.next': 'Keyingi',
     'surahList.ayahsSuffix': 'oyat',
     'surahList.loadFailed': 'Suralarni yuklab bo‘lmadi',
     'settings.language': 'Til',
@@ -303,19 +382,31 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'search.noResults': 'Hech narsa topilmadi',
     'search.loadFailed': 'Qidirib bo‘lmadi',
     'dictionary.browse': 'Ko‘rish',
-    'dictionary.frequent': 'Ko‘p uchraydigan',
-    'dictionary.noRoots': 'Bu harfda o‘zak yo‘q',
+    'dictionary.frequent': 'Eng ko‘p ishlatiladigan',
     'dictionary.alphabet': 'Arab alifbosi',
-    'dictionary.letterCaption': 'Harf',
     'dictionary.loadFailed': 'O‘zaklarni yuklab bo‘lmadi',
+    'dictionary.searchPlaceholder': 'O‘zak yoki ma’noni qidirish…',
+    'dictionary.searchLabel': 'O‘zak yoki ma’noni qidirish',
+    'dictionary.clearSearch': 'Qidiruvni tozalash',
+    'dictionary.sortAlpha': 'Alifbo bo‘yicha',
+    'dictionary.sortFreq': 'Chastota bo‘yicha',
+    'dictionary.sortFilter': 'Tartiblash',
+    'dictionary.noRootsFound': 'O‘zak topilmadi',
     'dictionary.kindRoots': 'O‘zaklar',
     'dictionary.kindLemmas': 'Lemmalar',
     'dictionary.kindVerbs': 'Fe’llar',
     'dictionary.frequentFailed': 'Ro‘yxatni yuklab bo‘lmadi',
     'dictionary.kindFilter': 'Turi bo‘yicha filtr',
     'dictionary.occurrences': 'marta uchraydi',
+    'dictionary.columnRank': '#',
+    'dictionary.columnForm': 'Shakl',
+    'dictionary.columnCount': 'Soni',
+    'concordance.heading': 'Uchrashuvlar',
     'concordance.empty': 'Uchrashlar yo‘q',
     'concordance.loadFailed': 'Uchrashlarni yuklab bo‘lmadi',
+    'concordance.showFullVerse': 'To‘liq oyatni ko‘rsatish',
+    'text.showMore': 'Ko‘proq ko‘rsatish',
+    'text.showLess': 'Kamroq ko‘rsatish',
   },
   ru: {
     'tabs.home': 'Главная',
@@ -360,12 +451,22 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'word.grammar': 'Грамматика',
     'word.notFound': 'Этого слова нет в корпусе',
     'word.transliteration': 'Транслитерация',
-    'root.forms': 'Формы',
-    'root.definitions': 'Определения',
     'root.noDefinition': 'Для этого корня пока нет определения',
     'root.notFound': 'Этого корня нет в корпусе',
+    'root.previous': 'Предыдущий',
+    'root.next': 'Следующий',
+    'root.adjacent': 'Соседние корни',
+    'root.formsFilter': 'Фильтр по форме',
     'lemma.notFound': 'Этой леммы нет в корпусе',
     'lemma.translatedAs': 'Переводится как',
+    'lemma.aboutTranslations': 'Об этих переводах',
+    'lemma.translationsNote': 'Из пословных переводов, упорядочены по частоте — это не словарные определения.',
+    'lemma.rootDefinition': 'Определение корня',
+    'lemma.viewRoot': 'Открыть корень',
+    'lemma.adjacent': 'Соседние леммы',
+    'lemma.close': 'Закрыть',
+    'lemma.previous': 'Предыдущая',
+    'lemma.next': 'Следующая',
     'surahList.ayahsSuffix': 'аятов',
     'surahList.loadFailed': 'Не удалось загрузить суры',
     'settings.language': 'Язык',
@@ -402,19 +503,31 @@ const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'search.noResults': 'Ничего не найдено',
     'search.loadFailed': 'Не удалось выполнить поиск',
     'dictionary.browse': 'Обзор',
-    'dictionary.frequent': 'Частотные',
-    'dictionary.noRoots': 'Под этой буквой нет корней',
+    'dictionary.frequent': 'Самые частые',
     'dictionary.alphabet': 'Арабский алфавит',
-    'dictionary.letterCaption': 'Буква',
     'dictionary.loadFailed': 'Не удалось загрузить корни',
+    'dictionary.searchPlaceholder': 'Поиск корня или значения…',
+    'dictionary.searchLabel': 'Поиск корня или значения',
+    'dictionary.clearSearch': 'Очистить поиск',
+    'dictionary.sortAlpha': 'По алфавиту',
+    'dictionary.sortFreq': 'По частоте',
+    'dictionary.sortFilter': 'Сортировка',
+    'dictionary.noRootsFound': 'Корни не найдены',
     'dictionary.kindRoots': 'Корни',
     'dictionary.kindLemmas': 'Леммы',
     'dictionary.kindVerbs': 'Глаголы',
     'dictionary.frequentFailed': 'Не удалось загрузить список',
     'dictionary.kindFilter': 'Фильтр по типу',
     'dictionary.occurrences': 'вхождений',
+    'dictionary.columnRank': '№',
+    'dictionary.columnForm': 'Форма',
+    'dictionary.columnCount': 'Кол-во',
+    'concordance.heading': 'Конкорданс',
     'concordance.empty': 'Нет вхождений',
     'concordance.loadFailed': 'Не удалось загрузить вхождения',
+    'concordance.showFullVerse': 'Показать весь аят',
+    'text.showMore': 'Показать больше',
+    'text.showLess': 'Свернуть',
   },
 };
 

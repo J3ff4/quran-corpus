@@ -5,23 +5,35 @@ import LemmaRoute from '../../app/lemma/[lemma]';
 
 const mocks = vi.hoisted(() => ({
   lemma: undefined as string | string[] | undefined,
+  from: undefined as string | string[] | undefined,
 }));
 
 vi.mock('expo-router', () => ({
-  useLocalSearchParams: () => ({ lemma: mocks.lemma }),
+  useLocalSearchParams: () => ({ lemma: mocks.lemma, from: mocks.from }),
 }));
 
 // Stubbed to the one prop the route computes: this suite is about what the
 // route forwards to the screen, not what the screen does with it -- that is
 // LemmaScreen.test.tsx's job.
 vi.mock('@/screens/LemmaScreen', () => ({
-  LemmaScreen: ({ lemmaBuckwalter }: { lemmaBuckwalter: string | null }) =>
-    React.createElement('div', { 'data-testid': 'lemma-screen', 'data-lemma': String(lemmaBuckwalter) }),
+  LemmaScreen: ({
+    lemmaBuckwalter,
+    source,
+  }: {
+    lemmaBuckwalter: string | null;
+    source: string | null;
+  }) =>
+    React.createElement('div', {
+      'data-testid': 'lemma-screen',
+      'data-lemma': String(lemmaBuckwalter),
+      'data-source': String(source),
+    }),
 }));
 
 describe('LemmaRoute', () => {
   beforeEach(() => {
     mocks.lemma = undefined;
+    mocks.from = undefined;
   });
   afterEach(cleanup);
 
@@ -69,5 +81,25 @@ describe('LemmaRoute', () => {
     expect(forwarded).not.toBe('qAl,mA');
     // The array guard must take the first segment, not just avoid the join.
     expect(forwarded).toBe('qAl');
+  });
+});
+
+describe('LemmaRoute ?from', () => {
+  beforeEach(() => {
+    mocks.lemma = 'qwl';
+    mocks.from = undefined;
+  });
+  afterEach(cleanup);
+
+  it('validates the ranking before the screen sees it', () => {
+    // Untrusted: whatever a deep link carried.
+    mocks.from = 'roots';
+    render(<LemmaRoute />);
+    expect(screen.getByTestId('lemma-screen').getAttribute('data-source')).toBe('null');
+
+    cleanup();
+    mocks.from = 'verbs';
+    render(<LemmaRoute />);
+    expect(screen.getByTestId('lemma-screen').getAttribute('data-source')).toBe('verbs');
   });
 });

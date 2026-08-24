@@ -21,7 +21,7 @@ interface HostProps {
   accessibilityLabel?: string;
   accessibilityLiveRegion?: 'none' | 'polite' | 'assertive';
   accessibilityRole?: string;
-  accessibilityState?: { disabled?: boolean; selected?: boolean };
+  accessibilityState?: { disabled?: boolean; selected?: boolean; expanded?: boolean };
   children?: React.ReactNode;
   onPress?: () => void;
   role?: string;
@@ -29,13 +29,14 @@ interface HostProps {
   testID?: string;
   // Native-only props with no DOM equivalent. Destructured so they never reach
   // createElement: React logs "Unknown event handler property" for onLayout and
-  // a non-boolean-attribute warning for `accessible` and pointerEvents, on
-  // every render.
+  // onTextLayout, and a non-boolean-attribute warning for `accessible` and
+  // pointerEvents, on every render.
   accessible?: unknown;
   contentContainerStyle?: unknown;
   importantForAccessibility?: unknown;
   numberOfLines?: unknown;
   onLayout?: unknown;
+  onTextLayout?: unknown;
   pointerEvents?: unknown;
 }
 
@@ -43,6 +44,57 @@ interface HostProps {
 function flattenStyle(style: unknown): Record<string, unknown> | undefined {
   if (!Array.isArray(style)) return style as Record<string, unknown> | undefined;
   return Object.assign({}, ...style.flat(Infinity).filter(Boolean));
+}
+
+/** The `nativeEvent.lines` shape Android's `onTextLayout` reports. */
+export type LayoutHandler = (event: { nativeEvent: { lines: { text: string }[] } }) => void;
+
+/**
+ * A `react-native` mock whose `Text` is `host('span')` plus an
+ * `onTextLayout`-aware wrapper, for suites that need to simulate a text
+ * measurement (`ClampedText` and anything that renders it, e.g.
+ * `DefinitionCard` and the screens that embed either).
+ *
+ * jsdom's `MouseEvent` constructor silently drops init keys it doesn't
+ * recognise, so a `fireEvent.click(node, { nativeEvent: {...} })` never makes
+ * it to `event.nativeEvent` the way it would on a real synthetic click --
+ * there is no DOM channel for RN's `onTextLayout` payload. `__layoutHandlers`
+ * is the substitute: it remembers each rendered `Text`'s current
+ * `onTextLayout` by the same testID the DOM node carries, and `__fireLayout`
+ * looks a handler up by a node's testID and calls it directly, so callers
+ * still wrap it in `act()` for the resulting setState to flush.
+ *
+ * Return this from a `vi.mock('react-native', async () => {...})` factory:
+ * the factory is hoisted above every static import and can only reach this
+ * module via `await import('@/testing/rnHosts.js')` -- see the module-level
+ * comment above for why the extension is required.
+ */
+export function reactNativeTextMock() {
+  const layoutHandlers = new Map<string, LayoutHandler>();
+  const HostText = host('span');
+  const Text = ({
+    onTextLayout,
+    ...rest
+  }: Record<string, unknown> & { onTextLayout?: LayoutHandler; testID?: string }) => {
+    const testID = rest.testID as string | undefined;
+    if (testID && onTextLayout) layoutHandlers.set(testID, onTextLayout);
+    return React.createElement(HostText, rest);
+  };
+  // `node`'s type stays structural, not `HTMLElement`: this file is compiled
+  // under the app tsconfig, which has no "DOM" lib (RN has no DOM), while the
+  // callers below live under tsconfig.test.json, which does.
+  const fireLayout = (node: { dataset: { testid?: string } }, shownLines: string[]) => {
+    layoutHandlers.get(node.dataset.testid ?? '')?.({
+      nativeEvent: { lines: shownLines.map((text) => ({ text })) },
+    });
+  };
+  return {
+    Text,
+    View: host('div'),
+    Pressable: host('button'),
+    __layoutHandlers: layoutHandlers,
+    __fireLayout: fireLayout,
+  };
 }
 
 export function host(tag: string) {
@@ -58,9 +110,10 @@ export function host(tag: string) {
     testID,
     accessible: _accessible,
     contentContainerStyle: _contentContainerStyle,
-    importantForAccessibility: _importantForAccessibility,
+    importantForAccessibility,
     numberOfLines: _numberOfLines,
     onLayout: _onLayout,
+    onTextLayout: _onTextLayout,
     pointerEvents: _pointerEvents,
     ...props
   }: HostProps) {
@@ -80,11 +133,17 @@ export function host(tag: string) {
         // lets a test see the state a control announces.
         'aria-disabled': accessibilityState?.disabled,
         'aria-selected': accessibilityState?.selected,
+        'aria-expanded': accessibilityState?.expanded,
         // `role` wins: it is the cross-platform prop, and components that set
         // it (role="dialog") leave accessibilityRole undefined, which would
         // otherwise overwrite it with nothing.
         role: role ?? accessibilityRole,
         'data-testid': testID,
+        // A data- attribute, not the camelCase prop: React warns about an
+        // unknown DOM attribute. It is Android's only way to take a subtree
+        // away from TalkBack behind a sheet (accessibilityViewIsModal is
+        // iOS-only), so a test has to be able to see it.
+        'data-hidden-from-a11y': importantForAccessibility === 'no-hide-descendants' ? 'true' : undefined,
         onClick: onPress,
         style: flattenStyle(style),
       },

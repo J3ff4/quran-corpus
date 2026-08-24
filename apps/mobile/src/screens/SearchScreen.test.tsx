@@ -1,7 +1,8 @@
 import React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { SearchScreen } from './SearchScreen';
+import { DEBOUNCE_MS, SearchScreen, SPINNER_DELAY_MS } from './SearchScreen';
+import { deferred } from '../testing/deferred';
 
 const mocks = vi.hoisted(() => ({
   searchCorpus: vi.fn(),
@@ -227,6 +228,80 @@ describe('SearchScreen', () => {
     fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'zzz-no-match' } });
 
     await waitFor(() => expect(screen.getByText('Nothing found')).toBeTruthy());
+  });
+
+  it('does not flash the no-results message before a query has run', async () => {
+    render(<SearchScreen />);
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'z' } });
+
+    // The verdict belongs to a finished query. Judging it from the box paints
+    // "Nothing found" here, inside the debounce window, on every keystroke --
+    // which is the flicker device check 33 caught.
+    expect(screen.queryByText('Nothing found')).toBeNull();
+    await waitFor(() => expect(screen.getByText('Nothing found')).toBeTruthy());
+  });
+
+  it('keeps the previous verdict on screen while the next query runs', async () => {
+    render(<SearchScreen />);
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'zz' } });
+    await waitFor(() => expect(screen.getByText('Nothing found')).toBeTruthy());
+
+    // The next query has to be in flight, not merely debouncing: the old code
+    // dropped the verdict the moment `loading` flipped, so an assertion made
+    // inside the debounce window passes against the bug too.
+    const inFlight = deferred<unknown>();
+    mocks.searchCorpus.mockReturnValue(inFlight.promise);
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'zzq' } });
+    await waitFor(() => expect(mocks.searchCorpus).toHaveBeenCalledTimes(2));
+
+    // Still there while it runs: blinking it out and back is the same flicker
+    // seen from the other side.
+    expect(screen.getByText('Nothing found')).toBeTruthy();
+
+    await act(async () => {
+      inFlight.resolve(EMPTY);
+      await inFlight.promise;
+    });
+  });
+
+  it('holds the spinner back until a query is actually slow', async () => {
+    // Fake timers, because the interesting distance here is 300ms between two
+    // events the test itself triggers. On a real clock a loaded machine can
+    // arrive at the first assertion after the spinner has already fired.
+    vi.useFakeTimers();
+    try {
+      const inFlight = deferred<unknown>();
+      mocks.searchCorpus.mockReturnValue(inFlight.promise);
+
+      render(<SearchScreen />);
+      fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'x' } });
+
+      // Debounce elapsed, query running -- and nothing painted. A local query
+      // that answers in single-digit milliseconds must never show an indicator.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(DEBOUNCE_MS);
+      });
+      expect(mocks.searchCorpus).toHaveBeenCalled();
+      expect(screen.queryByTestId('search-loading')).toBeNull();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(SPINNER_DELAY_MS - 1);
+      });
+      expect(screen.queryByTestId('search-loading')).toBeNull();
+
+      // One millisecond later it is a slow query and the spinner is earned.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+      expect(screen.getByTestId('search-loading')).toBeTruthy();
+
+      await act(async () => {
+        inFlight.resolve(EMPTY);
+        await inFlight.promise;
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('reports a failed search instead of an empty result', async () => {

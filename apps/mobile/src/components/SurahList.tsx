@@ -4,6 +4,7 @@ import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
 import { touchTargets } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
+import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
 interface SurahListProps {
   surahs: SurahListItem[];
@@ -15,6 +16,7 @@ const rowHeight = 76;
 
 export function SurahList({ surahs, uiLocale, onOpenSurah }: SurahListProps) {
   const theme = useThemeColors();
+  const paddingBottom = useListBottomPadding();
   const ayahsSuffix = t(uiLocale, 'surahList.ayahsSuffix');
   const renderItem: ListRenderItem<SurahListItem> = ({ item }) => (
     <Pressable
@@ -48,7 +50,7 @@ export function SurahList({ surahs, uiLocale, onOpenSurah }: SurahListProps) {
       data={surahs}
       renderItem={renderItem}
       keyExtractor={(item) => String(item.id)}
-      contentContainerStyle={{ paddingBottom: 24 }}
+      contentContainerStyle={{ paddingBottom }}
     />
   );
 }

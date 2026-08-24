@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => mocks.params,
+  router: { push: vi.fn() },
 }));
 
 vi.mock('@quran-corpus/mobile-data', () => ({
@@ -25,12 +26,14 @@ vi.mock('@/data/openCorpusDb', () => ({
 
 vi.mock('@/data/corpusRepository', () => ({
   getRootScreen: (...args: unknown[]) => mocks.getRootScreen(...args),
-  // The route loads the occurrence count alongside the entry. This suite is
-  // about the header the route builds, so the concordance is stubbed empty and
-  // the list itself mocked to its header below; ConcordanceList has its own
-  // suite and RootRoute.test.tsx covers what the route forwards to it.
+  // The route loads the occurrence count and the hijāʾī neighbours alongside
+  // the entry. This suite is about the header the route builds, so both are
+  // stubbed to their empty/absent shape and the list itself mocked to its
+  // header below; ConcordanceList has its own suite and RootRoute.test.tsx
+  // covers what the route forwards to it and the Previous/Next behaviour.
   getRootOccurrenceCount: async () => 0,
   getRootOccurrences: async () => [],
+  getAdjacentRoots: async () => ({ prev: null, next: null }),
 }));
 
 vi.mock('@/components/ConcordanceList', () => ({
@@ -41,14 +44,16 @@ vi.mock('@/settings/settingsStore', () => ({
   useAppSettings: () => ({ contentLanguage: 'en', uiLocale: 'en' }),
 }));
 
+// reactNativeTextMock, not the bare `host` factory: the header now renders
+// EntryHeader and DefinitionCard, both of which mount ClampedText, and
+// Pressable for the Previous/Next arrows -- see reactNativeTextMock's doc
+// comment in rnHosts.ts.
 vi.mock('react-native', async () => {
-  const { host } = await import('@/testing/rnHosts.js');
-
+  const React = await import('react');
+  const { reactNativeTextMock } = await import('@/testing/rnHosts.js');
   return {
     ActivityIndicator: () => React.createElement('span', null, 'loading'),
-    ScrollView: host('div'),
-    Text: host('span'),
-    View: host('div'),
+    ...reactNativeTextMock(),
   };
 });
 
@@ -121,11 +126,12 @@ describe('root route', () => {
     expect(mocks.getRootScreen).toHaveBeenCalledWith({}, 'r$m');
   });
 
-  it('shows the root in Arabic, its forms and its definitions', async () => {
+  it('shows the root in Arabic and its definitions', async () => {
+    // Derived-form cards are gone from this header -- Task 7 replaces them
+    // with filter chips.
     render(<RootRoute />);
 
     expect(await screen.findByText('رحم')).toBeTruthy();
-    expect(screen.getAllByTestId('root-form')).toHaveLength(2);
     expect(screen.getByText('to have mercy, to be merciful')).toBeTruthy();
   });
 
@@ -137,15 +143,15 @@ describe('root route', () => {
     expect(await screen.findByText('Hans Wehr Dictionary of Modern Written Arabic')).toBeTruthy();
   });
 
-  it('renders forms and the root when a definition is missing', async () => {
+  it('shows the root when a definition is missing', async () => {
     // 24 roots still have no definition (hw_gap_24.tsv). A screen that shows
-    // nothing at all for them loses the forms too, which do exist.
+    // nothing at all for them reads as broken.
     mocks.getRootScreen.mockResolvedValue({ ...entry, definitions: [] });
 
     render(<RootRoute />);
 
     expect(await screen.findByText('No definition for this root yet')).toBeTruthy();
-    expect(screen.getAllByTestId('root-form')).toHaveLength(2);
+    expect(await screen.findByText('رحم')).toBeTruthy();
   });
 
   it('shows the not-found state for a root the corpus does not carry', async () => {

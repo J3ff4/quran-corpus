@@ -1,6 +1,5 @@
 import { selectedTranslators, type MobileDataClient } from '@quran-corpus/mobile-data';
 import {
-  compareRootsArabic,
   countLemmaConcordance,
   countRootConcordance,
   getAyahsBySurah,
@@ -9,15 +8,17 @@ import {
   getLemmaConcordancePage,
   getLemmaEntry,
   getLemmaFrequency,
+  getLemmaFrequencyNeighbors,
   getRootConcordancePage,
   getRootEntry,
+  getRootNeighbors,
   getRootSearchList,
   getRootsByFrequency,
-  rootFirstLetter,
   getSegmentsByWordIds,
   getSurahById,
   getTranslationsBySurahAndLang,
   getVerbConcordance,
+  type LemmaFrequencyKind,
   getWordByLocation,
   getWordDetail,
   getWordsByAyah,
@@ -317,34 +318,40 @@ export async function getRootScreen(
   return getRootEntry(client, rootBuckwalter);
 }
 
-/** Roots filed under one hijāʾī letter, in dictionary order.
+/** Hijāʾī-adjacent roots for the root screen's Previous/Next.
  *
- *  Filtered and sorted in JS, not in SQL, and deliberately so: rootFirstLetter
- *  folds hamza seats (أ إ آ ٱ to ا) and ى to ي, so a SQL prefix match would
- *  file those under four separate letters, and SQLite's binary collation would
- *  then order the bucket by codepoint -- every seated root ahead of every bare
- *  one. Web's DictionaryBrowser does both for the same reasons.
- *
- *  Nothing caches the list, so every letter tap re-reads all ~1.6k root rows
- *  (1642 in the shipped DB) and discards all but one bucket. That is a local
- *  SQLite file and one grouped query, so it is affordable; add a cache here if
- *  the grid ever feels slow. */
-export async function getRootsForLetter(
+ *  Indexed O(1) on roots.sort_order, which the bundled DB ships populated
+ *  (1642 rows, 0 NULL, verified 2026-08-21). If a future rebuild ships it NULL
+ *  the shared query degrades to a full compareRootsArabic sort -- slower, still
+ *  correct -- so this needs no fallback of its own. */
+export async function getAdjacentRoots(
   client: MobileDataClient,
-  letter: string,
-): Promise<RootSearchItem[]> {
-  const roots = await getRootSearchList(client);
-  return roots
-    .filter((root) => rootFirstLetter(root.root_arabic) === letter)
-    .sort((a, b) => compareRootsArabic(a.root_arabic, b.root_arabic));
+  bw: string,
+): Promise<{ prev: string | null; next: string | null }> {
+  return getRootNeighbors(client, bw);
 }
 
-/** Which hijāʾī buckets have any root at all. Folded with the same
- *  `rootFirstLetter` getRootsForLetter buckets with -- a second copy of the
- *  hamza-seat rules would enable a letter whose screen then comes up empty. */
-export async function getLettersWithRoots(client: MobileDataClient): Promise<Set<string>> {
-  const roots = await getRootSearchList(client);
-  return new Set(roots.map((root) => rootFirstLetter(root.root_arabic)));
+/** The lemmas either side of this one in the ranking the reader entered from.
+ *
+ *  Frequency rank, not alphabetical, because that is the only order a lemma
+ *  screen is ever reached in -- the Most-used lists. `lemmas` and `verbs` are
+ *  different rankings over overlapping sets (a verb lemma sits at a different
+ *  rank in each), which is why the ranking travels in the route rather than
+ *  being guessed here. */
+export async function getAdjacentLemmas(
+  client: MobileDataClient,
+  lemmaBuckwalter: string,
+  kind: LemmaFrequencyKind,
+): Promise<{ prev: string | null; next: string | null }> {
+  return getLemmaFrequencyNeighbors(client, lemmaBuckwalter, kind);
+}
+
+/** Every root, unfiltered and unsorted beyond `getRootSearchList`'s own
+ *  `ORDER BY root_arabic`. Browse does its own filter (search text, active
+ *  letter) and sort (alpha/freq) over this in JS -- see DictionaryScreen --
+ *  the same split web's DictionaryBrowser uses over its own static payload. */
+export async function getAllRootsForBrowse(client: MobileDataClient): Promise<RootSearchItem[]> {
+  return getRootSearchList(client);
 }
 
 /** One row of the Frequent pane, whichever of the three lists produced it. */
@@ -359,8 +366,9 @@ export interface FrequencyRow {
 export async function getRootOccurrenceCount(
   client: MobileDataClient,
   bw: string,
+  formIds?: number[],
 ): Promise<number> {
-  return countRootConcordance(client, bw);
+  return countRootConcordance(client, bw, formIds);
 }
 
 export async function getRootOccurrences(
@@ -369,8 +377,13 @@ export async function getRootOccurrences(
   lang: ContentLanguageCode,
   offset: number,
   limit: number,
+  formIds?: number[],
 ): Promise<ConcordanceEntry[]> {
-  return getRootConcordancePage(client, bw, { lang, offset, limit });
+  // Not `{ ..., formIds }`: apps/mobile's tsconfig sets
+  // exactOptionalPropertyTypes, which rejects an explicit `undefined` against
+  // ConcordancePageOpts's optional `formIds?: number[]` -- the key has to be
+  // absent, not present-with-undefined.
+  return getRootConcordancePage(client, bw, { lang, offset, limit, ...(formIds && { formIds }) });
 }
 
 export async function getLemmaScreen(
@@ -395,14 +408,21 @@ export async function getLemmaOccurrences(
   return getLemmaConcordancePage(client, lemmaBw, { lang, offset, limit });
 }
 
+/** Rows per Frequent list. The shared queries default to 200, which is a page
+ *  and a half of scrolling -- short enough that a reader hits the bottom and
+ *  reads it as the end of the data. 1000 rows of three columns is ~40KB across
+ *  the bridge from a local file, once per chip tap. */
+export const FREQUENCY_LIMIT = 1000;
+
 /** The Frequent pane's three lists flattened to one row shape, so the screen
  *  renders one list rather than three that differ only in field names. */
 export async function getFrequencyRows(
   client: MobileDataClient,
   kind: 'roots' | 'lemmas' | 'verbs',
+  limit = FREQUENCY_LIMIT,
 ): Promise<FrequencyRow[]> {
   if (kind === 'roots') {
-    const roots = await getRootsByFrequency(client);
+    const roots = await getRootsByFrequency(client, limit);
     return roots.map((root) => ({
       href: `/root/${encodeURIComponent(root.root_buckwalter)}`,
       arabic: root.root_arabic,
@@ -412,27 +432,29 @@ export async function getFrequencyRows(
   }
 
   if (kind === 'lemmas') {
-    const lemmas = await getLemmaFrequency(client);
+    const lemmas = await getLemmaFrequency(client, limit);
     // Both queries filter `lemma_buckwalter IS NOT NULL`, so this drops nothing
     // today -- but the row type still allows null, and `?? ''` would build a
     // dead `/lemma/` link rather than omit an unroutable row.
     return lemmas
       .filter((row) => row.lemma_buckwalter !== null)
       .map((row) => ({
-        href: `/lemma/${encodeURIComponent(row.lemma_buckwalter!)}`,
+        // The ranking travels with the row: the lemma screen's Previous/Next
+        // walks whichever list the reader opened it from.
+        href: `/lemma/${encodeURIComponent(row.lemma_buckwalter!)}?from=lemmas`,
         arabic: row.lemma,
         gloss: null,
         count: row.count,
       }));
   }
 
-  const verbs = await getVerbConcordance(client);
+  const verbs = await getVerbConcordance(client, limit);
   return verbs
     .filter((row) => row.lemma_buckwalter !== null)
     .map((row) => ({
       // The lemma, not the surface form the row displays: form_arabic is the
       // commonest spelling of the verb and routing on it opens nothing.
-      href: `/lemma/${encodeURIComponent(row.lemma_buckwalter!)}`,
+      href: `/lemma/${encodeURIComponent(row.lemma_buckwalter!)}?from=verbs`,
       arabic: row.form_arabic,
       gloss: row.lemma,
       count: row.count,

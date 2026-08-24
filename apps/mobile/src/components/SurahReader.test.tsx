@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
     | ((info: { index: number; averageItemLength: number }) => void)
     | null,
   onScroll: null as ((event: { nativeEvent: { contentOffset: { y: number } } }) => void) | null,
+  onContentSizeChange: null as ((width: number, height: number) => void) | null,
   headerLayout: null as ((height: number) => void) | null,
   scrollToIndex: vi.fn(),
   scrollToOffset: vi.fn(),
@@ -120,19 +121,22 @@ vi.mock('react-native', async () => {
     // Forwards the ref, so the imperative scroll calls the component makes on
     // mount are observable. A plain function component silently swallows it
     // and every scroll assertion would pass against a null ref.
-    FlatList: ({ data, ListHeaderComponent, renderItem, onViewableItemsChanged, onScrollToIndexFailed, onScroll, importantForAccessibility, ref }: {
+    FlatList: ({ data, ListHeaderComponent, renderItem, onViewableItemsChanged, onScrollToIndexFailed, onScroll, onContentSizeChange, importantForAccessibility, initialNumToRender, ref }: {
       data: unknown[];
       ListHeaderComponent?: React.ReactNode;
       renderItem: (info: { item: unknown; index: number }) => React.ReactNode;
       onViewableItemsChanged?: (info: { viewableItems: Array<{ item: unknown }> }) => void;
       onScrollToIndexFailed?: (info: { index: number; averageItemLength: number }) => void;
       onScroll?: (event: { nativeEvent: { contentOffset: { y: number } } }) => void;
+      onContentSizeChange?: (width: number, height: number) => void;
       importantForAccessibility?: string;
+      initialNumToRender?: number;
       ref?: React.Ref<unknown>;
     }) => {
       mocks.onViewableItemsChanged = onViewableItemsChanged ?? null;
       mocks.onScrollToIndexFailed = onScrollToIndexFailed ?? null;
       mocks.onScroll = onScroll ?? null;
+      mocks.onContentSizeChange = onContentSizeChange ?? null;
       React.useImperativeHandle(ref, () => ({
         scrollToIndex: mocks.scrollToIndex,
         scrollToOffset: mocks.scrollToOffset,
@@ -142,11 +146,16 @@ vi.mock('react-native', async () => {
         // Surfaced as an attribute: it is the only thing keeping the reader
         // out of TalkBack's swipe order while the sheet is up, and RN's own
         // prop has no DOM equivalent to assert against.
-        { 'data-important-for-accessibility': importantForAccessibility },
+        {
+          'data-testid': 'reader-list',
+          'data-important-for-accessibility': importantForAccessibility,
+          'data-initial-num-to-render': String(initialNumToRender),
+        },
         ListHeaderComponent,
         data.map((item, index) => React.createElement('div', { key: index }, renderItem({ item, index }))),
       );
     },
+    ActivityIndicator: () => React.createElement('span', null, 'loading'),
     Pressable: host('button'),
     Text: host('span'),
     View: (props: { onLayout?: (event: { nativeEvent: { layout: { height: number } } }) => void }) => {
@@ -221,27 +230,180 @@ describe('SurahReader', () => {
     expect(mocks.scrollToIndex).not.toHaveBeenCalled();
   });
 
-  it('recovers from an unmeasured row by estimating the offset, then gives up', async () => {
+  it('renders far enough down the list for the deep-linked ayah to exist', () => {
+    // Not a performance knob here: FlatList cannot scroll to a row it has
+    // never rendered, and there is no getItemLayout to tell it where one
+    // would be. Rendering the target is what makes the landing exact rather
+    // than an estimate off the short cards near the top.
+    render(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />);
+
+    expect(screen.getByTestId('reader-list').getAttribute('data-initial-num-to-render')).toBe('255');
+  });
+
+  it('opens a surah with no deep link on the default window', () => {
+    // Mounting 286 cards is worth it to land on 2:255; paying it to open at
+    // 2:1 is not.
+    render(<SurahReader {...baseProps(readerData(300))} />);
+
+    expect(screen.getByTestId('reader-list').getAttribute('data-initial-num-to-render')).toBe('10');
+  });
+
+  it('retries the scroll without moving the list when the row is not measured yet', async () => {
     vi.useFakeTimers();
     try {
       render(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />);
       mocks.scrollToIndex.mockClear();
 
-      // FlatList reports this for any row it has not laid out yet, which is
-      // every row past initialNumToRender on a list of variable-height cards.
-      for (let attempt = 0; attempt < 8; attempt += 1) {
-        act(() => {
-          mocks.onScrollToIndexFailed?.({ index: 254, averageItemLength: 120 });
-        });
-        await act(async () => {
-          await vi.advanceTimersByTimeAsync(200);
-        });
-      }
+      act(() => {
+        mocks.onScrollToIndexFailed?.({ index: 254, averageItemLength: 120 });
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(150);
+      });
 
-      expect(mocks.scrollToOffset).toHaveBeenCalledWith({ offset: 254 * 120, animated: false });
-      // Capped: a row that never measures must settle instead of retrying for
-      // as long as the screen is open.
-      expect(mocks.scrollToIndex).toHaveBeenCalledTimes(5);
+      expect(mocks.scrollToIndex).toHaveBeenCalledWith({ index: 254, animated: false });
+      // The estimate is what landed the reader on the wrong ayah, and every
+      // jump it made fired a reading-position write.
+      expect(mocks.scrollToOffset).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the reader hidden until the deep-link scroll lands', async () => {
+    vi.useFakeTimers();
+    try {
+      render(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />);
+      expect(screen.queryByTestId('reader-positioning')).not.toBeNull();
+
+      // Two ticks: a scroll that missed nothing, over a content height the
+      // previous scroll already ran against.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
+
+      expect(screen.queryByTestId('reader-positioning')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('hides the reader again when a second deep link arrives on the same surah', async () => {
+    // An `ayah` param change on a reader that is already mounted re-runs the
+    // landing without remounting. Left revealed, the second jump is seen as
+    // motion and every ayah it passes over is written to the saved reading
+    // position -- the pair of defects the landing loop exists to prevent.
+    vi.useFakeTimers();
+    try {
+      const { rerender } = render(
+        <SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />,
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
+      expect(screen.queryByTestId('reader-positioning')).toBeNull();
+
+      rerender(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={286} />);
+
+      expect(screen.queryByTestId('reader-positioning')).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('re-scrolls while the cards above the target are still growing', async () => {
+    // The defect this covers: FlatList reports no failure as soon as the target
+    // row is measured, but the offset it jumped to was summed over cards above
+    // it that had not finished laying out. They grow, the target slides down,
+    // and the reader is revealed two cards short of it (owner device, 6:87 from
+    // a concordance row). A growing content height means the jump is stale.
+    vi.useFakeTimers();
+    try {
+      render(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
+      act(() => {
+        mocks.onContentSizeChange?.(400, 90000);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
+
+      // Still hidden, and scrolled again -- against the taller content.
+      expect(screen.queryByTestId('reader-positioning')).not.toBeNull();
+      const attemptsWhileGrowing = mocks.scrollToIndex.mock.calls.length;
+      expect(attemptsWhileGrowing).toBeGreaterThanOrEqual(3);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
+
+      // Revealed on a tick that scrolled nothing: the last jump already ran
+      // against the settled height, so the row it landed on is the row it stays
+      // on.
+      expect(screen.queryByTestId('reader-positioning')).toBeNull();
+      expect(mocks.scrollToIndex).toHaveBeenCalledTimes(attemptsWhileGrowing);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('shows the reader anyway once the retries are spent', async () => {
+    vi.useFakeTimers();
+    try {
+      // Driven off the scroll, not fired independently: FlatList reports the
+      // miss synchronously in response to scrollToIndex, so a row that never
+      // measures fails every attempt rather than every other one.
+      mocks.scrollToIndex.mockImplementation(() => {
+        mocks.onScrollToIndexFailed?.({ index: 254, averageItemLength: 120 });
+      });
+      render(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />);
+
+      // A row that never measures must settle: leaving the reader behind a
+      // spinner for as long as the screen is open is worse than showing it in
+      // the wrong place.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100 * 30);
+      });
+
+      expect(screen.queryByTestId('reader-positioning')).toBeNull();
+      expect(mocks.scrollToIndex).toHaveBeenCalledTimes(25);
+    } finally {
+      // mockClear in beforeEach would leave the implementation behind for
+      // every later test in the file.
+      mocks.scrollToIndex.mockReset();
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not record a reading position before the deep-link scroll lands', async () => {
+    // The rows visible mid-landing are wherever the list happens to be, not
+    // where the reader is. Recording them overwrites the saved position with
+    // an ayah nobody read -- and that row is on the user's device, so a bad
+    // write is not fixed by shipping a new build.
+    vi.useFakeTimers();
+    try {
+      const onReadingAyah = vi.fn();
+      const data = readerData(300);
+      render(
+        <SurahReader {...baseProps(data)} initialAyahNumber={255} onReadingAyah={onReadingAyah} />,
+      );
+
+      act(() => {
+        mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
+      });
+      expect(onReadingAyah).not.toHaveBeenCalled();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
+      act(() => {
+        mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[254] }] });
+      });
+
+      expect(onReadingAyah).toHaveBeenCalledWith(255);
     } finally {
       vi.useRealTimers();
     }

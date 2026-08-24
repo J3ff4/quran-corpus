@@ -10,19 +10,33 @@ import { useAppSettings } from '@/settings/settingsStore';
 import { SnippetText } from '@/components/SnippetText';
 import { touchTargets } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
+import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
 // Long enough that a fast typist runs one query rather than six, short enough
 // that results still feel attached to the keystroke. The DB is local, so this
 // is about wasted work, not latency.
-const DEBOUNCE_MS = 200;
+export const DEBOUNCE_MS = 200;
+
+// How long a query may run before it is allowed to show a spinner. The DB is
+// local, so a query that beats this never flashes an indicator at all -- which
+// is the whole point: at 200ms debounce + an instant result, the old
+// unconditional spinner was a dot that appeared and vanished on every
+// keystroke.
+export const SPINNER_DELAY_MS = 300;
 
 export function SearchScreen() {
   const { uiLocale, contentLanguage } = useAppSettings();
   const theme = useThemeColors();
+  const paddingBottom = useListBottomPadding();
 
   const [query, setQuery] = useState('');
   const [result, setResult] = useState<SearchResult>(EMPTY_SEARCH_RESULT);
-  const [loading, setLoading] = useState(false);
+  // The query text `result` actually came back for, or null when nothing has
+  // completed yet. "Nothing found" is a verdict on a finished query, so it
+  // renders off this and never off the text currently in the box -- otherwise
+  // every keystroke paints it during the debounce, before any query has run.
+  const [settled, setSettled] = useState<string | null>(null);
+  const [slow, setSlow] = useState(false);
   const [failed, setFailed] = useState(false);
   // Every keystroke starts a query and they can land out of order; only the
   // newest is allowed to write state.
@@ -37,16 +51,21 @@ export function SearchScreen() {
       requestRef.current += 1;
       setResult(EMPTY_SEARCH_RESULT);
       setFailed(false);
+      // Back to "nothing has completed": re-typing the text just cleared must
+      // run a fresh query rather than inheriting the old verdict.
+      setSettled(null);
       // The bump above makes any in-flight request non-current, so its own
       // `finally` will no longer clear this -- the spinner would sit forever
       // beside the "type something" hint.
-      setLoading(false);
+      setSlow(false);
       return;
     }
 
     const request = (requestRef.current += 1);
     const timer = setTimeout(async () => {
-      setLoading(true);
+      const spinner = setTimeout(() => {
+        if (requestRef.current === request) setSlow(true);
+      }, SPINNER_DELAY_MS);
       try {
         const db = await openCorpusDb();
         const client = createExpoSqliteClient(db as ExpoSqliteLike);
@@ -54,6 +73,7 @@ export function SearchScreen() {
         if (requestRef.current !== request) return;
         setResult(found);
         setFailed(false);
+        setSettled(trimmed);
       } catch (cause) {
         // Distinct from "nothing found": an FTS5 build problem and an
         // unmatched word are otherwise the same blank screen. Query text is
@@ -64,7 +84,8 @@ export function SearchScreen() {
         setResult(EMPTY_SEARCH_RESULT);
         setFailed(true);
       } finally {
-        if (requestRef.current === request) setLoading(false);
+        clearTimeout(spinner);
+        if (requestRef.current === request) setSlow(false);
       }
     }, DEBOUNCE_MS);
 
@@ -80,9 +101,12 @@ export function SearchScreen() {
 
   const heading = { color: theme.mutedText, fontSize: 12, letterSpacing: 1, marginTop: 20 };
   const empty = query.trim().length === 0;
+  // Reads the last *completed* query, not the box: while the user keeps
+  // typing, the previous verdict and the previous hits both stay put instead
+  // of blinking out and back.
   const nothing =
     !empty &&
-    !loading &&
+    settled !== null &&
     !failed &&
     result.jump === null &&
     result.verses.length === 0 &&
@@ -112,13 +136,13 @@ export function SearchScreen() {
 
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom }}
         // Otherwise Android's default ("never") reads the first tap on a
         // result -- with the autofocused input still holding the keyboard
         // open -- as "dismiss the keyboard", not as a press on that row.
         keyboardShouldPersistTaps="handled"
       >
-        {loading ? <ActivityIndicator testID="search-loading" /> : null}
+        {slow ? <ActivityIndicator testID="search-loading" /> : null}
         {failed ? (
           <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ color: theme.danger }}>
             {t(uiLocale, 'search.loadFailed')}

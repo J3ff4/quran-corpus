@@ -13,3 +13,13 @@ vi.mock('react-native-svg', async () => {
   const Path = (props: { d: string }) => React.createElement('path', props);
   return { default: Svg, Svg, Path };
 });
+
+// useSafeAreaInsets throws outside a SafeAreaProvider, and no suite renders
+// through one -- expo-router mounts the provider on the device. Declared here
+// rather than per file for the same reason react-native-svg is: ten suites
+// reach it, and the eleventh would fail on a value rather than on anything
+// naming the cause.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  SafeAreaProvider: ({ children }: { children?: unknown }) => children,
+}));

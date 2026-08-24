@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { MobileDataClient, MobileRow, SqlValue } from '@quran-corpus/mobile-data';
 import {
+  FREQUENCY_LIMIT,
+  getAllRootsForBrowse,
   getAyahReaderLocation,
   getFrequencyRows,
-  getLettersWithRoots,
   getM0WordDetail,
   getRootOccurrences,
   getRootScreen,
-  getRootsForLetter,
   getSurahGlosses,
   getSurahList,
   getSurahReader,
@@ -72,9 +72,34 @@ describe('getFrequencyRows', () => {
     // identity is the lemma. Routing on the surface form opens nothing.
     const rows = await getFrequencyRows(createFakeClient(), 'verbs');
 
-    expect(rows[0]!.href).toBe('/lemma/qAl');
+    // The ranking rides along, so the lemma screen's Previous/Next walks the
+    // list the row was tapped in.
+    expect(rows[0]!.href).toBe('/lemma/qAl?from=verbs');
     expect(rows[0]!.arabic).toBe('يَقُولُ');
   });
+
+  // Every kind, not just one: each branch passes the limit on in its own call,
+  // so a test over a single kind leaves the other two free to drop it. The
+  // shared queries default to 200 rows, and dropping the argument is invisible
+  // -- the list still renders, just truncated a fifth of the way in, with the
+  // bottom of the data reading as the end of it.
+  it.each(['roots', 'lemmas', 'verbs'] as const)(
+    'asks the shared %s query for its own limit rather than taking the 200 default',
+    async (kind) => {
+      const limits: SqlValue[][] = [];
+      const client: MobileDataClient = {
+        async execute(statement) {
+          limits.push(typeof statement === 'string' ? [] : (statement.args ?? []));
+          return { rows: [] };
+        },
+      };
+
+      await getFrequencyRows(client, kind, FREQUENCY_LIMIT);
+
+      expect(FREQUENCY_LIMIT).toBeGreaterThan(200);
+      expect(limits[0]).toEqual([FREQUENCY_LIMIT]);
+    },
+  );
 
   it('omits a row with no lemma identifier rather than linking to /lemma/', async () => {
     const client = createFakeClient({
@@ -274,7 +299,8 @@ function createFakeClient({
         // Fixture order is SQL's binary ORDER BY root_arabic: أ (U+0623) sorts
         // before ا (U+0627), so a seated root lands ahead of a bare one no
         // matter what the second radical is. Handing these back unsorted is
-        // what puts getRootsForLetter's own sort under test.
+        // what proves getAllRootsForBrowse passes getRootSearchList through
+        // rather than re-sorting it.
         return { rows: rootSearch };
       }
       if (sql.includes('FROM roots WHERE root_buckwalter')) {
@@ -588,30 +614,14 @@ describe('getM0WordDetail', () => {
   });
 });
 
-describe('getLettersWithRoots', () => {
-  it('folds hamza seats into the bucket the letter screen will actually query', async () => {
-    const letters = await getLettersWithRoots(createFakeClient());
+describe('getAllRootsForBrowse', () => {
+  it('passes getRootSearchList through unfiltered, in its own order', async () => {
+    const list = await getAllRootsForBrowse(createFakeClient());
 
-    // أوب and ابل both land under ا, so ء stays out -- enabling it would send
-    // the user to a letter screen that then comes up empty.
-    expect(letters.has('ا')).toBe(true);
-    expect(letters.has('ر')).toBe(true);
-    expect(letters.has('ء')).toBe(false);
-    // The one that bites: 'ء' is absent whether or not the seat is folded,
-    // because no fixture root starts with it. أوب is what distinguishes the
-    // two -- unfolded it opens a أ bucket the grid has no cell for.
-    expect(letters.has('أ')).toBe(false);
-  });
-});
-
-describe('getRootsForLetter', () => {
-  it('files hamza seats under ا and orders the bucket hijāʾī, not by codepoint', async () => {
-    const list = await getRootsForLetter(createFakeClient(), 'ا');
-
-    // Both roots belong to the ا bucket because rootFirstLetter folds the seat.
-    // Order is the assertion: SQL hands them back أوب, ابل (codepoint order);
-    // hijāʾī order compares the *second* radical, ب before و.
-    expect(list.map((root) => root.root_arabic)).toEqual(['ابل', 'أوب']);
+    // All three fixture roots come back, in SQL's binary ORDER BY root_arabic
+    // -- Browse itself does the filtering (search, active letter) and the
+    // hijāʾī sort, over this list, in JS.
+    expect(list.map((root) => root.root_arabic)).toEqual(['أوب', 'ابل', 'رحم']);
   });
 });
 
