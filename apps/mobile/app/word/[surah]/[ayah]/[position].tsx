@@ -65,7 +65,7 @@ export default function WordDetailRoute() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.background }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator />
       </View>
     );
@@ -73,7 +73,7 @@ export default function WordDetailRoute() {
 
   if (!summary) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', padding: 20, backgroundColor: theme.background }}>
+      <View style={{ flex: 1, justifyContent: 'center', padding: 20 }}>
         <Text accessibilityRole="alert" style={{ color: theme.mutedText, fontSize: typography.body }}>
           {t(uiLocale, 'word.notFound')}
         </Text>
@@ -85,7 +85,7 @@ export default function WordDetailRoute() {
 
   return (
     <ScrollView
-      style={{ flex: 1, backgroundColor: theme.background }}
+      style={{ flex: 1 }}
       contentContainerStyle={{ padding: 20, gap: 18, paddingBottom }}
     >
       <Text accessibilityRole="header" style={{ color: theme.mutedText, fontSize: typography.caption }}>

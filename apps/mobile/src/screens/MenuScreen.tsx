@@ -21,7 +21,7 @@ export function MenuScreen() {
 
   return (
     <ScrollView
-      style={{ flex: 1, backgroundColor: theme.background }}
+      style={{ flex: 1 }}
       contentContainerStyle={{ paddingBottom }}
     >
       <View style={{ padding: 20 }}>

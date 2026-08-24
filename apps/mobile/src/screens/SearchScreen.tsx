@@ -113,7 +113,7 @@ export function SearchScreen() {
     result.roots.length === 0;
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.background }}>
+    <View style={{ flex: 1 }}>
       <View style={{ padding: 16 }}>
         <TextInput
           testID="search-input"

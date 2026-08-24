@@ -36,7 +36,7 @@ export default function MorphologyTab() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.background, padding: 20, gap: 12 }}>
+    <View style={{ flex: 1, padding: 20, gap: 12 }}>
       <Text accessibilityRole="header" style={{ color: theme.text, fontSize: typography.title, fontWeight: '700' }}>
         {t(uiLocale, 'wbw.title')}
       </Text>

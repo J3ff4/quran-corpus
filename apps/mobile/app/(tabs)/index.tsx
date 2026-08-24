@@ -17,7 +17,7 @@ export default function HomeTab() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.background, padding: 20, gap: 12 }}>
+    <View style={{ flex: 1, padding: 20, gap: 12 }}>
       <Pressable
         testID="open-search"
         accessibilityRole="button"

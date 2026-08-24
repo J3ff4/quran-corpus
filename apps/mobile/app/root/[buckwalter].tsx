@@ -200,7 +200,7 @@ export default function RootRoute() {
   }, []);
 
   const spinner = (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.background }}>
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
       <ActivityIndicator />
     </View>
   );
@@ -211,7 +211,7 @@ export default function RootRoute() {
 
   if (!entry) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', padding: 20, backgroundColor: theme.background }}>
+      <View style={{ flex: 1, justifyContent: 'center', padding: 20 }}>
         <Text accessibilityRole="alert" style={{ color: theme.mutedText, fontSize: typography.body }}>
           {t(uiLocale, 'root.notFound')}
         </Text>

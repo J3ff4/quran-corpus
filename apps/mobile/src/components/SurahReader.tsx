@@ -516,7 +516,7 @@ export function SurahReader({
         // is a native toolbar outside this View and is still reachable.
         importantForAccessibility={openWord || languageOpen ? 'no-hide-descendants' : 'auto'}
         initialNumToRender={initialIndex > 0 ? initialIndex + 1 : DEFAULT_INITIAL_RENDER}
-        style={{ flex: 1, backgroundColor: theme.background, opacity: positioned ? 1 : 0 }}
+        style={{ flex: 1, opacity: positioned ? 1 : 0 }}
         contentContainerStyle={{ paddingBottom }}
       />
       {/* Over the list rather than instead of it: the list has to be mounted
