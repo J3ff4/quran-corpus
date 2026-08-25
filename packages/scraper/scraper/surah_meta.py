@@ -1,4 +1,17 @@
 # ruff: noqa: E501
+#
+# `order_number` is the REVELATION order (tartib an-nuzul), not the mushaf
+# order -- the mushaf order is `id`, and this column duplicated it until
+# 2026-08-25. It follows the standard Egyptian chronology of the 1924 Cairo
+# edition, the ordering quran.com and Tanzil publish: 96 al-Alaq first, 1
+# al-Fatiha fifth, 110 an-Nasr last. Two properties hold and are asserted in
+# tests/test_surah_meta.py: the 114 values are a permutation of 1..114, and
+# ranks 1-86 are exactly the Meccan surahs while 87-114 are exactly the
+# Medinan ones, because the hijra separates the two periods.
+#
+# Other chronologies exist (Noldeke's differs in places). If one is ever
+# adopted, change it HERE -- db.py's upsert writes this column from this file,
+# so a DB edited by hand is undone by the next `scraper seed`.
 from .models import SurahModel
 
 SURAHS: list[SurahModel] = [
@@ -9,7 +22,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Opening",
         revelation_type="meccan",
         ayah_count=7,
-        order_number=1,
+        order_number=5,
     ),
     SurahModel(
         id=2,
@@ -18,7 +31,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Cow",
         revelation_type="medinan",
         ayah_count=286,
-        order_number=2,
+        order_number=87,
     ),
     SurahModel(
         id=3,
@@ -27,7 +40,7 @@ SURAHS: list[SurahModel] = [
         name_translation="Family of Imran",
         revelation_type="medinan",
         ayah_count=200,
-        order_number=3,
+        order_number=89,
     ),
     SurahModel(
         id=4,
@@ -36,7 +49,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Women",
         revelation_type="medinan",
         ayah_count=176,
-        order_number=4,
+        order_number=92,
     ),
     SurahModel(
         id=5,
@@ -45,7 +58,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Table Spread",
         revelation_type="medinan",
         ayah_count=120,
-        order_number=5,
+        order_number=112,
     ),
     SurahModel(
         id=6,
@@ -54,7 +67,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Cattle",
         revelation_type="meccan",
         ayah_count=165,
-        order_number=6,
+        order_number=55,
     ),
     SurahModel(
         id=7,
@@ -63,7 +76,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Heights",
         revelation_type="meccan",
         ayah_count=206,
-        order_number=7,
+        order_number=39,
     ),
     SurahModel(
         id=8,
@@ -72,7 +85,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Spoils of War",
         revelation_type="medinan",
         ayah_count=75,
-        order_number=8,
+        order_number=88,
     ),
     SurahModel(
         id=9,
@@ -81,7 +94,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Repentance",
         revelation_type="medinan",
         ayah_count=129,
-        order_number=9,
+        order_number=113,
     ),
     SurahModel(
         id=10,
@@ -90,7 +103,7 @@ SURAHS: list[SurahModel] = [
         name_translation="Jonah",
         revelation_type="meccan",
         ayah_count=109,
-        order_number=10,
+        order_number=51,
     ),
     SurahModel(
         id=11,
@@ -99,7 +112,7 @@ SURAHS: list[SurahModel] = [
         name_translation="Hud",
         revelation_type="meccan",
         ayah_count=123,
-        order_number=11,
+        order_number=52,
     ),
     SurahModel(
         id=12,
@@ -108,7 +121,7 @@ SURAHS: list[SurahModel] = [
         name_translation="Joseph",
         revelation_type="meccan",
         ayah_count=111,
-        order_number=12,
+        order_number=53,
     ),
     SurahModel(
         id=13,
@@ -117,7 +130,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Thunder",
         revelation_type="medinan",
         ayah_count=43,
-        order_number=13,
+        order_number=96,
     ),
     SurahModel(
         id=14,
@@ -126,7 +139,7 @@ SURAHS: list[SurahModel] = [
         name_translation="Abraham",
         revelation_type="meccan",
         ayah_count=52,
-        order_number=14,
+        order_number=72,
     ),
     SurahModel(
         id=15,
@@ -135,7 +148,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Rocky Tract",
         revelation_type="meccan",
         ayah_count=99,
-        order_number=15,
+        order_number=54,
     ),
     SurahModel(
         id=16,
@@ -144,7 +157,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Bee",
         revelation_type="meccan",
         ayah_count=128,
-        order_number=16,
+        order_number=70,
     ),
     SurahModel(
         id=17,
@@ -153,7 +166,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Night Journey",
         revelation_type="meccan",
         ayah_count=111,
-        order_number=17,
+        order_number=50,
     ),
     SurahModel(
         id=18,
@@ -162,7 +175,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Cave",
         revelation_type="meccan",
         ayah_count=110,
-        order_number=18,
+        order_number=69,
     ),
     SurahModel(
         id=19,
@@ -171,7 +184,7 @@ SURAHS: list[SurahModel] = [
         name_translation="Mary",
         revelation_type="meccan",
         ayah_count=98,
-        order_number=19,
+        order_number=44,
     ),
     SurahModel(
         id=20,
@@ -180,7 +193,7 @@ SURAHS: list[SurahModel] = [
         name_translation="Ta-Ha",
         revelation_type="meccan",
         ayah_count=135,
-        order_number=20,
+        order_number=45,
     ),
     SurahModel(
         id=21,
@@ -189,7 +202,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Prophets",
         revelation_type="meccan",
         ayah_count=112,
-        order_number=21,
+        order_number=73,
     ),
     SurahModel(
         id=22,
@@ -198,7 +211,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Pilgrimage",
         revelation_type="medinan",
         ayah_count=78,
-        order_number=22,
+        order_number=103,
     ),
     SurahModel(
         id=23,
@@ -207,7 +220,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Believers",
         revelation_type="meccan",
         ayah_count=118,
-        order_number=23,
+        order_number=74,
     ),
     SurahModel(
         id=24,
@@ -216,7 +229,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Light",
         revelation_type="medinan",
         ayah_count=64,
-        order_number=24,
+        order_number=102,
     ),
     SurahModel(
         id=25,
@@ -225,7 +238,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Criterion",
         revelation_type="meccan",
         ayah_count=77,
-        order_number=25,
+        order_number=42,
     ),
     SurahModel(
         id=26,
@@ -234,7 +247,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Poets",
         revelation_type="meccan",
         ayah_count=227,
-        order_number=26,
+        order_number=47,
     ),
     SurahModel(
         id=27,
@@ -243,7 +256,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Ant",
         revelation_type="meccan",
         ayah_count=93,
-        order_number=27,
+        order_number=48,
     ),
     SurahModel(
         id=28,
@@ -252,7 +265,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Stories",
         revelation_type="meccan",
         ayah_count=88,
-        order_number=28,
+        order_number=49,
     ),
     SurahModel(
         id=29,
@@ -261,7 +274,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Spider",
         revelation_type="meccan",
         ayah_count=69,
-        order_number=29,
+        order_number=85,
     ),
     SurahModel(
         id=30,
@@ -270,7 +283,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Romans",
         revelation_type="meccan",
         ayah_count=60,
-        order_number=30,
+        order_number=84,
     ),
     SurahModel(
         id=31,
@@ -279,7 +292,7 @@ SURAHS: list[SurahModel] = [
         name_translation="Luqman",
         revelation_type="meccan",
         ayah_count=34,
-        order_number=31,
+        order_number=57,
     ),
     SurahModel(
         id=32,
@@ -288,7 +301,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Prostration",
         revelation_type="meccan",
         ayah_count=30,
-        order_number=32,
+        order_number=75,
     ),
     SurahModel(
         id=33,
@@ -297,7 +310,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Combined Forces",
         revelation_type="medinan",
         ayah_count=73,
-        order_number=33,
+        order_number=90,
     ),
     SurahModel(
         id=34,
@@ -306,7 +319,7 @@ SURAHS: list[SurahModel] = [
         name_translation="Sheba",
         revelation_type="meccan",
         ayah_count=54,
-        order_number=34,
+        order_number=58,
     ),
     SurahModel(
         id=35,
@@ -315,7 +328,7 @@ SURAHS: list[SurahModel] = [
         name_translation="Originator",
         revelation_type="meccan",
         ayah_count=45,
-        order_number=35,
+        order_number=43,
     ),
     SurahModel(
         id=36,
@@ -324,7 +337,7 @@ SURAHS: list[SurahModel] = [
         name_translation="Ya Sin",
         revelation_type="meccan",
         ayah_count=83,
-        order_number=36,
+        order_number=41,
     ),
     SurahModel(
         id=37,
@@ -333,7 +346,7 @@ SURAHS: list[SurahModel] = [
         name_translation="Those Who Set the Ranks",
         revelation_type="meccan",
         ayah_count=182,
-        order_number=37,
+        order_number=56,
     ),
     SurahModel(
         id=38,
@@ -351,7 +364,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Troops",
         revelation_type="meccan",
         ayah_count=75,
-        order_number=39,
+        order_number=59,
     ),
     SurahModel(
         id=40,
@@ -360,7 +373,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Forgiver",
         revelation_type="meccan",
         ayah_count=85,
-        order_number=40,
+        order_number=60,
     ),
     SurahModel(
         id=41,
@@ -369,7 +382,7 @@ SURAHS: list[SurahModel] = [
         name_translation="Explained in Detail",
         revelation_type="meccan",
         ayah_count=54,
-        order_number=41,
+        order_number=61,
     ),
     SurahModel(
         id=42,
@@ -378,7 +391,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Consultation",
         revelation_type="meccan",
         ayah_count=53,
-        order_number=42,
+        order_number=62,
     ),
     SurahModel(
         id=43,
@@ -387,7 +400,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Ornaments of Gold",
         revelation_type="meccan",
         ayah_count=89,
-        order_number=43,
+        order_number=63,
     ),
     SurahModel(
         id=44,
@@ -396,7 +409,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Smoke",
         revelation_type="meccan",
         ayah_count=59,
-        order_number=44,
+        order_number=64,
     ),
     SurahModel(
         id=45,
@@ -405,7 +418,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Crouching",
         revelation_type="meccan",
         ayah_count=37,
-        order_number=45,
+        order_number=65,
     ),
     SurahModel(
         id=46,
@@ -414,7 +427,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Wind-Curved Sandhills",
         revelation_type="meccan",
         ayah_count=35,
-        order_number=46,
+        order_number=66,
     ),
     SurahModel(
         id=47,
@@ -423,7 +436,7 @@ SURAHS: list[SurahModel] = [
         name_translation="Muhammad",
         revelation_type="medinan",
         ayah_count=38,
-        order_number=47,
+        order_number=95,
     ),
     SurahModel(
         id=48,
@@ -432,7 +445,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Victory",
         revelation_type="medinan",
         ayah_count=29,
-        order_number=48,
+        order_number=111,
     ),
     SurahModel(
         id=49,
@@ -441,7 +454,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Rooms",
         revelation_type="medinan",
         ayah_count=18,
-        order_number=49,
+        order_number=106,
     ),
     SurahModel(
         id=50,
@@ -450,7 +463,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Letter Qaf",
         revelation_type="meccan",
         ayah_count=45,
-        order_number=50,
+        order_number=34,
     ),
     SurahModel(
         id=51,
@@ -459,7 +472,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Winnowing Winds",
         revelation_type="meccan",
         ayah_count=60,
-        order_number=51,
+        order_number=67,
     ),
     SurahModel(
         id=52,
@@ -468,7 +481,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Mount",
         revelation_type="meccan",
         ayah_count=49,
-        order_number=52,
+        order_number=76,
     ),
     SurahModel(
         id=53,
@@ -477,7 +490,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Star",
         revelation_type="meccan",
         ayah_count=62,
-        order_number=53,
+        order_number=23,
     ),
     SurahModel(
         id=54,
@@ -486,7 +499,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Moon",
         revelation_type="meccan",
         ayah_count=55,
-        order_number=54,
+        order_number=37,
     ),
     SurahModel(
         id=55,
@@ -495,7 +508,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Beneficent",
         revelation_type="medinan",
         ayah_count=78,
-        order_number=55,
+        order_number=97,
     ),
     SurahModel(
         id=56,
@@ -504,7 +517,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Inevitable",
         revelation_type="meccan",
         ayah_count=96,
-        order_number=56,
+        order_number=46,
     ),
     SurahModel(
         id=57,
@@ -513,7 +526,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Iron",
         revelation_type="medinan",
         ayah_count=29,
-        order_number=57,
+        order_number=94,
     ),
     SurahModel(
         id=58,
@@ -522,7 +535,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Pleading Woman",
         revelation_type="medinan",
         ayah_count=22,
-        order_number=58,
+        order_number=105,
     ),
     SurahModel(
         id=59,
@@ -531,7 +544,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Exile",
         revelation_type="medinan",
         ayah_count=24,
-        order_number=59,
+        order_number=101,
     ),
     SurahModel(
         id=60,
@@ -540,7 +553,7 @@ SURAHS: list[SurahModel] = [
         name_translation="She That Is to Be Examined",
         revelation_type="medinan",
         ayah_count=13,
-        order_number=60,
+        order_number=91,
     ),
     SurahModel(
         id=61,
@@ -549,7 +562,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Ranks",
         revelation_type="medinan",
         ayah_count=14,
-        order_number=61,
+        order_number=109,
     ),
     SurahModel(
         id=62,
@@ -558,7 +571,7 @@ SURAHS: list[SurahModel] = [
         name_translation="Friday",
         revelation_type="medinan",
         ayah_count=11,
-        order_number=62,
+        order_number=110,
     ),
     SurahModel(
         id=63,
@@ -567,7 +580,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Hypocrites",
         revelation_type="medinan",
         ayah_count=11,
-        order_number=63,
+        order_number=104,
     ),
     SurahModel(
         id=64,
@@ -576,7 +589,7 @@ SURAHS: list[SurahModel] = [
         name_translation="Mutual Disillusion",
         revelation_type="medinan",
         ayah_count=18,
-        order_number=64,
+        order_number=108,
     ),
     SurahModel(
         id=65,
@@ -585,7 +598,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Divorce",
         revelation_type="medinan",
         ayah_count=12,
-        order_number=65,
+        order_number=99,
     ),
     SurahModel(
         id=66,
@@ -594,7 +607,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Prohibition",
         revelation_type="medinan",
         ayah_count=12,
-        order_number=66,
+        order_number=107,
     ),
     SurahModel(
         id=67,
@@ -603,7 +616,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Sovereignty",
         revelation_type="meccan",
         ayah_count=30,
-        order_number=67,
+        order_number=77,
     ),
     SurahModel(
         id=68,
@@ -612,7 +625,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Pen",
         revelation_type="meccan",
         ayah_count=52,
-        order_number=68,
+        order_number=2,
     ),
     SurahModel(
         id=69,
@@ -621,7 +634,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Reality",
         revelation_type="meccan",
         ayah_count=52,
-        order_number=69,
+        order_number=78,
     ),
     SurahModel(
         id=70,
@@ -630,7 +643,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Ascending Stairways",
         revelation_type="meccan",
         ayah_count=44,
-        order_number=70,
+        order_number=79,
     ),
     SurahModel(
         id=71,
@@ -648,7 +661,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Jinn",
         revelation_type="meccan",
         ayah_count=28,
-        order_number=72,
+        order_number=40,
     ),
     SurahModel(
         id=73,
@@ -657,7 +670,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Enshrouded One",
         revelation_type="meccan",
         ayah_count=20,
-        order_number=73,
+        order_number=3,
     ),
     SurahModel(
         id=74,
@@ -666,7 +679,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Cloaked One",
         revelation_type="meccan",
         ayah_count=56,
-        order_number=74,
+        order_number=4,
     ),
     SurahModel(
         id=75,
@@ -675,7 +688,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Resurrection",
         revelation_type="meccan",
         ayah_count=40,
-        order_number=75,
+        order_number=31,
     ),
     SurahModel(
         id=76,
@@ -684,7 +697,7 @@ SURAHS: list[SurahModel] = [
         name_translation="Man",
         revelation_type="medinan",
         ayah_count=31,
-        order_number=76,
+        order_number=98,
     ),
     SurahModel(
         id=77,
@@ -693,7 +706,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Emissaries",
         revelation_type="meccan",
         ayah_count=50,
-        order_number=77,
+        order_number=33,
     ),
     SurahModel(
         id=78,
@@ -702,7 +715,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Tidings",
         revelation_type="meccan",
         ayah_count=40,
-        order_number=78,
+        order_number=80,
     ),
     SurahModel(
         id=79,
@@ -711,7 +724,7 @@ SURAHS: list[SurahModel] = [
         name_translation="Those Who Drag Forth",
         revelation_type="meccan",
         ayah_count=46,
-        order_number=79,
+        order_number=81,
     ),
     SurahModel(
         id=80,
@@ -720,7 +733,7 @@ SURAHS: list[SurahModel] = [
         name_translation="He Frowned",
         revelation_type="meccan",
         ayah_count=42,
-        order_number=80,
+        order_number=24,
     ),
     SurahModel(
         id=81,
@@ -729,7 +742,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Overthrowing",
         revelation_type="meccan",
         ayah_count=29,
-        order_number=81,
+        order_number=7,
     ),
     SurahModel(
         id=82,
@@ -747,7 +760,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Defrauding",
         revelation_type="meccan",
         ayah_count=36,
-        order_number=83,
+        order_number=86,
     ),
     SurahModel(
         id=84,
@@ -756,7 +769,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Sundering",
         revelation_type="meccan",
         ayah_count=25,
-        order_number=84,
+        order_number=83,
     ),
     SurahModel(
         id=85,
@@ -765,7 +778,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Mansions of the Stars",
         revelation_type="meccan",
         ayah_count=22,
-        order_number=85,
+        order_number=27,
     ),
     SurahModel(
         id=86,
@@ -774,7 +787,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Nightcomer",
         revelation_type="meccan",
         ayah_count=17,
-        order_number=86,
+        order_number=36,
     ),
     SurahModel(
         id=87,
@@ -783,7 +796,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Most High",
         revelation_type="meccan",
         ayah_count=19,
-        order_number=87,
+        order_number=8,
     ),
     SurahModel(
         id=88,
@@ -792,7 +805,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Overwhelming",
         revelation_type="meccan",
         ayah_count=26,
-        order_number=88,
+        order_number=68,
     ),
     SurahModel(
         id=89,
@@ -801,7 +814,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Dawn",
         revelation_type="meccan",
         ayah_count=30,
-        order_number=89,
+        order_number=10,
     ),
     SurahModel(
         id=90,
@@ -810,7 +823,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The City",
         revelation_type="meccan",
         ayah_count=20,
-        order_number=90,
+        order_number=35,
     ),
     SurahModel(
         id=91,
@@ -819,7 +832,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Sun",
         revelation_type="meccan",
         ayah_count=15,
-        order_number=91,
+        order_number=26,
     ),
     SurahModel(
         id=92,
@@ -828,7 +841,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Night",
         revelation_type="meccan",
         ayah_count=21,
-        order_number=92,
+        order_number=9,
     ),
     SurahModel(
         id=93,
@@ -837,7 +850,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Morning Hours",
         revelation_type="meccan",
         ayah_count=11,
-        order_number=93,
+        order_number=11,
     ),
     SurahModel(
         id=94,
@@ -846,7 +859,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Relief",
         revelation_type="meccan",
         ayah_count=8,
-        order_number=94,
+        order_number=12,
     ),
     SurahModel(
         id=95,
@@ -855,7 +868,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Fig",
         revelation_type="meccan",
         ayah_count=8,
-        order_number=95,
+        order_number=28,
     ),
     SurahModel(
         id=96,
@@ -864,7 +877,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Clot",
         revelation_type="meccan",
         ayah_count=19,
-        order_number=96,
+        order_number=1,
     ),
     SurahModel(
         id=97,
@@ -873,7 +886,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Power",
         revelation_type="meccan",
         ayah_count=5,
-        order_number=97,
+        order_number=25,
     ),
     SurahModel(
         id=98,
@@ -882,7 +895,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Clear Proof",
         revelation_type="medinan",
         ayah_count=8,
-        order_number=98,
+        order_number=100,
     ),
     SurahModel(
         id=99,
@@ -891,7 +904,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Earthquake",
         revelation_type="medinan",
         ayah_count=8,
-        order_number=99,
+        order_number=93,
     ),
     SurahModel(
         id=100,
@@ -900,7 +913,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Courser",
         revelation_type="meccan",
         ayah_count=11,
-        order_number=100,
+        order_number=14,
     ),
     SurahModel(
         id=101,
@@ -909,7 +922,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Calamity",
         revelation_type="meccan",
         ayah_count=11,
-        order_number=101,
+        order_number=30,
     ),
     SurahModel(
         id=102,
@@ -918,7 +931,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Rivalry in World Increase",
         revelation_type="meccan",
         ayah_count=8,
-        order_number=102,
+        order_number=16,
     ),
     SurahModel(
         id=103,
@@ -927,7 +940,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Declining Day",
         revelation_type="meccan",
         ayah_count=3,
-        order_number=103,
+        order_number=13,
     ),
     SurahModel(
         id=104,
@@ -936,7 +949,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Traducer",
         revelation_type="meccan",
         ayah_count=9,
-        order_number=104,
+        order_number=32,
     ),
     SurahModel(
         id=105,
@@ -945,7 +958,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Elephant",
         revelation_type="meccan",
         ayah_count=5,
-        order_number=105,
+        order_number=19,
     ),
     SurahModel(
         id=106,
@@ -954,7 +967,7 @@ SURAHS: list[SurahModel] = [
         name_translation="Quraysh",
         revelation_type="meccan",
         ayah_count=4,
-        order_number=106,
+        order_number=29,
     ),
     SurahModel(
         id=107,
@@ -963,7 +976,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Small Kindnesses",
         revelation_type="meccan",
         ayah_count=7,
-        order_number=107,
+        order_number=17,
     ),
     SurahModel(
         id=108,
@@ -972,7 +985,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Abundance",
         revelation_type="meccan",
         ayah_count=3,
-        order_number=108,
+        order_number=15,
     ),
     SurahModel(
         id=109,
@@ -981,7 +994,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Disbelievers",
         revelation_type="meccan",
         ayah_count=6,
-        order_number=109,
+        order_number=18,
     ),
     SurahModel(
         id=110,
@@ -990,7 +1003,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Divine Support",
         revelation_type="medinan",
         ayah_count=3,
-        order_number=110,
+        order_number=114,
     ),
     SurahModel(
         id=111,
@@ -999,7 +1012,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Palm Fiber",
         revelation_type="meccan",
         ayah_count=5,
-        order_number=111,
+        order_number=6,
     ),
     SurahModel(
         id=112,
@@ -1008,7 +1021,7 @@ SURAHS: list[SurahModel] = [
         name_translation="Sincerity",
         revelation_type="meccan",
         ayah_count=4,
-        order_number=112,
+        order_number=22,
     ),
     SurahModel(
         id=113,
@@ -1017,7 +1030,7 @@ SURAHS: list[SurahModel] = [
         name_translation="The Daybreak",
         revelation_type="meccan",
         ayah_count=5,
-        order_number=113,
+        order_number=20,
     ),
     SurahModel(
         id=114,
@@ -1026,7 +1039,7 @@ SURAHS: list[SurahModel] = [
         name_translation="Mankind",
         revelation_type="meccan",
         ayah_count=6,
-        order_number=114,
+        order_number=21,
     ),
 ]
 

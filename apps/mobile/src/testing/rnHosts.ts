@@ -94,6 +94,10 @@ export function reactNativeTextMock() {
     Text,
     View: host('div'),
     Pressable: host('button'),
+    AccessibilityInfo,
+    AppState,
+    FlatList,
+    SectionList,
     StyleSheet,
     __layoutHandlers: layoutHandlers,
     __fireLayout: fireLayout,
@@ -177,6 +181,80 @@ export function host(tag: string) {
     );
   };
 }
+
+/** FlatList and SectionList, rendered eagerly and in full.
+ *
+ *  The real ones virtualize, which in jsdom means measuring a viewport that has
+ *  no height and rendering nothing -- every assertion then fails on an empty
+ *  list rather than on the component. Rendering everything is the point: a
+ *  suite asserting on the 604th row wants the 604th row.
+ *
+ *  `keyExtractor` is honoured rather than ignored so a duplicate-key bug still
+ *  surfaces as a React warning, and section headers render through the same
+ *  path the device uses. Sections themselves key by index, not by title: two
+ *  sections may legitimately share a title (a chronology that stops being two
+ *  contiguous blocks yields alternating Meccan/Medinan ones), and keying by it
+ *  would swallow that as a duplicate-key warning instead of rendering it.
+ */
+export function FlatList({
+  data,
+  renderItem,
+  keyExtractor,
+}: {
+  data?: readonly unknown[];
+  renderItem: (info: { item: unknown; index: number }) => React.ReactNode;
+  keyExtractor?: (item: unknown, index: number) => string;
+}) {
+  return React.createElement(
+    'div',
+    null,
+    (data ?? []).map((item, index) =>
+      React.createElement('div', { key: keyExtractor?.(item, index) ?? index }, renderItem({ item, index })),
+    ),
+  );
+}
+
+export function SectionList({
+  sections,
+  renderItem,
+  renderSectionHeader,
+  keyExtractor,
+}: {
+  sections?: readonly { title: string; data: readonly unknown[] }[];
+  renderItem: (info: { item: unknown; index: number }) => React.ReactNode;
+  renderSectionHeader?: (info: { section: { title: string; data: readonly unknown[] } }) => React.ReactNode;
+  keyExtractor?: (item: unknown, index: number) => string;
+}) {
+  return React.createElement(
+    'div',
+    null,
+    (sections ?? []).map((section, sectionIndex) =>
+      React.createElement(
+        'div',
+        { key: sectionIndex },
+        renderSectionHeader?.({ section }),
+        section.data.map((item, index) =>
+          React.createElement('div', { key: keyExtractor?.(item, index) ?? index }, renderItem({ item, index })),
+        ),
+      ),
+    ),
+  );
+}
+
+/** Inert AccessibilityInfo reporting "reduce motion off".
+ *
+ *  Here for the same reason as AppState below: usePressScale reaches
+ *  useReducedMotion, which reads this on mount, so every component that
+ *  squeezes on press now needs it -- and without it the suite fails on
+ *  `AccessibilityInfo is undefined` rather than on anything naming the
+ *  component. Off rather than on so the press branch under test is the one
+ *  users get; the reduced-motion branch is covered purely in
+ *  motion/usePressScale.test.ts.
+ */
+export const AccessibilityInfo = {
+  isReduceMotionEnabled: async () => false,
+  addEventListener: () => ({ remove: () => {} }),
+};
 
 /** Inert AppState for suites that mock react-native wholesale.
  *

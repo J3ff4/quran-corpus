@@ -58,7 +58,7 @@ export async function getPageIndex(client: QueryClient): Promise<PageEntry[]>;
 export async function getRevealedIndex(client: QueryClient): Promise<RevealedEntry[]>;
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `packages/data/tests/browse.test.ts`, against the fixture DB the other query
 suites already build:
@@ -70,11 +70,10 @@ describe('getJuzIndex', () => {
 
     expect(rows).toHaveLength(30);
     expect(rows[0]).toMatchObject({ juz: 1, startSurahId: 1, startAyahNumber: 1 });
-    // Juz 2 famously starts mid-surah, at 2:142. A GROUP BY that took MIN over
-    // surah_id and MIN over ayah_number independently would say 2:1 here, which
-    // is a real ayah and a wrong answer -- the failure mode a row-count check
-    // cannot see.
-    expect(rows[1]).toMatchObject({ juz: 2, startSurahId: 2, startAyahNumber: 142 });
+    // CORRECTED 2026-08-25, see the note under Step 6. Juz 3 (2:253 -> 3:92),
+    // not juz 2: juz 2 never leaves al-Baqarah, so the broken query answers
+    // 2:142 as well and this assertion passes either way.
+    expect(rows[2]).toMatchObject({ juz: 3, startSurahId: 2, startAyahNumber: 253 });
     expect(rows.map((r) => r.juz)).toEqual(Array.from({ length: 30 }, (_, i) => i + 1));
   });
 });
@@ -97,6 +96,8 @@ describe('getRevealedIndex', () => {
     expect(rows).toHaveLength(114);
     // 96 (al-Alaq) was revealed first; al-Fatiha is 5th. Ordering by id would
     // put surah 1 at the top and look entirely plausible.
+    //
+    // NOTE 2026-08-25: order_number did NOT hold this. See Step 3 below.
     expect(rows[0]).toMatchObject({ surahId: 96, orderNumber: 1, revelationType: 'meccan' });
     expect(rows.map((r) => r.orderNumber)).toEqual(Array.from({ length: 114 }, (_, i) => i + 1));
   });
@@ -109,12 +110,12 @@ describe('getRevealedIndex', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `pnpm --filter @quran-corpus/data test browse`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```ts
 /**
@@ -156,29 +157,58 @@ export async function getJuzIndex(client: QueryClient): Promise<JuzEntry[]> {
 
 `getPageIndex` is the same shape over `ayahs.page` (604 rows, no ayah count).
 `getRevealedIndex` is a plain `SELECT ... FROM surahs ORDER BY order_number`.
+
+**Blocked and resolved, 2026-08-25.** This task's architecture claims all four
+modes are views over data the corpus DB already holds. That was false for
+Revealed: `surahs.order_number` held a copy of `id` in all 114 rows -- mushaf
+order, not tartib an-nuzul. Nothing read the column, so nothing was visibly
+wrong, and Revealed mode would have rendered the surah index under a different
+heading. Raised as the §12 stop this plan's Global Constraints call for; the
+owner chose to backfill the column rather than carry a constant in
+`packages/data` or cut the mode.
+
+Done in `8efd005`: the ranks are the standard Egyptian (1924 Cairo) chronology,
+written into `packages/scraper/scraper/surah_meta.py` because `db.py`'s upsert
+is what writes the column -- a hand-edited DB is undone by the next
+`scraper seed`. `seed_database` gained a parking pass, since UNIQUE(order_number)
+rejects every intermediate state of a permutation. Live DB re-seeded (backup at
+`~/quran-data/quran.db.bak-m6c-revelation-order`) and the bundled mobile DB
+regenerated; both verified to open on 96 al-Alaq with a clean hijra split and
+unchanged ayah/word counts.
 Write all three; do not factor the two index queries into one parameterized
 helper that interpolates a column name — a column name cannot be a bound
 parameter and the "shared" version would be string-built SQL for no gain.
 
-- [ ] **Step 4: Re-export and guard**
+- [x] **Step 4: Re-export and guard**
 
 Add all three to `packages/data/src/mobile.ts`, and to the export assertions in
 `packages/data/tests/mobile-entry.test.ts` — that suite is what stops a mobile
 query from quietly acquiring a node-only import.
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 Run: `pnpm --filter @quran-corpus/data test`
 Expected: PASS.
 
-- [ ] **Step 6: Mutation-check (§4)**
+- [x] **Step 6: Mutation-check (§4)**
 
 In `getJuzIndex`, swap the subquery for
 `SELECT juz, MIN(surah_id) AS s, MIN(ayah_number) AS n, COUNT(*) ... GROUP BY juz`
-and join on those. Expected: the juz-2 assertion FAILS with `2:1`. Restore by
-re-editing.
+and join on those. Expected: the **juz-3** assertion FAILS with `2:1`.
 
-- [ ] **Step 7: Commit**
+**This step as originally written was vacuous.** It named juz 2, which runs
+2:142 to 2:252 and never leaves al-Baqarah -- so the independent-MIN version
+answers 2:142 there too and the test passes against both. Only a juz that
+crosses a surah boundary distinguishes them. Same class as the brief-specified
+vacuous tests in PRs #71 and #73: the defect was upstream of the implementer.
+
+Run 2026-08-25 against a synthetic fixture rather than the real corpus (see the
+commit body). Three mutations, each failing exactly the intended test:
+independent MINs -> the boundary-crossing juz assertion; dropping
+`WHERE juz IS NOT NULL` -> all seven; `ORDER BY order_number` -> `ORDER BY id`
+-> both revealed assertions. Restored by re-editing from a scratchpad copy.
+
+- [x] **Step 7: Commit**
 
 ```bash
 git add packages/data/src/queries/browse.ts packages/data/tests/browse.test.ts \
@@ -206,13 +236,16 @@ export interface SegmentedControlProps<T extends string> {
   testID?: string;
 }
 export function SegmentedControl<T extends string>(props: SegmentedControlProps<T>): JSX.Element;
+// Shipped without the `testID?: string` this block specified: every segment
+// already carries `segment-<value>`, which is what the screen and its tests
+// address, and the row-level one had no caller.
 ```
 
 Generic and content-free — M6d's reader mode chip and M6e's density chip both
 use it. That is why it is a component and not four buttons inside the surah
 screen.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```tsx
 it('marks exactly one option selected', () => {
@@ -247,12 +280,12 @@ it('names the group for a screen reader', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test SegmentedControl`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 A `GlassSurface radius="pill"` row of `Pressable`s. The selected one gets a
 filled `theme.accentWash` pill behind it and `theme.accent` text; the rest are
@@ -261,17 +294,22 @@ filled `theme.accentWash` pill behind it and `theme.accent` text; the rest are
 segments in a row cannot each be 48 wide on a 390pt frame — the *row* is 48
 tall, which is what the guideline measures.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `pnpm --filter @quran-corpus/mobile test SegmentedControl`
 Expected: PASS.
 
-- [ ] **Step 5: Mutation-check (§4)**
+- [x] **Step 5: Mutation-check (§4)**
 
 Remove the "already selected" guard. Expected: the third test FAILS. Restore by
 re-editing.
 
-- [ ] **Step 6: Commit**
+Run 2026-08-25, three mutations rather than the one specified, each failing
+exactly one test: dropping the guard -> "does not fire when the selected option
+is tapped again"; reporting the index -> "reports the value, not the index";
+dropping the selected font weight -> "signals selection by more than colour".
+
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/mobile/src/components/SegmentedControl.tsx apps/mobile/src/components/SegmentedControl.test.tsx
@@ -300,7 +338,7 @@ New `uiStrings` keys, all three locales: `browse.surah`, `browse.juz`,
 `browse.page`, `browse.revealed`, `browse.meccan`, `browse.medinan`,
 `browse.mode`, `browse.juzLabel`, `browse.pageLabel`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```tsx
 it('lists surahs by default', async () => {
@@ -336,12 +374,12 @@ it('keeps the chosen mode while the tab stays mounted', async () => {
 });
 ```
 
-- [ ] **Step 2: Run them and watch them fail**
+- [x] **Step 2: Run them and watch them fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test SurahsTab`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 - Mode lives in `useState`, defaulting to `'surah'`.
 - Each mode's data loads lazily on first switch and is memoized for the mount —
@@ -357,17 +395,28 @@ Expected: FAIL.
 - `contentContainerStyle.paddingBottom` uses `useListBottomPadding()`; the
   floating tab pill is over this screen.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `pnpm --filter @quran-corpus/mobile test && pnpm -r type-check && pnpm -r lint`
 Expected: PASS.
 
-- [ ] **Step 5: Mutation-check (§4)**
+- [x] **Step 5: Mutation-check (§4)**
 
-Change the juz row's link params to `ayah: '1'`. Expected: the juz-2 test
+Change the juz row's link params to `ayah: '1'`. Expected: the juz-3 test
 FAILS. Restore by re-editing.
 
-- [ ] **Step 6: Commit**
+Run 2026-08-25, four mutations, each failing exactly the intended test: the
+juz row opening at ayah 1 -> the juz navigation test; dropping the
+already-loaded guard -> "loads each mode once"; grouping every revealed row
+into one section -> the Meccan/Medinan test; swallowing the load error -> all
+three failure tests.
+
+Also shipped differently from the file list above: `BrowseList.tsx` is new and
+`SurahList` maps onto it rather than keeping its own FlatList. Four
+near-identical lists is where a row gains a fix in one mode and keeps the bug
+in the other three.
+
+- [x] **Step 6: Commit**
 
 ```bash
 git add 'apps/mobile/app/(tabs)/surahs.tsx' apps/mobile/src/screens/SurahsScreen.tsx \
@@ -380,11 +429,74 @@ git commit -m "feat(mobile): browse by surah, juz, page or revelation order"
 
 ### Task 4: §5 stop, then build
 
-- [ ] **Step 1: Self-review** the diff against DRY / SOLID / OWASP.
-- [ ] **Step 2: Stop and ask the owner to run `/code-review`** — new
+- [x] **Step 1: Self-review** the diff against DRY / SOLID / OWASP.
+
+  - **DRY**: one `BrowseList` behind all four modes and the surah index; the
+    three queries live only in `packages/data`; `corpusRepository` re-exports
+    them rather than wrapping, since a wrapper here would be a rename.
+  - **SOLID**: `BrowseList` takes rows, never a data source, so no mode is
+    privileged in it. `SegmentedControl` is generic over the value.
+  - **OWASP**: no new trust boundary. Every row navigates through the existing
+    reader route, whose `parseAyahNumber`/`parseSurahId` already validate the
+    params -- at the route, so the three new link sources inherit it rather
+    than each re-checking. Row values come from the bundled DB, not from input.
+  - One accepted cost: the four caches are dropped whenever the UI language
+    changes, which re-runs up to four queries. The alternative is re-localizing
+    cached rows on read, which is more code to keep three lists out of the
+    previous language.
+- [x] **Step 2: Stop and ask the owner to run `/code-review`** — new
   `packages/data` queries (§5). Plain `/code-review`, never `ultra` unprompted.
-- [ ] **Step 3: Act on the findings.** One pass. Say what is declined and why.
-- [ ] **Step 4: Build.**
+  Run 2026-08-25. Five findings, all against code, none declined.
+- [x] **Step 3: Act on the findings.** One pass, all five fixed:
+
+  1. **A failed load left its error over every already-cached mode**
+     (`SurahsScreen.tsx`). `setError(null)` sat inside the load path, which the
+     effect never reaches for a cached mode, so switching away from a failed
+     juz read kept "Unable to load surahs" on screen over the surah list
+     permanently — nothing left could clear it. Cleared before the `loaded`
+     bail instead. New test; mutation-checked by moving the call back.
+  2. **`accessible` on the tablist collapsed all four segments into one
+     TalkBack node** (`SegmentedControl.tsx`). On Android an accessible View
+     stops its children being focusable, so the control was unoperable by
+     screen reader and a double-tap fired at the row's centre. Dropped, which
+     is what `GlassTabBar` already does. **No unit test can catch this** —
+     `rnHosts.host()` ignores `accessible`, so the group-label test passed
+     against the broken control. Check 61 must be re-run with TalkBack on.
+     Done 2026-08-25 — see the verification log: focus lands on one
+     segment at a time, and the node dump shows the container is no
+     longer the focusable element.
+  3. **An interrupted seed left the whole surah table in reverse order**
+     (`db.py`, `seed.py`). The park pass committed on its own and `upsert_surah`
+     commits per row, so a crash mid-loop left negative ranks, and
+     `getRevealedIndex`'s `ORDER BY order_number` renders those as reverse
+     mushaf order — a plausible chronology with nothing to signal it. Replaced
+     `park_surah_order` with `reseed_surahs`, one transaction around the park
+     and all 114 upserts (`upsert_surah` keeps its own commit for every other
+     caller). New rollback test; mutation-checked back to per-row commits, and
+     it leaves 112 parked rows.
+  4. **`MIN(id)` made the juz/page start ayah depend on insertion order**
+     (`browse.ts`). `ayahs.id` is AUTOINCREMENT, so a delete-and-re-import of
+     one surah hands it the highest ids and every juz and page it touches then
+     opens at the wrong end of itself. Replaced with
+     `ROW_NUMBER() OVER (PARTITION BY … ORDER BY surah_id, ayah_number)` — one
+     pass, ordering stated intrinsically. The fixture could not catch it
+     (ids ran in mushaf order); surah 1 now carries ids 20–22, which makes juz 1
+     and page 2 discriminate. Mutation-checked back to `ORDER BY a.id`: two
+     tests fail. Re-verified against the live corpus — 30 juz, 604 pages, 6236
+     ayahs, juz 2/3/15/30 → 2:142 / 2:253 / 17:1 / 78:1, pages 1/300/604 →
+     1:1 / 18:54 / 112:1.
+  5. **SectionList mock keyed sections by title** (`rnHosts.ts`). Two sections
+     may legitimately share one, and the mock swallowed that as a duplicate-key
+     warning. Keyed by index.
+- [ ] **Step 4: Build. DEFERRED to 2026-09-01** — the free-plan EAS Android
+  build quota is exhausted until then. This is the only unfinished step in the
+  phase; Tasks 1, 2, 3, 5 and Task 4 Steps 1–3 are all done, and the device
+  gate (§10, checks 61–64) passed on Expo Go, so the phase's behaviour is
+  verified on real hardware without it. What the build still buys is a release
+  binary rather than a dev bundle: Hermes in release mode, minified JS, the
+  bundled DB going through `prebuild:assert-db`, and no Expo Go dev-launcher
+  overlay. Re-run the command below on or after 2026-09-01 and note the result
+  here; nothing else in M6c waits on it.
 
 ```bash
 cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --profile preview
@@ -392,7 +504,7 @@ cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --prof
 
 ---
 
-### Task 5: Device run
+### Task 5: Device run — DONE 2026-08-25 (Expo Go)
 
 | # | Check | Pass condition |
 | --- | --- | --- |
@@ -403,9 +515,45 @@ cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --prof
 
 ## Verification Log
 
+Run on the owner's OnePlus 7 Pro (GM1917, Android 12) via Expo Go over adb
+wireless debugging, Metro at `exp://192.168.0.103:8081`, bundle
+`expo-router/entry.js` (2070 modules). No EAS build: the free-plan Android
+quota is exhausted until 2026-09-01, so Expo Go is the loop.
+
 | Check | Build | Date | Result | Notes |
 | --- | --- | --- | --- | --- |
-| 61 | | | | |
-| 62 | | | | |
-| 63 | | | | |
-| 64 | | | | |
+| 61 | Expo Go, 7f30244 | 2026-08-25 | PASS | All four modes render. First load of each is ~1-3s; every switch after that is instant, and the list keeps its scroll offset across a reader round-trip. TalkBack pass below. |
+| 62 | Expo Go, 7f30244 | 2026-08-25 | PASS | 30 juz listed. Juz 2 -> Al-Baqara 142, juz 15 -> Al-Isra 1, juz 30 -> An-Naba 1, each opening the reader on that ayah rather than ayah 1. Juz 3 -> Al-Baqara 253 checked too: it is the case that a query taking surah and ayah from independent aggregates gets wrong. |
+| 63 | Expo Go, 7f30244 | 2026-08-25 | PASS | 604 pages listed. Page 1 -> 1:1, page 300 -> Al-Kahf 54 (18:54, mid-surah), page 604 -> Al-Ikhlas 1 (112:1). Reader opened on the named ayah in all three. |
+| 64 | Expo Go, 7f30244 | 2026-08-25 | PASS | al-Alaq first under a MECCAN header; the Meccan block ends at rank 86 (Al-Mutaffifin) and MEDINAN opens at rank 87 (Al-Baqara) -- 86/28, matching the bundled DB. Tapping a row opens that surah at ayah 1. |
+
+### Check 61, accessibility half (review finding 2)
+
+`accessible` on the segmented control's tablist collapsed all four segments
+into one accessibility element. No unit test in this repo can see that --
+`rnHosts.host()` destructures `accessible` and drops it -- so the device was
+the only gate. Two independent confirmations, both on 2026-08-25:
+
+- `uiautomator dump` of the live screen: the tablist ViewGroup
+  `[64,169][1376,369]` is `clickable=false focusable=false`, and each segment
+  below it is its own node -- `clickable=true focusable=true`, its own
+  `content-desc` (Surah / Juz / Page / Revealed) and its own 306px-wide
+  bounds. The active one carries `selected=true`. Under the bug the container
+  itself would have been the focusable node and the four children would not
+  have appeared.
+- TalkBack on (enabled through Settings; `adb shell settings put secure` is
+  refused on this device -- no `WRITE_SECURE_SETTINGS`): the green
+  accessibility-focus rectangle lands on one segment at a time, never on the
+  strip as a whole, and focusing then activating Surah / Juz / Page /
+  Revealed each switched to that mode. TalkBack was turned back off
+  afterwards; `enabled_accessibility_services` is empty and
+  `accessibility_enabled` is 0, as it was before the run.
+
+### Device-loop notes (not product defects)
+
+- Expo Go's floating dev-launcher button sits over the right end of the
+  segmented control and swallows taps aimed at the "Revealed" segment,
+  opening the dev menu instead. It does not exist in a release build.
+- One unexplained navigation back to the Home tab early in the run, with
+  nothing in the Metro log and no reload. It did not reproduce across the
+  rest of the session; noted rather than diagnosed.

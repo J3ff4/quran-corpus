@@ -55,6 +55,13 @@ export interface SurahReaderData {
   ayahs: ReaderAyah[];
 }
 
+// Re-exported rather than wrapped: these already return the shape the screen
+// renders, so a mapping layer here would be a rename and nothing else. The
+// re-export keeps the mocking seam uniform -- every screen mocks
+// @/data/corpusRepository, not @quran-corpus/data/mobile.
+export { getJuzIndex, getPageIndex, getRevealedIndex } from '@quran-corpus/data/mobile';
+export type { JuzEntry, PageEntry, RevealedEntry } from '@quran-corpus/data/mobile';
+
 export interface SurahListItem {
   id: number;
   nameArabic: string;

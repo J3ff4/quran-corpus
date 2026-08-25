@@ -10,6 +10,9 @@ describe('@quran-corpus/data/mobile', () => {
     expect(typeof mod.getAllSurahs).toBe('function');
     expect(typeof mod.getAyahsBySurah).toBe('function');
     expect(typeof mod.getWordsByAyah).toBe('function');
+    expect(typeof mod.getJuzIndex).toBe('function');
+    expect(typeof mod.getPageIndex).toBe('function');
+    expect(typeof mod.getRevealedIndex).toBe('function');
     expect(typeof mod.getWordDetail).toBe('function');
     expect(typeof mod.getTranslationsBySurahAndLang).toBe('function');
     expect(typeof mod.search).toBe('function');

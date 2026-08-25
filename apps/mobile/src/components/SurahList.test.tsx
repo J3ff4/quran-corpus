@@ -3,49 +3,10 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { SurahList } from './SurahList';
 
-vi.mock('react-native', async () => {
-  const React = await import('react');
-  const host =
-    (tag: string) =>
-    ({ accessibilityRole, accessibilityLabel, children, onPress, ...props }: {
-      accessibilityRole?: string;
-      accessibilityLabel?: string;
-      children?: React.ReactNode;
-      onPress?: () => void;
-    }) =>
-      React.createElement(
-        tag,
-        {
-          ...props,
-          'aria-label': accessibilityLabel,
-          onClick: onPress,
-          role: accessibilityRole,
-        },
-        children,
-      );
-
-  return {
-    FlatList: ({
-      data,
-      renderItem,
-      keyExtractor,
-    }: {
-      data: unknown[];
-      renderItem: (info: { item: unknown; index: number }) => React.ReactNode;
-      keyExtractor?: (item: unknown, index: number) => string;
-    }) =>
-      React.createElement(
-        'div',
-        null,
-        data.map((item, index) =>
-          React.createElement('div', { key: keyExtractor?.(item, index) ?? index }, renderItem({ item, index })),
-        ),
-      ),
-    Pressable: host('button'),
-    Text: host('span'),
-    View: host('div'),
-  };
-});
+vi.mock('react-native', async () => (await import('@/testing/rnHosts.js')).reactNativeTextMock());
+// SurahList renders BrowseList rows, whose press squeeze reads the in-app
+// reduce-motion setting; the real store opens expo-secure-store.
+vi.mock('@/settings/settingsStore', () => ({ useAppSettings: () => ({ uiLocale: 'en', reduceMotion: false }) }));
 
 describe('SurahList', () => {
   it('renders surah names and ayah counts', () => {

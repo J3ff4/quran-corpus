@@ -93,6 +93,19 @@ export type UiStringKey =
   | 'lemma.next'
   | 'surahList.ayahsSuffix'
   | 'surahList.loadFailed'
+  // Browse modes (M6c). `mode` names the segmented control itself; `juzLabel`
+  // and `pageLabel` prefix a number in a row and in its spoken label, which is
+  // why they are words rather than "Juz 2" templates.
+  | 'browse.mode'
+  | 'browse.surah'
+  | 'browse.juz'
+  | 'browse.page'
+  | 'browse.revealed'
+  | 'browse.meccan'
+  | 'browse.medinan'
+  | 'browse.juzLabel'
+  | 'browse.pageLabel'
+  | 'browse.opensAt'
   | 'settings.language'
   | 'settings.theme'
   | 'settings.about'
@@ -234,6 +247,16 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'lemma.next': 'Next',
     'surahList.ayahsSuffix': 'ayahs',
     'surahList.loadFailed': 'Unable to load surahs',
+    'browse.mode': 'Browse by',
+    'browse.surah': 'Surah',
+    'browse.juz': 'Juz',
+    'browse.page': 'Page',
+    'browse.revealed': 'Revealed',
+    'browse.meccan': 'Meccan',
+    'browse.medinan': 'Medinan',
+    'browse.juzLabel': 'Juz',
+    'browse.pageLabel': 'Page',
+    'browse.opensAt': 'opens at',
     'settings.language': 'Language',
     'settings.theme': 'Theme',
     'settings.about': 'About and credits',
@@ -363,6 +386,16 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'lemma.next': 'Keyingi',
     'surahList.ayahsSuffix': 'oyat',
     'surahList.loadFailed': 'Suralarni yuklab bo‘lmadi',
+    'browse.mode': 'Saralash',
+    'browse.surah': 'Sura',
+    'browse.juz': 'Juz',
+    'browse.page': 'Sahifa',
+    'browse.revealed': 'Nozil tartibi',
+    'browse.meccan': 'Makkiy',
+    'browse.medinan': 'Madaniy',
+    'browse.juzLabel': 'Juz',
+    'browse.pageLabel': 'Sahifa',
+    'browse.opensAt': 'boshlanishi',
     'settings.language': 'Til',
     'settings.theme': 'Mavzu',
     'settings.about': 'Ilova va manbalar',
@@ -489,6 +522,16 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'lemma.next': 'Следующая',
     'surahList.ayahsSuffix': 'аятов',
     'surahList.loadFailed': 'Не удалось загрузить суры',
+    'browse.mode': 'Сортировка',
+    'browse.surah': 'Сура',
+    'browse.juz': 'Джуз',
+    'browse.page': 'Страница',
+    'browse.revealed': 'Ниспослание',
+    'browse.meccan': 'Мекканские',
+    'browse.medinan': 'Мединские',
+    'browse.juzLabel': 'Джуз',
+    'browse.pageLabel': 'Страница',
+    'browse.opensAt': 'начало',
     'settings.language': 'Язык',
     'settings.theme': 'Тема',
     'settings.about': 'О приложении и источниках',

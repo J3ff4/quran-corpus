@@ -8,6 +8,10 @@ import { strings, t, type UiStringKey } from './uiStrings';
 // collides with 'en' is an untranslated string that shipped by accident.
 const ALLOWED_COLLISIONS: Partial<Record<UiStringKey, readonly ('uz' | 'ru')[]>> = {
   'dictionary.columnRank': ['uz'],
+  // "Juz" is the same word in Uzbek -- the Arabic juzʼ, transliterated the same
+  // way in both. Not an untranslated copy.
+  'browse.juz': ['uz'],
+  'browse.juzLabel': ['uz'],
 };
 
 // Concatenate every .ts/.tsx source file under src/ and app/, except the
