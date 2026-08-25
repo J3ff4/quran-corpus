@@ -545,7 +545,7 @@ git commit -m "feat(mobile): full transport in the recitation bar"
   `<ReciterSheet onClose onSelect current />` built on the existing
   `BottomSheet`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```tsx
 it('falls back to the default for an unknown stored reciter', async () => {
@@ -568,18 +568,18 @@ it('never lists Alafasy', () => {
 });
 ```
 
-- [ ] **Step 2: Run them, watch them fail, implement, re-run**
+- [x] **Step 2: Run them, watch them fail, implement, re-run**
 
 Validate with `reciterById(value) !== null` in the settings guard — do not write
 a second list of ids in `apps/mobile`. The picker is reachable from two places:
 the recitation bar's reciter label and the Settings screen.
 
-- [ ] **Step 3: Mutation-check (§4)**
+- [x] **Step 3: Mutation-check (§4)**
 
 Drop the settings guard. Expected: the fallback test FAILS. Restore by
 re-editing.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/mobile/src/settings apps/mobile/src/components/ReciterSheet.tsx \
