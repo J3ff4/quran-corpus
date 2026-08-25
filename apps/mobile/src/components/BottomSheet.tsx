@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { BackHandler, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { BackHandler, Modal, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import Animated, {
   Easing,
@@ -8,7 +8,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useReducedMotion } from '@/motion/useReducedMotion';
 import { useThemeColors } from '@/theme/themeContext';
 
@@ -45,6 +45,15 @@ export interface BottomSheetProps {
  * The sheet shell: dim backdrop, slide-up entrance, drag-to-dismiss, Android
  * back. Mounting it opens it; unmounting closes it. Extracted from WordSheet so
  * the language sheet does not duplicate any of it (CLAUDE.md §3).
+ *
+ * Inside a <Modal>, which is the only way it can cover the floating tab pill:
+ * the pill is the navigator's `tabBar`, a sibling of the whole screen, so
+ * anything a screen renders paints under it however it is positioned or
+ * z-indexed. On the device the word sheet's Root row came out behind the pill,
+ * and the pill stayed tappable over the dimmed backdrop (owner report,
+ * 2026-08-25). A Modal renders in its own native window above the navigator,
+ * so the backdrop dims the pill too and swallows its taps -- which is what an
+ * Android system sheet does.
  */
 export function BottomSheet({ onClose, closeLabel, children }: BottomSheetProps) {
   const theme = useThemeColors();
@@ -124,7 +133,25 @@ export function BottomSheet({ onClose, closeLabel, children }: BottomSheetProps)
   }));
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    <Modal
+      transparent
+      visible
+      // We animate the sheet ourselves, in the effect above.
+      animationType="none"
+      // Without it the backdrop stops at the status bar and the sheet sits
+      // under a bright strip.
+      statusBarTranslucent
+      // Android routes the back press to the topmost Modal, so the
+      // BackHandler subscription above no longer sees it. Both are kept: the
+      // subscription is what covers the sheet's own dismissal path, and this
+      // is what covers back while the Modal window has focus.
+      onRequestClose={onClose}
+    >
+      {/* RNGH needs its own root inside a Modal: the one in app/_layout.tsx
+          belongs to the main window, and gestures in this window are not
+          routed through it, so drag-to-dismiss dies silently on Android. */}
+      <GestureHandlerRootView style={StyleSheet.absoluteFill}>
+        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <AnimatedPressable
         testID="sheet-backdrop"
         accessibilityRole="button"
@@ -168,7 +195,9 @@ export function BottomSheet({ onClose, closeLabel, children }: BottomSheetProps)
           />
           {children}
         </Animated.View>
-      </GestureDetector>
-    </View>
+        </GestureDetector>
+        </View>
+      </GestureHandlerRootView>
+    </Modal>
   );
 }

@@ -54,6 +54,18 @@ function flattenStyle(style: unknown): Record<string, unknown> | undefined {
   return Object.assign({}, ...style.flat(Infinity).filter(Boolean));
 }
 
+/**
+ * A Modal that renders its children inline when visible, and nothing when not.
+ *
+ * The real one opens a separate native window, which jsdom has no counterpart
+ * for. Honouring `visible` rather than always rendering: a hidden Modal's
+ * children are not on screen, and a shim that renders them anyway would let a
+ * suite assert on a sheet the user cannot see.
+ */
+export function Modal({ children, visible = true }: { children?: React.ReactNode; visible?: boolean }) {
+  return visible ? React.createElement(React.Fragment, null, children) : null;
+}
+
 /** The `nativeEvent.lines` shape Android's `onTextLayout` reports. */
 export type LayoutHandler = (event: { nativeEvent: { lines: { text: string }[] } }) => void;
 
@@ -103,6 +115,7 @@ export function reactNativeTextMock() {
     AccessibilityInfo,
     AppState,
     FlatList,
+    Modal,
     ScrollView: host('div'),
     SectionList,
     StyleSheet,
