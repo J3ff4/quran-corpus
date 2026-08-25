@@ -434,6 +434,30 @@ describe('loadPersistedAppSettings', () => {
     }
   });
 
+  it('restores a persisted word-by-word density', async () => {
+    const userClient = requireSettingsClient();
+    await saveSetting(userClient, 'wbwDensity', 'dense');
+
+    const settings = await loadPersistedAppSettings(userClient);
+
+    expect(settings.wbwDensity).toBe('dense');
+  });
+
+  it('falls back to hybrid for a wbwDensity it does not recognise', async () => {
+    // '2c' and '2d' are in the list because they are the mockup names the
+    // plan and every commit body use, and so the plausible thing for a later
+    // writer to store. An unvalidated read hands the layout switch a value
+    // that renders neither layout.
+    const userClient = requireSettingsClient();
+    for (const bad of ['2c', '2d', 'DENSE', '', 'compact']) {
+      await saveSetting(userClient, 'wbwDensity', bad);
+
+      const settings = await loadPersistedAppSettings(userClient);
+
+      expect(settings.wbwDensity).toBe('hybrid');
+    }
+  });
+
   it('rejects an arabicScale that only names a property of Object.prototype', async () => {
     // `value in arabicScales` would accept this and hand `toString` to the
     // multiply, which is NaN. Object.hasOwn is why it does not.

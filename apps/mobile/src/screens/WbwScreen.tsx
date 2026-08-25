@@ -1,18 +1,31 @@
-import { router, useNavigation } from 'expo-router';
+import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Text, View } from 'react-native';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 import type { Word } from '@quran-corpus/data/mobile';
+import { SegmentedControl } from '@/components/SegmentedControl';
 import { VersePicker } from '@/components/VersePicker';
-import { WbwGrid } from '@/components/WbwGrid';
+import { WbwDense } from '@/components/WbwDense';
+import { WbwHybrid } from '@/components/WbwHybrid';
 import { WordSheet } from '@/components/WordSheet';
-import { getWbwScreen, type WbwScreenData, type WordSummary } from '@/data/corpusRepository';
+import {
+  getSurahGlosses,
+  getWbwScreen,
+  type WbwScreenData,
+  type WordSummary,
+} from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { useWordSummaryLoader } from '@/data/useWordSummaryLoader';
 import { t } from '@/i18n/uiStrings';
-import { useAppSettings } from '@/settings/settingsStore';
+import { useAppSettings, type WbwDensity } from '@/settings/settingsStore';
+import { typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
+
+const DENSITY_OPTIONS: readonly { value: WbwDensity; labelKey: 'wbw.densityHybrid' | 'wbw.densityDense' }[] = [
+  { value: 'hybrid', labelKey: 'wbw.densityHybrid' },
+  { value: 'dense', labelKey: 'wbw.densityDense' },
+];
 
 interface OpenWord {
   summary: WordSummary;
@@ -28,10 +41,9 @@ export interface WbwScreenProps {
 }
 
 export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
-  const { contentLanguage, uiLocale } = useAppSettings();
+  const { contentLanguage, uiLocale, wbwDensity, setWbwDensity } = useAppSettings();
   const theme = useThemeColors();
   const paddingBottom = useListBottomPadding();
-  const navigation = useNavigation();
 
   // Keyed on the raw params, and reset during render when they change.
   // expo-router reuses this component across in-app navigations to the same
@@ -45,6 +57,13 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
   const setFrom = (next: number) => setPage({ key: paramKey, from: next });
 
   const [wbw, setWbw] = useState<WbwScreenData | null>(null);
+  // Fetched here rather than left to the sheet's loader: every layout now
+  // prints a gloss under every word, so the map is needed to RENDER the
+  // screen, not just to answer a tap. useWordSummaryLoader keeps its own copy
+  // because the reader shares it -- one duplicate query per surah, off the
+  // first-paint path, in exchange for not threading a cache through two
+  // screens.
+  const [glosses, setGlosses] = useState<Map<number, string>>(new Map());
   const [corpusClient, setCorpusClient] = useState<MobileDataClient | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -67,9 +86,13 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
         const corpusDb = await openCorpusDb();
         const client = createExpoSqliteClient(corpusDb as ExpoSqliteLike);
         const data = await getWbwScreen(client, surahId, from);
+        // Sequential: the gloss query is per surah and only worth issuing once
+        // the range query has proved the surah exists.
+        const surahGlosses = await getSurahGlosses(client, surahId, contentLanguage);
         if (!cancelled) {
           setCorpusClient(client);
           setWbw(data);
+          setGlosses(surahGlosses);
         }
       } catch (cause) {
         // See the note in app/(tabs)/surahs.tsx: logged for logcat, never shown.
@@ -84,40 +107,9 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
     return () => {
       cancelled = true;
     };
-  }, [from, surahId, uiLocale]);
+  }, [contentLanguage, from, surahId, uiLocale]);
 
   const loadWordSummary = useWordSummaryLoader(corpusClient, surahId, contentLanguage);
-
-  // Surah name and pager live IN the nav header rather than in two rows under
-  // it. Stacked, the tab header, the title block and the pager row ate roughly
-  // a third of the screen before the first word (owner screenshot, 2026-08-17).
-  // Both entry points -- the morphology tab and the reader's word-by-word push
-  // -- already draw a header, so this reuses one bar instead of adding a third.
-  // headerTitle, not title: `title` also renames the bottom tab.
-  useEffect(() => {
-    navigation.setOptions({
-      headerTitle: wbw ? wbw.surah.name_translit : t(uiLocale, 'wbw.title'),
-      // Pulled while the sheet is up. The sheet and its backdrop render inside
-      // this screen, and the nav header sits above it -- so a pager left here
-      // stays lit over the dimmed grid, tappable by finger and reachable by
-      // TalkBack swipe, which is what the wrapper below prevents for
-      // everything the backdrop does cover.
-      headerRight:
-        wbw && !open
-          ? () => (
-              <VersePicker
-                from={wbw.from}
-                to={wbw.to}
-                ayahCount={wbw.surah.ayah_count}
-                uiLocale={uiLocale}
-                onRange={(nextFrom) => setFrom(nextFrom)}
-              />
-            )
-          : undefined,
-    });
-    // setFrom is deliberately absent: it closes over `paramKey`, which only
-    // changes together with the surah this effect already re-runs for.
-  }, [navigation, wbw, uiLocale, open]);
 
   // Taps are cheap and the grid puts ~150 of them on screen at once, so two can
   // easily be in flight together. Without the sequence check the sheet shows
@@ -166,19 +158,79 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
     <View style={{ flex: 1 }}>
       {/* accessibilityViewIsModal is iOS-only, so on Android this is what stops
           TalkBack swiping into the grid behind the sheet (CLAUDE.md §8, WCAG
-          AA). The header is outside it and cannot be wrapped, which is why the
-          pager is unmounted above rather than hidden here. */}
-      <View style={{ flex: 1 }} importantForAccessibility={open ? 'no-hide-descendants' : 'auto'}>
+          AA). The pager is inside it now that it renders in the screen, so it
+          is hidden along with everything else rather than unmounted. */}
+      <View
+        testID="wbw-screen"
+        style={{ flex: 1 }}
+        importantForAccessibility={open ? 'no-hide-descendants' : 'auto'}
+      >
+        {/* Drawn in the screen rather than pushed to the nav header with
+            setOptions. The morphology tab has no header to push to -- tabs run
+            headerShown: false since M6a, because a native header strip cuts
+            across the bloom -- so on that entry point the surah name and the
+            pager were both silently absent, leaving no way to change the ayah
+            range at all (issue #25, found on the M6e device run). Here they
+            reach both entry points, and it is what every other screen already
+            does: app/_layout.tsx sets `title: ''` on the Stack so the nav
+            header carries the back affordance and nothing else.
+
+            Name and pager share one row on purpose. Stacked as separate rows
+            under a header they ate roughly a third of the screen before the
+            first word (owner screenshot, 2026-08-17). */}
+        <View style={{ paddingHorizontal: 14, paddingTop: 10, gap: 10 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+            }}
+          >
+            <Text
+              accessibilityRole="header"
+              // Clamped and shrinkable: 'Al-Munafiqoon' beside the pager
+              // overflows a 390pt frame, and an unclamped name would push the
+              // pager off the edge instead of truncating itself.
+              numberOfLines={1}
+              style={{ color: theme.text, fontSize: typography.title, fontWeight: '700', flexShrink: 1 }}
+            >
+              {wbw.surah.name_translit}
+            </Text>
+            <VersePicker
+              from={wbw.from}
+              to={wbw.to}
+              ayahCount={wbw.surah.ayah_count}
+              uiLocale={uiLocale}
+              onRange={(nextFrom) => setFrom(nextFrom)}
+            />
+          </View>
+          <SegmentedControl
+            options={DENSITY_OPTIONS.map((option) => ({
+              value: option.value,
+              label: t(uiLocale, option.labelKey),
+            }))}
+            value={wbwDensity}
+            onChange={setWbwDensity}
+            accessibilityLabel={t(uiLocale, 'wbw.density')}
+          />
+        </View>
         <FlatList
           data={wbw.pages}
           keyExtractor={(page) => String(page.ayahNumber)}
-          renderItem={({ item }) => (
-            <WbwGrid
-              page={item}
-              uiLocale={uiLocale}
-              onWordPress={(word) => onWordPress(item.ayahNumber, word)}
-            />
-          )}
+          renderItem={({ item }) => {
+            const layoutProps = {
+              page: item,
+              uiLocale,
+              glosses,
+              onWordPress: (word: Word) => onWordPress(item.ayahNumber, word),
+            };
+            return wbwDensity === 'dense' ? (
+              <WbwDense {...layoutProps} />
+            ) : (
+              <WbwHybrid {...layoutProps} />
+            );
+          }}
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingBottom }}
         />

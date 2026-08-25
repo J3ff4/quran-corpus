@@ -18,6 +18,11 @@ export type UiStringKey =
   // Prefix for the pager's range, read as "Ayahs 11-20". The bare "11-20" on
   // screen announces as two numbers with nothing to say what they count.
   | 'wbw.rangeLabel'
+  // Names the density chip for TalkBack. The two segment labels below name
+  // layouts, not settings, so the group needs its own word.
+  | 'wbw.density'
+  | 'wbw.densityHybrid'
+  | 'wbw.densityDense'
   | 'morphology.noHistory'
   | 'bookmarks.empty'
   | 'bookmarks.entryPrefix'
@@ -201,6 +206,9 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'wbw.previous': 'Previous ayahs',
     'wbw.next': 'Next ayahs',
     'wbw.rangeLabel': 'Ayahs',
+    'wbw.density': 'Layout',
+    'wbw.densityHybrid': 'Verse',
+    'wbw.densityDense': 'Dense',
     'morphology.noHistory': 'No reading history yet',
     'bookmarks.empty': 'No bookmarks yet',
     'bookmarks.entryPrefix': 'Open',
@@ -345,6 +353,9 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'wbw.previous': 'Oldingi oyatlar',
     'wbw.next': 'Keyingi oyatlar',
     'wbw.rangeLabel': 'Oyatlar',
+    'wbw.density': 'Ko‘rinish',
+    'wbw.densityHybrid': 'Oyat',
+    'wbw.densityDense': 'Zich',
     'morphology.noHistory': 'Hali o‘qish tarixi yo‘q',
     'bookmarks.empty': 'Hali xatcho‘p yo‘q',
     'bookmarks.entryPrefix': 'Ochish',
@@ -486,6 +497,9 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'wbw.previous': 'Предыдущие аяты',
     'wbw.next': 'Следующие аяты',
     'wbw.rangeLabel': 'Аяты',
+    'wbw.density': 'Вид',
+    'wbw.densityHybrid': 'Аят',
+    'wbw.densityDense': 'Плотно',
     'morphology.noHistory': 'Истории чтения пока нет',
     'bookmarks.empty': 'Закладок пока нет',
     'bookmarks.entryPrefix': 'Открыть',

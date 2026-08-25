@@ -21,7 +21,7 @@ vi.mock('@/settings/settingsStore', () => ({
 }));
 
 vi.mock('react-native', async () => {
-  const { host } = await import('@/testing/rnHosts.js');
+  const { Modal, host } = await import('@/testing/rnHosts.js');
 
   return {
     // Reached through useReducedMotion, which every render of the sheet calls.
@@ -32,6 +32,8 @@ vi.mock('react-native', async () => {
     BackHandler: {
       addEventListener: () => ({ remove: () => {} }),
     },
+    // The sheet lives in a Modal so it can cover the navigator's tab pill.
+    Modal,
     Pressable: host('button'),
     StyleSheet: { absoluteFill: {} },
     Text: host('span'),
@@ -68,6 +70,8 @@ vi.mock('react-native-reanimated', async () => {
 
 vi.mock('react-native-gesture-handler', () => ({
   GestureDetector: ({ children }: { children?: React.ReactNode }) => children,
+  // The sheet mounts its own root inside the Modal -- see BottomSheet.
+  GestureHandlerRootView: ({ children }: { children?: React.ReactNode }) => children,
   Gesture: {
     Pan: () => {
       const chain = {

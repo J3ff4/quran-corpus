@@ -39,9 +39,9 @@ export function VersePicker({ from, to, ayahCount, uiLocale, onRange }: VersePic
   const controlStyle = {
     minHeight: touchTargets.minimum,
     minWidth: touchTargets.minimum,
-    // Tighter than the 16 it carried as a full-width row: in the header it
-    // shares the bar with the surah name, and the 48dp floor is what actually
-    // sizes the target.
+    // Tighter than the 16 it carried as a full-width row: it shares its row
+    // with the surah name, and the 48dp floor is what actually sizes the
+    // target.
     paddingHorizontal: 8,
     justifyContent: 'center' as const,
     alignItems: 'center' as const,
@@ -49,8 +49,8 @@ export function VersePicker({ from, to, ayahCount, uiLocale, onRange }: VersePic
 
   return (
     <View
-      // No border, no background and no vertical padding: this renders inside
-      // the nav header, which already draws the bar it used to draw for itself.
+      // No border, no background and no vertical padding: this sits in the
+      // screen's heading row beside the surah name, not in a bar of its own.
       style={{
         flexDirection: 'row',
         alignItems: 'center',
@@ -73,8 +73,8 @@ export function VersePicker({ from, to, ayahCount, uiLocale, onRange }: VersePic
         </Text>
       </Pressable>
       <Text
-        // The surah is named at the other end of this same header bar, so the
-        // range does not repeat it -- "Ayahs 11-20, 2" reads as a third number.
+        // The surah is named at the other end of this same row, so the range
+        // does not repeat it -- "Ayahs 11-20, 2" reads as a third number.
         accessibilityLabel={`${t(uiLocale, 'wbw.rangeLabel')} ${from}–${to}`}
         style={{ color: theme.text, fontSize: typography.body, fontWeight: '600' }}
       >

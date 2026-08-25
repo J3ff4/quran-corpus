@@ -12,6 +12,15 @@ export type ThemePreference = 'system' | 'light' | 'dark';
 // app onto a screen the user left by pressing back.
 export type ReaderMode = 'mushaf' | 'translation';
 
+// Global, not per-screen (decision 26): the density is a reading preference,
+// and a reader who wants dense wants it in every surah.
+//
+// Two values. 'rail' briefly existed while mockup 2c's horizontal rail was on
+// trial against the wrapped run; the owner rejected it on the device
+// (2026-08-25). A phone that stored 'rail' in that window falls back to
+// 'hybrid' through the guard below, which is why the guard is not an `as`.
+export type WbwDensity = 'hybrid' | 'dense';
+
 export interface AppSettings {
   uiLocale: UiLocaleCode;
   contentLanguage: ContentLanguageCode;
@@ -20,6 +29,7 @@ export interface AppSettings {
   arabicScale: ArabicScale;
   reduceMotion: boolean;
   readerMode: ReaderMode;
+  wbwDensity: WbwDensity;
 }
 
 export interface AppSettingsContextValue extends AppSettings {
@@ -30,6 +40,7 @@ export interface AppSettingsContextValue extends AppSettings {
   setArabicScale: (scale: ArabicScale) => void;
   setReduceMotion: (reduce: boolean) => void;
   setReaderMode: (mode: ReaderMode) => void;
+  setWbwDensity: (density: WbwDensity) => void;
   /** Set while the settings database cannot be opened, so a screen can say so
    *  instead of letting changes look saved when nothing is being persisted. */
   storageError: string | null;
@@ -43,6 +54,7 @@ const defaultSettings: AppSettings = {
   arabicScale: 'medium',
   reduceMotion: false,
   readerMode: 'translation',
+  wbwDensity: 'hybrid',
 };
 
 const AppSettingsContext = createContext<AppSettingsContextValue | null>(null);
@@ -59,7 +71,7 @@ const AppSettingsContext = createContext<AppSettingsContextValue | null>(null);
 // change -- the owner's report was that the Arabic dominated the card at any
 // system size. System scaling still composes on top; nothing here sets
 // allowFontScaling.
-const settingKeys = ['uiLocale', 'contentLanguage', 'theme', 'analyticsEnabled', 'arabicScale', 'reduceMotion', 'readerMode'] as const;
+const settingKeys = ['uiLocale', 'contentLanguage', 'theme', 'analyticsEnabled', 'arabicScale', 'reduceMotion', 'readerMode', 'wbwDensity'] as const;
 
 function isUiLocale(value: string | null): value is UiLocaleCode {
   return uiLocales.some((locale) => locale.code === value);
@@ -81,6 +93,10 @@ function isReaderMode(value: string | null): value is ReaderMode {
   return value === 'mushaf' || value === 'translation';
 }
 
+function isWbwDensity(value: string | null): value is WbwDensity {
+  return value === 'hybrid' || value === 'dense';
+}
+
 export async function loadPersistedAppSettings(client: MobileDataClient): Promise<AppSettings> {
   // Keyed, not positional. This used to destructure the Promise.all result by
   // index, which is correct only as long as nobody reorders settingKeys or
@@ -99,6 +115,7 @@ export async function loadPersistedAppSettings(client: MobileDataClient): Promis
   const persistedArabicScale = persisted.arabicScale;
   const reduceMotion = persisted.reduceMotion;
   const persistedReaderMode = persisted.readerMode;
+  const persistedWbwDensity = persisted.wbwDensity;
 
   return {
     uiLocale: isUiLocale(persistedUiLocale) ? persistedUiLocale : defaultSettings.uiLocale,
@@ -108,6 +125,7 @@ export async function loadPersistedAppSettings(client: MobileDataClient): Promis
     arabicScale: isArabicScale(persistedArabicScale) ? persistedArabicScale : defaultSettings.arabicScale,
     reduceMotion: reduceMotion === 'true',
     readerMode: isReaderMode(persistedReaderMode) ? persistedReaderMode : defaultSettings.readerMode,
+    wbwDensity: isWbwDensity(persistedWbwDensity) ? persistedWbwDensity : defaultSettings.wbwDensity,
   };
 }
 
@@ -309,6 +327,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       setArabicScale: (arabicScale) => updateSetting('arabicScale', arabicScale),
       setReduceMotion: (reduceMotion) => updateSetting('reduceMotion', reduceMotion),
       setReaderMode: (readerMode) => updateSetting('readerMode', readerMode),
+      setWbwDensity: (wbwDensity) => updateSetting('wbwDensity', wbwDensity),
     }),
     [settings, storageError, userClient],
   );

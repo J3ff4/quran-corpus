@@ -33,8 +33,14 @@ interface HostProps {
   // pointerEvents, on every render.
   accessible?: unknown;
   contentContainerStyle?: unknown;
+  horizontal?: unknown;
   importantForAccessibility?: unknown;
-  numberOfLines?: unknown;
+  onContentSizeChange?: unknown;
+  showsHorizontalScrollIndicator?: unknown;
+  // Mapped to data-lines below, not dropped: the dense word-by-word layout IS
+  // its one-line gloss clamp, and a shim that swallows numberOfLines leaves
+  // that assertion vacuous -- it would pass against a two-line gloss too.
+  numberOfLines?: number;
   onLayout?: unknown;
   onPressIn?: unknown;
   onPressOut?: unknown;
@@ -46,6 +52,18 @@ interface HostProps {
 function flattenStyle(style: unknown): Record<string, unknown> | undefined {
   if (!Array.isArray(style)) return style as Record<string, unknown> | undefined;
   return Object.assign({}, ...style.flat(Infinity).filter(Boolean));
+}
+
+/**
+ * A Modal that renders its children inline when visible, and nothing when not.
+ *
+ * The real one opens a separate native window, which jsdom has no counterpart
+ * for. Honouring `visible` rather than always rendering: a hidden Modal's
+ * children are not on screen, and a shim that renders them anyway would let a
+ * suite assert on a sheet the user cannot see.
+ */
+export function Modal({ children, visible = true }: { children?: React.ReactNode; visible?: boolean }) {
+  return visible ? React.createElement(React.Fragment, null, children) : null;
 }
 
 /** The `nativeEvent.lines` shape Android's `onTextLayout` reports. */
@@ -97,6 +115,8 @@ export function reactNativeTextMock() {
     AccessibilityInfo,
     AppState,
     FlatList,
+    Modal,
+    ScrollView: host('div'),
     SectionList,
     StyleSheet,
     __layoutHandlers: layoutHandlers,
@@ -135,8 +155,11 @@ export function host(tag: string) {
     testID,
     accessible: _accessible,
     contentContainerStyle: _contentContainerStyle,
+    horizontal: _horizontal,
     importantForAccessibility,
-    numberOfLines: _numberOfLines,
+    onContentSizeChange: _onContentSizeChange,
+    showsHorizontalScrollIndicator: _showsHorizontalScrollIndicator,
+    numberOfLines,
     onLayout: _onLayout,
     // usePressScale's handlers. Dropped rather than mapped: there is no DOM
     // event for a press phase, and React logs "does not recognize the
@@ -169,6 +192,7 @@ export function host(tag: string) {
         // otherwise overwrite it with nothing.
         role: role ?? accessibilityRole,
         'data-testid': testID,
+        'data-lines': numberOfLines === undefined ? undefined : String(numberOfLines),
         // A data- attribute, not the camelCase prop: React warns about an
         // unknown DOM attribute. It is Android's only way to take a subtree
         // away from TalkBack behind a sheet (accessibilityViewIsModal is
