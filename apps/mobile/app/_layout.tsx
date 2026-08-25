@@ -95,9 +95,11 @@ function AppStack() {
       <Bloom />
       <Stack
         screenOptions={{
-          // Transparent, not tinted: the header sits over the bloom, and a
-          // solid background colour would cut a flat strip across it.
-          headerTransparent: true,
+          // Transparent background, but NOT a transparent (overlaying) header:
+          // the bloom has to show through the header strip, and a tinted one
+          // would cut a flat band across it -- but `headerTransparent` also
+          // stops the navigator insetting the content, so every screen's own
+          // heading rendered underneath the back arrow.
           headerStyle: { backgroundColor: 'transparent' },
           headerTintColor: theme.text,
           headerShadowVisible: false,
