@@ -94,6 +94,8 @@ export function reactNativeTextMock() {
     Text,
     View: host('div'),
     Pressable: host('button'),
+    AccessibilityInfo,
+    AppState,
     StyleSheet,
     __layoutHandlers: layoutHandlers,
     __fireLayout: fireLayout,
@@ -177,6 +179,21 @@ export function host(tag: string) {
     );
   };
 }
+
+/** Inert AccessibilityInfo reporting "reduce motion off".
+ *
+ *  Here for the same reason as AppState below: usePressScale reaches
+ *  useReducedMotion, which reads this on mount, so every component that
+ *  squeezes on press now needs it -- and without it the suite fails on
+ *  `AccessibilityInfo is undefined` rather than on anything naming the
+ *  component. Off rather than on so the press branch under test is the one
+ *  users get; the reduced-motion branch is covered purely in
+ *  motion/usePressScale.test.ts.
+ */
+export const AccessibilityInfo = {
+  isReduceMotionEnabled: async () => false,
+  addEventListener: () => ({ remove: () => {} }),
+};
 
 /** Inert AppState for suites that mock react-native wholesale.
  *
