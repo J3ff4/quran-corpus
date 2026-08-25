@@ -11,7 +11,7 @@ Updated: 2026-08-25
 
 ## Now
 
-### 🎨 M6 GLASS REDESIGN — M6a/M6b/M6c merged; M6d next (2026-08-25)
+### 🎨 M6 GLASS REDESIGN — M6a-M6d merged; M6e next (2026-08-25)
 Spec + 9 sub-phase plans: `docs/plans/phase-m6-glass-redesign.md` (+ `phase-m6a..i`).
 40 owner decisions recorded there. §5 fires on M6b, M6c, M6f, M6h.
 
@@ -56,10 +56,28 @@ existing test passed against the inoperable control; verified on device by
 **Task 4 Step 4 (EAS build) DEFERRED to 2026-09-01** — free-plan quota. Only
 unfinished step in M6c.
 
-**M6d starting 2026-08-25** on `feat/m6d-reader`, plan
-`docs/plans/phase-m6d-reader.md`. Reader re-skin to mockups 1e/1j + the
-Mushaf/Translation/WBW mode chip. **No §5 trigger** (no `packages/data`, no
-schema). Device checks 65-72.
+**M6d MERGED to main 2026-08-25 as `d4d73d4` (PR #23).** Reader re-skin to
+mockups 1e/1j: Mushaf/Translation modes behind a glass header chip (WBW is the
+chip's third segment but a navigation, not a persisted mode), glass ayah cards,
+surah opening plate, docked recitation bar. Plan
+`docs/plans/phase-m6d-reader.md`. **No §5 trigger** (no `packages/data`, no
+schema, no trust boundary, no user-DB write) — shipped on §4 self-review plus
+the gates: mobile 581, data 398, web 479, type-check and lint clean.
+The native toolbar is **replaced**, not layered over: mockup 1e draws one glass
+bar, the toolbar holds the M3b/M5c scroll-linked title, and `headerTransparent`
+was already rejected in `app/_layout.tsx` for not insetting content.
+`setOptions({ header })` replaces it while the navigator still insets. Owner
+ruled "replace the native header" 2026-08-25.
+**Device run 2026-08-25 via Expo Go: checks 65-72 all PASS**, both themes.
+Three defects found on hardware and fixed in `51e3840`: chip label truncated to
+"Word by wo…" at 390pt, mushaf mode missing its plate, and the recitation bar
+see-through over scrolling text — RN has no `backdrop-filter` and expo-blur
+stays uninstalled, so the bar paints an opaque backing under the glass. The
+inline medallion inside the Arabic `<Text>` run shapes correctly on device.
+**Task 6 Step 1 (EAS build) DEFERRED to 2026-09-01** — free-plan quota, same
+window as M6c's Task 4 Step 4.
+
+**M6e next**, plan `docs/plans/phase-m6e-wbw.md` (word-by-word), not started.
 
 Two calls made in-flight, both in commit bodies:
 - Dark glass fill is the night page colour at 45%, NOT the mockup's white .075.
