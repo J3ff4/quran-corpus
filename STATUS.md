@@ -15,7 +15,7 @@ Updated: 2026-08-24
 Spec + 9 sub-phase plans: `docs/plans/phase-m6-glass-redesign.md` (+ `phase-m6a..i`).
 40 owner decisions recorded there. §5 fires on M6b, M6c, M6f, M6h.
 
-**M6a on `feat/m6a-design-system` at `746ddaf`, not merged.** Bloom backdrop,
+**M6a MERGED to main 2026-08-25 as `7168e71` (PR #20).** Bloom backdrop,
 GlassSurface, Newsreader, press-scale hook, floating tab pill; 506 tests green.
 **Device run 1 done 2026-08-24 via Expo Go** (no APK — EAS blocked until
 2026-09-01, so plan Task 7 is deferred): 49-52 pass, **48 FAILED**, 53-54 not
