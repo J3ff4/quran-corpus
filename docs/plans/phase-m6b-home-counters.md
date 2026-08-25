@@ -1287,7 +1287,7 @@ change this milestone wants.
 
 ### Task 8: Device run
 
-- [ ] Run checks 55–60 **and the carried-over check 48** , and record every
+- [x] Run checks 55–60 **and the carried-over check 48** , and record every
   result below.
 
 Check 48 failed on M6a's device run and the owner parked it here rather than
@@ -1313,12 +1313,74 @@ Stop and ask; do not install it.
 
 ## Verification Log
 
+### Device run 1 -- 2026-08-24, Expo Go at `6fdd970`
+
+Owner's OnePlus 7 Pro (GM1917, 1440x3120, 640dpi) over adb-wifi, both themes.
+No APK: see Task 7 Step 4. Checks 57, 58 and 60's "different tomorrow" were run
+by moving the device clock forward through Settings -> Date & time; `adb shell
+date` and `settings put global auto_time` are both refused on this ROM
+(`WRITE_SECURE_SETTINGS` denied to uid 2000). The clock was restored to
+automatic afterwards and re-verified against real time.
+
+**Check 48 was measured, not eyeballed**, the same way M6a measured the tab
+pill that failed it. Sampling the screenshot at full resolution:
+
+| | Wash outside | Card fill | Hairline / highlight |
+| --- | --- | --- | --- |
+| night, continue card | `(22,49,41)` | `(21,35,29)` | `(69,88,82)` then `(68,79,75)` |
+| night, counter card | `(24,42,36)` | `(21,30,26)` | `(69,82,77)` -> `(63,71,67)` |
+| light, counter card | `(226,228,222)` | `(250,248,243)` | `(255,254,254)` top, `(185,202,192)` left |
+
+Three things follow. The fill is offset from the wash by 12-14 levels of green
+in night and 7-11 in light, against the **3** that made M6a's pill read as an
+outlined hole. The hairline and the top highlight are both far above that: ~40
+levels in night, a pure-white 1px line in light. And the fill *tracks* the wash
+down the screen -- night goes 30 -> 25 inside while the page goes 42 -> 29
+outside -- which is the part that cannot be faked by a flat rectangle, and
+follows from the fills being genuinely alpha (`rgba(...,0.45)` night,
+`rgba(...,0.85)` light) rather than pre-composited. Recorded as a pass on the
+measurement; the owner's own arm's-length look overrules it if it disagrees.
+
 | Check | Build | Date | Result | Notes |
 | --- | --- | --- | --- | --- |
-| 48 (re-run) | | | | |
+| 48 (re-run) | Expo Go `6fdd970` | 2026-08-24 | **pass** | Both themes, measured above. `expo-blur` stays uninstalled |
 | 55 | -- | -- | **deferred** | Release-binary property; Expo Go does not install over a prior build. Runs when EAS opens (2026-09-01) |
-| 56 | | | | |
-| 57 | | | | |
-| 58 | | | | |
-| 59 | | | | |
-| 60 | | | | |
+| 56 | Expo Go `6fdd970` | 2026-08-24 | **pass** | Read Al-Baqara, backgrounded, reopened; streak 0 -> 1 |
+| 57 | Expo Go `6fdd970` | 2026-08-24 | **pass** | Clock to Aug 25, read; streak 2. Before reading it still showed 1 -- `streakFrom`'s yesterday tolerance, live |
+| 58 | Expo Go `6fdd970` | 2026-08-24 | **pass** | Clock to Aug 27 (Aug 26 skipped); 0 before reading, 1 after |
+| 59 | Expo Go `6fdd970` | 2026-08-24 | **pass** | Stronger than specified: see below |
+| 60 | Expo Go `6fdd970` | 2026-08-24 | **pass** | Yunus 10:62 all of Aug 24; tapping it opened Yunus scrolled to ayah 62; a different ayah on Aug 25 |
+
+**Check 59 landed as a de-duplication test rather than the counting test it was
+written as.** The counter already read 3 when the run started -- three roots had
+been opened on the device earlier the same day -- and opening the first three
+alphabetical roots (أبب, أبد, أبق) left it at 3 rather than moving it to 6. That
+is the correct answer, not a failure: the count is of *distinct* roots. Opening
+a fourth root that had never been opened (قبر) moved it to 4, which is what
+proves the write path. The plan's "open three, read 3" would have passed on a
+buggy implementation that counted rows.
+
+### The one defect, fixed and re-run
+
+**Counters do not refresh when the app is resumed on the tab it was left on.**
+`useUserDbOnFocus` hangs off `useFocusEffect`, which does not fire again for a
+tab that never lost focus. Parking Home, backgrounding, moving the clock two
+days and resuming showed the pre-background streak; switching to another tab
+and back corrected it. Home is the launch screen, so this is the ordinary case,
+and a streak is exactly the number that goes stale overnight.
+
+Fixed in `260fc23` at the hook, not at the screen -- all four user-DB screens
+route through it. Overlapping reads are generation-stamped so a slow focus read
+cannot settle last and overwrite the resume's numbers. Four tests, each
+mutation-checked individually. Re-run on the device: parked on Home at streak
+1, backgrounded, clock forward two days, resumed -- **2**, with the weekly bar
+moved, no navigation.
+
+Gates after the fix: lint and type-check clean, 1429 tests (data 389,
+mobile-data 12, web 479, mobile 549).
+
+**Device left as found**, with one exception: the clock is back on automatic and
+the app theme back on Dark, but the *system* dark-mode setting was flipped to
+light early in the run (`adb shell cmd uimode night no`) to test whether the app
+followed the OS, and there was no record of its prior value to restore. The app
+sets its own theme explicitly, so nothing in this milestone depends on it.
