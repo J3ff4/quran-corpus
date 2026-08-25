@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from scraper.db import ScraperDatabase
-from scraper.models import AyahModel, SurahModel, WordGlossModel, WordModel
+from scraper.models import AyahModel, WordGlossModel, WordModel
 from scraper.seed import seed_database
 from scraper.translate_glosses import translate_glosses
 from tests.test_mt import FakeMt
@@ -9,11 +9,7 @@ from tests.test_mt import FakeMt
 
 def _db(tmp_path) -> ScraperDatabase:
     db = ScraperDatabase(str(tmp_path / "s.db"))
-    seed_database(db)  # languages (en/uz) — word_glosses.language_code FKs into it
-    db.upsert_surah(SurahModel(
-        id=1, name_arabic="ا", name_translit="a", name_translation="a",
-        revelation_type="meccan", ayah_count=1, order_number=1,
-    ))
+    seed_database(db)  # languages (en/uz) for the gloss FK, and all 114 surahs
     return db
 
 

@@ -4,6 +4,7 @@ import tempfile
 
 from scraper.db import ScraperDatabase
 from scraper.seed import seed_database
+from scraper.surah_meta import get_all_surahs
 
 
 def _make_db() -> tuple[ScraperDatabase, str]:
@@ -51,5 +52,47 @@ def test_seed_is_idempotent():
         assert lang_count == 4
         assert surah_count == 114
         conn.close()
+    finally:
+        os.unlink(path)
+
+
+def test_seed_repermutes_order_number_over_an_existing_database():
+    """A DB seeded before 2026-08-25 holds order_number = id, i.e. mushaf order.
+
+    Re-seeding has to move all 114 rows to revelation order, and every
+    intermediate state collides with UNIQUE(order_number): surah 1 moves to 5
+    while surah 5 still holds 5. Without a parking pass the upsert loop raises
+    IntegrityError partway through and leaves the table half-converted.
+    """
+    db, path = _make_db()
+    try:
+        for s in get_all_surahs():
+            db.upsert_surah(s.model_copy(update={"order_number": s.id}))
+        seed_database(db)
+        db.close()
+        conn = sqlite3.connect(path)
+        rows = dict(conn.execute("SELECT id, order_number FROM surahs").fetchall())
+        conn.close()
+        assert rows[96] == 1, "al-Alaq is first revealed"
+        assert rows[1] == 5, "al-Fatiha is fifth"
+        assert sorted(rows.values()) == list(range(1, 115))
+    finally:
+        os.unlink(path)
+
+
+def test_seed_leaves_no_parked_order_number_behind():
+    """The parking pass writes negative ranks. If the loop after it fails or is
+    ever removed, the table is left holding those, and every revelation-ordered
+    list silently inverts."""
+    db, path = _make_db()
+    try:
+        seed_database(db)
+        db.close()
+        conn = sqlite3.connect(path)
+        parked = conn.execute(
+            "SELECT COUNT(*) FROM surahs WHERE order_number < 1"
+        ).fetchone()[0]
+        conn.close()
+        assert parked == 0
     finally:
         os.unlink(path)

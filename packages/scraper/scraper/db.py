@@ -154,6 +154,25 @@ class ScraperDatabase:
             "UPDATE word_glosses SET source = 'corpus' WHERE source IS NULL"
         )
 
+    def park_surah_order(self) -> None:
+        """Move every existing order_number clear of the 1..114 range.
+
+        order_number is UNIQUE and holds the revelation rank, which is not the
+        row id -- so re-seeding rewrites all 114 rows into a *permutation* of
+        what is already there, one row at a time. Every non-identity
+        permutation collides partway through: surah 1 takes rank 5 while surah
+        5 still holds it. Negative ids are distinct by construction and cannot
+        equal an incoming rank, so this one statement clears the way for the
+        whole loop.
+
+        A seed that dies between this and the upserts leaves the parked values
+        behind, and a revelation-ordered list would then read backwards. Seeding
+        is idempotent and re-running it fixes that; tests/test_seed.py asserts
+        no parked value survives a completed seed.
+        """
+        self._conn.execute("UPDATE surahs SET order_number = -id")
+        self._conn.commit()
+
     def upsert_surah(self, surah: SurahModel) -> None:
         self._conn.execute(
             """INSERT INTO surahs

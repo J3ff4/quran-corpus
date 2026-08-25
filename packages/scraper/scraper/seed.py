@@ -22,5 +22,8 @@ def seed_database(db: ScraperDatabase) -> None:
     """Seed languages and surah metadata. Call before any import pipeline."""
     for lang in _LANGUAGES:
         db.upsert_language(lang)
+    # Before the loop, not inside it: order_number is UNIQUE and this rewrites
+    # all 114 ranks as a permutation of the ones already stored.
+    db.park_surah_order()
     for surah in get_all_surahs():
         db.upsert_surah(surah)
