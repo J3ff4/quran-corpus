@@ -338,7 +338,7 @@ New `uiStrings` keys, all three locales: `browse.surah`, `browse.juz`,
 `browse.page`, `browse.revealed`, `browse.meccan`, `browse.medinan`,
 `browse.mode`, `browse.juzLabel`, `browse.pageLabel`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```tsx
 it('lists surahs by default', async () => {
@@ -374,12 +374,12 @@ it('keeps the chosen mode while the tab stays mounted', async () => {
 });
 ```
 
-- [ ] **Step 2: Run them and watch them fail**
+- [x] **Step 2: Run them and watch them fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test SurahsTab`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 - Mode lives in `useState`, defaulting to `'surah'`.
 - Each mode's data loads lazily on first switch and is memoized for the mount —
@@ -395,17 +395,28 @@ Expected: FAIL.
 - `contentContainerStyle.paddingBottom` uses `useListBottomPadding()`; the
   floating tab pill is over this screen.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `pnpm --filter @quran-corpus/mobile test && pnpm -r type-check && pnpm -r lint`
 Expected: PASS.
 
-- [ ] **Step 5: Mutation-check (§4)**
+- [x] **Step 5: Mutation-check (§4)**
 
-Change the juz row's link params to `ayah: '1'`. Expected: the juz-2 test
+Change the juz row's link params to `ayah: '1'`. Expected: the juz-3 test
 FAILS. Restore by re-editing.
 
-- [ ] **Step 6: Commit**
+Run 2026-08-25, four mutations, each failing exactly the intended test: the
+juz row opening at ayah 1 -> the juz navigation test; dropping the
+already-loaded guard -> "loads each mode once"; grouping every revealed row
+into one section -> the Meccan/Medinan test; swallowing the load error -> all
+three failure tests.
+
+Also shipped differently from the file list above: `BrowseList.tsx` is new and
+`SurahList` maps onto it rather than keeping its own FlatList. Four
+near-identical lists is where a row gains a fix in one mode and keeps the bug
+in the other three.
+
+- [x] **Step 6: Commit**
 
 ```bash
 git add 'apps/mobile/app/(tabs)/surahs.tsx' apps/mobile/src/screens/SurahsScreen.tsx \
@@ -418,7 +429,21 @@ git commit -m "feat(mobile): browse by surah, juz, page or revelation order"
 
 ### Task 4: §5 stop, then build
 
-- [ ] **Step 1: Self-review** the diff against DRY / SOLID / OWASP.
+- [x] **Step 1: Self-review** the diff against DRY / SOLID / OWASP.
+
+  - **DRY**: one `BrowseList` behind all four modes and the surah index; the
+    three queries live only in `packages/data`; `corpusRepository` re-exports
+    them rather than wrapping, since a wrapper here would be a rename.
+  - **SOLID**: `BrowseList` takes rows, never a data source, so no mode is
+    privileged in it. `SegmentedControl` is generic over the value.
+  - **OWASP**: no new trust boundary. Every row navigates through the existing
+    reader route, whose `parseAyahNumber`/`parseSurahId` already validate the
+    params -- at the route, so the three new link sources inherit it rather
+    than each re-checking. Row values come from the bundled DB, not from input.
+  - One accepted cost: the four caches are dropped whenever the UI language
+    changes, which re-runs up to four queries. The alternative is re-localizing
+    cached rows on read, which is more code to keep three lists out of the
+    previous language.
 - [ ] **Step 2: Stop and ask the owner to run `/code-review`** — new
   `packages/data` queries (§5). Plain `/code-review`, never `ultra` unprompted.
 - [ ] **Step 3: Act on the findings.** One pass. Say what is declined and why.
