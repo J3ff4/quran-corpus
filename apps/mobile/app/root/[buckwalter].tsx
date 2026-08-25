@@ -16,6 +16,9 @@ import {
 } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { parseRootParam } from '@/data/routeParams';
+import { openUserDb } from '@/data/userDb';
+import { recordRootView } from '@/data/userRepository';
+import { localDay } from '@/home/counters';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
 import { typography } from '@/theme/tokens';
@@ -118,6 +121,20 @@ export default function RootRoute() {
       cancelled = true;
     };
   }, [buckwalter]);
+
+  // Keyed on the resolved entry, not on `buckwalter`: a deep link to a root the
+  // corpus does not carry must not inflate the roots counter with something the
+  // reader never saw. `entry.root.id` is the integer root_views is keyed by, so
+  // no Buckwalter string -- and no second charset validator -- reaches the
+  // write site.
+  useEffect(() => {
+    if (!entry) return;
+    const rootId = entry.root.id;
+    void openUserDb()
+      .then((db) => recordRootView(createExpoSqliteClient(db as ExpoSqliteLike), rootId, localDay(new Date())))
+      // Counted for the Home tab only; nothing on this screen depends on it.
+      .catch((cause: unknown) => console.error('[home] root-view write failed', { cause }));
+  }, [entry]);
 
   // Separate from loadRoot: the occurrence count depends on the form filter,
   // which changes far more often than the root itself and must not re-run

@@ -67,7 +67,7 @@ export async function migrateUserDb(client: QueryClient): Promise<number>;
 
 `migrateUserDb` returns the version the file is at when it returns.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `packages/data/tests/userData.test.ts` — the suite already has an in-memory
 client helper; reuse it rather than adding a second one.
@@ -138,12 +138,12 @@ describe('migrateUserDb', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `pnpm --filter @quran-corpus/data test -t migrateUserDb`
 Expected: FAIL — no such export.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `packages/data/src/userData.ts`, below `USER_DB_SCHEMA`:
 
@@ -212,7 +212,7 @@ export async function migrateUserDb(client: QueryClient): Promise<number> {
 }
 ```
 
-- [ ] **Step 4: Call it on open**
+- [x] **Step 4: Call it on open**
 
 `apps/mobile/src/data/userDb.ts`:
 
@@ -231,12 +231,12 @@ async function createUserDb() {
 }
 ```
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 Run: `pnpm --filter @quran-corpus/data test && pnpm --filter @quran-corpus/mobile test`
 Expected: PASS.
 
-- [ ] **Step 6: Mutation-check (§4)**
+- [x] **Step 6: Mutation-check (§4)**
 
 Change `if (migration.version <= current) continue;` to `if (false) continue;`
 and re-run. Expected: no failure yet — migration 2 is `IF NOT EXISTS`. That is
@@ -245,7 +245,32 @@ already at the current version. If it does not fail, the test is vacuous and
 must be fixed before moving on (`[[sdd-brief-can-specify-vacuous-tests]]`).
 Restore by re-editing.
 
-- [ ] **Step 7: Commit**
+
+**Deviations from this brief, taken during execution:**
+
+- **Migrations hold `statements: readonly string[]`, not one `sql` string.**
+  Both drivers execute a single statement -- libsql's `execute` rejects the
+  rest, and `createExpoSqliteClient` routes through expo's `getAllAsync`, which
+  prepares one. The brief's two-`CREATE TABLE` string would have created
+  `reading_days` and silently skipped `root_views` on every device. A test
+  asserts the one-statement-per-entry rule so the next migration cannot
+  reintroduce it.
+- **The brief's `newClient()` helper does not exist.** `userData.test.ts` has
+  `recordingClient()`, a double with no SQLite in it, which cannot answer a
+  `PRAGMA user_version` or show a table exists. These tests use
+  `createDatabase('file::memory:')`, as every other suite in the package does.
+- **The brief's fourth test was vacuous.** Its spy pushed only when the query
+  was *not* a string, and every statement migrateUserDb runs is a string, so
+  `applied` was `[]` no matter what the code did. It now records what reaches
+  the driver and asserts no migration statement is among it -- and that is the
+  test the Step 6 mutation kills (`[[sdd-brief-can-specify-vacuous-tests]]`).
+
+Two additions beyond the brief, each with its own test and mutation-check: a
+file from a *newer* build is returned as-is rather than stamped back down, and a
+non-integer `user_version` is treated as 0 rather than left to poison every
+comparison with NaN.
+
+- [x] **Step 7: Commit**
 
 ```bash
 git add packages/data/src/userData.ts packages/data/tests/userData.test.ts \
@@ -274,7 +299,7 @@ export async function getRootViewsByDay(client: QueryClient, sinceDay: string): 
 export function isIsoDay(value: unknown): value is string;
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 describe('reading days', () => {
@@ -348,12 +373,12 @@ describe('root views', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `pnpm --filter @quran-corpus/data test -t 'reading days'`
 Expected: FAIL — no such export.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```ts
 /** Roots in the corpus are 1..1548 today; the cap carries headroom for a
@@ -432,18 +457,55 @@ export async function getRootViewsByDay(
 Re-export all five plus `isIsoDay` from
 `apps/mobile/src/data/userRepository.ts`, in the existing export block.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `pnpm --filter @quran-corpus/data test`
 Expected: PASS.
 
-- [ ] **Step 5: Mutation-check (§4)**
+- [x] **Step 5: Mutation-check (§4)**
 
 Delete the `new Date(...)` line from `isIsoDay` and return the regex result.
 Expected: the rejection test FAILS on `2026-13-01` and `2026-02-30`. Restore by
 re-editing.
 
-- [ ] **Step 6: Commit**
+
+**Deviations from this brief, taken during execution**
+
+- **`isIsoDay` as written throws instead of returning false.** `2026-13-01`
+  parses to an Invalid Date, and `toISOString()` on one throws
+  `RangeError: Invalid time value` -- so the predicate crashed on exactly the
+  input it exists to reject, and every `if (isIsoDay(x))` caller would crash
+  with it. A `Number.isNaN(parsed.getTime())` guard returns false instead. The
+  brief's own rejection test could not see this: `recordReadingDay` rejects with
+  a `RangeError` either way (`[[sdd-brief-can-specify-vacuous-tests]]` again).
+  `isIsoDay` now has its own three tests, and mutation B below is the brief's
+  original line.
+- **`newClient()` still does not exist** (same as Task 1). These tests use a
+  `migratedUserDb()` helper over `createDatabase('file::memory:')`, since the
+  two tables only exist after `migrateUserDb` has run, and apply the schema with
+  `executeMultiple` because `USER_DB_SCHEMA` is three statements.
+- **Rejection tests assert no statement reached the driver**, via the existing
+  `recordingProxy`, rather than only that a `RangeError` was thrown. A validator
+  that throws *after* writing would pass the brief's version.
+
+Three tests beyond the brief: a cutoff that is not an ISO day is rejected on the
+read side too, `countDistinctRootsViewed` returns 0 rather than NaN on a file
+with no views, and the leap day 2024-02-29 is accepted.
+
+Mutations run, each killed, each restored by re-editing and verified identical
+against a scratchpad copy:
+
+- A: `isIsoDay` returns the regex result only -> 3 tests fail (both `isIsoDay`
+  validity tests and the reading-day rejection test).
+- B: drop the NaN guard, i.e. the brief's original line -> `returns false for an
+  impossible date rather than throwing` fails with `RangeError: Invalid time value`.
+- C: drop `assertIsoDay(sinceDay)` from `getReadingDays` -> `rejects a cutoff
+  that is not an ISO day` fails.
+
+Gates: lint clean, type-check clean, `pnpm -r test` = data 389, mobile-data 12,
+web 479, mobile 507.
+
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/data/src/userData.ts packages/data/tests/userData.test.ts \
@@ -472,7 +534,7 @@ export function weeklyLog(rows: readonly { day: string; roots: number }[], today
 
 `weeklyLog` always returns exactly 7 entries, oldest first, zero-filled.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -531,12 +593,12 @@ describe('weeklyLog', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test counters`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```ts
 /** The device's local calendar day as YYYY-MM-DD.
@@ -594,17 +656,17 @@ export function weeklyLog(
 }
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `pnpm --filter @quran-corpus/mobile test counters`
 Expected: PASS (all nine).
 
-- [ ] **Step 5: Mutation-check (§4)**
+- [x] **Step 5: Mutation-check (§4)**
 
 Replace `seen.has(today) ? today : shiftDay(today, -1)` with `today`. Expected:
 "still counts a streak that ended yesterday" FAILS. Restore by re-editing.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/mobile/src/home/counters.ts apps/mobile/src/home/counters.test.ts
@@ -612,6 +674,40 @@ git commit -m "feat(mobile): derive the reading streak and weekly root log"
 ```
 
 ---
+
+
+**Deviations from this brief, taken during execution**
+
+- **The `localDay` test as written was vacuous.** This runner sits at
+  `America/Chicago` (UTC-5), where `new Date(2026, 7, 24, 1, 0, 0)` is
+  `2026-08-24T06:00Z` -- so a `toISOString().slice(0, 10)` implementation, the
+  exact bug decision 22 is about, returns `'2026-08-24'` and the assertion
+  passes. Verified directly in node. The test now pins `TZ=Asia/Tashkent` with
+  `vi.stubEnv` (node honours a runtime `process.env.TZ` change) and asserts the
+  UTC date is `2026-08-23` first, so it fails for that implementation on any
+  machine, not only on a positive-offset one. Third brief in this phase to
+  specify a test that cannot fail.
+- The brief says "all nine"; it lists eight. Twelve shipped -- added digit
+  padding for `localDay`, a year boundary for `streakFrom`, and two for
+  `weeklyLog`: rows older than the window are dropped, and an empty history is
+  seven zeroes rather than a short chart.
+- `dayValue`'s comment justified midday UTC by DST. The arithmetic here is
+  entirely UTC, where DST does not exist, so the comment now says what the hour
+  is actually insurance against.
+- No validation on `day` inputs: both callers are `localDay` and days already
+  validated by `assertIsoDay` on the way into the user DB. A malformed day
+  throws `RangeError` from `toISOString()` rather than returning a wrong number.
+- Mutations run, each killed and restored byte-identically from a scratchpad
+  copy (never `git restore`):
+  - **A** (the brief's) -- `cursor = today` -> "still counts a streak that ended
+    yesterday" fails.
+  - **B** -- `localDay` via `toISOString()` -> the pinned-TZ test fails,
+    `expected '2026-08-23' to be '2026-08-24'`. The brief's unpinned version
+    survives this mutation here.
+  - **C** -- `weeklyLog` keyed by `rows.slice(-7)` index instead of by day -> 2 fail.
+
+Gate: lint clean, type-check clean, `pnpm -r test` = data 389, mobile-data 12,
+web 479, mobile 519.
 
 ### Task 4: Write the counters from the real screens
 
@@ -624,7 +720,7 @@ git commit -m "feat(mobile): derive the reading streak and weekly root log"
 **Interfaces:**
 - Consumes: `recordReadingDay`, `recordRootView`, `localDay`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `latestReadingPositionRecorder.test.ts`:
 
@@ -658,12 +754,12 @@ new dependencies through the same injection style it already uses. If it takes
 no options object today, add one with defaults rather than importing the clock
 directly; the second test cannot be written otherwise.
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test latestReadingPositionRecorder`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement both write sites**
+- [x] **Step 3: Implement both write sites**
 
 The reading day goes in the recorder, after the position write, wrapped so its
 failure cannot propagate:
@@ -694,17 +790,17 @@ loads the root, once the root has resolved — so a 404 root never counts:
   }, [entry]);
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `pnpm --filter @quran-corpus/mobile test`
 Expected: PASS.
 
-- [ ] **Step 5: Mutation-check (§4)**
+- [x] **Step 5: Mutation-check (§4)**
 
 Remove the `try`/`catch` around the day write. Expected: the "does not fail the
 position write" test FAILS. Restore by re-editing.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/mobile/src/data/latestReadingPositionRecorder.ts \
@@ -714,6 +810,46 @@ git commit -m "feat(mobile): count reading days and roots opened"
 ```
 
 ---
+
+
+**Deviations from this brief, taken during execution**
+
+- **The recorder does not have the signature the brief assumed.**
+  `latestReadingPositionRecorder` is
+  `createLatestReadingPositionRecorder(persist, onError)` -- a serializing queue
+  over an injected write, with no client, no surah id and no clock. There is no
+  `recordLatest(client, surah, ayah, deps)` to extend. Adding a client and a
+  clock to it to host the day write would have given a queue a second
+  responsibility for the sake of a test.
+- **Both writes went in at their call sites, and both existing route suites
+  already had the mocks for them.** `SurahRoute.test.tsx` mocks
+  `@/data/userRepository` and `@/data/userDb`, and drives the recorder through
+  the mocked `SurahReader`; `RootRoute.test.tsx` mocks the same. So no new
+  module, no options object, no default-dependency injection: the day write is
+  in the `persist` closure in `app/surah/[surahId].tsx`, the root-view write is
+  the effect in `app/root/[buckwalter].tsx`, and the tests assert through the
+  mocks that already existed.
+- The clock is not injected either. Both tests compute the expected day from
+  `new Date()` the same way `localDay` does, which is a stronger assertion than
+  a pinned fake would be: a UTC implementation still fails it on this runner
+  between 19:00 and midnight, and it can never go stale.
+- `src/test/routes/root.test.tsx` needed `@/data/userDb` and
+  `@/data/userRepository` stubbed. It renders the same route, so the new import
+  pulled real `expo-sqlite` into jsdom and the file failed to collect.
+- Two tests beyond the brief on the root side: the id written is `entry.root.id`
+  rather than any other integer on the entry, and a root the corpus does not
+  carry is not counted at all.
+- Mutations run, each killed and restored byte-identically from a scratchpad
+  copy (never `git restore`):
+  - **A** (the brief's) -- drop the `try`/`catch` around the day write -> "does
+    not report a position failure when only the reading-day write throws" fails.
+  - **B** -- `if (!entry) return` -> `entry?.root.id ?? 0` -> "does not count a
+    root the corpus does not carry" fails.
+  - **C** -- write `entry.root.occurrence_count` instead of `entry.root.id` ->
+    "counts the root as viewed once it has resolved" fails.
+
+Gate: lint clean, type-check clean, `pnpm -r test` = data 389, mobile-data 12,
+web 479, mobile 523.
 
 ### Task 5: Ayah of the day
 
@@ -746,7 +882,7 @@ Take the owner's strike-through and use exactly what survives. Do **not** add to
 it — decision 24 makes the list theirs. If an entry is added later, validate the
 coordinate the same way first.
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -783,12 +919,12 @@ describe('ayahForDay', () => {
 });
 ```
 
-- [ ] **Step 3: Run it and watch it fail**
+- [x] **Step 3: Run it and watch it fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test ayahOfTheDay`
 Expected: FAIL — module not found.
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 ```ts
 /** Owner-curated. Do not add to this list without asking -- it is editorial
@@ -813,12 +949,12 @@ export function ayahForDay(day: string): { surah: number; ayah: number } {
 }
 ```
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 Run: `pnpm --filter @quran-corpus/mobile test ayahOfTheDay`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/mobile/src/home/ayahOfTheDay.ts apps/mobile/src/home/ayahOfTheDay.test.ts
@@ -826,6 +962,38 @@ git commit -m "feat(mobile): add the curated ayah-of-the-day rotation"
 ```
 
 ---
+
+
+**Deviations from this brief, taken during execution**
+
+- **Step 1 is not done, and it is the owner's to do.**
+  `docs/design/m6/ayah-of-the-day-draft.md` is untouched since the M6a commit:
+  all 118 `Keep` boxes are still `[ ]` and nothing is struck. The list shipped
+  here is therefore the **full 118 candidates, pending the owner's
+  strike-through**, and the module says so at the top. Deleting a line is all a
+  strike takes. Decision 24 makes the selection editorial and the owner's, so
+  nothing was added, reordered, or removed on the agent's judgement.
+- Correctness was re-verified rather than taken from the draft's claim: all 118
+  coordinates were re-queried against the live corpus DB (`apps/web/quran.db`).
+  Every ayah exists and every one has an `en` translation row -- 0 missing, 0
+  duplicate coordinates. That is correctness, not approval.
+- The brief's third test asserts `seen.size > min(20, length) - 1` while looping
+  `length` times over only 28 distinct day strings, so it never tested the
+  property it describes. Replaced with the actual claim: over
+  `AYAH_OF_THE_DAY.length` consecutive days every entry appears exactly once,
+  plus a wrap test for the day after a full cycle.
+- Three tests beyond the brief: the pre-1970 case the twice-modulo exists for,
+  integer-ness of `ayah` (the brief checked it only for `surah`), and no
+  duplicate coordinate in the list.
+- Mutations run, each killed and restored byte-identically from a scratchpad
+  copy (never `git restore`):
+  - **A** -- single modulo -> "does not fall off the list for a day before 1970"
+    fails.
+  - **B** -- hash the date string instead of cycling -> 2 fail, which is the
+    collision the doc comment describes.
+
+Gate: lint clean, type-check clean, `pnpm -r test` = data 389, mobile-data 12,
+web 479, mobile 530.
 
 ### Task 6: The home screen
 
@@ -858,7 +1026,7 @@ New `uiStrings` keys (all three locales, en/uz/ru):
 `home.streak`, `home.streakDays`, `home.rootsStudied`, `home.rootsThisWeek`,
 `home.ayahOfTheDay`, `home.countersFailed`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```tsx
 it('shows the streak the counters derive, not a raw row count', async () => {
@@ -887,12 +1055,12 @@ it('opens the reader at the day's ayah', async () => {
 });
 ```
 
-- [ ] **Step 2: Run them and watch them fail**
+- [x] **Step 2: Run them and watch them fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test HomeTab`
 Expected: FAIL.
 
-- [ ] **Step 3: Build the screen**
+- [x] **Step 3: Build the screen**
 
 Compose `GlassSurface` cards. Rules that are not negotiable:
 
@@ -907,17 +1075,17 @@ Compose `GlassSurface` cards. Rules that are not negotiable:
   `roots / max(roots, 1)`, each with an `accessibilityLabel` of its day and
   count. No chart library (§12).
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `pnpm --filter @quran-corpus/mobile test && pnpm -r type-check && pnpm -r lint`
 Expected: PASS.
 
-- [ ] **Step 5: Mutation-check (§4)**
+- [x] **Step 5: Mutation-check (§4)**
 
 Replace `streakFrom(days, today)` at the call site with `days.length`. Expected:
 the first test FAILS (3 rows, streak 2). Restore by re-editing.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add 'apps/mobile/app/(tabs)/index.tsx' apps/mobile/src/home apps/mobile/src/screens/HomeTab.test.tsx \
@@ -925,30 +1093,201 @@ git add 'apps/mobile/app/(tabs)/index.tsx' apps/mobile/src/home apps/mobile/src/
 git commit -m "feat(mobile): rebuild home as four glass blocks"
 ```
 
+**Deviations from this brief, taken during execution**
+
+- The brief cites `src/test/routes/appDirIsRoutesOnly.test.ts` as requiring the
+  screen body under `src/`. It does not -- that test only bans *test* files
+  under `app/`. The one-line route was kept anyway (it is the pattern
+  `menu.tsx`/`MenuScreen.tsx` already established), but not for the stated
+  reason.
+- The brief's tests inject `today` through a `renderHome({ today })` option
+  with no production counterpart -- a clock parameter on the screen for the
+  tests' sake. Fixtures are computed from the real `localDay(new Date())`
+  instead (the Task 4 pattern): a streak fixture pinned to 2026-08-24 would
+  become a *broken* streak the day after this was written and every assertion
+  would keep passing, against 0.
+- The brief asserts an `href` on `home-ayah-of-day` while Step 3 requires every
+  card to be a `Pressable` -- a Pressable has no href. The tests assert
+  `router.push` instead.
+- The brief's "Consumes" list carries no corpus read, but the layout needs the
+  surah name, the ayah's opening words, and the day's ayah with its
+  translation. `getAyahReaderLocation` (which existed with no production
+  caller) gained the surah and became that reader; `useCorpusAyah` is a local
+  hook over it. Its ceiling is commented: it loads a whole surah for one ayah.
+- `getReadingDays(client, sinceDay)` takes a *window*, which the brief does not
+  mention. A seven-day cutoff would silently cap a 40-day streak at 7, so the
+  streak load asks for the whole history and a test pins that.
+- The brief's bar height `roots / max(roots, 1)` is `1` for every non-empty
+  day. Bars scale against the week's peak, and a test distinguishes the two.
+- The streak and roots cards are not `Pressable`s: neither has a destination,
+  and a button that does nothing announces worse to TalkBack than a labelled
+  panel. Both are still labelled as one phrase ("Day streak: 2").
+- `home.streakDays` was not added -- nothing renders it. The other five keys
+  ship in all three locales.
+- The brief's `toHaveTextContent` needs jest-dom, which is not installed;
+  assertions read `.textContent`.
+- `src/testing/rnHosts.ts` drops `onPressIn`/`onPressOut`. Home is the first
+  screen to use `usePressScale` (M6a shipped it with no caller), and spreading
+  them logs a React unknown-prop warning per card per render.
+
+**Tests beyond the brief:** whole-history window; bars scale against the week's
+peak; all-time roots rather than this week's; counters failing leaves the
+reading position alone; the day's ayah is read from the corpus; the ayah card
+survives a failed corpus read; search still opens; the saved position opens at
+its own ayah. 14 in the suite, up from 2.
+
+**Mutations run (§4):** A `streakFrom(...)` -> `days.length` (streak test
+fails); B the brief's `roots / max(roots, 1)` bar formula (scaling test fails);
+C the streak's window -> `weekStart(today)` (history-window test fails); D hide
+the ayah card when its corpus read fails (tap-target test fails). All four
+killed; `HomeScreen.tsx` restored from a scratchpad copy and `diff -q` clean.
+
+**Gate:** lint clean, type-check clean, `pnpm -r test` = data 389, mobile-data
+12, web 479, mobile 542.
+
 ---
 
 ### Task 7: §5 stop, then build
 
-- [ ] **Step 1: Self-review the diff** against DRY / SOLID / OWASP and the
+- [x] **Step 1: Self-review the diff** against DRY / SOLID / OWASP and the
   umbrella constraints. Specifically: is every new write validated in
   `packages/data` rather than in a screen? Is every migration additive?
-- [ ] **Step 2: Stop and ask the owner to run `/code-review`.** §5 fires here —
+
+  Done over `git diff main...HEAD`, 1915 insertions across 21 files. Findings:
+
+  - **Writes are validated in `packages/data`.** `recordReadingDay` and
+    `recordRootView` both `assertIsoDay`, and `recordRootView` range-checks the
+    id (`1..MAX_ROOT_ID`, integer). Neither screen validates anything of its
+    own: `app/surah/[surahId].tsx` passes `localDay(new Date())` and
+    `app/root/[buckwalter].tsx` passes `entry.root.id`, an integer that only
+    exists because the corpus resolved the root -- no Buckwalter string reaches
+    a write, so there is no second charset validator to keep in step.
+  - **Every migration is additive.** `USER_DB_MIGRATIONS` v2 is two
+    `CREATE TABLE IF NOT EXISTS`; no `DROP`, no `UPDATE`, no rewrite. A file
+    from a newer build is left alone rather than stamped back down.
+  - **Injection.** Every value is a bound parameter. The one interpolation is
+    `PRAGMA user_version = ${USER_DB_VERSION}`, which PRAGMA cannot
+    parameterize; the value is computed in that module from the migration list
+    and never comes from a caller. Commented as such.
+  - **DRY.** No SQL in an app: `src/data/userRepository.ts` re-exports from
+    `@quran-corpus/data/user-db`. The home screen composes `GlassSurface`,
+    `usePressScale`, `useUserDbOnFocus`, `useListBottomPadding` and
+    `getAyahReaderLocation` rather than growing its own.
+  - **Nothing leaves the device** (decision 34): no telemetry call was added.
+  - One accepted cost, commented at the call site rather than fixed:
+    `getAyahReaderLocation` reads a whole surah to render one ayah. The upgrade
+    is a by-coordinate query in `packages/data`, which is deliberately not
+    being written on a hunch before the device run says the launch feels slow.
+- [x] **Step 2: Stop and ask the owner to run `/code-review`.** §5 fires here —
   `packages/data` queries *and* an on-device user-DB write. Plain
   `/code-review` (Pro, local). Never `/code-review ultra` without asking.
-- [ ] **Step 3: Act on the findings.** One pass, not a loop to green. Say
+
+  Run 2026-08-24 over `main...HEAD` (8 commits, 21 files). **No data-layer
+  findings**: the reviewer re-derived the migration runner, both write paths and
+  the `isIsoDay` NaN guard, mutation-checked those tests itself, and
+  independently re-validated all 118 `AYAH_OF_THE_DAY` coordinates against
+  `SURAH_AYAH_COUNTS`. All 8 findings are in the new Home UI.
+- [x] **Step 3: Act on the findings.** One pass, not a loop to green. Say
   plainly which findings are declined and why. Findings against prose are
   advisory — do not spend a round on them.
-- [ ] **Step 4: Build.**
+
+  **Fixed (5):**
+
+  - `WeekLog`'s row carried an `accessibilityLabel` without `accessible`, so RN
+    never exposed it and the `home.rootsThisWeek` string was dead, while each of
+    the seven bars announced a raw ISO date. Row is now one accessible node
+    labelled with the week's total; the bars are decorative and keep their
+    testIDs.
+  - The counters rendered `0` for the whole first load, so a reader with a
+    40-day streak was shown 0 on every launch — the wrong number, not an empty
+    one. `CounterCard` takes `number | null` and shows `—` while loading.
+  - `continueAyah.error` was discarded, so a corpus failure left an empty row
+    where the surah name goes and a double-spaced a11y label, with nothing
+    saying anything had failed. The card now takes the same `error` prop the
+    ayah card already had, and the label is joined rather than interpolated.
+  - `WEEK = 7` in the screen duplicated `weeklyLog`'s own `length: 7`: two
+    copies of one window, where changing either would make the fetched range and
+    the drawn range disagree with no test failing. `WEEK_DAYS` is exported from
+    `counters.ts` and used by both.
+
+  Three tests added (545 mobile, up from 542), each mutation-checked: restoring
+  the labelled bars, the eager `0`, and the swallowed error each fails exactly
+  one test. `HomeScreen.tsx` restored byte-identically after all three.
+
+  **Declined (4):**
+
+  - *No `accessibilityRole="header"` anywhere on the tab.* True, and it is a
+    design decision, not an oversight: the redesign turned the old screen's
+    "Continue reading" heading into an in-card caption, and every caption now
+    sits inside a `Pressable` that RN collapses into a single a11y node — a
+    header role in there would be just as unexposed as the WeekLog label was.
+    Restoring heading navigation means adding a visible screen title, which is
+    §8 owner territory, not a review fix. All four blocks are reachable in one
+    swipe pass.
+  - *`getAyahReaderLocation` returning `null` renders a silent blank forever.*
+    The bundled corpus ships complete and all 118 coordinates were verified in
+    range twice; distinguishing "missing row" from "still loading" costs a third
+    state on a case that cannot currently occur. Revisit if a future build ever
+    ships a partial DB.
+  - *`ayahForDay` can throw during render on a device clock past year 9999.*
+    The realistic bad clock is the other direction — an RTC reset to 1970 — and
+    the twice-modulo already handles it, with a test. A throw for a year-10000
+    clock is a loud failure for an impossible input; swapping it for a silent
+    fallback to index 0 makes the real bug harder to find.
+  - *The reading-day write sits inside the position-write callback, which
+    short-circuits on the same ayah, so crossing midnight without scrolling
+    skips a day.* Real, but absorbed: `streakFrom` counts a streak ending
+    yesterday precisely so a day boundary does not zero a live streak, and any
+    scroll to a different ayah records the day. Gating the insert behind a
+    `lastRecordedDay` ref adds state to save one idempotent
+    `INSERT OR IGNORE`.
+- [x] **Step 4: Build.** EAS is unavailable until 2026-09-01, so this is very
+  likely Expo Go again, as M6a's run was. If so, say so in the verification log
+  rather than implying an APK, and note what a Go run cannot cover: Hermes and
+  ProGuard behaviour, and the bundled DB asset path. **Check 55 is the one that
+  suffers** — "upgrade over the M6a build without clearing app data" is a
+  release-binary property, and Expo Go does not exercise it. Either defer 55
+  until the build window opens, or run it as an approximation and mark it as
+  one; do not tick it off a Go run.
 
 ```bash
-cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --profile preview
+cd apps/mobile && pnpm prebuild:assert-db && npx expo start --clear --lan
 ```
+
+**No APK.** EAS is closed until 2026-09-01, so this is Expo Go over the LAN, as
+M6a's run was -- same JS, same device, not a release binary. `prebuild:assert-db`
+passed (`assets/db/quran.db`, 139,923,456 bytes) and the Android bundle built
+clean: 2066 modules, 10,284,575 bytes of Hermes bytecode, no warnings.
+
+Not covered by a Go run, and re-checked when the APK is built:
+
+- **Release Hermes and ProGuard.** The Go bundle is Hermes, but a dev bundle:
+  unminified, no shrinking, no `-keep` rules. Anything reflection-shaped that
+  ProGuard could strip is untested.
+- **The bundled DB asset path.** In Expo Go the 140MB corpus is served by Metro
+  over the wire; in an APK it is packaged and resolved from the asset bundle.
+  These are different code paths and only the first one runs here.
+- **Check 55**, which is exactly the release-binary property: "upgrade over the
+  M6a build without clearing app data". Expo Go never installs over anything.
+  **Deferred to the build window, not approximated and not ticked.** The
+  migration runner is additive-only and unit-tested, but that is evidence about
+  the SQL, not about an upgrade install.
+
+Launched on the owner's OnePlus 7 Pro (GM1917, Android, 1440x3120) over
+adb-wifi at `6fdd970`, night theme. Home rendered on first paint -- search
+field, continue card at Al-Baqara 2:1, both counters, the weekly log, and the
+ayah-of-the-day card at Yunus 10:62. `logcat` clean: no JS exception, no
+SQLite error. Check results are Task 8's, below.
+
+`expo start` rewrites `apps/mobile/tsconfig.json` on launch (reformats it and
+drops `expo-env.d.ts` from `include`). Reverted; it is Expo's doing, not a
+change this milestone wants.
 
 ---
 
 ### Task 8: Device run
 
-- [ ] Run checks 55–60 **and the carried-over check 48** , and record every
+- [x] Run checks 55–60 **and the carried-over check 48** , and record every
   result below.
 
 Check 48 failed on M6a's device run and the owner parked it here rather than
@@ -974,12 +1313,74 @@ Stop and ask; do not install it.
 
 ## Verification Log
 
+### Device run 1 -- 2026-08-24, Expo Go at `6fdd970`
+
+Owner's OnePlus 7 Pro (GM1917, 1440x3120, 640dpi) over adb-wifi, both themes.
+No APK: see Task 7 Step 4. Checks 57, 58 and 60's "different tomorrow" were run
+by moving the device clock forward through Settings -> Date & time; `adb shell
+date` and `settings put global auto_time` are both refused on this ROM
+(`WRITE_SECURE_SETTINGS` denied to uid 2000). The clock was restored to
+automatic afterwards and re-verified against real time.
+
+**Check 48 was measured, not eyeballed**, the same way M6a measured the tab
+pill that failed it. Sampling the screenshot at full resolution:
+
+| | Wash outside | Card fill | Hairline / highlight |
+| --- | --- | --- | --- |
+| night, continue card | `(22,49,41)` | `(21,35,29)` | `(69,88,82)` then `(68,79,75)` |
+| night, counter card | `(24,42,36)` | `(21,30,26)` | `(69,82,77)` -> `(63,71,67)` |
+| light, counter card | `(226,228,222)` | `(250,248,243)` | `(255,254,254)` top, `(185,202,192)` left |
+
+Three things follow. The fill is offset from the wash by 12-14 levels of green
+in night and 7-11 in light, against the **3** that made M6a's pill read as an
+outlined hole. The hairline and the top highlight are both far above that: ~40
+levels in night, a pure-white 1px line in light. And the fill *tracks* the wash
+down the screen -- night goes 30 -> 25 inside while the page goes 42 -> 29
+outside -- which is the part that cannot be faked by a flat rectangle, and
+follows from the fills being genuinely alpha (`rgba(...,0.45)` night,
+`rgba(...,0.85)` light) rather than pre-composited. Recorded as a pass on the
+measurement; the owner's own arm's-length look overrules it if it disagrees.
+
 | Check | Build | Date | Result | Notes |
 | --- | --- | --- | --- | --- |
-| 48 (re-run) | | | | |
-| 55 | | | | |
-| 56 | | | | |
-| 57 | | | | |
-| 58 | | | | |
-| 59 | | | | |
-| 60 | | | | |
+| 48 (re-run) | Expo Go `6fdd970` | 2026-08-24 | **pass** | Both themes, measured above. `expo-blur` stays uninstalled |
+| 55 | -- | -- | **deferred** | Release-binary property; Expo Go does not install over a prior build. Runs when EAS opens (2026-09-01) |
+| 56 | Expo Go `6fdd970` | 2026-08-24 | **pass** | Read Al-Baqara, backgrounded, reopened; streak 0 -> 1 |
+| 57 | Expo Go `6fdd970` | 2026-08-24 | **pass** | Clock to Aug 25, read; streak 2. Before reading it still showed 1 -- `streakFrom`'s yesterday tolerance, live |
+| 58 | Expo Go `6fdd970` | 2026-08-24 | **pass** | Clock to Aug 27 (Aug 26 skipped); 0 before reading, 1 after |
+| 59 | Expo Go `6fdd970` | 2026-08-24 | **pass** | Stronger than specified: see below |
+| 60 | Expo Go `6fdd970` | 2026-08-24 | **pass** | Yunus 10:62 all of Aug 24; tapping it opened Yunus scrolled to ayah 62; a different ayah on Aug 25 |
+
+**Check 59 landed as a de-duplication test rather than the counting test it was
+written as.** The counter already read 3 when the run started -- three roots had
+been opened on the device earlier the same day -- and opening the first three
+alphabetical roots (أبب, أبد, أبق) left it at 3 rather than moving it to 6. That
+is the correct answer, not a failure: the count is of *distinct* roots. Opening
+a fourth root that had never been opened (قبر) moved it to 4, which is what
+proves the write path. The plan's "open three, read 3" would have passed on a
+buggy implementation that counted rows.
+
+### The one defect, fixed and re-run
+
+**Counters do not refresh when the app is resumed on the tab it was left on.**
+`useUserDbOnFocus` hangs off `useFocusEffect`, which does not fire again for a
+tab that never lost focus. Parking Home, backgrounding, moving the clock two
+days and resuming showed the pre-background streak; switching to another tab
+and back corrected it. Home is the launch screen, so this is the ordinary case,
+and a streak is exactly the number that goes stale overnight.
+
+Fixed in `260fc23` at the hook, not at the screen -- all four user-DB screens
+route through it. Overlapping reads are generation-stamped so a slow focus read
+cannot settle last and overwrite the resume's numbers. Four tests, each
+mutation-checked individually. Re-run on the device: parked on Home at streak
+1, backgrounded, clock forward two days, resumed -- **2**, with the weekly bar
+moved, no navigation.
+
+Gates after the fix: lint and type-check clean, 1429 tests (data 389,
+mobile-data 12, web 479, mobile 549).
+
+**Device left as found**, with one exception: the clock is back on automatic and
+the app theme back on Dark, but the *system* dark-mode setting was flipped to
+light early in the run (`adb shell cmd uimode night no`) to test whether the app
+followed the OS, and there was no record of its prior value to restore. The app
+sets its own theme explicitly, so nothing in this milestone depends on it.

@@ -40,7 +40,9 @@ vi.mock('expo-router', async () => {
 
 vi.mock('react-native', async () => {
   const React = await import('react');
+  const { AppState } = await import('@/testing/rnHosts.js');
   return {
+    AppState,
     ActivityIndicator: () => React.createElement('span', null, 'loading'),
     Text: ({ children }: { children?: React.ReactNode }) => React.createElement('span', null, children),
     View: ({ children }: { children?: React.ReactNode }) => React.createElement('div', null, children),

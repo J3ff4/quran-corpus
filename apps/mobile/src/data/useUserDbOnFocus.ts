@@ -1,5 +1,6 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 
 import { openUserDb } from './userDb';
@@ -21,6 +22,12 @@ export interface UserDbLoadState<T> {
  *
  * On focus rather than on mount because the reader writes as you scroll, so a
  * mount-only read shows whatever was true the last time the tab mounted.
+ *
+ * And on resume as well as on focus, because focus does not fire again for the
+ * tab you were already on. Home is the launch screen, so backgrounding the app
+ * there and reopening it is the common case, and the numbers it shows are
+ * dated: a device run on 2026-08-24 left Home focused across a day boundary and
+ * it kept yesterday's streak until the tab was switched away and back.
  */
 export function useUserDbOnFocus<T>(
   load: (client: MobileDataClient) => Promise<T>,
@@ -40,30 +47,44 @@ export function useUserDbOnFocus<T>(
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
+      // A resume can arrive while the focus read is still in flight, and the
+      // two reads can then settle out of order. Only the newest may write:
+      // stamping the older result over it is the same defect as painting 0
+      // while loading -- a wrong number, not a stale one.
+      let generation = 0;
 
       async function run() {
+        const mine = ++generation;
+        const current = () => !cancelled && mine === generation;
         setError(null);
         setLoading(true);
         try {
           const userDb = await openUserDb();
           const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
           const result = await loadRef.current(userClient);
-          if (!cancelled) setData(result);
+          if (current()) setData(result);
         } catch (cause) {
           console.error('[user-db] read failed', cause);
           // Always the localized string, never `cause.message`. A rejected
           // promise here is an expo-sqlite or storage failure, whose message is
           // untranslated internal English and can carry a file path -- neither
           // belongs on screen in a Uzbek or Russian UI.
-          if (!cancelled) setError(fallbackMessage);
+          if (current()) setError(fallbackMessage);
         } finally {
-          if (!cancelled) setLoading(false);
+          if (current()) setLoading(false);
         }
       }
 
       run();
+      // Subscribed only while focused, so a backgrounded app does not re-read
+      // the DB once per blurred screen.
+      const resumed = AppState.addEventListener('change', (state) => {
+        if (state === 'active') run();
+      });
+
       return () => {
         cancelled = true;
+        resumed.remove();
       };
     }, [fallbackMessage]),
   );

@@ -131,14 +131,31 @@ export async function getSurahReader(
   };
 }
 
+/** One ayah plus the surah it sits in -- the home cards name the surah, the
+ *  reader does not. */
+export interface ReaderLocation extends ReaderAyah {
+  surah: Surah;
+}
+
+/**
+ * One ayah by its surah:ayah coordinate, in the reader's own shape.
+ *
+ * ponytail: reads the whole surah and picks one row out of it, because
+ * getSurahReader already joins the surah, the ayah and the selected
+ * translator's translation and nothing else here does. The ceiling is
+ * al-Baqarah -- 286 ayahs and 286 translations across the bridge for one ayah.
+ * If the home screen ever feels slow on launch, the upgrade is a
+ * by-coordinate query in packages/data, not a second join here.
+ */
 export async function getAyahReaderLocation(
   client: MobileDataClient,
   surahId: number,
   ayahNumber: number,
   languageCode: ContentLanguageCode,
-): Promise<ReaderAyah | null> {
+): Promise<ReaderLocation | null> {
   const reader = await getSurahReader(client, surahId, languageCode);
-  return reader.ayahs.find((item) => item.ayah.ayah_number === ayahNumber) ?? null;
+  const found = reader.ayahs.find((item) => item.ayah.ayah_number === ayahNumber);
+  return found ? { surah: reader.surah, ...found } : null;
 }
 
 export async function getM0SurahReader(

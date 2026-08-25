@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { USER_DB_VERSION } from '@quran-corpus/data/user-db';
 
 const mocks = vi.hoisted(() => ({
   opens: [] as string[],
   applied: [] as string[],
+  queried: [] as string[],
   openResult: null as (() => Promise<unknown>) | null,
 }));
 
@@ -13,6 +15,14 @@ vi.mock('expo-sqlite', () => ({
     return {
       execAsync: async (sql: string) => {
         mocks.applied.push(sql);
+      },
+      // migrateUserDb reaches the driver through createExpoSqliteClient, which
+      // is a read client -- every statement it runs, DDL included, goes through
+      // getAllAsync. Returning [] for `PRAGMA user_version` is what a file that
+      // predates the pragma looks like, which is the case that matters here.
+      getAllAsync: async (sql: string) => {
+        mocks.queried.push(sql);
+        return [];
       },
     };
   },
@@ -31,7 +41,21 @@ describe('openUserDb', () => {
   beforeEach(() => {
     mocks.opens = [];
     mocks.applied = [];
+    mocks.queried = [];
     mocks.openResult = null;
+  });
+
+  it('migrates the file on the same open, not on a later call', async () => {
+    const openUserDb = await freshOpenUserDb();
+
+    await openUserDb();
+
+    // Every caller of openUserDb() gets a migrated file because the migration
+    // is inside the memoized open. Without this assertion the call could be
+    // deleted and the rest of this suite would still pass.
+    expect(mocks.queried[0]).toContain('PRAGMA user_version');
+    expect(mocks.queried.some((sql) => sql.includes('reading_days'))).toBe(true);
+    expect(mocks.queried.at(-1)).toBe(`PRAGMA user_version = ${USER_DB_VERSION}`);
   });
 
   it('applies the shared user-DB schema on first open', async () => {

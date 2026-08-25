@@ -10,7 +10,8 @@ import { openCorpusDb } from '@/data/openCorpusDb';
 import { parseAyahNumber, parseSurahId } from '@/data/routeParams';
 import { openUserDb } from '@/data/userDb';
 import { useWordSummaryLoader } from '@/data/useWordSummaryLoader';
-import { getBookmarks, recordReadingPosition, setBookmark } from '@/data/userRepository';
+import { getBookmarks, recordReadingDay, recordReadingPosition, setBookmark } from '@/data/userRepository';
+import { localDay } from '@/home/counters';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
 import { useThemeColors } from '@/theme/themeContext';
@@ -49,6 +50,18 @@ export default function SurahRoute() {
       const userDb = await openUserDb();
       const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
       await recordReadingPosition(userClient, surahId, ayahNumber);
+      // Decision 22: any reading counts, and this write already fires on the
+      // reader's scroll, so it is the one place that sees every read without a
+      // second listener to keep in step.
+      try {
+        await recordReadingDay(userClient, localDay(new Date()));
+      } catch (cause) {
+        // Deliberately swallowed. The streak is decoration; the reading
+        // position is what the reader came back for and is written above, so
+        // letting this reject would show "position not saved" for a position
+        // that was in fact saved.
+        console.error('[home] reading-day write failed', { cause });
+      }
     }, () => setReadingError(t(uiLocale, 'reader.positionFailed')));
   }, [surahId, uiLocale]);
 

@@ -1,6 +1,21 @@
 import { describe, expect, it } from 'vitest';
+import { createDatabase } from '../src/db.js';
 import type { QueryClient } from '../src/queryClient.js';
-import { recordReadingPosition, setBookmark } from '../src/userData.js';
+import {
+  USER_DB_MIGRATIONS,
+  USER_DB_SCHEMA,
+  USER_DB_VERSION,
+  countDistinctRootsViewed,
+  getBookmarks,
+  getReadingDays,
+  getRootViewsByDay,
+  isIsoDay,
+  migrateUserDb,
+  recordReadingDay,
+  recordReadingPosition,
+  recordRootView,
+  setBookmark,
+} from '../src/userData.js';
 
 /** Records what reached the driver, so a rejected write can be shown to have
  *  produced no statement at all rather than a harmless one. */
@@ -99,5 +114,283 @@ describe('user-data write validation', () => {
 
     expect(total).toBe(6236);
     expect(statements).toHaveLength(6236);
+  });
+});
+
+
+/** A real in-memory file, because every assertion below is about SQLite's own
+ *  `PRAGMA user_version` and about tables actually existing -- neither of which
+ *  a recording double can answer. `executeMultiple` rather than `execute`:
+ *  USER_DB_SCHEMA is three statements and libsql's execute takes one. */
+function memoryUserDb() {
+  const db = createDatabase('file::memory:');
+  return db;
+}
+
+/** Wraps a client and records every statement that reaches the driver, so
+ *  "nothing ran" can be asserted as an empty list rather than inferred from an
+ *  unchanged database. */
+function recordingProxy(client: QueryClient) {
+  const statements: string[] = [];
+  const proxy: QueryClient = {
+    async execute(statement) {
+      statements.push(typeof statement === 'string' ? statement : statement.sql);
+      return client.execute(statement);
+    },
+  };
+  return { proxy, statements };
+}
+
+describe('migrateUserDb', () => {
+  it('brings a fresh file to the current version', async () => {
+    const db = memoryUserDb();
+    await db.executeMultiple(USER_DB_SCHEMA);
+
+    expect(await migrateUserDb(db)).toBe(USER_DB_VERSION);
+    const after = await db.execute('PRAGMA user_version');
+    expect(Number(after.rows[0]!['user_version'])).toBe(USER_DB_VERSION);
+
+    db.close();
+  });
+
+  it('creates the tables the migrations declare', async () => {
+    const db = memoryUserDb();
+    await db.executeMultiple(USER_DB_SCHEMA);
+
+    await migrateUserDb(db);
+
+    // Bumping user_version without running the statements would pass every
+    // other test here: the pragma would read right and the no-op test would
+    // still be a no-op. Only asking the schema catches it.
+    const tables = await db.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name");
+    const names = tables.rows.map((row) => String(row['name']));
+    expect(names).toContain('reading_days');
+    expect(names).toContain('root_views');
+
+    db.close();
+  });
+
+  it('is a no-op on a file already at the current version', async () => {
+    const db = memoryUserDb();
+    await db.executeMultiple(USER_DB_SCHEMA);
+    await migrateUserDb(db);
+
+    // Runs on every app launch. A migration that re-applies is how an
+    // ALTER TABLE in a later version throws "duplicate column" on the second
+    // start and locks the user out of their own data.
+    expect(await migrateUserDb(db)).toBe(USER_DB_VERSION);
+
+    db.close();
+  });
+
+  it('preserves rows written before the migration ran', async () => {
+    const db = memoryUserDb();
+    await db.executeMultiple(USER_DB_SCHEMA);
+    await setBookmark(db, 2, 255, true);
+
+    await migrateUserDb(db);
+
+    // The whole reason this is versioned rather than a schema rewrite: the
+    // file is on the owner's phone and predates every migration in the list.
+    expect(await getBookmarks(db)).toEqual([{ surahId: 2, ayahNumber: 255 }]);
+
+    db.close();
+  });
+
+  it('applies only the migrations above the file version', async () => {
+    const db = memoryUserDb();
+    await db.executeMultiple(USER_DB_SCHEMA);
+    await db.execute(`PRAGMA user_version = ${USER_DB_VERSION}`);
+    const { proxy, statements } = recordingProxy(db);
+
+    await migrateUserDb(proxy);
+
+    // Every migration statement, flattened -- so this fails if any one of them
+    // runs against a file that is already current, not just the first.
+    const migrationSql = USER_DB_MIGRATIONS.flatMap((migration) => migration.statements);
+    expect(statements.filter((statement) => migrationSql.includes(statement))).toEqual([]);
+
+    db.close();
+  });
+
+  it('leaves a file from a newer build alone', async () => {
+    const db = memoryUserDb();
+    await db.executeMultiple(USER_DB_SCHEMA);
+    await db.execute(`PRAGMA user_version = ${USER_DB_VERSION + 5}`);
+
+    // Downgrading the pragma would make the *next* run of this build re-apply
+    // every migration, and hand a future build a file that lies about its own
+    // shape. Additive-only migrations mean an older build can open a newer
+    // file; it just must not rewrite the version it found.
+    expect(await migrateUserDb(db)).toBe(USER_DB_VERSION + 5);
+    const after = await db.execute('PRAGMA user_version');
+    expect(Number(after.rows[0]!['user_version'])).toBe(USER_DB_VERSION + 5);
+
+    db.close();
+  });
+
+  it('numbers migrations contiguously from 2', () => {
+    // Migration 1 is USER_DB_SCHEMA itself, applied on open. A gap or a
+    // duplicate silently skips a table on exactly the devices that were on the
+    // skipped version.
+    expect(USER_DB_MIGRATIONS.map((m) => m.version)).toEqual(
+      USER_DB_MIGRATIONS.map((_, i) => i + 2),
+    );
+    expect(USER_DB_VERSION).toBe(USER_DB_MIGRATIONS.length + 1);
+  });
+
+  it('declares one statement per migration entry', () => {
+    // Both drivers execute a single statement: libsql's execute rejects the
+    // rest, and the mobile client routes through expo's getAllAsync, which
+    // prepares one. A migration written as one multi-statement string would
+    // create its first table and silently skip the others.
+    for (const migration of USER_DB_MIGRATIONS) {
+      for (const statement of migration.statements) {
+        expect(statement.replace(/;\s*$/, '')).not.toContain(';');
+      }
+    }
+  });
+});
+
+
+/** A migrated in-memory user DB -- the two tables under test only exist after
+ *  the migration, so every case below needs both steps. */
+async function migratedUserDb() {
+  const db = memoryUserDb();
+  await db.executeMultiple(USER_DB_SCHEMA);
+  await migrateUserDb(db);
+  return db;
+}
+
+describe('isIsoDay', () => {
+  it('returns false for an impossible date rather than throwing', () => {
+    // `new Date('2026-13-01T00:00:00Z')` is an Invalid Date, and calling
+    // toISOString() on one throws RangeError. A predicate that throws is not a
+    // predicate: `if (isIsoDay(x))` would crash on exactly the input it exists
+    // to reject, and the recordReadingDay tests below cannot see the difference
+    // because they expect a RangeError either way.
+    expect(isIsoDay('2026-13-01')).toBe(false);
+    expect(isIsoDay('2026-00-10')).toBe(false);
+    expect(isIsoDay('2026-08-32')).toBe(false);
+  });
+
+  it('returns false for a date that rolls over into the next month', () => {
+    // These parse fine and come back as a *different* day, so only the
+    // round-trip comparison catches them.
+    expect(isIsoDay('2026-02-30')).toBe(false);
+    expect(isIsoDay('2026-04-31')).toBe(false);
+  });
+
+  it('accepts a real calendar day, leap day included', () => {
+    expect(isIsoDay('2026-08-24')).toBe(true);
+    expect(isIsoDay('2024-02-29')).toBe(true);
+    expect(isIsoDay('2026-02-28')).toBe(true);
+  });
+});
+
+describe('reading days', () => {
+  it('rejects anything that is not an ISO day', async () => {
+    const db = await migratedUserDb();
+    const { proxy, statements } = recordingProxy(db);
+
+    // The write boundary for a shared API. `day` is a PRIMARY KEY, so a junk
+    // value is not a bad row that gets overwritten tomorrow -- it is a
+    // permanent extra row that inflates the streak for ever.
+    for (const bad of [
+      '2026-8-24',
+      '24/08/2026',
+      '2026-13-01',
+      '2026-02-30',
+      '',
+      'today',
+      '2026-08-24T10:00:00Z',
+    ]) {
+      await expect(recordReadingDay(proxy, bad)).rejects.toThrow(RangeError);
+    }
+    // Rejected means no statement at all, not a statement that happens to be
+    // harmless -- the row would be permanent if one got through.
+    expect(statements).toEqual([]);
+
+    db.close();
+  });
+
+  it('is idempotent for a day already recorded', async () => {
+    const db = await migratedUserDb();
+
+    await recordReadingDay(db, '2026-08-24');
+    await recordReadingDay(db, '2026-08-24');
+
+    // Fires on every scroll of the reader. A non-idempotent insert either
+    // throws on the second ayah or counts one day many times.
+    expect(await getReadingDays(db, '2026-08-01')).toEqual(['2026-08-24']);
+
+    db.close();
+  });
+
+  it('returns days from the cutoff onward, newest first', async () => {
+    const db = await migratedUserDb();
+
+    for (const day of ['2026-08-20', '2026-08-22', '2026-08-24']) {
+      await recordReadingDay(db, day);
+    }
+
+    expect(await getReadingDays(db, '2026-08-22')).toEqual(['2026-08-24', '2026-08-22']);
+
+    db.close();
+  });
+
+  it('rejects a cutoff that is not an ISO day', async () => {
+    const db = await migratedUserDb();
+
+    // Same boundary on the read side: an unvalidated cutoff is compared as
+    // text, so 'today' silently returns every row ever written.
+    await expect(getReadingDays(db, 'today')).rejects.toThrow(RangeError);
+
+    db.close();
+  });
+});
+
+describe('root views', () => {
+  it('rejects a root id that cannot name a root', async () => {
+    const db = await migratedUserDb();
+    const { proxy, statements } = recordingProxy(db);
+
+    for (const bad of [0, -1, 1.5, Number.NaN, 99999]) {
+      await expect(recordRootView(proxy, bad, '2026-08-24')).rejects.toThrow(RangeError);
+    }
+    await expect(recordRootView(proxy, 12, 'yesterday')).rejects.toThrow(RangeError);
+    expect(statements).toEqual([]);
+
+    db.close();
+  });
+
+  it('counts a root once however many times it is opened', async () => {
+    const db = await migratedUserDb();
+
+    await recordRootView(db, 12, '2026-08-24');
+    await recordRootView(db, 12, '2026-08-24');
+    await recordRootView(db, 12, '2026-08-25');
+    await recordRootView(db, 99, '2026-08-25');
+
+    // "Distinct roots studied", not "root screens opened". Re-reading one root
+    // all week is one root.
+    expect(await countDistinctRootsViewed(db)).toBe(2);
+    expect(await getRootViewsByDay(db, '2026-08-24')).toEqual([
+      { day: '2026-08-25', roots: 2 },
+      { day: '2026-08-24', roots: 1 },
+    ]);
+
+    db.close();
+  });
+
+  it('counts nothing on a file where no root has been opened', async () => {
+    const db = await migratedUserDb();
+
+    // COUNT over no rows returns one row holding 0, but a driver that returned
+    // no row at all would make this NaN and render as a blank counter.
+    expect(await countDistinctRootsViewed(db)).toBe(0);
+    expect(await getRootViewsByDay(db, '2026-08-24')).toEqual([]);
+
+    db.close();
   });
 });
