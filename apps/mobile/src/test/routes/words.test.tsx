@@ -12,6 +12,9 @@ import WbwRoute from '../../../app/surah/[surahId]/words';
 const mocks = vi.hoisted(() => ({
   params: { surahId: '2' } as Record<string, string>,
   getWbwScreen: vi.fn(),
+  setWbwDensity: vi.fn(),
+  /** The persisted layout the screen renders. Reassigned per test. */
+  wbwDensity: 'hybrid' as 'hybrid' | 'rail' | 'dense',
   loadWordSummary: vi.fn(),
   push: vi.fn(),
   // The screen puts its title and pager in the nav header, so the pager is not
@@ -73,7 +76,14 @@ vi.mock('@/data/openCorpusDb', () => ({
 // silently disagreeing with the repository's.
 vi.mock('@/data/corpusRepository', async (importOriginal) => {
   const actual = await importOriginal<typeof CorpusRepository>();
-  return { ...actual, getWbwScreen: (...args: unknown[]) => mocks.getWbwScreen(...args) };
+  return {
+    ...actual,
+    getWbwScreen: (...args: unknown[]) => mocks.getWbwScreen(...args),
+    // Every layout prints a gloss per word, so the screen fetches the surah's
+    // gloss map before it renders. Stubbed here because the real one runs SQL
+    // against openCorpusDb's stub object.
+    getSurahGlosses: async () => new Map<number, string>([[1, 'Allah'], [2, 'not']]),
+  };
 });
 
 vi.mock('@/data/useWordSummaryLoader', () => ({
@@ -81,7 +91,13 @@ vi.mock('@/data/useWordSummaryLoader', () => ({
 }));
 
 vi.mock('@/settings/settingsStore', () => ({
-  useAppSettings: () => ({ contentLanguage: 'en', uiLocale: 'en' }),
+  useAppSettings: () => ({
+    contentLanguage: 'en',
+    uiLocale: 'en',
+    arabicScale: 'medium',
+    wbwDensity: mocks.wbwDensity,
+    setWbwDensity: mocks.setWbwDensity,
+  }),
 }));
 
 // The sheet has its own suite; stubbed so this one covers the wiring without
@@ -112,9 +128,12 @@ vi.mock('@/components/WordSheet', async () => {
 
 vi.mock('react-native', async () => {
   const React = await import('react');
-  const { host } = await import('@/testing/rnHosts.js');
+  const { AccessibilityInfo, host } = await import('@/testing/rnHosts.js');
 
   return {
+    // usePressScale -> useReducedMotion reads this on mount, and the density
+    // chip's segments are the first pressables this screen has had.
+    AccessibilityInfo,
     ActivityIndicator: () => React.createElement('span', { 'data-testid': 'loading' }),
     FlatList: ({
       data,
@@ -131,10 +150,14 @@ vi.mock('react-native', async () => {
         ),
       ),
     Pressable: host('button'),
+    ScrollView: host('div'),
     Text: host('span'),
     View: host('div'),
+    useWindowDimensions: () => ({ width: 390, height: 844, scale: 2, fontScale: 1 }),
   };
 });
+
+
 
 function word(id: number, textArabic: string): Word {
   return {
@@ -210,6 +233,7 @@ describe('word-by-word route', () => {
     mocks.headerRight = null;
     mocks.headerTitle = null;
     mocks.params = { surahId: '2' };
+    mocks.wbwDensity = 'hybrid';
     mocks.getWbwScreen.mockReset();
     mocks.getWbwScreen.mockResolvedValue(screenData());
     mocks.loadWordSummary.mockReset();
@@ -246,6 +270,59 @@ describe('word-by-word route', () => {
     render(<RouteWithHeader />);
 
     await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenCalledWith(expect.anything(), 2, 1));
+  });
+
+  it('renders the hybrid layout by default and remembers a switch to dense', async () => {
+    mocks.params = { surahId: '2' };
+
+    render(<RouteWithHeader />);
+    await screen.findAllByTestId('wbw-cell');
+
+    // One container per ayah in range, so all-queries throughout.
+    expect(screen.getAllByTestId('wbw-wrap').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByTestId('segment-dense'));
+
+    // Decision 26: the chip writes the setting, it does not hold local state --
+    // local state forgets the choice on every navigation, and the density is
+    // meant to be a reading preference.
+    expect(mocks.setWbwDensity).toHaveBeenCalledWith('dense');
+  });
+
+  it('renders the dense layout when the setting says so', async () => {
+    mocks.wbwDensity = 'dense';
+    mocks.params = { surahId: '2' };
+
+    render(<RouteWithHeader />);
+    await screen.findAllByTestId('wbw-cell');
+
+    expect(screen.getAllByTestId('wbw-dense-run').length).toBeGreaterThan(0);
+    expect(screen.queryAllByTestId('wbw-wrap')).toHaveLength(0);
+    expect(screen.queryAllByTestId('wbw-ayah-line')).toHaveLength(0);
+  });
+
+  it('renders the rail when the setting says so', async () => {
+    // On trial against the wrapped layout; this assertion goes with the loser.
+    mocks.wbwDensity = 'rail';
+    mocks.params = { surahId: '2' };
+
+    render(<RouteWithHeader />);
+    await screen.findAllByTestId('wbw-cell');
+
+    expect(screen.getAllByTestId('wbw-rail')[0]!.getAttribute('data-horizontal')).toBe('true');
+    expect(screen.queryAllByTestId('wbw-wrap')).toHaveLength(0);
+  });
+
+  it('gives every word its gloss, not the first one', async () => {
+    mocks.params = { surahId: '2' };
+
+    render(<RouteWithHeader />);
+    await screen.findAllByTestId('wbw-cell');
+
+    // The screen fetches one map for the whole surah and each cell looks its
+    // own word up in it. Fanning the first entry out to every cell renders a
+    // full, plausible, entirely wrong screen.
+    expect(screen.getAllByTestId('wbw-gloss-1')[0]!.textContent).toBe('Allah');
+    expect(screen.getAllByTestId('wbw-gloss-2')[0]!.textContent).toBe('not');
   });
 
   it('puts the surah name and the pager in the nav header, not in rows above the grid', async () => {

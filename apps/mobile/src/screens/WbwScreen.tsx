@@ -3,16 +3,30 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Text, View } from 'react-native';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 import type { Word } from '@quran-corpus/data/mobile';
+import { SegmentedControl } from '@/components/SegmentedControl';
 import { VersePicker } from '@/components/VersePicker';
-import { WbwGrid } from '@/components/WbwGrid';
+import { WbwDense } from '@/components/WbwDense';
+import { WbwHybrid } from '@/components/WbwHybrid';
 import { WordSheet } from '@/components/WordSheet';
-import { getWbwScreen, type WbwScreenData, type WordSummary } from '@/data/corpusRepository';
+import {
+  getSurahGlosses,
+  getWbwScreen,
+  type WbwScreenData,
+  type WordSummary,
+} from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { useWordSummaryLoader } from '@/data/useWordSummaryLoader';
 import { t } from '@/i18n/uiStrings';
-import { useAppSettings } from '@/settings/settingsStore';
+import { useAppSettings, type WbwDensity } from '@/settings/settingsStore';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
+
+/** 'rail' is on trial against 'hybrid' -- see the WbwDensity comment. */
+const DENSITY_OPTIONS: readonly { value: WbwDensity; labelKey: 'wbw.densityHybrid' | 'wbw.densityRail' | 'wbw.densityDense' }[] = [
+  { value: 'hybrid', labelKey: 'wbw.densityHybrid' },
+  { value: 'rail', labelKey: 'wbw.densityRail' },
+  { value: 'dense', labelKey: 'wbw.densityDense' },
+];
 
 interface OpenWord {
   summary: WordSummary;
@@ -28,7 +42,7 @@ export interface WbwScreenProps {
 }
 
 export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
-  const { contentLanguage, uiLocale } = useAppSettings();
+  const { contentLanguage, uiLocale, wbwDensity, setWbwDensity } = useAppSettings();
   const theme = useThemeColors();
   const paddingBottom = useListBottomPadding();
   const navigation = useNavigation();
@@ -45,6 +59,13 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
   const setFrom = (next: number) => setPage({ key: paramKey, from: next });
 
   const [wbw, setWbw] = useState<WbwScreenData | null>(null);
+  // Fetched here rather than left to the sheet's loader: every layout now
+  // prints a gloss under every word, so the map is needed to RENDER the
+  // screen, not just to answer a tap. useWordSummaryLoader keeps its own copy
+  // because the reader shares it -- one duplicate query per surah, off the
+  // first-paint path, in exchange for not threading a cache through two
+  // screens.
+  const [glosses, setGlosses] = useState<Map<number, string>>(new Map());
   const [corpusClient, setCorpusClient] = useState<MobileDataClient | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -67,9 +88,13 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
         const corpusDb = await openCorpusDb();
         const client = createExpoSqliteClient(corpusDb as ExpoSqliteLike);
         const data = await getWbwScreen(client, surahId, from);
+        // Sequential: the gloss query is per surah and only worth issuing once
+        // the range query has proved the surah exists.
+        const surahGlosses = await getSurahGlosses(client, surahId, contentLanguage);
         if (!cancelled) {
           setCorpusClient(client);
           setWbw(data);
+          setGlosses(surahGlosses);
         }
       } catch (cause) {
         // See the note in app/(tabs)/surahs.tsx: logged for logcat, never shown.
@@ -84,7 +109,7 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
     return () => {
       cancelled = true;
     };
-  }, [from, surahId, uiLocale]);
+  }, [contentLanguage, from, surahId, uiLocale]);
 
   const loadWordSummary = useWordSummaryLoader(corpusClient, surahId, contentLanguage);
 
@@ -169,16 +194,36 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
           AA). The header is outside it and cannot be wrapped, which is why the
           pager is unmounted above rather than hidden here. */}
       <View style={{ flex: 1 }} importantForAccessibility={open ? 'no-hide-descendants' : 'auto'}>
+        {/* In the screen, not the nav header: that bar already carries the
+            surah name and the pager, and a third control in it leaves the
+            pager no room on a 390pt frame. */}
+        <View style={{ paddingHorizontal: 14, paddingTop: 10 }}>
+          <SegmentedControl
+            options={DENSITY_OPTIONS.map((option) => ({
+              value: option.value,
+              label: t(uiLocale, option.labelKey),
+            }))}
+            value={wbwDensity}
+            onChange={setWbwDensity}
+            accessibilityLabel={t(uiLocale, 'wbw.density')}
+          />
+        </View>
         <FlatList
           data={wbw.pages}
           keyExtractor={(page) => String(page.ayahNumber)}
-          renderItem={({ item }) => (
-            <WbwGrid
-              page={item}
-              uiLocale={uiLocale}
-              onWordPress={(word) => onWordPress(item.ayahNumber, word)}
-            />
-          )}
+          renderItem={({ item }) => {
+            const layoutProps = {
+              page: item,
+              uiLocale,
+              glosses,
+              onWordPress: (word: Word) => onWordPress(item.ayahNumber, word),
+            };
+            return wbwDensity === 'dense' ? (
+              <WbwDense {...layoutProps} />
+            ) : (
+              <WbwHybrid {...layoutProps} rail={wbwDensity === 'rail'} />
+            );
+          }}
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingBottom }}
         />

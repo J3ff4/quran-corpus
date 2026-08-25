@@ -42,9 +42,9 @@ function word(id: number, textArabic = `كلمة${id}`): Word {
   };
 }
 
-/** form_arabic is set, unlike WbwGrid's fixture: SegmentedWord falls back to a
- *  plain unjoined <Text> the moment any segment is missing its form, so a
- *  null-form fixture would never exercise the joined path at all. */
+/** form_arabic is always set here: SegmentedWord falls back to a plain
+ *  unjoined <Text> the moment any segment is missing its form, so a null-form
+ *  fixture would never exercise the joined path at all. */
 function segment(wordId: number, posTag: string, formArabic: string): WordSegment {
   return {
     id: wordId * 100,

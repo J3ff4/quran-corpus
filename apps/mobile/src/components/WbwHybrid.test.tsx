@@ -42,9 +42,9 @@ function word(id: number, textArabic = `كلمة${id}`): Word {
   };
 }
 
-/** form_arabic is set, unlike WbwGrid's fixture: SegmentedWord falls back to a
- *  plain unjoined <Text> the moment any segment is missing its form, so a
- *  null-form fixture would never exercise the joined path at all. */
+/** form_arabic is always set here: SegmentedWord falls back to a plain
+ *  unjoined <Text> the moment any segment is missing its form, so a null-form
+ *  fixture would never exercise the joined path at all. */
 function segment(wordId: number, posTag: string, formArabic: string): WordSegment {
   return {
     id: wordId * 100,
@@ -147,8 +147,8 @@ describe('WbwHybrid', () => {
   it('shows each word its own gloss', () => {
     renderHybrid();
 
-    // The same "plausible but wrong" hazard WbwGrid documents for segments:
-    // handing every cell the surah's whole gloss map looks fine on screen.
+    // The same "plausible but wrong" hazard as the segments above: handing
+    // every cell the surah's whole gloss map looks fine on screen.
     expect(screen.getByTestId('wbw-gloss-1').textContent).toBe('Allah');
     expect(screen.getByTestId('wbw-gloss-2').textContent).toBe('not');
   });
@@ -164,7 +164,7 @@ describe('WbwHybrid', () => {
   it('keeps a word with no analysed segments', () => {
     renderHybrid({ page: pageWithUnanalysedWord() });
 
-    // Dropping it silently shortens the ayah -- WbwGrid's existing warning.
+    // Dropping it silently shortens the ayah, and nothing on screen says so.
     expect(screen.getAllByTestId('wbw-cell')).toHaveLength(2);
   });
 
