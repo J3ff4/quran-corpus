@@ -1149,9 +1149,35 @@ killed; `HomeScreen.tsx` restored from a scratchpad copy and `diff -q` clean.
 
 ### Task 7: §5 stop, then build
 
-- [ ] **Step 1: Self-review the diff** against DRY / SOLID / OWASP and the
+- [x] **Step 1: Self-review the diff** against DRY / SOLID / OWASP and the
   umbrella constraints. Specifically: is every new write validated in
   `packages/data` rather than in a screen? Is every migration additive?
+
+  Done over `git diff main...HEAD`, 1915 insertions across 21 files. Findings:
+
+  - **Writes are validated in `packages/data`.** `recordReadingDay` and
+    `recordRootView` both `assertIsoDay`, and `recordRootView` range-checks the
+    id (`1..MAX_ROOT_ID`, integer). Neither screen validates anything of its
+    own: `app/surah/[surahId].tsx` passes `localDay(new Date())` and
+    `app/root/[buckwalter].tsx` passes `entry.root.id`, an integer that only
+    exists because the corpus resolved the root -- no Buckwalter string reaches
+    a write, so there is no second charset validator to keep in step.
+  - **Every migration is additive.** `USER_DB_MIGRATIONS` v2 is two
+    `CREATE TABLE IF NOT EXISTS`; no `DROP`, no `UPDATE`, no rewrite. A file
+    from a newer build is left alone rather than stamped back down.
+  - **Injection.** Every value is a bound parameter. The one interpolation is
+    `PRAGMA user_version = ${USER_DB_VERSION}`, which PRAGMA cannot
+    parameterize; the value is computed in that module from the migration list
+    and never comes from a caller. Commented as such.
+  - **DRY.** No SQL in an app: `src/data/userRepository.ts` re-exports from
+    `@quran-corpus/data/user-db`. The home screen composes `GlassSurface`,
+    `usePressScale`, `useUserDbOnFocus`, `useListBottomPadding` and
+    `getAyahReaderLocation` rather than growing its own.
+  - **Nothing leaves the device** (decision 34): no telemetry call was added.
+  - One accepted cost, commented at the call site rather than fixed:
+    `getAyahReaderLocation` reads a whole surah to render one ayah. The upgrade
+    is a by-coordinate query in `packages/data`, which is deliberately not
+    being written on a hunch before the device run says the launch feels slow.
 - [ ] **Step 2: Stop and ask the owner to run `/code-review`.** §5 fires here —
   `packages/data` queries *and* an on-device user-DB write. Plain
   `/code-review` (Pro, local). Never `/code-review ultra` without asking.
