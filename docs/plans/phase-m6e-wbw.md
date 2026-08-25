@@ -359,7 +359,9 @@ Expo Go, as M6c's and M6d's did.
 cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --profile preview
 ```
 
-- [ ] **Step 2: Run checks 73–78 and record every result below.**
+- [x] **Step 2: Run checks 73–79** — done 2026-08-25 over Expo Go on the
+      owner's OnePlus 7 Pro (GM1917, Android 12), bundle 2076 modules, both
+      themes. 73–78 PASS. **79 is open: it is the owner's call.**
 
 | # | Check | Pass condition |
 | --- | --- | --- |
@@ -375,10 +377,45 @@ cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --prof
 
 | Check | Build | Date | Result | Notes |
 | --- | --- | --- | --- | --- |
-| 73 | | | | |
-| 74 | | | | |
-| 75 | | | | |
-| 76 | | | | |
-| 77 | | | | |
-| 78 | | | | |
-| 79 | | | | |
+| 73 | Expo Go, Metro 2076 mod. | 2026-08-25 | PASS | 2:91 and 2:137. Ayah reads as one continuous line, per-word POS colour intact, cells wrap RTL with the gloss under each word. |
+| 74 | " | 2026-08-25 | **PASS** | `فَسَيَكْفِيكَهُمُ` (2:137), five segments, renders as ONE joined word in the ayah line AND in its cell, in all three layouts. Decision 28's gate. |
+| 75 | " | 2026-08-25 | PASS | 2:91's 26 words fit one screen in dense against roughly a third of that in verse. Glosses hold to one line. |
+| 76 | " | 2026-08-25 | PASS | Switched to dense, force-stopped Expo Go, relaunched: still dense. Later switched back to verse on the pushed route and that persisted too. |
+| 77 | " | 2026-08-25 | PASS | Tapped `قَالُوا` in dense; the sheet opened on that word, gloss "they say,", segments `قَالُ` Verb + `وا` Personal pronoun. |
+| 78 | " | 2026-08-25 | PASS | Both themes. Light: noun blue, verb red, prep green, pron olive on the paper plate. Dark unchanged from M6c's measured set. |
+| 79 | " | 2026-08-25 | **OPEN — owner's call** | Both layouts are on the device behind the chip's first two segments. See below. |
+
+### Check 79: rail vs wrapped, what the device shows
+
+- **Verse (wrapped)** puts the whole ayah's glosses on screen with a short
+  scroll: at 2:137, ten cells were visible under the plate without scrolling.
+- **Rail (mockup 2c)** shows three cells at a time and needs a sideways swipe
+  per ayah, while taking the same vertical space as the wrapped run's first
+  row. `scrollToEnd` on content-size change works: the rail opens on word 1 at
+  the right, as an Arabic reader expects.
+
+The mockup's own tradeoff note called this "the neighbourhood, not the whole
+ayah", and on hardware that is exactly how it reads. Nothing here is a defect
+in either one; it is a design choice.
+
+## Defects found
+
+None in M6e's own code. Nothing was fixed during this run.
+
+## Observed, not defects (pre-existing, and NOT introduced by M6e)
+
+- **The morphology tab draws no header at all**, so `WbwScreen`'s
+  `headerTitle` and its `VersePicker` go nowhere there: no surah name and **no
+  way to change the ayah range from that tab**. `app/(tabs)/_layout.tsx` sets
+  `headerShown: false` for every tab (M6a, so the screen can draw over the
+  bloom), and the tab has rendered `WbwScreen` since M3. The pushed route
+  `/surah/[id]/words` has a proper header — back arrow, "Al-Baqara", the
+  `137–146` pager — and was verified working in this run. M6e makes the gap
+  more visible, since the density chip is now the tab's only control. Worth an
+  issue; out of M6e's scope.
+- The floating tab pill overlays the bottom of the word sheet on that tab
+  (the Root row sits behind it). Also pre-existing; `WordSheet` is untouched by
+  M6e.
+- Expo's dev-menu FAB covers the top-right of every screen, as in M6c and M6d.
+
+Device state restored: system night mode back to `yes`, app Theme back to Dark.
