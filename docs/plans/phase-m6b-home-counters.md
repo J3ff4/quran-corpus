@@ -299,7 +299,7 @@ export async function getRootViewsByDay(client: QueryClient, sinceDay: string): 
 export function isIsoDay(value: unknown): value is string;
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 describe('reading days', () => {
@@ -373,12 +373,12 @@ describe('root views', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `pnpm --filter @quran-corpus/data test -t 'reading days'`
 Expected: FAIL — no such export.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```ts
 /** Roots in the corpus are 1..1548 today; the cap carries headroom for a
@@ -457,18 +457,55 @@ export async function getRootViewsByDay(
 Re-export all five plus `isIsoDay` from
 `apps/mobile/src/data/userRepository.ts`, in the existing export block.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `pnpm --filter @quran-corpus/data test`
 Expected: PASS.
 
-- [ ] **Step 5: Mutation-check (§4)**
+- [x] **Step 5: Mutation-check (§4)**
 
 Delete the `new Date(...)` line from `isIsoDay` and return the regex result.
 Expected: the rejection test FAILS on `2026-13-01` and `2026-02-30`. Restore by
 re-editing.
 
-- [ ] **Step 6: Commit**
+
+**Deviations from this brief, taken during execution**
+
+- **`isIsoDay` as written throws instead of returning false.** `2026-13-01`
+  parses to an Invalid Date, and `toISOString()` on one throws
+  `RangeError: Invalid time value` -- so the predicate crashed on exactly the
+  input it exists to reject, and every `if (isIsoDay(x))` caller would crash
+  with it. A `Number.isNaN(parsed.getTime())` guard returns false instead. The
+  brief's own rejection test could not see this: `recordReadingDay` rejects with
+  a `RangeError` either way (`[[sdd-brief-can-specify-vacuous-tests]]` again).
+  `isIsoDay` now has its own three tests, and mutation B below is the brief's
+  original line.
+- **`newClient()` still does not exist** (same as Task 1). These tests use a
+  `migratedUserDb()` helper over `createDatabase('file::memory:')`, since the
+  two tables only exist after `migrateUserDb` has run, and apply the schema with
+  `executeMultiple` because `USER_DB_SCHEMA` is three statements.
+- **Rejection tests assert no statement reached the driver**, via the existing
+  `recordingProxy`, rather than only that a `RangeError` was thrown. A validator
+  that throws *after* writing would pass the brief's version.
+
+Three tests beyond the brief: a cutoff that is not an ISO day is rejected on the
+read side too, `countDistinctRootsViewed` returns 0 rather than NaN on a file
+with no views, and the leap day 2024-02-29 is accepted.
+
+Mutations run, each killed, each restored by re-editing and verified identical
+against a scratchpad copy:
+
+- A: `isIsoDay` returns the regex result only -> 3 tests fail (both `isIsoDay`
+  validity tests and the reading-day rejection test).
+- B: drop the NaN guard, i.e. the brief's original line -> `returns false for an
+  impossible date rather than throwing` fails with `RangeError: Invalid time value`.
+- C: drop `assertIsoDay(sinceDay)` from `getReadingDays` -> `rejects a cutoff
+  that is not an ISO day` fails.
+
+Gates: lint clean, type-check clean, `pnpm -r test` = data 389, mobile-data 12,
+web 479, mobile 507.
+
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/data/src/userData.ts packages/data/tests/userData.test.ts \

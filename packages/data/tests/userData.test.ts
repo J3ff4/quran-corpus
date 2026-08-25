@@ -5,9 +5,15 @@ import {
   USER_DB_MIGRATIONS,
   USER_DB_SCHEMA,
   USER_DB_VERSION,
+  countDistinctRootsViewed,
   getBookmarks,
+  getReadingDays,
+  getRootViewsByDay,
+  isIsoDay,
   migrateUserDb,
+  recordReadingDay,
   recordReadingPosition,
+  recordRootView,
   setBookmark,
 } from '../src/userData.js';
 
@@ -243,5 +249,148 @@ describe('migrateUserDb', () => {
         expect(statement.replace(/;\s*$/, '')).not.toContain(';');
       }
     }
+  });
+});
+
+
+/** A migrated in-memory user DB -- the two tables under test only exist after
+ *  the migration, so every case below needs both steps. */
+async function migratedUserDb() {
+  const db = memoryUserDb();
+  await db.executeMultiple(USER_DB_SCHEMA);
+  await migrateUserDb(db);
+  return db;
+}
+
+describe('isIsoDay', () => {
+  it('returns false for an impossible date rather than throwing', () => {
+    // `new Date('2026-13-01T00:00:00Z')` is an Invalid Date, and calling
+    // toISOString() on one throws RangeError. A predicate that throws is not a
+    // predicate: `if (isIsoDay(x))` would crash on exactly the input it exists
+    // to reject, and the recordReadingDay tests below cannot see the difference
+    // because they expect a RangeError either way.
+    expect(isIsoDay('2026-13-01')).toBe(false);
+    expect(isIsoDay('2026-00-10')).toBe(false);
+    expect(isIsoDay('2026-08-32')).toBe(false);
+  });
+
+  it('returns false for a date that rolls over into the next month', () => {
+    // These parse fine and come back as a *different* day, so only the
+    // round-trip comparison catches them.
+    expect(isIsoDay('2026-02-30')).toBe(false);
+    expect(isIsoDay('2026-04-31')).toBe(false);
+  });
+
+  it('accepts a real calendar day, leap day included', () => {
+    expect(isIsoDay('2026-08-24')).toBe(true);
+    expect(isIsoDay('2024-02-29')).toBe(true);
+    expect(isIsoDay('2026-02-28')).toBe(true);
+  });
+});
+
+describe('reading days', () => {
+  it('rejects anything that is not an ISO day', async () => {
+    const db = await migratedUserDb();
+    const { proxy, statements } = recordingProxy(db);
+
+    // The write boundary for a shared API. `day` is a PRIMARY KEY, so a junk
+    // value is not a bad row that gets overwritten tomorrow -- it is a
+    // permanent extra row that inflates the streak for ever.
+    for (const bad of [
+      '2026-8-24',
+      '24/08/2026',
+      '2026-13-01',
+      '2026-02-30',
+      '',
+      'today',
+      '2026-08-24T10:00:00Z',
+    ]) {
+      await expect(recordReadingDay(proxy, bad)).rejects.toThrow(RangeError);
+    }
+    // Rejected means no statement at all, not a statement that happens to be
+    // harmless -- the row would be permanent if one got through.
+    expect(statements).toEqual([]);
+
+    db.close();
+  });
+
+  it('is idempotent for a day already recorded', async () => {
+    const db = await migratedUserDb();
+
+    await recordReadingDay(db, '2026-08-24');
+    await recordReadingDay(db, '2026-08-24');
+
+    // Fires on every scroll of the reader. A non-idempotent insert either
+    // throws on the second ayah or counts one day many times.
+    expect(await getReadingDays(db, '2026-08-01')).toEqual(['2026-08-24']);
+
+    db.close();
+  });
+
+  it('returns days from the cutoff onward, newest first', async () => {
+    const db = await migratedUserDb();
+
+    for (const day of ['2026-08-20', '2026-08-22', '2026-08-24']) {
+      await recordReadingDay(db, day);
+    }
+
+    expect(await getReadingDays(db, '2026-08-22')).toEqual(['2026-08-24', '2026-08-22']);
+
+    db.close();
+  });
+
+  it('rejects a cutoff that is not an ISO day', async () => {
+    const db = await migratedUserDb();
+
+    // Same boundary on the read side: an unvalidated cutoff is compared as
+    // text, so 'today' silently returns every row ever written.
+    await expect(getReadingDays(db, 'today')).rejects.toThrow(RangeError);
+
+    db.close();
+  });
+});
+
+describe('root views', () => {
+  it('rejects a root id that cannot name a root', async () => {
+    const db = await migratedUserDb();
+    const { proxy, statements } = recordingProxy(db);
+
+    for (const bad of [0, -1, 1.5, Number.NaN, 99999]) {
+      await expect(recordRootView(proxy, bad, '2026-08-24')).rejects.toThrow(RangeError);
+    }
+    await expect(recordRootView(proxy, 12, 'yesterday')).rejects.toThrow(RangeError);
+    expect(statements).toEqual([]);
+
+    db.close();
+  });
+
+  it('counts a root once however many times it is opened', async () => {
+    const db = await migratedUserDb();
+
+    await recordRootView(db, 12, '2026-08-24');
+    await recordRootView(db, 12, '2026-08-24');
+    await recordRootView(db, 12, '2026-08-25');
+    await recordRootView(db, 99, '2026-08-25');
+
+    // "Distinct roots studied", not "root screens opened". Re-reading one root
+    // all week is one root.
+    expect(await countDistinctRootsViewed(db)).toBe(2);
+    expect(await getRootViewsByDay(db, '2026-08-24')).toEqual([
+      { day: '2026-08-25', roots: 2 },
+      { day: '2026-08-24', roots: 1 },
+    ]);
+
+    db.close();
+  });
+
+  it('counts nothing on a file where no root has been opened', async () => {
+    const db = await migratedUserDb();
+
+    // COUNT over no rows returns one row holding 0, but a driver that returned
+    // no row at all would make this NaN and render as a blank counter.
+    expect(await countDistinctRootsViewed(db)).toBe(0);
+    expect(await getRootViewsByDay(db, '2026-08-24')).toEqual([]);
+
+    db.close();
   });
 });

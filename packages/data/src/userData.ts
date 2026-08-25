@@ -286,3 +286,82 @@ export async function getSetting(client: QueryClient, key: string): Promise<stri
   const value = result.rows[0]?.value;
   return value == null ? null : String(value);
 }
+
+/** Roots in the corpus are 1..1548 today; the cap carries headroom for a
+ *  re-import the way the Buckwalter length caps do. A view row is only ever
+ *  counted, never joined back for display, so an id past the end would inflate
+ *  a number with nothing on screen to reveal it. */
+const MAX_ROOT_ID = 5000;
+
+/**
+ * True for a calendar day in `YYYY-MM-DD`, and only for one that exists.
+ *
+ * The regex alone accepts 2026-02-30 and 2026-13-01. Both are storable, both
+ * are PRIMARY KEYs, and both would sit in the streak table for ever -- so the
+ * round-trip through Date is the actual check and the regex only fixes the
+ * shape (Date parses far too much on its own, including full timestamps).
+ *
+ * The NaN guard is not belt-and-braces: 2026-13-01 parses to an Invalid Date,
+ * and `toISOString()` on one throws RangeError. Without the guard this
+ * predicate throws on the very input it exists to reject, so `if (isIsoDay(x))`
+ * would crash instead of taking the false branch.
+ */
+export function isIsoDay(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return false;
+  return parsed.toISOString().slice(0, 10) === value;
+}
+
+function assertIsoDay(day: string): void {
+  if (!isIsoDay(day)) throw new RangeError(`day must be an ISO calendar day (YYYY-MM-DD), got ${day}`);
+}
+
+export async function recordReadingDay(client: QueryClient, day: string): Promise<void> {
+  assertIsoDay(day);
+  await client.execute({
+    sql: 'INSERT INTO reading_days (day) VALUES (?) ON CONFLICT(day) DO NOTHING',
+    args: [day],
+  });
+}
+
+export async function getReadingDays(client: QueryClient, sinceDay: string): Promise<string[]> {
+  assertIsoDay(sinceDay);
+  const result = await client.execute({
+    sql: 'SELECT day FROM reading_days WHERE day >= ? ORDER BY day DESC',
+    args: [sinceDay],
+  });
+  return result.rows.map((row) => String(row.day));
+}
+
+export async function recordRootView(client: QueryClient, rootId: number, day: string): Promise<void> {
+  if (!Number.isInteger(rootId) || rootId < 1 || rootId > MAX_ROOT_ID) {
+    throw new RangeError(`rootId must be an integer in 1..${MAX_ROOT_ID}, got ${rootId}`);
+  }
+  assertIsoDay(day);
+  await client.execute({
+    sql: 'INSERT INTO root_views (root_id, day) VALUES (?, ?) ON CONFLICT(root_id, day) DO NOTHING',
+    args: [rootId, day],
+  });
+}
+
+export async function countDistinctRootsViewed(client: QueryClient): Promise<number> {
+  const result = await client.execute('SELECT COUNT(DISTINCT root_id) AS roots FROM root_views');
+  return Number(result.rows[0]?.roots ?? 0);
+}
+
+export async function getRootViewsByDay(
+  client: QueryClient,
+  sinceDay: string,
+): Promise<{ day: string; roots: number }[]> {
+  assertIsoDay(sinceDay);
+  const result = await client.execute({
+    sql: `SELECT day, COUNT(DISTINCT root_id) AS roots
+          FROM root_views
+          WHERE day >= ?
+          GROUP BY day
+          ORDER BY day DESC`,
+    args: [sinceDay],
+  });
+  return result.rows.map((row) => ({ day: String(row.day), roots: Number(row.roots) }));
+}

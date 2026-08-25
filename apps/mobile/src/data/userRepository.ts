@@ -4,10 +4,16 @@
 // app, which CLAUDE.md §2 forbids -- packages/data is the single source of truth
 // for both the schema and the statements that read it.
 export {
+  countDistinctRootsViewed,
   getBookmarks,
   getLastReadingPosition,
+  getReadingDays,
+  getRootViewsByDay,
   getSetting,
+  isIsoDay,
+  recordReadingDay,
   recordReadingPosition,
+  recordRootView,
   saveSetting,
   setBookmark,
   type Bookmark,
