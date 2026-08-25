@@ -29,6 +29,14 @@ behind it to see through — `expo-blur` would render that screen identically an
 was declined. Re-run 48 against M6b's home cards; if it reads flat over *those*,
 expo-blur is a live §12 question again. Bloom stays at `.62` / `ry 66%`.
 M6a ships with 48 outstanding; PR is the owner's call.
+**48 re-run on M6b's home cards 2026-08-24: PASS** (measured, both themes).
+expo-blur stays uninstalled.
+
+**M6b on `feat/m6b-home-counters` at `acca5f7`, not merged.** Streak/roots
+counters, weekly log, ayah of the day, home rebuilt as four glass blocks; 1429
+tests. §5 review done (0 data-layer findings, 4 UI fixed / 4 declined). Device
+run 2026-08-24: 48 + 56-60 pass, **55 deferred to the EAS window**, one defect
+found and fixed (`260fc23`, counters stale on resume). PR is the owner's call.
 
 Two calls made in-flight, both in commit bodies:
 - Dark glass fill is the night page colour at 45%, NOT the mockup's white .075.
