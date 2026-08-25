@@ -95,7 +95,7 @@ not pin the old reciter at web's call site to "keep web unchanged", and do not
 split the helper in two. This is the one deliberate web-visible change in all of
 M6; note it in the PR body so it is not read as an accident.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 describe('reciters', () => {
@@ -146,12 +146,12 @@ describe('ayahAudioUrl', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `pnpm --filter @quran-corpus/data test audio`
 Expected: FAIL — no `RECITERS`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Keep the existing coordinate validation in `ayahAudioUrl` exactly as it is and
 add the reciter lookup in front of the path build:
@@ -179,7 +179,7 @@ with per-reciter values. Grep for both across `apps/web` as well as
 and per the ruling above both must now say Husary — `uiStrings.ts` imports `AYAH_AUDIO_ATTRIBUTION`, so
 update that call site to build the attribution from the active reciter.
 
-- [ ] **Step 4: Re-probe the folders**
+- [x] **Step 4: Re-probe the folders**
 
 ```bash
 for f in Husary_64kbps Husary_Muallim_128kbps Husary_Mujawwad_64kbps \
@@ -193,14 +193,14 @@ done
 Every line must read `200`. A `404` means the folder was renamed upstream —
 find the new name or drop that reciter; do not ship a dead entry.
 
-- [ ] **Step 5: Run the tests, then mutation-check (§4)**
+- [x] **Step 5: Run the tests, then mutation-check (§4)**
 
 Run: `pnpm --filter @quran-corpus/data test` → PASS.
 Then delete the `if (!reciter) throw` line and default `reciter.folder` to the
 raw `reciterId`. Expected: the "refuses a reciter it does not know" test FAILS
 on every entry. Restore by re-editing.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/data/src/audio.ts packages/data/tests/audio.test.ts packages/data/src/mobile.ts \
