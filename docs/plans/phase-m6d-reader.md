@@ -54,7 +54,7 @@ Two values, not three: `'wbw'` is a navigation, not a rendering (see
 Architecture), and storing it would reopen the app onto a screen the user left
 by pressing back.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```tsx
 it('restores a persisted reader mode', async () => {
@@ -72,12 +72,12 @@ it('falls back to translation for a value it does not recognise', async () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test settingsStore`
 Expected: FAIL — no `readerMode`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Add `readerMode` to `AppSettings`, to `defaultSettings` (`'translation'`), to
 `settingKeys`, an `isReaderMode` guard beside the others, the read in
@@ -85,13 +85,19 @@ Add `readerMode` to `AppSettings`, to `defaultSettings` (`'translation'`), to
 file's existing shape exactly — the keyed-not-positional read is deliberate and
 documented; do not restructure it.
 
-- [ ] **Step 4: Run the tests, then mutation-check (§4)**
+- [x] **Step 4: Run the tests, then mutation-check (§4)**
 
 Run: `pnpm --filter @quran-corpus/mobile test settingsStore` → PASS.
 Then drop the `isReaderMode` guard and return the raw string. Expected: the
 fallback test FAILS. Restore by re-editing.
 
-- [ ] **Step 5: Commit**
+Done 2026-08-25. 15/15 in `settingsStore`, 563/563 across the mobile suite,
+type-check clean. Mutation ran as written — guard replaced by
+`(persistedReaderMode ?? default) as ReaderMode`, and exactly the fallback test
+failed (1 failed / 14 passed). The tests use this file's own `saveSetting`
+helper rather than the plan's sketched `clientWith`, which does not exist here.
+
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/mobile/src/settings/settingsStore.tsx apps/mobile/src/settings/settingsStore.test.tsx

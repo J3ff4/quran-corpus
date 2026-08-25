@@ -7,6 +7,11 @@ import { arabicScales, type ArabicScale } from '../theme/tokens';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 
+// Two values, not three. 'wbw' is a navigation, not a rendering -- the chip's
+// third segment pushes /surah/[id]/words -- so persisting it would reopen the
+// app onto a screen the user left by pressing back.
+export type ReaderMode = 'mushaf' | 'translation';
+
 export interface AppSettings {
   uiLocale: UiLocaleCode;
   contentLanguage: ContentLanguageCode;
@@ -14,6 +19,7 @@ export interface AppSettings {
   analyticsEnabled: boolean;
   arabicScale: ArabicScale;
   reduceMotion: boolean;
+  readerMode: ReaderMode;
 }
 
 export interface AppSettingsContextValue extends AppSettings {
@@ -23,6 +29,7 @@ export interface AppSettingsContextValue extends AppSettings {
   setAnalyticsEnabled: (enabled: boolean) => void;
   setArabicScale: (scale: ArabicScale) => void;
   setReduceMotion: (reduce: boolean) => void;
+  setReaderMode: (mode: ReaderMode) => void;
   /** Set while the settings database cannot be opened, so a screen can say so
    *  instead of letting changes look saved when nothing is being persisted. */
   storageError: string | null;
@@ -35,6 +42,7 @@ const defaultSettings: AppSettings = {
   analyticsEnabled: false,
   arabicScale: 'medium',
   reduceMotion: false,
+  readerMode: 'translation',
 };
 
 const AppSettingsContext = createContext<AppSettingsContextValue | null>(null);
@@ -51,7 +59,7 @@ const AppSettingsContext = createContext<AppSettingsContextValue | null>(null);
 // change -- the owner's report was that the Arabic dominated the card at any
 // system size. System scaling still composes on top; nothing here sets
 // allowFontScaling.
-const settingKeys = ['uiLocale', 'contentLanguage', 'theme', 'analyticsEnabled', 'arabicScale', 'reduceMotion'] as const;
+const settingKeys = ['uiLocale', 'contentLanguage', 'theme', 'analyticsEnabled', 'arabicScale', 'reduceMotion', 'readerMode'] as const;
 
 function isUiLocale(value: string | null): value is UiLocaleCode {
   return uiLocales.some((locale) => locale.code === value);
@@ -67,6 +75,10 @@ function isTheme(value: string | null): value is ThemePreference {
 
 function isArabicScale(value: string | null): value is ArabicScale {
   return value !== null && Object.hasOwn(arabicScales, value);
+}
+
+function isReaderMode(value: string | null): value is ReaderMode {
+  return value === 'mushaf' || value === 'translation';
 }
 
 export async function loadPersistedAppSettings(client: MobileDataClient): Promise<AppSettings> {
@@ -86,6 +98,7 @@ export async function loadPersistedAppSettings(client: MobileDataClient): Promis
   const analyticsEnabled = persisted.analyticsEnabled;
   const persistedArabicScale = persisted.arabicScale;
   const reduceMotion = persisted.reduceMotion;
+  const persistedReaderMode = persisted.readerMode;
 
   return {
     uiLocale: isUiLocale(persistedUiLocale) ? persistedUiLocale : defaultSettings.uiLocale,
@@ -94,6 +107,7 @@ export async function loadPersistedAppSettings(client: MobileDataClient): Promis
     analyticsEnabled: analyticsEnabled === 'true',
     arabicScale: isArabicScale(persistedArabicScale) ? persistedArabicScale : defaultSettings.arabicScale,
     reduceMotion: reduceMotion === 'true',
+    readerMode: isReaderMode(persistedReaderMode) ? persistedReaderMode : defaultSettings.readerMode,
   };
 }
 
@@ -294,6 +308,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       setAnalyticsEnabled: (analyticsEnabled) => updateSetting('analyticsEnabled', analyticsEnabled),
       setArabicScale: (arabicScale) => updateSetting('arabicScale', arabicScale),
       setReduceMotion: (reduceMotion) => updateSetting('reduceMotion', reduceMotion),
+      setReaderMode: (readerMode) => updateSetting('readerMode', readerMode),
     }),
     [settings, storageError, userClient],
   );
