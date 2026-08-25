@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Pressable,
   Text,
   View,
   type LayoutChangeEvent,
@@ -10,7 +9,7 @@ import {
   type NativeSyntheticEvent,
   type ViewToken,
 } from 'react-native';
-import Animated, {
+import {
   Extrapolation,
   interpolate,
   useAnimatedStyle,
@@ -20,16 +19,14 @@ import { router, useNavigation } from 'expo-router';
 import { splitBasmala, type Word } from '@quran-corpus/data/mobile';
 import type { ReaderAyah, SurahReaderData, WordSummary } from '@/data/corpusRepository';
 import type { ContentLanguageCode, UiLocaleCode } from '@/i18n/languages';
-import { t } from '@/i18n/uiStrings';
+import type { ReaderMode } from '@/settings/settingsStore';
 
 import { AyahCard } from './AyahCard';
+import { ReaderHeader } from './ReaderHeader';
 import { Bismillah } from './Bismillah';
 import { LanguageSheet } from './LanguageSheet';
-import { SearchHeaderButton } from './SearchHeaderButton';
 import { WordSheet } from './WordSheet';
-import { Icon } from './icons/Icon';
 import { useReducedMotion } from '@/motion/useReducedMotion';
-import { touchTargets } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
@@ -44,6 +41,12 @@ interface SurahReaderProps {
    *  test without the store's expo-sqlite import. */
   contentLanguage: ContentLanguageCode;
   onChangeContentLanguage: (code: ContentLanguageCode) => void;
+  /** Which rendering the ayahs get. Owned by the screen above for the same
+   *  reason contentLanguage is: it is a persisted setting, and reading it here
+   *  would drag the settings store's expo-sqlite import into every test that
+   *  renders a reader. */
+  readerMode: ReaderMode;
+  onChangeReaderMode: (mode: ReaderMode) => void;
   /** Ayah to open at, from a bookmark or the saved reading position. */
   initialAyahNumber?: number | null;
   /** Omitted leaves the reader as a plain mushaf: every ayah renders its full
@@ -111,6 +114,8 @@ export function SurahReader({
   uiLocale,
   contentLanguage,
   onChangeContentLanguage,
+  readerMode,
+  onChangeReaderMode,
   initialAyahNumber,
   loadWords,
   loadWordSummary,
@@ -141,76 +146,6 @@ export function SurahReader({
   const [positioned, setPositioned] = useState(false);
 
   const [languageOpen, setLanguageOpen] = useState(false);
-
-  // Fixed, not scrolled away with the title: the nav header exists as of the
-  // M3b header pass, so the reader's actions no longer ride the list. The
-  // language control joined them on 2026-08-17 -- it used to be a fixed pill
-  // band above the ayahs, costing a strip of every screenful.
-  useEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          {/* Same reachability rule as the globe and the words button: close
-              the sheet first, or it stays mounted behind the pushed screen
-              holding the list at no-hide-descendants. */}
-          <SearchHeaderButton
-            uiLocale={uiLocale}
-            onPress={() => {
-              closeSheet();
-              router.push('/search');
-            }}
-          />
-          <Pressable
-            testID="open-language"
-            accessibilityRole="button"
-            accessibilityLabel={t(uiLocale, 'reader.chooseLanguage')}
-            // closeSheet is declared further down (after openWord/requestRef),
-            // so it can't sit in this effect's dependency array without a
-            // temporal-dead-zone error -- but it's fine to call from inside
-            // this onPress, which only runs after the whole component body,
-            // closeSheet included, has finished evaluating. Without this call
-            // the globe button stays reachable while WordSheet is up: two
-            // stacked absoluteFill backdrops (the header is a native toolbar
-            // above WordSheet's, not inside it) and the word panel peeking out
-            // from behind the language panel.
-            onPress={() => {
-              closeSheet();
-              setLanguageOpen(true);
-            }}
-            style={{
-              minHeight: touchTargets.minimum,
-              minWidth: touchTargets.minimum,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Icon name="translate" color={theme.accent} />
-          </Pressable>
-          <Pressable
-            testID="open-wbw"
-            accessibilityRole="button"
-            accessibilityLabel={t(uiLocale, 'wbw.title')}
-            // Same reachability problem as the globe above: this button sits in
-            // the native toolbar, outside the sheet's backdrop. Leaving the
-            // sheet mounted means coming back from the grid lands on a stale
-            // sheet still holding the list at no-hide-descendants.
-            onPress={() => {
-              closeSheet();
-              router.push(`/surah/${data.surah.id}/words`);
-            }}
-            style={{
-              minHeight: touchTargets.minimum,
-              minWidth: touchTargets.minimum,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Icon name="words" color={theme.accent} />
-          </Pressable>
-        </View>
-      ),
-    });
-  }, [navigation, data.surah.id, uiLocale, theme.accent]);
 
   // The nav header carries the surah name once the list header's 24pt heading
   // has scrolled off -- Android's own app-bar behaviour, and it keeps the name
@@ -251,26 +186,58 @@ export function SurahReader({
 
   useEffect(() => {
     navigation.setOptions({
-      // An element, not a title string: setOptions renders the title into the
-      // native toolbar, outside this screen's view tree, so nothing there can
-      // be animated by swapping the string.
+      // The whole bar, not headerTitle/headerRight: the reader's chrome is one
+      // glass surface with the bloom behind it (owner ruling 2026-08-25,
+      // mockup 1e), and a native toolbar cannot be that. Everything the
+      // toolbar provided is now ReaderHeader's -- the back affordance included.
       //
-      // The text is always mounted, at opacity 0 while the heading is on
-      // screen. TalkBack therefore always has the surah name in the toolbar,
-      // which is the behaviour a screen reader wants; hiding it would need
-      // React state and a re-render per scroll frame, which is the cost this
-      // whole approach exists to avoid.
-      headerTitle: () => (
-        <Animated.Text
-          testID="reader-title"
-          numberOfLines={1}
-          style={[titleStyle, { color: theme.text, fontSize: 20, fontWeight: '600' }]}
-        >
-          {data.surah.name_translit}
-        </Animated.Text>
+      // `header`, not `headerTransparent`: a transparent header stops the
+      // navigator insetting the content, and every screen's own heading then
+      // renders underneath the back arrow (see app/_layout.tsx).
+      header: () => (
+        <ReaderHeader
+          surahName={data.surah.name_translit}
+          titleStyle={titleStyle}
+          mode={readerMode}
+          onChangeMode={onChangeReaderMode}
+          uiLocale={uiLocale}
+          onBack={() => {
+            closeSheet();
+            navigation.goBack();
+          }}
+          // Each of these closes the word sheet first. The bar sits above the
+          // sheet's backdrop rather than inside it, so leaving the sheet
+          // mounted holds the ayah list at no-hide-descendants behind whatever
+          // opens next -- coming back from the grid then lands on a stale
+          // sheet over an unreachable list.
+          onOpenSearch={() => {
+            closeSheet();
+            router.push('/search');
+          }}
+          onOpenLanguage={() => {
+            closeSheet();
+            setLanguageOpen(true);
+          }}
+          onOpenWbw={() => {
+            closeSheet();
+            router.push(`/surah/${data.surah.id}/words`);
+          }}
+        />
       ),
     });
-  }, [navigation, titleStyle, theme.text, data.surah.name_translit]);
+    // closeSheet is declared after this effect (it needs openWord and
+    // requestRef), so it cannot sit in the dependency array without a
+    // temporal-dead-zone error -- but calling it from these handlers is safe:
+    // they only run once the whole component body has evaluated.
+  }, [
+    navigation,
+    titleStyle,
+    uiLocale,
+    readerMode,
+    onChangeReaderMode,
+    data.surah.id,
+    data.surah.name_translit,
+  ]);
 
   const onScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {

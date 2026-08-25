@@ -139,7 +139,7 @@ segment.
 New `uiStrings` keys: `reader.mode`, `reader.modeMushaf`,
 `reader.modeTranslation`, `reader.modeWbw`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```tsx
 it('reports the chosen mode', () => {
@@ -174,12 +174,12 @@ it('closes the word sheet before navigating', () => {
 });
 ```
 
-- [ ] **Step 2: Run them and watch them fail**
+- [x] **Step 2: Run them and watch them fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test ReaderHeader`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `SegmentedControl` with three options; `onChange` routes `'wbw'` to
 `onOpenWbw()` and the other two to `onChangeMode()`. Keep every `closeSheet()`
@@ -187,13 +187,36 @@ call that exists in the current header — each one has a comment explaining a
 bug it fixed. Wire the header through `navigation.setOptions` as today, with
 `headerTransparent` from M6a so the bloom shows behind it.
 
-- [ ] **Step 4: Run the tests, then mutation-check (§4)**
+- [x] **Step 4: Run the tests, then mutation-check (§4)**
 
 Run: `pnpm --filter @quran-corpus/mobile test` → PASS.
 Then route `'wbw'` into `onChangeMode` as well. Expected: the second test
 FAILS. Restore by re-editing.
 
-- [ ] **Step 5: Commit**
+Done 2026-08-25. 6/6 in `ReaderHeader`, 569/569 across mobile, type-check and
+lint clean. Mutation ran as written and exactly the WBW test failed.
+
+Three deviations from this task as planned, all deliberate:
+
+1. **The header replaces the native one** (`navigation.setOptions({ header })`),
+   rather than filling `headerRight`. Owner ruling 2026-08-25, asked because
+   mockup `1e` draws one glass bar and a native toolbar cannot be one. So
+   `ReaderHeaderProps` also carries `surahName`, `titleStyle` and `onBack` --
+   the back affordance and the scroll-linked name are this component's job now.
+   The reader keeps authoring the animated style, so the M3b/M5c title fade is
+   unchanged.
+2. **Two rows inside the one bar.** The mockup's chip has two segments and no
+   search or globe beside it; ours has three plus both actions, and five
+   controls in a 390pt row leaves the name about 34pt.
+3. **The tests query by text and testID, not `getByLabelText`.**
+   `SegmentedControl` labels the group, and each segment announces its own
+   visible text -- there is no per-segment `accessibilityLabel` to match, and
+   asserting on one would have meant adding a label the device does not use.
+   The sheet-ordering case is covered by the two reader-level tests that already
+   assert it (`closes an open word sheet before ...`), rather than by the plan's
+   sketched `renderReaderWithSheetOpen`, which does not exist.
+
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/mobile/src/components/ReaderHeader.tsx apps/mobile/src/components/ReaderHeader.test.tsx \

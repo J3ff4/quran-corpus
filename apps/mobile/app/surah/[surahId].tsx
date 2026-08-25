@@ -27,7 +27,7 @@ export default function SurahRoute() {
   // Validated the same way as surahId -- it arrives from a URL, so it is
   // untrusted input even when we are the only ones writing the links.
   const initialAyahNumber = useMemo(() => parseAyahNumber(params.ayah), [params.ayah]);
-  const { contentLanguage, setContentLanguage, uiLocale } = useAppSettings();
+  const { contentLanguage, setContentLanguage, uiLocale, readerMode, setReaderMode } = useAppSettings();
   const theme = useThemeColors();
   const audio = useAyahAudioController(process.env.EXPO_PUBLIC_AUDIO_API_BASE_URL, surahId);
   const [reader, setReader] = useState<SurahReaderData | null>(null);
@@ -191,6 +191,8 @@ export default function SurahRoute() {
         uiLocale={uiLocale}
         contentLanguage={contentLanguage}
         onChangeContentLanguage={setContentLanguage}
+        readerMode={readerMode}
+        onChangeReaderMode={setReaderMode}
         initialAyahNumber={initialAyahNumber}
         loadWords={loadWords}
         loadWordSummary={loadWordSummary}

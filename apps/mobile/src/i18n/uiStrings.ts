@@ -43,6 +43,11 @@ export type UiStringKey =
   | 'reader.ayahLabel'
   | 'reader.chooseLanguage'
   | 'reader.bismillah'
+  | 'reader.back'
+  | 'reader.mode'
+  | 'reader.modeMushaf'
+  | 'reader.modeTranslation'
+  | 'reader.modeWbw'
   | 'word.fullAnalysis'
   | 'word.root'
   | 'word.noGloss'
@@ -221,6 +226,11 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.ayahLabel': 'Ayah',
     'reader.chooseLanguage': 'Choose translation language',
     'reader.bismillah': 'In the name of Allah, the Entirely Merciful, the Especially Merciful',
+    'reader.back': 'Back',
+    'reader.mode': 'Reading mode',
+    'reader.modeMushaf': 'Mushaf',
+    'reader.modeTranslation': 'Translation',
+    'reader.modeWbw': 'Word by word',
     'word.fullAnalysis': 'Full analysis',
     'word.root': 'Root',
     'word.noGloss': 'No translation for this word',
@@ -360,6 +370,11 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.ayahLabel': 'Oyat',
     'reader.chooseLanguage': 'Tarjima tilini tanlang',
     'reader.bismillah': 'Mehribon va rahmli Alloh nomi bilan',
+    'reader.back': 'Orqaga',
+    'reader.mode': 'O‘qish rejimi',
+    'reader.modeMushaf': 'Mushaf',
+    'reader.modeTranslation': 'Tarjima',
+    'reader.modeWbw': 'So‘zma-so‘z',
     'word.fullAnalysis': 'To‘liq tahlil',
     'word.root': 'O‘zak',
     'word.noGloss': 'Bu so‘z uchun tarjima yo‘q',
@@ -496,6 +511,11 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.ayahLabel': 'Аят',
     'reader.chooseLanguage': 'Выберите язык перевода',
     'reader.bismillah': 'Именем Аллаха, Милостивого, Милосердного',
+    'reader.back': 'Назад',
+    'reader.mode': 'Режим чтения',
+    'reader.modeMushaf': 'Мусхаф',
+    'reader.modeTranslation': 'Перевод',
+    'reader.modeWbw': 'Пословно',
     'word.fullAnalysis': 'Полный разбор',
     'word.root': 'Корень',
     'word.noGloss': 'Нет перевода для этого слова',
