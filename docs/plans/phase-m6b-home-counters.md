@@ -882,7 +882,7 @@ Take the owner's strike-through and use exactly what survives. Do **not** add to
 it — decision 24 makes the list theirs. If an entry is added later, validate the
 coordinate the same way first.
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -919,12 +919,12 @@ describe('ayahForDay', () => {
 });
 ```
 
-- [ ] **Step 3: Run it and watch it fail**
+- [x] **Step 3: Run it and watch it fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test ayahOfTheDay`
 Expected: FAIL — module not found.
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 ```ts
 /** Owner-curated. Do not add to this list without asking -- it is editorial
@@ -949,12 +949,12 @@ export function ayahForDay(day: string): { surah: number; ayah: number } {
 }
 ```
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 Run: `pnpm --filter @quran-corpus/mobile test ayahOfTheDay`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/mobile/src/home/ayahOfTheDay.ts apps/mobile/src/home/ayahOfTheDay.test.ts
@@ -962,6 +962,38 @@ git commit -m "feat(mobile): add the curated ayah-of-the-day rotation"
 ```
 
 ---
+
+
+**Deviations from this brief, taken during execution**
+
+- **Step 1 is not done, and it is the owner's to do.**
+  `docs/design/m6/ayah-of-the-day-draft.md` is untouched since the M6a commit:
+  all 118 `Keep` boxes are still `[ ]` and nothing is struck. The list shipped
+  here is therefore the **full 118 candidates, pending the owner's
+  strike-through**, and the module says so at the top. Deleting a line is all a
+  strike takes. Decision 24 makes the selection editorial and the owner's, so
+  nothing was added, reordered, or removed on the agent's judgement.
+- Correctness was re-verified rather than taken from the draft's claim: all 118
+  coordinates were re-queried against the live corpus DB (`apps/web/quran.db`).
+  Every ayah exists and every one has an `en` translation row -- 0 missing, 0
+  duplicate coordinates. That is correctness, not approval.
+- The brief's third test asserts `seen.size > min(20, length) - 1` while looping
+  `length` times over only 28 distinct day strings, so it never tested the
+  property it describes. Replaced with the actual claim: over
+  `AYAH_OF_THE_DAY.length` consecutive days every entry appears exactly once,
+  plus a wrap test for the day after a full cycle.
+- Three tests beyond the brief: the pre-1970 case the twice-modulo exists for,
+  integer-ness of `ayah` (the brief checked it only for `surah`), and no
+  duplicate coordinate in the list.
+- Mutations run, each killed and restored byte-identically from a scratchpad
+  copy (never `git restore`):
+  - **A** -- single modulo -> "does not fall off the list for a day before 1970"
+    fails.
+  - **B** -- hash the date string instead of cycling -> 2 fail, which is the
+    collision the doc comment describes.
+
+Gate: lint clean, type-check clean, `pnpm -r test` = data 389, mobile-data 12,
+web 479, mobile 530.
 
 ### Task 6: The home screen
 
