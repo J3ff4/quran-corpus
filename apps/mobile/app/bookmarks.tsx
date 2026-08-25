@@ -13,7 +13,7 @@ export default function BookmarksRoute() {
   const bookmarks = data ?? [];
 
   return (
-    <View style={{ flex: 1, padding: 20, gap: 12, backgroundColor: theme.background }}>
+    <View style={{ flex: 1, padding: 20, gap: 12 }}>
       <Text accessibilityRole="header" style={{ color: theme.text, fontSize: 20, fontWeight: '700' }}>
         {t(uiLocale, 'tabs.bookmarks')}
       </Text>

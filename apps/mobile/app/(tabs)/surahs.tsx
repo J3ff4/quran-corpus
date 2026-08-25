@@ -53,7 +53,7 @@ export default function SurahsTab() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.background }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator />
       </View>
     );
@@ -61,7 +61,7 @@ export default function SurahsTab() {
 
   if (error) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', padding: 20, backgroundColor: theme.background }}>
+      <View style={{ flex: 1, justifyContent: 'center', padding: 20 }}>
         {/* Live region: the list never gets focus, so without this TalkBack
             announces nothing when the load fails. */}
         <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ color: theme.danger }}>
@@ -72,7 +72,7 @@ export default function SurahsTab() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.background }}>
+    <View style={{ flex: 1 }}>
       <SurahList surahs={surahs} uiLocale={uiLocale} onOpenSurah={openSurah} />
     </View>
   );

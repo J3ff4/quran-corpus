@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { Bloom } from '@/components/Bloom';
 import { openCorpusDb, useCorpusFonts } from '@/data/openCorpusDb';
 import { AppSettingsProvider } from '@/settings/settingsStore';
 import { ThemeProvider } from '@/theme/ThemeProvider';
@@ -88,19 +89,30 @@ export default function RootLayout() {
 function AppStack() {
   const theme = useThemeColors();
   return (
-    <Stack
-      screenOptions={{
-        headerStyle: { backgroundColor: theme.background },
-        headerTintColor: theme.text,
-        headerShadowVisible: false,
-        // Every screen renders its own heading; a nav title repeating it would
-        // put the same words on screen twice. The header exists for the back
-        // affordance.
-        title: '',
-      }}
-    >
-      {/* The tab group draws its own headers via app/(tabs)/_layout. */}
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-    </Stack>
+    <View style={{ flex: 1 }}>
+      {/* One instance for the whole app, behind the navigator. A per-screen
+          copy would repaint a full-screen gradient on every navigation. */}
+      <Bloom />
+      <Stack
+        screenOptions={{
+          // Transparent background, but NOT a transparent (overlaying) header:
+          // the bloom has to show through the header strip, and a tinted one
+          // would cut a flat band across it -- but `headerTransparent` also
+          // stops the navigator insetting the content, so every screen's own
+          // heading rendered underneath the back arrow.
+          headerStyle: { backgroundColor: 'transparent' },
+          headerTintColor: theme.text,
+          headerShadowVisible: false,
+          contentStyle: { backgroundColor: 'transparent' },
+          // Every screen renders its own heading; a nav title repeating it
+          // would put the same words on screen twice. The header exists for the
+          // back affordance.
+          title: '',
+        }}
+      >
+        {/* The tab group draws its own chrome via app/(tabs)/_layout. */}
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      </Stack>
+    </View>
   );
 }

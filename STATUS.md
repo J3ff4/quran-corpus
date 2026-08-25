@@ -7,9 +7,38 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-08-20
+Updated: 2026-08-24
 
 ## Now
+
+### 🎨 M6 GLASS REDESIGN — planned, M6a implemented + device-run 1 done (2026-08-24)
+Spec + 9 sub-phase plans: `docs/plans/phase-m6-glass-redesign.md` (+ `phase-m6a..i`).
+40 owner decisions recorded there. §5 fires on M6b, M6c, M6f, M6h.
+
+**M6a on `feat/m6a-design-system` at `746ddaf`, not merged.** Bloom backdrop,
+GlassSurface, Newsreader, press-scale hook, floating tab pill; 506 tests green.
+**Device run 1 done 2026-08-24 via Expo Go** (no APK — EAS blocked until
+2026-09-01, so plan Task 7 is deferred): 49-52 pass, **48 FAILED**, 53-54 not
+exercisable until something consumes the serif and the press-scale. Two
+chrome-inset defects found and fixed in `746ddaf` (screens rendering under the
+back arrow and under the status bar).
+
+**48 is parked to M6b, not fixed** (owner, 2026-08-24). The tab pill is M6a's
+only glass surface and it floats below the bloom's reach, so there is nothing
+behind it to see through — `expo-blur` would render that screen identically and
+was declined. Re-run 48 against M6b's home cards; if it reads flat over *those*,
+expo-blur is a live §12 question again. Bloom stays at `.62` / `ry 66%`.
+M6a ships with 48 outstanding; PR is the owner's call.
+
+Two calls made in-flight, both in commit bodies:
+- Dark glass fill is the night page colour at 45%, NOT the mockup's white .075.
+  The mockup value is 3.35:1 on the accent over the bloom. Alternative was
+  cutting the dark bloom .62 -> .12; two-value flip either way.
+- M6c triggers §5 after all (browse needs new `packages/data` queries).
+
+Awaiting owner: ayah-of-the-day strike-through
+(`docs/design/m6/ayah-of-the-day-draft.md`, 118 candidates).
+
 
 ### 🔀 REPO MIGRATED — `quran-corpus-pwa` → `quran-corpus` (2026-08-13)
 The orphaned-object blocker is **gone**, and no support ticket was ever filed.

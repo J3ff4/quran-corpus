@@ -128,7 +128,7 @@ export function DictionaryScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.background }}>
+    <View style={{ flex: 1 }}>
       <View style={{ flexDirection: 'row', padding: 16, gap: 8 }}>
         {(['browse', 'frequent'] as const).map((option) => (
           <Pressable

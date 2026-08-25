@@ -383,7 +383,9 @@ Decision: create fresh Android mobile mockups before implementation. They should
 ## 10. Milestones
 
 > Numbering follows `docs/plans/`. The design-foundation phase was inserted as
-> M2 on 2026-08-16 and everything below it shifted by one.
+> M2 on 2026-08-16 and everything below it shifted by one. The glass redesign
+> was inserted as M6 on 2026-08-24 and everything below *it* shifted by one
+> again: release hardening M5 -> M7, treebank M6 -> M8, iOS M7 -> M9.
 
 ### Phase M0: Mobile Technical Spike
 
@@ -414,7 +416,7 @@ Status: in progress.
 - Reading history.
 - Theme.
 - About/Credits.
-- Basic ayah audio streaming through our thin audio endpoint, defaulting to Abdul Rashid Sufi.
+- Basic ayah audio streaming, defaulting to Al-Husary. (Corrected 2026-08-24: no thin audio endpoint was ever deployed, and Abdur-Rashid Sufi exists only as whole-surah files while the whole playback path is per-ayah. Audio is streamed per ayah from everyayah.com; M6f adds the reciter picker.)
 - Privacy-safe crash reporting and analytics instrumentation.
 
 ### Phase M2: Design Foundation
@@ -441,7 +443,45 @@ Status: in progress.
 - Verb concordance.
 - Offline search.
 
-### Phase M5: Android Release Hardening
+### Phase M5: Dictionary Parity
+
+Shipped 2026-08-23. Not in the original numbering -- the milestone that was M5
+here was release hardening, which is now M7. M5 as built brought the three
+dictionary surfaces up to web's content parity, then M5c fixed the four defects
+the device run found.
+
+- Root entry, lemma/verb entry and dictionary browse at web parity
+  (transliterations, glosses, sense lists, form counts, hijāʾī neighbours).
+- Derived-form concordance filter.
+- Safe-area bottom inset on every scrolling screen.
+- Deep links land on the ayah rather than near it.
+- Previous/Next replaces rather than pushes, so back leaves in one press.
+
+Device checks 34-47 all passed on 2026-08-23.
+
+### Phase M6: Glass Redesign
+
+Full re-skin of every screen to the owner's glass design, plus the four features
+it assumes. Nine sub-phases, one PR and one preview APK each. Spec and plans:
+`docs/plans/phase-m6-glass-redesign.md`.
+
+- Design system: radial bloom backdrop, fake-glass surfaces, Newsreader display
+  face, floating tab pill. No blur (React Native has no `backdrop-filter`), no
+  new dependency.
+- Home: continue reading, day streak, roots studied, ayah of the day.
+- Browse by surah, juz, page or revelation order.
+- Reader: mushaf / translation / word-by-word mode chip.
+- Word-by-word: `2c` hybrid and `2d` dense, switchable and remembered.
+- Audio: scrub, continuous play, background playback with lock-screen controls,
+  and a reciter picker defaulting to Al-Husary.
+- Dictionary, root, lemma, frequency, concordance and search re-skinned.
+- Bookmarks: three tabs, notes on a bookmark, and a list that scrolls.
+- Settings, About and Menu, with credits for every source M6 adds.
+
+A true paged mushaf is explicitly **not** in scope; page browse scrolls to the
+page's first ayah.
+
+### Phase M7: Android Release Hardening
 
 - Accessibility pass.
 - Performance pass on target devices.
@@ -450,13 +490,13 @@ Status: in progress.
 - Legal/source attribution review.
 - Release candidate QA.
 
-### Phase M6: Post-V1 Treebank Readiness
+### Phase M8: Post-V1 Treebank Readiness
 
 - Track web/data treebank implementation.
 - Add native treebank viewer after treebank exists in the shared data layer.
 - Validate touch pan/zoom rendering and performance.
 
-### Phase M7: iOS Readiness
+### Phase M9: iOS Readiness
 
 - Audit platform-specific code.
 - Enable iOS build.

@@ -146,7 +146,7 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.background }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator />
       </View>
     );
@@ -154,7 +154,7 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
 
   if (error || !wbw) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', padding: 20, backgroundColor: theme.background }}>
+      <View style={{ flex: 1, justifyContent: 'center', padding: 20 }}>
         <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ color: theme.danger }}>
           {error ?? t(uiLocale, 'reader.loadFailed')}
         </Text>
@@ -163,7 +163,7 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.background }}>
+    <View style={{ flex: 1 }}>
       {/* accessibilityViewIsModal is iOS-only, so on Android this is what stops
           TalkBack swiping into the grid behind the sheet (CLAUDE.md §8, WCAG
           AA). The header is outside it and cannot be wrapped, which is why the

@@ -131,8 +131,10 @@ every list sits under the gesture bar (check 44), a concordance tap lands on
 the wrong ayah in the second half of a long surah (check 45), and Previous/Next
 stacks a screen per tap (check 47). Confirm the EAS upload is ~36–43 MB
 — a ~5 MB upload means `.easignore` dropped the bundled DB and every check
-below fails for the wrong reason. Run these alongside M3's outstanding checks (F5, F6, check 27 and
-the M2 rosette carry-over).
+below fails for the wrong reason. **Checks 28-33 are superseded by M6** — the dictionary and search screens they
+test are redrawn in `docs/plans/phase-m6-glass-redesign.md` (M6g). Do not run
+them; the record of what was never verified stays here deliberately. Run
+checks 44-47 and the M5 checks as before; see checks 48+ for M6.
 
 28. Tab bar reads Home · Read · Morphology · Dictionary · Menu. Menu opens
     Bookmarks, Settings and About & credits, and all three open.
@@ -217,6 +219,49 @@ the M2 rosette carry-over).
     arrows. Each new root opens at the top of its own concordance, not at the
     scroll offset of the one before it.
 
+## M6a Design System Smoke Test
+
+Run on a physical Android device at `746ddaf` or later. This is the first build
+of the M6 glass redesign (`docs/plans/phase-m6-glass-redesign.md`); check 48 is
+the gate on the whole approach, so run it first and stop if it fails.
+
+EAS is unavailable until 2026-09-01, so run 1 went through Expo Go rather than a
+`preview` APK. Same JS, same device, but not a release binary — re-run against
+the APK when the build window reopens.
+
+48. **Failed on run 1; parked to M6b, do not re-run here.** Open any tab in
+    **both themes**. Cards read as translucent panels over the green wash, not
+    as flat rectangles: the hairline border and the 1px top highlight are both
+    visible at arm's length. **If the surfaces read flat, stop and report it** —
+    that is the trigger to reconsider `expo-blur` (umbrella decision 8), which
+    is a dependency question and needs the owner. On 2026-08-24 it read flat,
+    but the only glass surface in the M6a build is the tab pill, which floats
+    below the bloom's reach with nothing behind it to show through. The owner
+    declined `expo-blur` — it would not change that screen, since blurring a
+    flat colour returns the flat colour — and moved the check to M6b, where real
+    cards sit over the wash.
+49. Open surah 2 (al-Baqarah) and scroll from the top to the end. Scrolling is
+    smooth and the background wash stays put — it must not repaint, shift or
+    flicker as rows move.
+50. Settings → switch theme with a tab screen open. The wash and every glass
+    surface flip together, with no flash of the other theme in between.
+51. Tap all five tabs in the floating pill. Each opens its own screen, the
+    active tab is tinted accent while the rest are muted, and the pill clears
+    the gesture bar. Tap the tab you are already on: nothing navigates.
+52. Scroll any long list (Dictionary browse, or a concordance) to the very end.
+    The last row clears the floating pill — nothing is hidden underneath it.
+53. **Not exercisable until a heading uses the serif.** Look at a heading
+    anywhere: it renders in the Newsreader serif, not the system sans, with no
+    tofu boxes and no mid-screen fallback to another face. M6a loads the font
+    and names it in `typography.display`, but no component sets it as
+    `fontFamily`, so there is nothing on screen this check can fail on. Run it
+    in the sub-phase that consumes it.
+54. **Not exercisable until something animates on press.** Turn the system
+    "remove animations" setting on (or Settings → reduce animations), then press
+    and hold a card. It does not shrink, and nothing else animates on tap. M6a
+    ships `usePressScale` with no consumer, so "it does not shrink" passes
+    whether or not the hook honours the setting. Run it with 53.
+
 ## Current Status
 
 M0-M2 are complete. M3 (morphology) is implemented on `feat/m3-morphology`: an offline reader over a bundled SQLite DB, per-segment coloured word morphology behind a bottom sheet, word-detail and root screens, a word-by-word grid, and Hafs font loading with English/Uzbek/Russian translations. M3b then fixed the defects found on the first two device runs — sheet spring, basmala placement, navigation headers, the word-by-word screen's chrome, a four-step Arabic size setting and an in-app reduce-animations switch.
@@ -229,17 +274,31 @@ and localised the basmala label; Run 2 on 2026-08-18 cleared ten of the twelve
 checks those commits touched, left two unexercised, and found the header title
 popping in and the sheet's coloured word coming apart at its segment
 boundaries. Both are now fixed, but neither has been seen on
-hardware: Run 3 is still owed, and it is now folded into M4's build.
+hardware: Run 3 was still owed when M6 began; F5, F6 and check 27 are now **superseded by M6** — the reader is rebuilt in M6d and re-tested by checks 65-72.
 
-M4 (dictionary + search) is implemented on the same branch: five tabs with
-Bookmarks and Settings behind a Menu, offline FTS5 verse search with a `2:255`
-"Go to" row, translation search filtered to one language so an ayah appears once,
-dictionary browse by hijāʾī letter, frequency lists for roots/lemmas/verbs, and
-paged concordances on the root and lemma screens. **None of it has run on a
-device.** One build clears both: checks 1-27 (F5, F6 and check 27 outstanding)
-plus the M2 rosette carry-over go in the Verification Log of
-`docs/plans/phase-m3-morphology-mvp.md`, and checks 28-33 go in that of
-`docs/plans/phase-m4-dictionary-search.md`. Checks 34-41 were rewritten by M5
-and go in the Verification Log of `docs/plans/phase-m5-dictionary-parity.md` —
-the M4 plan's log still describes the versions of 34-38 that only checked a
-screen opened.
+M4 (dictionary + search) is implemented and merged: five tabs with Bookmarks and
+Settings behind a Menu, offline FTS5 verse search with a `2:255` "Go to" row,
+translation search filtered to one language so an ayah appears once, dictionary
+browse by hijāʾī letter, frequency lists for roots/lemmas/verbs, and paged
+concordances on the root and lemma screens. M5 and M5c followed; their checks
+34-47 all passed on 2026-08-23.
+
+**M6 (glass redesign) is in progress** — see
+`docs/plans/phase-m6-glass-redesign.md` for the spec and the nine sub-phase
+plans. M6a (design system and app chrome) is implemented on
+`feat/m6a-design-system`; its device run happened on 2026-08-24 through Expo Go
+(no APK — EAS is unavailable until 2026-09-01). Checks 49-52 pass; 48 **failed**
+and is parked to M6b for a re-run against real cards; 53-54 move to the
+sub-phase that first uses the serif and the press-scale. Two chrome-inset
+defects were found and fixed in `746ddaf`.
+
+Three sets of checks are **superseded by M6**, because the screens they test are
+being redrawn. They were never run and are not going to be; the record of that
+stays here rather than being deleted:
+
+- The M2 rosette carry-over — the medallion is restyled in M6d.
+- M3 Run 3's outstanding F5, F6 and check 27 — the reader is rebuilt in M6d.
+- M4's checks 28-33 — dictionary and search are rebuilt in M6g.
+
+Everything they covered is re-tested against the redesigned screens by checks
+48-107, which are distributed across the nine M6 sub-phase plans.

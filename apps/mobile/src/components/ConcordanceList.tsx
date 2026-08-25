@@ -405,7 +405,7 @@ export function ConcordanceList({
       }
       ListEmptyComponent={loading ? null : status}
       renderItem={renderItem}
-      style={{ flex: 1, backgroundColor: theme.background }}
+      style={{ flex: 1 }}
       contentContainerStyle={{ paddingBottom }}
     />
   );

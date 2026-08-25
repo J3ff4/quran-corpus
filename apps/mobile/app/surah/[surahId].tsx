@@ -152,7 +152,7 @@ export default function SurahRoute() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.background }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator />
       </View>
     );
@@ -160,7 +160,7 @@ export default function SurahRoute() {
 
   if (error || !reader) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', padding: 20, backgroundColor: theme.background }}>
+      <View style={{ flex: 1, justifyContent: 'center', padding: 20 }}>
         <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ color: theme.danger }}>
           {error ?? t(uiLocale, 'reader.loadFailed')}
         </Text>
@@ -169,7 +169,7 @@ export default function SurahRoute() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.background }}>
+    <View style={{ flex: 1 }}>
       <SurahReader
         data={reader}
         bookmarkedAyahs={bookmarks}
