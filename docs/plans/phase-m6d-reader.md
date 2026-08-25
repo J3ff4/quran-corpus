@@ -341,7 +341,7 @@ Per mockups `1e`/`1j`:
 - Bookmark and play controls become icon buttons in the card's footer row, each
   ≥ `touchTargets.minimum`, each with an `accessibilityLabel`.
 
-- [ ] **Step 1: Restyle, running the existing suites as you go**
+- [x] **Step 1: Restyle, running the existing suites as you go**
 
 There is no new logic in this task — it is styling over components that already
 have tests. §4's mutation-check does not apply to a style constant. The gate is
@@ -349,7 +349,7 @@ the existing suites staying green plus device checks 65–68.
 
 Run after each file: `pnpm --filter @quran-corpus/mobile test`
 
-- [ ] **Step 2: Check contrast on the real surface**
+- [x] **Step 2: Check contrast on the real surface**
 
 Every colour used on a card must be measured against
 `composite(glass[mode].fill, bloom)`, not against `theme.background` — M6a Task
@@ -357,7 +357,7 @@ Every colour used on a card must be measured against
 *new* colour pairing this task introduces. Do not introduce a new hex without
 one.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add apps/mobile/src/components

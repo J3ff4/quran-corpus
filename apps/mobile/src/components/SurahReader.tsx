@@ -27,7 +27,11 @@ import { ReaderHeader } from './ReaderHeader';
 import { Bismillah } from './Bismillah';
 import { LanguageSheet } from './LanguageSheet';
 import { WordSheet } from './WordSheet';
+import { GlassSurface } from './GlassSurface';
 import { useReducedMotion } from '@/motion/useReducedMotion';
+import { t } from '@/i18n/uiStrings';
+import { fonts, typography } from '@/theme/tokens';
+import { useArabicSizes } from '@/theme/useArabicSizes';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
@@ -125,6 +129,7 @@ export function SurahReader({
   onReadingAyah,
 }: SurahReaderProps) {
   const theme = useThemeColors();
+  const arabicSizes = useArabicSizes();
   const paddingBottom = useListBottomPadding();
   const navigation = useNavigation();
   const listRef = useRef<FlatList<SurahReaderData['ayahs'][number]>>(null);
@@ -442,17 +447,39 @@ export function SurahReader({
             onLayout={(event: LayoutChangeEvent) => {
               headerHeight.value = event.nativeEvent.layout.height;
             }}
-            style={{
-              paddingHorizontal: 20,
-              paddingVertical: 16,
-              gap: 6,
-            }}
+            style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16 }}
           >
-            <Text accessibilityRole="header" style={{ color: theme.text, fontSize: 24, fontWeight: '700' }}>
-              {data.surah.name_translit}
-            </Text>
-            <Text style={{ color: theme.mutedText }}>{data.surah.name_translation}</Text>
-            {basmala ? <Bismillah text={basmala} uiLocale={uiLocale} /> : null}
+            {/* The surah opens on a plate (mockups 1e/1j): the Arabic name
+                leads, the Latin names sit under it in the display serif, and
+                the count and revelation type are a muted caption. */}
+            <GlassSurface style={{ padding: 20, gap: 6, alignItems: 'center' }}>
+              <Text
+                style={{
+                  color: theme.text,
+                  fontFamily: fonts.arabic,
+                  fontSize: arabicSizes.banner,
+                  writingDirection: 'rtl',
+                }}
+              >
+                {data.surah.name_arabic}
+              </Text>
+              <Text
+                accessibilityRole="header"
+                style={{ color: theme.text, fontFamily: fonts.displaySemiBold, fontSize: typography.title }}
+              >
+                {data.surah.name_translit}
+              </Text>
+              <Text style={{ color: theme.mutedText, fontFamily: fonts.display, fontSize: typography.body }}>
+                {data.surah.name_translation}
+              </Text>
+              <Text style={{ color: theme.mutedText, fontSize: typography.caption }}>
+                {`${data.surah.ayah_count} ${t(uiLocale, 'surahList.ayahsSuffix')} · ${t(
+                  uiLocale,
+                  data.surah.revelation_type === 'meccan' ? 'browse.meccan' : 'browse.medinan',
+                )}`}
+              </Text>
+              {basmala ? <Bismillah text={basmala} uiLocale={uiLocale} /> : null}
+            </GlassSurface>
           </View>
         }
         renderItem={({ item }) => {

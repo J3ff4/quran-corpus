@@ -1,10 +1,6 @@
 import { Text, useWindowDimensions, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import {
-  MEDALLION_BACKING_PATH,
-  MEDALLION_OUTLINE_PATH,
-  MEDALLION_VIEW_BOX,
-} from '@quran-corpus/config/ornaments/medallion';
+import { MEDALLION_OUTLINE_PATH, MEDALLION_VIEW_BOX } from '@quran-corpus/config/ornaments/medallion';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
 import { useThemeColors } from '@/theme/themeContext';
@@ -49,7 +45,10 @@ export function AyahMedallion({ n, uiLocale }: { n: number; uiLocale: UiLocaleCo
         viewBox={MEDALLION_VIEW_BOX}
         style={{ position: 'absolute' }}
       >
-        <Path d={MEDALLION_BACKING_PATH} fill={theme.surface} />
+        {/* No backing fill as of M6d. It existed to seat the rosette on the
+            page colour; on a glass card that same fill paints an opaque patch
+            over the surface the card is meant to show through, and the mockups
+            draw the marker as outline only. */}
         <Path
           d={MEDALLION_OUTLINE_PATH}
           fill="none"
