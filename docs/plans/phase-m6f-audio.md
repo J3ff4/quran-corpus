@@ -220,7 +220,7 @@ git commit -m "feat(data): make the reciter a validated choice, defaulting to Hu
 - Produces: `configureAudioSession(): Promise<void>` from `@/audio/ayahAudio`,
   called once from `app/_layout.tsx`.
 
-- [ ] **Step 1: Add the plugin entry**
+- [x] **Step 1: Add the plugin entry**
 
 `apps/mobile/app.json`, in `plugins`:
 
@@ -250,7 +250,7 @@ for the media notification. If it does, add it to `android.permissions` in
 `requestNotificationPermissionsAsync()` before the first play — do not add it
 speculatively.
 
-- [ ] **Step 2: Configure the session**
+- [x] **Step 2: Configure the session**
 
 ```ts
 import { setAudioModeAsync } from 'expo-audio';
@@ -280,7 +280,7 @@ Call it from `app/_layout.tsx`'s existing startup effect, and swallow its
 rejection the way the reading-day write does — a failed session config must not
 block the splash.
 
-- [ ] **Step 3: Prebuild and inspect the manifest**
+- [x] **Step 3: Prebuild and inspect the manifest**
 
 ```bash
 cd apps/mobile && npx expo prebuild --platform android --clean
@@ -291,7 +291,7 @@ Expected: `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK`,
 `MODIFY_AUDIO_SETTINGS`, the service line — and **no** `RECORD_AUDIO`.
 `android/` is prebuild output and stays out of git (§7); do not commit it.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/mobile/app.json apps/mobile/src/audio/ayahAudio.ts apps/mobile/app/_layout.tsx
