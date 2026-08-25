@@ -52,7 +52,7 @@ describe('ReaderHeader', () => {
     // by pressing back.
     const { onChangeMode, onOpenWbw } = renderHeader();
 
-    fireEvent.click(screen.getByText('Word by word'));
+    fireEvent.click(screen.getByText('Words'));
 
     expect(onOpenWbw).toHaveBeenCalledTimes(1);
     expect(onChangeMode).not.toHaveBeenCalled();

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -108,6 +108,23 @@ const TITLE_FADE_DISTANCE = 40;
 // How far the name rises as it fades. Small enough to read as the same word
 // settling into the bar, not as a second element flying in.
 const TITLE_RISE = 10;
+
+/** The single plate mushaf mode's rows flow across. */
+function MushafPlate({ children }: { children: ReactNode }) {
+  return (
+    <GlassSurface style={{ flex: 1, marginHorizontal: 12, marginBottom: 8, paddingTop: 4 }}>
+      {children}
+    </GlassSurface>
+  );
+}
+
+/** The surah's opening block: its own glass in translation mode, bare in
+ *  mushaf mode, where the whole list is already one plate. */
+function SurahPlate({ mushaf, children }: { mushaf: boolean; children: ReactNode }) {
+  const style = { padding: 20, gap: 6, alignItems: 'center' as const };
+  if (mushaf) return <View style={style}>{children}</View>;
+  return <GlassSurface style={style}>{children}</GlassSurface>;
+}
 
 // Shared instance: a fresh `[]` per render would change AyahText's memo key
 // for every not-yet-loaded ayah on every scroll frame.
@@ -447,8 +464,14 @@ export function SurahReader({
     [data.ayahs],
   );
 
+  // Mushaf mode reads as one page, so the whole list sits on a single glass
+  // plate (mockup 1e). Translation mode's cards are each their own surface, so
+  // a plate under them would be glass on glass.
+  const Plate = readerMode === 'mushaf' ? MushafPlate : Fragment;
+
   return (
     <View style={{ flex: 1 }}>
+      <Plate>
       <FlatList
         ref={listRef}
         data={data.ayahs}
@@ -463,7 +486,7 @@ export function SurahReader({
             {/* The surah opens on a plate (mockups 1e/1j): the Arabic name
                 leads, the Latin names sit under it in the display serif, and
                 the count and revelation type are a muted caption. */}
-            <GlassSurface style={{ padding: 20, gap: 6, alignItems: 'center' }}>
+            <SurahPlate mushaf={readerMode === 'mushaf'}>
               <Text
                 style={{
                   color: theme.text,
@@ -490,7 +513,7 @@ export function SurahReader({
                 )}`}
               </Text>
               {basmala ? <Bismillah text={basmala} uiLocale={uiLocale} /> : null}
-            </GlassSurface>
+            </SurahPlate>
           </View>
         }
         renderItem={({ item }) => {
@@ -534,6 +557,7 @@ export function SurahReader({
         style={{ flex: 1, opacity: positioned ? 1 : 0 }}
         contentContainerStyle={{ paddingBottom }}
       />
+      </Plate>
       {/* Over the list rather than instead of it: the list has to be mounted
           and laid out for the scroll to have anything to land on. Opacity, not
           a conditional render, for the same reason. */}

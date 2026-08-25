@@ -1,4 +1,4 @@
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { GlassSurface } from './GlassSurface';
@@ -7,7 +7,7 @@ import { t } from '@/i18n/uiStrings';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
-import { useListBottomPadding } from '@/theme/useListBottomPadding';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -33,7 +33,7 @@ export interface RecitationBarProps {
 export function RecitationBar({ ayahNumber, playing, onTogglePlay, uiLocale }: RecitationBarProps) {
   const theme = useThemeColors();
   const press = usePressScale();
-  const bottom = useListBottomPadding();
+  const insets = useSafeAreaInsets();
 
   if (ayahNumber === null) return null;
 
@@ -41,8 +41,8 @@ export function RecitationBar({ ayahNumber, playing, onTogglePlay, uiLocale }: R
   const action = t(uiLocale, playing ? 'reader.pause' : 'reader.play');
 
   return (
-    // Absolute, and clearing the tab pill by the same rule the lists use: a
-    // bar pinned to the raw bottom inset sits under the floating pill.
+    // The reader is a stack screen, so there is no tab pill to clear -- just
+    // the gesture bar.
     <View
       testID="recitation-bar"
       // The label is here, not only on the button: "Pause" alone tells a
@@ -51,12 +51,18 @@ export function RecitationBar({ ayahNumber, playing, onTogglePlay, uiLocale }: R
       // the button inside it (see rn-accessible-view-collapses-children).
       accessibilityLabel={`${ayahLabel} · ${action}`}
       pointerEvents="box-none"
-      style={{ position: 'absolute', left: 16, right: 16, bottom: bottom - 68 }}
+      style={{ position: 'absolute', left: 16, right: 16, bottom: insets.bottom + 12 }}
     >
       <GlassSurface
         radius="pill"
         style={{ flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 14, paddingVertical: 10 }}
       >
+        {/* An opaque backing under the glass. Every other glass surface in the
+            app sits on the page; this one floats over scrolling text, and the
+            translucent fill alone let the ayah behind it read straight through
+            the bar (device, 2026-08-25). RN has no backdrop-filter, so the
+            only way a docked bar stays legible is to stop being see-through. */}
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: theme.background, opacity: 0.94 }]} />
         <AnimatedPressable
           accessibilityRole="button"
           accessibilityLabel={action}
