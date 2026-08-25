@@ -236,13 +236,16 @@ export interface SegmentedControlProps<T extends string> {
   testID?: string;
 }
 export function SegmentedControl<T extends string>(props: SegmentedControlProps<T>): JSX.Element;
+// Shipped without the `testID?: string` this block specified: every segment
+// already carries `segment-<value>`, which is what the screen and its tests
+// address, and the row-level one had no caller.
 ```
 
 Generic and content-free — M6d's reader mode chip and M6e's density chip both
 use it. That is why it is a component and not four buttons inside the surah
 screen.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```tsx
 it('marks exactly one option selected', () => {
@@ -277,12 +280,12 @@ it('names the group for a screen reader', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test SegmentedControl`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 A `GlassSurface radius="pill"` row of `Pressable`s. The selected one gets a
 filled `theme.accentWash` pill behind it and `theme.accent` text; the rest are
@@ -291,17 +294,22 @@ filled `theme.accentWash` pill behind it and `theme.accent` text; the rest are
 segments in a row cannot each be 48 wide on a 390pt frame — the *row* is 48
 tall, which is what the guideline measures.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `pnpm --filter @quran-corpus/mobile test SegmentedControl`
 Expected: PASS.
 
-- [ ] **Step 5: Mutation-check (§4)**
+- [x] **Step 5: Mutation-check (§4)**
 
 Remove the "already selected" guard. Expected: the third test FAILS. Restore by
 re-editing.
 
-- [ ] **Step 6: Commit**
+Run 2026-08-25, three mutations rather than the one specified, each failing
+exactly one test: dropping the guard -> "does not fire when the selected option
+is tapped again"; reporting the index -> "reports the value, not the index";
+dropping the selected font weight -> "signals selection by more than colour".
+
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/mobile/src/components/SegmentedControl.tsx apps/mobile/src/components/SegmentedControl.test.tsx
