@@ -1,10 +1,8 @@
-import { FlatList, Pressable, Text, View, type ListRenderItem } from 'react-native';
+import { useMemo } from 'react';
+import { BrowseList, type BrowseItem } from './BrowseList';
 import type { SurahListItem } from '@/data/corpusRepository';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
-import { touchTargets } from '@/theme/tokens';
-import { useThemeColors } from '@/theme/themeContext';
-import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
 interface SurahListProps {
   surahs: SurahListItem[];
@@ -12,45 +10,30 @@ interface SurahListProps {
   onOpenSurah: (surah: SurahListItem) => void;
 }
 
-const rowHeight = 76;
-
+/**
+ * The surah index, as glass rows.
+ *
+ * A mapping onto BrowseList rather than its own FlatList: this is the same row
+ * as the juz, page and revealed lists, and keeping four copies is how one of
+ * them gains a fix the others miss. The props stay as they were -- this screen
+ * is not the place to learn about BrowseItem.
+ */
 export function SurahList({ surahs, uiLocale, onOpenSurah }: SurahListProps) {
-  const theme = useThemeColors();
-  const paddingBottom = useListBottomPadding();
   const ayahsSuffix = t(uiLocale, 'surahList.ayahsSuffix');
-  const renderItem: ListRenderItem<SurahListItem> = ({ item }) => (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${item.nameTranslit}, ${item.ayahCount} ${ayahsSuffix}`}
-      onPress={() => onOpenSurah(item)}
-      style={{
-        minHeight: rowHeight,
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.border,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 16,
-      }}
-    >
-      <View style={{ flex: 1, gap: 4, minHeight: touchTargets.minimum }}>
-        <Text style={{ color: theme.text, fontSize: 17, fontWeight: '600' }}>{item.nameTranslit}</Text>
-        <Text style={{ color: theme.mutedText, fontSize: 13 }}>
-          {item.nameTranslation} · {item.ayahCount} {ayahsSuffix}
-        </Text>
-      </View>
-      <Text style={{ color: theme.text, fontFamily: 'Hafs', fontSize: 28, textAlign: 'right' }}>{item.nameArabic}</Text>
-    </Pressable>
+  const items = useMemo<BrowseItem[]>(
+    () =>
+      surahs.map((surah) => ({
+        key: `surah-${surah.id}`,
+        testID: `browse-surah-${surah.id}`,
+        leading: String(surah.id),
+        title: surah.nameTranslit,
+        subtitle: `${surah.nameTranslation} · ${surah.ayahCount} ${ayahsSuffix}`,
+        arabic: surah.nameArabic,
+        accessibilityLabel: `${surah.nameTranslit}, ${surah.ayahCount} ${ayahsSuffix}`,
+        onPress: () => onOpenSurah(surah),
+      })),
+    [surahs, ayahsSuffix, onOpenSurah],
   );
 
-  return (
-    <FlatList
-      data={surahs}
-      renderItem={renderItem}
-      keyExtractor={(item) => String(item.id)}
-      contentContainerStyle={{ paddingBottom }}
-    />
-  );
+  return <BrowseList items={items} />;
 }

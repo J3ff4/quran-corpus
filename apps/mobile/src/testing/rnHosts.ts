@@ -96,6 +96,8 @@ export function reactNativeTextMock() {
     Pressable: host('button'),
     AccessibilityInfo,
     AppState,
+    FlatList,
+    SectionList,
     StyleSheet,
     __layoutHandlers: layoutHandlers,
     __fireLayout: fireLayout,
@@ -178,6 +180,62 @@ export function host(tag: string) {
       children,
     );
   };
+}
+
+/** FlatList and SectionList, rendered eagerly and in full.
+ *
+ *  The real ones virtualize, which in jsdom means measuring a viewport that has
+ *  no height and rendering nothing -- every assertion then fails on an empty
+ *  list rather than on the component. Rendering everything is the point: a
+ *  suite asserting on the 604th row wants the 604th row.
+ *
+ *  `keyExtractor` is honoured rather than ignored so a duplicate-key bug still
+ *  surfaces as a React warning, and section headers render through the same
+ *  path the device uses.
+ */
+export function FlatList({
+  data,
+  renderItem,
+  keyExtractor,
+}: {
+  data?: readonly unknown[];
+  renderItem: (info: { item: unknown; index: number }) => React.ReactNode;
+  keyExtractor?: (item: unknown, index: number) => string;
+}) {
+  return React.createElement(
+    'div',
+    null,
+    (data ?? []).map((item, index) =>
+      React.createElement('div', { key: keyExtractor?.(item, index) ?? index }, renderItem({ item, index })),
+    ),
+  );
+}
+
+export function SectionList({
+  sections,
+  renderItem,
+  renderSectionHeader,
+  keyExtractor,
+}: {
+  sections?: readonly { title: string; data: readonly unknown[] }[];
+  renderItem: (info: { item: unknown; index: number }) => React.ReactNode;
+  renderSectionHeader?: (info: { section: { title: string; data: readonly unknown[] } }) => React.ReactNode;
+  keyExtractor?: (item: unknown, index: number) => string;
+}) {
+  return React.createElement(
+    'div',
+    null,
+    (sections ?? []).map((section, sectionIndex) =>
+      React.createElement(
+        'div',
+        { key: section.title || sectionIndex },
+        renderSectionHeader?.({ section }),
+        section.data.map((item, index) =>
+          React.createElement('div', { key: keyExtractor?.(item, index) ?? index }, renderItem({ item, index })),
+        ),
+      ),
+    ),
+  );
 }
 
 /** Inert AccessibilityInfo reporting "reduce motion off".
