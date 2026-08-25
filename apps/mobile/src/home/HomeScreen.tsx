@@ -15,7 +15,7 @@ import {
 } from '@/data/userRepository';
 import { useUserDbOnFocus } from '@/data/useUserDbOnFocus';
 import { ayahForDay } from '@/home/ayahOfTheDay';
-import { localDay, streakFrom, weeklyLog, type DailyRoots } from '@/home/counters';
+import { WEEK_DAYS, localDay, streakFrom, weeklyLog, type DailyRoots } from '@/home/counters';
 import { t } from '@/i18n/uiStrings';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { usePressScale } from '@/motion/usePressScale';
@@ -30,9 +30,6 @@ import { useListBottomPadding } from '@/theme/useListBottomPadding';
  *  screen to say the number was truncated. One row per day read, so this is a
  *  few thousand rows after a decade. */
 const ALL_HISTORY = '1970-01-01';
-
-/** Days the weekly log shows. Matches weeklyLog's own fixed window. */
-const WEEK = 7;
 
 const WEEK_BAR_HEIGHT = 44;
 
@@ -103,17 +100,22 @@ export function HomeScreen() {
           surahId={position.data.surahId}
           ayahNumber={position.data.ayahNumber}
           location={continueAyah.data}
+          error={continueAyah.error ? t(uiLocale, 'reader.loadFailed') : null}
           uiLocale={uiLocale}
         />
       ) : null}
 
       {countersError ? <ErrorLine message={countersError} /> : null}
       <View style={{ flexDirection: 'row', gap: 14 }}>
-        <CounterCard testID="home-streak" label={t(uiLocale, 'home.streak')} value={streak} />
+        <CounterCard
+          testID="home-streak"
+          label={t(uiLocale, 'home.streak')}
+          value={readingDays.loading ? null : streak}
+        />
         <CounterCard
           testID="home-roots"
           label={t(uiLocale, 'home.rootsStudied')}
-          value={roots.data?.total ?? 0}
+          value={roots.loading ? null : (roots.data?.total ?? 0)}
         >
           <WeekLog week={week} uiLocale={uiLocale} />
         </CounterCard>
@@ -132,7 +134,7 @@ export function HomeScreen() {
 
 /** The first day of the log's window: today minus six. */
 function weekStart(today: string): string {
-  return new Date(Date.parse(`${today}T12:00:00Z`) - (WEEK - 1) * 86_400_000).toISOString().slice(0, 10);
+  return new Date(Date.parse(`${today}T12:00:00Z`) - (WEEK_DAYS - 1) * 86_400_000).toISOString().slice(0, 10);
 }
 
 /**
@@ -253,11 +255,13 @@ function SearchPill({ uiLocale }: { uiLocale: UiLocaleCode }) {
 function ContinueCard({
   surahId,
   ayahNumber,
+  error,
   location,
   uiLocale,
 }: {
   surahId: number;
   ayahNumber: number;
+  error: string | null;
   location: ReaderLocation | null;
   uiLocale: UiLocaleCode;
 }) {
@@ -268,7 +272,11 @@ function ContinueCard({
       testID="home-continue"
       // The visible label is bare coordinates ("2:255"); on its own a screen
       // reader announces two numbers with no indication of what tapping does.
-      accessibilityLabel={`${t(uiLocale, 'home.continue')} ${location?.surah.name_translit ?? ''} ${surahId}:${ayahNumber}`}
+      // Joined rather than interpolated: the surah name is absent while the
+      // corpus read is in flight, and a bare slot announces as a stutter pause.
+      accessibilityLabel={[t(uiLocale, 'home.continue'), location?.surah.name_translit, `${surahId}:${ayahNumber}`]
+        .filter(Boolean)
+        .join(' ')}
       onPress={() => openReader(surahId, ayahNumber)}
     >
       <Text style={{ color: theme.mutedText, fontSize: typography.caption }}>
@@ -282,6 +290,10 @@ function ContinueCard({
           {surahId}:{ayahNumber}
         </Text>
       </View>
+      {/* Same shape as the ayah card: the card is still the way back into the
+          reader, so a failed corpus read costs the preview line, not the tap
+          target -- but it must say so rather than render an empty row. */}
+      {error ? <ErrorLine message={error} /> : null}
       {location ? (
         <Text
           numberOfLines={1}
@@ -309,21 +321,24 @@ function CounterCard({
   children?: ReactNode;
   label: string;
   testID: string;
-  value: number;
+  /** null while the count is still loading. Rendering 0 instead paints a wrong
+   *  number first: a reader with a 40-day streak is shown 0 on every launch. */
+  value: number | null;
 }) {
   const theme = useThemeColors();
+  const shown = value ?? '—';
   return (
     // Not a Pressable: neither counter has a destination, and a button that
     // does nothing when tapped is worse for TalkBack than a labelled panel.
     <GlassSurface testID={testID} style={{ flex: 1, padding: 16, gap: 4 }}>
       {/* Grouped: the number and its label announce as one phrase, where the
           bare "2" on its own says nothing. */}
-      <View accessible accessibilityLabel={`${label}: ${value}`}>
+      <View accessible accessibilityLabel={`${label}: ${shown}`}>
         <Text
           testID={`${testID}-value`}
           style={{ color: theme.text, fontFamily: fonts.displaySemiBold, fontSize: COUNTER_SIZE }}
         >
-          {value}
+          {shown}
         </Text>
         <Text style={{ color: theme.mutedText, fontSize: typography.caption }}>{label}</Text>
       </View>
@@ -339,18 +354,22 @@ function WeekLog({ week, uiLocale }: { week: DailyRoots[]; uiLocale: UiLocaleCod
   // a day by itself makes every non-empty bar full height and the chart says
   // nothing.
   const peak = Math.max(...week.map((day) => day.roots), 1);
+  const total = week.reduce((sum, day) => sum + day.roots, 0);
 
   return (
+    // One accessible node for the whole row, not seven. A label on a container
+    // RN never exposes is a label nobody hears, and seven bars each announcing
+    // a raw ISO date ("2026-08-18: 0") is seven swipes of noise for a chart
+    // whose point is the shape.
     <View
-      accessibilityLabel={t(uiLocale, 'home.rootsThisWeek')}
+      accessible
+      accessibilityLabel={`${t(uiLocale, 'home.rootsThisWeek')}: ${total}`}
       style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 4, height: WEEK_BAR_HEIGHT, marginTop: 6 }}
     >
       {week.map((day, index) => (
         <View
           key={day.day}
           testID={`home-week-bar-${index}`}
-          accessible
-          accessibilityLabel={`${day.day}: ${day.roots}`}
           style={{
             flex: 1,
             // A floor of 2px, so an empty day is a visible gap in a row of

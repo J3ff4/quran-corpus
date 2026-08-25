@@ -190,6 +190,45 @@ describe('HomeTab', () => {
     expect(height(bars[6]!)).toBeGreaterThan(height(bars[5]!));
   });
 
+  it('announces the weekly log once, with a total rather than seven raw dates', async () => {
+    mocks.getRootViewsByDay.mockResolvedValue([
+      { day: TODAY, roots: 3 },
+      { day: daysAgo(1), roots: 1 },
+    ]);
+
+    render(<HomeTab />);
+
+    // One node for the row. A label on a container React Native never exposes
+    // is a label nobody hears, and seven bars each announcing an ISO date is
+    // seven swipes of noise.
+    await screen.findByLabelText('Roots this week: 4');
+    const bars = await screen.findAllByTestId(/^home-week-bar-/);
+    expect(bars.every((bar) => bar.getAttribute('aria-label') === null)).toBe(true);
+  });
+
+  it('shows a placeholder rather than 0 while the counters are still loading', async () => {
+    // Never resolves: the first paint of every cold launch looks like this.
+    mocks.getReadingDays.mockReturnValue(new Promise(() => {}));
+
+    render(<HomeTab />);
+
+    // 0 would be a wrong number, not an empty one -- a reader with a 40-day
+    // streak would be told they have none, on every launch.
+    expect((await screen.findByTestId('home-streak-value')).textContent).toBe('\u2014');
+  });
+
+  it('says so when the continue card cannot read its ayah from the corpus', async () => {
+    mocks.getLastReadingPosition.mockResolvedValue({ surahId: 2, ayahNumber: 255 });
+    mocks.getAyahReaderLocation.mockRejectedValue(new Error('bundled db missing'));
+
+    render(<HomeTab />);
+
+    // Without this the card renders an empty row where the surah name goes and
+    // nothing anywhere says the read failed.
+    await waitFor(() => expect(screen.getAllByText('Unable to load surah').length).toBe(2));
+    expect(screen.getByTestId('home-continue')).toBeTruthy();
+  });
+
   it('shows every root ever opened, not just this week', async () => {
     mocks.countDistinctRootsViewed.mockResolvedValue(42);
     mocks.getRootViewsByDay.mockResolvedValue([{ day: TODAY, roots: 3 }]);

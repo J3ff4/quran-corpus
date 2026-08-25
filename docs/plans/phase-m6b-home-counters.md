@@ -1178,12 +1178,69 @@ killed; `HomeScreen.tsx` restored from a scratchpad copy and `diff -q` clean.
     `getAyahReaderLocation` reads a whole surah to render one ayah. The upgrade
     is a by-coordinate query in `packages/data`, which is deliberately not
     being written on a hunch before the device run says the launch feels slow.
-- [ ] **Step 2: Stop and ask the owner to run `/code-review`.** §5 fires here —
+- [x] **Step 2: Stop and ask the owner to run `/code-review`.** §5 fires here —
   `packages/data` queries *and* an on-device user-DB write. Plain
   `/code-review` (Pro, local). Never `/code-review ultra` without asking.
-- [ ] **Step 3: Act on the findings.** One pass, not a loop to green. Say
+
+  Run 2026-08-24 over `main...HEAD` (8 commits, 21 files). **No data-layer
+  findings**: the reviewer re-derived the migration runner, both write paths and
+  the `isIsoDay` NaN guard, mutation-checked those tests itself, and
+  independently re-validated all 118 `AYAH_OF_THE_DAY` coordinates against
+  `SURAH_AYAH_COUNTS`. All 8 findings are in the new Home UI.
+- [x] **Step 3: Act on the findings.** One pass, not a loop to green. Say
   plainly which findings are declined and why. Findings against prose are
   advisory — do not spend a round on them.
+
+  **Fixed (5):**
+
+  - `WeekLog`'s row carried an `accessibilityLabel` without `accessible`, so RN
+    never exposed it and the `home.rootsThisWeek` string was dead, while each of
+    the seven bars announced a raw ISO date. Row is now one accessible node
+    labelled with the week's total; the bars are decorative and keep their
+    testIDs.
+  - The counters rendered `0` for the whole first load, so a reader with a
+    40-day streak was shown 0 on every launch — the wrong number, not an empty
+    one. `CounterCard` takes `number | null` and shows `—` while loading.
+  - `continueAyah.error` was discarded, so a corpus failure left an empty row
+    where the surah name goes and a double-spaced a11y label, with nothing
+    saying anything had failed. The card now takes the same `error` prop the
+    ayah card already had, and the label is joined rather than interpolated.
+  - `WEEK = 7` in the screen duplicated `weeklyLog`'s own `length: 7`: two
+    copies of one window, where changing either would make the fetched range and
+    the drawn range disagree with no test failing. `WEEK_DAYS` is exported from
+    `counters.ts` and used by both.
+
+  Three tests added (545 mobile, up from 542), each mutation-checked: restoring
+  the labelled bars, the eager `0`, and the swallowed error each fails exactly
+  one test. `HomeScreen.tsx` restored byte-identically after all three.
+
+  **Declined (4):**
+
+  - *No `accessibilityRole="header"` anywhere on the tab.* True, and it is a
+    design decision, not an oversight: the redesign turned the old screen's
+    "Continue reading" heading into an in-card caption, and every caption now
+    sits inside a `Pressable` that RN collapses into a single a11y node — a
+    header role in there would be just as unexposed as the WeekLog label was.
+    Restoring heading navigation means adding a visible screen title, which is
+    §8 owner territory, not a review fix. All four blocks are reachable in one
+    swipe pass.
+  - *`getAyahReaderLocation` returning `null` renders a silent blank forever.*
+    The bundled corpus ships complete and all 118 coordinates were verified in
+    range twice; distinguishing "missing row" from "still loading" costs a third
+    state on a case that cannot currently occur. Revisit if a future build ever
+    ships a partial DB.
+  - *`ayahForDay` can throw during render on a device clock past year 9999.*
+    The realistic bad clock is the other direction — an RTC reset to 1970 — and
+    the twice-modulo already handles it, with a test. A throw for a year-10000
+    clock is a loud failure for an impossible input; swapping it for a silent
+    fallback to index 0 makes the real bug harder to find.
+  - *The reading-day write sits inside the position-write callback, which
+    short-circuits on the same ayah, so crossing midnight without scrolling
+    skips a day.* Real, but absorbed: `streakFrom` counts a streak ending
+    yesterday precisely so a day boundary does not zero a live streak, and any
+    scroll to a different ayah records the day. Gating the insert behind a
+    `lastRecordedDay` ref adds state to save one idempotent
+    `INSERT OR IGNORE`.
 - [ ] **Step 4: Build.** EAS is unavailable until 2026-09-01, so this is very
   likely Expo Go again, as M6a's run was. If so, say so in the verification log
   rather than implying an APK, and note what a Go run cannot cover: Hermes and

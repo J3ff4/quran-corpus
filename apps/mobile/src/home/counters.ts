@@ -42,13 +42,18 @@ export function streakFrom(days: readonly string[], today: string): number {
   return streak;
 }
 
+/** Days the weekly log covers. Exported because the screen queries the same
+ *  window it renders: two independent 7s would let the fetched range and the
+ *  drawn range drift apart silently. */
+export const WEEK_DAYS = 7;
+
 /** Seven days ending today, oldest first, zero-filled. Fixed length so the
  *  bar chart does not change width as history accumulates, and keyed by day so
  *  rows outside the window are dropped rather than shifting the bars along. */
 export function weeklyLog(rows: readonly DailyRoots[], today: string): DailyRoots[] {
   const byDay = new Map(rows.map((row) => [row.day, row.roots]));
-  return Array.from({ length: 7 }, (_, index) => {
-    const day = shiftDay(today, index - 6);
+  return Array.from({ length: WEEK_DAYS }, (_, index) => {
+    const day = shiftDay(today, index - (WEEK_DAYS - 1));
     return { day, roots: byDay.get(day) ?? 0 };
   });
 }
