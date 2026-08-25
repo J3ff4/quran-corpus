@@ -948,10 +948,23 @@ cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --prof
 
 ### Task 8: Device run
 
-- [ ] Run checks 55–60 and record every result below.
+- [ ] Run checks 55–60 **and the carried-over check 48** , and record every
+  result below.
+
+Check 48 failed on M6a's device run and the owner parked it here rather than
+opening a fix task there: the only `GlassSurface` in that build was the tab
+pill, which floats below the bloom's reach with nothing behind it, so
+translucency had nothing to show. This sub-phase puts real cards in the top half
+of the home screen, over the wash -- the composition the glass tokens were
+calibrated against. That is the honest test.
+
+If it reads flat *there*, the tokens are wrong rather than the test surface, and
+`expo-blur` returns as a live §12 dependency question (umbrella decision 8).
+Stop and ask; do not install it.
 
 | # | Check | Pass condition |
 | --- | --- | --- |
+| 48 (re-run) | The home cards, **both themes** | Cards read as translucent panels over the wash, not as flat rectangles; the hairline and the 1px top highlight are both visible at arm's length. **Fail = stop and ask about `expo-blur`** |
 | 55 | Upgrade over the M6a build **without clearing app data** | Existing bookmarks and reading position survive; home renders |
 | 56 | Read an ayah, background the app, reopen | Streak reads 1 |
 | 57 | Read again the next day (or set the device date forward one day) | Streak reads 2, not 1 and not 3 |
@@ -963,6 +976,7 @@ cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --prof
 
 | Check | Build | Date | Result | Notes |
 | --- | --- | --- | --- | --- |
+| 48 (re-run) | | | | |
 | 55 | | | | |
 | 56 | | | | |
 | 57 | | | | |

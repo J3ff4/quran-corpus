@@ -1119,11 +1119,14 @@ git commit -m "docs: renumber PRD milestones for M6 and open the M6a checklist"
   ProGuard/Hermes behaviour, the bundled DB asset path) is therefore *not*
   covered and is re-checked when the APK is built.
 - [x] **Step 2:** Ran checks 48-54, both themes.
-- [x] **Step 3:** Recorded in the log below. Two findings; both fixed in
-  `746ddaf` and re-run.
-- [ ] **Step 4:** Only once every check is `pass`, ask the owner to open the PR
-  (never `gh pr create` unprompted) and to run `/code-review` **only if** they
-  want it -- §5 does not require one here.
+- [x] **Step 3:** Recorded in the log below. Three findings: two chrome-inset
+  defects fixed in `746ddaf` and re-run, and check 48's fail, which the owner
+  parked to M6b rather than opening a fix task here. That overrides this step's
+  "it does not move to M6b" -- see the ruling in the log.
+- [ ] **Step 4:** ~~Only once every check is `pass`~~ -- 48 is a parked fail, so
+  this gate is waived by the same ruling. Ask the owner to open the PR (never
+  `gh pr create` unprompted) and to run `/code-review` **only if** they want it
+  -- §5 does not require one here.
 
 ## Verification Log
 
@@ -1158,13 +1161,40 @@ No APK: see Task 7. Owner's physical Android device over adb-wifi, both themes.
 
 | Check | Build | Date | Result | Notes |
 | --- | --- | --- | --- | --- |
-| 48 | Expo Go `746ddaf` | 2026-08-24 | owner sign-off pending | Surfaces render translucent over the wash with the hairline and top highlight both visible, so decision 8's stop-condition did not fire and `expo-blur` is not on the table. Whether the pill reads as *glass* rather than as a tinted panel, and whether the dark bloom at `.62` is too heavy in the reader, are taste calls left to the owner |
+| 48 | Expo Go `746ddaf` | 2026-08-24 | **fail** -- parked to M6b (owner, 2026-08-24) | The pill reads as an outlined hole, not as glass. Measured on the Surahs list: page above the pill `(21,20,18)`, inside it `(18,17,16)` -- the fill darkens what is behind it by three levels out of 255, so a row's text runs straight through and tangles with the tab labels. Two causes: the bloom is a top-left glow (`cy -6%`, `ry 66%`) that has faded to nothing by 58% of the screen height while the pill floats at 92%, so there is nothing behind it to see through; and `night` at 45% over a `night` page is the page. See the ruling below |
 | 49 | Expo Go `746ddaf` | 2026-08-24 | pass | Surah 2 top to end; the wash is a sibling of the scroller, not a child, so it does not repaint or shift |
 | 50 | Expo Go `746ddaf` | 2026-08-24 | pass | Wash and every glass surface flip together; no intermediate frame of the other theme |
 | 51 | Expo Go `746ddaf` | 2026-08-24 | pass | All five tabs route correctly, active tab accent-tinted, pill clears the gesture bar; re-tapping the active tab does not navigate |
 | 52 | Expo Go `746ddaf` | 2026-08-24 | pass | Last row clears the pill on the dictionary browse list |
 | 53 | -- | 2026-08-24 | not exercisable at M6a | Newsreader loads in `openCorpusDb.ts` and `typography.display` names it, but no component sets it as `fontFamily` yet. There is no heading on screen that *could* render as the serif, so the check cannot fail here. Moves to the sub-phase that consumes it |
 | 54 | -- | 2026-08-24 | not exercisable at M6a | `usePressScale` has no consumer outside its own module. Nothing on screen animates on press, so "it does not shrink" passes vacuously. Moves with 53 |
+
+**Check 48: fail, parked to M6b (owner ruling, 2026-08-24).**
+
+The gate's stop-condition fired, so `expo-blur` was put back on the table as
+umbrella decision 8 requires. The owner declined it and parked the whole
+question instead. The reasoning, recorded here because the next person to read
+this will otherwise reopen it:
+
+- **Blur does not fix the case that failed.** The Home tab has nothing behind
+  the pill at all -- no bloom that far down, no content. A backdrop blur of a
+  flat colour returns that flat colour, so the screen that read worst would look
+  identical with `expo-blur` installed. It only helps where content scrolls
+  under the surface, and there a heavier fill fixes the legibility half more
+  cheaply than a second render of the view tree.
+- **The tab pill is the worst possible test surface for this design.** It is the
+  one element furthest from the wash, and it is the only `GlassSurface` consumer
+  in the app. M6b puts real cards on the home screen, in the top half, over the
+  bloom -- which is the composition the tokens were actually calibrated against.
+  Judging fake glass on the one surface it was not designed for, and then paying
+  for a dependency on that reading, is the wrong order.
+- **The bloom stays as drawn.** `.62` and `ry 66%` are unchanged; the owner
+  ruled the corner glow correct and its falloff intentional.
+
+So M6a ships with 48 outstanding. Re-run it in M6b against the home cards
+(Task 8 there carries the row). If it reads flat over *those*, the tokens are
+wrong rather than the test surface, and `expo-blur` becomes a live §12 question
+again.
 
 **Findings, both fixed in `746ddaf` and re-verified on device:**
 

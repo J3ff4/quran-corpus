@@ -229,11 +229,17 @@ EAS is unavailable until 2026-09-01, so run 1 went through Expo Go rather than a
 `preview` APK. Same JS, same device, but not a release binary — re-run against
 the APK when the build window reopens.
 
-48. Open any tab in **both themes**. Cards read as translucent panels over the
-    green wash, not as flat rectangles: the hairline border and the 1px top
-    highlight are both visible at arm's length. **If the surfaces read flat,
-    stop and report it** — that is the trigger to reconsider `expo-blur`
-    (umbrella decision 8), which is a dependency question and needs the owner.
+48. **Failed on run 1; parked to M6b, do not re-run here.** Open any tab in
+    **both themes**. Cards read as translucent panels over the green wash, not
+    as flat rectangles: the hairline border and the 1px top highlight are both
+    visible at arm's length. **If the surfaces read flat, stop and report it** —
+    that is the trigger to reconsider `expo-blur` (umbrella decision 8), which
+    is a dependency question and needs the owner. On 2026-08-24 it read flat,
+    but the only glass surface in the M6a build is the tab pill, which floats
+    below the bloom's reach with nothing behind it to show through. The owner
+    declined `expo-blur` — it would not change that screen, since blurring a
+    flat colour returns the flat colour — and moved the check to M6b, where real
+    cards sit over the wash.
 49. Open surah 2 (al-Baqarah) and scroll from the top to the end. Scrolling is
     smooth and the background wash stays put — it must not repaint, shift or
     flicker as rows move.
@@ -281,9 +287,10 @@ concordances on the root and lemma screens. M5 and M5c followed; their checks
 `docs/plans/phase-m6-glass-redesign.md` for the spec and the nine sub-phase
 plans. M6a (design system and app chrome) is implemented on
 `feat/m6a-design-system`; its device run happened on 2026-08-24 through Expo Go
-(no APK — EAS is unavailable until 2026-09-01). Checks 49-52 pass, 48 awaits the
-owner's eye, and 53-54 move to the sub-phase that first uses the serif and the
-press-scale. Two chrome-inset defects were found and fixed in `746ddaf`.
+(no APK — EAS is unavailable until 2026-09-01). Checks 49-52 pass; 48 **failed**
+and is parked to M6b for a re-run against real cards; 53-54 move to the
+sub-phase that first uses the serif and the press-scale. Two chrome-inset
+defects were found and fixed in `746ddaf`.
 
 Three sets of checks are **superseded by M6**, because the screens they test are
 being redrawn. They were never run and are not going to be; the record of that
