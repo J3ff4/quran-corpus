@@ -7,11 +7,11 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-08-24
+Updated: 2026-08-25
 
 ## Now
 
-### 🎨 M6 GLASS REDESIGN — planned, M6a implemented + device-run 1 done (2026-08-24)
+### 🎨 M6 GLASS REDESIGN — M6a/M6b/M6c merged; M6d next (2026-08-25)
 Spec + 9 sub-phase plans: `docs/plans/phase-m6-glass-redesign.md` (+ `phase-m6a..i`).
 40 owner decisions recorded there. §5 fires on M6b, M6c, M6f, M6h.
 
@@ -32,11 +32,34 @@ M6a ships with 48 outstanding; PR is the owner's call.
 **48 re-run on M6b's home cards 2026-08-24: PASS** (measured, both themes).
 expo-blur stays uninstalled.
 
-**M6b on `feat/m6b-home-counters` at `acca5f7`, not merged.** Streak/roots
-counters, weekly log, ayah of the day, home rebuilt as four glass blocks; 1429
-tests. §5 review done (0 data-layer findings, 4 UI fixed / 4 declined). Device
-run 2026-08-24: 48 + 56-60 pass, **55 deferred to the EAS window**, one defect
-found and fixed (`260fc23`, counters stale on resume). PR is the owner's call.
+**M6b MERGED to main 2026-08-24 as `8ac1348` (PR #21).** Streak/roots counters,
+weekly log, ayah of the day, home rebuilt as four glass blocks; 1429 tests.
+§5 review done (0 data-layer findings, 4 UI fixed / 4 declined). Device run
+2026-08-24: 48 + 56-60 pass, **55 deferred to the EAS window**, one defect found
+and fixed (`260fc23`, counters stale on resume).
+
+**M6c MERGED to main 2026-08-25 as `764c232` (PR #22).** Browse by surah, juz,
+page or revelation behind the glass segmented control. Three new
+`packages/data` queries (`getJuzIndex`/`getPageIndex`/`getRevealedIndex`, opening
+ayah via `ROW_NUMBER() OVER (PARTITION BY … ORDER BY surah_id, ayah_number)` —
+two independent `MIN()`s answer 2:1 for juz 3, a real ayah in juz 1), plus
+`surahs.order_number` fixed in the scraper to hold revelation order instead of
+mirroring the id. §5 fired (data-layer): one pass, 5 findings, all fixed in
+`7f30244`. Suites green there: data 398, mobile 561, web 479, scraper 800.
+**Device run 2026-08-25 via Expo Go: checks 61-64 all PASS**, logged in the
+plan's verification log; juz 3 -> 2:253, juz 15 -> 17:1, page 300 -> 18:54 all
+opened correctly, which is the corpus discriminating the fixed query.
+Finding 2 (an `accessible` View swallowing the segmented control's children)
+ships with no unit test on purpose — `rnHosts.host()` drops `accessible`, so the
+existing test passed against the inoperable control; verified on device by
+`uiautomator` node dump + a live TalkBack pass instead.
+**Task 4 Step 4 (EAS build) DEFERRED to 2026-09-01** — free-plan quota. Only
+unfinished step in M6c.
+
+**M6d starting 2026-08-25** on `feat/m6d-reader`, plan
+`docs/plans/phase-m6d-reader.md`. Reader re-skin to mockups 1e/1j + the
+Mushaf/Translation/WBW mode chip. **No §5 trigger** (no `packages/data`, no
+schema). Device checks 65-72.
 
 Two calls made in-flight, both in commit bodies:
 - Dark glass fill is the night page colour at 45%, NOT the mockup's white .075.
