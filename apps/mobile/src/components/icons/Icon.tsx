@@ -10,7 +10,8 @@ export type IconName =
   | 'translate'
   | 'dictionary'
   | 'menu'
-  | 'search';
+  | 'search'
+  | 'back';
 
 /**
  * Path data ported verbatim from web so the two products draw one glyph set:
@@ -54,6 +55,9 @@ const PATHS: Record<IconName, string[]> = {
   // handle from 20,20). The circle is drawn as two arcs closing back on
   // itself, the same technique `translate`'s outer ring above uses.
   search: ['M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z', 'M20 20l-3.5-3.5'],
+  // Chevron only, no shaft: mockup 1e's back affordance, and the reader draws
+  // its own header now that the native toolbar is gone.
+  back: ['M15 5l-7 7 7 7'],
 };
 
 export function Icon({

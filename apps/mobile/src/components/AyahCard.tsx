@@ -6,6 +6,7 @@ import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { AyahMedallion } from './AyahMedallion';
 import { AyahText } from './AyahText';
+import { GlassSurface } from './GlassSurface';
 
 const pressableStyle = {
   minHeight: touchTargets.minimum,
@@ -46,19 +47,17 @@ export function AyahCard({
 }: AyahCardProps) {
   const theme = useThemeColors();
   return (
-    <View
-      style={{
-        paddingHorizontal: 20,
-        paddingVertical: 18,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.border,
-        gap: 14,
-      }}
-    >
+    // A glass card per ayah, not a row with a rule under it (mockup 1j). The
+    // margins are the gutter between cards; the reader's list adds none.
+    <GlassSurface style={{ marginHorizontal: 16, marginBottom: 11, padding: 20, gap: 14 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <AyahMedallion n={ayahNumber} uiLocale={uiLocale} />
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <Pressable
+            // Same testID MushafAyah gives its own bookmark: the reader swaps
+            // renderers by mode, and a test that reaches for one handle has to
+            // find whichever renderer is mounted.
+            testID={`ayah-${surahId}-${ayahNumber}-bookmark`}
             accessibilityRole="button"
             accessibilityState={{ selected: bookmarked }}
             onPress={() => onToggleBookmark(ayahNumber)}
@@ -72,6 +71,7 @@ export function AyahCard({
             </Text>
           </Pressable>
           <Pressable
+            testID={`ayah-${surahId}-${ayahNumber}-audio`}
             accessibilityRole="button"
             // Without this TalkBack announces an ordinary button whose press
             // does nothing when audio is unconfigured.
@@ -95,7 +95,24 @@ export function AyahCard({
         ayahNumber={ayahNumber}
         onWordPress={onWordPress}
       />
-      {translationText ? <Text style={{ color: theme.text, fontSize: typography.body }}>{translationText}</Text> : null}
-    </View>
+      {translationText ? (
+        <Text
+          style={{
+            color: theme.text,
+            fontSize: typography.body,
+            // 1.65, as the mockup sets it: the translation is the one long
+            // prose run on the screen and the Arabic above it is airy.
+            lineHeight: Math.round(typography.body * 1.65),
+            // The rule separates the two scripts inside one card, where the
+            // old layout had a rule between whole ayahs.
+            borderTopWidth: 1,
+            borderTopColor: theme.border,
+            paddingTop: 14,
+          }}
+        >
+          {translationText}
+        </Text>
+      ) : null}
+    </GlassSurface>
   );
 }

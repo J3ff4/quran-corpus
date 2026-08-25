@@ -16,7 +16,11 @@ const mocks = vi.hoisted(() => ({
   scrollToOffset: vi.fn(),
   push: vi.fn(),
   setOptions: vi.fn(),
-  titleStyle: null as (() => { opacity: number; transform: [{ translateY: number }] }) | null,
+  // Every worklet registered this render, not just the last: usePressScale
+  // registers one per animated Pressable (the header chip's segments, the
+  // recitation bar), so "the last one wins" silently swapped the nav title's
+  // worklet for a press scale.
+  animatedStyles: [] as Array<() => Record<string, unknown>>,
   reduceMotion: false,
 }));
 
@@ -39,10 +43,13 @@ vi.mock('react-native-reanimated', async () => {
   const AnimatedText = host('span');
 
   return {
-    default: { Text: AnimatedText },
+    // createAnimatedComponent joined Text here when the reader took over its
+    // own header: ReaderHeader renders SegmentedControl, whose segments are
+    // animated Pressables.
+    default: { Text: AnimatedText, createAnimatedComponent: (Component: unknown) => Component },
     useSharedValue: (initial: number) => React.useRef({ value: initial }).current,
     useAnimatedStyle: (worklet: () => never) => {
-      mocks.titleStyle = worklet as never;
+      mocks.animatedStyles.push(worklet as unknown as () => Record<string, unknown>);
       return {};
     },
     // Linear between two stops with both ends clamped, which is all this
@@ -167,6 +174,8 @@ vi.mock('react-native', async () => {
       return React.createElement(Div, props);
     },
     useWindowDimensions: () => ({ width: 400, height: 800, scale: 2, fontScale: 1 }),
+    // The docked recitation bar's layer stretches over the reader.
+    StyleSheet: (await import('@/testing/rnHosts.js')).StyleSheet,
     // useReducedMotion reads the OS flag. Off here, so the in-app setting is
     // the only thing these tests vary.
     AccessibilityInfo: {
@@ -184,7 +193,7 @@ describe('SurahReader', () => {
     mocks.setOptions.mockClear();
     mocks.onScroll = null;
     mocks.headerLayout = null;
-    mocks.titleStyle = null;
+    mocks.animatedStyles = [];
     mocks.reduceMotion = false;
   });
 
@@ -203,6 +212,8 @@ describe('SurahReader', () => {
       onToggleAudio: vi.fn(),
       contentLanguage: 'en' as const,
       onChangeContentLanguage: vi.fn(),
+      readerMode: 'translation' as const,
+      onChangeReaderMode: vi.fn(),
     };
 
     const { rerender } = render(<SurahReader {...props} onReadingAyah={firstHandler} />);
@@ -493,11 +504,7 @@ describe('SurahReader', () => {
     const { container } = render(<SurahReader {...baseProps(readerData(3))} />);
     const list = () => container.querySelector('[data-important-for-accessibility]');
 
-    const headerRight = mocks.setOptions.mock.calls
-      .map(([options]) => options.headerRight)
-      .filter(Boolean)
-      .at(-1);
-    render(<div>{headerRight()}</div>);
+    renderReaderHeader();
 
     expect(list()?.getAttribute('data-important-for-accessibility')).toBe('auto');
 
@@ -674,20 +681,89 @@ describe('SurahReader', () => {
     render(<SurahReader {...baseProps(data)} />);
 
     await waitFor(() => expect(mocks.setOptions).toHaveBeenCalled());
-    // The last call carrying its own key, not the last call overall: a second
-    // setOptions effect (the nav title, Task 4) fires too, and it does not
-    // carry headerRight.
-    const headerRight = mocks.setOptions.mock.calls
-      .map(([options]) => options.headerRight)
-      .filter(Boolean)
-      .at(-1);
-    render(headerRight());
-    fireEvent.click(screen.getByTestId('open-wbw'));
+    renderReaderHeader();
+    fireEvent.click(screen.getByTestId('segment-wbw'));
 
     // The surah on screen, not a hardcoded one: setOptions is re-run whenever
     // data.surah.id changes.
     expect(mocks.push).toHaveBeenCalledWith('/surah/2/words');
   });
+  it('docks the recitation bar on the ayah that played, and keeps it after it stops', () => {
+    // The bar outliving playingAyah is the point: it goes null the moment the
+    // recitation ends, and a bar that vanished with the last syllable would
+    // take the resume control with it.
+    const data = readerData(3);
+    const ayahNumber = data.ayahs[1]!.ayah.ayah_number;
+
+    const { rerender } = render(<SurahReader {...baseProps(data)} audioEnabled playingAyah={null} />);
+    expect(screen.queryByTestId('recitation-bar')).toBeNull();
+
+    rerender(<SurahReader {...baseProps(data)} audioEnabled playingAyah={ayahNumber} />);
+    expect(screen.getByTestId('recitation-bar').getAttribute('aria-label')).toContain(String(ayahNumber));
+
+    rerender(<SurahReader {...baseProps(data)} audioEnabled playingAyah={null} />);
+    expect(screen.getByTestId('recitation-bar').getAttribute('aria-label')).toContain(String(ayahNumber));
+  });
+
+  it('hides the docked bar from a screen reader while a sheet covers it', async () => {
+    // accessibilityViewIsModal is iOS-only, so on Android a TalkBack swipe
+    // walks out of the sheet onto whatever is behind it -- the same defect the
+    // ayah list carries importantForAccessibility for.
+    const data = readerData(1);
+    const { container } = render(
+      <SurahReader
+        {...baseProps(data)}
+        audioEnabled
+        playingAyah={data.ayahs[0]!.ayah.ayah_number}
+        loadWords={async (ayahId) => surahWords(ayahId)}
+        loadWordSummary={(async (word: { id: number }) => ({ word, segments: [], gloss: null })) as never}
+      />,
+    );
+    const barLayer = () => screen.getByTestId('recitation-bar').parentElement;
+    expect(barLayer()?.getAttribute('data-hidden-from-a11y')).toBeNull();
+
+    await act(async () => {
+      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getAllByTestId('word-token')[0]!);
+    });
+
+    expect(container.querySelector('[data-testid="word-sheet"]')).toBeTruthy();
+    expect(barLayer()?.getAttribute('data-hidden-from-a11y')).toBe('true');
+  });
+
+  it('renders mushaf mode without the translation the cards show', () => {
+    // The switch in renderItem is the logic. Asserting on MushafAyah directly
+    // would pass just as well with the reader hardcoded to AyahCard, which is
+    // exactly the mistake this catches.
+    const data = readerData(1);
+
+    const { container, rerender } = render(<SurahReader {...baseProps(data)} readerMode="translation" />);
+    const translation = data.ayahs[0]!.translation!.text;
+    expect(container.textContent).toContain(translation);
+
+    rerender(<SurahReader {...baseProps(data)} readerMode="mushaf" />);
+
+    expect(container.textContent).not.toContain(translation);
+    // The Arabic is still there -- mushaf mode drops the translation, not the
+    // ayah.
+    expect(container.textContent).toContain(data.ayahs[0]!.ayah.text_uthmani.slice(-8));
+  });
+
+  it('keeps the bookmark control reachable in either mode', () => {
+    // Check 71 on the device list. Both renderers carry the same testID, so a
+    // mode that quietly loses a control fails here rather than on the phone.
+    const data = readerData(1);
+    const ayahNumber = data.ayahs[0]!.ayah.ayah_number;
+
+    const { rerender } = render(<SurahReader {...baseProps(data)} readerMode="translation" />);
+    expect(screen.getByTestId(`ayah-1-${ayahNumber}-bookmark`)).toBeTruthy();
+
+    rerender(<SurahReader {...baseProps(data)} readerMode="mushaf" />);
+    expect(screen.getByTestId(`ayah-1-${ayahNumber}-bookmark`)).toBeTruthy();
+  });
+
   it('opens the surah with the basmala above ayah 1, not inside its card', () => {
     // The device defect this replaced: the banner lived inside AyahCard, under
     // the ayah number and bookmark row, and still read as ayah 1's own first
@@ -727,14 +803,10 @@ describe('SurahReader', () => {
     // ends up carrying a word-by-word control AND a language control. The
     // language pills used to sit in a fixed band above the list, costing a
     // strip of every screenful (owner ruling 2026-08-17).
-    const headerRight = mocks.setOptions.mock.calls
-      .map(([options]) => options.headerRight)
-      .filter(Boolean)
-      .at(-1);
-    expect(headerRight).toBeTypeOf('function');
+    expect(readerHeaderFactory()).toBeTypeOf('function');
 
-    render(<div>{headerRight()}</div>);
-    expect(screen.getByTestId('open-wbw')).toBeTruthy();
+    renderReaderHeader();
+    expect(screen.getByTestId('segment-wbw')).toBeTruthy();
     expect(screen.getByTestId('open-language')).toBeTruthy();
   });
 
@@ -747,11 +819,7 @@ describe('SurahReader', () => {
       />,
     );
 
-    const headerRight = mocks.setOptions.mock.calls
-      .map(([options]) => options.headerRight)
-      .filter(Boolean)
-      .at(-1);
-    render(<div>{headerRight()}</div>);
+    renderReaderHeader();
 
     // Closed until asked for: an always-mounted sheet leaves a full-screen
     // backdrop swallowing every tap in the reader.
@@ -785,11 +853,7 @@ describe('SurahReader', () => {
     });
     expect(screen.getByTestId('word-sheet')).toBeTruthy();
 
-    const headerRight = mocks.setOptions.mock.calls
-      .map(([options]) => options.headerRight)
-      .filter(Boolean)
-      .at(-1);
-    render(<div>{headerRight()}</div>);
+    renderReaderHeader();
     fireEvent.click(screen.getByTestId('open-language'));
 
     expect(screen.queryByTestId('word-sheet')).toBeNull();
@@ -818,12 +882,8 @@ describe('SurahReader', () => {
     });
     expect(screen.getByTestId('word-sheet')).toBeTruthy();
 
-    const headerRight = mocks.setOptions.mock.calls
-      .map(([options]) => options.headerRight)
-      .filter(Boolean)
-      .at(-1);
-    render(<div>{headerRight()}</div>);
-    fireEvent.click(screen.getByTestId('open-wbw'));
+    renderReaderHeader();
+    fireEvent.click(screen.getByTestId('segment-wbw'));
 
     expect(screen.queryByTestId('word-sheet')).toBeNull();
     expect(mocks.push).toHaveBeenCalledWith('/surah/1/words');
@@ -831,19 +891,32 @@ describe('SurahReader', () => {
 
   /** The animated style the nav title would be wearing right now. */
   function titleStyle() {
-    const style = mocks.titleStyle?.();
+    // The one worklet that produces an opacity: the press-scale worklets
+    // produce a transform alone.
+    const style = mocks.animatedStyles
+      .map((worklet) => worklet())
+      .find((candidate) => 'opacity' in candidate) as
+      | { opacity: number; transform: [{ translateY: number }] }
+      | undefined;
     if (!style) throw new Error('the reader never registered an animated title style');
     return { opacity: style.opacity, translateY: style.transform[0].translateY };
   }
 
-  /** The element the reader hands the native toolbar as its title. */
-  function renderHeaderTitle() {
-    const headerTitle = mocks.setOptions.mock.calls
-      .map(([options]) => options.headerTitle)
+  /** The reader's own header bar, which replaced the native toolbar in M6d.
+   *
+   *  The last call carrying its own key, not the last call overall: the nav
+   *  title's effect fires separately and does not set `header`. */
+  function readerHeaderFactory() {
+    return mocks.setOptions.mock.calls
+      .map(([options]) => options.header)
       .filter((factory) => factory !== undefined)
       .at(-1) as (() => React.ReactElement) | undefined;
-    if (!headerTitle) throw new Error('the reader never set a header title');
-    return render(headerTitle());
+  }
+
+  function renderReaderHeader() {
+    const header = readerHeaderFactory();
+    if (!header) throw new Error('the reader never set a header');
+    return render(<div>{header()}</div>);
   }
 
   /** Scrolls to `y` with a header of `height` behind it. */
@@ -858,7 +931,7 @@ describe('SurahReader', () => {
     // A title string is rendered into the native toolbar, outside this screen's
     // view tree, and nothing there can be animated.
     render(<SurahReader {...baseProps(readerData(30))} />);
-    const { getByTestId } = renderHeaderTitle();
+    const { getByTestId } = renderReaderHeader();
 
     expect(getByTestId('reader-title').textContent).toBe('Al-Baqarah');
   });
@@ -961,6 +1034,8 @@ function baseProps(data: ReturnType<typeof readerData>) {
     onToggleAudio: vi.fn(),
     contentLanguage: 'en' as const,
     onChangeContentLanguage: vi.fn(),
+    readerMode: 'translation' as const,
+    onChangeReaderMode: vi.fn(),
   };
 }
 

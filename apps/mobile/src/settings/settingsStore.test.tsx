@@ -408,6 +408,32 @@ describe('loadPersistedAppSettings', () => {
     await expect(loadPersistedAppSettings(userClient)).resolves.toMatchObject({ reduceMotion: true });
   });
 
+  it('restores a persisted reader mode', async () => {
+    const userClient = requireSettingsClient();
+    await saveSetting(userClient, 'readerMode', 'mushaf');
+
+    const settings = await loadPersistedAppSettings(userClient);
+
+    expect(settings.readerMode).toBe('mushaf');
+  });
+
+  it('falls back to translation for a readerMode it does not recognise', async () => {
+    // Same keyed-not-positional hazard this file already documents: an
+    // unvalidated read puts an arbitrary stored string into the reader's mode
+    // switch, which renders neither branch. 'wbw' is in the list because it is
+    // the plausible one -- it is a real mode chip segment, and it is precisely
+    // the value that must not be stored, since reopening onto the screen the
+    // user left by pressing back is not a restore.
+    const userClient = requireSettingsClient();
+    for (const bad of ['wbw', 'MUSHAF', '', 'null']) {
+      await saveSetting(userClient, 'readerMode', bad);
+
+      const settings = await loadPersistedAppSettings(userClient);
+
+      expect(settings.readerMode).toBe('translation');
+    }
+  });
+
   it('rejects an arabicScale that only names a property of Object.prototype', async () => {
     // `value in arabicScales` would accept this and hand `toString` to the
     // multiply, which is NaN. Object.hasOwn is why it does not.

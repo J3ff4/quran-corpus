@@ -48,11 +48,17 @@ vi.mock('react-native-safe-area-context', () => ({
 // testing (reduced motion) lives in the pure nextPressScale.
 vi.mock('react-native-reanimated', async () => {
   const React = await import('react');
+  const { host } = await import('@/testing/rnHosts.js');
   return {
     default: {
       createAnimatedComponent: (Component: unknown) => Component,
       View: ({ children, ...props }: { children?: React.ReactNode }) =>
         React.createElement('div', props, children),
+      // Through the same host shim the plain <Text> uses, not a raw spread:
+      // an Animated.Text is where a component puts a label it also animates
+      // (the reader's fading surah name), and a raw spread renders testID and
+      // accessibilityLabel as unknown DOM attributes that no query can reach.
+      Text: host('span'),
     },
     useSharedValue: (initial: number) => ({ value: initial }),
     useAnimatedStyle: (factory: () => unknown) => factory(),

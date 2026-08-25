@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { Text } from 'react-native';
 import { alignAyahTokens, splitBasmala, type Word } from '@quran-corpus/data/mobile';
 import { useThemeColors } from '@/theme/themeContext';
@@ -11,6 +11,12 @@ export interface AyahTextProps {
   surahId: number;
   ayahNumber: number;
   onWordPress: (word: Word) => void;
+  /** Rendered inside the run, after the last word -- mushaf mode's ayah
+   *  medallion. Inside rather than beside: only one text run gets native
+   *  Arabic line breaking, so a marker in a sibling View sits at the end of
+   *  the *block*, not at the end of the text, and a one-line ayah then shows
+   *  its marker a full line below the words it closes. */
+  trailing?: ReactNode;
 }
 
 /**
@@ -28,7 +34,7 @@ export interface AyahTextProps {
  * basmala, on the aligned path or the fallback, so the two can never disagree
  * about whether it was taken out.
  */
-export function AyahText({ textUthmani, words, surahId, ayahNumber, onWordPress }: AyahTextProps) {
+export function AyahText({ textUthmani, words, surahId, ayahNumber, onWordPress, trailing }: AyahTextProps) {
   const theme = useThemeColors();
   const sizes = useArabicSizes();
   const tokens = useMemo(
@@ -70,7 +76,12 @@ export function AyahText({ textUthmani, words, surahId, ayahNumber, onWordPress 
   // the prefix in here printed it twice on the first paint of every surah but
   // 1 and 9.
   if (!tokens) {
-    return <Text style={style}>{splitBasmala(textUthmani, { surahId, ayahNumber }).rest}</Text>;
+    return (
+      <Text style={style}>
+        {splitBasmala(textUthmani, { surahId, ayahNumber }).rest}
+        {trailing}
+      </Text>
+    );
   }
 
   return (
@@ -110,6 +121,7 @@ export function AyahText({ textUthmani, words, surahId, ayahNumber, onWordPress 
             </Text>
           );
         })}
+        {trailing}
       </Text>
     </>
   );
