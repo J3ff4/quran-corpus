@@ -40,7 +40,10 @@ interface HostProps {
   importantForAccessibility?: unknown;
   onContentSizeChange?: unknown;
   showsHorizontalScrollIndicator?: unknown;
-  numberOfLines?: unknown;
+  // Mapped to data-lines below, not dropped: the dense word-by-word layout IS
+  // its one-line gloss clamp, and a shim that swallows numberOfLines leaves
+  // that assertion vacuous -- it would pass against a two-line gloss too.
+  numberOfLines?: number;
   onLayout?: unknown;
   onPressIn?: unknown;
   onPressOut?: unknown;
@@ -146,7 +149,7 @@ export function host(tag: string) {
     importantForAccessibility,
     onContentSizeChange: _onContentSizeChange,
     showsHorizontalScrollIndicator: _showsHorizontalScrollIndicator,
-    numberOfLines: _numberOfLines,
+    numberOfLines,
     onLayout: _onLayout,
     // usePressScale's handlers. Dropped rather than mapped: there is no DOM
     // event for a press phase, and React logs "does not recognize the
@@ -180,6 +183,7 @@ export function host(tag: string) {
         role: role ?? accessibilityRole,
         'data-testid': testID,
         'data-horizontal': horizontal ? 'true' : undefined,
+        'data-lines': numberOfLines === undefined ? undefined : String(numberOfLines),
         // A data- attribute, not the camelCase prop: React warns about an
         // unknown DOM attribute. It is Android's only way to take a subtree
         // away from TalkBack behind a sheet (accessibilityViewIsModal is
