@@ -462,6 +462,9 @@ git commit -m "feat(mobile): browse by surah, juz, page or revelation order"
      is what `GlassTabBar` already does. **No unit test can catch this** —
      `rnHosts.host()` ignores `accessible`, so the group-label test passed
      against the broken control. Check 61 must be re-run with TalkBack on.
+     Done 2026-08-25 — see the verification log: focus lands on one
+     segment at a time, and the node dump shows the container is no
+     longer the focusable element.
   3. **An interrupted seed left the whole surah table in reverse order**
      (`db.py`, `seed.py`). The park pass committed on its own and `upsert_surah`
      commits per row, so a crash mid-loop left negative ranks, and
@@ -485,7 +488,9 @@ git commit -m "feat(mobile): browse by surah, juz, page or revelation order"
   5. **SectionList mock keyed sections by title** (`rnHosts.ts`). Two sections
      may legitimately share one, and the mock swallowed that as a duplicate-key
      warning. Keyed by index.
-- [ ] **Step 4: Build.**
+- [ ] **Step 4: Build.** Blocked: the free-plan EAS Android build quota is
+  exhausted until 2026-09-01. Task 5 ran on Expo Go instead, which is the loop
+  until that window opens.
 
 ```bash
 cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --profile preview
@@ -493,7 +498,7 @@ cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --prof
 
 ---
 
-### Task 5: Device run
+### Task 5: Device run — DONE 2026-08-25 (Expo Go)
 
 | # | Check | Pass condition |
 | --- | --- | --- |
@@ -504,9 +509,45 @@ cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --prof
 
 ## Verification Log
 
+Run on the owner's OnePlus 7 Pro (GM1917, Android 12) via Expo Go over adb
+wireless debugging, Metro at `exp://192.168.0.103:8081`, bundle
+`expo-router/entry.js` (2070 modules). No EAS build: the free-plan Android
+quota is exhausted until 2026-09-01, so Expo Go is the loop.
+
 | Check | Build | Date | Result | Notes |
 | --- | --- | --- | --- | --- |
-| 61 | | | | |
-| 62 | | | | |
-| 63 | | | | |
-| 64 | | | | |
+| 61 | Expo Go, 7f30244 | 2026-08-25 | PASS | All four modes render. First load of each is ~1-3s; every switch after that is instant, and the list keeps its scroll offset across a reader round-trip. TalkBack pass below. |
+| 62 | Expo Go, 7f30244 | 2026-08-25 | PASS | 30 juz listed. Juz 2 -> Al-Baqara 142, juz 15 -> Al-Isra 1, juz 30 -> An-Naba 1, each opening the reader on that ayah rather than ayah 1. Juz 3 -> Al-Baqara 253 checked too: it is the case that a query taking surah and ayah from independent aggregates gets wrong. |
+| 63 | Expo Go, 7f30244 | 2026-08-25 | PASS | 604 pages listed. Page 1 -> 1:1, page 300 -> Al-Kahf 54 (18:54, mid-surah), page 604 -> Al-Ikhlas 1 (112:1). Reader opened on the named ayah in all three. |
+| 64 | Expo Go, 7f30244 | 2026-08-25 | PASS | al-Alaq first under a MECCAN header; the Meccan block ends at rank 86 (Al-Mutaffifin) and MEDINAN opens at rank 87 (Al-Baqara) -- 86/28, matching the bundled DB. Tapping a row opens that surah at ayah 1. |
+
+### Check 61, accessibility half (review finding 2)
+
+`accessible` on the segmented control's tablist collapsed all four segments
+into one accessibility element. No unit test in this repo can see that --
+`rnHosts.host()` destructures `accessible` and drops it -- so the device was
+the only gate. Two independent confirmations, both on 2026-08-25:
+
+- `uiautomator dump` of the live screen: the tablist ViewGroup
+  `[64,169][1376,369]` is `clickable=false focusable=false`, and each segment
+  below it is its own node -- `clickable=true focusable=true`, its own
+  `content-desc` (Surah / Juz / Page / Revealed) and its own 306px-wide
+  bounds. The active one carries `selected=true`. Under the bug the container
+  itself would have been the focusable node and the four children would not
+  have appeared.
+- TalkBack on (enabled through Settings; `adb shell settings put secure` is
+  refused on this device -- no `WRITE_SECURE_SETTINGS`): the green
+  accessibility-focus rectangle lands on one segment at a time, never on the
+  strip as a whole, and focusing then activating Surah / Juz / Page /
+  Revealed each switched to that mode. TalkBack was turned back off
+  afterwards; `enabled_accessibility_services` is empty and
+  `accessibility_enabled` is 0, as it was before the run.
+
+### Device-loop notes (not product defects)
+
+- Expo Go's floating dev-launcher button sits over the right end of the
+  segmented control and swallows taps aimed at the "Revealed" segment,
+  opening the dev menu instead. It does not exist in a release build.
+- One unexplained navigation back to the Home tab early in the run, with
+  nothing in the Metro log and no reload. It did not reproduce across the
+  rest of the session; noted rather than diagnosed.
