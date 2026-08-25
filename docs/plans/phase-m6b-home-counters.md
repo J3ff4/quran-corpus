@@ -1241,7 +1241,7 @@ killed; `HomeScreen.tsx` restored from a scratchpad copy and `diff -q` clean.
     scroll to a different ayah records the day. Gating the insert behind a
     `lastRecordedDay` ref adds state to save one idempotent
     `INSERT OR IGNORE`.
-- [ ] **Step 4: Build.** EAS is unavailable until 2026-09-01, so this is very
+- [x] **Step 4: Build.** EAS is unavailable until 2026-09-01, so this is very
   likely Expo Go again, as M6a's run was. If so, say so in the verification log
   rather than implying an APK, and note what a Go run cannot cover: Hermes and
   ProGuard behaviour, and the bundled DB asset path. **Check 55 is the one that
@@ -1251,8 +1251,37 @@ killed; `HomeScreen.tsx` restored from a scratchpad copy and `diff -q` clean.
   one; do not tick it off a Go run.
 
 ```bash
-cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --profile preview
+cd apps/mobile && pnpm prebuild:assert-db && npx expo start --clear --lan
 ```
+
+**No APK.** EAS is closed until 2026-09-01, so this is Expo Go over the LAN, as
+M6a's run was -- same JS, same device, not a release binary. `prebuild:assert-db`
+passed (`assets/db/quran.db`, 139,923,456 bytes) and the Android bundle built
+clean: 2066 modules, 10,284,575 bytes of Hermes bytecode, no warnings.
+
+Not covered by a Go run, and re-checked when the APK is built:
+
+- **Release Hermes and ProGuard.** The Go bundle is Hermes, but a dev bundle:
+  unminified, no shrinking, no `-keep` rules. Anything reflection-shaped that
+  ProGuard could strip is untested.
+- **The bundled DB asset path.** In Expo Go the 140MB corpus is served by Metro
+  over the wire; in an APK it is packaged and resolved from the asset bundle.
+  These are different code paths and only the first one runs here.
+- **Check 55**, which is exactly the release-binary property: "upgrade over the
+  M6a build without clearing app data". Expo Go never installs over anything.
+  **Deferred to the build window, not approximated and not ticked.** The
+  migration runner is additive-only and unit-tested, but that is evidence about
+  the SQL, not about an upgrade install.
+
+Launched on the owner's OnePlus 7 Pro (GM1917, Android, 1440x3120) over
+adb-wifi at `6fdd970`, night theme. Home rendered on first paint -- search
+field, continue card at Al-Baqara 2:1, both counters, the weekly log, and the
+ayah-of-the-day card at Yunus 10:62. `logcat` clean: no JS exception, no
+SQLite error. Check results are Task 8's, below.
+
+`expo start` rewrites `apps/mobile/tsconfig.json` on launch (reformats it and
+drops `expo-env.d.ts` from `include`). Reverted; it is Expo's doing, not a
+change this milestone wants.
 
 ---
 
@@ -1287,7 +1316,7 @@ Stop and ask; do not install it.
 | Check | Build | Date | Result | Notes |
 | --- | --- | --- | --- | --- |
 | 48 (re-run) | | | | |
-| 55 | | | | |
+| 55 | -- | -- | **deferred** | Release-binary property; Expo Go does not install over a prior build. Runs when EAS opens (2026-09-01) |
 | 56 | | | | |
 | 57 | | | | |
 | 58 | | | | |
