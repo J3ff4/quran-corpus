@@ -7,6 +7,7 @@ import { deferred } from '../testing/deferred';
 const mocks = vi.hoisted(() => ({
   setBookmark: vi.fn(),
   recordReadingPosition: vi.fn(),
+  recordReadingDay: vi.fn(),
   uiLocale: 'en',
   getSurahReader: vi.fn(),
   getWordsForAyah: vi.fn(),
@@ -81,6 +82,7 @@ vi.mock('@/data/userRepository', () => ({
   getBookmarks: async () => [],
   setBookmark: (...args: unknown[]) => mocks.setBookmark(...args),
   recordReadingPosition: (...args: unknown[]) => mocks.recordReadingPosition(...args),
+  recordReadingDay: (...args: unknown[]) => mocks.recordReadingDay(...args),
 }));
 
 vi.mock('@/settings/settingsStore', () => ({
@@ -108,6 +110,7 @@ describe('SurahRoute', () => {
   beforeEach(() => {
     mocks.setBookmark.mockReset();
     mocks.recordReadingPosition.mockReset();
+    mocks.recordReadingDay.mockReset();
     mocks.uiLocale = 'en';
     mocks.getSurahReader.mockReset();
     mocks.getSurahReader.mockResolvedValue(readerFixture);
@@ -171,6 +174,39 @@ describe('SurahRoute', () => {
 
     await waitFor(() => expect(screen.getByText('Unable to save reading position')).toBeTruthy());
     expect(screen.getByText('reader-content')).toBeTruthy();
+  });
+
+  it('records the local day on the same write as the reading position', async () => {
+    // Decision 22: any reading counts. The position write already fires on the
+    // reader's scroll, so it is the one place that sees every read without a
+    // second listener to keep in step.
+    render(<SurahRoute />);
+
+    await screen.findByText('reader-content');
+    fireEvent.click(screen.getByText('read ayah'));
+
+    await waitFor(() => expect(mocks.recordReadingDay).toHaveBeenCalled());
+    // Computed here rather than hard-coded: the assertion is that the day is
+    // the device's local one, and localDay is the thing under test elsewhere.
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    expect(mocks.recordReadingDay.mock.calls[0]?.[1]).toBe(today);
+  });
+
+  it('does not report a position failure when only the reading-day write throws', async () => {
+    // The streak is a nicety; losing the reading position is what the user
+    // notices. A rejected day insert must not surface as "position not saved"
+    // for a position that was in fact saved.
+    mocks.recordReadingDay.mockRejectedValue(new Error('disk full'));
+    render(<SurahRoute />);
+
+    await screen.findByText('reader-content');
+    fireEvent.click(screen.getByText('read ayah'));
+
+    await waitFor(() => expect(mocks.recordReadingDay).toHaveBeenCalled());
+    expect(mocks.recordReadingPosition).toHaveBeenCalledWith({}, 2, 256);
+    expect(screen.queryByText('Unable to save reading position')).toBeNull();
   });
 
   it('keeps a bookmark failure on screen while background reading writes run', async () => {

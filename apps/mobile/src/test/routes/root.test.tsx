@@ -24,6 +24,17 @@ vi.mock('@/data/openCorpusDb', () => ({
   openCorpusDb: async () => ({}),
 }));
 
+// The route counts the root as viewed once it resolves. Stubbed here so this
+// suite does not pull expo-sqlite into jsdom; the counter itself is asserted in
+// RootRoute.test.tsx.
+vi.mock('@/data/userDb', () => ({
+  openUserDb: async () => ({}),
+}));
+
+vi.mock('@/data/userRepository', () => ({
+  recordRootView: async () => undefined,
+}));
+
 vi.mock('@/data/corpusRepository', () => ({
   getRootScreen: (...args: unknown[]) => mocks.getRootScreen(...args),
   // The route loads the occurrence count and the hijāʾī neighbours alongside

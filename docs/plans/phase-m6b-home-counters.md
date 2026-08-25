@@ -720,7 +720,7 @@ web 479, mobile 519.
 **Interfaces:**
 - Consumes: `recordReadingDay`, `recordRootView`, `localDay`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `latestReadingPositionRecorder.test.ts`:
 
@@ -754,12 +754,12 @@ new dependencies through the same injection style it already uses. If it takes
 no options object today, add one with defaults rather than importing the clock
 directly; the second test cannot be written otherwise.
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test latestReadingPositionRecorder`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement both write sites**
+- [x] **Step 3: Implement both write sites**
 
 The reading day goes in the recorder, after the position write, wrapped so its
 failure cannot propagate:
@@ -790,17 +790,17 @@ loads the root, once the root has resolved — so a 404 root never counts:
   }, [entry]);
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `pnpm --filter @quran-corpus/mobile test`
 Expected: PASS.
 
-- [ ] **Step 5: Mutation-check (§4)**
+- [x] **Step 5: Mutation-check (§4)**
 
 Remove the `try`/`catch` around the day write. Expected: the "does not fail the
 position write" test FAILS. Restore by re-editing.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/mobile/src/data/latestReadingPositionRecorder.ts \
@@ -810,6 +810,46 @@ git commit -m "feat(mobile): count reading days and roots opened"
 ```
 
 ---
+
+
+**Deviations from this brief, taken during execution**
+
+- **The recorder does not have the signature the brief assumed.**
+  `latestReadingPositionRecorder` is
+  `createLatestReadingPositionRecorder(persist, onError)` -- a serializing queue
+  over an injected write, with no client, no surah id and no clock. There is no
+  `recordLatest(client, surah, ayah, deps)` to extend. Adding a client and a
+  clock to it to host the day write would have given a queue a second
+  responsibility for the sake of a test.
+- **Both writes went in at their call sites, and both existing route suites
+  already had the mocks for them.** `SurahRoute.test.tsx` mocks
+  `@/data/userRepository` and `@/data/userDb`, and drives the recorder through
+  the mocked `SurahReader`; `RootRoute.test.tsx` mocks the same. So no new
+  module, no options object, no default-dependency injection: the day write is
+  in the `persist` closure in `app/surah/[surahId].tsx`, the root-view write is
+  the effect in `app/root/[buckwalter].tsx`, and the tests assert through the
+  mocks that already existed.
+- The clock is not injected either. Both tests compute the expected day from
+  `new Date()` the same way `localDay` does, which is a stronger assertion than
+  a pinned fake would be: a UTC implementation still fails it on this runner
+  between 19:00 and midnight, and it can never go stale.
+- `src/test/routes/root.test.tsx` needed `@/data/userDb` and
+  `@/data/userRepository` stubbed. It renders the same route, so the new import
+  pulled real `expo-sqlite` into jsdom and the file failed to collect.
+- Two tests beyond the brief on the root side: the id written is `entry.root.id`
+  rather than any other integer on the entry, and a root the corpus does not
+  carry is not counted at all.
+- Mutations run, each killed and restored byte-identically from a scratchpad
+  copy (never `git restore`):
+  - **A** (the brief's) -- drop the `try`/`catch` around the day write -> "does
+    not report a position failure when only the reading-day write throws" fails.
+  - **B** -- `if (!entry) return` -> `entry?.root.id ?? 0` -> "does not count a
+    root the corpus does not carry" fails.
+  - **C** -- write `entry.root.occurrence_count` instead of `entry.root.id` ->
+    "counts the root as viewed once it has resolved" fails.
+
+Gate: lint clean, type-check clean, `pnpm -r test` = data 389, mobile-data 12,
+web 479, mobile 523.
 
 ### Task 5: Ayah of the day
 

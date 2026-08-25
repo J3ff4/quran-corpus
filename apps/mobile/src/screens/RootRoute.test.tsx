@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   getAdjacentRoots: vi.fn(),
   push: vi.fn(),
   replace: vi.fn(),
+  recordRootView: vi.fn(),
   /** The `total` in force each time ConcordanceList is handed a new loadPage,
    *  i.e. each time it would restart the list. */
   listResets: [] as number[],
@@ -31,6 +32,14 @@ vi.mock('@quran-corpus/mobile-data', () => ({
 
 vi.mock('@/data/openCorpusDb', () => ({
   openCorpusDb: async () => ({}),
+}));
+
+vi.mock('@/data/userDb', () => ({
+  openUserDb: async () => ({}),
+}));
+
+vi.mock('@/data/userRepository', () => ({
+  recordRootView: (...args: unknown[]) => mocks.recordRootView(...args),
 }));
 
 vi.mock('@/data/corpusRepository', () => ({
@@ -110,6 +119,7 @@ describe('RootRoute', () => {
     mocks.getAdjacentRoots.mockReset();
     mocks.push.mockReset();
     mocks.replace.mockReset();
+    mocks.recordRootView.mockReset();
     mocks.listResets.length = 0;
     mocks.getRootScreen.mockResolvedValue(rootEntry);
     mocks.getRootOccurrenceCount.mockResolvedValue(1722);
@@ -118,6 +128,30 @@ describe('RootRoute', () => {
   });
 
   afterEach(cleanup);
+
+  it('counts the root as viewed once it has resolved', async () => {
+    render(<RootRoute />);
+
+    await waitFor(() => expect(mocks.recordRootView).toHaveBeenCalled());
+    // The integer id, not the Buckwalter string: root_views is keyed by id
+    // precisely so no charset validator is needed at this write site.
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    expect(mocks.recordRootView).toHaveBeenCalledWith({}, 7, today);
+  });
+
+  it('does not count a root the corpus does not carry', async () => {
+    // Written after the entry resolves, not alongside the query, so a deep
+    // link to a root that does not exist cannot inflate the roots counter with
+    // something the reader never saw.
+    mocks.getRootScreen.mockResolvedValue(null);
+    render(<RootRoute />);
+
+    await waitFor(() => expect(mocks.getRootScreen).toHaveBeenCalled());
+    await Promise.resolve();
+    expect(mocks.recordRootView).not.toHaveBeenCalled();
+  });
 
   it('pages the validated root in the chosen content language', async () => {
     // The two silent failures here are forwarding the raw param instead of the
