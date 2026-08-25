@@ -58,7 +58,7 @@ export async function getPageIndex(client: QueryClient): Promise<PageEntry[]>;
 export async function getRevealedIndex(client: QueryClient): Promise<RevealedEntry[]>;
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `packages/data/tests/browse.test.ts`, against the fixture DB the other query
 suites already build:
@@ -70,11 +70,10 @@ describe('getJuzIndex', () => {
 
     expect(rows).toHaveLength(30);
     expect(rows[0]).toMatchObject({ juz: 1, startSurahId: 1, startAyahNumber: 1 });
-    // Juz 2 famously starts mid-surah, at 2:142. A GROUP BY that took MIN over
-    // surah_id and MIN over ayah_number independently would say 2:1 here, which
-    // is a real ayah and a wrong answer -- the failure mode a row-count check
-    // cannot see.
-    expect(rows[1]).toMatchObject({ juz: 2, startSurahId: 2, startAyahNumber: 142 });
+    // CORRECTED 2026-08-25, see the note under Step 6. Juz 3 (2:253 -> 3:92),
+    // not juz 2: juz 2 never leaves al-Baqarah, so the broken query answers
+    // 2:142 as well and this assertion passes either way.
+    expect(rows[2]).toMatchObject({ juz: 3, startSurahId: 2, startAyahNumber: 253 });
     expect(rows.map((r) => r.juz)).toEqual(Array.from({ length: 30 }, (_, i) => i + 1));
   });
 });
@@ -97,6 +96,8 @@ describe('getRevealedIndex', () => {
     expect(rows).toHaveLength(114);
     // 96 (al-Alaq) was revealed first; al-Fatiha is 5th. Ordering by id would
     // put surah 1 at the top and look entirely plausible.
+    //
+    // NOTE 2026-08-25: order_number did NOT hold this. See Step 3 below.
     expect(rows[0]).toMatchObject({ surahId: 96, orderNumber: 1, revelationType: 'meccan' });
     expect(rows.map((r) => r.orderNumber)).toEqual(Array.from({ length: 114 }, (_, i) => i + 1));
   });
@@ -109,12 +110,12 @@ describe('getRevealedIndex', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `pnpm --filter @quran-corpus/data test browse`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```ts
 /**
@@ -156,29 +157,58 @@ export async function getJuzIndex(client: QueryClient): Promise<JuzEntry[]> {
 
 `getPageIndex` is the same shape over `ayahs.page` (604 rows, no ayah count).
 `getRevealedIndex` is a plain `SELECT ... FROM surahs ORDER BY order_number`.
+
+**Blocked and resolved, 2026-08-25.** This task's architecture claims all four
+modes are views over data the corpus DB already holds. That was false for
+Revealed: `surahs.order_number` held a copy of `id` in all 114 rows -- mushaf
+order, not tartib an-nuzul. Nothing read the column, so nothing was visibly
+wrong, and Revealed mode would have rendered the surah index under a different
+heading. Raised as the §12 stop this plan's Global Constraints call for; the
+owner chose to backfill the column rather than carry a constant in
+`packages/data` or cut the mode.
+
+Done in `8efd005`: the ranks are the standard Egyptian (1924 Cairo) chronology,
+written into `packages/scraper/scraper/surah_meta.py` because `db.py`'s upsert
+is what writes the column -- a hand-edited DB is undone by the next
+`scraper seed`. `seed_database` gained a parking pass, since UNIQUE(order_number)
+rejects every intermediate state of a permutation. Live DB re-seeded (backup at
+`~/quran-data/quran.db.bak-m6c-revelation-order`) and the bundled mobile DB
+regenerated; both verified to open on 96 al-Alaq with a clean hijra split and
+unchanged ayah/word counts.
 Write all three; do not factor the two index queries into one parameterized
 helper that interpolates a column name — a column name cannot be a bound
 parameter and the "shared" version would be string-built SQL for no gain.
 
-- [ ] **Step 4: Re-export and guard**
+- [x] **Step 4: Re-export and guard**
 
 Add all three to `packages/data/src/mobile.ts`, and to the export assertions in
 `packages/data/tests/mobile-entry.test.ts` — that suite is what stops a mobile
 query from quietly acquiring a node-only import.
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 Run: `pnpm --filter @quran-corpus/data test`
 Expected: PASS.
 
-- [ ] **Step 6: Mutation-check (§4)**
+- [x] **Step 6: Mutation-check (§4)**
 
 In `getJuzIndex`, swap the subquery for
 `SELECT juz, MIN(surah_id) AS s, MIN(ayah_number) AS n, COUNT(*) ... GROUP BY juz`
-and join on those. Expected: the juz-2 assertion FAILS with `2:1`. Restore by
-re-editing.
+and join on those. Expected: the **juz-3** assertion FAILS with `2:1`.
 
-- [ ] **Step 7: Commit**
+**This step as originally written was vacuous.** It named juz 2, which runs
+2:142 to 2:252 and never leaves al-Baqarah -- so the independent-MIN version
+answers 2:142 there too and the test passes against both. Only a juz that
+crosses a surah boundary distinguishes them. Same class as the brief-specified
+vacuous tests in PRs #71 and #73: the defect was upstream of the implementer.
+
+Run 2026-08-25 against a synthetic fixture rather than the real corpus (see the
+commit body). Three mutations, each failing exactly the intended test:
+independent MINs -> the boundary-crossing juz assertion; dropping
+`WHERE juz IS NOT NULL` -> all seven; `ORDER BY order_number` -> `ORDER BY id`
+-> both revealed assertions. Restored by re-editing from a scratchpad copy.
+
+- [x] **Step 7: Commit**
 
 ```bash
 git add packages/data/src/queries/browse.ts packages/data/tests/browse.test.ts \
