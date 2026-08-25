@@ -534,7 +534,7 @@ export function weeklyLog(rows: readonly { day: string; roots: number }[], today
 
 `weeklyLog` always returns exactly 7 entries, oldest first, zero-filled.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -593,12 +593,12 @@ describe('weeklyLog', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test counters`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```ts
 /** The device's local calendar day as YYYY-MM-DD.
@@ -656,17 +656,17 @@ export function weeklyLog(
 }
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `pnpm --filter @quran-corpus/mobile test counters`
 Expected: PASS (all nine).
 
-- [ ] **Step 5: Mutation-check (§4)**
+- [x] **Step 5: Mutation-check (§4)**
 
 Replace `seen.has(today) ? today : shiftDay(today, -1)` with `today`. Expected:
 "still counts a streak that ended yesterday" FAILS. Restore by re-editing.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/mobile/src/home/counters.ts apps/mobile/src/home/counters.test.ts
@@ -674,6 +674,40 @@ git commit -m "feat(mobile): derive the reading streak and weekly root log"
 ```
 
 ---
+
+
+**Deviations from this brief, taken during execution**
+
+- **The `localDay` test as written was vacuous.** This runner sits at
+  `America/Chicago` (UTC-5), where `new Date(2026, 7, 24, 1, 0, 0)` is
+  `2026-08-24T06:00Z` -- so a `toISOString().slice(0, 10)` implementation, the
+  exact bug decision 22 is about, returns `'2026-08-24'` and the assertion
+  passes. Verified directly in node. The test now pins `TZ=Asia/Tashkent` with
+  `vi.stubEnv` (node honours a runtime `process.env.TZ` change) and asserts the
+  UTC date is `2026-08-23` first, so it fails for that implementation on any
+  machine, not only on a positive-offset one. Third brief in this phase to
+  specify a test that cannot fail.
+- The brief says "all nine"; it lists eight. Twelve shipped -- added digit
+  padding for `localDay`, a year boundary for `streakFrom`, and two for
+  `weeklyLog`: rows older than the window are dropped, and an empty history is
+  seven zeroes rather than a short chart.
+- `dayValue`'s comment justified midday UTC by DST. The arithmetic here is
+  entirely UTC, where DST does not exist, so the comment now says what the hour
+  is actually insurance against.
+- No validation on `day` inputs: both callers are `localDay` and days already
+  validated by `assertIsoDay` on the way into the user DB. A malformed day
+  throws `RangeError` from `toISOString()` rather than returning a wrong number.
+- Mutations run, each killed and restored byte-identically from a scratchpad
+  copy (never `git restore`):
+  - **A** (the brief's) -- `cursor = today` -> "still counts a streak that ended
+    yesterday" fails.
+  - **B** -- `localDay` via `toISOString()` -> the pinned-TZ test fails,
+    `expected '2026-08-23' to be '2026-08-24'`. The brief's unpinned version
+    survives this mutation here.
+  - **C** -- `weeklyLog` keyed by `rows.slice(-7)` index instead of by day -> 2 fail.
+
+Gate: lint clean, type-check clean, `pnpm -r test` = data 389, mobile-data 12,
+web 479, mobile 519.
 
 ### Task 4: Write the counters from the real screens
 
