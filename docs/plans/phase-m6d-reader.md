@@ -390,7 +390,7 @@ this props shape with the full transport (scrub, next/previous, reciter). Ship
 the surface now so M6f is a behaviour change on a component that already has a
 device-verified layout.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```tsx
 it('is not rendered when nothing is playing', () => {
@@ -413,18 +413,37 @@ it('toggles playback', () => {
 });
 ```
 
-- [ ] **Step 2: Run them and watch them fail; implement; re-run**
+- [x] **Step 2: Run them and watch them fail; implement; re-run**
 
 `GlassSurface radius="pill"`, absolutely positioned above the tab pill's
 clearance, `usePressScale` on the transport button. Nothing new in
 `useAyahAudioController`.
 
-- [ ] **Step 3: Mutation-check (§4)**
+- [x] **Step 3: Mutation-check (§4)**
 
 Render the bar unconditionally. Expected: the first test FAILS. Restore by
 re-editing.
 
-- [ ] **Step 4: Commit**
+Done 2026-08-25. 581/581, type-check and lint clean. Mutation ran as written
+and failed both the component's first test and the reader-level dock test.
+
+Two additions beyond the planned props:
+
+- **The bar outlives `playingAyah`.** That prop goes null the moment the
+  recitation ends, so a bar bound straight to it disappears with the last
+  syllable and takes the resume control with it. The reader parks a
+  `dockedAyah` and the bar's one control flips to Play, which is also why the
+  component has a fourth test the plan did not list.
+- **It sits in a layer carrying `importantForAccessibility`**, like the ayah
+  list: `accessibilityViewIsModal` is iOS-only, so on Android a TalkBack swipe
+  walks out of an open sheet onto whatever is behind it.
+
+`SurahReader.test.tsx` also had to stop keeping only the *last*
+`useAnimatedStyle` worklet -- `usePressScale` registers one per animated
+Pressable (the chip's segments, this bar), so the nav title's worklet was being
+overwritten and every title assertion read `undefined`.
+
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/mobile/src/components/RecitationBar.tsx apps/mobile/src/components/RecitationBar.test.tsx \

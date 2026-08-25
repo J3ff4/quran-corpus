@@ -16,7 +16,11 @@ const mocks = vi.hoisted(() => ({
   scrollToOffset: vi.fn(),
   push: vi.fn(),
   setOptions: vi.fn(),
-  titleStyle: null as (() => { opacity: number; transform: [{ translateY: number }] }) | null,
+  // Every worklet registered this render, not just the last: usePressScale
+  // registers one per animated Pressable (the header chip's segments, the
+  // recitation bar), so "the last one wins" silently swapped the nav title's
+  // worklet for a press scale.
+  animatedStyles: [] as Array<() => Record<string, unknown>>,
   reduceMotion: false,
 }));
 
@@ -45,7 +49,7 @@ vi.mock('react-native-reanimated', async () => {
     default: { Text: AnimatedText, createAnimatedComponent: (Component: unknown) => Component },
     useSharedValue: (initial: number) => React.useRef({ value: initial }).current,
     useAnimatedStyle: (worklet: () => never) => {
-      mocks.titleStyle = worklet as never;
+      mocks.animatedStyles.push(worklet as unknown as () => Record<string, unknown>);
       return {};
     },
     // Linear between two stops with both ends clamped, which is all this
@@ -170,6 +174,8 @@ vi.mock('react-native', async () => {
       return React.createElement(Div, props);
     },
     useWindowDimensions: () => ({ width: 400, height: 800, scale: 2, fontScale: 1 }),
+    // The docked recitation bar's layer stretches over the reader.
+    StyleSheet: (await import('@/testing/rnHosts.js')).StyleSheet,
     // useReducedMotion reads the OS flag. Off here, so the in-app setting is
     // the only thing these tests vary.
     AccessibilityInfo: {
@@ -187,7 +193,7 @@ describe('SurahReader', () => {
     mocks.setOptions.mockClear();
     mocks.onScroll = null;
     mocks.headerLayout = null;
-    mocks.titleStyle = null;
+    mocks.animatedStyles = [];
     mocks.reduceMotion = false;
   });
 
@@ -682,6 +688,51 @@ describe('SurahReader', () => {
     // data.surah.id changes.
     expect(mocks.push).toHaveBeenCalledWith('/surah/2/words');
   });
+  it('docks the recitation bar on the ayah that played, and keeps it after it stops', () => {
+    // The bar outliving playingAyah is the point: it goes null the moment the
+    // recitation ends, and a bar that vanished with the last syllable would
+    // take the resume control with it.
+    const data = readerData(3);
+    const ayahNumber = data.ayahs[1]!.ayah.ayah_number;
+
+    const { rerender } = render(<SurahReader {...baseProps(data)} audioEnabled playingAyah={null} />);
+    expect(screen.queryByTestId('recitation-bar')).toBeNull();
+
+    rerender(<SurahReader {...baseProps(data)} audioEnabled playingAyah={ayahNumber} />);
+    expect(screen.getByTestId('recitation-bar').getAttribute('aria-label')).toContain(String(ayahNumber));
+
+    rerender(<SurahReader {...baseProps(data)} audioEnabled playingAyah={null} />);
+    expect(screen.getByTestId('recitation-bar').getAttribute('aria-label')).toContain(String(ayahNumber));
+  });
+
+  it('hides the docked bar from a screen reader while a sheet covers it', async () => {
+    // accessibilityViewIsModal is iOS-only, so on Android a TalkBack swipe
+    // walks out of the sheet onto whatever is behind it -- the same defect the
+    // ayah list carries importantForAccessibility for.
+    const data = readerData(1);
+    const { container } = render(
+      <SurahReader
+        {...baseProps(data)}
+        audioEnabled
+        playingAyah={data.ayahs[0]!.ayah.ayah_number}
+        loadWords={async (ayahId) => surahWords(ayahId)}
+        loadWordSummary={(async (word: { id: number }) => ({ word, segments: [], gloss: null })) as never}
+      />,
+    );
+    const barLayer = () => screen.getByTestId('recitation-bar').parentElement;
+    expect(barLayer()?.getAttribute('data-hidden-from-a11y')).toBeNull();
+
+    await act(async () => {
+      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getAllByTestId('word-token')[0]!);
+    });
+
+    expect(container.querySelector('[data-testid="word-sheet"]')).toBeTruthy();
+    expect(barLayer()?.getAttribute('data-hidden-from-a11y')).toBe('true');
+  });
+
   it('renders mushaf mode without the translation the cards show', () => {
     // The switch in renderItem is the logic. Asserting on MushafAyah directly
     // would pass just as well with the reader hardcoded to AyahCard, which is
@@ -840,7 +891,13 @@ describe('SurahReader', () => {
 
   /** The animated style the nav title would be wearing right now. */
   function titleStyle() {
-    const style = mocks.titleStyle?.();
+    // The one worklet that produces an opacity: the press-scale worklets
+    // produce a transform alone.
+    const style = mocks.animatedStyles
+      .map((worklet) => worklet())
+      .find((candidate) => 'opacity' in candidate) as
+      | { opacity: number; transform: [{ translateY: number }] }
+      | undefined;
     if (!style) throw new Error('the reader never registered an animated title style');
     return { opacity: style.opacity, translateY: style.transform[0].translateY };
   }

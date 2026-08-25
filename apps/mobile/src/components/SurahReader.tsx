@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  StyleSheet,
   Text,
   View,
   type LayoutChangeEvent,
@@ -23,6 +24,7 @@ import type { ReaderMode } from '@/settings/settingsStore';
 
 import { AyahCard } from './AyahCard';
 import { MushafAyah } from './MushafAyah';
+import { RecitationBar } from './RecitationBar';
 import { ReaderHeader } from './ReaderHeader';
 import { Bismillah } from './Bismillah';
 import { LanguageSheet } from './LanguageSheet';
@@ -152,6 +154,15 @@ export function SurahReader({
   const [positioned, setPositioned] = useState(false);
 
   const [languageOpen, setLanguageOpen] = useState(false);
+
+  // The ayah the docked bar is parked on. Not `playingAyah`: that goes null the
+  // moment the recitation ends, and a bar that vanishes with the last syllable
+  // takes the resume control with it -- the user is then scrolling back to the
+  // card to replay the ayah they are still looking at.
+  const [dockedAyah, setDockedAyah] = useState<number | null>(null);
+  useEffect(() => {
+    if (playingAyah !== null) setDockedAyah(playingAyah);
+  }, [playingAyah]);
 
   // The nav header carries the surah name once the list header's 24pt heading
   // has scrolled off -- Android's own app-bar behaviour, and it keeps the name
@@ -543,6 +554,23 @@ export function SurahReader({
           <ActivityIndicator />
         </View>
       )}
+      {/* Hidden from TalkBack behind a sheet for the same reason the list is:
+          accessibilityViewIsModal is iOS-only, so on Android a swipe would
+          otherwise walk from the sheet straight onto this bar. */}
+      <View
+        pointerEvents="box-none"
+        importantForAccessibility={openWord || languageOpen ? 'no-hide-descendants' : 'auto'}
+        style={StyleSheet.absoluteFill}
+      >
+        <RecitationBar
+          ayahNumber={audioEnabled ? dockedAyah : null}
+          playing={playingAyah !== null}
+          uiLocale={uiLocale}
+          onTogglePlay={() => {
+            if (dockedAyah !== null) onToggleAudio(dockedAyah);
+          }}
+        />
+      </View>
       <WordSheet
         summary={openWord}
         uiLocale={uiLocale}
