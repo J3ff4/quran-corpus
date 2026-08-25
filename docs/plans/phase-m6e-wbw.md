@@ -419,14 +419,28 @@ is two segments. Do not rebuild the rail from the mockup.
 ## Observed, not defects (pre-existing, and NOT introduced by M6e)
 
 - **The morphology tab draws no header at all**, so `WbwScreen`'s
-  `headerTitle` and its `VersePicker` go nowhere there: no surah name and **no
+  `headerTitle` and its `VersePicker` went nowhere there: no surah name and **no
   way to change the ayah range from that tab**. `app/(tabs)/_layout.tsx` sets
   `headerShown: false` for every tab (M6a, so the screen can draw over the
   bloom), and the tab has rendered `WbwScreen` since M3. The pushed route
   `/surah/[id]/words` has a proper header — back arrow, "Al-Baqara", the
-  `137–146` pager — and was verified working in this run. M6e makes the gap
-  more visible, since the density chip is now the tab's only control. Worth an
-  issue; out of M6e's scope.
+  `137–146` pager — and was verified working in this run. M6e made the gap
+  more visible, since the density chip was the tab's only control.
+  **Filed as issue #25 and fixed in `cfca90e`** on the owner's instruction: the
+  name and pager are drawn in the screen, as every other screen already draws
+  its heading, so they reach both entry points. Re-verified on device — the tab
+  names Al-Hajj and pages 77–78 → 67–76, the push route still reads
+  Al-Munafiqun 1–10 under its back arrow, and a word tap still opens the sheet
+  over the pill.
+- `DictionaryScreen` pushes a `SearchHeaderButton` into `headerRight` and is
+  also a tab, so that button has never been on screen either — same cause,
+  noted in #25. Lower impact (the dictionary has its own in-screen filter box,
+  and Home and the reader both carry search entry points), and left alone: out
+  of scope here.
+- Multi-word phrases carry the **same gloss on every word of the phrase** —
+  22:77 words 1–3 all read "O you who believe!". That is the imported corpus
+  data (`word_glosses` holds one row per word with the phrase repeated), not a
+  fan-out bug in the screen; web renders it the same way. Untouched.
 - Expo's dev-menu FAB covers the top-right of every screen, as in M6c and M6d.
 
 Device state restored: system night mode back to `yes`, app Theme back to Dark.
