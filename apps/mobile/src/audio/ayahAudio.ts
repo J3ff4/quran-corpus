@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { createAudioPlayer } from 'expo-audio';
+import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import {
   ayahAudioUrl,
   reciterById,
@@ -9,6 +9,26 @@ import {
 import type { UiStringKey } from '../i18n/uiStrings';
 
 const DEFAULT_RECITER_ATTRIBUTION = `${reciterById(DEFAULT_RECITER_ID)?.label ?? ''} — everyayah.com`;
+
+/**
+ * Put the app's audio session in the mode recitation needs.
+ *
+ * `doNotMix` is not a preference: expo-audio's own docs make it a precondition
+ * for lock-screen controls -- without exclusive focus the OS does not associate
+ * the media session with our player. `shouldPlayInBackground` alone is not
+ * enough either; on Android the OS stops background audio after roughly three
+ * minutes unless a player has claimed the lock screen, which is what
+ * setActiveForLockScreen does in the controller.
+ *
+ * Called once at startup rather than per play: the session is process-wide.
+ */
+export async function configureAudioSession(): Promise<void> {
+  await setAudioModeAsync({
+    playsInSilentMode: true,
+    interruptionMode: 'doNotMix',
+    shouldPlayInBackground: true,
+  });
+}
 
 export interface AyahAudioParams {
   /** The thin endpoint's origin. Undefined until one is deployed. */

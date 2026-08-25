@@ -1,14 +1,39 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { expoAudioAyahAudioPlayer, getAyahAudioUrl, playAyahAudioUrl, useAyahAudioController } from './ayahAudio';
+import {
+  configureAudioSession,
+  expoAudioAyahAudioPlayer,
+  getAyahAudioUrl,
+  playAyahAudioUrl,
+  useAyahAudioController,
+} from './ayahAudio';
 
 const mocks = vi.hoisted(() => ({
   createAudioPlayer: vi.fn(),
+  setAudioModeAsync: vi.fn(async () => undefined),
 }));
 
 vi.mock('expo-audio', () => ({
   createAudioPlayer: mocks.createAudioPlayer,
+  setAudioModeAsync: mocks.setAudioModeAsync,
 }));
+
+describe('configureAudioSession', () => {
+  it('claims exclusive focus and background playback', async () => {
+    // Asserted value by value rather than "was called": doNotMix is a
+    // precondition for the lock-screen controls, not a preference, and
+    // shouldPlayInBackground is what keeps audio alive once the screen is off.
+    // Either one silently downgraded still plays audio in the foreground, so
+    // nothing else in this suite would notice.
+    await configureAudioSession();
+
+    expect(mocks.setAudioModeAsync).toHaveBeenCalledWith({
+      playsInSilentMode: true,
+      interruptionMode: 'doNotMix',
+      shouldPlayInBackground: true,
+    });
+  });
+});
 
 describe('getAyahAudioUrl', () => {
   afterEach(() => {
