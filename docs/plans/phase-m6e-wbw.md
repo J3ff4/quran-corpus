@@ -52,7 +52,9 @@ Inherited from the umbrella plan. Sub-phase specifics:
 Global, not per-screen (decision 26): the chip is a reading preference, and a
 user who wants dense wants it in every surah.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test** — done 2026-08-25. Written against the
+      suite's real settings client (`requireSettingsClient` + `saveSetting`),
+      not the plan's `clientWith` sketch, which this file has never had.
 
 ```tsx
 it('restores a persisted density', async () => {
@@ -67,16 +69,17 @@ it('falls back to hybrid for a value it does not recognise', async () => {
 });
 ```
 
-- [ ] **Step 2: Run it, watch it fail, implement, re-run**
+- [x] **Step 2: Run it, watch it fail, implement, re-run** — done 2026-08-25,
+      17/17. `WbwDensity` gained a THIRD value, `'rail'`, for the layout trial
+      in Task 2; it is temporary and goes with the loser.
 
 Same shape as M6d Task 1 — `isWbwDensity` guard beside the others, key in
 `settingKeys`, entry in `defaultSettings`, setter on the context.
 
-- [ ] **Step 3: Mutation-check (§4)**
+- [x] **Step 3: Mutation-check (§4)** — done. Guard replaced by an `as` cast;
+      the fallback test failed, 16/17. Restored by re-editing.
 
-Drop the guard. Expected: the fallback test FAILS. Restore by re-editing.
-
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit** — `44be20b`.
 
 ```bash
 git add apps/mobile/src/settings/settingsStore.tsx apps/mobile/src/settings/settingsStore.test.tsx
@@ -103,7 +106,11 @@ top of a glass plate, then beneath it a wrapped RTL run of word cells, each
 cell = the word in POS colour over its gloss. The ayah line is the "hybrid"
 part — it is what `2b`/`2d` lose and `1f` never had.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1-3: tests + implementation** — done 2026-08-25. Written in one
+      pass rather than red-then-green, because the shape changed: **both** the
+      mockup's horizontal rail and the plan's wrapped run ship, behind a `rail`
+      prop, for the owner to choose between on the device (their call,
+      2026-08-25). §4's mutation-checks below are what hold the tests honest.
 
 ```tsx
 it('renders one cell per word, in mushaf order', () => {
@@ -150,12 +157,20 @@ it('keeps a word with no analysed segments', () => {
 });
 ```
 
-- [ ] **Step 2: Run them and watch them fail**
+**Deviations, all deliberate:**
 
-Run: `pnpm --filter @quran-corpus/mobile test WbwHybrid`
-Expected: FAIL — module not found.
+- The plan says `WbwScreen` already fetches the glosses. It does not — they
+  were lazy inside `useWordSummaryLoader` and only arrived on the first word
+  tap. Fetched in the screen's existing load effect instead (Task 4).
+- Three files, not one: `WbwCell` (the cell every layout shares) and
+  `WbwAyahLine` (the continuous mushaf line) sit under `WbwHybrid`, so the
+  dense layout in Task 3 reuses the cell rather than copying it.
+- The fixture sets `form_arabic`. The old grid's fixture left it null, which
+  sends `SegmentedWord` down its unjoined fallback — a decision-28 test over
+  that fixture would never touch the joined path at all.
+- Cells carry the POS tag the mockup draws (`ADJ`), from `word.pos_tag`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement** — done
 
 ```tsx
         <Pressable
@@ -189,13 +204,14 @@ inside one `GlassSurface` per ayah — not one card per word. That is the visual
 difference from today's grid and the reason `2c` reads as a verse rather than a
 table.
 
-- [ ] **Step 4: Run the tests, then mutation-check (§4)**
+- [x] **Step 4: Run the tests, then mutation-check (§4)** — 10/10 pass. Three
+      mutations, each killed its own test and nothing else:
+      `glosses.get(word.id)` → `[...glosses.values()][0]` failed the gloss
+      test; `page.segments.get(word.id)` → first entry failed the per-cell
+      segments test; `{rail ? …}` → `{false ? …}` failed the rail test.
+      Restored by re-editing.
 
-Run: `pnpm --filter @quran-corpus/mobile test WbwHybrid` → PASS.
-Then change `glosses.get(word.id)` to `[...glosses.values()][0]`. Expected: the
-gloss test FAILS on the second word. Restore by re-editing.
-
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit** — `a546420`.
 
 ```bash
 git add apps/mobile/src/components/WbwHybrid.tsx apps/mobile/src/components/WbwHybrid.test.tsx \
@@ -216,7 +232,10 @@ tight interlinear run where each word sits directly above its gloss and the
 lines pack close. Same cells, much less air: no card, smaller gaps, gloss at
 `typography.caption`, one line.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1-2: tests + implementation** — done 2026-08-25, 8/8.
+      `WbwDense` is `WbwCell` in `compact` mode: no border, no POS tag,
+      one-line gloss. The mockup groups `لَآ إِلَٰهَ إِلَّا` into one phrase
+      cell; decision 27 overrides it, one cell per word.
 
 ```tsx
 it('renders one cell per word, like the hybrid layout', () => {
@@ -252,13 +271,14 @@ equivalent). Map it to a `data-lines` attribute in the shim so the third test
 can see it — that is a one-line change in `rnHosts.ts` and it is the only way
 this assertion is not vacuous.
 
-- [ ] **Step 2: Run them, watch them fail, implement, re-run**
+- [x] **Step 3: Mutation-check (§4)** — two mutations. `glossLines={2}` failed
+      the clamp test; `showPos` failed the dropped-tag test. Restored by
+      re-editing. `rnHosts` now maps `numberOfLines` to `data-lines` and
+      `horizontal` to `data-horizontal`; both were being destructured away, so
+      without the first the clamp assertion would have passed against a
+      two-line gloss.
 
-- [ ] **Step 3: Mutation-check (§4)**
-
-Set `numberOfLines={2}`. Expected: the clamp test FAILS. Restore by re-editing.
-
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit** — `a972473`.
 
 ```bash
 git add apps/mobile/src/components/WbwDense.tsx apps/mobile/src/components/WbwDense.test.tsx \
@@ -281,7 +301,11 @@ Delete `WbwGrid`, do not leave it beside the new pair. Decision 25 dropped `2a`;
 a third layout nothing renders is exactly the dead code that gets "fixed" later
 by someone who does not know it is dead.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1-2: test + implementation** — done 2026-08-25, 18/18 in the route
+      suite. The chip is in the SCREEN, above the list, not in the nav header:
+      that bar already carries the surah name and the pager, and a third
+      control leaves the pager no room at 390pt. Three segments while the rail
+      is on trial. `morphologyTab.test.tsx` needed no change after all.
 
 ```tsx
 it('renders the hybrid layout by default and remembers a switch to dense', async () => {
@@ -302,24 +326,18 @@ it('renders the dense layout when the setting says so', () => {
 });
 ```
 
-- [ ] **Step 2: Run it, watch it fail, implement**
-
 `SegmentedControl` in the WBW header with two options; `onChange` calls
 `setWbwDensity`. The renderer is picked from `wbwDensity`, straight off
 `useAppSettings()`. Keep `WbwScreen`'s paging, the `WBW_PAGE_SIZE` window and
 the sheet exactly as they are.
 
-- [ ] **Step 3: Run the whole suite**
+- [x] **Step 3: Run the whole suite** — mobile 71 files / 597 tests green,
+      `pnpm -r type-check` clean, mobile lint clean.
 
-Run: `pnpm --filter @quran-corpus/mobile test && pnpm -r type-check && pnpm -r lint`
-Expected: PASS. The route suites will need their `WbwGrid` assertions swapped.
+- [x] **Step 4: Mutation-check (§4)** — renderer hardcoded to `WbwHybrid`; the
+      dense-layout test failed, 17/18. Restored by re-editing.
 
-- [ ] **Step 4: Mutation-check (§4)**
-
-Hardcode the renderer to `WbwHybrid`. Expected: the second test FAILS. Restore
-by re-editing.
-
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit** — `b187e92`.
 
 ```bash
 git add apps/mobile/src/screens/WbwScreen.tsx apps/mobile/src/test/routes
@@ -330,6 +348,10 @@ git commit -m "feat(mobile): switch word-by-word density from the header"
 ---
 
 ### Task 5: Build and device run
+
+**Step 1 is DEFERRED to 2026-09-01** — the EAS free-plan quota, the same window
+M6c Task 4 Step 4 and M6d Task 6 Step 1 wait on. The device run goes through
+Expo Go, as M6c's and M6d's did.
 
 - [ ] **Step 1: Build.**
 
@@ -347,6 +369,7 @@ cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --prof
 | 76 | Switch density, leave the screen, come back, kill and reopen the app | Density is remembered every time |
 | 77 | Tap a word in each layout | The existing word sheet opens with the right word |
 | 78 | Segment colours, both themes | Every POS colour is AA-legible on the glass surface |
+| 79 | **Rail vs wrapped**, same ayah, both ways | The owner picks one. The loser's branch, its `'rail'` density value, its i18n keys and its tests are deleted in a follow-up commit |
 
 ## Verification Log
 
@@ -358,3 +381,4 @@ cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --prof
 | 76 | | | | |
 | 77 | | | | |
 | 78 | | | | |
+| 79 | | | | |
