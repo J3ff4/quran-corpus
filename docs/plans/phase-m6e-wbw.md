@@ -383,9 +383,9 @@ cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --prof
 | 76 | " | 2026-08-25 | PASS | Switched to dense, force-stopped Expo Go, relaunched: still dense. Later switched back to verse on the pushed route and that persisted too. |
 | 77 | " | 2026-08-25 | PASS | Tapped `قَالُوا` in dense; the sheet opened on that word, gloss "they say,", segments `قَالُ` Verb + `وا` Personal pronoun. |
 | 78 | " | 2026-08-25 | PASS | Both themes. Light: noun blue, verb red, prep green, pron olive on the paper plate. Dark unchanged from M6c's measured set. |
-| 79 | " | 2026-08-25 | **OPEN — owner's call** | Both layouts are on the device behind the chip's first two segments. See below. |
+| 79 | " | 2026-08-25 | **RESOLVED — wrapped stays** | Owner: the rail is "ugly and confusing". Deleted in `e0e9f3e`. |
 
-### Check 79: rail vs wrapped, what the device shows
+### Check 79: rail vs wrapped — RESOLVED, the wrapped run stays
 
 - **Verse (wrapped)** puts the whole ayah's glosses on screen with a short
   scroll: at 2:137, ten cells were visible under the plate without scrolling.
@@ -395,12 +395,26 @@ cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --prof
   the right, as an Arabic reader expects.
 
 The mockup's own tradeoff note called this "the neighbourhood, not the whole
-ayah", and on hardware that is exactly how it reads. Nothing here is a defect
-in either one; it is a design choice.
+ayah", and on hardware that is exactly how it reads. Owner ruled on the device
+2026-08-25: **the rail goes.** `e0e9f3e` removes the layout, the temporary
+`'rail'` density value, its i18n keys in three locales and its tests. The chip
+is two segments. Do not rebuild the rail from the mockup.
 
 ## Defects found
 
-None in M6e's own code. Nothing was fixed during this run.
+- **Every bottom sheet rendered under the floating tab pill** (owner report,
+  2026-08-25, seen in both verse and dense). Not M6e's: the pill is the
+  navigator's own `tabBar`, a sibling of the entire screen, so anything a
+  screen renders paints beneath it whatever its position or z-index, and all
+  five sheets have done this since the pill landed in M6a. Fixed at the root in
+  `8ebdbe2` — `BottomSheet` now renders inside a `<Modal>`, its own native
+  window above the navigator, so the backdrop dims the pill and swallows its
+  taps. The Modal needs its own `GestureHandlerRootView` (the one in
+  `app/_layout.tsx` belongs to the main window, and without it drag-to-dismiss
+  dies silently on Android) and an `onRequestClose` (Android routes back to the
+  topmost Modal, where the `BackHandler` subscription no longer sees it).
+  Re-verified on device: the word sheet clears the pill, and drag, back and
+  backdrop tap all still dismiss; the reader's language sheet checked too.
 
 ## Observed, not defects (pre-existing, and NOT introduced by M6e)
 
@@ -413,9 +427,6 @@ None in M6e's own code. Nothing was fixed during this run.
   `137–146` pager — and was verified working in this run. M6e makes the gap
   more visible, since the density chip is now the tab's only control. Worth an
   issue; out of M6e's scope.
-- The floating tab pill overlays the bottom of the word sheet on that tab
-  (the Root row sits behind it). Also pre-existing; `WordSheet` is untouched by
-  M6e.
 - Expo's dev-menu FAB covers the top-right of every screen, as in M6c and M6d.
 
 Device state restored: system night mode back to `yes`, app Theme back to Dark.
