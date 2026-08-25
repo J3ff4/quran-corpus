@@ -591,7 +591,7 @@ git commit -m "feat(mobile): let the reader choose a reciter"
 
 ### Task 6: §5 stop, then build
 
-- [ ] **Step 1: Self-review**, with the OWASP question front and centre: can any
+- [x] **Step 1: Self-review**, with the OWASP question front and centre: can any
   value that is not in `RECITERS` reach a URL path? Trace the persisted setting
   through to `ayahAudioUrl`.
 - [ ] **Step 2: Stop and ask the owner to run `/code-review`** — `packages/data`
