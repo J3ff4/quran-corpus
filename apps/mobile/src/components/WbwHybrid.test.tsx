@@ -9,7 +9,6 @@ vi.mock('react-native', async () => {
 
   return {
     Pressable: host('button'),
-    ScrollView: host('div'),
     Text: host('span'),
     View: host('div'),
     useWindowDimensions: () => ({ width: 390, height: 844, scale: 2, fontScale: 1 }),
@@ -89,12 +88,11 @@ const GLOSSES = new Map([
 function renderHybrid({
   page: wbwPage = page(3),
   glosses = GLOSSES,
-  rail = false,
   onWordPress = vi.fn(),
-}: { page?: WbwPage; glosses?: Map<number, string>; rail?: boolean; onWordPress?: (word: Word) => void } = {}) {
+}: { page?: WbwPage; glosses?: Map<number, string>; onWordPress?: (word: Word) => void } = {}) {
   const result = render(
     <ThemeContext.Provider value={themeColors.dark}>
-      <WbwHybrid page={wbwPage} uiLocale="en" glosses={glosses} rail={rail} onWordPress={onWordPress} />
+      <WbwHybrid page={wbwPage} uiLocale="en" glosses={glosses} onWordPress={onWordPress} />
     </ThemeContext.Provider>,
   );
   return { ...result, onWordPress };
@@ -171,30 +169,10 @@ describe('WbwHybrid', () => {
   it('wraps the cells and orders them right to left', () => {
     const { container } = renderHybrid();
 
-    expect(screen.queryByTestId('wbw-rail')).toBeNull();
     const wrap = container.querySelector<HTMLElement>('[data-testid="wbw-wrap"]')!;
     expect(wrap.style.flexWrap).toBe('wrap');
     // Arabic reads RTL and flexbox lays these out, not a text engine, so
     // nothing else puts word 1 on the right.
     expect(wrap.style.flexDirection).toBe('row-reverse');
-  });
-
-  it('puts the cells in a horizontal rail instead when asked', () => {
-    const { container } = renderHybrid({ rail: true });
-
-    // Mockup 2c's rail. Without the horizontal flag this is the wrapped
-    // layout with a different testID -- the flag is the layout.
-    const rail = container.querySelector<HTMLElement>('[data-testid="wbw-rail"]')!;
-    expect(rail.getAttribute('data-horizontal')).toBe('true');
-    expect(screen.queryByTestId('wbw-wrap')).toBeNull();
-    expect(screen.getAllByTestId('wbw-cell')).toHaveLength(3);
-  });
-
-  it('gives the rail cells a fixed width so one long gloss cannot widen a cell', () => {
-    renderHybrid({ rail: true, glosses: new Map([[1, 'a very long gloss indeed'], [2, 'not']]) });
-
-    const cells = screen.getAllByTestId('wbw-cell');
-    expect(cells[0]!.style.width).toBe(cells[1]!.style.width);
-    expect(cells[0]!.style.width).not.toBe('');
   });
 });

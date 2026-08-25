@@ -15,11 +15,11 @@ export type ReaderMode = 'mushaf' | 'translation';
 // Global, not per-screen (decision 26): the density is a reading preference,
 // and a reader who wants dense wants it in every surah.
 //
-// 'rail' is temporary: mockup 2c's horizontal rail and the wrapped run are
-// both on the device for the owner to choose between. When it goes, a phone
-// that stored it falls back to 'hybrid' through the guard below, which is why
-// the guard is not an `as`.
-export type WbwDensity = 'hybrid' | 'rail' | 'dense';
+// Two values. 'rail' briefly existed while mockup 2c's horizontal rail was on
+// trial against the wrapped run; the owner rejected it on the device
+// (2026-08-25). A phone that stored 'rail' in that window falls back to
+// 'hybrid' through the guard below, which is why the guard is not an `as`.
+export type WbwDensity = 'hybrid' | 'dense';
 
 export interface AppSettings {
   uiLocale: UiLocaleCode;
@@ -94,7 +94,7 @@ function isReaderMode(value: string | null): value is ReaderMode {
 }
 
 function isWbwDensity(value: string | null): value is WbwDensity {
-  return value === 'hybrid' || value === 'rail' || value === 'dense';
+  return value === 'hybrid' || value === 'dense';
 }
 
 export async function loadPersistedAppSettings(client: MobileDataClient): Promise<AppSettings> {

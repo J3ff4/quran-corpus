@@ -10,8 +10,6 @@ export interface WbwCellProps {
   word: Word;
   segments: WordSegment[];
   gloss: string | null;
-  /** Fixed in the rail, unset in the wrapped layout, absent in the dense one. */
-  width?: number | undefined;
   /** Dense drops the POS tag row; the two 2c layouts keep it. */
   showPos?: boolean;
   /** Dense clamps the gloss to one line -- that is the whole density mode. */
@@ -31,7 +29,6 @@ export function WbwCell({
   word,
   segments,
   gloss,
-  width,
   showPos = true,
   glossLines = 2,
   compact = false,
@@ -50,7 +47,6 @@ export function WbwCell({
       accessibilityLabel={word.text_arabic}
       onPress={onPress}
       style={{
-        width,
         minHeight: touchTargets.minimum,
         alignItems: 'center',
         gap: compact ? 0 : 3,

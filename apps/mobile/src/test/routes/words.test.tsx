@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   getWbwScreen: vi.fn(),
   setWbwDensity: vi.fn(),
   /** The persisted layout the screen renders. Reassigned per test. */
-  wbwDensity: 'hybrid' as 'hybrid' | 'rail' | 'dense',
+  wbwDensity: 'hybrid' as 'hybrid' | 'dense',
   loadWordSummary: vi.fn(),
   push: vi.fn(),
   // The screen puts its title and pager in the nav header, so the pager is not
@@ -150,7 +150,6 @@ vi.mock('react-native', async () => {
         ),
       ),
     Pressable: host('button'),
-    ScrollView: host('div'),
     Text: host('span'),
     View: host('div'),
     useWindowDimensions: () => ({ width: 390, height: 844, scale: 2, fontScale: 1 }),
@@ -298,18 +297,6 @@ describe('word-by-word route', () => {
     expect(screen.getAllByTestId('wbw-dense-run').length).toBeGreaterThan(0);
     expect(screen.queryAllByTestId('wbw-wrap')).toHaveLength(0);
     expect(screen.queryAllByTestId('wbw-ayah-line')).toHaveLength(0);
-  });
-
-  it('renders the rail when the setting says so', async () => {
-    // On trial against the wrapped layout; this assertion goes with the loser.
-    mocks.wbwDensity = 'rail';
-    mocks.params = { surahId: '2' };
-
-    render(<RouteWithHeader />);
-    await screen.findAllByTestId('wbw-cell');
-
-    expect(screen.getAllByTestId('wbw-rail')[0]!.getAttribute('data-horizontal')).toBe('true');
-    expect(screen.queryAllByTestId('wbw-wrap')).toHaveLength(0);
   });
 
   it('gives every word its gloss, not the first one', async () => {

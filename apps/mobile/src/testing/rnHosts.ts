@@ -33,10 +33,7 @@ interface HostProps {
   // pointerEvents, on every render.
   accessible?: unknown;
   contentContainerStyle?: unknown;
-  // Mapped to data-horizontal below, not dropped: a horizontal ScrollView is
-  // the whole difference between the rail layout and the wrapped one, and a
-  // test that cannot see it asserts nothing about which one rendered.
-  horizontal?: boolean;
+  horizontal?: unknown;
   importantForAccessibility?: unknown;
   onContentSizeChange?: unknown;
   showsHorizontalScrollIndicator?: unknown;
@@ -145,7 +142,7 @@ export function host(tag: string) {
     testID,
     accessible: _accessible,
     contentContainerStyle: _contentContainerStyle,
-    horizontal,
+    horizontal: _horizontal,
     importantForAccessibility,
     onContentSizeChange: _onContentSizeChange,
     showsHorizontalScrollIndicator: _showsHorizontalScrollIndicator,
@@ -182,7 +179,6 @@ export function host(tag: string) {
         // otherwise overwrite it with nothing.
         role: role ?? accessibilityRole,
         'data-testid': testID,
-        'data-horizontal': horizontal ? 'true' : undefined,
         'data-lines': numberOfLines === undefined ? undefined : String(numberOfLines),
         // A data- attribute, not the camelCase prop: React warns about an
         // unknown DOM attribute. It is Android's only way to take a subtree

@@ -18,11 +18,10 @@ export type UiStringKey =
   // Prefix for the pager's range, read as "Ayahs 11-20". The bare "11-20" on
   // screen announces as two numbers with nothing to say what they count.
   | 'wbw.rangeLabel'
-  // Names the density chip for TalkBack. The three segment labels below name
+  // Names the density chip for TalkBack. The two segment labels below name
   // layouts, not settings, so the group needs its own word.
   | 'wbw.density'
   | 'wbw.densityHybrid'
-  | 'wbw.densityRail'
   | 'wbw.densityDense'
   | 'morphology.noHistory'
   | 'bookmarks.empty'
@@ -209,7 +208,6 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'wbw.rangeLabel': 'Ayahs',
     'wbw.density': 'Layout',
     'wbw.densityHybrid': 'Verse',
-    'wbw.densityRail': 'Rail',
     'wbw.densityDense': 'Dense',
     'morphology.noHistory': 'No reading history yet',
     'bookmarks.empty': 'No bookmarks yet',
@@ -357,7 +355,6 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'wbw.rangeLabel': 'Oyatlar',
     'wbw.density': 'Ko‘rinish',
     'wbw.densityHybrid': 'Oyat',
-    'wbw.densityRail': 'Lenta',
     'wbw.densityDense': 'Zich',
     'morphology.noHistory': 'Hali o‘qish tarixi yo‘q',
     'bookmarks.empty': 'Hali xatcho‘p yo‘q',
@@ -502,7 +499,6 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'wbw.rangeLabel': 'Аяты',
     'wbw.density': 'Вид',
     'wbw.densityHybrid': 'Аят',
-    'wbw.densityRail': 'Лента',
     'wbw.densityDense': 'Плотно',
     'morphology.noHistory': 'Истории чтения пока нет',
     'bookmarks.empty': 'Закладок пока нет',

@@ -21,10 +21,8 @@ import { useAppSettings, type WbwDensity } from '@/settings/settingsStore';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
-/** 'rail' is on trial against 'hybrid' -- see the WbwDensity comment. */
-const DENSITY_OPTIONS: readonly { value: WbwDensity; labelKey: 'wbw.densityHybrid' | 'wbw.densityRail' | 'wbw.densityDense' }[] = [
+const DENSITY_OPTIONS: readonly { value: WbwDensity; labelKey: 'wbw.densityHybrid' | 'wbw.densityDense' }[] = [
   { value: 'hybrid', labelKey: 'wbw.densityHybrid' },
-  { value: 'rail', labelKey: 'wbw.densityRail' },
   { value: 'dense', labelKey: 'wbw.densityDense' },
 ];
 
@@ -221,7 +219,7 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
             return wbwDensity === 'dense' ? (
               <WbwDense {...layoutProps} />
             ) : (
-              <WbwHybrid {...layoutProps} rail={wbwDensity === 'rail'} />
+              <WbwHybrid {...layoutProps} />
             );
           }}
           style={{ flex: 1 }}
