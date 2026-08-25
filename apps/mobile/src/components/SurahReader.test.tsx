@@ -682,6 +682,37 @@ describe('SurahReader', () => {
     // data.surah.id changes.
     expect(mocks.push).toHaveBeenCalledWith('/surah/2/words');
   });
+  it('renders mushaf mode without the translation the cards show', () => {
+    // The switch in renderItem is the logic. Asserting on MushafAyah directly
+    // would pass just as well with the reader hardcoded to AyahCard, which is
+    // exactly the mistake this catches.
+    const data = readerData(1);
+
+    const { container, rerender } = render(<SurahReader {...baseProps(data)} readerMode="translation" />);
+    const translation = data.ayahs[0]!.translation!.text;
+    expect(container.textContent).toContain(translation);
+
+    rerender(<SurahReader {...baseProps(data)} readerMode="mushaf" />);
+
+    expect(container.textContent).not.toContain(translation);
+    // The Arabic is still there -- mushaf mode drops the translation, not the
+    // ayah.
+    expect(container.textContent).toContain(data.ayahs[0]!.ayah.text_uthmani.slice(-8));
+  });
+
+  it('keeps the bookmark control reachable in either mode', () => {
+    // Check 71 on the device list. Both renderers carry the same testID, so a
+    // mode that quietly loses a control fails here rather than on the phone.
+    const data = readerData(1);
+    const ayahNumber = data.ayahs[0]!.ayah.ayah_number;
+
+    const { rerender } = render(<SurahReader {...baseProps(data)} readerMode="translation" />);
+    expect(screen.getByTestId(`ayah-1-${ayahNumber}-bookmark`)).toBeTruthy();
+
+    rerender(<SurahReader {...baseProps(data)} readerMode="mushaf" />);
+    expect(screen.getByTestId(`ayah-1-${ayahNumber}-bookmark`)).toBeTruthy();
+  });
+
   it('opens the surah with the basmala above ayah 1, not inside its card', () => {
     // The device defect this replaced: the banner lived inside AyahCard, under
     // the ayah number and bookmark row, and still read as ayah 1's own first

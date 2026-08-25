@@ -59,6 +59,10 @@ export function AyahCard({
         <AyahMedallion n={ayahNumber} uiLocale={uiLocale} />
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <Pressable
+            // Same testID MushafAyah gives its own bookmark: the reader swaps
+            // renderers by mode, and a test that reaches for one handle has to
+            // find whichever renderer is mounted.
+            testID={`ayah-${surahId}-${ayahNumber}-bookmark`}
             accessibilityRole="button"
             accessibilityState={{ selected: bookmarked }}
             onPress={() => onToggleBookmark(ayahNumber)}
@@ -72,6 +76,7 @@ export function AyahCard({
             </Text>
           </Pressable>
           <Pressable
+            testID={`ayah-${surahId}-${ayahNumber}-audio`}
             accessibilityRole="button"
             // Without this TalkBack announces an ordinary button whose press
             // does nothing when audio is unconfigured.

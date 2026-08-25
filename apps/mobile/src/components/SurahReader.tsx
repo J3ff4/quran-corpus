@@ -22,6 +22,7 @@ import type { ContentLanguageCode, UiLocaleCode } from '@/i18n/languages';
 import type { ReaderMode } from '@/settings/settingsStore';
 
 import { AyahCard } from './AyahCard';
+import { MushafAyah } from './MushafAyah';
 import { ReaderHeader } from './ReaderHeader';
 import { Bismillah } from './Bismillah';
 import { LanguageSheet } from './LanguageSheet';
@@ -454,22 +455,31 @@ export function SurahReader({
             {basmala ? <Bismillah text={basmala} uiLocale={uiLocale} /> : null}
           </View>
         }
-        renderItem={({ item }) => (
-          <AyahCard
-            surahId={data.surah.id}
-            ayahNumber={item.ayah.ayah_number}
-            arabicText={item.ayah.text_uthmani}
-            words={wordsByAyah.get(item.ayah.id) ?? EMPTY_WORDS}
-            translationText={item.translation?.text ?? null}
-            bookmarked={bookmarkedAyahs.has(item.ayah.ayah_number)}
-            playing={playingAyah === item.ayah.ayah_number}
-            uiLocale={uiLocale}
-            audioDisabled={!audioEnabled}
-            onToggleBookmark={onToggleBookmark}
-            onToggleAudio={onToggleAudio}
-            onWordPress={onWordPress}
-          />
-        )}
+        renderItem={({ item }) => {
+          // Two renderers, one list. Everything the list does around them --
+          // the landing sequence, viewability tracking, the sheets, the retry
+          // loop -- is mode-blind, and both renderers expose the same testIDs
+          // and the same word tap targets, so nothing below this line has to
+          // know which one is mounted.
+          const shared = {
+            surahId: data.surah.id,
+            ayahNumber: item.ayah.ayah_number,
+            arabicText: item.ayah.text_uthmani,
+            words: wordsByAyah.get(item.ayah.id) ?? EMPTY_WORDS,
+            bookmarked: bookmarkedAyahs.has(item.ayah.ayah_number),
+            playing: playingAyah === item.ayah.ayah_number,
+            uiLocale,
+            audioDisabled: !audioEnabled,
+            onToggleBookmark,
+            onToggleAudio,
+            onWordPress,
+          };
+          return readerMode === 'mushaf' ? (
+            <MushafAyah {...shared} />
+          ) : (
+            <AyahCard {...shared} translationText={item.translation?.text ?? null} />
+          );
+        }}
         onViewableItemsChanged={onViewableItemsChanged.current}
         onScrollToIndexFailed={onScrollToIndexFailed}
         onContentSizeChange={onContentSizeChange}

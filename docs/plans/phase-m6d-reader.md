@@ -243,7 +243,7 @@ git commit -m "feat(mobile): put a mode chip in a glass reader header"
 - Consumes: `AyahText`, `AyahMedallion` (both unchanged), `GlassSurface` for
   the plate.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```tsx
 it('renders the Arabic without a translation block', () => {
@@ -266,12 +266,12 @@ it('still marks a bookmarked ayah', () => {
 });
 ```
 
-- [ ] **Step 2: Run them and watch them fail**
+- [x] **Step 2: Run them and watch them fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test MushafAyah`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implement, then switch on mode in the reader**
+- [x] **Step 3: Implement, then switch on mode in the reader**
 
 In `SurahReader`, `renderItem` picks `MushafAyah` or the restyled `AyahCard` by
 `readerMode`. Everything else in that component — the landing sequence, the
@@ -279,20 +279,37 @@ viewability tracking, the sheet, the retry loop — is untouched. Both renderers
 must expose the same `testID`s for bookmark and word presses, or the M5c
 landing tests and the M3 word-sheet tests fail against mushaf mode.
 
-- [ ] **Step 4: Run the whole mobile suite**
+- [x] **Step 4: Run the whole mobile suite**
 
 Run: `pnpm --filter @quran-corpus/mobile test && pnpm -r type-check && pnpm -r lint`
 Expected: PASS, **including** the M5c deep-link landing tests. If those fail,
 the re-skin broke the scroll sequence — fix that before continuing.
 
-- [ ] **Step 5: Mutation-check (§4)**
+- [x] **Step 5: Mutation-check (§4)**
 
 Make `renderItem` always return `AyahCard`. Expected: the first MushafAyah test
 still passes (it renders the component directly) but the reader-level mode test
 FAILS. If no reader-level test fails, add one — the switch is the logic.
 Restore by re-editing.
 
-- [ ] **Step 6: Commit**
+Done 2026-08-25. 576/576 across mobile, type-check and lint clean, M5c landing
+tests included. Mutation ran as written: `renderItem` forced to `AyahCard` left
+MushafAyah's own five tests passing and failed exactly the reader-level mode
+test, which is why that test was added.
+
+Two notes on how it was built:
+
+- The medallion is inline **inside the text run**, via a new `trailing` slot on
+  `AyahText`. A marker in a sibling View sits at the end of the *block*, so a
+  one-line ayah showed it a full line below the words it closes. Only one text
+  run gets native Arabic line breaking, which is the same reason `AyahText`
+  nests `<Text>` rather than laying out a row of Views. Device check 66 is the
+  gate on whether an inline View disturbs Android's shaping at the run's end.
+- `AyahCard` gained the same `ayah-{surah}-{ayah}-bookmark` / `-audio` testIDs
+  MushafAyah carries, so a reader-level test reaches whichever renderer the
+  mode mounted.
+
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/mobile/src/components/MushafAyah.tsx apps/mobile/src/components/MushafAyah.test.tsx \
