@@ -1,6 +1,7 @@
 import re
 import sqlite3
 import unicodedata
+from collections.abc import Iterable
 from pathlib import Path
 
 from .models import (
@@ -154,26 +155,36 @@ class ScraperDatabase:
             "UPDATE word_glosses SET source = 'corpus' WHERE source IS NULL"
         )
 
-    def park_surah_order(self) -> None:
-        """Move every existing order_number clear of the 1..114 range.
+    def reseed_surahs(self, surahs: Iterable[SurahModel]) -> None:
+        """Rewrite every surah row, revelation ranks included, atomically.
 
         order_number is UNIQUE and holds the revelation rank, which is not the
         row id -- so re-seeding rewrites all 114 rows into a *permutation* of
         what is already there, one row at a time. Every non-identity
         permutation collides partway through: surah 1 takes rank 5 while surah
-        5 still holds it. Negative ids are distinct by construction and cannot
-        equal an incoming rank, so this one statement clears the way for the
-        whole loop.
+        5 still holds it. Parking the whole column outside 1..114 first clears
+        the way; negative ids are distinct by construction and cannot equal an
+        incoming rank.
 
-        A seed that dies between this and the upserts leaves the parked values
-        behind, and a revelation-ordered list would then read backwards. Seeding
-        is idempotent and re-running it fixes that; tests/test_seed.py asserts
-        no parked value survives a completed seed.
+        One transaction, not a commit per row. A seed interrupted between the
+        park and the last upsert would otherwise leave parked (negative) ranks
+        behind, and getRevealedIndex's ORDER BY order_number would then list
+        the surahs in reverse mushaf order -- a plausible-looking chronology
+        with nothing anywhere to signal the failure. `with self._conn` commits
+        on success and rolls back on any exception, so the table is only ever
+        seen holding one complete permutation or the other.
         """
-        self._conn.execute("UPDATE surahs SET order_number = -id")
-        self._conn.commit()
+        with self._conn:
+            self._conn.execute("UPDATE surahs SET order_number = -id")
+            for surah in surahs:
+                self._write_surah(surah)
 
     def upsert_surah(self, surah: SurahModel) -> None:
+        self._write_surah(surah)
+        self._conn.commit()
+
+    def _write_surah(self, surah: SurahModel) -> None:
+        """The INSERT alone. Uncommitted, so reseed_surahs can batch it."""
         self._conn.execute(
             """INSERT INTO surahs
                (
@@ -203,7 +214,6 @@ class ScraperDatabase:
                 surah.order_number,
             ),
         )
-        self._conn.commit()
 
     def upsert_language(self, language: LanguageModel) -> None:
         self._conn.execute(

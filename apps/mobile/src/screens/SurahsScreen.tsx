@@ -69,13 +69,15 @@ export function SurahsScreen() {
   const loaded = data[mode] !== undefined;
 
   useEffect(() => {
+    // Cleared before the bail, not inside load(): the effect returns early for
+    // an already-cached mode, so an error left standing from a *different*
+    // mode's failed load would render over every other list -- permanently,
+    // since switching back never re-runs a load that could clear it.
+    setError(null);
     if (loaded) return;
     let cancelled = false;
 
     async function load() {
-      // Cleared per run, not just on first mount: without this a stale failure
-      // keeps rendering over the list a later run just loaded.
-      setError(null);
       try {
         const db = await openCorpusDb();
         const client = createExpoSqliteClient(db as ExpoSqliteLike);

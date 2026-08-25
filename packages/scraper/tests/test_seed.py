@@ -96,3 +96,36 @@ def test_seed_leaves_no_parked_order_number_behind():
         assert parked == 0
     finally:
         os.unlink(path)
+
+
+def test_an_interrupted_reseed_leaves_no_parked_order_number_behind():
+    """The park pass writes negative ranks, so a reseed that dies partway must
+    roll all of them back.
+
+    Left committed, every revelation-ordered list reads as reverse mushaf order
+    -- a plausible-looking chronology with nothing to signal the failure. The
+    generator raises after two surahs, which is exactly a Ctrl-C or a disk
+    error mid-loop.
+    """
+
+    def dies_partway():
+        for i, surah in enumerate(get_all_surahs()):
+            if i == 2:
+                raise RuntimeError("disk full")
+            yield surah
+
+    db, path = _make_db()
+    try:
+        seed_database(db)
+        try:
+            db.reseed_surahs(dies_partway())
+        except RuntimeError:
+            pass
+        db.close()
+        conn = sqlite3.connect(path)
+        rows = dict(conn.execute("SELECT id, order_number FROM surahs").fetchall())
+        conn.close()
+        assert sorted(rows.values()) == list(range(1, 115))
+        assert rows[96] == 1, "the completed seed's ranks survive intact"
+    finally:
+        os.unlink(path)

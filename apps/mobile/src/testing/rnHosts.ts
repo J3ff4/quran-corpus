@@ -191,7 +191,10 @@ export function host(tag: string) {
  *
  *  `keyExtractor` is honoured rather than ignored so a duplicate-key bug still
  *  surfaces as a React warning, and section headers render through the same
- *  path the device uses.
+ *  path the device uses. Sections themselves key by index, not by title: two
+ *  sections may legitimately share a title (a chronology that stops being two
+ *  contiguous blocks yields alternating Meccan/Medinan ones), and keying by it
+ *  would swallow that as a duplicate-key warning instead of rendering it.
  */
 export function FlatList({
   data,
@@ -228,7 +231,7 @@ export function SectionList({
     (sections ?? []).map((section, sectionIndex) =>
       React.createElement(
         'div',
-        { key: section.title || sectionIndex },
+        { key: sectionIndex },
         renderSectionHeader?.({ section }),
         section.data.map((item, index) =>
           React.createElement('div', { key: keyExtractor?.(item, index) ?? index }, renderItem({ item, index })),

@@ -238,4 +238,20 @@ describe('SurahsTab', () => {
     expect(screen.getByText('Unable to load surahs')).toBeTruthy();
     expect(screen.queryByText('no such column: juz')).toBeNull();
   });
+
+  it('leaves a failed mode behind when switching back to one already loaded', async () => {
+    mocks.getJuzIndex.mockRejectedValue(new Error('no such column: juz'));
+    render(<SurahsTab />);
+    await screen.findByText('Al-Fatihah');
+
+    fireEvent.click(screen.getByTestId('segment-juz'));
+    await screen.findByRole('alert');
+    fireEvent.click(screen.getByTestId('segment-surah'));
+
+    // The surah list is cached, so its load never re-runs -- an error cleared
+    // only inside the load path would stay on screen over every other mode,
+    // with nothing left that could clear it.
+    expect(await screen.findByText('Al-Fatihah')).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
 });

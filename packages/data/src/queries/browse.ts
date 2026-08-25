@@ -26,33 +26,39 @@ export interface PageEntry {
 /**
  * The juz index: thirty rows, each pointing at the ayah the juz opens on.
  *
- * The start ayah comes from the row with the smallest `ayahs.id` in the juz,
- * not from MIN(surah_id) and MIN(ayah_number) taken separately -- those are
- * independent aggregates over the group and answer with a coordinate that need
- * not be in it. Juz 3 runs 2:253 to 3:92; independently they say 2:1, which is
- * a real ayah, in a different juz, and looks entirely plausible in a list.
- * `ayahs.id` is AUTOINCREMENT in mushaf order, so it is the ordering the whole
- * file already relies on.
+ * The start ayah is the smallest (surah_id, ayah_number) *pair* in the juz, not
+ * MIN(surah_id) and MIN(ayah_number) taken separately -- those are independent
+ * aggregates over the group and answer with a coordinate that need not be in
+ * it. Juz 3 runs 2:253 to 3:92; independently they say 2:1, which is a real
+ * ayah, in a different juz, and looks entirely plausible in a list.
  *
- * No index on `ayahs.juz`: this is one grouped scan of 6236 rows, run once per
+ * Not MIN(id) either, though it agrees today: `ayahs.id` is AUTOINCREMENT, so
+ * ids are assigned in insertion order, not mushaf order. Re-importing one surah
+ * after a delete (tests/test_corpus_import.py does exactly that, and so does a
+ * manual repair) hands that surah the highest ids in the table, and every juz
+ * and page it touches would then report a start ayah from the wrong end of
+ * itself, with nothing anywhere to raise. ROW_NUMBER states the ordering
+ * intrinsically and cannot drift from it.
+ *
+ * No index on `ayahs.juz`: this is one windowed scan of 6236 rows, run once per
  * mode switch, and adding one would be a schema change (M6c forbids those).
  */
 export async function getJuzIndex(client: QueryClient): Promise<JuzEntry[]> {
   const result = await client.execute(`
-    SELECT j.juz,
-           a.surah_id      AS start_surah_id,
-           a.ayah_number   AS start_ayah_number,
-           s.name_translit AS surah_name,
-           j.ayah_count
+    SELECT juz, start_surah_id, start_ayah_number, surah_name, ayah_count
     FROM (
-      SELECT juz, MIN(id) AS first_id, COUNT(*) AS ayah_count
-      FROM ayahs
-      WHERE juz IS NOT NULL
-      GROUP BY juz
-    ) j
-    JOIN ayahs  a ON a.id = j.first_id
-    JOIN surahs s ON s.id = a.surah_id
-    ORDER BY j.juz
+      SELECT a.juz,
+             a.surah_id      AS start_surah_id,
+             a.ayah_number   AS start_ayah_number,
+             s.name_translit AS surah_name,
+             COUNT(*)     OVER (PARTITION BY a.juz) AS ayah_count,
+             ROW_NUMBER() OVER (PARTITION BY a.juz ORDER BY a.surah_id, a.ayah_number) AS rn
+      FROM ayahs  a
+      JOIN surahs s ON s.id = a.surah_id
+      WHERE a.juz IS NOT NULL
+    )
+    WHERE rn = 1
+    ORDER BY juz
   `);
 
   return result.rows.map((row) => ({
@@ -67,7 +73,7 @@ export async function getJuzIndex(client: QueryClient): Promise<JuzEntry[]> {
 /**
  * The page index: 604 rows, each pointing at the ayah the page opens on.
  *
- * Same MIN(id) reasoning as getJuzIndex, and the same failure mode -- pages
+ * Same ordering reasoning as getJuzIndex, and the same failure mode -- pages
  * cross surah boundaries far more often than juz do. No ayah count: a page is
  * a fixed slab of glyphs, and "12 ayahs" says nothing a reader wants.
  *
@@ -76,19 +82,19 @@ export async function getJuzIndex(client: QueryClient): Promise<JuzEntry[]> {
  */
 export async function getPageIndex(client: QueryClient): Promise<PageEntry[]> {
   const result = await client.execute(`
-    SELECT p.page,
-           a.surah_id      AS start_surah_id,
-           a.ayah_number   AS start_ayah_number,
-           s.name_translit AS surah_name
+    SELECT page, start_surah_id, start_ayah_number, surah_name
     FROM (
-      SELECT page, MIN(id) AS first_id
-      FROM ayahs
-      WHERE page IS NOT NULL
-      GROUP BY page
-    ) p
-    JOIN ayahs  a ON a.id = p.first_id
-    JOIN surahs s ON s.id = a.surah_id
-    ORDER BY p.page
+      SELECT a.page,
+             a.surah_id      AS start_surah_id,
+             a.ayah_number   AS start_ayah_number,
+             s.name_translit AS surah_name,
+             ROW_NUMBER() OVER (PARTITION BY a.page ORDER BY a.surah_id, a.ayah_number) AS rn
+      FROM ayahs  a
+      JOIN surahs s ON s.id = a.surah_id
+      WHERE a.page IS NOT NULL
+    )
+    WHERE rn = 1
+    ORDER BY page
   `);
 
   return result.rows.map((row) => ({

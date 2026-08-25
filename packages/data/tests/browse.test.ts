@@ -11,10 +11,16 @@ let db: Client;
 // from. What a bug here *can* change is which ayah a juz or page is said to
 // start at, so the fixture is shaped to make the wrong answer available:
 //
-//   juz 1 : 1:1 1:2 1:3 | 2:1 2:2       (pages 1, 2)
+//   juz 1 : 1:1 1:2 (page 1) | 1:3 2:1 2:2 (page 2)
 //   juz 2 : 2:6 2:7 2:8               (page 3)
 //   juz 3 : 2:9 | 3:1 3:2             (page 4)  <- crosses a surah boundary
 //   (3:3 has no juz and no page at all)
+//
+// Surah 1's ayahs carry ids 20-22, above every other row: that is what a
+// delete-and-re-import of one surah leaves behind, since ayahs.id is
+// AUTOINCREMENT. It makes juz 1 and page 2 discriminate a query that opens a
+// group at its smallest id (2:1, wrong) from one that opens it at its smallest
+// (surah_id, ayah_number) pair (1:1 and 1:3, right).
 //
 // The three order_number values are deliberately NOT equal to the ids, for the
 // same reason: that is what the real column held until 2026-08-25, and a
@@ -35,12 +41,11 @@ beforeAll(async () => {
                  (3, 'آل عمران', 'Aal-Imran', 'Family of Imran', 'medinan', 3, 1)`,
     args: [],
   });
-  // Explicit ids, ascending in mushaf order: the queries read MIN(id) as the
-  // opening ayah, which is only meaningful if the ids run in that order.
+  // Explicit ids, deliberately NOT ascending in mushaf order -- see the header.
   const ayahs: Array<[number, number, number, number | null, number | null]> = [
-    [1, 1, 1, 1, 1],
-    [2, 1, 2, 1, 1],
-    [3, 1, 3, 1, 1],
+    [20, 1, 1, 1, 1],
+    [21, 1, 2, 1, 1],
+    [22, 1, 3, 1, 2],
     [4, 2, 1, 1, 2],
     [5, 2, 2, 1, 2],
     [6, 2, 6, 2, 3],
@@ -73,8 +78,9 @@ describe('getJuzIndex', () => {
   it('opens a juz that starts mid-surah at that ayah, not at ayah 1', async () => {
     const rows = await getJuzIndex(db);
 
-    // The whole reason the subquery takes MIN(id) rather than two independent
-    // MINs. 2:1 is what the broken version answers, and it is a real ayah.
+    // The whole reason the subquery orders by the (surah_id, ayah_number) pair
+    // rather than by two independent MINs. 2:1 is what the broken version
+    // answers, and it is a real ayah.
     expect(rows[2]).toMatchObject({ juz: 3, startSurahId: 2, startAyahNumber: 9, surahName: 'Al-Baqarah' });
   });
 
@@ -100,7 +106,9 @@ describe('getPageIndex', () => {
 
     expect(rows.map((r) => r.page)).toEqual([1, 2, 3, 4]);
     expect(rows[0]).toMatchObject({ page: 1, startSurahId: 1, startAyahNumber: 1 });
-    expect(rows[1]).toMatchObject({ page: 2, startSurahId: 2, startAyahNumber: 1 });
+    // 1:3, not 2:1: surah 1 holds the higher ids here, so a MIN(id) start would
+    // skip past the three ayahs the page actually opens with.
+    expect(rows[1]).toMatchObject({ page: 2, startSurahId: 1, startAyahNumber: 3, surahName: 'Al-Fatihah' });
   });
 
   it('opens a page that starts mid-surah at that ayah, not at ayah 1', async () => {

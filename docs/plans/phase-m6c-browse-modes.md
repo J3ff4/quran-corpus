@@ -444,9 +444,47 @@ git commit -m "feat(mobile): browse by surah, juz, page or revelation order"
     changes, which re-runs up to four queries. The alternative is re-localizing
     cached rows on read, which is more code to keep three lists out of the
     previous language.
-- [ ] **Step 2: Stop and ask the owner to run `/code-review`** — new
+- [x] **Step 2: Stop and ask the owner to run `/code-review`** — new
   `packages/data` queries (§5). Plain `/code-review`, never `ultra` unprompted.
-- [ ] **Step 3: Act on the findings.** One pass. Say what is declined and why.
+  Run 2026-08-25. Five findings, all against code, none declined.
+- [x] **Step 3: Act on the findings.** One pass, all five fixed:
+
+  1. **A failed load left its error over every already-cached mode**
+     (`SurahsScreen.tsx`). `setError(null)` sat inside the load path, which the
+     effect never reaches for a cached mode, so switching away from a failed
+     juz read kept "Unable to load surahs" on screen over the surah list
+     permanently — nothing left could clear it. Cleared before the `loaded`
+     bail instead. New test; mutation-checked by moving the call back.
+  2. **`accessible` on the tablist collapsed all four segments into one
+     TalkBack node** (`SegmentedControl.tsx`). On Android an accessible View
+     stops its children being focusable, so the control was unoperable by
+     screen reader and a double-tap fired at the row's centre. Dropped, which
+     is what `GlassTabBar` already does. **No unit test can catch this** —
+     `rnHosts.host()` ignores `accessible`, so the group-label test passed
+     against the broken control. Check 61 must be re-run with TalkBack on.
+  3. **An interrupted seed left the whole surah table in reverse order**
+     (`db.py`, `seed.py`). The park pass committed on its own and `upsert_surah`
+     commits per row, so a crash mid-loop left negative ranks, and
+     `getRevealedIndex`'s `ORDER BY order_number` renders those as reverse
+     mushaf order — a plausible chronology with nothing to signal it. Replaced
+     `park_surah_order` with `reseed_surahs`, one transaction around the park
+     and all 114 upserts (`upsert_surah` keeps its own commit for every other
+     caller). New rollback test; mutation-checked back to per-row commits, and
+     it leaves 112 parked rows.
+  4. **`MIN(id)` made the juz/page start ayah depend on insertion order**
+     (`browse.ts`). `ayahs.id` is AUTOINCREMENT, so a delete-and-re-import of
+     one surah hands it the highest ids and every juz and page it touches then
+     opens at the wrong end of itself. Replaced with
+     `ROW_NUMBER() OVER (PARTITION BY … ORDER BY surah_id, ayah_number)` — one
+     pass, ordering stated intrinsically. The fixture could not catch it
+     (ids ran in mushaf order); surah 1 now carries ids 20–22, which makes juz 1
+     and page 2 discriminate. Mutation-checked back to `ORDER BY a.id`: two
+     tests fail. Re-verified against the live corpus — 30 juz, 604 pages, 6236
+     ayahs, juz 2/3/15/30 → 2:142 / 2:253 / 17:1 / 78:1, pages 1/300/604 →
+     1:1 / 18:54 / 112:1.
+  5. **SectionList mock keyed sections by title** (`rnHosts.ts`). Two sections
+     may legitimately share one, and the mock swallowed that as a duplicate-key
+     warning. Keyed by index.
 - [ ] **Step 4: Build.**
 
 ```bash

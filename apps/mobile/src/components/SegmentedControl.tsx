@@ -92,9 +92,15 @@ export function SegmentedControl<T extends string>({
   return (
     <GlassSurface radius="pill" style={{ padding: 4 }}>
       {/* The label lives here rather than on each option: four segments each
-          announcing "Browse by" is four swipes of the same words. */}
+          announcing "Browse by" is four swipes of the same words.
+
+          No `accessible` on this View, deliberately. It would make the row a
+          single accessibility element, and its children then stop being
+          focusable at all: TalkBack would read "Browse by" once and a
+          double-tap would fire at the row's centre rather than at a segment.
+          GlassTabBar does the same thing -- role and label per control, no
+          accessible container. */}
       <View
-        accessible
         accessibilityRole="tablist"
         accessibilityLabel={accessibilityLabel}
         style={{ flexDirection: 'row', gap: 4 }}
