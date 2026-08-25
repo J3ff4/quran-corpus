@@ -339,7 +339,7 @@ a smoother advance. One `AudioPlayer` plus `replace()` keeps the media session
 attached across ayahs, and `preload()` covers most of the seam. Record this in
 the commit body; a reviewer will ask.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Against a fake player implementing the same structural interface the existing
 suite already fakes:
@@ -416,12 +416,12 @@ it('reports a failed load through the existing error key', async () => {
 });
 ```
 
-- [ ] **Step 2: Run them and watch them fail**
+- [x] **Step 2: Run them and watch them fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test ayahAudio`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Shape:
 
@@ -436,13 +436,13 @@ Shape:
 - Every URL comes from `ayahAudioUrl(surah, ayah, reciterId)`. No string
   building at this layer.
 
-- [ ] **Step 4: Run the tests, then mutation-check (§4)**
+- [x] **Step 4: Run the tests, then mutation-check (§4)**
 
 Run: `pnpm --filter @quran-corpus/mobile test ayahAudio` → PASS.
 Then change the end-of-surah guard to `ayah + 1 <= ayahCount + 1`. Expected:
 "stops at the end of the surah" FAILS. Restore by re-editing.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/mobile/src/audio/ayahAudio.ts apps/mobile/src/audio/ayahAudio.test.ts
