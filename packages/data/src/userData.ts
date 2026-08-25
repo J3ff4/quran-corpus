@@ -43,6 +43,90 @@ export const USER_DB_SCHEMA = `
 `;
 
 /**
+ * Schema changes past the baseline, applied in order.
+ *
+ * Version 1 *is* `USER_DB_SCHEMA` above, which every open applies and which is
+ * idempotent. Everything after it needs a version number, because the
+ * statements are not: `ALTER TABLE ... ADD COLUMN` throws on the second run,
+ * and a caught-and-ignored throw is indistinguishable from a migration that
+ * silently did nothing.
+ *
+ * Additive only, and that is a rule rather than a coincidence: this file lives
+ * on a user's phone and survives app updates, so a build that rewrites or drops
+ * data has no way back. It also means an older build still opens a newer file --
+ * it simply does not see the new tables.
+ *
+ * **One statement per entry in `statements`.** Both drivers execute a single
+ * statement -- libsql's `execute` rejects the rest, and the mobile client routes
+ * through expo's `getAllAsync`, which prepares one -- so a migration written as
+ * a single multi-statement string would create its first table and skip the
+ * others, on every device, silently. `USER_DB_SCHEMA` gets away with being one
+ * string only because apps/mobile hands it to `execAsync`, which does take
+ * several.
+ */
+export const USER_DB_MIGRATIONS: readonly { version: number; statements: readonly string[] }[] = [
+  {
+    version: 2,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS reading_days (
+         day TEXT PRIMARY KEY,
+         recorded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+       )`,
+      `CREATE TABLE IF NOT EXISTS root_views (
+         root_id INTEGER NOT NULL,
+         day TEXT NOT NULL,
+         PRIMARY KEY (root_id, day)
+       )`,
+    ],
+  },
+];
+
+/** The version a file is at once every migration above has been applied. */
+export const USER_DB_VERSION = USER_DB_MIGRATIONS.length + 1;
+
+/**
+ * Apply pending migrations and return the version the file is at when it
+ * returns.
+ *
+ * `PRAGMA user_version` is SQLite's own four-byte slot in the header, so this
+ * needs no bookkeeping table of its own. It reads 0 on a file that predates
+ * this function, which is exactly right: every migration below is above 0, so
+ * an existing install gets all of them, and each one is `IF NOT EXISTS` anyway.
+ *
+ * A file from a *newer* build is left alone rather than stamped back down.
+ * Rewriting the version there would make this build re-apply everything on the
+ * next open and would hand the newer build a file that lies about its own
+ * shape; additive-only migrations mean the old build can read the new file as
+ * it is.
+ *
+ * Callers run this on every open, after applying USER_DB_SCHEMA.
+ */
+export async function migrateUserDb(client: QueryClient): Promise<number> {
+  const result = await client.execute('PRAGMA user_version');
+  const raw = Number(result.rows[0]?.['user_version'] ?? 0);
+  // A non-integer here means the pragma read back as something SQLite should
+  // never produce. Treating it as 0 re-runs migrations that are all
+  // IF NOT EXISTS anyway; trusting it would leave NaN in every comparison
+  // below, which silently skips the version stamp and repeats this forever.
+  const current = Number.isInteger(raw) ? raw : 0;
+
+  for (const migration of USER_DB_MIGRATIONS) {
+    if (migration.version <= current) continue;
+    for (const statement of migration.statements) {
+      await client.execute(statement);
+    }
+  }
+
+  if (current >= USER_DB_VERSION) return current;
+
+  // Not parameterizable: PRAGMA takes a literal. USER_DB_VERSION is a number
+  // computed in this module, never caller input, so there is nothing to
+  // inject -- but keep it that way if this ever takes an argument.
+  await client.execute(`PRAGMA user_version = ${USER_DB_VERSION}`);
+  return USER_DB_VERSION;
+}
+
+/**
  * Ayahs per surah, indexed by `surahId - 1`.
  *
  * Inlined rather than queried because this module is the user database and the

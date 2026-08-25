@@ -67,7 +67,7 @@ export async function migrateUserDb(client: QueryClient): Promise<number>;
 
 `migrateUserDb` returns the version the file is at when it returns.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `packages/data/tests/userData.test.ts` — the suite already has an in-memory
 client helper; reuse it rather than adding a second one.
@@ -138,12 +138,12 @@ describe('migrateUserDb', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `pnpm --filter @quran-corpus/data test -t migrateUserDb`
 Expected: FAIL — no such export.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `packages/data/src/userData.ts`, below `USER_DB_SCHEMA`:
 
@@ -212,7 +212,7 @@ export async function migrateUserDb(client: QueryClient): Promise<number> {
 }
 ```
 
-- [ ] **Step 4: Call it on open**
+- [x] **Step 4: Call it on open**
 
 `apps/mobile/src/data/userDb.ts`:
 
@@ -231,12 +231,12 @@ async function createUserDb() {
 }
 ```
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 Run: `pnpm --filter @quran-corpus/data test && pnpm --filter @quran-corpus/mobile test`
 Expected: PASS.
 
-- [ ] **Step 6: Mutation-check (§4)**
+- [x] **Step 6: Mutation-check (§4)**
 
 Change `if (migration.version <= current) continue;` to `if (false) continue;`
 and re-run. Expected: no failure yet — migration 2 is `IF NOT EXISTS`. That is
@@ -245,7 +245,32 @@ already at the current version. If it does not fail, the test is vacuous and
 must be fixed before moving on (`[[sdd-brief-can-specify-vacuous-tests]]`).
 Restore by re-editing.
 
-- [ ] **Step 7: Commit**
+
+**Deviations from this brief, taken during execution:**
+
+- **Migrations hold `statements: readonly string[]`, not one `sql` string.**
+  Both drivers execute a single statement -- libsql's `execute` rejects the
+  rest, and `createExpoSqliteClient` routes through expo's `getAllAsync`, which
+  prepares one. The brief's two-`CREATE TABLE` string would have created
+  `reading_days` and silently skipped `root_views` on every device. A test
+  asserts the one-statement-per-entry rule so the next migration cannot
+  reintroduce it.
+- **The brief's `newClient()` helper does not exist.** `userData.test.ts` has
+  `recordingClient()`, a double with no SQLite in it, which cannot answer a
+  `PRAGMA user_version` or show a table exists. These tests use
+  `createDatabase('file::memory:')`, as every other suite in the package does.
+- **The brief's fourth test was vacuous.** Its spy pushed only when the query
+  was *not* a string, and every statement migrateUserDb runs is a string, so
+  `applied` was `[]` no matter what the code did. It now records what reaches
+  the driver and asserts no migration statement is among it -- and that is the
+  test the Step 6 mutation kills (`[[sdd-brief-can-specify-vacuous-tests]]`).
+
+Two additions beyond the brief, each with its own test and mutation-check: a
+file from a *newer* build is returned as-is rather than stamped back down, and a
+non-integer `user_version` is treated as 0 rather than left to poison every
+comparison with NaN.
+
+- [x] **Step 7: Commit**
 
 ```bash
 git add packages/data/src/userData.ts packages/data/tests/userData.test.ts \

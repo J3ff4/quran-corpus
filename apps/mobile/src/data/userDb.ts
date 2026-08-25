@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
-import { USER_DB_SCHEMA } from '@quran-corpus/data/user-db';
+import { USER_DB_SCHEMA, migrateUserDb } from '@quran-corpus/data/user-db';
+import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
 
 const USER_DB_NAME = 'quran-corpus-user.db';
 
@@ -26,5 +27,9 @@ export function openUserDb(): Promise<SQLite.SQLiteDatabase> {
 async function createUserDb() {
   const db = await SQLite.openDatabaseAsync(USER_DB_NAME);
   await db.execAsync(USER_DB_SCHEMA);
+  // Inside the memoized open, so it runs exactly once per process and every
+  // caller of openUserDb() is guaranteed a migrated file -- there is no
+  // "call this first" ordering for a screen to get wrong.
+  await migrateUserDb(createExpoSqliteClient(db as ExpoSqliteLike));
   return db;
 }
