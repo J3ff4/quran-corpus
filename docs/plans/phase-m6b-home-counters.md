@@ -1026,7 +1026,7 @@ New `uiStrings` keys (all three locales, en/uz/ru):
 `home.streak`, `home.streakDays`, `home.rootsStudied`, `home.rootsThisWeek`,
 `home.ayahOfTheDay`, `home.countersFailed`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```tsx
 it('shows the streak the counters derive, not a raw row count', async () => {
@@ -1055,12 +1055,12 @@ it('opens the reader at the day's ayah', async () => {
 });
 ```
 
-- [ ] **Step 2: Run them and watch them fail**
+- [x] **Step 2: Run them and watch them fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test HomeTab`
 Expected: FAIL.
 
-- [ ] **Step 3: Build the screen**
+- [x] **Step 3: Build the screen**
 
 Compose `GlassSurface` cards. Rules that are not negotiable:
 
@@ -1075,23 +1075,75 @@ Compose `GlassSurface` cards. Rules that are not negotiable:
   `roots / max(roots, 1)`, each with an `accessibilityLabel` of its day and
   count. No chart library (§12).
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `pnpm --filter @quran-corpus/mobile test && pnpm -r type-check && pnpm -r lint`
 Expected: PASS.
 
-- [ ] **Step 5: Mutation-check (§4)**
+- [x] **Step 5: Mutation-check (§4)**
 
 Replace `streakFrom(days, today)` at the call site with `days.length`. Expected:
 the first test FAILS (3 rows, streak 2). Restore by re-editing.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add 'apps/mobile/app/(tabs)/index.tsx' apps/mobile/src/home apps/mobile/src/screens/HomeTab.test.tsx \
         apps/mobile/src/i18n/uiStrings.ts
 git commit -m "feat(mobile): rebuild home as four glass blocks"
 ```
+
+**Deviations from this brief, taken during execution**
+
+- The brief cites `src/test/routes/appDirIsRoutesOnly.test.ts` as requiring the
+  screen body under `src/`. It does not -- that test only bans *test* files
+  under `app/`. The one-line route was kept anyway (it is the pattern
+  `menu.tsx`/`MenuScreen.tsx` already established), but not for the stated
+  reason.
+- The brief's tests inject `today` through a `renderHome({ today })` option
+  with no production counterpart -- a clock parameter on the screen for the
+  tests' sake. Fixtures are computed from the real `localDay(new Date())`
+  instead (the Task 4 pattern): a streak fixture pinned to 2026-08-24 would
+  become a *broken* streak the day after this was written and every assertion
+  would keep passing, against 0.
+- The brief asserts an `href` on `home-ayah-of-day` while Step 3 requires every
+  card to be a `Pressable` -- a Pressable has no href. The tests assert
+  `router.push` instead.
+- The brief's "Consumes" list carries no corpus read, but the layout needs the
+  surah name, the ayah's opening words, and the day's ayah with its
+  translation. `getAyahReaderLocation` (which existed with no production
+  caller) gained the surah and became that reader; `useCorpusAyah` is a local
+  hook over it. Its ceiling is commented: it loads a whole surah for one ayah.
+- `getReadingDays(client, sinceDay)` takes a *window*, which the brief does not
+  mention. A seven-day cutoff would silently cap a 40-day streak at 7, so the
+  streak load asks for the whole history and a test pins that.
+- The brief's bar height `roots / max(roots, 1)` is `1` for every non-empty
+  day. Bars scale against the week's peak, and a test distinguishes the two.
+- The streak and roots cards are not `Pressable`s: neither has a destination,
+  and a button that does nothing announces worse to TalkBack than a labelled
+  panel. Both are still labelled as one phrase ("Day streak: 2").
+- `home.streakDays` was not added -- nothing renders it. The other five keys
+  ship in all three locales.
+- The brief's `toHaveTextContent` needs jest-dom, which is not installed;
+  assertions read `.textContent`.
+- `src/testing/rnHosts.ts` drops `onPressIn`/`onPressOut`. Home is the first
+  screen to use `usePressScale` (M6a shipped it with no caller), and spreading
+  them logs a React unknown-prop warning per card per render.
+
+**Tests beyond the brief:** whole-history window; bars scale against the week's
+peak; all-time roots rather than this week's; counters failing leaves the
+reading position alone; the day's ayah is read from the corpus; the ayah card
+survives a failed corpus read; search still opens; the saved position opens at
+its own ayah. 14 in the suite, up from 2.
+
+**Mutations run (§4):** A `streakFrom(...)` -> `days.length` (streak test
+fails); B the brief's `roots / max(roots, 1)` bar formula (scaling test fails);
+C the streak's window -> `weekStart(today)` (history-window test fails); D hide
+the ayah card when its corpus read fails (tap-target test fails). All four
+killed; `HomeScreen.tsx` restored from a scratchpad copy and `diff -q` clean.
+
+**Gate:** lint clean, type-check clean, `pnpm -r test` = data 389, mobile-data
+12, web 479, mobile 542.
 
 ---
 

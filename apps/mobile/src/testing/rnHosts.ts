@@ -36,6 +36,8 @@ interface HostProps {
   importantForAccessibility?: unknown;
   numberOfLines?: unknown;
   onLayout?: unknown;
+  onPressIn?: unknown;
+  onPressOut?: unknown;
   onTextLayout?: unknown;
   pointerEvents?: unknown;
 }
@@ -132,6 +134,11 @@ export function host(tag: string) {
     importantForAccessibility,
     numberOfLines: _numberOfLines,
     onLayout: _onLayout,
+    // usePressScale's handlers. Dropped rather than mapped: there is no DOM
+    // event for a press phase, and React logs "does not recognize the
+    // onPressIn prop" for every card on every render if they are spread.
+    onPressIn: _onPressIn,
+    onPressOut: _onPressOut,
     onTextLayout: _onTextLayout,
     pointerEvents: _pointerEvents,
     ...props
