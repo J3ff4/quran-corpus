@@ -221,10 +221,13 @@ checks 44-47 and the M5 checks as before; see checks 48+ for M6.
 
 ## M6a Design System Smoke Test
 
-Run on a physical Android device, on a `preview` profile APK built at `c978b79`
-or later. This is the first build of the M6 glass redesign
-(`docs/plans/phase-m6-glass-redesign.md`); check 48 is the gate on the whole
-approach, so run it first and stop if it fails.
+Run on a physical Android device at `746ddaf` or later. This is the first build
+of the M6 glass redesign (`docs/plans/phase-m6-glass-redesign.md`); check 48 is
+the gate on the whole approach, so run it first and stop if it fails.
+
+EAS is unavailable until 2026-09-01, so run 1 went through Expo Go rather than a
+`preview` APK. Same JS, same device, but not a release binary — re-run against
+the APK when the build window reopens.
 
 48. Open any tab in **both themes**. Cards read as translucent panels over the
     green wash, not as flat rectangles: the hairline border and the 1px top
@@ -241,11 +244,17 @@ approach, so run it first and stop if it fails.
     the gesture bar. Tap the tab you are already on: nothing navigates.
 52. Scroll any long list (Dictionary browse, or a concordance) to the very end.
     The last row clears the floating pill — nothing is hidden underneath it.
-53. Look at a heading anywhere. It renders in the Newsreader serif, not the
-    system sans, with no tofu boxes and no mid-screen fallback to another face.
-54. Turn the system "remove animations" setting on (or Settings → reduce
-    animations), then press and hold a card. It does not shrink, and nothing
-    else animates on tap.
+53. **Not exercisable until a heading uses the serif.** Look at a heading
+    anywhere: it renders in the Newsreader serif, not the system sans, with no
+    tofu boxes and no mid-screen fallback to another face. M6a loads the font
+    and names it in `typography.display`, but no component sets it as
+    `fontFamily`, so there is nothing on screen this check can fail on. Run it
+    in the sub-phase that consumes it.
+54. **Not exercisable until something animates on press.** Turn the system
+    "remove animations" setting on (or Settings → reduce animations), then press
+    and hold a card. It does not shrink, and nothing else animates on tap. M6a
+    ships `usePressScale` with no consumer, so "it does not shrink" passes
+    whether or not the hook honours the setting. Run it with 53.
 
 ## Current Status
 
@@ -271,7 +280,10 @@ concordances on the root and lemma screens. M5 and M5c followed; their checks
 **M6 (glass redesign) is in progress** — see
 `docs/plans/phase-m6-glass-redesign.md` for the spec and the nine sub-phase
 plans. M6a (design system and app chrome) is implemented on
-`feat/m6a-design-system` and awaits its device run, checks 48-54.
+`feat/m6a-design-system`; its device run happened on 2026-08-24 through Expo Go
+(no APK — EAS is unavailable until 2026-09-01). Checks 49-52 pass, 48 awaits the
+owner's eye, and 53-54 move to the sub-phase that first uses the serif and the
+press-scale. Two chrome-inset defects were found and fixed in `746ddaf`.
 
 Three sets of checks are **superseded by M6**, because the screens they test are
 being redrawn. They were never run and are not going to be; the record of that

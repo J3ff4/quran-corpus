@@ -1036,11 +1036,16 @@ git commit -m "feat(mobile): float a glass tab pill over the bloom"
 
 ---
 
-### Task 7: Preview build
+### Task 7: Preview build — DEFERRED
 
 **Files:** none.
 
-- [ ] **Step 1: Build**
+EAS builds are unavailable until 2026-09-01 (the account's free build window),
+so no `preview` APK exists for this milestone. Task 9 ran through Expo Go over
+adb-wifi instead. Deferred, not skipped: the first M6 APK will be built when
+the window reopens, and checks 48-54 are re-run against it then.
+
+- [ ] **Step 1: Build** — blocked until 2026-09-01
 
 ```bash
 cd apps/mobile
@@ -1048,10 +1053,10 @@ pnpm prebuild:assert-db
 eas build --platform android --profile preview
 ```
 
-- [ ] **Step 2: Record the build id**
+- [ ] **Step 2: Record the build id** — blocked with Step 1
 
 Write the EAS build id and the head commit into this plan's verification log
-below. Do not tick any device check yet.
+below.
 
 ---
 
@@ -1108,19 +1113,24 @@ git commit -m "docs: renumber PRD milestones for M6 and open the M6a checklist"
 
 ### Task 9: Device run
 
-- [ ] **Step 1:** Install the Task 7 APK on the owner's device.
-- [ ] **Step 2:** Run checks 48–54, both themes.
-- [ ] **Step 3:** Record every result in the log below. A `fail` opens a fix
-  task in this plan; it does not move to M6b.
+- [x] **Step 1:** Run the app on the owner's device. Task 7's APK does not
+  exist (see above), so this was Expo Go over adb-wifi -- same JS bundle, same
+  device, but not a release binary. Anything build-profile-specific (release
+  ProGuard/Hermes behaviour, the bundled DB asset path) is therefore *not*
+  covered and is re-checked when the APK is built.
+- [x] **Step 2:** Ran checks 48-54, both themes.
+- [x] **Step 3:** Recorded in the log below. Two findings; both fixed in
+  `746ddaf` and re-run.
 - [ ] **Step 4:** Only once every check is `pass`, ask the owner to open the PR
   (never `gh pr create` unprompted) and to run `/code-review` **only if** they
-  want it — §5 does not require one here.
+  want it -- §5 does not require one here.
 
 ## Verification Log
 
-Implementation complete at `c978b79` (Tasks 1-6) and `c1e242e` (Task 8);
-506 tests, type-check and lint green. Tasks 7 and 9 are the owner's: the EAS
-build and the device run.
+Implementation complete at `c978b79` (Tasks 1-6) and `c1e242e` (Task 8), plus
+the device-run fix at `746ddaf`; 506 tests, type-check and lint green. Task 9's
+device run is done (below). Task 7 is deferred -- EAS is unavailable until
+2026-09-01, so nothing has been seen in a release binary.
 
 Two decisions taken during execution, both beyond what the plan specified:
 
@@ -1142,12 +1152,38 @@ last one matters beyond M6a -- suites had been steering around reanimated by
 never rendering `BottomSheet`, and from here every pressable component reaches
 it.
 
+### Device run 1 -- 2026-08-24, Expo Go at `746ddaf`
+
+No APK: see Task 7. Owner's physical Android device over adb-wifi, both themes.
+
 | Check | Build | Date | Result | Notes |
 | --- | --- | --- | --- | --- |
-| 48 | | | | |
-| 49 | | | | |
-| 50 | | | | |
-| 51 | | | | |
-| 52 | | | | |
-| 53 | | | | |
-| 54 | | | | |
+| 48 | Expo Go `746ddaf` | 2026-08-24 | owner sign-off pending | Surfaces render translucent over the wash with the hairline and top highlight both visible, so decision 8's stop-condition did not fire and `expo-blur` is not on the table. Whether the pill reads as *glass* rather than as a tinted panel, and whether the dark bloom at `.62` is too heavy in the reader, are taste calls left to the owner |
+| 49 | Expo Go `746ddaf` | 2026-08-24 | pass | Surah 2 top to end; the wash is a sibling of the scroller, not a child, so it does not repaint or shift |
+| 50 | Expo Go `746ddaf` | 2026-08-24 | pass | Wash and every glass surface flip together; no intermediate frame of the other theme |
+| 51 | Expo Go `746ddaf` | 2026-08-24 | pass | All five tabs route correctly, active tab accent-tinted, pill clears the gesture bar; re-tapping the active tab does not navigate |
+| 52 | Expo Go `746ddaf` | 2026-08-24 | pass | Last row clears the pill on the dictionary browse list |
+| 53 | -- | 2026-08-24 | not exercisable at M6a | Newsreader loads in `openCorpusDb.ts` and `typography.display` names it, but no component sets it as `fontFamily` yet. There is no heading on screen that *could* render as the serif, so the check cannot fail here. Moves to the sub-phase that consumes it |
+| 54 | -- | 2026-08-24 | not exercisable at M6a | `usePressScale` has no consumer outside its own module. Nothing on screen animates on press, so "it does not shrink" passes vacuously. Moves with 53 |
+
+**Findings, both fixed in `746ddaf` and re-verified on device:**
+
+- **Stack screens rendered their own heading under the back arrow.** Task 5 set
+  `headerTransparent: true` to keep the bloom continuous through the header
+  band, but that flag also stops the navigator insetting the content --
+  "Settings" sat on top of "Language", "Al-Baqara" on top of "The Cow". Dropping
+  the flag while keeping `headerStyle.backgroundColor: 'transparent'` gives both:
+  the native toolbar honours the transparent colour, and the bloom is an
+  `absoluteFill` sibling behind the whole navigator, so it still shows through.
+  Verified by sampling a pixel column down through the header band -- the
+  gradient is monotonic, with no seam where the toolbar ends.
+- **Tab screens rendered under the status bar.** `headerShown: false` on the tab
+  group removed the header that had been the only thing insetting them, so the
+  first row of every tab sat under the clock. The top inset now comes from
+  `sceneStyle` in `app/(tabs)/_layout.tsx` -- one place rather than five
+  screens. `GlassTabBar` keeps reading its *bottom* inset from the navigator's
+  props, so the two do not disagree.
+
+No test accompanies `746ddaf`: the change is two navigator options, and an
+assertion against react-navigation's own layout resolution passes whichever way
+the flags sit. The device screenshots are the check. Add one if it breaks twice.

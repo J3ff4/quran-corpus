@@ -11,14 +11,18 @@ Updated: 2026-08-24
 
 ## Now
 
-### 🎨 M6 GLASS REDESIGN — planned, M6a implemented, device run owed (2026-08-24)
+### 🎨 M6 GLASS REDESIGN — planned, M6a implemented + device-run 1 done (2026-08-24)
 Spec + 9 sub-phase plans: `docs/plans/phase-m6-glass-redesign.md` (+ `phase-m6a..i`).
 40 owner decisions recorded there. §5 fires on M6b, M6c, M6f, M6h.
 
-**M6a on `feat/m6a-design-system`, not merged.** Bloom backdrop, GlassSurface,
-Newsreader, press-scale hook, floating tab pill; 506 tests green. **Checks 48-54
-not run.** Check 48 is the gate on fake glass — if it reads flat, `expo-blur` is
-a §12 dependency question for the owner.
+**M6a on `feat/m6a-design-system` at `746ddaf`, not merged.** Bloom backdrop,
+GlassSurface, Newsreader, press-scale hook, floating tab pill; 506 tests green.
+**Device run 1 done 2026-08-24 via Expo Go** (no APK — EAS blocked until
+2026-09-01, so plan Task 7 is deferred): 49-52 pass, 48 needs the owner's eye,
+53-54 not exercisable until something consumes the serif and the press-scale.
+Fake glass did not read flat, so `expo-blur` is not a live question. Two
+chrome-inset defects found and fixed in `746ddaf` (screens rendering under the
+back arrow and under the status bar). PR is the owner's call.
 
 Two calls made in-flight, both in commit bodies:
 - Dark glass fill is the night page colour at 45%, NOT the mockup's white .075.
