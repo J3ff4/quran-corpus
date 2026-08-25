@@ -17,49 +17,12 @@ const mocks = vi.hoisted(() => ({
   wbwDensity: 'hybrid' as 'hybrid' | 'dense',
   loadWordSummary: vi.fn(),
   push: vi.fn(),
-  // The screen puts its title and pager in the nav header, so the pager is not
-  // in its own subtree any more. Captured here and rendered by RouteWithHeader
-  // below, which keeps every existing pager assertion querying real output
-  // rather than props.
-  headerRight: null as null | (() => React.ReactNode),
-  headerTitle: null as unknown,
-  /** Set by RouteWithHeader so a setOptions call re-renders the header. */
-  onHeader: null as null | (() => void),
-  // One stable object, not a fresh one per call: the screen's setOptions effect
-  // depends on the navigation identity, so a new object per render would re-run it
-  // on every render -- and RouteWithHeader re-renders from inside it.
-  navigation: {
-    setOptions(options: { headerTitle?: unknown; headerRight?: () => React.ReactNode }) {
-      mocks.headerTitle = options.headerTitle;
-      mocks.headerRight = options.headerRight ?? null;
-      mocks.onHeader?.();
-    },
-  },
 }));
 
 vi.mock('expo-router', () => ({
   router: { push: mocks.push },
   useLocalSearchParams: () => mocks.params,
-  useNavigation: () => mocks.navigation,
 }));
-
-/** The route plus whatever it pushed into the nav header, in one tree. */
-function RouteWithHeader() {
-  const [, bump] = React.useReducer((n: number) => n + 1, 0);
-  React.useEffect(() => {
-    mocks.onHeader = bump;
-    return () => {
-      mocks.onHeader = null;
-    };
-  }, []);
-
-  return (
-    <>
-      <WbwRoute />
-      {mocks.headerRight ? mocks.headerRight() : null}
-    </>
-  );
-}
 
 vi.mock('@quran-corpus/mobile-data', () => ({
   createExpoSqliteClient: (db: unknown) => db,
@@ -229,8 +192,6 @@ describe('word-by-word route', () => {
   beforeEach(() => {
     // Module-level, so without this a test renders the previous test's header
     // -- a pager wired to a screen that has already unmounted.
-    mocks.headerRight = null;
-    mocks.headerTitle = null;
     mocks.params = { surahId: '2' };
     mocks.wbwDensity = 'hybrid';
     mocks.getWbwScreen.mockReset();
@@ -247,7 +208,7 @@ describe('word-by-word route', () => {
   ])('refuses %s (%s) without opening the database', async (surahId) => {
     mocks.params = { surahId };
 
-    render(<RouteWithHeader />);
+    render(<WbwRoute />);
 
     expect(await screen.findByRole('alert')).toBeTruthy();
     expect(mocks.getWbwScreen).not.toHaveBeenCalled();
@@ -256,7 +217,7 @@ describe('word-by-word route', () => {
   it('asks for the range named by ?from=', async () => {
     mocks.params = { surahId: '2', from: '255' };
 
-    render(<RouteWithHeader />);
+    render(<WbwRoute />);
 
     await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenCalledWith(expect.anything(), 2, 255));
   });
@@ -266,7 +227,7 @@ describe('word-by-word route', () => {
     // validated even though the app writes its own links.
     mocks.params = { surahId: '2', from: '1e9' };
 
-    render(<RouteWithHeader />);
+    render(<WbwRoute />);
 
     await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenCalledWith(expect.anything(), 2, 1));
   });
@@ -274,7 +235,7 @@ describe('word-by-word route', () => {
   it('renders the hybrid layout by default and remembers a switch to dense', async () => {
     mocks.params = { surahId: '2' };
 
-    render(<RouteWithHeader />);
+    render(<WbwRoute />);
     await screen.findAllByTestId('wbw-cell');
 
     // One container per ayah in range, so all-queries throughout.
@@ -291,7 +252,7 @@ describe('word-by-word route', () => {
     mocks.wbwDensity = 'dense';
     mocks.params = { surahId: '2' };
 
-    render(<RouteWithHeader />);
+    render(<WbwRoute />);
     await screen.findAllByTestId('wbw-cell');
 
     expect(screen.getAllByTestId('wbw-dense-run').length).toBeGreaterThan(0);
@@ -302,7 +263,7 @@ describe('word-by-word route', () => {
   it('gives every word its gloss, not the first one', async () => {
     mocks.params = { surahId: '2' };
 
-    render(<RouteWithHeader />);
+    render(<WbwRoute />);
     await screen.findAllByTestId('wbw-cell');
 
     // The screen fetches one map for the whole surah and each cell looks its
@@ -312,22 +273,21 @@ describe('word-by-word route', () => {
     expect(screen.getAllByTestId('wbw-gloss-2')[0]!.textContent).toBe('not');
   });
 
-  it('puts the surah name and the pager in the nav header, not in rows above the grid', async () => {
-    // Stacked, the tab header, a title block and a pager row took roughly a
-    // third of the screen before the first word (owner screenshot, 2026-08-17).
-    render(<RouteWithHeader />);
+  it('draws the surah name and the pager in the screen, not through setOptions', async () => {
+    // Pushed to the nav header they reached only the reader's stack route: the
+    // morphology tab runs headerShown: false, so on that entry point the surah
+    // went unnamed and the ayah range could not be changed at all (issue #25).
+    // This suite renders the route with no navigator around it, which is what
+    // that tab amounts to -- so a regression to setOptions fails here.
+    render(<WbwRoute />);
     await screen.findAllByTestId('wbw-cell');
 
-    // headerTitle, not title: `title` also renames the bottom tab, which has
-    // to keep saying Morphology.
-    expect(mocks.headerTitle).toBe('Al-Baqarah');
-    // findBy, not getBy: the header renders on the re-render setOptions
-    // triggers, which is one commit behind the grid.
-    expect(await screen.findByTestId('wbw-next')).toBeTruthy();
+    expect(screen.getByRole('header').textContent).toBe('Al-Baqarah');
+    expect(screen.getByTestId('wbw-next')).toBeTruthy();
   });
 
   it('renders one cell per word across every page in range', async () => {
-    render(<RouteWithHeader />);
+    render(<WbwRoute />);
 
     expect(await screen.findAllByTestId('wbw-cell')).toHaveLength(3);
   });
@@ -337,13 +297,13 @@ describe('word-by-word route', () => {
     // requested range instead would label an al-Fatihah page "200-209".
     mocks.getWbwScreen.mockResolvedValue(screenData({ from: 7, to: 7 }));
 
-    render(<RouteWithHeader />);
+    render(<WbwRoute />);
 
     expect(await screen.findByText('7–7')).toBeTruthy();
   });
 
   it('reloads at the next page when the pager advances', async () => {
-    render(<RouteWithHeader />);
+    render(<WbwRoute />);
     await screen.findAllByTestId('wbw-cell');
 
     fireEvent.click(await screen.findByTestId('wbw-next'));
@@ -355,19 +315,19 @@ describe('word-by-word route', () => {
     // expo-router reuses this component for the next push to the same route,
     // so a paged-to position survives unless the params reset it -- opening
     // surah 3 after paging surah 2 to ayah 11 would land on 3:11.
-    const { rerender } = render(<RouteWithHeader />);
+    const { rerender } = render(<WbwRoute />);
     await screen.findAllByTestId('wbw-cell');
     fireEvent.click(await screen.findByTestId('wbw-next'));
     await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenLastCalledWith(expect.anything(), 2, 11));
 
     mocks.params = { surahId: '3' };
-    rerender(<RouteWithHeader />);
+    rerender(<WbwRoute />);
 
     await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenLastCalledWith(expect.anything(), 3, 1));
   });
 
   it('opens the sheet on the word that was tapped', async () => {
-    render(<RouteWithHeader />);
+    render(<WbwRoute />);
     const cells = await screen.findAllByTestId('wbw-cell');
 
     fireEvent.click(cells[2]!);
@@ -375,26 +335,29 @@ describe('word-by-word route', () => {
     expect((await screen.findByTestId('word-sheet')).textContent).toContain('الكتاب');
   });
 
-  it('takes the pager out of the header while the sheet is open', async () => {
-    // The sheet and its dimming backdrop render inside the screen; the nav
-    // header sits above them. A pager left up there stays lit and tappable
-    // over the modal, so it comes out of the tree instead.
-    render(<RouteWithHeader />);
+  it('hides the screen from TalkBack while the sheet is open', async () => {
+    // accessibilityViewIsModal is iOS-only; without this the reader can swipe
+    // straight past the sheet into the words and the pager behind it. The
+    // pager used to be unmounted instead, because it lived in the nav header
+    // and could not be wrapped -- rendered in the screen it is covered by the
+    // same wrapper as everything else.
+    render(<WbwRoute />);
     const cells = await screen.findAllByTestId('wbw-cell');
-    expect(await screen.findByTestId('wbw-next')).toBeTruthy();
+    const wrapper = () => screen.getByTestId('wbw-screen');
+    expect(wrapper().getAttribute('data-hidden-from-a11y')).toBeNull();
 
     fireEvent.click(cells[2]!);
     await screen.findByTestId('word-sheet');
 
-    // waitFor: the header re-renders one commit after the sheet's state lands.
-    await waitFor(() => expect(screen.queryByTestId('wbw-next')).toBeNull());
+    expect(wrapper().getAttribute('data-hidden-from-a11y')).toBe('true');
+    expect(screen.getByTestId('wbw-next')).toBeTruthy();
   });
 
   it('carries the tapped word\'s own ayah into the word-detail route', async () => {
     // `Word` holds ayah_id, not the ayah number the route is addressed by, so
     // the number has to come from the page the cell belongs to. Taking it from
     // the first page instead sends every deeper link to ayah 1.
-    render(<RouteWithHeader />);
+    render(<WbwRoute />);
     const cells = await screen.findAllByTestId('wbw-cell');
     fireEvent.click(cells[1]!);
     await screen.findByTestId('word-sheet');
@@ -415,7 +378,7 @@ describe('word-by-word route', () => {
       .mockImplementationOnce(() => first.promise)
       .mockImplementationOnce(() => second.promise);
 
-    render(<RouteWithHeader />);
+    render(<WbwRoute />);
     const cells = await screen.findAllByTestId('wbw-cell');
 
     fireEvent.click(cells[1]!);
