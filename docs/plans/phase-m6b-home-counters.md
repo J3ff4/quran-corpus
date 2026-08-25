@@ -938,7 +938,14 @@ git commit -m "feat(mobile): rebuild home as four glass blocks"
 - [ ] **Step 3: Act on the findings.** One pass, not a loop to green. Say
   plainly which findings are declined and why. Findings against prose are
   advisory — do not spend a round on them.
-- [ ] **Step 4: Build.**
+- [ ] **Step 4: Build.** EAS is unavailable until 2026-09-01, so this is very
+  likely Expo Go again, as M6a's run was. If so, say so in the verification log
+  rather than implying an APK, and note what a Go run cannot cover: Hermes and
+  ProGuard behaviour, and the bundled DB asset path. **Check 55 is the one that
+  suffers** — "upgrade over the M6a build without clearing app data" is a
+  release-binary property, and Expo Go does not exercise it. Either defer 55
+  until the build window opens, or run it as an approximation and mark it as
+  one; do not tick it off a Go run.
 
 ```bash
 cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --profile preview
