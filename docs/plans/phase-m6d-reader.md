@@ -455,13 +455,18 @@ git commit -m "feat(mobile): dock a glass recitation bar in the reader"
 
 ### Task 6: Build and device run
 
-- [ ] **Step 1: Build.**
+- [ ] **Step 1: Build. DEFERRED to 2026-09-01** — same free-plan EAS quota that
+  deferred M6c Task 4. The §10 gate below was run on Expo Go instead, so the
+  phase's behaviour is verified on real hardware without it; what the build
+  still buys is a release binary (Hermes in release mode, minified JS, the DB
+  through `prebuild:assert-db`, no dev-launcher overlay). Re-run on or after
+  2026-09-01 and note the result here.
 
 ```bash
 cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --profile preview
 ```
 
-- [ ] **Step 2: Run checks 65–72 and record every result below.**
+- [x] **Step 2: Run checks 65–72 and record every result below.**
 
 | # | Check | Pass condition |
 | --- | --- | --- |
@@ -476,13 +481,44 @@ cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --prof
 
 ## Verification Log
 
+Run 2026-08-25 on the owner's OnePlus 7 Pro via Expo Go (no APK — see Step 1),
+bundle `51e3840`. Every check passed; three defects were found on the first
+pass, fixed, and re-verified on the phone in both themes.
+
 | Check | Build | Date | Result | Notes |
 | --- | --- | --- | --- | --- |
-| 65 | | | | |
-| 66 | | | | |
-| 67 | | | | |
-| 68 | | | | |
-| 69 | | | | |
-| 70 | | | | |
-| 71 | | | | |
-| 72 | | | | |
+| 65 | Expo Go, 51e3840 | 2026-08-25 | PASS | Both themes. Dark: glass cards over the bloom, Arabic and translation both legible, hairline rule between them. Light: warm paper, same. |
+| 66 | Expo Go, 51e3840 | 2026-08-25 | PASS | Arabic only, no translation anywhere, medallions inline at the end of each run. **The inline marker does not disturb Android's Arabic shaping** — سَبِيلَهُۥ فِى ٱلْبَحْرِ عَجَبًا joins correctly around it, which was the open risk on `AyahText`'s new `trailing` slot. |
+| 67 | Expo Go, 51e3840 | 2026-08-25 | PASS | Force-stopped and cold-started: the reader reopened in Mushaf, the mode last used. |
+| 68 | Expo Go, 51e3840 | 2026-08-25 | PASS | The Words segment pushed `/surah/18/words`; back returned to the reader still in Mushaf, at the same scroll offset. |
+| 69 | Expo Go, 51e3840 | 2026-08-25 | PASS | Morphology tab reached the same WBW screen at the same ayah. Both doors, one screen (decision 17). |
+| 70 | Expo Go, 51e3840 | 2026-08-25 | PASS | Deep link to 16:90 landed **on** 16:90 with no flash-scroll, in mushaf mode and again in translation mode. The M5c sequence survives the re-skin. |
+| 71 | Expo Go, 51e3840 | 2026-08-25 | PASS | Bookmark toggled from a mushaf row (18:63) and from a translation card (16:47); both flipped to "Remove bookmark". Play worked from both. |
+| 72 | Expo Go, 51e3840 | 2026-08-25 | PASS after fix | Bar appears on play naming the ayah ("Pause · Ayah 90"), pauses, and stays docked on that ayah after playback stops. See defect 3. |
+
+### Defects found and fixed (`51e3840`)
+
+1. **The chip's third segment truncated** to "Word by wo…" at 390pt. "Words"
+   now, which is what mockup `1j` calls that action.
+2. **Mushaf mode had no plate.** Task 3's interface names `GlassSurface` for
+   it and the first pass shipped without one; on bare page it reads as
+   unfinished, in light mode especially. The whole list is one glass surface
+   now, and the surah opening drops its own glass there rather than stacking
+   glass on glass.
+3. **The recitation bar was see-through** — the ayah behind it read straight
+   through the fill. React Native has no backdrop-filter, so a bar floating
+   over scrolling text cannot be translucent; it has an opaque backing under
+   the glass now and sits on the gesture inset rather than clearing a tab pill
+   the reader does not have.
+
+### Observed, not defects
+
+- Switching modes keeps the scroll *offset*, not the ayah: rows differ in
+  height between the two renderers, so the reader lands a few ayahs away.
+  Nothing in M6d promises otherwise, and no check covers it.
+- Expo Go's dev-launcher FAB covers the app's own settings gear at the top
+  right, so Settings was reached by deep link (`exp://…/--/settings`). It does
+  not exist in a release build.
+- The device's system night mode was flipped to `no` and back to `yes` to test
+  the light theme; the app's own Theme setting was moved Dark → Light → Dark.
+  Both are back where they started, and `accessibility_enabled` reads 0.
