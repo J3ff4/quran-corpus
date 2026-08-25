@@ -1,12 +1,13 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   configureAudioSession,
-  expoAudioAyahAudioPlayer,
+  createExpoRecitationDriver,
   getAyahAudioUrl,
-  playAyahAudioUrl,
-  useAyahAudioController,
+  useRecitation,
+  type RecitationStatus,
 } from './ayahAudio';
+import { ayahAudioUrl } from '@quran-corpus/data/mobile';
 
 const mocks = vi.hoisted(() => ({
   createAudioPlayer: vi.fn(),
@@ -100,227 +101,23 @@ describe('getAyahAudioUrl', () => {
       getAyahAudioUrl({ baseUrl: 'https://api.example', surah: 1, ayah: 1 }, fetchMock as never),
     ).rejects.toThrow(/no url/);
   });
+});
 
-  it('passes the fetched audio URL to the selected player', async () => {
-    const handle = { stopAsync: vi.fn(), unloadAsync: vi.fn() };
-    const player = { playUrl: vi.fn().mockResolvedValue(handle) };
-    const fetchMock = audioFetch('https://api.example/002001.mp3');
-
-    await expect(
-      playAyahAudioUrl({ baseUrl: 'https://api.example', surah: 2, ayah: 1 }, player, fetchMock as never),
-    ).resolves.toBe(handle);
-    expect(player.playUrl).toHaveBeenCalledWith('https://api.example/002001.mp3', expect.any(Function));
+describe('createExpoRecitationDriver', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
   });
 
-  it('starts fetched audio URLs with the Expo Audio player', async () => {
+  it('forwards playback status and tears the player down in the Android order', () => {
     const subscription = { remove: vi.fn() };
+    let emit: ((status: Record<string, unknown>) => void) | undefined;
     const nativePlayer = {
       play: vi.fn(),
       pause: vi.fn(),
-      release: vi.fn(),
-      remove: vi.fn(),
-      addListener: vi.fn().mockReturnValue(subscription),
-    };
-    mocks.createAudioPlayer.mockReturnValue(nativePlayer);
-
-    const playback = await expoAudioAyahAudioPlayer.playUrl('https://api.example/003001.mp3', () => undefined);
-    expect(playback).toEqual({
-      stopAsync: expect.any(Function),
-      unloadAsync: expect.any(Function),
-    });
-    await playback.unloadAsync();
-
-    expect(mocks.createAudioPlayer).toHaveBeenCalledWith('https://api.example/003001.mp3');
-    expect(nativePlayer.play).toHaveBeenCalled();
-    expect(subscription.remove).toHaveBeenCalled();
-    expect(nativePlayer.remove).toHaveBeenCalled();
-    expect(nativePlayer.release).toHaveBeenCalled();
-    // Order matters on Android -- see the comment on unloadAsync. Asserting it
-    // here because getting it backwards fails only on a device, never in CI.
-    expect(nativePlayer.remove.mock.invocationCallOrder[0]).toBeLessThan(
-      nativePlayer.release.mock.invocationCallOrder[0] as number,
-    );
-  });
-
-  it('reports natural completion instead of leaving the ayah marked as playing', async () => {
-    const handle = { stopAsync: vi.fn(), unloadAsync: vi.fn() };
-    let finish: ((error: string | null) => void) | undefined;
-    const player = {
-      playUrl: vi.fn().mockImplementation((_url: string, onStopped: (error: string | null) => void) => {
-        finish = onStopped;
-        return Promise.resolve(handle);
-      }),
-    };
-    stubAudioFetch('https://api.example/002255.mp3');
-    const { result } = renderHook(() => useAyahAudioController('https://api.example', 2, player));
-
-    await act(async () => {
-      await result.current.toggleAyah(255);
-    });
-    expect(result.current.playingAyah).toBe(255);
-
-    await act(async () => {
-      finish?.(null);
-    });
-
-    expect(result.current.playingAyah).toBeNull();
-    await waitFor(() => expect(handle.unloadAsync).toHaveBeenCalled());
-  });
-
-  it('unloads playback even when stopping rejects', async () => {
-    const handle = { stopAsync: vi.fn().mockRejectedValue(new Error('stop failed')), unloadAsync: vi.fn() };
-    const player = { playUrl: vi.fn().mockResolvedValue(handle) };
-    stubAudioFetch('https://api.example/004001.mp3');
-    const { result } = renderHook(() => useAyahAudioController('https://api.example', 4, player));
-
-    await act(async () => {
-      await result.current.toggleAyah(1);
-    });
-    await act(async () => {
-      await result.current.toggleAyah(1);
-    });
-
-    expect(handle.stopAsync).toHaveBeenCalled();
-    expect(handle.unloadAsync).toHaveBeenCalled();
-    expect(result.current.playingAyah).toBeNull();
-  });
-
-  it('keeps the newest playback request active and unloads stale playback', async () => {
-    const firstHandle = { stopAsync: vi.fn(), unloadAsync: vi.fn() };
-    const secondHandle = { stopAsync: vi.fn(), unloadAsync: vi.fn() };
-    const firstPlayback = deferred<{ stopAsync: () => Promise<unknown>; unloadAsync: () => Promise<unknown> }>();
-    const secondPlayback = deferred<{ stopAsync: () => Promise<unknown>; unloadAsync: () => Promise<unknown> }>();
-    const player = {
-      playUrl: vi.fn()
-        .mockReturnValueOnce(firstPlayback.promise)
-        .mockReturnValueOnce(secondPlayback.promise),
-    };
-    stubAudioFetch('https://api.example/file.mp3');
-    const { result } = renderHook(() => useAyahAudioController('https://api.example', 2, player));
-
-    let firstToggle = Promise.resolve();
-    let secondToggle = Promise.resolve();
-    await act(async () => {
-      firstToggle = result.current.toggleAyah(1);
-    });
-    await act(async () => {
-      secondToggle = result.current.toggleAyah(2);
-    });
-    await act(async () => {
-      secondPlayback.resolve(secondHandle);
-      await secondToggle;
-    });
-    await act(async () => {
-      firstPlayback.resolve(firstHandle);
-      await firstToggle;
-    });
-
-    expect(result.current.playingAyah).toBe(2);
-    expect(firstHandle.stopAsync).toHaveBeenCalled();
-    expect(firstHandle.unloadAsync).toHaveBeenCalled();
-    expect(secondHandle.unloadAsync).not.toHaveBeenCalled();
-  });
-
-  it('stops and unloads active playback on unmount', async () => {
-    const handle = { stopAsync: vi.fn(), unloadAsync: vi.fn() };
-    const player = { playUrl: vi.fn().mockResolvedValue(handle) };
-    stubAudioFetch('https://api.example/005001.mp3');
-    const { result, unmount } = renderHook(() => useAyahAudioController('https://api.example', 5, player));
-
-    await act(async () => {
-      await result.current.toggleAyah(1);
-    });
-    unmount();
-
-    expect(handle.stopAsync).toHaveBeenCalled();
-    await waitFor(() => expect(handle.unloadAsync).toHaveBeenCalled());
-  });
-
-  it('ignores stale stop errors after a newer playback request succeeds', async () => {
-    const stopFailure = deferred<never>();
-    const firstHandle = { stopAsync: vi.fn().mockReturnValue(stopFailure.promise), unloadAsync: vi.fn() };
-    const secondHandle = { stopAsync: vi.fn(), unloadAsync: vi.fn() };
-    const player = {
-      playUrl: vi.fn()
-        .mockResolvedValueOnce(firstHandle)
-        .mockResolvedValueOnce(secondHandle),
-    };
-    stubAudioFetch('https://api.example/file.mp3');
-    const { result } = renderHook(() => useAyahAudioController('https://api.example', 2, player));
-
-    await act(async () => {
-      await result.current.toggleAyah(1);
-    });
-
-    let stopToggle = Promise.resolve();
-    await act(async () => {
-      stopToggle = result.current.toggleAyah(1);
-    });
-    await act(async () => {
-      await result.current.toggleAyah(2);
-    });
-    await act(async () => {
-      stopFailure.reject(new Error('stale stop failed'));
-      await stopToggle;
-    });
-
-    expect(result.current.playingAyah).toBe(2);
-    expect(result.current.audioError).toBeNull();
-  });
-
-  it('plays the public recitation when no endpoint is configured', async () => {
-    // The state every shipped build is in. While audioEnabled was
-    // Boolean(baseUrl) the button was disabled here and none of the tests
-    // above noticed, because all of them pass a base URL.
-    const handle = { stopAsync: vi.fn(), unloadAsync: vi.fn() };
-    const player = { playUrl: vi.fn().mockResolvedValue(handle) };
-    const { result } = renderHook(() => useAyahAudioController(undefined, 2, player));
-
-    expect(result.current.audioEnabled).toBe(true);
-    await act(async () => {
-      await result.current.toggleAyah(255);
-    });
-
-    expect(player.playUrl).toHaveBeenCalledWith(
-      'https://everyayah.com/data/Husary_64kbps/002255.mp3',
-      expect.any(Function),
-    );
-    expect(result.current.playingAyah).toBe(255);
-  });
-
-  it('reports a failed load instead of sitting on Pause with nothing playing', async () => {
-    // Offline, or an mp3 that 404s: play() still resolves and the failure
-    // arrives on the status event, so without reading it the card stays on
-    // "Pause" for ever and the user is told nothing.
-    const handle = { stopAsync: vi.fn(), unloadAsync: vi.fn() };
-    let stopped: ((error: string | null) => void) | undefined;
-    const player = {
-      playUrl: vi.fn().mockImplementation((_url: string, onStopped: (error: string | null) => void) => {
-        stopped = onStopped;
-        return Promise.resolve(handle);
-      }),
-    };
-    const { result } = renderHook(() => useAyahAudioController(undefined, 2, player));
-
-    await act(async () => {
-      await result.current.toggleAyah(255);
-    });
-    await act(async () => {
-      stopped?.('Source error: Unable to connect');
-    });
-
-    expect(result.current.playingAyah).toBeNull();
-    // A key, not the driver's English message -- the screen localizes it.
-    expect(result.current.audioError).toBe('reader.audioFailed');
-    await waitFor(() => expect(handle.unloadAsync).toHaveBeenCalled());
-  });
-
-  it('forwards a driver playback error from the Expo Audio player', async () => {
-    const subscription = { remove: vi.fn() };
-    let emit: ((status: { didJustFinish?: boolean; error?: string | null }) => void) | undefined;
-    const nativePlayer = {
-      play: vi.fn(),
-      pause: vi.fn(),
+      replace: vi.fn(),
+      seekTo: vi.fn().mockResolvedValue(undefined),
+      setActiveForLockScreen: vi.fn(),
+      clearLockScreenControls: vi.fn(),
       release: vi.fn(),
       remove: vi.fn(),
       addListener: vi.fn().mockImplementation((_event: string, listener: typeof emit) => {
@@ -329,14 +126,247 @@ describe('getAyahAudioUrl', () => {
       }),
     };
     mocks.createAudioPlayer.mockReturnValue(nativePlayer);
-    const onStopped = vi.fn();
+    const onStatus = vi.fn();
 
-    await expoAudioAyahAudioPlayer.playUrl('https://everyayah.com/data/x/001001.mp3', onStopped);
-    emit?.({ error: 'Source error', didJustFinish: false });
+    const driver = createExpoRecitationDriver('https://everyayah.com/data/Husary_64kbps/001001.mp3', onStatus);
+    emit?.({ currentTime: 3, duration: 9, didJustFinish: false, error: 'Source error' });
+    driver.destroy();
 
-    expect(onStopped).toHaveBeenCalledWith('Source error');
+    expect(onStatus).toHaveBeenCalledWith({
+      currentTime: 3,
+      duration: 9,
+      didJustFinish: false,
+      error: 'Source error',
+    });
+    expect(nativePlayer.clearLockScreenControls).toHaveBeenCalled();
+    expect(subscription.remove).toHaveBeenCalled();
+    // Order matters on Android -- see the comment on destroy(). Asserted here
+    // because getting it backwards fails only on a device, never in CI.
+    expect(nativePlayer.remove.mock.invocationCallOrder[0]).toBeLessThan(
+      nativePlayer.release.mock.invocationCallOrder[0] as number,
+    );
   });
 });
+
+describe('useRecitation', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('advances to the next ayah when continuous play is on', async () => {
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: true });
+
+    r.toggleAyah(1);
+    await player.finish();
+
+    // The point of the whole feature. A controller that only clears state on
+    // finish looks identical until you listen to it.
+    expect(player.replaced).toEqual([ayahAudioUrl(1, 2, 'husary')]);
+    expect(r.state().ayah).toBe(2);
+  });
+
+  it('stops at the end of the surah instead of wrapping', async () => {
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: true });
+
+    r.toggleAyah(7);
+    await player.finish();
+
+    expect(player.replaced).toEqual([]);
+    expect(r.state().playing).toBe(false);
+  });
+
+  it('does not advance when continuous play is off', async () => {
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: false });
+
+    r.toggleAyah(1);
+    await player.finish();
+
+    expect(player.replaced).toEqual([]);
+    expect(r.state().ayah).toBeNull();
+  });
+
+  it('preloads the next ayah while the current one plays', () => {
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: true });
+
+    r.toggleAyah(1);
+    // The only lever we have against the gap between two per-ayah mp3s.
+    expect(player.preloaded).toContain(ayahAudioUrl(1, 2, 'husary'));
+  });
+
+  it('does not preload past the end of the surah', () => {
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: true });
+
+    r.toggleAyah(7);
+
+    // ayahAudioUrl would happily build 1:8. Nothing would ever play it, and on
+    // a metered connection it is a file the user pays for twice over.
+    expect(player.preloaded).toEqual([]);
+  });
+
+  it('clamps a seek to the track', () => {
+    const player = fakePlayer({ duration: 12 });
+    const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: false });
+
+    r.toggleAyah(1);
+    r.seekTo(-5);
+    r.seekTo(999);
+
+    // The scrub bar reports a fraction of a width; a stale duration or a
+    // rotated screen can put that outside the track, and ExoPlayer's behaviour
+    // past the end is not something to find out on a user's device.
+    expect(player.seeks).toEqual([0, 12]);
+  });
+
+  it('reports a failed load through the existing error key', async () => {
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: true });
+
+    r.toggleAyah(1);
+    await player.fail('404');
+
+    expect(r.state().error).toBe('reader.audioFailed');
+    // And it must not keep marching through the surah on a dead network.
+    expect(player.replaced).toEqual([]);
+  });
+
+  it('retries a failed ayah instead of resuming a dead player', async () => {
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: false });
+
+    r.toggleAyah(1);
+    await player.fail('Source error: Unable to connect');
+    r.toggleAyah(1);
+
+    // The failed source is still loaded, so play() on it does nothing -- the
+    // second tap has to reload it or the button is dead until the reader
+    // navigates away (device check 88).
+    expect(player.replaced).toEqual([ayahAudioUrl(1, 1, 'husary')]);
+    expect(r.state().error).toBeNull();
+  });
+
+  it('pauses and resumes the same ayah on the same player', () => {
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 2, ayahCount: 286, player, continuous: false });
+
+    r.toggleAyah(255);
+    r.toggleAyah(255);
+    expect(r.state().playing).toBe(false);
+    expect(player.pauses).toBe(1);
+
+    r.toggleAyah(255);
+    // Resumed, not restarted: a second createAudioPlayer would drop the media
+    // session the lock screen is attached to.
+    expect(r.state().playing).toBe(true);
+    expect(player.created).toHaveLength(1);
+    expect(player.replaced).toEqual([]);
+  });
+
+  it('names the surah and the reciter on the lock screen', () => {
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: false });
+
+    r.toggleAyah(1);
+
+    // Device check 82: a media notification with no title is what a stub looks
+    // like from the lock screen.
+    expect(player.lockScreen).toEqual([
+      { title: 'Al-Fatihah', artist: 'Mahmoud Khalil Al-Husary (Murattal)' },
+    ]);
+  });
+
+  it('tears the player down on unmount', () => {
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: false });
+
+    r.toggleAyah(1);
+    r.unmount();
+
+    // Background playback keeps a player alive with no screen attached, so the
+    // one thing that must still stop it is leaving the reader.
+    expect(player.destroyed).toBe(1);
+  });
+});
+
+/** A RecitationDriver that records what the controller asked it to do. */
+function fakePlayer({ duration = 30 }: { duration?: number } = {}) {
+  let onStatus: ((status: RecitationStatus) => void) | null = null;
+  const recorder = {
+    created: [] as string[],
+    replaced: [] as string[],
+    preloaded: [] as string[],
+    seeks: [] as number[],
+    lockScreen: [] as { title: string; artist: string }[],
+    plays: 0,
+    pauses: 0,
+    destroyed: 0,
+    create(url: string, listener: (status: RecitationStatus) => void) {
+      recorder.created.push(url);
+      onStatus = listener;
+      return {
+        play: () => {
+          recorder.plays += 1;
+          // The duration arrives on a status event, not from play() -- the
+          // controller has to read it there or a seek has nothing to clamp
+          // against.
+          onStatus?.({ currentTime: 0, duration, didJustFinish: false, error: null });
+        },
+        pause: () => {
+          recorder.pauses += 1;
+        },
+        replace: (next: string) => recorder.replaced.push(next),
+        seekTo: (seconds: number) => recorder.seeks.push(seconds),
+        preload: (next: string) => recorder.preloaded.push(next),
+        setLockScreen: (title: string, artist: string) => recorder.lockScreen.push({ title, artist }),
+        destroy: () => {
+          recorder.destroyed += 1;
+        },
+      };
+    },
+    async finish() {
+      await act(async () => {
+        onStatus?.({ currentTime: duration, duration, didJustFinish: true, error: null });
+      });
+    },
+    async fail(error: string) {
+      await act(async () => {
+        onStatus?.({ currentTime: 0, duration: 0, didJustFinish: false, error });
+      });
+    },
+  };
+  return recorder;
+}
+
+function renderRecitation({
+  surah,
+  ayahCount,
+  player,
+  continuous,
+}: {
+  surah: number;
+  ayahCount: number;
+  player: ReturnType<typeof fakePlayer>;
+  continuous: boolean;
+}) {
+  const hook = renderHook(() =>
+    useRecitation(surah, ayahCount, 'husary', {
+      surahName: 'Al-Fatihah',
+      createDriver: player.create,
+    }),
+  );
+  if (continuous) act(() => hook.result.current.setContinuous(true));
+
+  return {
+    state: () => hook.result.current,
+    toggleAyah: (ayah: number) => act(() => hook.result.current.toggleAyah(ayah)),
+    seekTo: (seconds: number) => act(() => hook.result.current.seekTo(seconds)),
+    unmount: hook.unmount,
+  };
+}
 
 function audioFetch(url: string) {
   return vi.fn().mockResolvedValue({
@@ -348,18 +378,4 @@ function audioFetch(url: string) {
       attribution: 'Audio source',
     }),
   });
-}
-
-function stubAudioFetch(url: string) {
-  vi.stubGlobal('fetch', audioFetch(url));
-}
-
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (reason: unknown) => void;
-  const promise = new Promise<T>((settle, fail) => {
-    resolve = settle;
-    reject = fail;
-  });
-  return { promise, resolve, reject };
 }

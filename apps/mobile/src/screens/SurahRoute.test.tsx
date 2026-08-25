@@ -22,11 +22,18 @@ vi.mock('@quran-corpus/mobile-data', () => ({
 }));
 
 vi.mock('@/audio/ayahAudio', () => ({
-  useAyahAudioController: () => ({
-    audioEnabled: true,
-    audioError: null,
-    playingAyah: null,
+  useRecitation: () => ({
+    ayah: null,
+    playing: false,
+    positionSec: 0,
+    durationSec: Number.NaN,
+    error: null,
+    continuous: false,
+    setContinuous: vi.fn(),
     toggleAyah: vi.fn(),
+    seekTo: vi.fn(),
+    skipNext: vi.fn(),
+    skipPrevious: vi.fn(),
   }),
 }));
 
