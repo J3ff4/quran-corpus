@@ -44,6 +44,15 @@ export type UiStringKey =
   | 'reader.removeBookmark'
   | 'reader.play'
   | 'reader.pause'
+  | 'reader.previousAyah'
+  | 'reader.nextAyah'
+  // Names the repeat toggle. "Continuous" alone is an adjective with no noun;
+  // the control turns play-through-the-surah on and off.
+  | 'reader.continuous'
+  // Names the tappable reciter label. The name itself is a proper noun, so
+  // without this TalkBack announces only "Mahmoud Khalil Al-Husary" with
+  // nothing to say it opens a picker.
+  | 'reader.reciter'
   | 'reader.ayahLabel'
   | 'reader.chooseLanguage'
   | 'reader.bismillah'
@@ -230,6 +239,10 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.removeBookmark': 'Remove bookmark',
     'reader.play': 'Play',
     'reader.pause': 'Pause',
+    'reader.previousAyah': 'Previous ayah',
+    'reader.nextAyah': 'Next ayah',
+    'reader.continuous': 'Continuous play',
+    'reader.reciter': 'Reciter',
     'reader.ayahLabel': 'Ayah',
     'reader.chooseLanguage': 'Choose translation language',
     'reader.bismillah': 'In the name of Allah, the Entirely Merciful, the Especially Merciful',
@@ -379,6 +392,10 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.removeBookmark': 'Xatcho‘pni olib tashlash',
     'reader.play': 'Ijro etish',
     'reader.pause': 'To‘xtatish',
+    'reader.previousAyah': 'Oldingi oyat',
+    'reader.nextAyah': 'Keyingi oyat',
+    'reader.continuous': 'Ketma-ket ijro',
+    'reader.reciter': 'Qori',
     'reader.ayahLabel': 'Oyat',
     'reader.chooseLanguage': 'Tarjima tilini tanlang',
     'reader.bismillah': 'Mehribon va rahmli Alloh nomi bilan',
@@ -523,6 +540,10 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.removeBookmark': 'Удалить закладку',
     'reader.play': 'Воспроизвести',
     'reader.pause': 'Пауза',
+    'reader.previousAyah': 'Предыдущий аят',
+    'reader.nextAyah': 'Следующий аят',
+    'reader.continuous': 'Непрерывное воспроизведение',
+    'reader.reciter': 'Чтец',
     'reader.ayahLabel': 'Аят',
     'reader.chooseLanguage': 'Выберите язык перевода',
     'reader.bismillah': 'Именем Аллаха, Милостивого, Милосердного',

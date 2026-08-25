@@ -26,6 +26,11 @@ const mocks = vi.hoisted(() => ({
 
 // Not importOriginal: the real package doesn't parse under vitest (Metro-only
 // syntax), and SurahReader only ever touches these two exports.
+// The recitation bar builds a pan gesture for its scrub track. Nothing here
+// drives it -- this is only so the real package, which does not parse under
+// vitest, stays out of the graph.
+vi.mock('react-native-gesture-handler', async () => (await import('@/testing/rnHosts.js')).reactNativeGestureHandlerMock());
+
 vi.mock('@/settings/settingsStore', () => ({
   // Not a provider: the real store pulls expo-sqlite into the jsdom module
   // graph, and every other component test here mocks it the same way. The
@@ -128,7 +133,7 @@ vi.mock('react-native', async () => {
     // Forwards the ref, so the imperative scroll calls the component makes on
     // mount are observable. A plain function component silently swallows it
     // and every scroll assertion would pass against a null ref.
-    FlatList: ({ data, ListHeaderComponent, renderItem, onViewableItemsChanged, onScrollToIndexFailed, onScroll, onContentSizeChange, importantForAccessibility, initialNumToRender, ref }: {
+    FlatList: ({ data, ListHeaderComponent, renderItem, onViewableItemsChanged, onScrollToIndexFailed, onScroll, onContentSizeChange, contentContainerStyle, importantForAccessibility, initialNumToRender, ref }: {
       data: unknown[];
       ListHeaderComponent?: React.ReactNode;
       renderItem: (info: { item: unknown; index: number }) => React.ReactNode;
@@ -136,6 +141,7 @@ vi.mock('react-native', async () => {
       onScrollToIndexFailed?: (info: { index: number; averageItemLength: number }) => void;
       onScroll?: (event: { nativeEvent: { contentOffset: { y: number } } }) => void;
       onContentSizeChange?: (width: number, height: number) => void;
+      contentContainerStyle?: { paddingBottom?: number };
       importantForAccessibility?: string;
       initialNumToRender?: number;
       ref?: React.Ref<unknown>;
@@ -157,6 +163,9 @@ vi.mock('react-native', async () => {
           'data-testid': 'reader-list',
           'data-important-for-accessibility': importantForAccessibility,
           'data-initial-num-to-render': String(initialNumToRender),
+          // The docked bar floats over the list, so this is the only thing
+          // keeping the last ayah out from behind it.
+          'data-padding-bottom': String(contentContainerStyle?.paddingBottom),
         },
         ListHeaderComponent,
         data.map((item, index) => React.createElement('div', { key: index }, renderItem({ item, index }))),
@@ -202,19 +211,8 @@ describe('SurahReader', () => {
   it('uses the latest reading callback after rerender', () => {
     const firstHandler = vi.fn();
     const secondHandler = vi.fn();
-    const props = {
-      data: readerData(),
-      bookmarkedAyahs: new Set<number>(),
-      playingAyah: null,
-      audioEnabled: false,
-      uiLocale: 'en' as const,
-      onToggleBookmark: vi.fn(),
-      onToggleAudio: vi.fn(),
-      contentLanguage: 'en' as const,
-      onChangeContentLanguage: vi.fn(),
-      readerMode: 'translation' as const,
-      onChangeReaderMode: vi.fn(),
-    };
+    // The same literal baseProps builds, and it had already drifted from it.
+    const props = baseProps(readerData());
 
     const { rerender } = render(<SurahReader {...props} onReadingAyah={firstHandler} />);
     rerender(<SurahReader {...props} onReadingAyah={secondHandler} />);
@@ -705,6 +703,22 @@ describe('SurahReader', () => {
     expect(screen.getByTestId('recitation-bar').getAttribute('aria-label')).toContain(String(ayahNumber));
   });
 
+  it('reserves room under the last ayah for the docked bar', () => {
+    // The bar is two rows tall and absolutely positioned over the list, so
+    // without this the last ayah of every surah reads from behind it.
+    const data = readerData(3);
+    const { rerender } = render(<SurahReader {...baseProps(data)} audioEnabled playingAyah={null} />);
+    const withoutBar = Number(screen.getByTestId('reader-list').getAttribute('data-padding-bottom'));
+
+    rerender(
+      <SurahReader {...baseProps(data)} audioEnabled playingAyah={data.ayahs[0]!.ayah.ayah_number} />,
+    );
+
+    expect(
+      Number(screen.getByTestId('reader-list').getAttribute('data-padding-bottom')),
+    ).toBeGreaterThan(withoutBar);
+  });
+
   it('hides the docked bar from a screen reader while a sheet covers it', async () => {
     // accessibilityViewIsModal is iOS-only, so on Android a TalkBack swipe
     // walks out of the sheet onto whatever is behind it -- the same defect the
@@ -1029,6 +1043,16 @@ function baseProps(data: ReturnType<typeof readerData>) {
     bookmarkedAyahs: new Set<number>(),
     playingAyah: null,
     audioEnabled: false,
+    recitation: {
+      positionSec: 0,
+      durationSec: Number.NaN,
+      continuous: false,
+      reciterLabel: 'Mahmoud Khalil Al-Husary (Murattal)',
+      onSkipNext: vi.fn(),
+      onSkipPrevious: vi.fn(),
+      onSeek: vi.fn(),
+      onToggleContinuous: vi.fn(),
+    },
     uiLocale: 'en' as const,
     onToggleBookmark: vi.fn(),
     onToggleAudio: vi.fn(),

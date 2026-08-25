@@ -125,6 +125,49 @@ export function reactNativeTextMock() {
 }
 
 /**
+ * A `react-native-gesture-handler` stand-in, for `vi.mock('react-native-gesture-handler')`.
+ *
+ * The real package does not parse under vitest, and its `Gesture.Pan()` is a
+ * fluent builder -- `.runOnJS(true).minDistance(0).onUpdate(fn)` -- so a mock
+ * has to return something chainable from every call. Rather than enumerate the
+ * fifteen-odd builder methods (and grow the list the first time a component
+ * reaches for a sixteenth), any method returns the chain, and any `on*` one
+ * also records its handler.
+ *
+ * That recording is the point: `GestureDetector` renders nothing, so a
+ * captured handler is the only way a suite can drive a drag. Read them off
+ * `__gestureHandlers` by builder-method name, e.g. `.get('onEnd')`.
+ */
+export function reactNativeGestureHandlerMock() {
+  const handlers = new Map<string, (event: never) => void>();
+
+  function builder() {
+    const chain: unknown = new Proxy(
+      {},
+      {
+        get: (_target, method: string) => (argument: unknown) => {
+          if (method.startsWith('on') && typeof argument === 'function') {
+            handlers.set(method, argument as (event: never) => void);
+          }
+          return chain;
+        },
+      },
+    );
+    return chain;
+  }
+
+  const passthrough = ({ children }: { children?: React.ReactNode }) => children;
+
+  return {
+    GestureDetector: passthrough,
+    // The sheet mounts its own root inside its Modal -- see BottomSheet.
+    GestureHandlerRootView: passthrough,
+    Gesture: { Pan: builder, Tap: builder },
+    __gestureHandlers: handlers,
+  };
+}
+
+/**
  * The three StyleSheet members components actually reach for.
  *
  * Here rather than in one suite because the alternative is a component being

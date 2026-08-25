@@ -2,7 +2,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
-import { DEFAULT_RECITER_ID } from '@quran-corpus/data/mobile';
+import { DEFAULT_RECITER_ID, reciterById } from '@quran-corpus/data/mobile';
 import { useRecitation } from '@/audio/ayahAudio';
 import { SurahReader } from '@/components/SurahReader';
 import { getSurahReader, getWordsForAyah, type SurahReaderData } from '@/data/corpusRepository';
@@ -195,6 +195,19 @@ export default function SurahRoute() {
         bookmarkedAyahs={bookmarks}
         playingAyah={audio.playing ? audio.ayah : null}
         audioEnabled
+        recitation={{
+          positionSec: audio.positionSec,
+          durationSec: audio.durationSec,
+          continuous: audio.continuous,
+          // The English label off the reciter table, not a translated string:
+          // these are people's names. M6f task 5 swaps DEFAULT_RECITER_ID for
+          // the persisted setting, and `onOpenReciters` for the picker.
+          reciterLabel: reciterById(DEFAULT_RECITER_ID)?.label ?? '',
+          onSkipNext: audio.skipNext,
+          onSkipPrevious: audio.skipPrevious,
+          onSeek: audio.seekTo,
+          onToggleContinuous: () => audio.setContinuous(!audio.continuous),
+        }}
         uiLocale={uiLocale}
         contentLanguage={contentLanguage}
         onChangeContentLanguage={setContentLanguage}

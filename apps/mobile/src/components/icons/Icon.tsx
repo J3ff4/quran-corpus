@@ -11,7 +11,12 @@ export type IconName =
   | 'dictionary'
   | 'menu'
   | 'search'
-  | 'back';
+  | 'back'
+  | 'play'
+  | 'pause'
+  | 'skipBack'
+  | 'skipForward'
+  | 'repeat';
 
 /**
  * Path data ported verbatim from web so the two products draw one glyph set:
@@ -58,6 +63,16 @@ const PATHS: Record<IconName, string[]> = {
   // Chevron only, no shaft: mockup 1e's back affordance, and the reader draws
   // its own header now that the native toolbar is gone.
   back: ['M15 5l-7 7 7 7'],
+  // The recitation transport. Outlines, not filled shapes: every glyph above
+  // is a stroke at `fill="none"`, and a solid triangle beside them would read
+  // as a different icon set.
+  play: ['M8 5l11 7-11 7z'],
+  pause: ['M9 5v14', 'M15 5v14'],
+  skipBack: ['M18 5v14l-10-7z', 'M6 5v14'],
+  skipForward: ['M6 5v14l10-7z', 'M18 5v14'],
+  // Continuous play. A loop with two arrowheads -- the conventional repeat
+  // glyph, so it does not need a label to be understood at 20pt.
+  repeat: ['M7 7h10a3 3 0 0 1 3 3v1', 'M17 17H7a3 3 0 0 1-3-3v-1', 'M17 4l3 3-3 3', 'M7 20l-3-3 3-3'],
 };
 
 export function Icon({
