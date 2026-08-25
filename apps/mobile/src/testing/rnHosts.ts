@@ -33,7 +33,13 @@ interface HostProps {
   // pointerEvents, on every render.
   accessible?: unknown;
   contentContainerStyle?: unknown;
+  // Mapped to data-horizontal below, not dropped: a horizontal ScrollView is
+  // the whole difference between the rail layout and the wrapped one, and a
+  // test that cannot see it asserts nothing about which one rendered.
+  horizontal?: boolean;
   importantForAccessibility?: unknown;
+  onContentSizeChange?: unknown;
+  showsHorizontalScrollIndicator?: unknown;
   numberOfLines?: unknown;
   onLayout?: unknown;
   onPressIn?: unknown;
@@ -97,6 +103,7 @@ export function reactNativeTextMock() {
     AccessibilityInfo,
     AppState,
     FlatList,
+    ScrollView: host('div'),
     SectionList,
     StyleSheet,
     __layoutHandlers: layoutHandlers,
@@ -135,7 +142,10 @@ export function host(tag: string) {
     testID,
     accessible: _accessible,
     contentContainerStyle: _contentContainerStyle,
+    horizontal,
     importantForAccessibility,
+    onContentSizeChange: _onContentSizeChange,
+    showsHorizontalScrollIndicator: _showsHorizontalScrollIndicator,
     numberOfLines: _numberOfLines,
     onLayout: _onLayout,
     // usePressScale's handlers. Dropped rather than mapped: there is no DOM
@@ -169,6 +179,7 @@ export function host(tag: string) {
         // otherwise overwrite it with nothing.
         role: role ?? accessibilityRole,
         'data-testid': testID,
+        'data-horizontal': horizontal ? 'true' : undefined,
         // A data- attribute, not the camelCase prop: React warns about an
         // unknown DOM attribute. It is Android's only way to take a subtree
         // away from TalkBack behind a sheet (accessibilityViewIsModal is
