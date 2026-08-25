@@ -21,7 +21,7 @@ interface HostProps {
   accessibilityLabel?: string;
   accessibilityLiveRegion?: 'none' | 'polite' | 'assertive';
   accessibilityRole?: string;
-  accessibilityState?: { disabled?: boolean; selected?: boolean; expanded?: boolean };
+  accessibilityState?: { disabled?: boolean; selected?: boolean; checked?: boolean; expanded?: boolean };
   children?: React.ReactNode;
   onPress?: () => void;
   role?: string;
@@ -229,6 +229,10 @@ export function host(tag: string) {
         // lets a test see the state a control announces.
         'aria-disabled': accessibilityState?.disabled,
         'aria-selected': accessibilityState?.selected,
+        // `checked` as well as `selected`: RN's radio role carries selection in
+        // `checked`, and a shim that mapped only `selected` left every
+        // radiogroup in the app assertable on the wrong half of its own state.
+        'aria-checked': accessibilityState?.checked,
         'aria-expanded': accessibilityState?.expanded,
         // `role` wins: it is the cross-platform prop, and components that set
         // it (role="dialog") leave accessibilityRole undefined, which would

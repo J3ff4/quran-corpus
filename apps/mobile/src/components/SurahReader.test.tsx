@@ -95,6 +95,23 @@ vi.mock('./LanguageSheet', async () => {
   };
 });
 
+vi.mock('./ReciterSheet', async () => {
+  const React = await import('react');
+  return {
+    ReciterSheet: ({ current, onSelect, onClose }: {
+      current: string;
+      onSelect: (id: string) => void;
+      onClose: () => void;
+    }) =>
+      React.createElement(
+        'div',
+        { 'data-testid': 'reciter-sheet', 'data-current': current },
+        React.createElement('button', { 'data-testid': 'pick-sudais', onClick: () => onSelect('sudais') }),
+        React.createElement('button', { 'data-testid': 'close-reciters', onClick: onClose }),
+      ),
+  };
+});
+
 vi.mock('./WordSheet', async () => {
   const React = await import('react');
   return {
@@ -719,6 +736,39 @@ describe('SurahReader', () => {
     ).toBeGreaterThan(withoutBar);
   });
 
+  it('opens the reciter picker from the bar and reports the pick', () => {
+    // The bar renders the reciter's name, not its id, and the picker it opens
+    // hands the choice back to the screen above rather than storing it here.
+    const data = readerData(3);
+    const onChangeReciter = vi.fn();
+    const props = baseProps(data);
+    render(
+      <SurahReader
+        {...props}
+        audioEnabled
+        playingAyah={data.ayahs[0]!.ayah.ayah_number}
+        recitation={{ ...props.recitation, reciterId: 'husary', onChangeReciter }}
+      />,
+    );
+
+    expect(screen.getByTestId('recitation-reciter').textContent).toContain('Al-Husary');
+    fireEvent.click(screen.getByTestId('recitation-reciter'));
+    expect(screen.getByTestId('reciter-sheet').getAttribute('data-current')).toBe('husary');
+    // Same reason the word and language sheets do it: accessibilityViewIsModal
+    // is iOS-only, so on Android a TalkBack swipe walks out of the picker onto
+    // the ayah list and the bar underneath it.
+    expect(screen.getByTestId('reader-list').getAttribute('data-important-for-accessibility')).toBe(
+      'no-hide-descendants',
+    );
+    expect(
+      screen.getByTestId('recitation-bar').parentElement?.getAttribute('data-hidden-from-a11y'),
+    ).toBe('true');
+
+    fireEvent.click(screen.getByTestId('pick-sudais'));
+
+    expect(onChangeReciter).toHaveBeenCalledWith('sudais');
+  });
+
   it('hides the docked bar from a screen reader while a sheet covers it', async () => {
     // accessibilityViewIsModal is iOS-only, so on Android a TalkBack swipe
     // walks out of the sheet onto whatever is behind it -- the same defect the
@@ -1047,7 +1097,8 @@ function baseProps(data: ReturnType<typeof readerData>) {
       positionSec: 0,
       durationSec: Number.NaN,
       continuous: false,
-      reciterLabel: 'Mahmoud Khalil Al-Husary (Murattal)',
+      reciterId: 'husary',
+      onChangeReciter: vi.fn(),
       onSkipNext: vi.fn(),
       onSkipPrevious: vi.fn(),
       onSeek: vi.fn(),

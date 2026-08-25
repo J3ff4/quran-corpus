@@ -17,7 +17,7 @@ import {
   useSharedValue,
 } from 'react-native-reanimated';
 import { router, useNavigation } from 'expo-router';
-import { splitBasmala, type Word } from '@quran-corpus/data/mobile';
+import { reciterById, splitBasmala, type Word } from '@quran-corpus/data/mobile';
 import type { ReaderAyah, SurahReaderData, WordSummary } from '@/data/corpusRepository';
 import type { ContentLanguageCode, UiLocaleCode } from '@/i18n/languages';
 import type { ReaderMode } from '@/settings/settingsStore';
@@ -28,6 +28,7 @@ import { RecitationBar, type RecitationBarProps } from './RecitationBar';
 import { ReaderHeader } from './ReaderHeader';
 import { Bismillah } from './Bismillah';
 import { LanguageSheet } from './LanguageSheet';
+import { ReciterSheet } from './ReciterSheet';
 import { WordSheet } from './WordSheet';
 import { GlassSurface } from './GlassSurface';
 import { useReducedMotion } from '@/motion/useReducedMotion';
@@ -45,8 +46,13 @@ import { useListBottomPadding } from '@/theme/useListBottomPadding';
  *  played, which is the reader's own state (see `dockedAyah`). */
 export type ReaderRecitation = Omit<
   RecitationBarProps,
-  'ayahNumber' | 'playing' | 'onTogglePlay' | 'uiLocale'
->;
+  'ayahNumber' | 'playing' | 'onTogglePlay' | 'uiLocale' | 'reciterLabel' | 'onOpenReciters'
+> & {
+  /** A `Reciter.id`. The label and the picker are both derived from it here,
+   *  so the screen above passes one value instead of three. */
+  reciterId: string;
+  onChangeReciter: (id: string) => void;
+};
 
 interface SurahReaderProps {
   data: SurahReaderData;
@@ -197,6 +203,7 @@ export function SurahReader({
   const [positioned, setPositioned] = useState(false);
 
   const [languageOpen, setLanguageOpen] = useState(false);
+  const [reciterOpen, setReciterOpen] = useState(false);
 
   // The ayah the docked bar is parked on. Not `playingAyah`: that goes null the
   // moment the recitation ends, and a bar that vanishes with the last syllable
@@ -581,7 +588,7 @@ export function SurahReader({
         // reachable by TalkBack swipe while either sheet covers them and the
         // modal is only visually modal (CLAUDE.md §8, WCAG AA). The nav header
         // is a native toolbar outside this View and is still reachable.
-        importantForAccessibility={openWord || languageOpen ? 'no-hide-descendants' : 'auto'}
+        importantForAccessibility={openWord || languageOpen || reciterOpen ? 'no-hide-descendants' : 'auto'}
         initialNumToRender={initialIndex > 0 ? initialIndex + 1 : DEFAULT_INITIAL_RENDER}
         style={{ flex: 1, opacity: positioned ? 1 : 0 }}
         contentContainerStyle={{
@@ -614,11 +621,20 @@ export function SurahReader({
           otherwise walk from the sheet straight onto this bar. */}
       <View
         pointerEvents="box-none"
-        importantForAccessibility={openWord || languageOpen ? 'no-hide-descendants' : 'auto'}
+        importantForAccessibility={openWord || languageOpen || reciterOpen ? 'no-hide-descendants' : 'auto'}
         style={StyleSheet.absoluteFill}
       >
         <RecitationBar
           {...recitation}
+          reciterLabel={reciterById(recitation.reciterId)?.label ?? ''}
+          onOpenReciters={() => {
+            // Closes the word sheet first, for the same reason the header's
+            // actions do: this bar sits above the sheet's backdrop, so leaving
+            // it mounted holds the ayah list at no-hide-descendants behind the
+            // picker.
+            closeSheet();
+            setReciterOpen(true);
+          }}
           ayahNumber={barDocked ? dockedAyah : null}
           playing={playingAyah !== null}
           uiLocale={uiLocale}
@@ -644,6 +660,14 @@ export function SurahReader({
           router.push(`/root/${encodeURIComponent(rootBuckwalter)}`);
         }}
       />
+      {reciterOpen ? (
+        <ReciterSheet
+          current={recitation.reciterId}
+          uiLocale={uiLocale}
+          onSelect={recitation.onChangeReciter}
+          onClose={() => setReciterOpen(false)}
+        />
+      ) : null}
       {languageOpen ? (
         <LanguageSheet
           value={contentLanguage}

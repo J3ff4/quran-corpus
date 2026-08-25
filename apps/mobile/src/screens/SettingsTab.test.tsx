@@ -6,6 +6,7 @@ import SettingsTab from '../../app/settings';
 const mocks = vi.hoisted(() => ({
   setArabicScale: vi.fn(),
   setReduceMotion: vi.fn(),
+  setReciterId: vi.fn(),
   reduceMotion: false,
 }));
 
@@ -17,14 +18,30 @@ vi.mock('@/settings/settingsStore', () => ({
     analyticsEnabled: true,
     arabicScale: 'large',
     reduceMotion: mocks.reduceMotion,
+    reciterId: 'husary',
     setUiLocale: vi.fn(),
     setContentLanguage: vi.fn(),
     setTheme: vi.fn(),
     setAnalyticsEnabled: vi.fn(),
     setArabicScale: mocks.setArabicScale,
     setReduceMotion: mocks.setReduceMotion,
+    setReciterId: mocks.setReciterId,
   }),
 }));
+
+// The sheet has its own suite. Stubbed here so this one does not pull
+// BottomSheet's reanimated and gesture-handler imports into a settings test.
+vi.mock('@/components/ReciterSheet', async () => {
+  const React = await import('react');
+  return {
+    ReciterSheet: ({ current, onSelect }: { current: string; onSelect: (id: string) => void }) =>
+      React.createElement(
+        'div',
+        { 'data-testid': 'reciter-sheet', 'data-current': current },
+        React.createElement('button', { 'data-testid': 'pick-sudais', onClick: () => onSelect('sudais') }),
+      ),
+  };
+});
 
 vi.mock('expo-router', async () => {
   const React = await import('react');
@@ -33,41 +50,35 @@ vi.mock('expo-router', async () => {
   };
 });
 
-vi.mock('react-native', async () => {
-  const React = await import('react');
-  return {
-    Pressable: ({ accessibilityLabel, accessibilityRole, accessibilityState, children, onPress }: {
-      accessibilityLabel?: string;
-      accessibilityRole?: string;
-      accessibilityState?: { checked?: boolean; selected?: boolean };
-      children?: React.ReactNode;
-      onPress?: () => void;
-    }) =>
-      React.createElement(
-        'button',
-        {
-          role: accessibilityRole,
-          // Forwarded because ChoiceOption sets it precisely so the decorative
-          // bullet stays out of the accessible name.
-          'aria-label': accessibilityLabel,
-          'aria-checked': accessibilityState?.checked ?? accessibilityState?.selected,
-          onClick: onPress,
-        },
-        children,
-      ),
-    Text: ({ children }: { children?: React.ReactNode }) => React.createElement('span', null, children),
-    View: ({ children }: { children?: React.ReactNode }) => React.createElement('div', null, children),
-  };
-});
+// The shared shim, not a fourth hand-rolled copy: this one predated rnHosts
+// and had already drifted -- it dropped testID, and mapped aria-checked off
+// `selected` when `checked` was absent, which rnHosts does not need to do
+// because ChoiceOption sets both.
+vi.mock('react-native', async () => (await import('@/testing/rnHosts.js')).reactNativeTextMock());
 
 describe('SettingsTab', () => {
   beforeEach(() => {
     mocks.setArabicScale.mockClear();
     mocks.setReduceMotion.mockClear();
+    mocks.setReciterId.mockClear();
     mocks.reduceMotion = false;
   });
 
   afterEach(cleanup);
+
+  it('names the stored reciter and opens the picker on it', () => {
+    // The row shows a name, not the stored id: 'husary' on a settings screen
+    // means nothing to a reader choosing a voice.
+    render(<SettingsTab />);
+    expect(screen.queryByTestId('reciter-sheet')).toBeNull();
+    expect(screen.getByTestId('open-reciters').textContent).toContain('Al-Husary');
+
+    fireEvent.click(screen.getByTestId('open-reciters'));
+
+    expect(screen.getByTestId('reciter-sheet').getAttribute('data-current')).toBe('husary');
+    fireEvent.click(screen.getByTestId('pick-sudais'));
+    expect(mocks.setReciterId).toHaveBeenCalledWith('sudais');
+  });
 
   it('marks the stored Arabic step as the selected one and writes a new choice', () => {
     render(<SettingsTab />);

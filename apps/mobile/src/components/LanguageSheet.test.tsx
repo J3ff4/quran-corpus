@@ -56,9 +56,9 @@ describe('LanguageSheet', () => {
   it('marks the current language selected', () => {
     render(<LanguageSheet {...handlers} value="ru" />);
 
-    // aria-selected, not aria-checked: rnHosts maps accessibilityState.selected
-    // and .disabled only. LanguageSelector sets both `selected` and `checked`;
-    // only the first reaches the DOM.
+    // By aria-selected. LanguageSelector sets both `selected` and `checked`
+    // and rnHosts maps both, so either would do here; this asserts the one the
+    // radio role reads from on Android.
     const selected = screen
       .getAllByRole('radio')
       .filter((option) => option.getAttribute('aria-selected') === 'true');

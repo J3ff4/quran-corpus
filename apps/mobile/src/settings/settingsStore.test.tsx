@@ -2,6 +2,7 @@ import React from 'react';
 import { act, render, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MobileDataClient } from '@quran-corpus/mobile-data';
+import { DEFAULT_RECITER_ID } from '@quran-corpus/data/mobile';
 import { createMemoryUserClient } from '../data/userRepository.testHelpers';
 import { getSetting, saveSetting } from '../data/userRepository';
 import {
@@ -369,6 +370,48 @@ describe('AppSettingsProvider', () => {
     });
     expect(flakyClient.settingWriteAttempts()).toBe(2);
   });
+
+  it('refuses to store a reciter that is not in the shared table', async () => {
+    // The read side already falls back, but a value set at runtime is live for
+    // the rest of the session, and it is read straight into a URL builder.
+    const userClient = requireSettingsClient();
+    const refused = vi.spyOn(console, 'error').mockImplementation(() => {});
+    let settings: AppSettingsContextValue | null = null;
+    render(
+      <AppSettingsProvider>
+        <SettingsProbe onSettings={(nextSettings) => { settings = nextSettings; }} />
+      </AppSettingsProvider>,
+    );
+    await waitFor(() => expect(requireSettings(settings).reciterId).toBe(DEFAULT_RECITER_ID));
+
+    act(() => {
+      requireSettings(settings).setReciterId('alafasy');
+    });
+
+    expect(requireSettings(settings).reciterId).toBe(DEFAULT_RECITER_ID);
+    await expect(getSetting(userClient, 'reciterId')).resolves.toBeNull();
+    expect(refused).toHaveBeenCalled();
+    refused.mockRestore();
+  });
+
+  it('persists a reciter the table knows', async () => {
+    const userClient = requireSettingsClient();
+    let settings: AppSettingsContextValue | null = null;
+    render(
+      <AppSettingsProvider>
+        <SettingsProbe onSettings={(nextSettings) => { settings = nextSettings; }} />
+      </AppSettingsProvider>,
+    );
+    await waitFor(() => expect(requireSettings(settings).reciterId).toBe(DEFAULT_RECITER_ID));
+
+    act(() => {
+      requireSettings(settings).setReciterId('sudais');
+    });
+
+    await waitFor(async () => {
+      await expect(getSetting(userClient, 'reciterId')).resolves.toBe('sudais');
+    });
+  });
 });
 
 describe('loadPersistedAppSettings', () => {
@@ -393,6 +436,30 @@ describe('loadPersistedAppSettings', () => {
     const settings = await loadPersistedAppSettings(userClient);
 
     expect(settings.arabicScale).toBe('medium');
+  });
+
+  it('round-trips a chosen reciter', async () => {
+    const userClient = requireSettingsClient();
+    await saveSetting(userClient, 'reciterId', 'sudais');
+
+    const settings = await loadPersistedAppSettings(userClient);
+
+    expect(settings.reciterId).toBe('sudais');
+  });
+
+  it('falls back to the default for an unknown stored reciter', async () => {
+    // Same class as readerMode, and worse: this value becomes a path segment
+    // in the audio URL. 'alafasy' is a real everyayah folder the owner ruled
+    // out (decision 37), and 'Husary_64kbps' is a folder rather than an id --
+    // a guard that checked the wrong column would let it through.
+    for (const stored of ['alafasy', '', '../..', 'Husary_64kbps']) {
+      const userClient = createMemoryUserClient();
+      await saveSetting(userClient, 'reciterId', stored);
+
+      const settings = await loadPersistedAppSettings(userClient);
+
+      expect(settings.reciterId, `stored ${JSON.stringify(stored)}`).toBe(DEFAULT_RECITER_ID);
+    }
   });
 
   it('reads reduceMotion as on only for the exact stored "true"', async () => {

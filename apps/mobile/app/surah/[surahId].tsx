@@ -2,7 +2,6 @@ import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
-import { DEFAULT_RECITER_ID, reciterById } from '@quran-corpus/data/mobile';
 import { useRecitation } from '@/audio/ayahAudio';
 import { SurahReader } from '@/components/SurahReader';
 import { getSurahReader, getWordsForAyah, type SurahReaderData } from '@/data/corpusRepository';
@@ -28,14 +27,18 @@ export default function SurahRoute() {
   // Validated the same way as surahId -- it arrives from a URL, so it is
   // untrusted input even when we are the only ones writing the links.
   const initialAyahNumber = useMemo(() => parseAyahNumber(params.ayah), [params.ayah]);
-  const { contentLanguage, setContentLanguage, uiLocale, readerMode, setReaderMode } = useAppSettings();
+  const { contentLanguage, setContentLanguage, uiLocale, readerMode, setReaderMode, reciterId, setReciterId } =
+    useAppSettings();
   const theme = useThemeColors();
   const [reader, setReader] = useState<SurahReaderData | null>(null);
   // ayahCount is what stops continuous play at the end of the surah, so it
   // comes from the loaded surah rather than a constant; 0 until the reader
   // loads, which is also the window in which nothing can be tapped to play.
-  // The reciter is the default until M6f task 5 puts it in settings.
-  const audio = useRecitation(surahId, reader?.surah.ayah_count ?? 0, DEFAULT_RECITER_ID, {
+  //
+  // Switching reciter mid-surah changes the voice from the NEXT ayah, not this
+  // one: the hook reads reciterId when it starts an ayah, and the one already
+  // sounding keeps its source (device check 87).
+  const audio = useRecitation(surahId, reader?.surah.ayah_count ?? 0, reciterId, {
     surahName: reader?.surah.name_translit,
   });
   // Kept so the reader can query words for the ayahs scrolling into view,
@@ -199,10 +202,8 @@ export default function SurahRoute() {
           positionSec: audio.positionSec,
           durationSec: audio.durationSec,
           continuous: audio.continuous,
-          // The English label off the reciter table, not a translated string:
-          // these are people's names. M6f task 5 swaps DEFAULT_RECITER_ID for
-          // the persisted setting, and `onOpenReciters` for the picker.
-          reciterLabel: reciterById(DEFAULT_RECITER_ID)?.label ?? '',
+          reciterId,
+          onChangeReciter: setReciterId,
           onSkipNext: audio.skipNext,
           onSkipPrevious: audio.skipPrevious,
           onSeek: audio.seekTo,

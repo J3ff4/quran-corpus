@@ -53,6 +53,9 @@ export type UiStringKey =
   // without this TalkBack announces only "Mahmoud Khalil Al-Husary" with
   // nothing to say it opens a picker.
   | 'reader.reciter'
+  // Heads the reciter sheet, the way reader.chooseLanguage heads the
+  // translation one.
+  | 'reader.chooseReciter'
   | 'reader.ayahLabel'
   | 'reader.chooseLanguage'
   | 'reader.bismillah'
@@ -243,6 +246,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.nextAyah': 'Next ayah',
     'reader.continuous': 'Continuous play',
     'reader.reciter': 'Reciter',
+    'reader.chooseReciter': 'Choose reciter',
     'reader.ayahLabel': 'Ayah',
     'reader.chooseLanguage': 'Choose translation language',
     'reader.bismillah': 'In the name of Allah, the Entirely Merciful, the Especially Merciful',
@@ -396,6 +400,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.nextAyah': 'Keyingi oyat',
     'reader.continuous': 'Ketma-ket ijro',
     'reader.reciter': 'Qori',
+    'reader.chooseReciter': 'Qorini tanlang',
     'reader.ayahLabel': 'Oyat',
     'reader.chooseLanguage': 'Tarjima tilini tanlang',
     'reader.bismillah': 'Mehribon va rahmli Alloh nomi bilan',
@@ -544,6 +549,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.nextAyah': 'Следующий аят',
     'reader.continuous': 'Непрерывное воспроизведение',
     'reader.reciter': 'Чтец',
+    'reader.chooseReciter': 'Выберите чтеца',
     'reader.ayahLabel': 'Аят',
     'reader.chooseLanguage': 'Выберите язык перевода',
     'reader.bismillah': 'Именем Аллаха, Милостивого, Милосердного',
