@@ -483,7 +483,7 @@ Grow M6d's chrome into the real transport: previous / play-pause / next, a
 scrub track with elapsed and remaining, a continuous-play toggle, and the
 reciter name as a tappable label that opens the picker (Task 5).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```tsx
 it('reports a scrub as a position in seconds, not a fraction', () => {
@@ -510,18 +510,18 @@ it('labels every transport control for a screen reader', () => {
 });
 ```
 
-- [ ] **Step 2: Run them, watch them fail, implement, re-run**
+- [x] **Step 2: Run them, watch them fail, implement, re-run**
 
 `formatClock(sec)` is a pure helper — put it beside the component and test it
 directly for `0`, `65`, `125`, `3600` and a `NaN` duration (a track whose
 duration has not arrived yet must render `--:--`, not `NaN:NaN`).
 
-- [ ] **Step 3: Mutation-check (§4)**
+- [x] **Step 3: Mutation-check (§4)**
 
 Return the raw fraction from the scrub handler. Expected: the first test FAILS.
 Restore by re-editing.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/mobile/src/components/RecitationBar.tsx apps/mobile/src/components/RecitationBar.test.tsx \
