@@ -46,7 +46,7 @@ describe('getAyahAudioUrl', () => {
 
     const result = await getAyahAudioUrl({ surah: 2, ayah: 255 }, fetchMock as never);
 
-    expect(result.url).toBe('https://everyayah.com/data/Abdul_Basit_Murattal_64kbps/002255.mp3');
+    expect(result.url).toBe('https://everyayah.com/data/Husary_64kbps/002255.mp3');
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -257,7 +257,7 @@ describe('getAyahAudioUrl', () => {
     });
 
     expect(player.playUrl).toHaveBeenCalledWith(
-      'https://everyayah.com/data/Abdul_Basit_Murattal_64kbps/002255.mp3',
+      'https://everyayah.com/data/Husary_64kbps/002255.mp3',
       expect.any(Function),
     );
     expect(result.current.playingAyah).toBe(255);

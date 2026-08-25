@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { createAudioPlayer } from 'expo-audio';
-import { ayahAudioUrl, AYAH_AUDIO_ATTRIBUTION, AYAH_AUDIO_ORIGIN } from '@quran-corpus/data/mobile';
+import {
+  ayahAudioUrl,
+  reciterById,
+  AYAH_AUDIO_ORIGIN,
+  DEFAULT_RECITER_ID,
+} from '@quran-corpus/data/mobile';
 import type { UiStringKey } from '../i18n/uiStrings';
+
+const DEFAULT_RECITER_ATTRIBUTION = `${reciterById(DEFAULT_RECITER_ID)?.label ?? ''} — everyayah.com`;
 
 export interface AyahAudioParams {
   /** The thin endpoint's origin. Undefined until one is deployed. */
@@ -138,7 +145,8 @@ export async function getAyahAudioUrl(
       url: ayahAudioUrl(params.surah, params.ayah),
       duration_ms: null,
       source: AYAH_AUDIO_ORIGIN,
-      attribution: AYAH_AUDIO_ATTRIBUTION,
+      // The fallback plays the default reciter, so it credits that one.
+      attribution: DEFAULT_RECITER_ATTRIBUTION,
     };
   }
 
