@@ -14,6 +14,8 @@
 export { ayahAudioUrl, AYAH_AUDIO_ATTRIBUTION, AYAH_AUDIO_ORIGIN, AYAH_AUDIO_RECITER } from './audio.js';
 export { getAllSurahs, getSurahById } from './queries/surahs.js';
 export { getAyahsBySurah, getAyahWithWords } from './queries/ayahs.js';
+export { getJuzIndex, getPageIndex, getRevealedIndex } from './queries/browse.js';
+export type { JuzEntry, PageEntry, RevealedEntry } from './queries/browse.js';
 export {
   getWordsByAyah,
   getWordsBySurah,
