@@ -11,7 +11,7 @@ Updated: 2026-08-25
 
 ## Now
 
-### 🎨 M6 GLASS REDESIGN — M6a-M6d merged; M6e next (2026-08-25)
+### 🎨 M6 GLASS REDESIGN — M6a-M6e merged; M6f next (2026-08-25)
 Spec + 9 sub-phase plans: `docs/plans/phase-m6-glass-redesign.md` (+ `phase-m6a..i`).
 40 owner decisions recorded there. §5 fires on M6b, M6c, M6f, M6h.
 
@@ -77,7 +77,49 @@ inline medallion inside the Arabic `<Text>` run shapes correctly on device.
 **Task 6 Step 1 (EAS build) DEFERRED to 2026-09-01** — free-plan quota, same
 window as M6c's Task 4 Step 4.
 
-**M6e next**, plan `docs/plans/phase-m6e-wbw.md` (word-by-word), not started.
+**M6e MERGED to main 2026-08-25 as `9c0f86d` (PR #24).** Word-by-word re-skin:
+`WbwGrid` split into two layouts behind a persisted density chip — Hybrid (the
+ayah line above a wrapped word run) and Dense (word cells only) — plus the word
+sheet over the tab pill. Plan `docs/plans/phase-m6e-wbw.md`. **No §5 trigger**
+(no `packages/data`, no schema, no trust boundary, no user-DB write) — shipped
+on §4 self-review plus the gates: mobile 597 tests / 71 files, type-check clean
+across 5 workspace projects, lint clean.
+**Device run 2026-08-25 via Expo Go: checks 73–79 all PASS**, both themes.
+Check 79 (rail vs wrapped word run) resolved in favour of the wrapped run.
+Two defects found on hardware and fixed on the branch: the word sheet rendered
+*under* the floating tab pill (the pill is the navigator's `tabBar`, a sibling
+of the whole scene, so only a `<Modal>` layers above it — `8ebdbe2`), and the
+morphology tab drew no surah name and no verse pager (issue #25, `cfca90e`).
+**Task 5 Step 1 (EAS build) DEFERRED to 2026-09-01** — free-plan quota, same
+window as M6c's Task 4 Step 4 and M6d's Task 6 Step 1.
+
+Issue #25's root cause is worth carrying: `WbwScreen` was the only screen
+publishing its heading through `navigation.setOptions`, and tabs run
+`headerShown: false` since M6a, so on the morphology tab it published into
+nothing. **Any tab screen must draw its own heading** — `app/_layout.tsx` sets
+`title: ''` on the Stack precisely because the nav header carries the back
+affordance and nothing else.
+
+**Carry-forward from M6e** (owner ruled 2026-08-25: fold into the next phase,
+do not spin separate PRs):
+1. `DictionaryScreen` has the same dead `setOptions({ headerRight })` — a
+   `SearchHeaderButton` that has never been on screen, since that screen is
+   also a tab. Lower impact: the screen has its own root-filter field, and Home
+   and the reader both carry the real `/search` entry point. Folds into **M6g**
+   (dictionary + search), which rewrites that screen anyway. Recommendation on
+   record: delete it rather than re-render it in-screen — a magnifier beside a
+   filter field that opens a *different* search is the confusing option.
+2. Multi-word phrase glosses repeat per word (22:77 words 1–3 each read "O you
+   who believe!"). **Not a render bug** — `word_glosses` stores the phrase gloss
+   on every word of the phrase, verified against `apps/web/quran.db`; web
+   renders it identically. Fixing it means either an upstream import ruling
+   (which word owns a phrase gloss — that would be `packages/data`, so §5 would
+   fire) or a display heuristic collapsing identical adjacent glosses. Owner
+   ruling needed before either.
+
+**M6f next**, plan `docs/plans/phase-m6f-audio.md` (audio: scrub bar,
+continuous play, lock-screen controls, reciter picker). **§5 fires** — reciters
+become a validated table in `packages/data`.
 
 Two calls made in-flight, both in commit bodies:
 - Dark glass fill is the night page colour at 45%, NOT the mockup's white .075.
