@@ -488,9 +488,15 @@ git commit -m "feat(mobile): browse by surah, juz, page or revelation order"
   5. **SectionList mock keyed sections by title** (`rnHosts.ts`). Two sections
      may legitimately share one, and the mock swallowed that as a duplicate-key
      warning. Keyed by index.
-- [ ] **Step 4: Build.** Blocked: the free-plan EAS Android build quota is
-  exhausted until 2026-09-01. Task 5 ran on Expo Go instead, which is the loop
-  until that window opens.
+- [ ] **Step 4: Build. DEFERRED to 2026-09-01** — the free-plan EAS Android
+  build quota is exhausted until then. This is the only unfinished step in the
+  phase; Tasks 1, 2, 3, 5 and Task 4 Steps 1–3 are all done, and the device
+  gate (§10, checks 61–64) passed on Expo Go, so the phase's behaviour is
+  verified on real hardware without it. What the build still buys is a release
+  binary rather than a dev bundle: Hermes in release mode, minified JS, the
+  bundled DB going through `prebuild:assert-db`, and no Expo Go dev-launcher
+  overlay. Re-run the command below on or after 2026-09-01 and note the result
+  here; nothing else in M6c waits on it.
 
 ```bash
 cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --profile preview
