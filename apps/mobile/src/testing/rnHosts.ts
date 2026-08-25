@@ -177,3 +177,15 @@ export function host(tag: string) {
     );
   };
 }
+
+/** Inert AppState for suites that mock react-native wholesale.
+ *
+ *  useUserDbOnFocus subscribes to it on every focus, so every screen that
+ *  reads the user DB now reaches it -- without this each of those suites fails
+ *  on `AppState is undefined` rather than on anything naming the screen. A
+ *  suite that wants to *drive* a resume declares its own controllable stub;
+ *  this one only has to exist.
+ */
+export const AppState = {
+  addEventListener: () => ({ remove: () => {} }),
+};

@@ -62,7 +62,7 @@ vi.mock('expo-router', async () => {
 });
 
 vi.mock('react-native', async () => {
-  const { host, StyleSheet } = await import('@/testing/rnHosts.js');
+  const { AppState, host, StyleSheet } = await import('@/testing/rnHosts.js');
   const React = await import('react');
   return {
     // usePressScale -> useReducedMotion reads the system setting; every card
@@ -71,6 +71,7 @@ vi.mock('react-native', async () => {
       isReduceMotionEnabled: async () => false,
       addEventListener: () => ({ remove: () => {} }),
     },
+    AppState,
     ActivityIndicator: () => React.createElement('span', null, 'loading'),
     Pressable: host('button'),
     ScrollView: host('div'),

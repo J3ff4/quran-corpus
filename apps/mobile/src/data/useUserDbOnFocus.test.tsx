@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   openUserDb: null as (() => Promise<unknown>) | null,
   focusCallbacks: [] as Array<() => void | (() => void)>,
   blur: null as (() => void) | null,
+  appStateListeners: [] as Array<(state: string) => void>,
 }));
 
 vi.mock('@quran-corpus/mobile-data', () => ({
@@ -16,6 +17,22 @@ vi.mock('@quran-corpus/mobile-data', () => ({
 
 vi.mock('./userDb', () => ({
   openUserDb: async () => (mocks.openUserDb ? mocks.openUserDb() : {}),
+}));
+
+// Only AppState is reached from this module, and the real one needs a native
+// bridge jsdom has no counterpart for. Listeners are kept so a test can drive
+// a resume, and the remove() is observable so the unsubscribe can be asserted.
+vi.mock('react-native', () => ({
+  AppState: {
+    addEventListener: (_event: string, listener: (state: string) => void) => {
+      mocks.appStateListeners.push(listener);
+      return {
+        remove: () => {
+          mocks.appStateListeners = mocks.appStateListeners.filter((entry) => entry !== listener);
+        },
+      };
+    },
+  },
 }));
 
 // The real useFocusEffect runs the callback on focus and its returned teardown
@@ -51,6 +68,7 @@ describe('useUserDbOnFocus', () => {
     mocks.openUserDb = null;
     mocks.focusCallbacks = [];
     mocks.blur = null;
+    mocks.appStateListeners = [];
   });
 
   afterEach(cleanup);
@@ -76,6 +94,79 @@ describe('useUserDbOnFocus', () => {
     // The reader writes as you scroll, so a tab that only read on mount would
     // show whatever was true the last time it mounted.
     await waitFor(() => expect(screen.getByText('read-2')).toBeTruthy());
+  });
+
+  it('reloads when the app is resumed on a screen that never lost focus', async () => {
+    let reads = 0;
+    render(<Probe load={async () => `read-${++reads}`} />);
+
+    await screen.findByText('read-1');
+
+    await act(async () => {
+      for (const listener of mocks.appStateListeners) listener('active');
+    });
+
+    // Focus does not fire again for the tab you were already on, and Home is
+    // the launch screen. Without this it shows the counters it read on the way
+    // in -- across a day boundary, yesterday's streak.
+    await waitFor(() => expect(screen.getByText('read-2')).toBeTruthy());
+  });
+
+  it('ignores a resume that is not a return to the foreground', async () => {
+    let reads = 0;
+    render(<Probe load={async () => `read-${++reads}`} />);
+
+    await screen.findByText('read-1');
+
+    await act(async () => {
+      for (const listener of mocks.appStateListeners) listener('background');
+    });
+
+    // 'change' fires on the way out too. Re-reading there costs a DB open per
+    // blurred screen and lands on a screen nobody is looking at.
+    expect(screen.getByText('read-1')).toBeTruthy();
+  });
+
+  it('stops listening for resumes once the screen blurs', async () => {
+    render(<Probe load={async () => 'first'} />);
+    await screen.findByText('first');
+
+    // Asserted before as well as after: without this the test also passes when
+    // the hook never subscribes at all.
+    expect(mocks.appStateListeners).toHaveLength(1);
+
+    act(() => {
+      mocks.blur?.();
+    });
+
+    // Left subscribed, every screen ever focused re-reads the user DB on every
+    // resume, and each one setStates into a blurred tree.
+    expect(mocks.appStateListeners).toHaveLength(0);
+  });
+
+  it('keeps the newest read when a resume overtakes the focus read', async () => {
+    const first = deferred<string>();
+    const second = deferred<string>();
+    const loads = [() => first.promise, () => second.promise];
+    render(<Probe load={() => (loads.shift() ?? (() => second.promise))()} />);
+
+    await screen.findByText('loading');
+    act(() => {
+      for (const listener of mocks.appStateListeners) listener('active');
+    });
+
+    // The resume's read settles first, then the focus read that started
+    // earlier. Order of arrival is not order of issue, and the older one must
+    // not win: that would paint pre-resume numbers and leave them there.
+    await act(async () => {
+      second.resolve('resume');
+    });
+    await act(async () => {
+      first.resolve('stale');
+    });
+
+    expect(screen.getByText('resume')).toBeTruthy();
+    expect(screen.queryByText('stale')).toBeNull();
   });
 
   it('shows the localized fallback rather than the driver message', async () => {
