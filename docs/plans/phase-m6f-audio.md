@@ -594,9 +594,9 @@ git commit -m "feat(mobile): let the reader choose a reciter"
 - [x] **Step 1: Self-review**, with the OWASP question front and centre: can any
   value that is not in `RECITERS` reach a URL path? Trace the persisted setting
   through to `ayahAudioUrl`.
-- [ ] **Step 2: Stop and ask the owner to run `/code-review`** — `packages/data`
+- [x] **Step 2: Stop and ask the owner to run `/code-review`** — `packages/data`
   plus a trust boundary (§5). Plain `/code-review`; never `ultra` unprompted.
-- [ ] **Step 3: Act on the findings.** One pass.
+- [x] **Step 3: Act on the findings.** One pass. 5 findings: 4 fixed (`de2b41d`, `37f9023`), 1 (dead `api/audio.ts`) left as an open owner question.
 - [ ] **Step 4: Build.** A prebuild is required this time — the manifest changed.
 
 ```bash
