@@ -45,6 +45,13 @@ export function GlassSurface({ children, radius = 'card', style, testID }: Glass
         style,
       ]}
     >
+      {children}
+      {/* After the children, not before them. The recitation bar puts an opaque
+          backing over the translucent fill (RN has no backdrop-filter), and as
+          the first child that backing painted straight over this rim -- the one
+          docked surface in the app lost the top edge every other one has. A 1px
+          inset line is what the children are lit BY; nothing renders content
+          under it. */}
       <View
         testID={testID ? `${testID}-highlight` : undefined}
         pointerEvents="none"
@@ -57,7 +64,6 @@ export function GlassSurface({ children, radius = 'card', style, testID }: Glass
           backgroundColor: skin.highlight,
         }}
       />
-      {children}
     </View>
   );
 }
