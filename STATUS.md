@@ -7,11 +7,11 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-08-25
+Updated: 2026-08-26
 
 ## Now
 
-### 🎨 M6 GLASS REDESIGN — M6a-M6e merged; M6f next (2026-08-25)
+### 🎨 M6 GLASS REDESIGN — M6a-M6f merged; M6g next (2026-08-26)
 Spec + 9 sub-phase plans: `docs/plans/phase-m6-glass-redesign.md` (+ `phase-m6a..i`).
 40 owner decisions recorded there. §5 fires on M6b, M6c, M6f, M6h.
 
@@ -117,9 +117,66 @@ do not spin separate PRs):
    fire) or a display heuristic collapsing identical adjacent glosses. Owner
    ruling needed before either.
 
-**M6f next**, plan `docs/plans/phase-m6f-audio.md` (audio: scrub bar,
-continuous play, lock-screen controls, reciter picker). **§5 fires** — reciters
-become a validated table in `packages/data`.
+**M6f MERGED to main 2026-08-26 as `d4d695d` (PR #26); the device run and its
+two fixes as `865cdf4` (PR #27).** Plan `docs/plans/phase-m6f-audio.md`.
+Recitation audio: `useRecitation` over an injectable `expo-audio` driver, the
+docked `RecitationBar` from mockup 1e (transport, scrub track with
+elapsed/remaining, continuous toggle, reciter name), one-ahead preload, and a
+`ReciterSheet` reachable from both the reader and Settings. The 10-reciter allowlist and
+`ayahAudioUrl` live in `packages/data/src/audio.ts`; the URL is validated
+coordinate by coordinate rather than interpolated, because it goes straight to
+a media player. **§5 fired** and `/code-review` ran **one pass**: five findings,
+four fixed, one archived on the owner's ruling (the unreachable endpoint path
+deleted — git history is the archive:
+`git show a47c418:apps/mobile/src/audio/ayahAudio.ts`).
+Gates at merge: lint clean, type-check 6/6, mobile **634** tests / 72 files,
+`packages/data` 407, `apps/web` 479, `mobile-data` 12.
+
+**Device run 2026-08-26 via Expo Go — checks 79–88, 8 of 10 PASS.** Driven over
+`adb` on the owner's OnePlus 7 Pro (GM1917, Android 12), with playback measured
+against `dumpsys audio` rather than read off the UI. Full table in the plan's
+Verification Log. 336 ms start latency (79); seam gaps 500–622 ms against a 1 s
+ceiling (84); the reciter change proved by *measured ayah durations*, not the
+label — Husary 4.92 s vs Sudais 2.73 s on al-Fatiha 1 (87); offline failure
+surfacing `Unable to play audio` with no hung spinner (88).
+
+**Two defects found on hardware, both fixed on `docs/m6f-verification`:**
+1. **Check 86 FAILED its first run.** An OS-initiated pause (another app taking
+   audio focus) left the bar holding its **pause** icon over a clock frozen at
+   0:03 and silence, needing two taps to recover. Cause: the driver forwarded
+   only `currentTime`/`duration`/`didJustFinish`/`error`, so `status.playing`
+   never reached `handleStatus`. Fixed in `8c625b1` by forwarding `playing` and
+   `isBuffering` behind three guards — `isBuffering`, because a stall reports
+   `playing: false` too; a `soundedRef`, because a source still loading reports
+   `playing: false` identically and mirroring that would flip the button before
+   the first note of every ayah; and resetting `soundedRef` on **resume** as
+   well as on a new ayah, or the first tick after a resume bounces the button
+   straight back. Four new tests, each mutation-checked. Re-run: PASS, one tap
+   resumes mid-ayah and continuous play carries on through 4–7 unchanged.
+2. **The repeat/continuous glyph drew two arrows passing each other**, not a
+   loop: each rail ended in a one-unit stub under a detached arrowhead. Redrawn
+   as full-width rails that turn back on themselves (`6ff9edb`).
+
+**Checks 82 (controls half) and 83 are BLOCKED on Expo Go, not on our code.**
+Expo Go's own APK manifest carries none of our config-plugin output, so the
+media service never binds — `Failed to start the expo-audio playback service`
+on every play. Background *audio* works regardless: verified surviving both
+backgrounding and a real screen lock (the lock confirmed by the owner on the
+device). `app.json` sets `enableBackgroundPlayback: true` and the prebuild
+manifest carries `FOREGROUND_SERVICE_MEDIA_PLAYBACK`, `AudioControlsService`
+and `MediaSessionService`, so the controls half needs only the EAS build.
+Check 83's `POST_NOTIFICATIONS` half additionally needs Android 13+ hardware —
+the owner's device is SDK 31.
+**Task 6 Step 4 (EAS build) DEFERRED to 2026-09-01** — free-plan quota. That
+same build closes the identical last step on M6c, M6d and M6e; all four land
+together.
+
+**M6g next**, plan `docs/plans/phase-m6g-dictionary-search.md` (dictionary +
+search re-skin). Task 1 is four mockup HTML files under `docs/design/m6/`
+(lemma-entry, frequency, dictionary-browse, concordance) — UI only, no §5
+trigger — and its Step 3 gates Task 2 on the owner having seen them. M6e
+carry-forward item 1 (`DictionaryScreen`'s dead `setOptions({ headerRight })`)
+folds in here.
 
 Two calls made in-flight, both in commit bodies:
 - Dark glass fill is the night page colour at 45%, NOT the mockup's white .075.
