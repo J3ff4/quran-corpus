@@ -34,6 +34,11 @@ export interface RecitationStatus {
   currentTime: number;
   duration: number;
   didJustFinish: boolean;
+  /** What the player is actually doing, which a pause we did not ask for is
+   *  the only way to learn about. */
+  playing: boolean;
+  /** Told apart from a pause: a stall reports `playing: false` too. */
+  isBuffering: boolean;
   error: string | null;
 }
 
@@ -83,6 +88,8 @@ export const createExpoRecitationDriver: CreateRecitationDriver = (url, onStatus
       currentTime: status.currentTime,
       duration: status.duration,
       didJustFinish: status.didJustFinish,
+      playing: status.playing,
+      isBuffering: status.isBuffering,
       error: status.error,
     });
   });
@@ -195,6 +202,11 @@ export function useRecitation(
   const loadedUrlRef = useRef<string | null>(null);
   // The ayah played to its end. ayahRef stays on it -- see handleStatus.
   const finishedRef = useRef(false);
+  // Whether this ayah has been heard yet. An unplayed source reports
+  // `playing: false` exactly like a paused one, so nothing may read a false
+  // there as a pause until the player has been observed sounding at least
+  // once -- see handleStatus.
+  const soundedRef = useRef(false);
 
   function startAyah(ayah: number) {
     if (surah === null) return;
@@ -225,6 +237,7 @@ export function useRecitation(
     loadedReciterRef.current = reciterId;
     loadedUrlRef.current = url;
     finishedRef.current = false;
+    soundedRef.current = false;
     durationRef.current = Number.NaN;
     setState({ ayah, playing: true, positionSec: 0, durationSec: Number.NaN, error: null });
 
@@ -281,6 +294,28 @@ export function useRecitation(
       return;
     }
 
+    if (status.playing) soundedRef.current = true;
+
+    // A pause nobody asked for: an incoming call, or another app taking audio
+    // focus. It never goes through toggleAyah, so without this the bar keeps
+    // its Pause icon over a frozen clock and silence -- device check 86, which
+    // the note in toggleAyah nominated as the decider, and which failed on the
+    // owner's phone on 2026-08-26.
+    //
+    // Three things keep it off our own transitions. `sounded` waits for the
+    // player to have been heard, because a source still loading reports
+    // `playing: false` in exactly the same way and mirroring that would flip
+    // the button before the first note of every ayah. `isBuffering` excludes a
+    // mid-ayah stall, which is what the old comment was protecting against.
+    // And returning `current` unchanged when the flag already agrees keeps the
+    // status tick from re-rendering the bar four times a second.
+    if (soundedRef.current && !status.playing && !status.isBuffering) {
+      setState((current) =>
+        current.playing ? { ...current, playing: false, positionSec: status.currentTime } : current,
+      );
+      return;
+    }
+
     setState((current) => ({
       ...current,
       positionSec: status.currentTime,
@@ -311,13 +346,20 @@ export function useRecitation(
     ) {
       // ponytail: our own flag, not status.playing. ExoPlayer reports `playing:
       // false` while it buffers, and mirroring that would flicker the button on
-      // every stall. Device check 86 (an incoming call mid-recitation) is what
-      // decides whether the OS pausing us needs to show here too.
+      // every stall. Check 86 has since answered the other half -- an OS pause
+      // does have to show -- and handleStatus does that without giving the
+      // stall back, so this stays reading our flag.
       if (state.playing) {
         driver.pause();
         setState((current) => ({ ...current, playing: false }));
       } else {
         driver.play();
+        // Reset with the play, not only with a new ayah: `sounded` means heard
+        // since we last asked for sound. Left standing from before the pause,
+        // the first status tick after this -- which can still report
+        // `playing: false` while the player acts on it -- would read as an OS
+        // pause and bounce the button straight back.
+        soundedRef.current = false;
         setState((current) => ({ ...current, playing: true, error: null }));
       }
       return;

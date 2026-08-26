@@ -629,13 +629,16 @@ Record every result below.
 
 | Check | Build | Date | Result | Notes |
 | --- | --- | --- | --- | --- |
-| 79 | | | | |
-| 80 | | | | |
-| 81 | | | | |
-| 82 | | | | |
-| 83 | | | | |
-| 84 | | | | |
-| 85 | | | | |
-| 86 | | | | |
-| 87 | | | | |
-| 88 | | | | |
+| 79 | Expo Go | 2026-08-26 | PASS | Audio started 336 ms after the tap (`dumpsys audio` sampled at ~100 ms on device). Position advanced 0:08 -> 0:11 while sounding. |
+| 80 | Expo Go | 2026-08-26 | PASS | A drag along the track moved playback 0:08 -> 0:11 on a 14 s ayah; elapsed and remaining summed to the duration before and after. |
+| 81 | Expo Go | 2026-08-26 | PASS | Seven playback spans, then silence held for the remaining 64 s of a 115 s sample. No wrap, no restart. |
+| 82 | Expo Go | 2026-08-26 | PASS (audio) / BLOCKED (controls) | Audio survived both backgrounding and a real screen lock -- the second confirmed by the owner on the device. The lock-screen **controls** could not be tested at all: Expo Go's own manifest has none of our plugin's output, so the service never binds (`Failed to start the expo-audio playback service` on every play). `app.json` sets `enableBackgroundPlayback: true` and the prebuild manifest carries `FOREGROUND_SERVICE_MEDIA_PLAYBACK`, `AudioControlsService` and `MediaSessionService`, so this is Expo Go's ceiling, not ours. The controls half needs the EAS build. |
+| 83 | — | 2026-08-26 | BLOCKED | Same service-binding failure. Note the device is Android 12 (SDK 31), so `POST_NOTIFICATIONS` is not exercised here -- the Android 13+ half of this check needs newer hardware or an emulator. |
+| 84 | Expo Go | 2026-08-26 | PASS | Six seams across al-Fatiha: 622, 610, 532, 525, 537, 514 ms (mean 557 ms). Six more on a second run with a different reciter: 500-607 ms. Comfortably inside the 1 s ceiling, no stalls -- the one-ahead preload is doing its job. |
+| 85 | Expo Go | 2026-08-26 | PASS | The phone was in silent mode (`settings get global mode_ringer` = 0) for the whole session and recitation played throughout. |
+| 86 | Expo Go | 2026-08-26 | PASS (after fix `8c625b1`) | First run FAILED its second clause: focus was surrendered correctly, but the bar kept the **pause** icon over a clock frozen at 0:03 / -0:01 and silence, needing two taps to recover. Cause: the driver forwarded only `error` and `didJustFinish`, so an OS-initiated pause never reached `handleStatus`. Re-run against the fix: Brave taking focus stops us, the bar then reads `Ayah 3 · Play` with the position kept, and **one** tap resumes mid-ayah (1.67 s remainder) with continuous play carrying on through 4-7 at unchanged 500-620 ms seams. |
+| 87 | Expo Go | 2026-08-26 | PASS | Husary -> Sudais from the bar's picker. Every al-Fatiha ayah then ran materially shorter (ayah 1: 2.73 s vs 4.92 s, ayah 5: 4.65 s vs 6.59 s), so the source changed rather than only the label. The choice survived a force-stop and relaunch. |
+| 88 | Expo Go | 2026-08-26 | PASS | Run on-device inside an airplane-mode window, on a surah never played (3:1) so nothing could answer from the preload cache. Play produced `Unable to play audio` in red, the bar fell back to its Play icon, and `[audio] playback failed {"surah":3,"ayah":1...}` was logged. No spinner left hanging, no crash. |
+
+Checks 79-81, 84-87 were driven over `adb` on the owner's OnePlus 7 Pro (GM1917, Android 12),
+with playback confirmed against `dumpsys audio` rather than the UI alone.

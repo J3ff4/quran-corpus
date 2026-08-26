@@ -67,13 +67,16 @@ describe('createExpoRecitationDriver', () => {
     const onStatus = vi.fn();
 
     const driver = createExpoRecitationDriver('https://everyayah.com/data/Husary_64kbps/001001.mp3', onStatus);
-    emit?.({ currentTime: 3, duration: 9, didJustFinish: false, error: 'Source error' });
+    emit?.({ currentTime: 3, duration: 9, didJustFinish: false, playing: false, isBuffering: false, error: 'Source error' });
     driver.destroy();
 
     expect(onStatus).toHaveBeenCalledWith({
       currentTime: 3,
       duration: 9,
       didJustFinish: false,
+      // Forwarded, not dropped: an OS pause is only ever visible here.
+      playing: false,
+      isBuffering: false,
       error: 'Source error',
     });
     expect(nativePlayer.clearLockScreenControls).toHaveBeenCalled();
@@ -319,6 +322,68 @@ describe('useRecitation', () => {
     ]);
   });
 
+  it('stops claiming to play when something else takes audio focus', async () => {
+    // Device check 86, 2026-08-26: a call or another app pausing us never goes
+    // through toggleAyah, and the bar was left showing Pause over a frozen
+    // clock and silence.
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: false });
+
+    r.toggleAyah(1);
+    expect(r.state().playing).toBe(true);
+
+    await player.tick({ playing: false, isBuffering: false, currentTime: 3 });
+
+    expect(r.state().playing).toBe(false);
+    // Parked on the ayah, not cleared: one tap has to resume where it stopped.
+    expect(r.state().ayah).toBe(1);
+    expect(r.state().positionSec).toBe(3);
+  });
+
+  it('rides out a buffering stall without touching the button', async () => {
+    // The other half of the same signal. A stall reports `playing: false` too,
+    // and flipping the button on every one of those was the reason this event
+    // went unread in the first place.
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: false });
+
+    r.toggleAyah(1);
+    await player.tick({ playing: false, isBuffering: true });
+
+    expect(r.state().playing).toBe(true);
+  });
+
+  it('ignores a not-playing tick from a source that has not sounded yet', async () => {
+    // A source still loading is indistinguishable from a paused one on this
+    // event, so a status arriving before the first note must not read as an
+    // interruption -- otherwise every ayah starts by flipping itself to Play.
+    const player = fakePlayer({ announcePlaying: false });
+    const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: false });
+
+    r.toggleAyah(1);
+    await player.tick({ playing: false, isBuffering: false });
+
+    expect(r.state().playing).toBe(true);
+  });
+
+  it('does not bounce back to paused on the tick after a resume', async () => {
+    // Resuming an interrupted ayah re-arms the same ambiguity: the player can
+    // still report `playing: false` on the tick that play() has not reached
+    // yet, and by then it has already been heard once.
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: false });
+
+    r.toggleAyah(1);
+    await player.tick({ playing: false, isBuffering: false });
+    expect(r.state().playing).toBe(false);
+
+    r.toggleAyah(1);
+    await player.tick({ playing: false, isBuffering: false });
+
+    expect(r.state().playing).toBe(true);
+    expect(player.plays).toBe(2);
+  });
+
   it('tears the player down on unmount', () => {
     const player = fakePlayer();
     const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: false });
@@ -333,7 +398,10 @@ describe('useRecitation', () => {
 });
 
 /** A RecitationDriver that records what the controller asked it to do. */
-function fakePlayer({ duration = 30 }: { duration?: number } = {}) {
+function fakePlayer({
+  duration = 30,
+  announcePlaying = true,
+}: { duration?: number; announcePlaying?: boolean } = {}) {
   let onStatus: ((status: RecitationStatus) => void) | null = null;
   const recorder = {
     created: [] as string[],
@@ -354,7 +422,17 @@ function fakePlayer({ duration = 30 }: { duration?: number } = {}) {
           // The duration arrives on a status event, not from play() -- the
           // controller has to read it there or a seek has nothing to clamp
           // against.
-          onStatus?.({ currentTime: 0, duration, didJustFinish: false, error: null });
+          onStatus?.({
+            currentTime: 0,
+            duration,
+            didJustFinish: false,
+            // A real player reports itself playing on the tick after play().
+            // `announcePlaying: false` models the one before that, where the
+            // source is still loading and reports exactly what a pause does.
+            playing: announcePlaying,
+            isBuffering: false,
+            error: null,
+          });
         },
         pause: () => {
           recorder.pauses += 1;
@@ -371,12 +449,40 @@ function fakePlayer({ duration = 30 }: { duration?: number } = {}) {
     },
     async finish() {
       await act(async () => {
-        onStatus?.({ currentTime: duration, duration, didJustFinish: true, error: null });
+        onStatus?.({
+          currentTime: duration,
+          duration,
+          didJustFinish: true,
+          playing: false,
+          isBuffering: false,
+          error: null,
+        });
+      });
+    },
+    /** One raw status event, defaulting to an ordinary playing tick. */
+    async tick(status: Partial<RecitationStatus> = {}) {
+      await act(async () => {
+        onStatus?.({
+          currentTime: 1,
+          duration,
+          didJustFinish: false,
+          playing: true,
+          isBuffering: false,
+          error: null,
+          ...status,
+        });
       });
     },
     async fail(error: string) {
       await act(async () => {
-        onStatus?.({ currentTime: 0, duration: 0, didJustFinish: false, error });
+        onStatus?.({
+          currentTime: 0,
+          duration: 0,
+          didJustFinish: false,
+          playing: false,
+          isBuffering: false,
+          error,
+        });
       });
     },
   };

@@ -70,9 +70,11 @@ const PATHS: Record<IconName, string[]> = {
   pause: ['M9 5v14', 'M15 5v14'],
   skipBack: ['M18 5v14l-10-7z', 'M6 5v14'],
   skipForward: ['M6 5v14l10-7z', 'M18 5v14'],
-  // Continuous play. A loop with two arrowheads -- the conventional repeat
-  // glyph, so it does not need a label to be understood at 20pt.
-  repeat: ['M7 7h10a3 3 0 0 1 3 3v1', 'M17 17H7a3 3 0 0 1-3-3v-1', 'M17 4l3 3-3 3', 'M7 20l-3-3 3-3'],
+  // Continuous play. The two rails have to run the full width and turn back on
+  // themselves for this to read as a loop; the first attempt ended each rail in
+  // a one-unit stub under a detached arrowhead, which drew two arrows passing
+  // each other rather than a cycle (device, 2026-08-26).
+  repeat: ['M17 2l4 4-4 4', 'M3 12v-2a4 4 0 0 1 4-4h14', 'M7 22l-4-4 4-4', 'M21 12v2a4 4 0 0 1-4 4H3'],
 };
 
 export function Icon({
