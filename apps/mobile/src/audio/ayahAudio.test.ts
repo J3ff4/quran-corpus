@@ -12,11 +12,17 @@ import { ayahAudioUrl } from '@quran-corpus/data/mobile';
 const mocks = vi.hoisted(() => ({
   createAudioPlayer: vi.fn(),
   setAudioModeAsync: vi.fn(async () => undefined),
+  preload: vi.fn(async () => undefined),
+  clearPreloadedSource: vi.fn(async () => undefined),
+  clearAllPreloadedSources: vi.fn(async () => undefined),
 }));
 
 vi.mock('expo-audio', () => ({
   createAudioPlayer: mocks.createAudioPlayer,
   setAudioModeAsync: mocks.setAudioModeAsync,
+  preload: mocks.preload,
+  clearPreloadedSource: mocks.clearPreloadedSource,
+  clearAllPreloadedSources: mocks.clearAllPreloadedSources,
 }));
 
 describe('configureAudioSession', () => {
@@ -145,6 +151,23 @@ describe('createExpoRecitationDriver', () => {
     expect(nativePlayer.remove.mock.invocationCallOrder[0]).toBeLessThan(
       nativePlayer.release.mock.invocationCallOrder[0] as number,
     );
+    // The preload cache is module-level, so it survives the player that filled
+    // it. On Android nothing evicts it on its own.
+    expect(mocks.clearAllPreloadedSources).toHaveBeenCalled();
+  });
+
+  it('drops one warmed source without touching the rest', () => {
+    mocks.createAudioPlayer.mockReturnValue({
+      addListener: vi.fn().mockReturnValue({ remove: vi.fn() }),
+    });
+
+    const driver = createExpoRecitationDriver('https://everyayah.com/data/Husary_64kbps/001001.mp3', vi.fn());
+    driver.clearPreload('https://everyayah.com/data/Husary_64kbps/001001.mp3');
+
+    expect(mocks.clearPreloadedSource).toHaveBeenCalledWith(
+      'https://everyayah.com/data/Husary_64kbps/001001.mp3',
+    );
+    expect(mocks.clearAllPreloadedSources).not.toHaveBeenCalled();
   });
 });
 
@@ -185,7 +208,73 @@ describe('useRecitation', () => {
     await player.finish();
 
     expect(player.replaced).toEqual([]);
-    expect(r.state().ayah).toBeNull();
+    expect(r.state().playing).toBe(false);
+  });
+
+  it('keeps the finished ayah skippable', async () => {
+    // The bar does not leave with the sound -- it stays docked on the ayah that
+    // just ended, offering Previous, Play and Next. Clearing the ayah on finish
+    // left two of those three doing nothing at all.
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: false });
+
+    r.toggleAyah(3);
+    await player.finish();
+    r.skipNext();
+
+    expect(player.replaced).toEqual([ayahAudioUrl(1, 4, 'husary')]);
+    expect(r.state().ayah).toBe(4);
+
+    await player.finish();
+    r.skipPrevious();
+
+    expect(player.replaced).toEqual([ayahAudioUrl(1, 4, 'husary'), ayahAudioUrl(1, 3, 'husary')]);
+  });
+
+  it('replays a finished ayah rather than resuming an exhausted source', async () => {
+    // play() on a player sitting at the end of its track does nothing, so the
+    // resume path would leave the one working control on the docked bar dead.
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: false });
+
+    r.toggleAyah(3);
+    await player.finish();
+    r.toggleAyah(3);
+
+    expect(player.replaced).toEqual([ayahAudioUrl(1, 3, 'husary')]);
+    expect(r.state().playing).toBe(true);
+  });
+
+  it('resumes a paused ayah in the voice the bar is naming', () => {
+    // Changing reciter mid-ayah takes effect from the next one (device check
+    // 87) -- but a PAUSED ayah is not sounding, and resuming it in the old
+    // voice under the new name is the bar lying about what is playing.
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: false });
+
+    r.toggleAyah(2);
+    r.toggleAyah(2);
+    expect(r.state().playing).toBe(false);
+
+    r.changeReciter('sudais');
+    r.toggleAyah(2);
+
+    expect(player.replaced).toEqual([ayahAudioUrl(1, 2, 'sudais')]);
+    expect(r.state().playing).toBe(true);
+  });
+
+  it('leaves a paused ayah alone when the reciter has not changed', () => {
+    // The other direction: pause/resume must not reload the source, or every
+    // resume restarts the ayah from the beginning.
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: false });
+
+    r.toggleAyah(2);
+    r.toggleAyah(2);
+    r.toggleAyah(2);
+
+    expect(player.replaced).toEqual([]);
+    expect(r.state().playing).toBe(true);
   });
 
   it('preloads the next ayah while the current one plays', () => {
@@ -195,6 +284,25 @@ describe('useRecitation', () => {
     r.toggleAyah(1);
     // The only lever we have against the gap between two per-ayah mp3s.
     expect(player.preloaded).toContain(ayahAudioUrl(1, 2, 'husary'));
+  });
+
+  it('drops the ayah it has left behind out of the preload cache', async () => {
+    // Android keeps every preloaded source until it is cleared by hand, so
+    // continuous play through a long surah retains the whole surah.
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: true });
+
+    r.toggleAyah(1);
+    await player.finish();
+    await player.finish();
+
+    // Everything already played is gone, and the clears keep pace with the
+    // playback rather than lagging further behind with every ayah.
+    expect(player.cleared).toEqual([ayahAudioUrl(1, 1, 'husary'), ayahAudioUrl(1, 2, 'husary')]);
+    // Never the file the player is actually on: 1:3 is sounding and 1:4 is warm
+    // for the seam, which is the whole two-entry ceiling.
+    expect(player.cleared).not.toContain(ayahAudioUrl(1, 3, 'husary'));
+    expect(player.preloaded).toContain(ayahAudioUrl(1, 4, 'husary'));
   });
 
   it('does not preload past the end of the surah', () => {
@@ -299,6 +407,7 @@ function fakePlayer({ duration = 30 }: { duration?: number } = {}) {
     created: [] as string[],
     replaced: [] as string[],
     preloaded: [] as string[],
+    cleared: [] as string[],
     seeks: [] as number[],
     lockScreen: [] as { title: string; artist: string }[],
     plays: 0,
@@ -321,6 +430,7 @@ function fakePlayer({ duration = 30 }: { duration?: number } = {}) {
         replace: (next: string) => recorder.replaced.push(next),
         seekTo: (seconds: number) => recorder.seeks.push(seconds),
         preload: (next: string) => recorder.preloaded.push(next),
+        clearPreload: (stale: string) => recorder.cleared.push(stale),
         setLockScreen: (title: string, artist: string) => recorder.lockScreen.push({ title, artist }),
         destroy: () => {
           recorder.destroyed += 1;
@@ -346,17 +456,21 @@ function renderRecitation({
   ayahCount,
   player,
   continuous,
+  reciterId = 'husary',
 }: {
   surah: number;
   ayahCount: number;
   player: ReturnType<typeof fakePlayer>;
   continuous: boolean;
+  reciterId?: string;
 }) {
-  const hook = renderHook(() =>
-    useRecitation(surah, ayahCount, 'husary', {
-      surahName: 'Al-Fatihah',
-      createDriver: player.create,
-    }),
+  const hook = renderHook(
+    ({ reciter }: { reciter: string }) =>
+      useRecitation(surah, ayahCount, reciter, {
+        surahName: 'Al-Fatihah',
+        createDriver: player.create,
+      }),
+    { initialProps: { reciter: reciterId } },
   );
   if (continuous) act(() => hook.result.current.setContinuous(true));
 
@@ -364,6 +478,10 @@ function renderRecitation({
     state: () => hook.result.current,
     toggleAyah: (ayah: number) => act(() => hook.result.current.toggleAyah(ayah)),
     seekTo: (seconds: number) => act(() => hook.result.current.seekTo(seconds)),
+    skipNext: () => act(() => hook.result.current.skipNext()),
+    skipPrevious: () => act(() => hook.result.current.skipPrevious()),
+    /** The setting changing under the hook, the way the reciter sheet does. */
+    changeReciter: (reciter: string) => act(() => hook.rerender({ reciter })),
     unmount: hook.unmount,
   };
 }

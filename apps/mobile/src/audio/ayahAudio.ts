@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { createAudioPlayer, preload, setAudioModeAsync } from 'expo-audio';
+import {
+  clearAllPreloadedSources,
+  clearPreloadedSource,
+  createAudioPlayer,
+  preload,
+  setAudioModeAsync,
+} from 'expo-audio';
 import {
   ayahAudioUrl,
   reciterById,
@@ -165,6 +171,8 @@ export interface RecitationDriver {
   seekTo(seconds: number): void;
   /** Warm a URL nothing has asked for yet. Fire and forget. */
   preload(url: string): void;
+  /** Drop a warmed URL again. On Android nothing else ever does. */
+  clearPreload(url: string): void;
   setLockScreen(title: string, artist: string): void;
   destroy(): void;
 }
@@ -214,10 +222,22 @@ export const createExpoRecitationDriver: CreateRecitationDriver = (url, onStatus
         console.error('[audio] preload failed', { url: next, cause });
       });
     },
+    // expo-audio's preload cache is module-level and, on Android, holds every
+    // source until it is cleared by hand -- continuous play through al-Baqarah
+    // would otherwise retain 285 mp3s for the life of the process.
+    clearPreload: (stale: string) => {
+      void clearPreloadedSource(stale).catch((cause: unknown) => {
+        console.error('[audio] clearing a preload failed', { url: stale, cause });
+      });
+    },
     setLockScreen: (title: string, artist: string) =>
       player.setActiveForLockScreen(true, { title, artist }),
     destroy: () => {
       player.clearLockScreenControls();
+      // The cache outlives the player, so leaving the reader has to empty it.
+      void clearAllPreloadedSources().catch((cause: unknown) => {
+        console.error('[audio] clearing preloads failed', { cause });
+      });
       // remove() and release(), in this order. On Android they do different
       // halves of the teardown: AudioModule holds every player in a strong-ref
       // ConcurrentHashMap, `remove()` drops that entry without touching the
@@ -285,6 +305,14 @@ export function useRecitation(
   // Same reason, plus one of its own: a seek clamps the moment the user lets go
   // of the scrub bar, not one render later.
   const durationRef = useRef(Number.NaN);
+  // What the driver is actually loaded with, which the *setting* stops
+  // describing the moment the reciter changes under a paused ayah.
+  const loadedReciterRef = useRef(reciterId);
+  // The URL the driver is on. Kept only so the one before it can be dropped
+  // from the preload cache.
+  const loadedUrlRef = useRef<string | null>(null);
+  // The ayah played to its end. ayahRef stays on it -- see handleStatus.
+  const finishedRef = useRef(false);
 
   function startAyah(ayah: number) {
     if (surah === null) return;
@@ -310,7 +338,11 @@ export function useRecitation(
     if (existing) existing.replace(url);
     driverRef.current = driver;
 
+    const stale = loadedUrlRef.current;
     ayahRef.current = ayah;
+    loadedReciterRef.current = reciterId;
+    loadedUrlRef.current = url;
+    finishedRef.current = false;
     durationRef.current = Number.NaN;
     setState({ ayah, playing: true, positionSec: 0, durationSec: Number.NaN, error: null });
 
@@ -319,6 +351,12 @@ export function useRecitation(
     // it.
     driver.setLockScreen(options.surahName ?? `Surah ${surah}`, reciterById(reciterId)?.label ?? '');
     driver.play();
+
+    // One behind, not all: the file sounding right now was itself warmed by the
+    // previous ayah, and clearing a source out from under the player is not
+    // something to find out about on a user's device. Two entries is the most
+    // the cache ever holds.
+    if (stale !== null && stale !== url) driver.clearPreload(stale);
 
     // One ahead of the ayah just started, and only when we mean to reach it.
     // The seam between two per-ayah mp3s is the only thing preload can help
@@ -348,8 +386,13 @@ export function useRecitation(
       // The end of the surah stops. Wrapping would restart al-Fatiha behind a
       // locked screen with nothing on screen to say why.
       if (!continuous || next === null || next > ayahCount) {
-        ayahRef.current = null;
-        setState(IDLE);
+        // Parked, not cleared. The bar outlives the sound -- SurahReader keeps
+        // it docked on this ayah -- and skipNext/skipPrevious read ayahRef, so
+        // clearing it left Next and Previous dead on a bar that was still on
+        // screen offering them. `finished` is what keeps the Play button a
+        // replay rather than a play() on an exhausted source.
+        finishedRef.current = true;
+        setState({ ...IDLE, ayah });
         return;
       }
       startAyah(next);
@@ -373,7 +416,17 @@ export function useRecitation(
     // play() on it does nothing and the user is left tapping a dead button
     // (device check 88, airplane mode). Falling through to startAyah replaces
     // the source and loads it again.
-    if (driver && ayahRef.current === ayah && state.error === null) {
+    // A finished ayah and a reciter changed while paused both have to fall
+    // through to startAyah: the first because play() on an exhausted source
+    // does nothing, the second because resuming would sound the old voice under
+    // the new name the bar is already showing.
+    if (
+      driver &&
+      ayahRef.current === ayah &&
+      state.error === null &&
+      !finishedRef.current &&
+      loadedReciterRef.current === reciterId
+    ) {
       // ponytail: our own flag, not status.playing. ExoPlayer reports `playing:
       // false` while it buffers, and mirroring that would flicker the button on
       // every stall. Device check 86 (an incoming call mid-recitation) is what
