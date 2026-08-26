@@ -596,7 +596,7 @@ git commit -m "feat(mobile): let the reader choose a reciter"
   through to `ayahAudioUrl`.
 - [x] **Step 2: Stop and ask the owner to run `/code-review`** — `packages/data`
   plus a trust boundary (§5). Plain `/code-review`; never `ultra` unprompted.
-- [x] **Step 3: Act on the findings.** One pass. 5 findings: 4 fixed (`de2b41d`, `37f9023`), 1 (dead `api/audio.ts`) left as an open owner question.
+- [x] **Step 3: Act on the findings.** One pass. 5 findings: 4 fixed (`de2b41d`, `37f9023`), the 5th (dead `api/audio.ts`) archived on the owner's ruling -- `git show a47c418:apps/mobile/src/audio/ayahAudio.ts` still has the endpoint's origin allowlist and payload validators if one is ever built.
 - [ ] **Step 4: Build.** A prebuild is required this time — the manifest changed.
 
 ```bash

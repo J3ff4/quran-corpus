@@ -3,7 +3,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   configureAudioSession,
   createExpoRecitationDriver,
-  getAyahAudioUrl,
   useRecitation,
   type RecitationStatus,
 } from './ayahAudio';
@@ -39,73 +38,6 @@ describe('configureAudioSession', () => {
       interruptionMode: 'doNotMix',
       shouldPlayInBackground: true,
     });
-  });
-});
-
-describe('getAyahAudioUrl', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.clearAllMocks();
-  });
-
-  it('calls the thin endpoint with Abdul Rashid Sufi as default reciter', async () => {
-    const fetchMock = audioFetch('https://api.example/001001.mp3');
-
-    const result = await getAyahAudioUrl({ baseUrl: 'https://api.example', surah: 1, ayah: 1 }, fetchMock as never);
-
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://api.example/api/v1/audio/ayah?reciter=abdul-rashid-sufi&surah=1&ayah=1',
-    );
-    expect(result.url).toBe('https://api.example/001001.mp3');
-  });
-
-  it('rejects an out-of-range reference before making the request', async () => {
-    const fetchMock = audioFetch('https://api.example/001001.mp3');
-
-    await expect(
-      getAyahAudioUrl({ baseUrl: 'https://api.example', surah: 115, ayah: 1 }, fetchMock as never),
-    ).rejects.toThrow(/surah 115/);
-    await expect(
-      getAyahAudioUrl({ baseUrl: 'https://api.example', surah: 1, ayah: 0 }, fetchMock as never),
-    ).rejects.toThrow(/ayah 0/);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it('resolves the shared public URL when no endpoint is configured', async () => {
-    // No thin endpoint is deployed, so this is the path every shipped build
-    // takes; when it returned nothing the Play button was inert.
-    const fetchMock = audioFetch('https://api.example/002255.mp3');
-
-    const result = await getAyahAudioUrl({ surah: 2, ayah: 255 }, fetchMock as never);
-
-    expect(result.url).toBe('https://everyayah.com/data/Husary_64kbps/002255.mp3');
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it('refuses a non-https url', async () => {
-    // Expo opens file: and content: URIs, so a tampered response could aim
-    // playback at a local resource.
-    const fetchMock = audioFetch('file:///data/data/com.app/databases/user.db');
-
-    await expect(
-      getAyahAudioUrl({ baseUrl: 'https://api.example', surah: 1, ayah: 1 }, fetchMock as never),
-    ).rejects.toThrow(/scheme file:/);
-  });
-
-  it('refuses a url from an origin outside the allowlist', async () => {
-    const fetchMock = audioFetch('https://attacker.example/001001.mp3');
-
-    await expect(
-      getAyahAudioUrl({ baseUrl: 'https://api.example', surah: 1, ayah: 1 }, fetchMock as never),
-    ).rejects.toThrow(/https:\/\/attacker.example/);
-  });
-
-  it('refuses a malformed payload', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ duration_ms: 5000 }) });
-
-    await expect(
-      getAyahAudioUrl({ baseUrl: 'https://api.example', surah: 1, ayah: 1 }, fetchMock as never),
-    ).rejects.toThrow(/no url/);
   });
 });
 
@@ -484,16 +416,4 @@ function renderRecitation({
     changeReciter: (reciter: string) => act(() => hook.rerender({ reciter })),
     unmount: hook.unmount,
   };
-}
-
-function audioFetch(url: string) {
-  return vi.fn().mockResolvedValue({
-    ok: true,
-    json: async () => ({
-      url,
-      duration_ms: 5000,
-      source: 'qua',
-      attribution: 'Audio source',
-    }),
-  });
 }

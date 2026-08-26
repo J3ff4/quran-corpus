@@ -6,15 +6,8 @@ import {
   preload,
   setAudioModeAsync,
 } from 'expo-audio';
-import {
-  ayahAudioUrl,
-  reciterById,
-  AYAH_AUDIO_ORIGIN,
-  DEFAULT_RECITER_ID,
-} from '@quran-corpus/data/mobile';
+import { ayahAudioUrl, reciterById } from '@quran-corpus/data/mobile';
 import type { UiStringKey } from '../i18n/uiStrings';
-
-const DEFAULT_RECITER_ATTRIBUTION = `${reciterById(DEFAULT_RECITER_ID)?.label ?? ''} — everyayah.com`;
 
 /**
  * Put the app's audio session in the mode recitation needs.
@@ -35,117 +28,6 @@ export async function configureAudioSession(): Promise<void> {
     shouldPlayInBackground: true,
   });
 }
-
-export interface AyahAudioParams {
-  /** The thin endpoint's origin. Undefined until one is deployed. */
-  baseUrl?: string | undefined;
-  surah: number;
-  ayah: number;
-}
-
-/** Only meaningful to the endpoint; the public fallback serves one recitation. */
-const ENDPOINT_RECITER = 'abdul-rashid-sufi';
-
-export interface AyahAudioResponse {
-  url: string;
-  duration_ms: number | null;
-  source: string;
-  attribution: string;
-}
-
-// al-Baqarah, the longest surah. A cheap upper bound is enough here: the point
-// is to keep an out-of-range or non-integer value from ever reaching the query
-// string, not to know each surah's exact length.
-const MAX_AYAH = 286;
-
-function assertAyahReference(surah: number, ayah: number) {
-  if (!Number.isInteger(surah) || surah < 1 || surah > 114) {
-    throw new Error(`Refusing audio request for surah ${surah}`);
-  }
-  if (!Number.isInteger(ayah) || ayah < 1 || ayah > MAX_AYAH) {
-    throw new Error(`Refusing audio request for ayah ${ayah}`);
-  }
-}
-
-/**
- * Origins an audio URL may point at.
- *
- * Defaults to the endpoint's own origin and fails closed: if audio is served
- * from a separate CDN, list it in EXPO_PUBLIC_AUDIO_ALLOWED_ORIGINS rather than
- * widening this. The response used to be cast straight to the result type and
- * handed to createAudioPlayer, and Expo will happily open file: and content:
- * URIs -- so a malformed or tampered response could point playback at a local
- * resource instead of at audio.
- */
-function allowedAudioOrigins(baseUrl: string): Set<string> {
-  const configured = (process.env.EXPO_PUBLIC_AUDIO_ALLOWED_ORIGINS ?? '')
-    .split(',')
-    .map((origin: string) => origin.trim())
-    .filter(Boolean);
-  return new Set([new URL(baseUrl).origin, ...configured]);
-}
-
-function parseAudioResponse(payload: unknown, baseUrl: string): AyahAudioResponse {
-  if (typeof payload !== 'object' || payload === null) {
-    throw new Error('Audio endpoint returned a malformed payload');
-  }
-
-  const { url, duration_ms: durationMs, source, attribution } = payload as Record<string, unknown>;
-  if (typeof url !== 'string') throw new Error('Audio endpoint returned no url');
-
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new Error('Audio endpoint returned a relative url');
-  }
-
-  if (parsed.protocol !== 'https:') {
-    throw new Error(`Refusing audio url with scheme ${parsed.protocol}`);
-  }
-  if (!allowedAudioOrigins(baseUrl).has(parsed.origin)) {
-    throw new Error(`Refusing audio url from ${parsed.origin}`);
-  }
-
-  return {
-    url: parsed.toString(),
-    duration_ms: typeof durationMs === 'number' ? durationMs : null,
-    source: typeof source === 'string' ? source : '',
-    attribution: typeof attribution === 'string' ? attribution : '',
-  };
-}
-
-export async function getAyahAudioUrl(
-  params: AyahAudioParams,
-  fetchFn: typeof fetch = fetch,
-): Promise<AyahAudioResponse> {
-  assertAyahReference(params.surah, params.ayah);
-
-  // No endpoint has ever been deployed, so with the fetch as the only path the
-  // Play button was dead in every build. Fall back to the source the web reader
-  // already streams from, built by the shared helper so the two cannot drift.
-  // The URL is constructed here from two validated integers rather than parsed
-  // out of a response, so none of the checks in parseAudioResponse apply to it.
-  if (!params.baseUrl) {
-    return {
-      url: ayahAudioUrl(params.surah, params.ayah),
-      duration_ms: null,
-      source: AYAH_AUDIO_ORIGIN,
-      // The fallback plays the default reciter, so it credits that one.
-      attribution: DEFAULT_RECITER_ATTRIBUTION,
-    };
-  }
-
-  const url = new URL('/api/v1/audio/ayah', params.baseUrl);
-  url.searchParams.set('reciter', ENDPOINT_RECITER);
-  url.searchParams.set('surah', String(params.surah));
-  url.searchParams.set('ayah', String(params.ayah));
-
-  const response = await fetchFn(url.toString());
-  if (!response.ok) throw new Error(`Audio endpoint failed with ${response.status}`);
-  return parseAudioResponse(await response.json(), params.baseUrl);
-}
-
 
 /** The slice of expo-audio's `AudioStatus` that recitation actually reads. */
 export interface RecitationStatus {
