@@ -21,7 +21,7 @@ interface HostProps {
   accessibilityLabel?: string;
   accessibilityLiveRegion?: 'none' | 'polite' | 'assertive';
   accessibilityRole?: string;
-  accessibilityState?: { disabled?: boolean; selected?: boolean; expanded?: boolean };
+  accessibilityState?: { disabled?: boolean; selected?: boolean; checked?: boolean; expanded?: boolean };
   children?: React.ReactNode;
   onPress?: () => void;
   role?: string;
@@ -125,6 +125,49 @@ export function reactNativeTextMock() {
 }
 
 /**
+ * A `react-native-gesture-handler` stand-in, for `vi.mock('react-native-gesture-handler')`.
+ *
+ * The real package does not parse under vitest, and its `Gesture.Pan()` is a
+ * fluent builder -- `.runOnJS(true).minDistance(0).onUpdate(fn)` -- so a mock
+ * has to return something chainable from every call. Rather than enumerate the
+ * fifteen-odd builder methods (and grow the list the first time a component
+ * reaches for a sixteenth), any method returns the chain, and any `on*` one
+ * also records its handler.
+ *
+ * That recording is the point: `GestureDetector` renders nothing, so a
+ * captured handler is the only way a suite can drive a drag. Read them off
+ * `__gestureHandlers` by builder-method name, e.g. `.get('onEnd')`.
+ */
+export function reactNativeGestureHandlerMock() {
+  const handlers = new Map<string, (event: never) => void>();
+
+  function builder() {
+    const chain: unknown = new Proxy(
+      {},
+      {
+        get: (_target, method: string) => (argument: unknown) => {
+          if (method.startsWith('on') && typeof argument === 'function') {
+            handlers.set(method, argument as (event: never) => void);
+          }
+          return chain;
+        },
+      },
+    );
+    return chain;
+  }
+
+  const passthrough = ({ children }: { children?: React.ReactNode }) => children;
+
+  return {
+    GestureDetector: passthrough,
+    // The sheet mounts its own root inside its Modal -- see BottomSheet.
+    GestureHandlerRootView: passthrough,
+    Gesture: { Pan: builder, Tap: builder },
+    __gestureHandlers: handlers,
+  };
+}
+
+/**
  * The three StyleSheet members components actually reach for.
  *
  * Here rather than in one suite because the alternative is a component being
@@ -186,6 +229,10 @@ export function host(tag: string) {
         // lets a test see the state a control announces.
         'aria-disabled': accessibilityState?.disabled,
         'aria-selected': accessibilityState?.selected,
+        // `checked` as well as `selected`: RN's radio role carries selection in
+        // `checked`, and a shim that mapped only `selected` left every
+        // radiogroup in the app assertable on the wrong half of its own state.
+        'aria-checked': accessibilityState?.checked,
         'aria-expanded': accessibilityState?.expanded,
         // `role` wins: it is the cross-platform prop, and components that set
         // it (role="dialog") leave accessibilityRole undefined, which would

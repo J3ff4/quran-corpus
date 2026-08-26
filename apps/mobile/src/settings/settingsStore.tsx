@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
+import { DEFAULT_RECITER_ID, reciterById } from '@quran-corpus/data/mobile';
 import { contentLanguages, uiLocales, type ContentLanguageCode, type UiLocaleCode } from '../i18n/languages';
 import { openUserDb } from '../data/userDb';
 import { getSetting, saveSetting } from '../data/userRepository';
@@ -30,6 +31,9 @@ export interface AppSettings {
   reduceMotion: boolean;
   readerMode: ReaderMode;
   wbwDensity: WbwDensity;
+  /** A `Reciter.id`, never a folder. Validated against the shared table on the
+   *  way in, because it ends up as a path segment in the audio URL. */
+  reciterId: string;
 }
 
 export interface AppSettingsContextValue extends AppSettings {
@@ -41,6 +45,7 @@ export interface AppSettingsContextValue extends AppSettings {
   setReduceMotion: (reduce: boolean) => void;
   setReaderMode: (mode: ReaderMode) => void;
   setWbwDensity: (density: WbwDensity) => void;
+  setReciterId: (id: string) => void;
   /** Set while the settings database cannot be opened, so a screen can say so
    *  instead of letting changes look saved when nothing is being persisted. */
   storageError: string | null;
@@ -55,6 +60,7 @@ const defaultSettings: AppSettings = {
   reduceMotion: false,
   readerMode: 'translation',
   wbwDensity: 'hybrid',
+  reciterId: DEFAULT_RECITER_ID,
 };
 
 const AppSettingsContext = createContext<AppSettingsContextValue | null>(null);
@@ -71,7 +77,7 @@ const AppSettingsContext = createContext<AppSettingsContextValue | null>(null);
 // change -- the owner's report was that the Arabic dominated the card at any
 // system size. System scaling still composes on top; nothing here sets
 // allowFontScaling.
-const settingKeys = ['uiLocale', 'contentLanguage', 'theme', 'analyticsEnabled', 'arabicScale', 'reduceMotion', 'readerMode', 'wbwDensity'] as const;
+const settingKeys = ['uiLocale', 'contentLanguage', 'theme', 'analyticsEnabled', 'arabicScale', 'reduceMotion', 'readerMode', 'wbwDensity', 'reciterId'] as const;
 
 function isUiLocale(value: string | null): value is UiLocaleCode {
   return uiLocales.some((locale) => locale.code === value);
@@ -97,6 +103,13 @@ function isWbwDensity(value: string | null): value is WbwDensity {
   return value === 'hybrid' || value === 'dense';
 }
 
+// Against the shared table, not a second list of ids kept here. A copy in
+// apps/mobile is a copy that drifts, and the one it would drift from is the
+// allowlist ayahAudioUrl validates against (CLAUDE.md §2).
+function isReciterId(value: string | null): value is string {
+  return value !== null && reciterById(value) !== null;
+}
+
 export async function loadPersistedAppSettings(client: MobileDataClient): Promise<AppSettings> {
   // Keyed, not positional. This used to destructure the Promise.all result by
   // index, which is correct only as long as nobody reorders settingKeys or
@@ -116,6 +129,7 @@ export async function loadPersistedAppSettings(client: MobileDataClient): Promis
   const reduceMotion = persisted.reduceMotion;
   const persistedReaderMode = persisted.readerMode;
   const persistedWbwDensity = persisted.wbwDensity;
+  const persistedReciterId = persisted.reciterId;
 
   return {
     uiLocale: isUiLocale(persistedUiLocale) ? persistedUiLocale : defaultSettings.uiLocale,
@@ -126,6 +140,7 @@ export async function loadPersistedAppSettings(client: MobileDataClient): Promis
     reduceMotion: reduceMotion === 'true',
     readerMode: isReaderMode(persistedReaderMode) ? persistedReaderMode : defaultSettings.readerMode,
     wbwDensity: isWbwDensity(persistedWbwDensity) ? persistedWbwDensity : defaultSettings.wbwDensity,
+    reciterId: isReciterId(persistedReciterId) ? persistedReciterId : defaultSettings.reciterId,
   };
 }
 
@@ -328,6 +343,17 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       setReduceMotion: (reduceMotion) => updateSetting('reduceMotion', reduceMotion),
       setReaderMode: (readerMode) => updateSetting('readerMode', readerMode),
       setWbwDensity: (wbwDensity) => updateSetting('wbwDensity', wbwDensity),
+      // Guarded on the way in as well as on the way out. The sheet only ever
+      // offers real ids, but this setter is public and the value it stores is
+      // read back into a URL builder on the next launch -- rejecting here is
+      // what keeps a bad write from ever reaching the file.
+      setReciterId: (reciterId) => {
+        if (!isReciterId(reciterId)) {
+          console.error('[settings] refused an unknown reciter', { reciterId });
+          return;
+        }
+        updateSetting('reciterId', reciterId);
+      },
     }),
     [settings, storageError, userClient],
   );

@@ -35,6 +35,14 @@
         }
       ],
       [
+        "expo-audio",
+        {
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": true,
+          "enableBackgroundRecording": false
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "android": {

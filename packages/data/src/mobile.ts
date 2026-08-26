@@ -11,7 +11,14 @@
 // helpers: mobile runs real queries against a real DB, so the list below is a
 // hand-maintained subset that overlaps the barrel. Widening it is fine as long
 // as nothing added reaches db.ts, migrate.ts, or a backfill.
-export { ayahAudioUrl, AYAH_AUDIO_ATTRIBUTION, AYAH_AUDIO_ORIGIN, AYAH_AUDIO_RECITER } from './audio.js';
+export {
+  ayahAudioUrl,
+  reciterById,
+  AYAH_AUDIO_ORIGIN,
+  DEFAULT_RECITER_ID,
+  RECITERS,
+  type Reciter,
+} from './audio.js';
 export { getAllSurahs, getSurahById } from './queries/surahs.js';
 export { getAyahsBySurah, getAyahWithWords } from './queries/ayahs.js';
 export { getJuzIndex, getPageIndex, getRevealedIndex } from './queries/browse.js';

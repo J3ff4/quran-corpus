@@ -9,10 +9,6 @@ vi.mock('@/theme/themeContext', () => ({
 vi.mock('@/settings/settingsStore', () => ({ useAppSettings: () => ({ uiLocale: 'en' }) }));
 vi.mock('@quran-corpus/data/mobile', () => ({
   definitionSourceLabel: (s: string) => (s === 'lane' ? "Lane's Lexicon" : s),
-  // ClampedText pulls `t()` from '@/i18n/uiStrings', which reads this
-  // constant at module scope for 'about.sourceAudio' -- unused by any
-  // assertion here, but its absence from this mock throws at import time.
-  AYAH_AUDIO_ATTRIBUTION: 'test attribution',
 }));
 // See reactNativeTextMock's doc comment in rnHosts.ts for why Text is built
 // on host('span') plus a layout-handler registry rather than a bare mock: it

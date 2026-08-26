@@ -95,7 +95,7 @@ not pin the old reciter at web's call site to "keep web unchanged", and do not
 split the helper in two. This is the one deliberate web-visible change in all of
 M6; note it in the PR body so it is not read as an accident.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 describe('reciters', () => {
@@ -146,12 +146,12 @@ describe('ayahAudioUrl', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `pnpm --filter @quran-corpus/data test audio`
 Expected: FAIL — no `RECITERS`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Keep the existing coordinate validation in `ayahAudioUrl` exactly as it is and
 add the reciter lookup in front of the path build:
@@ -179,7 +179,7 @@ with per-reciter values. Grep for both across `apps/web` as well as
 and per the ruling above both must now say Husary — `uiStrings.ts` imports `AYAH_AUDIO_ATTRIBUTION`, so
 update that call site to build the attribution from the active reciter.
 
-- [ ] **Step 4: Re-probe the folders**
+- [x] **Step 4: Re-probe the folders**
 
 ```bash
 for f in Husary_64kbps Husary_Muallim_128kbps Husary_Mujawwad_64kbps \
@@ -193,14 +193,14 @@ done
 Every line must read `200`. A `404` means the folder was renamed upstream —
 find the new name or drop that reciter; do not ship a dead entry.
 
-- [ ] **Step 5: Run the tests, then mutation-check (§4)**
+- [x] **Step 5: Run the tests, then mutation-check (§4)**
 
 Run: `pnpm --filter @quran-corpus/data test` → PASS.
 Then delete the `if (!reciter) throw` line and default `reciter.folder` to the
 raw `reciterId`. Expected: the "refuses a reciter it does not know" test FAILS
 on every entry. Restore by re-editing.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/data/src/audio.ts packages/data/tests/audio.test.ts packages/data/src/mobile.ts \
@@ -220,7 +220,7 @@ git commit -m "feat(data): make the reciter a validated choice, defaulting to Hu
 - Produces: `configureAudioSession(): Promise<void>` from `@/audio/ayahAudio`,
   called once from `app/_layout.tsx`.
 
-- [ ] **Step 1: Add the plugin entry**
+- [x] **Step 1: Add the plugin entry**
 
 `apps/mobile/app.json`, in `plugins`:
 
@@ -250,7 +250,7 @@ for the media notification. If it does, add it to `android.permissions` in
 `requestNotificationPermissionsAsync()` before the first play — do not add it
 speculatively.
 
-- [ ] **Step 2: Configure the session**
+- [x] **Step 2: Configure the session**
 
 ```ts
 import { setAudioModeAsync } from 'expo-audio';
@@ -280,7 +280,7 @@ Call it from `app/_layout.tsx`'s existing startup effect, and swallow its
 rejection the way the reading-day write does — a failed session config must not
 block the splash.
 
-- [ ] **Step 3: Prebuild and inspect the manifest**
+- [x] **Step 3: Prebuild and inspect the manifest**
 
 ```bash
 cd apps/mobile && npx expo prebuild --platform android --clean
@@ -291,7 +291,7 @@ Expected: `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK`,
 `MODIFY_AUDIO_SETTINGS`, the service line — and **no** `RECORD_AUDIO`.
 `android/` is prebuild output and stays out of git (§7); do not commit it.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/mobile/app.json apps/mobile/src/audio/ayahAudio.ts apps/mobile/app/_layout.tsx
@@ -339,7 +339,7 @@ a smoother advance. One `AudioPlayer` plus `replace()` keeps the media session
 attached across ayahs, and `preload()` covers most of the seam. Record this in
 the commit body; a reviewer will ask.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Against a fake player implementing the same structural interface the existing
 suite already fakes:
@@ -416,12 +416,12 @@ it('reports a failed load through the existing error key', async () => {
 });
 ```
 
-- [ ] **Step 2: Run them and watch them fail**
+- [x] **Step 2: Run them and watch them fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test ayahAudio`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Shape:
 
@@ -436,13 +436,13 @@ Shape:
 - Every URL comes from `ayahAudioUrl(surah, ayah, reciterId)`. No string
   building at this layer.
 
-- [ ] **Step 4: Run the tests, then mutation-check (§4)**
+- [x] **Step 4: Run the tests, then mutation-check (§4)**
 
 Run: `pnpm --filter @quran-corpus/mobile test ayahAudio` → PASS.
 Then change the end-of-surah guard to `ayah + 1 <= ayahCount + 1`. Expected:
 "stops at the end of the surah" FAILS. Restore by re-editing.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/mobile/src/audio/ayahAudio.ts apps/mobile/src/audio/ayahAudio.test.ts
@@ -483,7 +483,7 @@ Grow M6d's chrome into the real transport: previous / play-pause / next, a
 scrub track with elapsed and remaining, a continuous-play toggle, and the
 reciter name as a tappable label that opens the picker (Task 5).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```tsx
 it('reports a scrub as a position in seconds, not a fraction', () => {
@@ -510,18 +510,18 @@ it('labels every transport control for a screen reader', () => {
 });
 ```
 
-- [ ] **Step 2: Run them, watch them fail, implement, re-run**
+- [x] **Step 2: Run them, watch them fail, implement, re-run**
 
 `formatClock(sec)` is a pure helper — put it beside the component and test it
 directly for `0`, `65`, `125`, `3600` and a `NaN` duration (a track whose
 duration has not arrived yet must render `--:--`, not `NaN:NaN`).
 
-- [ ] **Step 3: Mutation-check (§4)**
+- [x] **Step 3: Mutation-check (§4)**
 
 Return the raw fraction from the scrub handler. Expected: the first test FAILS.
 Restore by re-editing.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/mobile/src/components/RecitationBar.tsx apps/mobile/src/components/RecitationBar.test.tsx \
@@ -545,7 +545,7 @@ git commit -m "feat(mobile): full transport in the recitation bar"
   `<ReciterSheet onClose onSelect current />` built on the existing
   `BottomSheet`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```tsx
 it('falls back to the default for an unknown stored reciter', async () => {
@@ -568,18 +568,18 @@ it('never lists Alafasy', () => {
 });
 ```
 
-- [ ] **Step 2: Run them, watch them fail, implement, re-run**
+- [x] **Step 2: Run them, watch them fail, implement, re-run**
 
 Validate with `reciterById(value) !== null` in the settings guard — do not write
 a second list of ids in `apps/mobile`. The picker is reachable from two places:
 the recitation bar's reciter label and the Settings screen.
 
-- [ ] **Step 3: Mutation-check (§4)**
+- [x] **Step 3: Mutation-check (§4)**
 
 Drop the settings guard. Expected: the fallback test FAILS. Restore by
 re-editing.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/mobile/src/settings apps/mobile/src/components/ReciterSheet.tsx \
@@ -591,12 +591,12 @@ git commit -m "feat(mobile): let the reader choose a reciter"
 
 ### Task 6: §5 stop, then build
 
-- [ ] **Step 1: Self-review**, with the OWASP question front and centre: can any
+- [x] **Step 1: Self-review**, with the OWASP question front and centre: can any
   value that is not in `RECITERS` reach a URL path? Trace the persisted setting
   through to `ayahAudioUrl`.
-- [ ] **Step 2: Stop and ask the owner to run `/code-review`** — `packages/data`
+- [x] **Step 2: Stop and ask the owner to run `/code-review`** — `packages/data`
   plus a trust boundary (§5). Plain `/code-review`; never `ultra` unprompted.
-- [ ] **Step 3: Act on the findings.** One pass.
+- [x] **Step 3: Act on the findings.** One pass. 5 findings: 4 fixed (`de2b41d`, `37f9023`), the 5th (dead `api/audio.ts`) archived on the owner's ruling -- `git show a47c418:apps/mobile/src/audio/ayahAudio.ts` still has the endpoint's origin allowlist and payload validators if one is ever built.
 - [ ] **Step 4: Build.** A prebuild is required this time — the manifest changed.
 
 ```bash

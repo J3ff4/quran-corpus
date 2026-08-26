@@ -1,4 +1,3 @@
-import { AYAH_AUDIO_ATTRIBUTION } from '@quran-corpus/data/mobile';
 import type { UiLocaleCode } from './languages';
 
 export type UiStringKey =
@@ -45,6 +44,18 @@ export type UiStringKey =
   | 'reader.removeBookmark'
   | 'reader.play'
   | 'reader.pause'
+  | 'reader.previousAyah'
+  | 'reader.nextAyah'
+  // Names the repeat toggle. "Continuous" alone is an adjective with no noun;
+  // the control turns play-through-the-surah on and off.
+  | 'reader.continuous'
+  // Names the tappable reciter label. The name itself is a proper noun, so
+  // without this TalkBack announces only "Mahmoud Khalil Al-Husary" with
+  // nothing to say it opens a picker.
+  | 'reader.reciter'
+  // Heads the reciter sheet, the way reader.chooseLanguage heads the
+  // translation one.
+  | 'reader.chooseReciter'
   | 'reader.ayahLabel'
   | 'reader.chooseLanguage'
   | 'reader.bismillah'
@@ -231,6 +242,11 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.removeBookmark': 'Remove bookmark',
     'reader.play': 'Play',
     'reader.pause': 'Pause',
+    'reader.previousAyah': 'Previous ayah',
+    'reader.nextAyah': 'Next ayah',
+    'reader.continuous': 'Continuous play',
+    'reader.reciter': 'Reciter',
+    'reader.chooseReciter': 'Choose reciter',
     'reader.ayahLabel': 'Ayah',
     'reader.chooseLanguage': 'Choose translation language',
     'reader.bismillah': 'In the name of Allah, the Entirely Merciful, the Especially Merciful',
@@ -299,7 +315,9 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceUzbek': 'Uzbek translation: Muhammad Sodik Muhammad Yusuf. Source approval incomplete.',
     'about.sourceRussian': 'Russian translation: Abu Adel. Source approval incomplete.',
     'about.sourceHafs': 'Hafs font: apps/mobile/assets/fonts/hafs.18.woff2. Source approval incomplete.',
-    'about.sourceAudio': `Recitation: ${AYAH_AUDIO_ATTRIBUTION}. Source approval incomplete.`,
+    // Names the host, not a reciter: ten of them are selectable now, so a
+    // single hard-coded name would be wrong for nine of the choices.
+    'about.sourceAudio': 'Recitation: everyayah.com, reciter chosen in Settings. Source approval incomplete.',
     'search.title': 'Search',
     'search.placeholder': 'Verse, word or root',
     'search.jump': 'Go to',
@@ -378,6 +396,11 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.removeBookmark': 'Xatcho‘pni olib tashlash',
     'reader.play': 'Ijro etish',
     'reader.pause': 'To‘xtatish',
+    'reader.previousAyah': 'Oldingi oyat',
+    'reader.nextAyah': 'Keyingi oyat',
+    'reader.continuous': 'Ketma-ket ijro',
+    'reader.reciter': 'Qori',
+    'reader.chooseReciter': 'Qorini tanlang',
     'reader.ayahLabel': 'Oyat',
     'reader.chooseLanguage': 'Tarjima tilini tanlang',
     'reader.bismillah': 'Mehribon va rahmli Alloh nomi bilan',
@@ -446,7 +469,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceUzbek': 'O‘zbekcha tarjima: Muhammad Sodik Muhammad Yusuf. Manba tasdig‘i tugallanmagan.',
     'about.sourceRussian': 'Ruscha tarjima: Abu Adel. Manba tasdig‘i tugallanmagan.',
     'about.sourceHafs': 'Hafs shrifti: apps/mobile/assets/fonts/hafs.18.woff2. Manba tasdig‘i tugallanmagan.',
-    'about.sourceAudio': `Qiroat: ${AYAH_AUDIO_ATTRIBUTION}. Manba tasdig‘i tugallanmagan.`,
+    'about.sourceAudio': 'Qiroat: everyayah.com, qori Sozlamalarda tanlanadi. Manba tasdig‘i tugallanmagan.',
     'search.title': 'Qidiruv',
     'search.placeholder': 'Oyat, so‘z yoki o‘zak',
     'search.jump': 'O‘tish',
@@ -522,6 +545,11 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.removeBookmark': 'Удалить закладку',
     'reader.play': 'Воспроизвести',
     'reader.pause': 'Пауза',
+    'reader.previousAyah': 'Предыдущий аят',
+    'reader.nextAyah': 'Следующий аят',
+    'reader.continuous': 'Непрерывное воспроизведение',
+    'reader.reciter': 'Чтец',
+    'reader.chooseReciter': 'Выберите чтеца',
     'reader.ayahLabel': 'Аят',
     'reader.chooseLanguage': 'Выберите язык перевода',
     'reader.bismillah': 'Именем Аллаха, Милостивого, Милосердного',
@@ -590,7 +618,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceUzbek': 'Узбекский перевод: Muhammad Sodik Muhammad Yusuf. Подтверждение источника не завершено.',
     'about.sourceRussian': 'Русский перевод: Abu Adel. Подтверждение источника не завершено.',
     'about.sourceHafs': 'Шрифт Hafs: apps/mobile/assets/fonts/hafs.18.woff2. Подтверждение источника не завершено.',
-    'about.sourceAudio': `Чтение: ${AYAH_AUDIO_ATTRIBUTION}. Подтверждение источника не завершено.`,
+    'about.sourceAudio': 'Чтение: everyayah.com, чтец выбирается в настройках. Подтверждение источника не завершено.',
     'search.title': 'Поиск',
     'search.placeholder': 'Аят, слово или корень',
     'search.jump': 'Перейти',

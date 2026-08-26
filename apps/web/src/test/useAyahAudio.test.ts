@@ -61,7 +61,7 @@ describe('useAyahAudio', () => {
     expect(result.current.playingAyahId).toBe(1);
     expect(result.current.isPlaying).toBe(true);
     expect(mockSrc).toBe(
-      'https://everyayah.com/data/Abdul_Basit_Murattal_64kbps/001001.mp3',
+      'https://everyayah.com/data/Husary_64kbps/001001.mp3',
     );
   });
 
@@ -71,7 +71,7 @@ describe('useAyahAudio', () => {
     await act(async () => { result.current.play(a1); });
     expect(result.current.playingAyahId).toBe(2);
     expect(mockSrc).toBe(
-      'https://everyayah.com/data/Abdul_Basit_Murattal_64kbps/001002.mp3',
+      'https://everyayah.com/data/Husary_64kbps/001002.mp3',
     );
   });
 
@@ -97,7 +97,7 @@ describe('useAyahAudio', () => {
     await act(async () => { storedOnended?.(); });
     expect(result.current.playingAyahId).toBe(2);
     expect(mockSrc).toBe(
-      'https://everyayah.com/data/Abdul_Basit_Murattal_64kbps/001002.mp3',
+      'https://everyayah.com/data/Husary_64kbps/001002.mp3',
     );
   });
 

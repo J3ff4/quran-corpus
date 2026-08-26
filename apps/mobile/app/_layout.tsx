@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { configureAudioSession } from '@/audio/ayahAudio';
 import { Bloom } from '@/components/Bloom';
 import { openCorpusDb, useCorpusFonts } from '@/data/openCorpusDb';
 import { AppSettingsProvider } from '@/settings/settingsStore';
@@ -30,6 +31,16 @@ export default function RootLayout() {
   // string in a trilingual app reads worse than no string.
   useEffect(() => {
     let cancelled = false;
+
+    // Rides the same startup effect rather than adding a second one: the audio
+    // session is process-wide and has nothing to do with the extract, and it
+    // has to be set before the first play rather than during it. Swallowed the
+    // way the reading-day write is -- a failed session config costs the lock
+    // screen its controls, and holding the splash for that would cost the user
+    // the whole app.
+    configureAudioSession().catch((cause: unknown) => {
+      console.error('[audio] session config failed', { cause });
+    });
 
     openCorpusDb().then(
       () => {

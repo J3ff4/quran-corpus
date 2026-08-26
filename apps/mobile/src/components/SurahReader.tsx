@@ -17,17 +17,18 @@ import {
   useSharedValue,
 } from 'react-native-reanimated';
 import { router, useNavigation } from 'expo-router';
-import { splitBasmala, type Word } from '@quran-corpus/data/mobile';
+import { reciterById, splitBasmala, type Word } from '@quran-corpus/data/mobile';
 import type { ReaderAyah, SurahReaderData, WordSummary } from '@/data/corpusRepository';
 import type { ContentLanguageCode, UiLocaleCode } from '@/i18n/languages';
 import type { ReaderMode } from '@/settings/settingsStore';
 
 import { AyahCard } from './AyahCard';
 import { MushafAyah } from './MushafAyah';
-import { RecitationBar } from './RecitationBar';
+import { RecitationBar, type RecitationBarProps } from './RecitationBar';
 import { ReaderHeader } from './ReaderHeader';
 import { Bismillah } from './Bismillah';
 import { LanguageSheet } from './LanguageSheet';
+import { ReciterSheet } from './ReciterSheet';
 import { WordSheet } from './WordSheet';
 import { GlassSurface } from './GlassSurface';
 import { useReducedMotion } from '@/motion/useReducedMotion';
@@ -37,11 +38,28 @@ import { useArabicSizes } from '@/theme/useArabicSizes';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
+/** Everything the docked bar needs that the ayah cards do not.
+ *
+ *  One prop rather than nine: the reader forwards these untouched, and nine
+ *  pass-throughs on a component that already takes seventeen is a wall nobody
+ *  reads. `ayahNumber` is not among them -- the bar docks on the last ayah
+ *  played, which is the reader's own state (see `dockedAyah`). */
+export type ReaderRecitation = Omit<
+  RecitationBarProps,
+  'ayahNumber' | 'playing' | 'onTogglePlay' | 'uiLocale' | 'reciterLabel' | 'onOpenReciters'
+> & {
+  /** A `Reciter.id`. The label and the picker are both derived from it here,
+   *  so the screen above passes one value instead of three. */
+  reciterId: string;
+  onChangeReciter: (id: string) => void;
+};
+
 interface SurahReaderProps {
   data: SurahReaderData;
   bookmarkedAyahs: Set<number>;
   playingAyah: number | null;
   audioEnabled: boolean;
+  recitation: ReaderRecitation;
   uiLocale: UiLocaleCode;
   /** The reader owns no settings state; the screen above it does. Passed down
    *  rather than read from the store so this component stays renderable in a
@@ -109,6 +127,19 @@ const TITLE_FADE_DISTANCE = 40;
 // settling into the bar, not as a second element flying in.
 const TITLE_RISE = 10;
 
+// Extra room under the last ayah while the recitation bar is docked.
+//
+// useListBottomPadding clears the floating tab pill, which this stack screen
+// does not have -- but the bar is two rows where the pill is one, so from M6f
+// the last ayah of every surah sat behind it. This is that difference plus the
+// same breathing room the hook gives.
+//
+// ponytail: a constant, not a measurement. The bar's own height is only known
+// after layout, and measuring it means an extra prop and a re-render per
+// mount. If the OS font scale ever pushes the bar past this, pass the measured
+// height up instead of growing the number.
+const RECITATION_BAR_CLEARANCE = 56;
+
 /** The single plate mushaf mode's rows flow across. */
 function MushafPlate({ children }: { children: ReactNode }) {
   return (
@@ -135,6 +166,7 @@ export function SurahReader({
   bookmarkedAyahs,
   playingAyah,
   audioEnabled,
+  recitation,
   uiLocale,
   contentLanguage,
   onChangeContentLanguage,
@@ -149,7 +181,7 @@ export function SurahReader({
 }: SurahReaderProps) {
   const theme = useThemeColors();
   const arabicSizes = useArabicSizes();
-  const paddingBottom = useListBottomPadding();
+  const listBottomPadding = useListBottomPadding();
   const navigation = useNavigation();
   const listRef = useRef<FlatList<SurahReaderData['ayahs'][number]>>(null);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -171,6 +203,7 @@ export function SurahReader({
   const [positioned, setPositioned] = useState(false);
 
   const [languageOpen, setLanguageOpen] = useState(false);
+  const [reciterOpen, setReciterOpen] = useState(false);
 
   // The ayah the docked bar is parked on. Not `playingAyah`: that goes null the
   // moment the recitation ends, and a bar that vanishes with the last syllable
@@ -180,6 +213,9 @@ export function SurahReader({
   useEffect(() => {
     if (playingAyah !== null) setDockedAyah(playingAyah);
   }, [playingAyah]);
+  // The one condition the bar renders under, named once: the list has to
+  // reserve room for exactly the frames the bar is on screen for.
+  const barDocked = audioEnabled && dockedAyah !== null;
 
   // The nav header carries the surah name once the list header's 24pt heading
   // has scrolled off -- Android's own app-bar behaviour, and it keeps the name
@@ -552,10 +588,12 @@ export function SurahReader({
         // reachable by TalkBack swipe while either sheet covers them and the
         // modal is only visually modal (CLAUDE.md §8, WCAG AA). The nav header
         // is a native toolbar outside this View and is still reachable.
-        importantForAccessibility={openWord || languageOpen ? 'no-hide-descendants' : 'auto'}
+        importantForAccessibility={openWord || languageOpen || reciterOpen ? 'no-hide-descendants' : 'auto'}
         initialNumToRender={initialIndex > 0 ? initialIndex + 1 : DEFAULT_INITIAL_RENDER}
         style={{ flex: 1, opacity: positioned ? 1 : 0 }}
-        contentContainerStyle={{ paddingBottom }}
+        contentContainerStyle={{
+          paddingBottom: listBottomPadding + (barDocked ? RECITATION_BAR_CLEARANCE : 0),
+        }}
       />
       </Plate>
       {/* Over the list rather than instead of it: the list has to be mounted
@@ -583,11 +621,21 @@ export function SurahReader({
           otherwise walk from the sheet straight onto this bar. */}
       <View
         pointerEvents="box-none"
-        importantForAccessibility={openWord || languageOpen ? 'no-hide-descendants' : 'auto'}
+        importantForAccessibility={openWord || languageOpen || reciterOpen ? 'no-hide-descendants' : 'auto'}
         style={StyleSheet.absoluteFill}
       >
         <RecitationBar
-          ayahNumber={audioEnabled ? dockedAyah : null}
+          {...recitation}
+          reciterLabel={reciterById(recitation.reciterId)?.label ?? ''}
+          onOpenReciters={() => {
+            // Closes the word sheet first, for the same reason the header's
+            // actions do: this bar sits above the sheet's backdrop, so leaving
+            // it mounted holds the ayah list at no-hide-descendants behind the
+            // picker.
+            closeSheet();
+            setReciterOpen(true);
+          }}
+          ayahNumber={barDocked ? dockedAyah : null}
           playing={playingAyah !== null}
           uiLocale={uiLocale}
           onTogglePlay={() => {
@@ -612,6 +660,14 @@ export function SurahReader({
           router.push(`/root/${encodeURIComponent(rootBuckwalter)}`);
         }}
       />
+      {reciterOpen ? (
+        <ReciterSheet
+          current={recitation.reciterId}
+          uiLocale={uiLocale}
+          onSelect={recitation.onChangeReciter}
+          onClose={() => setReciterOpen(false)}
+        />
+      ) : null}
       {languageOpen ? (
         <LanguageSheet
           value={contentLanguage}

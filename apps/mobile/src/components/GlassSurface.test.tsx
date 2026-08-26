@@ -54,6 +54,16 @@ describe('GlassSurface', () => {
     expect(screen.getByTestId('card').style.borderRadius).toBe(`${radii.card}px`);
   });
 
+  it('lights its rim above the children, not under them', () => {
+    // The recitation bar covers the translucent fill with an opaque backing --
+    // RN has no backdrop-filter and a docked bar over scrolling text has to be
+    // legible. As the first child, that backing painted straight over this 1px
+    // line and the bar lost the top edge every other glass surface has.
+    renderIn(themeColors.dark, <GlassSurface testID="card"><span>inside</span></GlassSurface>);
+
+    expect(screen.getByTestId('card').lastElementChild).toBe(screen.getByTestId('card-highlight'));
+  });
+
   it('renders its children', () => {
     renderIn(themeColors.light, <GlassSurface testID="card"><span>inside</span></GlassSurface>);
 

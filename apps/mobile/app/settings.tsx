@@ -1,5 +1,8 @@
 import { Link } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
+import { reciterById } from '@quran-corpus/data/mobile';
+import { ReciterSheet } from '@/components/ReciterSheet';
 import { contentLanguages, uiLocales } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
@@ -51,6 +54,7 @@ export default function SettingsRoute() {
   const settings = useAppSettings();
   const { uiLocale } = settings;
   const theme = useThemeColors();
+  const [reciterOpen, setReciterOpen] = useState(false);
 
   return (
     <View style={{ flex: 1, padding: 20, gap: 16 }}>
@@ -118,6 +122,19 @@ export default function SettingsRoute() {
           ))}
         </View>
       </View>
+      {/* A sheet, not a tenth radiogroup: ten reciter names would be more of
+          this screen than everything above it put together, and the same
+          picker is already the reader's. */}
+      <Pressable
+        testID="open-reciters"
+        accessibilityRole="button"
+        accessibilityLabel={`${t(uiLocale, 'reader.reciter')}, ${reciterById(settings.reciterId)?.label ?? ''}`}
+        onPress={() => setReciterOpen(true)}
+        style={{ minHeight: touchTargets.minimum, justifyContent: 'center', gap: 2 }}
+      >
+        <Text style={{ color: theme.text, fontWeight: '600' }}>{t(uiLocale, 'reader.reciter')}</Text>
+        <Text style={{ color: theme.mutedText }}>{reciterById(settings.reciterId)?.label ?? ''}</Text>
+      </Pressable>
       {/* In-app because the OS switch has no single path: Pixel puts it under
           Accessibility, Samsung under Visibility enhancements, and the owner's
           device exposed neither. This one only ever ADDS reduced motion -- see
@@ -149,6 +166,14 @@ export default function SettingsRoute() {
       >
         {t(uiLocale, 'settings.about')}
       </Link>
+      {reciterOpen ? (
+        <ReciterSheet
+          current={settings.reciterId}
+          uiLocale={uiLocale}
+          onSelect={settings.setReciterId}
+          onClose={() => setReciterOpen(false)}
+        />
+      ) : null}
     </View>
   );
 }
