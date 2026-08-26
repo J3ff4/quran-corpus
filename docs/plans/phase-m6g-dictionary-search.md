@@ -47,7 +47,7 @@ Decision 5: mockups first, drawn per sub-phase, reviewed by the owner.
 - Create: `docs/design/m6/dictionary-browse.html`
 - Create: `docs/design/m6/concordance.html`
 
-- [ ] **Step 1: Read the source of truth**
+- [x] **Step 1: Read the source of truth**
 
 Read `~/quran-data/corpus-design-files/Quran Corpus Glass.dc.html` in full
 (mockups `1h` and `1i` especially). Do not render or screenshot it. Match its
@@ -55,19 +55,31 @@ frame (390×844), its glass recipe and its type scale exactly — these four pag
 have to sit beside the owner's own without looking like a different hand drew
 them.
 
-- [ ] **Step 2: Draw the four screens**
+- [x] **Step 2: Draw the four screens**
 
 Each as a self-contained HTML file, inline styles, one 390×844 frame, night
 theme (the bundle's own default). Content comes from the real app, not from
 lorem: use root ق-و-ل, lemma `qawol`, and the frequency table's top rows, so the
 owner is reviewing real densities.
 
-- [ ] **Step 3: Show the owner and get approval**
+- [ ] **Step 3: Show the owner and get approval** — SENT 2026-08-26, AWAITING
 
 Send the four files. Do not start Task 2 until they have been seen — a
 restyle built against an unapproved mockup is a restyle done twice.
 
-- [ ] **Step 4: Commit**
+Sent as a review page carrying all four frames at 1:1 plus the data behind
+each: https://claude.ai/code/artifact/93c4c8ce-fa97-4861-a55e-bbc1d75ebaf8
+Four questions are open on it, one per frame:
+1. Browse rows carry no English gloss — `getAllRoots` is `SELECT * FROM roots`,
+   which has no definition column. Enriching them is a new query, a different
+   sub-phase, and a §5 review. Leave sparse?
+2. The frequency table's proportional rail is the one thing added to a row.
+   Ranks 4-8 sit within 3% of each other and read as undifferentiated digits
+   without it. Keep?
+3. Lemma entry docks Previous/Next rather than ending the list with it.
+4. Six form chips wrap to two rows on قول. Acceptable, or collapse the filter?
+
+- [x] **Step 4: Commit** — `4a592d2`
 
 ```bash
 git add docs/design/m6
