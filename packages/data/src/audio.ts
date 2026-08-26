@@ -18,7 +18,6 @@ export interface Reciter {
   folder: string;
   /** Display name, English. */
   label: string;
-  bitrateKbps: 64 | 128;
 }
 
 /**
@@ -38,16 +37,16 @@ export interface Reciter {
  * Every folder returned HTTP 200 for 002255.mp3 when probed 2026-08-25.
  */
 export const RECITERS: readonly Reciter[] = [
-  { id: 'husary', folder: 'Husary_64kbps', label: 'Mahmoud Khalil Al-Husary (Murattal)', bitrateKbps: 64 },
-  { id: 'husary-muallim', folder: 'Husary_Muallim_128kbps', label: 'Al-Husary (Muallim)', bitrateKbps: 128 },
-  { id: 'husary-mujawwad', folder: 'Husary_Mujawwad_64kbps', label: 'Al-Husary (Mujawwad)', bitrateKbps: 64 },
-  { id: 'minshawy', folder: 'Minshawy_Murattal_128kbps', label: 'Mohamed Siddiq El-Minshawi (Murattal)', bitrateKbps: 128 },
-  { id: 'minshawy-mujawwad', folder: 'Minshawy_Mujawwad_64kbps', label: 'El-Minshawi (Mujawwad)', bitrateKbps: 64 },
-  { id: 'abdul-basit', folder: 'Abdul_Basit_Murattal_64kbps', label: 'Abdul Basit (Murattal)', bitrateKbps: 64 },
-  { id: 'sudais', folder: 'Abdurrahmaan_As-Sudais_64kbps', label: 'Abdurrahman As-Sudais', bitrateKbps: 64 },
-  { id: 'shuraym', folder: 'Saood_ash-Shuraym_64kbps', label: 'Saud Al-Shuraim', bitrateKbps: 64 },
-  { id: 'shatri', folder: 'Abu_Bakr_Ash-Shaatree_64kbps', label: 'Abu Bakr Al-Shatri', bitrateKbps: 64 },
-  { id: 'ayyoub', folder: 'Muhammad_Ayyoub_64kbps', label: 'Muhammad Ayyoub', bitrateKbps: 64 },
+  { id: 'husary', folder: 'Husary_64kbps', label: 'Mahmoud Khalil Al-Husary (Murattal)' },
+  { id: 'husary-muallim', folder: 'Husary_Muallim_128kbps', label: 'Al-Husary (Muallim)' },
+  { id: 'husary-mujawwad', folder: 'Husary_Mujawwad_64kbps', label: 'Al-Husary (Mujawwad)' },
+  { id: 'minshawy', folder: 'Minshawy_Murattal_128kbps', label: 'Mohamed Siddiq El-Minshawi (Murattal)' },
+  { id: 'minshawy-mujawwad', folder: 'Minshawy_Mujawwad_64kbps', label: 'El-Minshawi (Mujawwad)' },
+  { id: 'abdul-basit', folder: 'Abdul_Basit_Murattal_64kbps', label: 'Abdul Basit (Murattal)' },
+  { id: 'sudais', folder: 'Abdurrahmaan_As-Sudais_64kbps', label: 'Abdurrahman As-Sudais' },
+  { id: 'shuraym', folder: 'Saood_ash-Shuraym_64kbps', label: 'Saud Al-Shuraim' },
+  { id: 'shatri', folder: 'Abu_Bakr_Ash-Shaatree_64kbps', label: 'Abu Bakr Al-Shatri' },
+  { id: 'ayyoub', folder: 'Muhammad_Ayyoub_64kbps', label: 'Muhammad Ayyoub' },
 ];
 
 /**
