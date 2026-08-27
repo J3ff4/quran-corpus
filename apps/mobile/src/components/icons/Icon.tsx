@@ -12,6 +12,8 @@ export type IconName =
   | 'menu'
   | 'search'
   | 'back'
+  | 'chevronLeft'
+  | 'chevronRight'
   | 'play'
   | 'pause'
   | 'skipBack'
@@ -63,6 +65,14 @@ const PATHS: Record<IconName, string[]> = {
   // Chevron only, no shaft: mockup 1e's back affordance, and the reader draws
   // its own header now that the native toolbar is gone.
   back: ['M15 5l-7 7 7 7'],
+  // The dictionary pager's two arrows. Drawn rather than reusing `back` (and a
+  // mirrored copy of it) because these sit inside a 34pt circle where being
+  // half a unit off centre is visible: both spans are x 8.5..15.5 and y 5..19,
+  // so each is exactly centred on the 24 viewBox in both axes. A `‹` glyph was
+  // what shipped first, and a text chevron carries its font's own side
+  // bearings -- it cannot be centred by the layout that holds it.
+  chevronLeft: ['M15.5 5l-7 7 7 7'],
+  chevronRight: ['M8.5 5l7 7-7 7'],
   // The recitation transport. Outlines, not filled shapes: every glyph above
   // is a stroke at `fill="none"`, and a solid triangle beside them would read
   // as a different icon set.

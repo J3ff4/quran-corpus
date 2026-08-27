@@ -1,7 +1,8 @@
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { useGlassSkin } from './GlassSurface';
+import { Icon } from './icons/Icon';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
 import { usePressScale } from '@/motion/usePressScale';
@@ -102,12 +103,20 @@ function PagerButton({
         },
       ]}
     >
-      {/* A single-glyph chevron, not the old "← Previous": the button now sits
-          beside the headword, where a word of English would crowd it. The
-          accessible name above is what it announces. */}
-      <Text style={{ color: theme.text, fontSize: 20, lineHeight: SIZE, includeFontPadding: false }}>
-        {side === 'prev' ? '‹' : '›'}
-      </Text>
+      {/* A chevron, not the old "← Previous": the button now sits beside the
+          headword, where a word of English would crowd it. The accessible name
+          above is what it announces.
+
+          Drawn, not a `‹` glyph: a text chevron sits wherever its font's side
+          bearings put it, so it painted off centre inside the circle and no
+          amount of lineHeight or alignment moved it (owner, 2026-08-27). The
+          Svg is exactly SIZE-16 square, so the flex centring above lands it
+          dead centre. */}
+      <Icon
+        name={side === 'prev' ? 'chevronLeft' : 'chevronRight'}
+        color={theme.text}
+        size={SIZE - 16}
+      />
     </AnimatedPressable>
   );
 }
