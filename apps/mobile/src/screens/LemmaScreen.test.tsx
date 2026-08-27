@@ -2,6 +2,7 @@ import React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LemmaEntry } from '@quran-corpus/data/mobile';
+import type * as EntryTransition from '@/motion/useEntryTransition';
 import { LemmaScreen } from './LemmaScreen';
 
 const mocks = vi.hoisted(() => ({
@@ -10,12 +11,21 @@ const mocks = vi.hoisted(() => ({
   getAdjacentLemmas: vi.fn(),
   push: vi.fn(),
   replace: vi.fn(),
+  markSide: vi.fn(),
 }));
 
 vi.mock('@/data/corpusRepository', () => ({
   getLemmaScreen: (...args: unknown[]) => mocks.getLemmaScreen(...args),
   getLemmaOccurrences: (...args: unknown[]) => mocks.getLemmaOccurrences(...args),
   getAdjacentLemmas: (...args: unknown[]) => mocks.getAdjacentLemmas(...args),
+}));
+// Only the direction is stubbed. The hook itself is covered by its own suite;
+// what this one has to pin down is that the screen forwards the side at all --
+// it silently dropped it when the pager was first wired, so Previous and Next
+// both arrived with no direction (M6g check 92).
+vi.mock('@/motion/useEntryTransition', async (importOriginal) => ({
+  ...(await importOriginal<typeof EntryTransition>()),
+  useEntryTransition: () => ({ style: {}, markSide: mocks.markSide }),
 }));
 vi.mock('@/data/openCorpusDb', () => ({ openCorpusDb: () => Promise.resolve({}) }));
 vi.mock('@quran-corpus/mobile-data', () => ({ createExpoSqliteClient: () => ({}) }));
@@ -425,6 +435,12 @@ describe('LemmaScreen', () => {
 
     fireEvent.click(await screen.findByTestId('lemma-next'));
     expect(mocks.replace).toHaveBeenCalledWith('/lemma/ktb?from=verbs');
+    // D4: which button was pressed is what decides the slide's direction, and
+    // the navigation itself carries no direction to recover it from.
+    expect(mocks.markSide).toHaveBeenCalledWith('next');
+
+    fireEvent.click(screen.getByTestId('lemma-previous'));
+    expect(mocks.markSide).toHaveBeenLastCalledWith('prev');
   });
 
   it('drops the old neighbours while the new lemma is still resolving', async () => {

@@ -218,7 +218,12 @@ export default function RootRoute() {
   // D4: the incoming root slides in from the side the reader pressed. Declared
   // with the other hooks, above the early returns -- a render that bails early
   // would otherwise change the hook order.
-  const transition = useEntryTransition(buckwalter);
+  //
+  // What is drawn, not what was asked for: the two gates below hold the first
+  // frame back while three queries run, and a slide keyed on the param alone
+  // plays out under the spinner instead of under the root it belongs to.
+  const shownRoot = entry && applied?.root === buckwalter ? buckwalter : null;
+  const transition = useEntryTransition(shownRoot);
 
   const toggleForm = useCallback((formId: number) => {
     setSelected((current) =>

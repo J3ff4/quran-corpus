@@ -144,7 +144,11 @@ export function LemmaScreen({ lemmaBuckwalter, source }: LemmaScreenProps) {
   // D4: the incoming lemma slides in from the side the reader pressed.
   // Declared with the other hooks, above the early returns -- a render that
   // bails early would otherwise change the hook order.
-  const transition = useEntryTransition(lemmaBuckwalter);
+  //
+  // Keyed on the loaded entry, not the param: the spinner below holds the
+  // first frame until the query lands, and a slide keyed on the param plays
+  // out under it. Same reasoning as the root screen.
+  const transition = useEntryTransition(entry ? lemmaBuckwalter : null);
 
   if (loading) {
     return (
@@ -201,7 +205,10 @@ export function LemmaScreen({ lemmaBuckwalter, source }: LemmaScreenProps) {
               // changes that must not be able to emit the string '?from=null'.
               onNavigate={
                 source
-                  ? (target) => router.replace(`/lemma/${encodeURIComponent(target)}?from=${source}`)
+                  ? (target, side) => {
+                      transition.markSide(side);
+                      router.replace(`/lemma/${encodeURIComponent(target)}?from=${source}`);
+                    }
                   : () => {}
               }
               label={t(uiLocale, 'lemma.adjacent')}
