@@ -97,6 +97,10 @@ export function FrequencyList({ kind }: FrequencyListProps) {
           // and padding another 16 inside. The labels have to start where the
           // columns they name start, or they name the gap between them.
           paddingHorizontal: 32,
+          // The kind chips sit directly above these labels and were touching
+          // them. The gap belongs here rather than under the chips, so the
+          // labels keep their own clearance whoever renders above them.
+          paddingTop: 14,
           paddingBottom: 8,
           gap: 12,
         }}
