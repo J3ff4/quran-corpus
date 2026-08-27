@@ -8,6 +8,8 @@ import { ConcordanceList } from '@/components/ConcordanceList';
 import { DefinitionCard } from '@/components/DefinitionCard';
 import { EntryHeader } from '@/components/EntryHeader';
 import { FormFilterChips } from '@/components/FormFilterChips';
+import { useGlassSkin } from '@/components/GlassSurface';
+import { SlimHeader } from '@/components/SlimHeader';
 import {
   getAdjacentRoots,
   getRootOccurrenceCount,
@@ -21,7 +23,7 @@ import { recordRootView } from '@/data/userRepository';
 import { localDay } from '@/home/counters';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
-import { typography } from '@/theme/tokens';
+import { fonts, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
 interface Neighbors {
@@ -49,6 +51,7 @@ interface AppliedFilter {
 export default function RootRoute() {
   const params = useLocalSearchParams<{ buckwalter: string }>();
   const theme = useThemeColors();
+  const skin = useGlassSkin();
   const { contentLanguage, uiLocale } = useAppSettings();
 
   // Untrusted: a path segment off a deep link. parseRootParam applies the same
@@ -252,88 +255,123 @@ export default function RootRoute() {
   // a scroll view inside a FlatList header is a nested VirtualizedList, which
   // breaks the scroll rather than nesting it.
   const header = (
-    <View style={{ padding: 20, gap: 18 }}>
-      <EntryHeader uiLocale={uiLocale} arabic={root.root_arabic} count={root.occurrence_count}>
-        {/* One pill per letter, right to left. The spaces in a compound root
-            ("ق و ل") are separators, not letters, so they are stripped before
-            splitting -- otherwise a three-letter root renders five pills, two
-            of them blank. */}
-        {/* row-reverse, not a reversed array: the pills stay in tree order
-            (ق و ل) so TalkBack reads the root forwards, and only the layout
-            flips. Same treatment AlphabetGrid gives the alphabet. */}
-        <View
-          testID="root-letters"
-          style={{
-            flexDirection: 'row-reverse',
-            flexWrap: 'wrap',
-            justifyContent: 'center',
-            gap: 6,
-          }}
-        >
-          {Array.from(root.root_arabic.replace(/\s+/g, '')).map((letter, index) => (
-            <View
-              key={`${letter}-${index}`}
-              testID="root-letter"
-              style={{
-                backgroundColor: theme.surface,
-                borderWidth: 1,
-                borderColor: theme.border,
-                borderRadius: 8,
-                paddingHorizontal: 10,
-                paddingVertical: 4,
-              }}
-            >
-              <Text style={{ color: theme.text, fontFamily: 'Hafs', fontSize: typography.body }}>
-                {letter}
-              </Text>
-            </View>
-          ))}
-        </View>
-      </EntryHeader>
-
-      <AdjacentNav
-        prev={neighbors.prev}
-        next={neighbors.next}
-        // replace, not push: paging is a pager, not a trail. Pushing left one
-        // screen per Next on a stack the reader can only leave by backing out
-        // of every root they passed, and root screens are outside the tab
-        // group, so there is no tab bar to escape to either.
-        onNavigate={(target) => router.replace(`/root/${encodeURIComponent(target)}`)}
-        label={t(uiLocale, 'root.adjacent')}
-        uiLocale={uiLocale}
+    <View style={{ gap: 16, paddingBottom: 14 }}>
+      {/* D1's slim bar. The stack's own transparent header already draws the
+          back arrow above this, so the bar carries the screen's name and the
+          Buckwalter spelling and nothing else. */}
+      <SlimHeader
+        testID="root-header"
+        title={t(uiLocale, 'root.heading')}
+        caption={root.root_buckwalter}
       />
-
-      <View style={{ gap: 10 }}>
-        {definitions.length > 0 ? (
-          definitions.map((definition) => (
-            <DefinitionCard
-              key={definition.id}
+      <View style={{ paddingHorizontal: 16, gap: 16 }}>
+        {/* D5: today's header, kept. Only the chips below took the new look. */}
+        <EntryHeader
+          uiLocale={uiLocale}
+          arabic={root.root_arabic}
+          count={root.occurrence_count}
+          pager={
+            <AdjacentNav
+              prev={neighbors.prev}
+              next={neighbors.next}
+              // replace, not push: paging is a pager, not a trail. Pushing left
+              // one screen per Next on a stack the reader can only leave by
+              // backing out of every root they passed, and root screens are
+              // outside the tab group, so there is no tab bar to escape to
+              // either.
+              onNavigate={(target) => router.replace(`/root/${encodeURIComponent(target)}`)}
+              label={t(uiLocale, 'root.adjacent')}
               uiLocale={uiLocale}
-              definition={definition.definition}
-              source={definition.source}
             />
-          ))
-        ) : (
-          // 24 roots still carry no definition (hw_gap_24.tsv). Saying so
-          // reads clearer than an empty section.
-          <Text
-            testID="root-no-definition"
-            style={{ color: theme.mutedText, fontSize: typography.body }}
+          }
+        >
+          {/* One pill per letter, right to left. The spaces in a compound root
+              ("ق و ل") are separators, not letters, so they are stripped before
+              splitting -- otherwise a three-letter root renders five pills, two
+              of them blank. */}
+          {/* row-reverse, not a reversed array: the pills stay in tree order
+              (ق و ل) so TalkBack reads the root forwards, and only the layout
+              flips. Same treatment AlphabetGrid gives the alphabet. */}
+          <View
+            testID="root-letters"
+            style={{
+              flexDirection: 'row-reverse',
+              flexWrap: 'wrap',
+              justifyContent: 'center',
+              gap: 6,
+            }}
           >
-            {t(uiLocale, 'root.noDefinition')}
+            {Array.from(root.root_arabic.replace(/\s+/g, '')).map((letter, index) => (
+              <View
+                key={`${letter}-${index}`}
+                testID="root-letter"
+                style={{
+                  backgroundColor: skin.fill,
+                  borderWidth: 1,
+                  borderColor: skin.border,
+                  borderRadius: 8,
+                  paddingHorizontal: 10,
+                  paddingVertical: 3,
+                }}
+              >
+                <Text style={{ color: theme.text, fontFamily: fonts.arabic, fontSize: typography.body }}>
+                  {letter}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </EntryHeader>
+
+        <View style={{ gap: 10 }}>
+          {definitions.length > 0 ? (
+            definitions.map((definition) => (
+              <DefinitionCard
+                key={definition.id}
+                uiLocale={uiLocale}
+                definition={definition.definition}
+                source={definition.source}
+              />
+            ))
+          ) : (
+            // 24 roots still carry no definition (hw_gap_24.tsv). Saying so
+            // reads clearer than an empty section.
+            <Text
+              testID="root-no-definition"
+              style={{ color: theme.mutedText, fontSize: typography.body }}
+            >
+              {t(uiLocale, 'root.noDefinition')}
+            </Text>
+          )}
+        </View>
+
+        <FormFilterChips forms={forms} selected={selected} onToggle={toggleForm} uiLocale={uiLocale} />
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <Text
+            testID="concordance-heading"
+            role="heading"
+            style={{
+              color: theme.mutedText,
+              fontFamily: fonts.displaySemiBold,
+              fontSize: typography.caption,
+              letterSpacing: 1.2,
+              textTransform: 'uppercase',
+            }}
+          >
+            {t(uiLocale, 'concordance.heading')}
           </Text>
-        )}
+          <Text
+            testID="concordance-count"
+            style={{
+              color: theme.mutedText,
+              fontSize: typography.caption,
+              fontVariant: ['tabular-nums'],
+            }}
+          >
+            {applied.total}
+          </Text>
+        </View>
       </View>
-
-      <FormFilterChips forms={forms} selected={selected} onToggle={toggleForm} uiLocale={uiLocale} />
-
-      <Text
-        testID="concordance-heading"
-        role="heading"
-        style={{ color: theme.mutedText, fontSize: typography.caption }}
-      >
-        {t(uiLocale, 'concordance.heading')} ({applied.total})
-      </Text>
     </View>
   );
 

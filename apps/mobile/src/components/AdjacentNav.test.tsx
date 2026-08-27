@@ -3,10 +3,11 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AdjacentNav } from './AdjacentNav';
 
-vi.mock('react-native', async () => {
-  const { host } = await import('@/testing/rnHosts.js');
-  return { Pressable: host('button'), Text: host('span'), View: host('div') };
-});
+vi.mock('react-native', async () => (await import('@/testing/rnHosts.js')).reactNativeTextMock());
+// The chevrons squeeze on press, so they reach usePressScale ->
+// useReducedMotion, which reads the in-app setting as well as the system one;
+// the real store opens expo-secure-store, which jsdom has no counterpart for.
+vi.mock('@/settings/settingsStore', () => ({ useAppSettings: () => ({ uiLocale: 'en', reduceMotion: false }) }));
 
 describe('AdjacentNav', () => {
   afterEach(cleanup);
@@ -53,10 +54,14 @@ describe('AdjacentNav', () => {
     // Russian agrees the adjective with the noun: корень is masculine, лемма is
     // feminine. Sharing one pair of strings put "Предыдущий" over a toolbar
     // labelled "Соседние леммы".
+    //
+    // Read off aria-label, not textContent: since D3 the control is a bare
+    // chevron, so the inflected string IS its accessible name and nothing else.
+    // A chevron with no name announces as "button".
     render(
       <AdjacentNav prev="a" next="b" onNavigate={vi.fn()} label="Соседние корни" uiLocale="ru" />,
     );
-    expect(screen.getByTestId('root-previous').textContent).toContain('Предыдущий');
+    expect(screen.getByTestId('root-previous').getAttribute('aria-label')).toBe('Предыдущий');
 
     cleanup();
     render(
@@ -69,7 +74,7 @@ describe('AdjacentNav', () => {
         testIDPrefix="lemma"
       />,
     );
-    expect(screen.getByTestId('lemma-previous').textContent).toContain('Предыдущая');
-    expect(screen.getByTestId('lemma-next').textContent).toContain('Следующая');
+    expect(screen.getByTestId('lemma-previous').getAttribute('aria-label')).toBe('Предыдущая');
+    expect(screen.getByTestId('lemma-next').getAttribute('aria-label')).toBe('Следующая');
   });
 });

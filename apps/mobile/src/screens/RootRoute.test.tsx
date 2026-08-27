@@ -270,12 +270,15 @@ describe('RootRoute', () => {
     expect(await screen.findByTestId('root-no-definition')).toBeTruthy();
   });
 
-  it('counts the concordance in its heading', async () => {
+  it('counts the concordance beside its heading', async () => {
+    // The count moved out of the heading string and into its own node when the
+    // row became an eyebrow with a right-aligned total (m6g-4). Both halves
+    // still have to be on screen: the heading alone says nothing about size,
+    // and a bare number says nothing about what it counts.
     mocks.getRootOccurrenceCount.mockResolvedValue(1722);
     render(<RootRoute />);
-    expect((await screen.findByTestId('concordance-heading')).textContent).toBe(
-      'Concordance (1722)',
-    );
+    expect((await screen.findByTestId('concordance-heading')).textContent).toBe('Concordance');
+    expect(screen.getByTestId('concordance-count').textContent).toBe('1722');
   });
 
   it('narrows the concordance to the selected forms', async () => {
@@ -295,7 +298,7 @@ describe('RootRoute', () => {
     render(<RootRoute />);
     fireEvent.click((await screen.findAllByTestId('form-chip'))[0]!);
     await waitFor(() =>
-      expect(screen.getByTestId('concordance-heading').textContent).toBe('Concordance (92)'),
+      expect(screen.getByTestId('concordance-count').textContent).toBe('92'),
     );
   });
 

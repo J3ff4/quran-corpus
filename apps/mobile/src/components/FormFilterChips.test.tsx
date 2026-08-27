@@ -10,6 +10,10 @@ vi.mock('react-native', async () => {
   const { reactNativeTextMock } = await import('@/testing/rnHosts.js');
   return reactNativeTextMock();
 });
+// A chip squeezes on press, so it reaches usePressScale -> useReducedMotion,
+// which reads the in-app setting as well as the system one; the real store
+// opens expo-secure-store, which jsdom has no counterpart for.
+vi.mock('@/settings/settingsStore', () => ({ useAppSettings: () => ({ uiLocale: 'en', reduceMotion: false }) }));
 
 const FORMS = [
   { id: 1, root_id: 1, sort_order: 0, pos_label: 'Form I verb', form_arabic: 'قَالَ',

@@ -75,6 +75,8 @@ export type UiStringKey =
   // No 'root.title': the sheet's 'word.root' is already the word "Root" in all
   // three locales, and a second key for the same string is a second place for
   // a translation to drift.
+  // Names the root screen in its slim header bar.
+  | 'root.heading'
   | 'root.noDefinition'
   | 'root.notFound'
   | 'root.previous'
@@ -263,6 +265,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'word.grammar': 'Grammar',
     'word.notFound': 'That word is not in the corpus',
     'word.transliteration': 'Transliteration',
+    'root.heading': 'Root',
     'root.noDefinition': 'No definition for this root yet',
     'root.notFound': 'That root is not in the corpus',
     'root.previous': 'Previous',
@@ -417,6 +420,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'word.grammar': 'Grammatika',
     'word.notFound': 'Bu so‘z korpusda yo‘q',
     'word.transliteration': 'Transliteratsiya',
+    'root.heading': 'O‘zak',
     'root.noDefinition': 'Bu o‘zak uchun hali ta‘rif yo‘q',
     'root.notFound': 'Bu o‘zak korpusda yo‘q',
     'root.previous': 'Oldingi',
@@ -566,6 +570,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'word.grammar': 'Грамматика',
     'word.notFound': 'Этого слова нет в корпусе',
     'word.transliteration': 'Транслитерация',
+    'root.heading': 'Корень',
     'root.noDefinition': 'Для этого корня пока нет определения',
     'root.notFound': 'Этого корня нет в корпусе',
     'root.previous': 'Предыдущий',

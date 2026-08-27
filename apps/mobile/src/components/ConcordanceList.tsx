@@ -1,14 +1,20 @@
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { trimConcordanceVerse, type ConcordanceEntry, type RootForm } from '@quran-corpus/data/mobile';
+
+import { GlassSurface } from './GlassSurface';
 import { t } from '@/i18n/uiStrings';
 import type { UiLocaleCode } from '@/i18n/languages';
+import { usePressScale } from '@/motion/usePressScale';
 import { useAppSettings } from '@/settings/settingsStore';
 import { formColorFor } from '@/theme/formTint';
-import { touchTargets, typography } from '@/theme/tokens';
+import { fonts, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 // One screenful and a bit: large enough that a scroll rarely waits, small
 // enough that the first page lands immediately on a hot root.
@@ -45,6 +51,7 @@ function ConcordanceRow({
   uiLocale: UiLocaleCode;
 }) {
   const theme = useThemeColors();
+  const press = usePressScale();
   // Per-row, not lifted: each row's expansion is independent, and this only
   // works because the row is its own component -- a renderItem closure can't
   // hold hook state across FlatList's re-renders.
@@ -61,8 +68,20 @@ function ConcordanceRow({
   const formStyle = form ? formColorFor(theme, form.pos_label) : null;
 
   return (
-    <View style={{ paddingHorizontal: 20, paddingVertical: 12, gap: 4 }}>
-      <Pressable
+    // Flat glass, like the dictionary rows: this list pages to 1722 rows on
+    // ق-و-ل, and a drop shadow per row at that count is a scroll you can feel.
+    <GlassSurface
+      style={{
+        shadowOpacity: 0,
+        elevation: 0,
+        marginHorizontal: 16,
+        marginBottom: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        gap: 6,
+      }}
+    >
+      <AnimatedPressable
         testID="concordance-row"
         accessibilityRole="link"
         // Pressable is one accessibility node, so this label replaces the
@@ -74,7 +93,9 @@ function ConcordanceRow({
         // the Arabic they annotate, and a longer label buys nothing here.
         accessibilityLabel={`${item.surah_id}:${item.ayah_number}:${item.position}${item.gloss ? `, ${item.gloss}` : ''}, ${shown.map((word) => word.text_arabic).join(' ')}`}
         onPress={() => router.push(`/surah/${item.surah_id}?ayah=${item.ayah_number}`)}
-        style={{ gap: 4, minHeight: touchTargets.minimum }}
+        onPressIn={press.onPressIn}
+        onPressOut={press.onPressOut}
+        style={[press.style, { gap: 6, minHeight: touchTargets.minimum }]}
       >
         <View
           // RTL, as in AlphabetGrid and FrequencyList: the Arabic takes the
@@ -95,7 +116,7 @@ function ConcordanceRow({
             <Text
               style={{
                 color: theme.text,
-                fontFamily: 'Hafs',
+                fontFamily: fonts.arabic,
                 fontSize: typography.body,
                 writingDirection: 'rtl',
               }}
@@ -125,7 +146,15 @@ function ConcordanceRow({
               </Text>
             ) : null}
           </View>
-          <Text testID="concordance-ref" style={{ color: theme.mutedText, fontSize: typography.caption }}>
+          <Text
+            testID="concordance-ref"
+            style={{
+              color: theme.accent,
+              fontSize: typography.caption,
+              fontWeight: '600',
+              fontVariant: ['tabular-nums'],
+            }}
+          >
             {item.surah_id}:{item.ayah_number}:{item.position}
           </Text>
         </View>
@@ -140,7 +169,7 @@ function ConcordanceRow({
           testID="concordance-verse"
           style={{
             color: theme.mutedText,
-            fontFamily: 'Hafs',
+            fontFamily: fonts.arabic,
             // typography.body, not useArabicSizes: this is a list row, not
             // reading text -- sizes.reader is 28px and would make one
             // occurrence fill the screen. The reader's own size setting
@@ -197,7 +226,7 @@ function ConcordanceRow({
           ))}
           {trimmed.truncatedAfter && !expanded ? <Text style={{ color: theme.border }}> …</Text> : ''}
         </Text>
-      </Pressable>
+      </AnimatedPressable>
 
       {/* Outside the Pressable above, deliberately: the row is one
           accessibility node whose label replaces its subtree, so a nested
@@ -233,7 +262,7 @@ function ConcordanceRow({
           </Text>
         </Pressable>
       ) : null}
-    </View>
+    </GlassSurface>
   );
 }
 
@@ -406,6 +435,8 @@ export function ConcordanceList({
       ListEmptyComponent={loading ? null : status}
       renderItem={renderItem}
       style={{ flex: 1 }}
+      // The rows are cards carrying their own side margins and the gap between
+      // them, the same split DictionaryRow uses.
       contentContainerStyle={{ paddingBottom }}
     />
   );

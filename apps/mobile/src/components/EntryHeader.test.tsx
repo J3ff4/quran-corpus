@@ -4,7 +4,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EntryHeader } from './EntryHeader';
 
 vi.mock('@/theme/themeContext', () => ({
-  useThemeColors: () => ({ text: '#000', mutedText: '#666', border: '#ccc', surface: '#fff' }),
+  useThemeColors: () => ({
+    text: '#000',
+    mutedText: '#666',
+    border: '#ccc',
+    surface: '#fff',
+    accent: '#1f6f5b',
+  }),
 }));
 vi.mock('@/theme/useArabicSizes', () => ({ useArabicSizes: () => ({ title: 36 }) }));
 vi.mock('react-native', async () => {
@@ -14,6 +20,31 @@ vi.mock('react-native', async () => {
 
 describe('EntryHeader', () => {
   afterEach(cleanup);
+
+  it('draws the pager on the headword\'s own row, without displacing the heading', () => {
+    // Owner ruling D3: Previous/Next flanks the headword instead of sitting in
+    // a docked bar at the foot of the screen. The slot is an overlay, so the
+    // heading has to stay exactly what it was -- a pager threaded between two
+    // halves of the row would make the headword a sibling of two buttons
+    // inside a toolbar.
+    render(
+      <EntryHeader
+        uiLocale="en"
+        arabic="قول"
+        count={12}
+        pager={<span data-testid="pager" />}
+      />,
+    );
+
+    expect(screen.getByTestId('pager')).toBeTruthy();
+    expect(screen.getByRole('heading').textContent).toBe('قول');
+  });
+
+  it('renders no pager slot when there is nothing to page to', () => {
+    render(<EntryHeader uiLocale="en" arabic="قول" count={12} />);
+
+    expect(screen.queryByTestId('pager')).toBeNull();
+  });
 
   it('renders the headword as the screen heading', () => {
     render(<EntryHeader uiLocale="en" arabic="قول" count={12} />);

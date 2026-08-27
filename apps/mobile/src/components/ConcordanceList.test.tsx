@@ -9,12 +9,15 @@ import { ConcordanceList } from './ConcordanceList';
 
 const mocks = vi.hoisted(() => ({ push: vi.fn() }));
 
-vi.mock('@/settings/settingsStore', () => ({ useAppSettings: () => ({ uiLocale: 'en' }) }));
+vi.mock('@/settings/settingsStore', () => ({ useAppSettings: () => ({ uiLocale: 'en', reduceMotion: false }) }));
 vi.mock('expo-router', () => ({ router: { push: mocks.push } }));
 vi.mock('react-native', async () => {
   const React = await import('react');
-  const { host } = await import('@/testing/rnHosts.js');
+  const { host, AccessibilityInfo } = await import('@/testing/rnHosts.js');
   return {
+    // The row squeezes on press, so it reaches useReducedMotion, which reads
+    // this on mount.
+    AccessibilityInfo,
     ActivityIndicator: () => React.createElement('span', null, 'loading'),
     Pressable: host('button'),
     Text: host('span'),
