@@ -7,9 +7,11 @@ import { useThemeColors } from '@/theme/themeContext';
 export interface SlimHeaderProps {
   /** The screen's name, set as an uppercase eyebrow on the left. */
   title: string;
-  /** Right-aligned caption: a count, a sort order, a rank. Optional -- not
-   *  every screen has a number that belongs beside its name. */
-  caption?: string;
+  /** Right-aligned caption: a count, a sort order, a reading. Optional, and
+   *  nullable because a caption is usually a nullable database column -- a
+   *  lemma with no transliteration passes it straight through rather than
+   *  spelling the same guard out again at the call site. */
+  caption?: string | null;
   testID?: string;
 }
 

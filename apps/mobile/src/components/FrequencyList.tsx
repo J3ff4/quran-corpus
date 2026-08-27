@@ -6,7 +6,7 @@ import { FREQUENCY_LIMIT, getFrequencyRows, type FrequencyRow } from '@/data/cor
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
-import { typography } from '@/theme/tokens';
+import { fonts, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
@@ -74,6 +74,14 @@ export function FrequencyList({ kind }: FrequencyListProps) {
   // ponytail: no empty state. All three queries are unfiltered over a bundled
   // DB -- capped, but never narrowed -- so an empty result means the DB is
   // broken, which is the failed branch above.
+  const label = {
+    color: theme.mutedText,
+    fontFamily: fonts.displaySemiBold,
+    fontSize: typography.caption,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  } as const;
+
   return (
     <View style={{ flex: 1 }}>
       <View
@@ -85,31 +93,18 @@ export function FrequencyList({ kind }: FrequencyListProps) {
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          paddingHorizontal: 20,
-          paddingVertical: 8,
+          // 32, not 20: the rows are cards now, insetting 16 from the screen
+          // and padding another 16 inside. The labels have to start where the
+          // columns they name start, or they name the gap between them.
+          paddingHorizontal: 32,
+          paddingBottom: 8,
           gap: 12,
         }}
       >
-        {/* The same 32/12 rank gutter DictionaryRow lays out, so the labels sit
-            over the columns they name. */}
-        <Text style={{ width: 32, color: theme.mutedText, fontSize: typography.caption }}>
-          {t(uiLocale, 'dictionary.columnRank')}
-        </Text>
-        <View
-          style={{
-            flex: 1,
-            flexDirection: 'row-reverse',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <Text style={{ color: theme.mutedText, fontSize: typography.caption }}>
-            {t(uiLocale, 'dictionary.columnForm')}
-          </Text>
-          <Text style={{ color: theme.mutedText, fontSize: typography.caption }}>
-            {t(uiLocale, 'dictionary.columnCount')}
-          </Text>
-        </View>
+        {/* The same 34/12 rank gutter DictionaryRow lays out. */}
+        <Text style={[label, { minWidth: 34 }]}>{t(uiLocale, 'dictionary.columnRank')}</Text>
+        <Text style={[label, { flex: 1 }]}>{t(uiLocale, 'dictionary.columnCount')}</Text>
+        <Text style={label}>{t(uiLocale, 'dictionary.columnForm')}</Text>
       </View>
       <FlatList
         // Refetching on a chip tap does not reset the content offset, so
@@ -129,7 +124,9 @@ export function FrequencyList({ kind }: FrequencyListProps) {
           />
         )}
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom }}
+        // The rows are cards carrying their own side margins and the gap
+        // between them, the same split Browse uses.
+        contentContainerStyle={{ paddingTop: 4, paddingBottom }}
       />
     </View>
   );

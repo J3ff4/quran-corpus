@@ -91,6 +91,8 @@ export type UiStringKey =
   // Root screen's concordance heading, read as "Concordance (1722)". t() has
   // no interpolation, so the count is concatenated at the call site.
   | 'concordance.heading'
+  // Names the lemma screen in its slim header bar.
+  | 'lemma.heading'
   | 'lemma.notFound'
   // Caption above a lemma's top glosses: contextual word-by-word
   // translations, not a definition -- see LemmaScreen and text/gloss.ts.
@@ -272,6 +274,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'root.next': 'Next',
     'root.adjacent': 'Adjacent roots',
     'root.formsFilter': 'Filter by form',
+    'lemma.heading': 'Lemma',
     'lemma.notFound': 'This lemma is not in the corpus',
     'lemma.translatedAs': 'Translated as',
     'lemma.aboutTranslations': 'About these translations',
@@ -427,6 +430,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'root.next': 'Keyingi',
     'root.adjacent': 'Qo‘shni o‘zaklar',
     'root.formsFilter': 'Shakl bo‘yicha filtr',
+    'lemma.heading': 'Lemma',
     'lemma.notFound': 'Bu lemma korpusda yo‘q',
     'lemma.translatedAs': 'Tarjimasi',
     'lemma.aboutTranslations': 'Bu tarjimalar haqida',
@@ -577,6 +581,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'root.next': 'Следующий',
     'root.adjacent': 'Соседние корни',
     'root.formsFilter': 'Фильтр по форме',
+    'lemma.heading': 'Лемма',
     'lemma.notFound': 'Этой леммы нет в корпусе',
     'lemma.translatedAs': 'Переводится как',
     'lemma.aboutTranslations': 'Об этих переводах',

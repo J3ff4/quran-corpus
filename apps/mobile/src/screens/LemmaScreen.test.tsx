@@ -377,10 +377,35 @@ describe('LemmaScreen', () => {
     expect(screen.queryByTestId('lemma-no-definition')).toBeNull();
   });
 
-  it('counts the concordance in its heading', async () => {
+  it('captions the slim header with the reading, and omits it when there is none', async () => {
+    // D3 sent frame 3's "rank 41 of 200" into the slim bar. The rank itself is
+    // not on this screen -- getAdjacentLemmas returns neighbours, not a
+    // position, and M6g adds no queries -- so the reading is what captions it.
+    // A caption node with nothing in it lays the title against a gap instead
+    // of against the right edge.
+    render(<LemmaScreen lemmaBuckwalter="qaAla" source={null} />);
+    expect((await screen.findByTestId('lemma-header-caption')).textContent).toBe('qāla');
+
+    cleanup();
+    mocks.getLemmaScreen.mockResolvedValue({
+      entry: { ...LEMMA, transliteration: null },
+      total: LEMMA.count,
+    });
+    render(<LemmaScreen lemmaBuckwalter="qaAla" source={null} />);
+
+    await screen.findByTestId('lemma-header');
+    expect(screen.queryByTestId('lemma-header-caption')).toBeNull();
+  });
+
+  it('counts the concordance beside its heading', async () => {
+    // The count moved out of the heading string into its own node when the row
+    // became an eyebrow with a right-aligned total (m6g-3/-4). Both halves are
+    // still asserted: the heading alone says nothing about size, and a bare
+    // number says nothing about what it counts.
     mocks.getLemmaScreen.mockResolvedValue({ entry: LEMMA, total: 1722 });
     render(<LemmaScreen lemmaBuckwalter="qaAla" source={null} />);
-    expect((await screen.findByTestId('concordance-heading')).textContent).toContain('Concordance (1722)');
+    expect((await screen.findByTestId('concordance-heading')).textContent).toBe('Concordance');
+    expect(screen.getByTestId('concordance-count').textContent).toBe('1722');
   });
 
   it('pages through the ranking it was entered from', async () => {

@@ -14,6 +14,9 @@ const ALLOWED_COLLISIONS: Partial<Record<UiStringKey, readonly ('uz' | 'ru')[]>>
   'browse.juzLabel': ['uz'],
   // Same again: "Mushaf" is the Arabic muṣḥaf, spelled the same in Uzbek.
   'reader.modeMushaf': ['uz'],
+  // "Lemma" is the same loanword in Uzbek -- 'dictionary.kindLemmas' is its
+  // plural, "Lemmalar". Not an untranslated copy.
+  'lemma.heading': ['uz'],
 };
 
 // Concatenate every .ts/.tsx source file under src/ and app/, except the
