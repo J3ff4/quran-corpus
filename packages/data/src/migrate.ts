@@ -93,9 +93,20 @@ const NFC_UPDATE_BATCH = 500;
  * Unscoped where this used to be LIKE-scoped to one decomposed sequence: that
  * scope is what left 12097 lemma rows un-normalized after the alef-madda fix
  * (PR #50) and hid this defect for a month. A predicate narrow enough to skip
- * rows cheaply is also narrow enough to skip rows wrongly, and it fails open.
- * The cost is one scan of each column per cold start, which is what the
- * LIKE-scoped version already paid.
+ * rows cheaply is also narrow enough to skip rows wrongly, and it fails open --
+ * the rows it misses are precisely the ones nobody knows to look for.
+ *
+ * That correctness is paid for, and the earlier draft of this comment
+ * understated the bill. The LIKE version pushed its predicate into SQLite and,
+ * once healed, transferred nothing; this reads all 153387 rows of the three
+ * columns into JS -- measured at 408ms against the live corpus, inside the init
+ * that blocks a cold process's first request. Accepted rather than optimized,
+ * for two reasons: SQLite has no NFC function, so the detection cannot move
+ * into SQL, and the obvious alternative -- a stored "already normalized"
+ * marker -- has the same fail-open shape as the LIKE scope, since it would be
+ * set on the word of the writer whose output this exists to check. apps/web is
+ * a long-lived server process, so the cost is once per deploy. Somewhere that
+ * cold-starts per request, this is the first thing to revisit.
  */
 async function normalizeNfcJoinColumns(db: Client): Promise<void> {
   for (const [table, column] of JOIN_TEXT_COLUMNS) {
