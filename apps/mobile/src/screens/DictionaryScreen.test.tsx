@@ -13,9 +13,13 @@ const mocks = vi.hoisted(() => ({
   //   count (1722) and gloss ('to say') are each unique in the fixture, so the
   //   Latin/meaning search tests isolate it too.
   // - أرض is the one root a folded Arabic search ('ارض' -> 'أرض') isolates.
+  // - رحم and ابل share a count, and are listed here in the order the tie must
+  //   NOT come out in: the frequency order is sorted from the alphabetical one
+  //   and leans on Array.sort being stable, so ا has to land before ر however
+  //   the DB hands them over.
   rows: [
-    { id: 2, root_buckwalter: 'Abl', root_arabic: 'ابل', occurrence_count: 2, gloss_blob: 'camel' },
     { id: 7, root_buckwalter: 'rHm', root_arabic: 'رحم', occurrence_count: 339, gloss_blob: 'mercy' },
+    { id: 2, root_buckwalter: 'Abl', root_arabic: 'ابل', occurrence_count: 339, gloss_blob: 'camel' },
     { id: 9, root_buckwalter: 'qwl', root_arabic: 'قول', occurrence_count: 1722, gloss_blob: 'to say' },
     { id: 4, root_buckwalter: 'ArD', root_arabic: 'أرض', occurrence_count: 9, gloss_blob: null },
   ] as unknown[],
@@ -272,6 +276,22 @@ describe('DictionaryScreen', () => {
     const rows = screen.getAllByTestId('dictionary-row');
     expect(rows).toHaveLength(4);
     expect(rows[0]!.textContent).toContain('1722');
+  });
+
+  it('breaks a frequency tie in hijāʾī order, not in the order the DB returned', async () => {
+    // The two orders are each sorted once when the payload lands, and the
+    // frequency one is sorted FROM the alphabetical one rather than from the
+    // raw rows -- Array.sort is stable, so equal counts keep the hijāʾī order
+    // they arrive in. Sorting it from the raw rows instead would leave this
+    // tie in DB order, which is why the fixture lists رحم first.
+    await renderLoaded();
+
+    fireEvent.click(screen.getByTestId('dictionary-sort-freq'));
+
+    const rows = screen.getAllByTestId('dictionary-row');
+    expect(rows[0]!.textContent).toContain('قول');
+    expect(rows[1]!.textContent).toContain('ابل');
+    expect(rows[2]!.textContent).toContain('رحم');
   });
 
   it('keeps the search box out of the scrolling list', async () => {
