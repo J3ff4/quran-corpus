@@ -425,3 +425,68 @@ reference. That bar is M6a's, not M6g's, and this is the same class as
 `[[rn-glass-bar-must-be-opaque]]` (M6d, fixed there for the reader's docked
 bar). Not fixed here: it is a different sub-phase's component and every tab
 screen shows it. Worth an issue before M7.
+
+---
+
+## Owner review of the built screens, 2026-08-27
+
+Four notes after using the branch on device. Answers taken with
+`AskUserQuestion` before any code was written; the rulings are recorded here
+because three of them overturn decisions this plan made.
+
+1. **The pager blanked, then slid, and stuttered — and the back arrow moved
+   with it.** Ruling: a *true* pager, both entries moving together. Superseded
+   check 92's fix rather than extending it, and the diagnosis there was
+   incomplete: `replace` was the root cause of more than the lost direction.
+   The navigator remounts the screen, which destroyed the outgoing entry
+   before the incoming one rendered (so there was never anything to slide
+   out), blanked the screen to a spinner in between (the "content
+   disappears"), and ran the navigator's own push transition over the top —
+   that is what animated the back arrow, and what the entry's own slide was
+   fighting for the same frames.
+
+   So paging no longer navigates at all. `useEntryPager` seeds from the route
+   parameter and Previous/Next move its own state; `useHeldEntry` keeps the
+   previous entry drawn until its replacement has fully loaded; reanimated's
+   layout animations (`SlideInRight`/`SlideOutLeft`, mirrored, `FadeIn`/
+   `FadeOut` under reduced motion) run both halves over one duration.
+   `useEntryTransition` is deleted — the module-level pending side it needed
+   existed only to survive the remount that no longer happens.
+
+   **Not applied, and deliberately:** the owner also chose `animation: 'none'`
+   on the two entry routes. That was picked on the premise that the navigator
+   animates on every page turn, which is no longer true — the only navigations
+   left are genuine pushes from the reader or the frequency list, where the
+   transition is wanted. Setting it would remove a wanted animation to fix one
+   that can no longer occur. One line in `app/_layout.tsx` if the owner
+   disagrees.
+
+2. **The slim headers go.** All three (D1 is reversed). Their captions stay:
+   the dictionary count moves onto the segmented control's row, the root's
+   Buckwalter spelling onto the headword plate, and the lemma's reading was
+   already under its headword, so nothing moved there. `root.heading` and
+   `lemma.heading` are gone.
+
+3. **The m6g-4 form chips, applied properly.** Task 3 restyled the row but
+   kept the old chip contents; the mockup's chip is the Arabic form and its
+   count, tinted by part of speech at all times. The label, reading and gloss
+   are the accessible name now — a tint says nothing to a screen reader, and
+   this is the one place the redesign could have cost information. The All
+   chip is built (Task 3 had deferred it as owner's call).
+
+4. **The frequency kind chips touched the column labels.** Padding.
+
+### Verification log — pending
+
+| Check | Build | Date | Result | Notes |
+| --- | --- | --- | --- | --- |
+| 97 | — | — | **PENDING** | Page Next/Previous on a root: previous entry slides out as the next slides in, both moving together, no blank, no stutter. Back arrow does not move. |
+| 98 | — | — | **PENDING** | Same on the lemma screen, entered from Most used. |
+| 99 | — | — | **PENDING** | Reduced motion on: the two entries cross-fade, neither slides. |
+| 100 | — | — | **PENDING** | Dictionary, root and lemma have no slim bar; the count, the Buckwalter spelling and the reading are all still on screen. |
+| 101 | — | — | **PENDING** | Form chips: All lit with no filter, tinted per part of speech, tapping All clears a multi-chip selection. |
+| 102 | — | — | **PENDING** | Most used: chips clear of the #/count/form labels in both themes. |
+
+Not run: the phone was locked when the work landed (02:32 local). §10 —
+implementation complete, verification pending is an unmet exit criterion, so
+M6g does not close until these six are recorded.
