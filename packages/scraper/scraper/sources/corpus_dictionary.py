@@ -20,6 +20,7 @@ Single-form roots carry no <ul class="also">; the form is stated inline:
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 
 from bs4 import BeautifulSoup, Tag
@@ -87,6 +88,21 @@ def _cap_first(s: str) -> str:
     return s[0].upper() + s[1:] if s else s
 
 
+def _form_arabic(el: Tag) -> str:
+    """The form's Arabic as the page writes it, NFC-normalized.
+
+    The page orders a shadda ahead of the vowel it shares a letter with, where
+    NFC orders them the other way (fatha is combining class 30, shadda 33).
+    The morphology import on the other side of the derived-form filter's join
+    already normalizes (buckwalter.py, PR #50), so leaving this side raw meant
+    two strings that render identically and compare unequal -- root Hqq's form
+    حَآقَّة counted three occurrences and filtered to none. NFC never changes
+    how a string renders, only which of several equal encodings it is stored
+    as, so nothing on screen moves.
+    """
+    return unicodedata.normalize("NFC", el.get_text(strip=True))
+
+
 def _extract_forms(soup: BeautifulSoup) -> list[ParsedRootForm]:
     forms: list[ParsedRootForm] = []
     # The page reuses class="also" for both the derived-forms list and the
@@ -103,7 +119,7 @@ def _extract_forms(soup: BeautifulSoup) -> list[ParsedRootForm]:
                 continue
             translit_el = li.find("i", class_="ab")
             form_translit = translit_el.get_text(strip=True) if translit_el else None
-            form_arabic = arabic_el.get_text(strip=True)
+            form_arabic = _form_arabic(arabic_el)
             # Text before the translit tag: "49 times as the form I verb"
             lead = li.get_text(" ", strip=True)
             if form_translit:
@@ -144,7 +160,7 @@ def _extract_single_form(soup: BeautifulSoup, total: int) -> list[ParsedRootForm
         # names no Arabic must not borrow a span from further down.
         if sentence is None or arabic_el is None or arabic_el.parent is not sentence:
             continue
-        arabic = arabic_el.get_text(strip=True)
+        arabic = _form_arabic(arabic_el)
         if not _ARABIC_RE.search(arabic):
             continue
         # Text ahead of the translit tag: "... in the Quran, as the noun".

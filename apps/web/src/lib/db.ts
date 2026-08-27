@@ -2,7 +2,7 @@ import {
   createDatabase,
   runMigrations,
   backfillSearchIndex,
-  normalizeLemmaMadda,
+  normalizeArabicJoinKeys,
   backfillRootSortOrderIfStale,
 } from '@quran-corpus/data';
 import type { Client } from '@quran-corpus/data';
@@ -24,7 +24,7 @@ export function getDatabase(): Promise<Client> {
       if (shouldRunMigrations()) {
         await runMigrations(db);
         await backfillSearchIndex(db);
-        // Inside the guard, unlike normalizeLemmaMadda below, because this one
+        // Inside the guard, unlike normalizeArabicJoinKeys below, because this one
         // is not self-contained: what marks the cache dirty is the
         // trg_roots_sort_order_* DDL that runMigrations installs. Under
         // DB_SKIP_MIGRATIONS=true those triggers never exist, so nothing ever
@@ -48,7 +48,26 @@ export function getDatabase(): Promise<Client> {
       // -- runs even when DB_SKIP_MIGRATIONS=true, since that flag's job is
       // only to keep DDL out of the request path against a pre-provisioned
       // database, not to exempt it from data corrections.
-      await normalizeLemmaMadda(db);
+      //
+      // Spelled out, because the comment above argues the other way for its
+      // own call: `next build` sets that flag, so a build pointed at the live
+      // database does write here -- and foldFormMaddaToLemma's write changes
+      // how a form is spelled on screen, not merely how it is encoded. That is
+      // deliberate (a chip the filter cannot match is worse than a build with
+      // a side effect), but it is the one write the flag does not hold back.
+      //
+      // Never fatal, for the same reason as the backfill above and now more
+      // so: this pass issues the write transactions, so it is the call that
+      // meets SQLITE_BUSY when the scraper holds the lock on the same file, or
+      // when two workers cold-start together. Letting it reject would fail the
+      // memoized init and 500 every SSR page. Skipping it leaves the chips
+      // mismatched exactly as they were before it ever ran -- degraded, never
+      // wrong -- and the next cold start retries.
+      try {
+        await normalizeArabicJoinKeys(db);
+      } catch (err) {
+        console.warn('Arabic join-key normalization skipped; derived-form chips may not match', err);
+      }
       return db;
     })();
     // Drop a failed init from the cache so the next request retries instead of
