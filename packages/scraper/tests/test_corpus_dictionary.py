@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import unicodedata
 from pathlib import Path
 
 import pytest
@@ -251,3 +252,28 @@ def test_root_arabic_keeps_corpus_hamza() -> None:
     parsed = parse_root_page(_ONE_FORM_MANY_HTML)
     assert parsed is not None
     assert parsed.root_arabic == "أرض"
+
+
+def test_form_arabic_is_nfc_normalized() -> None:
+    """The page writes a shadda ahead of the vowel it shares a letter with;
+    NFC orders them the other way (fatha is combining class 30, shadda 33).
+
+    The morphology import on the other side of the derived-form filter's join
+    already normalizes (buckwalter.py, PR #50), so an un-normalized form here
+    renders identically to its lemma and compares unequal: root Hqq's
+    حَآقَّة counted three occurrences and filtered to none.
+    """
+    scraped = "حَآقَّة"  # shadda before fatha
+    html = (
+        "<p>The triliteral root <i class='ab'>ha qaf qaf</i> "
+        "(<span class='at'>ح ق ق</span>) occurs 287 times in the Quran, "
+        "in seven derived forms:</p>"
+        "<ul class='also'><li>3 times as the noun "
+        f"<i class='ab'>haqqat</i> (<span class='at'>{scraped}</span>)</li></ul>"
+    )
+    parsed = parse_root_page(html)
+    assert parsed is not None
+    form = parsed.forms[0].form_arabic
+    assert form is not None
+    assert form == unicodedata.normalize("NFC", scraped)
+    assert form != scraped

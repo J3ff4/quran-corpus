@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createDatabase } from '../src/db.js';
-import { runMigrations, normalizeLemmaMadda, splitStatements, stripLineComments } from '../src/migrate.js';
+import {
+  runMigrations,
+  normalizeArabicJoinKeys,
+  splitStatements,
+  stripLineComments,
+} from '../src/migrate.js';
 import type { Client } from '@libsql/client';
 
 let db: Client;
@@ -112,33 +117,163 @@ describe('runMigrations', () => {
     d.close();
   });
 
-  it('normalizeLemmaMadda composes a decomposed alef-madda lemma on words and word_segments', async () => {
-    // Exercised directly (not via runMigrations) -- normalizeLemmaMadda is a
-    // data-only self-heal, called standalone by apps/web/src/lib/db.ts so it
-    // still runs under DB_SKIP_MIGRATIONS=true, which skips runMigrations' DDL.
+  // One fixture for the whole self-heal: a root whose forms reproduce each
+  // case the join has to survive. `seedJoinFixture` returns the ids so a test
+  // can assert on the row it cares about.
+  async function seedJoinFixture(d: Client): Promise<void> {
+    await d.execute("INSERT INTO surahs VALUES (1,'a','A','A','meccan',7,1)");
+    await d.execute("INSERT INTO ayahs (id,surah_id,ayah_number,text_uthmani) VALUES (1,1,1,'x')");
+    await d.execute("INSERT INTO roots (id,root_buckwalter,root_arabic,occurrence_count) VALUES (1,'Hqq','حقق',287)");
+  }
+
+  // Shadda (combining class 33) written ahead of fatha (30) -- the order
+  // corpus.quran.com's HTML uses and NFC does not.
+  const SHADDA = String.fromCodePoint(0x0651);
+  const FATHA = String.fromCodePoint(0x064e);
+  const ALEF_MADDA = String.fromCodePoint(0x0622);
+  const DAGGER_ALEF_MADDA = String.fromCodePoint(0x0670, 0x0653);
+  const scrapedOrder = `ح${FATHA}${ALEF_MADDA}ق${SHADDA}${FATHA}ة`;
+  const nfcOrder = `ح${FATHA}${ALEF_MADDA}ق${FATHA}${SHADDA}ة`;
+
+  async function addWord(d: Client, id: number, lemma: string, root: string): Promise<void> {
+    await d.execute({
+      sql: 'INSERT INTO words (id,ayah_id,position,text_arabic,lemma) VALUES (?,1,?,?,?)',
+      args: [id, id, 'x', lemma],
+    });
+    await d.execute({
+      sql: 'INSERT INTO word_segments (word_id,segment_index,lemma,root) VALUES (?,0,?,?)',
+      args: [id, lemma, root],
+    });
+  }
+
+  async function addForm(d: Client, id: number, formArabic: string): Promise<void> {
+    await d.execute({
+      sql: 'INSERT INTO root_forms (id,root_id,sort_order,pos_label,form_arabic,occurrence_count) VALUES (?,1,?,?,?,1)',
+      args: [id, id, 'Noun', formArabic],
+    });
+  }
+
+  it('normalizeArabicJoinKeys makes a non-NFC form match its NFC lemma', async () => {
+    // Exercised directly, not through runMigrations: this is a data-only
+    // self-heal, called standalone by apps/web/src/lib/db.ts so it still runs
+    // under DB_SKIP_MIGRATIONS=true, which skips runMigrations' DDL.
     const d = createDatabase('file::memory:');
     await runMigrations(d);
-    await d.execute("INSERT INTO surahs VALUES (1,'a','A','A','meccan',7,1)");
-    const decomposed = `ب${String.fromCodePoint(0x0627, 0x0653)}س`; // "ب" + alef+madda + "س"
-    const precomposed = 'بآس';
-    await d.execute({
-      sql: "INSERT INTO ayahs (id,surah_id,ayah_number,text_uthmani) VALUES (1,1,1,'x')",
-    });
-    await d.execute({
-      sql: 'INSERT INTO words (id,ayah_id,position,text_arabic,lemma) VALUES (1,1,1,?,?)',
-      args: ['x', decomposed],
-    });
-    await d.execute({
-      sql: 'INSERT INTO word_segments (word_id,segment_index,lemma) VALUES (1,0,?)',
-      args: [decomposed],
-    });
+    await seedJoinFixture(d);
+    await addWord(d, 1, nfcOrder, 'Hqq');
+    await addForm(d, 10, scrapedOrder);
 
-    await normalizeLemmaMadda(d);
+    // The defect itself: two strings that render the same and compare unequal.
+    expect(scrapedOrder).not.toBe(nfcOrder);
 
-    const word = await d.execute('SELECT lemma FROM words WHERE id = 1');
+    await normalizeArabicJoinKeys(d);
+
+    const form = await d.execute('SELECT form_arabic FROM root_forms WHERE id = 10');
+    expect(form.rows[0]!['form_arabic']).toBe(nfcOrder);
+    const joined = await d.execute(
+      'SELECT COUNT(*) AS n FROM root_forms rf JOIN word_segments ws ON ws.lemma = rf.form_arabic WHERE rf.id = 10',
+    );
+    expect(joined.rows[0]!['n']).toBe(1);
+    d.close();
+  });
+
+  it('normalizeArabicJoinKeys normalizes lemma and form together, never one alone', async () => {
+    // The trap in this repair: a form and a lemma that are BOTH stored in the
+    // page's mark order match each other today. Normalizing either column on
+    // its own would break 1040 live forms. Both sides move or neither does.
+    const d = createDatabase('file::memory:');
+    await runMigrations(d);
+    await seedJoinFixture(d);
+    await addWord(d, 1, scrapedOrder, 'Hqq');
+    await addForm(d, 10, scrapedOrder);
+
+    await normalizeArabicJoinKeys(d);
+
+    const form = await d.execute('SELECT form_arabic FROM root_forms WHERE id = 10');
     const seg = await d.execute('SELECT lemma FROM word_segments WHERE word_id = 1');
-    expect(word.rows[0]!['lemma']).toBe(precomposed);
-    expect(seg.rows[0]!['lemma']).toBe(precomposed);
+    const word = await d.execute('SELECT lemma FROM words WHERE id = 1');
+    expect(form.rows[0]!['form_arabic']).toBe(nfcOrder);
+    expect(seg.rows[0]!['lemma']).toBe(nfcOrder);
+    expect(word.rows[0]!['lemma']).toBe(nfcOrder);
+    d.close();
+  });
+
+  it('normalizeArabicJoinKeys re-spells alef-madda when that is what matches a lemma', async () => {
+    const d = createDatabase('file::memory:');
+    await runMigrations(d);
+    await seedJoinFixture(d);
+    // Stored in the page's mark order as well as the morphology's spelling,
+    // which pins the order of the two passes: the fold compares against
+    // stored lemmas, so running it before the NFC pass finds nothing to match
+    // and the form keeps its alef-madda.
+    const storedLemma = `ط${FATHA}${DAGGER_ALEF_MADDA}ق${SHADDA}${FATHA}`;
+    await addWord(d, 1, storedLemma, 'Hqq');
+    await addForm(d, 10, `ط${FATHA}${ALEF_MADDA}ق${SHADDA}${FATHA}`);
+
+    await normalizeArabicJoinKeys(d);
+
+    const form = await d.execute('SELECT form_arabic FROM root_forms WHERE id = 10');
+    expect(form.rows[0]!['form_arabic']).toBe(storedLemma.normalize('NFC'));
+    const joined = await d.execute(
+      'SELECT COUNT(*) AS n FROM root_forms rf JOIN word_segments ws ON ws.lemma = rf.form_arabic WHERE rf.id = 10',
+    );
+    expect(joined.rows[0]!['n']).toBe(1);
+    d.close();
+  });
+
+  it('normalizeArabicJoinKeys never moves a form off a lemma it already matches', async () => {
+    // No root in the corpus carries both spellings today, so this guard is
+    // defensive -- but a form that already matches is not a mismatch to
+    // repair, and re-spelling it would silently change which occurrences its
+    // chip returns.
+    const d = createDatabase('file::memory:');
+    await runMigrations(d);
+    await seedJoinFixture(d);
+    const asScraped = `ط${FATHA}${ALEF_MADDA}ق`;
+    await addWord(d, 1, asScraped, 'Hqq');
+    await addWord(d, 2, `ط${FATHA}${DAGGER_ALEF_MADDA}ق`, 'Hqq');
+    await addForm(d, 10, asScraped);
+
+    await normalizeArabicJoinKeys(d);
+
+    const form = await d.execute('SELECT form_arabic FROM root_forms WHERE id = 10');
+    expect(form.rows[0]!['form_arabic']).toBe(asScraped);
+    d.close();
+  });
+
+  it('normalizeArabicJoinKeys leaves a form alone when the re-spelling is not a real lemma', async () => {
+    // The fold is self-verifying, not a blind character swap: root Amm's
+    // آمِّين is a genuine alef-madda, and ٰٓمِّين is not a word. A form that
+    // matches nothing is left exactly as scraped rather than rewritten into a
+    // spelling the corpus does not contain.
+    const d = createDatabase('file::memory:');
+    await runMigrations(d);
+    await seedJoinFixture(d);
+    const genuine = `${ALEF_MADDA}م${SHADDA}ين`.normalize('NFC');
+    await addWord(d, 1, `${ALEF_MADDA}م${FATHA}ة`.normalize('NFC'), 'Hqq');
+    await addForm(d, 10, genuine);
+
+    await normalizeArabicJoinKeys(d);
+
+    const form = await d.execute('SELECT form_arabic FROM root_forms WHERE id = 10');
+    expect(form.rows[0]!['form_arabic']).toBe(genuine);
+    expect(form.rows[0]!['form_arabic']).toContain(ALEF_MADDA);
+    d.close();
+  });
+
+  it('normalizeArabicJoinKeys is idempotent', async () => {
+    const d = createDatabase('file::memory:');
+    await runMigrations(d);
+    await seedJoinFixture(d);
+    await addWord(d, 1, `ط${FATHA}${DAGGER_ALEF_MADDA}ئ`, 'Hqq');
+    await addForm(d, 10, `ط${FATHA}${ALEF_MADDA}ئ`);
+
+    await normalizeArabicJoinKeys(d);
+    const once = await d.execute('SELECT form_arabic FROM root_forms WHERE id = 10');
+    await normalizeArabicJoinKeys(d);
+    const twice = await d.execute('SELECT form_arabic FROM root_forms WHERE id = 10');
+
+    expect(twice.rows[0]!['form_arabic']).toBe(once.rows[0]!['form_arabic']);
     d.close();
   });
 });

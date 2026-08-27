@@ -4,7 +4,7 @@ vi.mock('@quran-corpus/data', () => ({
   createDatabase: vi.fn(() => ({ mock: 'client' })),
   runMigrations: vi.fn(async () => undefined),
   backfillSearchIndex: vi.fn(async () => undefined),
-  normalizeLemmaMadda: vi.fn(async () => undefined),
+  normalizeArabicJoinKeys: vi.fn(async () => undefined),
   backfillRootSortOrderIfStale: vi.fn(async () => 0),
 }));
 
@@ -20,7 +20,7 @@ describe('getDatabase', () => {
     const data = await import('@quran-corpus/data');
     vi.mocked(data.createDatabase).mockClear();
     vi.mocked(data.runMigrations).mockClear().mockResolvedValue(undefined);
-    vi.mocked(data.normalizeLemmaMadda).mockClear().mockResolvedValue(undefined);
+    vi.mocked(data.normalizeArabicJoinKeys).mockClear().mockResolvedValue(undefined);
     vi.mocked(data.backfillRootSortOrderIfStale).mockClear().mockResolvedValue(0);
   });
 
@@ -38,7 +38,7 @@ describe('getDatabase', () => {
       expect(warn).toHaveBeenCalled();
       // Resolving proves init did not reject; this proves it carried on past
       // the catch rather than skipping the remaining steps.
-      expect(data.normalizeLemmaMadda).toHaveBeenCalledTimes(1);
+      expect(data.normalizeArabicJoinKeys).toHaveBeenCalledTimes(1);
     } finally {
       warn.mockRestore();
     }
@@ -73,7 +73,7 @@ describe('getDatabase', () => {
       const data = await import('@quran-corpus/data');
       await getDatabase();
       expect(data.runMigrations).not.toHaveBeenCalled();
-      expect(data.normalizeLemmaMadda).toHaveBeenCalledTimes(1);
+      expect(data.normalizeArabicJoinKeys).toHaveBeenCalledTimes(1);
       // But NOT the root-rank backfill: the triggers that dirty that cache are
       // DDL this flag skips, so it could only ever find a clean cache and
       // pretend to heal. Running it here would also make `next build` — which

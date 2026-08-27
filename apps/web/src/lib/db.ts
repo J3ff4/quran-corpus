@@ -2,7 +2,7 @@ import {
   createDatabase,
   runMigrations,
   backfillSearchIndex,
-  normalizeLemmaMadda,
+  normalizeArabicJoinKeys,
   backfillRootSortOrderIfStale,
 } from '@quran-corpus/data';
 import type { Client } from '@quran-corpus/data';
@@ -24,7 +24,7 @@ export function getDatabase(): Promise<Client> {
       if (shouldRunMigrations()) {
         await runMigrations(db);
         await backfillSearchIndex(db);
-        // Inside the guard, unlike normalizeLemmaMadda below, because this one
+        // Inside the guard, unlike normalizeArabicJoinKeys below, because this one
         // is not self-contained: what marks the cache dirty is the
         // trg_roots_sort_order_* DDL that runMigrations installs. Under
         // DB_SKIP_MIGRATIONS=true those triggers never exist, so nothing ever
@@ -48,7 +48,7 @@ export function getDatabase(): Promise<Client> {
       // -- runs even when DB_SKIP_MIGRATIONS=true, since that flag's job is
       // only to keep DDL out of the request path against a pre-provisioned
       // database, not to exempt it from data corrections.
-      await normalizeLemmaMadda(db);
+      await normalizeArabicJoinKeys(db);
       return db;
     })();
     // Drop a failed init from the cache so the next request retries instead of
