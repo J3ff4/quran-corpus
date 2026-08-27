@@ -232,7 +232,7 @@ a shadow per row at 1000 rows is not — use the flat variant (`GlassSurface` wi
 plates. Note that in a comment.
 
 - [x] **Step 1: Restyle, suite green after each file**
-- [ ] **Step 2: Scroll-test the 1000-row list in the device run (check 93)** —
+- [x] **Step 2: Scroll-test the 1000-row list in the device run (check 93)** — PASS, see the log. Rank 1000 (محو) sits clear of the tab pill; the sticky header holds and no row blanks while flinging.
       Task 6, on the owner's device.
 - [x] **Step 3: Commit** — `aae3f94`
 
@@ -343,7 +343,9 @@ git commit -m "feat(mobile): glass search with three distinct result kinds"
 
 ### Task 6: Build and device run
 
-- [ ] **Step 1: Build.**
+- [x] **Step 1: Build.** Skipped, as this section allows: run over Expo Go
+  instead (`expo start --clear` + `exp://192.168.0.103:8081`), since none of
+  89-96 needs a native module Expo Go lacks. EAS stays parked to 2026-09-01.
 
 ```bash
 cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --profile preview
@@ -355,7 +357,10 @@ navigation — so run them over Expo Go rather than waiting for the build:
 `expo start --clear`, then the LAN URL. Only checks that need a real build
 (82, 83) stay parked.
 
-- [ ] **Step 2: Run checks 89–96 and record every result below.**
+- [x] **Step 2: Run checks 89–96 and record every result below.** Run
+  2026-08-27 over adb (wireless debugging) on the owner's OnePlus 7 Pro
+  (GM1917, Android 12). Check 92 failed first time and is recorded twice: the
+  failure, and the re-run after `c4f9780`.
 
 | # | Check | Pass condition |
 | --- | --- | --- |
@@ -372,11 +377,51 @@ navigation — so run them over Expo Go rather than waiting for the build:
 
 | Check | Build | Date | Result | Notes |
 | --- | --- | --- | --- | --- |
-| 89 | | | | |
-| 90 | | | | |
-| 91 | | | | |
-| 92 | | | | |
-| 93 | | | | |
-| 94 | | | | |
-| 95 | | | | |
-| 96 | | | | |
+| 89 | Expo Go, `562ebea` | 2026-08-27 | PASS | Both themes. Slim bar reads `DICTIONARY / Roots · 1642`; ten-across letter tiles and the row cards read as glass on the warm ground and on night. Arabic crisp at every size. ء renders dimmed (no roots), as designed. |
+| 90 | Expo Go, `562ebea` | 2026-08-27 | PASS | ق-و-ل: entry plate, Hans Wehr card, Lane collapsible with Show more, chevrons flanking the headword (D3). The compound-root count is checked on أ-م-م, which is the 119 root: 119 occurrences, and its six form chips sum to 119. |
+| 91 | Expo Go, `562ebea` | 2026-08-27 | PASS | Tapping *Verbal noun qawl 92* cut the concordance from 1722 to 92 and every row came back `qawl`. No dim on the unselected chips, and the chip positions are pixel-identical before and after the tap — no layout shift. |
+| 92 | Expo Go, `562ebea` | 2026-08-27 | **FAIL** | Back is correct: five Nexts then one Back left the pager chain in one step rather than walking all five. The slide did not happen at all — no direction, no fade. Traced to expo-router remounting the screen on `replace`, plus both screens keying the transition on the route param, plus LemmaScreen never forwarding the side. See the note below. |
+| 92 | Expo Go, `c4f9780` | 2026-08-27 | PASS | Re-run after the fix, with `ENTER_MS` temporarily at 20s so a screenshot can catch the transition mid-flight: Next brings the incoming root in from the right, Previous from the left. Back still leaves the chain once. |
+| 93 | Expo Go, `562ebea` | 2026-08-27 | PASS | Flung to rank 1000 (محو, count 3). Smooth throughout, no blank rows, sticky header holds, and the last row clears the tab pill. |
+| 94 | Expo Go, `562ebea` | 2026-08-27 | PASS | Russian UI. The lemma bar reads `ЛЕММА / qāla` and the count reads `1618 вхождений` — the right genitive plural. The pager's accessible names agree with their nouns: `Предыдущая / Следующая` on the lemma screen (лемма, feminine) and `Предыдущий / Следующий` on the root screen (корень, masculine). |
+| 95 | Expo Go, `562ebea` | 2026-08-27 | PASS, with a deviation | Each of the three kinds renders under its own labelled eyebrow and opens the right screen: `qwl` → **ROOTS** → the ق-و-ل screen; `16:90` → **GO TO** (the tinted accent card) → the reader at An-Nahl 90; `mercy` → **VERSES** with the match highlighted on the accent wash → the reader at Luqmān 3. The check as written expects all three sections from `qwl` alone, which cannot happen: a Buckwalter root is neither a verse reference nor translation text, so it returns the roots arm only. Three queries, not one. |
+| 96 | Expo Go, `562ebea` | 2026-08-27 | PASS | Ran on ف-ح-ش rather than ق-و-ل so 16:90 is reachable without paging 1722 rows: row `16:90:11` lands on An-Nahl with ayah 90 at the top of the screen. The M5c fix holds. |
+
+### What check 92 found
+
+The suite was green and the transition was dead on hardware. Three separate
+causes, all fixed in `c4f9780`:
+
+1. **expo-router remounts a `[param]` screen when `replace` changes the
+   param.** The direction was held in a `useRef` on the outgoing instance,
+   which no longer exists by the time the incoming one renders. Traced by
+   logging the effect's own state on device: it ran with the new key already
+   recorded as shown and the side back at `null`, and returned without
+   animating. The side now lives at module scope — it belongs to the
+   navigation event, not to a component instance.
+2. **Both screens keyed the transition on the route param**, which is
+   available on the first render, while the screen is still showing its
+   spinner. Even once the side survived, the slide played out under the
+   spinner and the entry faded in with no direction. They now key on what is
+   actually drawn, and the hook holds the pending side while the key is null.
+3. **`LemmaScreen` never forwarded the side to `markSide`** — its `onNavigate`
+   took only the target. The lemma pager could not have been directional even
+   with the first two fixed.
+
+Three regression tests, each mutation-checked. The first two are hook-level
+(a remount with a pending side; a null key that must not consume it); the
+third asserts LemmaScreen forwards the pressed side, and dies if the side is
+hardcoded.
+
+Worth carrying forward: **a screen-level transition keyed on a route param
+cannot be trusted on expo-router**, and no jsdom test can see it, because the
+remount is the navigator's behaviour and not the component's.
+
+### Observed but out of scope
+
+The tab bar is translucent enough that list rows read through it — visible in
+both themes on the Dictionary browse list, and on Home behind the ayah
+reference. That bar is M6a's, not M6g's, and this is the same class as
+`[[rn-glass-bar-must-be-opaque]]` (M6d, fixed there for the reader's docked
+bar). Not fixed here: it is a different sub-phase's component and every tab
+screen shows it. Worth an issue before M7.
