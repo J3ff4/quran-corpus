@@ -490,3 +490,68 @@ because three of them overturn decisions this plan made.
 Not run: the phone was locked when the work landed (02:32 local). §10 —
 implementation complete, verification pending is an unmet exit criterion, so
 M6g does not close until these six are recorded.
+
+## Owner review of the built screens, round 2 — 2026-08-27
+
+Three more notes from the same device session. Clarified with
+`AskUserQuestion` before any code; note 1 needed a second round because
+"lemma pages" turned out to mean the ranked pane, not the lemma screen.
+
+1. **The pane caption still takes a whole line.** Round 1 moved it out of the
+   slim bar onto its own row; the owner wants it inline. Ruling: each pane
+   hangs it off the right end of its own chip row — Browse's alphabetical/by
+   frequency row, Most used' roots/lemmas/verbs row. Outside the toolbar
+   element in both, so TalkBack does not count a caption among the controls
+   the toolbar holds.
+
+2. **The pager arrows sit off centre in their circles.** They were a `‹` / `›`
+   text glyph, which lands wherever its font's side bearings put it — the
+   layout was centring the glyph's box, not the mark inside it. Drawn as an
+   Svg through the existing icon set instead, both paths centred on the 24
+   viewBox in both axes.
+
+3. **Filtering is slow — "way slow" against a release build of this app.**
+   Symptom, per the owner: the tap itself feels dead, letter cells slow to
+   react *and* to filter. No debounce wanted; the search box stays instant.
+
+   Two causes, both measured over the real 1642-root corpus rather than
+   guessed at:
+
+   - **Browse re-derived its whole list on every tap.** It folded all 1642
+     `root_arabic` strings, then sorted the survivors with
+     `compareRootsArabic`, which allocates two key arrays per comparison. 4.3ms
+     per alphabetical pass, 9.1ms per frequency pass on V8 — Hermes on the
+     phone is an order of magnitude behind that, on the thread that dispatches
+     the next touch. Now indexed once when the payload lands and both orders
+     sorted once from it; every later tap is one filter pass. Same three
+     measurements after: 0.015ms, 0.000ms, 0.054ms.
+   - **Nothing was memoized.** Every row, alphabet cell and form chip is an
+     `Animated.Pressable` with a shared value behind it, and a letter tap
+     re-rendered all 29 cells to change `selected` on two.
+
+   The frequency order is now sorted *from* the alphabetical one, leaning on
+   `Array.sort` being stable (ES2019; Hermes complies) for the hijāʾī
+   tie-break. The Browse fixture gained a tie listed in the wrong order so
+   that assumption is under test.
+
+   Also folded in: the ranked pane cached its rows per kind. It unmounts on
+   every flip to Browse and was re-running a 1000-row query and flashing a
+   spinner over a list it had already drawn. The DB is bundled and opened
+   `query_only`, so a repeat query can only return what the first one did.
+
+   **Not established, by owner's choice:** how much of the felt slowness was
+   Expo Go's dev bundle rather than this code. The offer was
+   `expo start --no-dev --minify`, which gives a production-mode bundle
+   without EAS; the owner chose to skip the measurement and optimize
+   regardless. So the numbers above are the JS cost removed, not a device
+   before/after.
+
+### Verification log — pending
+
+| Check | Build | Date | Result | Notes |
+| --- | --- | --- | --- | --- |
+| 103 | — | — | **PENDING** | Dictionary: the caption sits at the right end of the chip row in both panes, no row of its own, not clipped at the largest font scale. |
+| 104 | — | — | **PENDING** | Pager arrows read as centred in their circles, both directions, both themes. |
+| 105 | — | — | **PENDING** | Letter cells light under the thumb and the list filters with them; alphabetical/by frequency and Browse/Most used switch without a stall. |
+| 106 | — | — | **PENDING** | Typing in the search box keeps up with the keyboard, no dropped characters. |
+| 107 | — | — | **PENDING** | Flipping Browse ↔ Most used redraws the ranked rows with no spinner, and the kind chips still switch the list. |
