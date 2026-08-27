@@ -14,6 +14,23 @@ export interface FrequencyListProps {
   kind: 'roots' | 'lemmas' | 'verbs';
 }
 
+/** Rows already fetched, by kind. The corpus DB is bundled and opened
+ *  `query_only`, so a kind's ranking cannot change while the app runs and a
+ *  second query for it can only return what is already here.
+ *
+ *  Worth the memory because this component unmounts constantly: it is torn
+ *  down every time the reader flips to Browse and remounted on the way back,
+ *  and each mount was re-running a 1000-row query and flashing a spinner over
+ *  a list it had already drawn (owner, 2026-08-27). */
+const cache = new Map<FrequencyListProps['kind'], FrequencyRow[]>();
+
+/** Empties the cache above. Nothing in the app calls this -- the data it holds
+ *  is immutable for the life of the process -- but a test that asserts on
+ *  query counts has to start from a known state. */
+export function resetFrequencyCache() {
+  cache.clear();
+}
+
 /** The Frequent pane's ranked table. One component over three queries -- the
  *  rows differ only in where they link and whether they carry a gloss, and the
  *  row itself is Browse's (`DictionaryRow`). */
@@ -21,12 +38,29 @@ export function FrequencyList({ kind }: FrequencyListProps) {
   const { uiLocale } = useAppSettings();
   const theme = useThemeColors();
   const paddingBottom = useListBottomPadding();
-  const [rows, setRows] = useState<FrequencyRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Seeded from the cache during render, not in an effect: an effect runs after
+  // paint, so a revisit would still show one frame of spinner over rows that
+  // were ready before it started -- the same reason useHeldEntry writes its ref
+  // during render. Not covered by a test: RTL flushes effects inside act(), so
+  // the effect's cache hit below always lands before an assertion can see the
+  // difference. Deleting these two seeds passes every test in this file and
+  // costs a spinner flash on every flip to Most used.
+  const [rows, setRows] = useState<FrequencyRow[]>(() => cache.get(kind) ?? []);
+  const [loading, setLoading] = useState(() => !cache.has(kind));
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    const hit = cache.get(kind);
+    if (hit) {
+      // A kind change, with that kind already in hand: adopt it and ask
+      // nothing. The seed above only covers the kind this component mounted
+      // with.
+      setRows(hit);
+      setLoading(false);
+      setFailed(false);
+      return;
+    }
     setLoading(true);
     setFailed(false);
     (async () => {
@@ -34,6 +68,9 @@ export function FrequencyList({ kind }: FrequencyListProps) {
         const db = await openCorpusDb();
         const client = createExpoSqliteClient(db as ExpoSqliteLike);
         const found = await getFrequencyRows(client, kind, FREQUENCY_LIMIT);
+        // Cached whether or not this mount is still interested: the rows are
+        // correct for the kind regardless of who asked.
+        cache.set(kind, found);
         if (!cancelled) setRows(found);
       } catch (cause) {
         console.error('[dictionary] frequency load failed', { kind, cause });
