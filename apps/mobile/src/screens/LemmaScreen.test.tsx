@@ -2,7 +2,6 @@ import React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LemmaEntry } from '@quran-corpus/data/mobile';
-import type * as EntryTransition from '@/motion/useEntryTransition';
 import { LemmaScreen } from './LemmaScreen';
 
 const mocks = vi.hoisted(() => ({
@@ -11,21 +10,12 @@ const mocks = vi.hoisted(() => ({
   getAdjacentLemmas: vi.fn(),
   push: vi.fn(),
   replace: vi.fn(),
-  markSide: vi.fn(),
 }));
 
 vi.mock('@/data/corpusRepository', () => ({
   getLemmaScreen: (...args: unknown[]) => mocks.getLemmaScreen(...args),
   getLemmaOccurrences: (...args: unknown[]) => mocks.getLemmaOccurrences(...args),
   getAdjacentLemmas: (...args: unknown[]) => mocks.getAdjacentLemmas(...args),
-}));
-// Only the direction is stubbed. The hook itself is covered by its own suite;
-// what this one has to pin down is that the screen forwards the side at all --
-// it silently dropped it when the pager was first wired, so Previous and Next
-// both arrived with no direction (M6g check 92).
-vi.mock('@/motion/useEntryTransition', async (importOriginal) => ({
-  ...(await importOriginal<typeof EntryTransition>()),
-  useEntryTransition: () => ({ style: {}, markSide: mocks.markSide }),
 }));
 vi.mock('@/data/openCorpusDb', () => ({ openCorpusDb: () => Promise.resolve({}) }));
 vi.mock('@quran-corpus/mobile-data', () => ({ createExpoSqliteClient: () => ({}) }));
@@ -391,14 +381,13 @@ describe('LemmaScreen', () => {
     expect(screen.queryByTestId('lemma-no-definition')).toBeNull();
   });
 
-  it('captions the slim header with the reading, and omits it when there is none', async () => {
-    // D3 sent frame 3's "rank 41 of 200" into the slim bar. The rank itself is
-    // not on this screen -- getAdjacentLemmas returns neighbours, not a
-    // position, and M6g adds no queries -- so the reading is what captions it.
-    // A caption node with nothing in it lays the title against a gap instead
-    // of against the right edge.
+  it('reads the lemma under the headword, and omits the line when there is none', async () => {
+    // The slim bar that used to caption itself with this went on 2026-08-27.
+    // Nothing moved: EntryHeader already drew the reading under the headword,
+    // which is where a reading belongs. A line with nothing in it opens a gap
+    // between the headword and the sense chips.
     render(<LemmaScreen lemmaBuckwalter="qaAla" source={null} />);
-    expect((await screen.findByTestId('lemma-header-caption')).textContent).toBe('qāla');
+    expect((await screen.findByTestId('entry-translit')).textContent).toBe('qāla');
 
     cleanup();
     mocks.getLemmaScreen.mockResolvedValue({
@@ -407,8 +396,8 @@ describe('LemmaScreen', () => {
     });
     render(<LemmaScreen lemmaBuckwalter="qaAla" source={null} />);
 
-    await screen.findByTestId('lemma-header');
-    expect(screen.queryByTestId('lemma-header-caption')).toBeNull();
+    await screen.findByTestId('concordance-heading');
+    expect(screen.queryByTestId('entry-translit')).toBeNull();
   });
 
   it('counts the concordance beside its heading', async () => {
@@ -434,20 +423,29 @@ describe('LemmaScreen', () => {
     expect(mocks.getAdjacentLemmas.mock.calls[0]!.slice(1)).toEqual(['brk', 'verbs']);
 
     fireEvent.click(await screen.findByTestId('lemma-next'));
-    expect(mocks.replace).toHaveBeenCalledWith('/lemma/ktb?from=verbs');
-    // D4: which button was pressed is what decides the slide's direction, and
-    // the navigation itself carries no direction to recover it from.
-    expect(mocks.markSide).toHaveBeenCalledWith('next');
-
-    fireEvent.click(screen.getByTestId('lemma-previous'));
-    expect(mocks.markSide).toHaveBeenLastCalledWith('prev');
+    // In place, not through the router: `replace` remounted the screen, which
+    // dropped the direction the tap had just recorded and left the pager with
+    // no outgoing lemma to animate (M6g check 92, and the owner's 2026-08-27
+    // ruling that both halves have to move).
+    await waitFor(() =>
+      expect(mocks.getLemmaScreen).toHaveBeenLastCalledWith(expect.anything(), 'ktb', 'ru'),
+    );
+    expect(mocks.replace).not.toHaveBeenCalled();
+    expect(mocks.push).not.toHaveBeenCalled();
+    // The ranking still travels with the neighbour query after paging: it is
+    // what decides where the next Next goes.
+    await waitFor(() =>
+      expect(mocks.getAdjacentLemmas).toHaveBeenLastCalledWith(expect.anything(), 'ktb', 'verbs'),
+    );
   });
 
-  it('drops the old neighbours while the new lemma is still resolving', async () => {
-    // A lemma change in place -- router.replace, or a deep link landing on the
-    // mounted route -- refetches, and the verb aggregate is the slowest query
-    // on this screen. Held-over arrows would point at the PREVIOUS lemma's
-    // neighbours, so Next would navigate somewhere the reader never was.
+  it('dims the arrows until the neighbours belong to the lemma on screen', async () => {
+    // The verb aggregate is the slowest query here, so the entry regularly
+    // lands first. Held-over arrows would point at the PREVIOUS lemma's
+    // neighbours, so Next would page somewhere the reader never was. The
+    // neighbours carry the lemma they were taken for and the screen compares
+    // it -- rather than clearing on every change, which dimmed the outgoing
+    // lemma's own arrows for the whole of the wait.
     mocks.getAdjacentLemmas.mockResolvedValue({ prev: 'qwl', next: 'ktb' });
     const { rerender } = render(<LemmaScreen lemmaBuckwalter="brk" source="verbs" />);
     await waitFor(() =>

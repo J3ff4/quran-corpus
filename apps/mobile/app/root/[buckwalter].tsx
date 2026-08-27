@@ -1,16 +1,15 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
-import type { RootEntry } from '@quran-corpus/data/mobile';
+import type { ConcordanceEntry, RootEntry } from '@quran-corpus/data/mobile';
 import { AdjacentNav } from '@/components/AdjacentNav';
 import { ConcordanceList } from '@/components/ConcordanceList';
 import { DefinitionCard } from '@/components/DefinitionCard';
 import { EntryHeader } from '@/components/EntryHeader';
 import { FormFilterChips } from '@/components/FormFilterChips';
 import { useGlassSkin } from '@/components/GlassSurface';
-import { SlimHeader } from '@/components/SlimHeader';
 import {
   getAdjacentRoots,
   getRootOccurrenceCount,
@@ -23,7 +22,7 @@ import { openUserDb } from '@/data/userDb';
 import { recordRootView } from '@/data/userRepository';
 import { localDay } from '@/home/counters';
 import { t } from '@/i18n/uiStrings';
-import { useEntryTransition } from '@/motion/useEntryTransition';
+import { useEntryPager, useHeldEntry } from '@/motion/entryPager';
 import { useAppSettings } from '@/settings/settingsStore';
 import { fonts, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
@@ -35,6 +34,17 @@ interface Neighbors {
 
 const NO_NEIGHBORS: Neighbors = { prev: null, next: null };
 
+/** Everything one root's queries return, published in a single state so the
+ *  screen can never draw one root's headword over another's neighbours. */
+interface Loaded {
+  root: string;
+  /** null is a root the corpus does not carry -- a settled answer, not a
+   *  pending one, which is why it travels in here rather than as its own
+   *  flag. */
+  entry: RootEntry | null;
+  neighbors: Neighbors;
+}
+
 /** A form filter together with the occurrence count taken for it. The two are
  *  one value because ConcordanceList reads both as list identity: handing it a
  *  filter whose count has not landed yet resets the list twice. */
@@ -45,6 +55,18 @@ interface AppliedFilter {
   total: number;
   /** The count query threw, so `total` is 0 for a reason that is not "none". */
   failed: boolean;
+}
+
+/** One root, drawn only once every query behind it has settled.
+ *
+ *  A bundle rather than the screen's own state, because the pager holds the
+ *  previous one of these on screen while the next root loads (see
+ *  `useHeldEntry`): the body has to render from a consistent set, not from
+ *  whatever each individual `useState` happens to hold mid-flight. */
+interface RootView {
+  loaded: Loaded;
+  applied: AppliedFilter;
+  loadPage: (offset: number, limit: number) => Promise<ConcordanceEntry[]>;
 }
 
 /** One root: its Arabic form, hijāʾī-adjacent roots to page between, the
@@ -60,11 +82,13 @@ export default function RootRoute() {
   // charset and length cap the web root page does, and takes the raw
   // useLocalSearchParams value (array and undefined cases included) so the
   // guard lives in one place. useMemo because it feeds an effect dependency.
-  const buckwalter = useMemo(() => parseRootParam(params.buckwalter), [params.buckwalter]);
+  const routeRoot = useMemo(() => parseRootParam(params.buckwalter), [params.buckwalter]);
 
-  const [entry, setEntry] = useState<RootEntry | null>(null);
-  const [neighbors, setNeighbors] = useState<Neighbors>(NO_NEIGHBORS);
-  const [loading, setLoading] = useState(true);
+  // Previous/Next changes this, not the URL. See useEntryPager for why paging
+  // stopped going through the router.
+  const { current: buckwalter, goTo, animation } = useEntryPager(routeRoot);
+
+  const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
   const [applied, setApplied] = useState<AppliedFilter | null>(null);
 
@@ -90,13 +114,10 @@ export default function RootRoute() {
       // Before the DB is opened, not inside the query: an identifier that is
       // not a root has no business reaching SQLite at all.
       if (!buckwalter) {
-        setEntry(null);
-        setNeighbors(NO_NEIGHBORS);
-        setLoading(false);
+        setLoaded(null);
         return;
       }
 
-      setLoading(true);
       try {
         const db = await openCorpusDb();
         const client = createExpoSqliteClient(db as ExpoSqliteLike);
@@ -105,23 +126,19 @@ export default function RootRoute() {
           getAdjacentRoots(client, buckwalter),
         ]);
         if (!cancelled) {
-          setEntry(found);
-          setNeighbors(adjacent);
+          setLoaded({ root: buckwalter, entry: found, neighbors: adjacent });
         }
       } catch (cause) {
         // Same dead end as a root the corpus does not carry: nothing the
         // reader can act on either way. Logged for logcat.
         console.error('[root] load failed', { buckwalter, cause });
         if (!cancelled) {
-          setEntry(null);
-          setNeighbors(NO_NEIGHBORS);
+          setLoaded({ root: buckwalter, entry: null, neighbors: NO_NEIGHBORS });
         }
-      } finally {
-        if (!cancelled) setLoading(false);
       }
     }
 
-    loadRoot();
+    void loadRoot();
     return () => {
       cancelled = true;
     };
@@ -132,14 +149,16 @@ export default function RootRoute() {
   // reader never saw. `entry.root.id` is the integer root_views is keyed by, so
   // no Buckwalter string -- and no second charset validator -- reaches the
   // write site.
+  const viewedRootId = loaded?.entry?.root.id ?? null;
   useEffect(() => {
-    if (!entry) return;
-    const rootId = entry.root.id;
+    if (viewedRootId === null) return;
     void openUserDb()
-      .then((db) => recordRootView(createExpoSqliteClient(db as ExpoSqliteLike), rootId, localDay(new Date())))
+      .then((db) =>
+        recordRootView(createExpoSqliteClient(db as ExpoSqliteLike), viewedRootId, localDay(new Date())),
+      )
       // Counted for the Home tab only; nothing on this screen depends on it.
       .catch((cause: unknown) => console.error('[home] root-view write failed', { cause }));
-  }, [entry]);
+  }, [viewedRootId]);
 
   // Separate from loadRoot: the occurrence count depends on the form filter,
   // which changes far more often than the root itself and must not re-run
@@ -192,8 +211,6 @@ export default function RootRoute() {
     // exactly the reason explained above countKey's declaration.
   }, [buckwalter, countKey]);
 
-  // Above the early returns, as every hook here must be: a render that bails
-  // early would otherwise change the hook order.
   const loadPage = useCallback(
     async (offset: number, limit: number) => {
       if (!applied) return [];
@@ -215,192 +232,216 @@ export default function RootRoute() {
     [applied, contentLanguage],
   );
 
-  // D4: the incoming root slides in from the side the reader pressed. Declared
-  // with the other hooks, above the early returns -- a render that bails early
-  // would otherwise change the hook order.
-  //
-  // What is drawn, not what was asked for: the two gates below hold the first
-  // frame back while three queries run, and a slide keyed on the param alone
-  // plays out under the spinner instead of under the root it belongs to.
-  const shownRoot = entry && applied?.root === buckwalter ? buckwalter : null;
-  const transition = useEntryTransition(shownRoot);
-
   const toggleForm = useCallback((formId: number) => {
     setSelected((current) =>
       current.includes(formId) ? current.filter((id) => id !== formId) : [...current, formId],
     );
   }, []);
 
-  const spinner = (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-      <ActivityIndicator />
-    </View>
-  );
+  const clearForms = useCallback(() => setSelected([]), []);
 
-  if (loading) {
-    return spinner;
+  // Both gates in one place. The entry query is three round trips and the
+  // count is one, so the count usually wins -- but not always, and a header
+  // rendered before it lands shows the previous root's total over the new
+  // root's rows. A chip tap does NOT fail this: `applied` still holds the
+  // previous filter for this same root, so the list stays put instead of
+  // flashing a spinner over the chips the reader is looking at.
+  const ready: RootView | null =
+    loaded && applied && loaded.root === buckwalter && applied.root === buckwalter
+      ? { loaded, applied, loadPage }
+      : null;
+  // What the reader sees: the previous root stays until its replacement is
+  // ready, which is what the outgoing half of the page turn animates.
+  const view = useHeldEntry(ready);
+
+  if (buckwalter === null) {
+    return <NotFound message={t(uiLocale, 'root.notFound')} color={theme.mutedText} />;
   }
 
-  if (!entry) {
+  if (!view) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', padding: 20 }}>
-        <Text accessibilityRole="alert" style={{ color: theme.mutedText, fontSize: typography.body }}>
-          {t(uiLocale, 'root.notFound')}
-        </Text>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator />
       </View>
     );
   }
 
-  // The entry query is three round trips and the count is one, so the count
-  // usually wins -- but not always, and a header rendered before it lands
-  // shows the previous root's total over the new root's rows. Both gate the
-  // same first frame. A chip tap does NOT come through here: `applied` still
-  // holds the previous filter for this same root, so the list stays put
-  // instead of flashing a full-screen spinner over the chips.
-  if (applied === null || applied.root !== buckwalter) {
-    return spinner;
-  }
+  const body = view.loaded.entry ? (
+    (() => {
+      const { root, definitions, forms } = view.loaded.entry;
 
-  const { root, definitions, forms } = entry;
-
-  // A plain View, not a ScrollView: this is the concordance list's header, and
-  // a scroll view inside a FlatList header is a nested VirtualizedList, which
-  // breaks the scroll rather than nesting it.
-  const header = (
-    <View style={{ gap: 16, paddingBottom: 14 }}>
-      {/* D1's slim bar. The stack's own transparent header already draws the
-          back arrow above this, so the bar carries the screen's name and the
-          Buckwalter spelling and nothing else. */}
-      <SlimHeader
-        testID="root-header"
-        title={t(uiLocale, 'root.heading')}
-        caption={root.root_buckwalter}
-      />
-      <View style={{ paddingHorizontal: 16, gap: 16 }}>
-        {/* D5: today's header, kept. Only the chips below took the new look. */}
-        <EntryHeader
-          uiLocale={uiLocale}
-          arabic={root.root_arabic}
-          count={root.occurrence_count}
-          pager={
-            <AdjacentNav
-              prev={neighbors.prev}
-              next={neighbors.next}
-              // replace, not push: paging is a pager, not a trail. Pushing left
-              // one screen per Next on a stack the reader can only leave by
-              // backing out of every root they passed, and root screens are
-              // outside the tab group, so there is no tab bar to escape to
-              // either.
-              onNavigate={(target, side) => {
-              transition.markSide(side);
-              router.replace(`/root/${encodeURIComponent(target)}`);
-            }}
-              label={t(uiLocale, 'root.adjacent')}
-              uiLocale={uiLocale}
-            />
-          }
-        >
-          {/* One pill per letter, right to left. The spaces in a compound root
-              ("ق و ل") are separators, not letters, so they are stripped before
-              splitting -- otherwise a three-letter root renders five pills, two
-              of them blank. */}
-          {/* row-reverse, not a reversed array: the pills stay in tree order
-              (ق و ل) so TalkBack reads the root forwards, and only the layout
-              flips. Same treatment AlphabetGrid gives the alphabet. */}
-          <View
-            testID="root-letters"
-            style={{
-              flexDirection: 'row-reverse',
-              flexWrap: 'wrap',
-              justifyContent: 'center',
-              gap: 6,
-            }}
-          >
-            {Array.from(root.root_arabic.replace(/\s+/g, '')).map((letter, index) => (
-              <View
-                key={`${letter}-${index}`}
-                testID="root-letter"
-                style={{
-                  backgroundColor: skin.fill,
-                  borderWidth: 1,
-                  borderColor: skin.border,
-                  borderRadius: 8,
-                  paddingHorizontal: 10,
-                  paddingVertical: 3,
-                }}
-              >
-                <Text style={{ color: theme.text, fontFamily: fonts.arabic, fontSize: typography.body }}>
-                  {letter}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </EntryHeader>
-
-        <View style={{ gap: 10 }}>
-          {definitions.length > 0 ? (
-            definitions.map((definition) => (
-              <DefinitionCard
-                key={definition.id}
+      // A plain View, not a ScrollView: this is the concordance list's header,
+      // and a scroll view inside a FlatList header is a nested VirtualizedList,
+      // which breaks the scroll rather than nesting it.
+      const header = (
+        <View style={{ paddingTop: 8, paddingHorizontal: 16, gap: 16, paddingBottom: 14 }}>
+          {/* D5: today's header, kept. Only the chips below took the new look. */}
+          <EntryHeader
+            uiLocale={uiLocale}
+            arabic={root.root_arabic}
+            count={root.occurrence_count}
+            pager={
+              <AdjacentNav
+                prev={view.loaded.neighbors.prev}
+                next={view.loaded.neighbors.next}
+                // Paging is a pager, not a trail: it changes what this screen
+                // shows and never touches the navigator. See useEntryPager.
+                onNavigate={goTo}
+                label={t(uiLocale, 'root.adjacent')}
                 uiLocale={uiLocale}
-                definition={definition.definition}
-                source={definition.source}
               />
-            ))
-          ) : (
-            // 24 roots still carry no definition (hw_gap_24.tsv). Saying so
-            // reads clearer than an empty section.
-            <Text
-              testID="root-no-definition"
-              style={{ color: theme.mutedText, fontSize: typography.body }}
+            }
+          >
+            {/* One pill per letter, right to left. The spaces in a compound root
+                ("ق و ل") are separators, not letters, so they are stripped before
+                splitting -- otherwise a three-letter root renders five pills, two
+                of them blank. */}
+            {/* row-reverse, not a reversed array: the pills stay in tree order
+                (ق و ل) so TalkBack reads the root forwards, and only the layout
+                flips. Same treatment AlphabetGrid gives the alphabet. */}
+            <View
+              testID="root-letters"
+              style={{
+                flexDirection: 'row-reverse',
+                flexWrap: 'wrap',
+                justifyContent: 'center',
+                gap: 6,
+              }}
             >
-              {t(uiLocale, 'root.noDefinition')}
+              {Array.from(root.root_arabic.replace(/\s+/g, '')).map((letter, index) => (
+                <View
+                  key={`${letter}-${index}`}
+                  testID="root-letter"
+                  style={{
+                    backgroundColor: skin.fill,
+                    borderWidth: 1,
+                    borderColor: skin.border,
+                    borderRadius: 8,
+                    paddingHorizontal: 10,
+                    paddingVertical: 3,
+                  }}
+                >
+                  <Text style={{ color: theme.text, fontFamily: fonts.arabic, fontSize: typography.body }}>
+                    {letter}
+                  </Text>
+                </View>
+              ))}
+            </View>
+            {/* The Buckwalter spelling, which the slim bar used to carry. It
+                belongs to the headword, so it moved onto the headword's own
+                plate rather than off the screen with the bar (owner ruling
+                2026-08-27). Mono and muted: it is how the root is typed, not
+                how it is read. */}
+            <Text
+              testID="root-buckwalter"
+              style={{
+                color: theme.mutedText,
+                fontSize: typography.caption,
+                letterSpacing: 0.6,
+              }}
+            >
+              {root.root_buckwalter}
             </Text>
-          )}
-        </View>
+          </EntryHeader>
 
-        <FormFilterChips forms={forms} selected={selected} onToggle={toggleForm} uiLocale={uiLocale} />
+          <View style={{ gap: 10 }}>
+            {definitions.length > 0 ? (
+              definitions.map((definition) => (
+                <DefinitionCard
+                  key={definition.id}
+                  uiLocale={uiLocale}
+                  definition={definition.definition}
+                  source={definition.source}
+                />
+              ))
+            ) : (
+              // 24 roots still carry no definition (hw_gap_24.tsv). Saying so
+              // reads clearer than an empty section.
+              <Text
+                testID="root-no-definition"
+                style={{ color: theme.mutedText, fontSize: typography.body }}
+              >
+                {t(uiLocale, 'root.noDefinition')}
+              </Text>
+            )}
+          </View>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <Text
-            testID="concordance-heading"
-            role="heading"
-            style={{
-              color: theme.mutedText,
-              fontFamily: fonts.displaySemiBold,
-              fontSize: typography.caption,
-              letterSpacing: 1.2,
-              textTransform: 'uppercase',
-            }}
-          >
-            {t(uiLocale, 'concordance.heading')}
-          </Text>
-          <Text
-            testID="concordance-count"
-            style={{
-              color: theme.mutedText,
-              fontSize: typography.caption,
-              fontVariant: ['tabular-nums'],
-            }}
-          >
-            {applied.total}
-          </Text>
+          <FormFilterChips
+            forms={forms}
+            selected={selected}
+            onToggle={toggleForm}
+            onClear={clearForms}
+            uiLocale={uiLocale}
+          />
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <Text
+              testID="concordance-heading"
+              role="heading"
+              style={{
+                color: theme.mutedText,
+                fontFamily: fonts.displaySemiBold,
+                fontSize: typography.caption,
+                letterSpacing: 1.2,
+                textTransform: 'uppercase',
+              }}
+            >
+              {t(uiLocale, 'concordance.heading')}
+            </Text>
+            <Text
+              testID="concordance-count"
+              style={{
+                color: theme.mutedText,
+                fontSize: typography.caption,
+                fontVariant: ['tabular-nums'],
+              }}
+            >
+              {view.applied.total}
+            </Text>
+          </View>
         </View>
-      </View>
-    </View>
+      );
+
+      return (
+        <ConcordanceList
+          total={view.applied.total}
+          loadPage={view.loadPage}
+          header={header}
+          forms={forms}
+          countFailed={view.applied.failed}
+        />
+      );
+    })()
+  ) : (
+    <NotFound message={t(uiLocale, 'root.notFound')} color={theme.mutedText} />
   );
 
   return (
     // The whole screen moves, header and list together, which is what makes it
-    // read as a pager rather than as a list that reloaded (D4).
-    <Animated.View style={[{ flex: 1 }, transition.style]}>
-      <ConcordanceList
-        total={applied.total}
-        loadPage={loadPage}
-        header={header}
-        forms={forms}
-        countFailed={applied.failed}
-      />
-    </Animated.View>
+    // read as a pager rather than as a list that reloaded.
+    //
+    // absoluteFill, not flex: reanimated keeps the outgoing entry in the native
+    // hierarchy until its exit finishes, and in a flex column that second child
+    // would halve both their heights for the length of the animation.
+    <View style={{ flex: 1 }}>
+      <Animated.View
+        key={view.loaded.root}
+        entering={animation.entering}
+        exiting={animation.exiting}
+        style={StyleSheet.absoluteFill}
+      >
+        {body}
+      </Animated.View>
+    </View>
+  );
+}
+
+function NotFound({ message, color }: { message: string; color: string }) {
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', padding: 20 }}>
+      <Text accessibilityRole="alert" style={{ color, fontSize: typography.body }}>
+        {message}
+      </Text>
+    </View>
   );
 }

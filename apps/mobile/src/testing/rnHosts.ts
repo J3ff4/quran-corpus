@@ -33,6 +33,11 @@ interface HostProps {
   // pointerEvents, on every render.
   accessible?: unknown;
   contentContainerStyle?: unknown;
+  // Reanimated's layout-animation builders, on an Animated.View. Nothing in
+  // jsdom can run one, and spread onto a DOM node React warns about both on
+  // every render of either entry screen.
+  entering?: unknown;
+  exiting?: unknown;
   horizontal?: unknown;
   importantForAccessibility?: unknown;
   onContentSizeChange?: unknown;
@@ -199,6 +204,8 @@ export function host(tag: string) {
     testID,
     accessible: _accessible,
     contentContainerStyle: _contentContainerStyle,
+    entering: _entering,
+    exiting: _exiting,
     horizontal: _horizontal,
     importantForAccessibility,
     onContentSizeChange: _onContentSizeChange,

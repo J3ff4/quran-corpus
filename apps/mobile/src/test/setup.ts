@@ -63,6 +63,16 @@ vi.mock('react-native-reanimated', async () => {
       // accessibilityLabel as unknown DOM attributes that no query can reach.
       Text: host('span'),
     },
+    // Layout-animation builders, for the dictionary pager. Chainable because
+    // the app configures them (`SlideInRight.duration(260)`), and inert
+    // because jsdom has no animation to run -- the direction they encode is
+    // asserted in motion/entryPager.test.ts against its own mock, and the
+    // components only have to render.
+    ...Object.fromEntries(
+      ['FadeIn', 'FadeOut', 'SlideInLeft', 'SlideInRight', 'SlideOutLeft', 'SlideOutRight'].map(
+        (name) => [name, { duration: () => ({ name }) }],
+      ),
+    ),
     useSharedValue: (initial: number) => ({ value: initial }),
     useAnimatedStyle: (factory: () => unknown) => factory(),
     withTiming: (toValue: number) => toValue,

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { Link, router } from 'expo-router';
+import { Link } from 'expo-router';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
 import {
   posBucket,
@@ -14,11 +14,10 @@ import { DefinitionCard } from '@/components/DefinitionCard';
 import { EntryHeader } from '@/components/EntryHeader';
 import { useGlassSkin } from '@/components/GlassSurface';
 import { InfoButton, InfoSheet } from '@/components/InfoSheet';
-import { SlimHeader } from '@/components/SlimHeader';
 import { getAdjacentLemmas, getLemmaOccurrences, getLemmaScreen } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { t } from '@/i18n/uiStrings';
-import { useEntryTransition } from '@/motion/useEntryTransition';
+import { useEntryPager, useHeldEntry } from '@/motion/entryPager';
 import { useAppSettings } from '@/settings/settingsStore';
 import { fonts, radii, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
@@ -31,6 +30,31 @@ interface Neighbors {
 /** Module scope: a fresh literal inside the effect would be a new identity on
  *  every run. */
 const NO_NEIGHBORS: Neighbors = { prev: null, next: null };
+
+/** Neighbours together with the lemma they were taken for. Keyed rather than
+ *  cleared on every change: the pager keeps the previous lemma on screen while
+ *  the next one loads, and clearing would dim that lemma's own arrows for the
+ *  whole of the wait. A key that does not match whatever is drawn reads as
+ *  "not known yet", which is the same dimmed state a deep link with no ranking
+ *  already shows. */
+interface KeyedNeighbors {
+  key: string | null;
+  value: Neighbors;
+}
+
+const NO_KEYED_NEIGHBORS: KeyedNeighbors = { key: null, value: NO_NEIGHBORS };
+
+/** One lemma, drawn only once its query has settled. A bundle rather than the
+ *  screen's own state, because the pager holds the previous one on screen
+ *  while the next loads (`useHeldEntry`): the body has to render from a
+ *  consistent set, not from whatever each `useState` holds mid-flight. */
+interface LemmaView {
+  key: string;
+  /** null is a lemma the corpus does not carry -- a settled answer, not a
+   *  pending one. */
+  entry: LemmaEntry | null;
+  total: number;
+}
 
 export interface LemmaScreenProps {
   /** Already validated by the route. `null` is an identifier that is not a
@@ -55,102 +79,99 @@ export function LemmaScreen({ lemmaBuckwalter, source }: LemmaScreenProps) {
   const theme = useThemeColors();
   const skin = useGlassSkin();
 
-  const [entry, setEntry] = useState<LemmaEntry | null>(null);
-  const [neighbors, setNeighbors] = useState<Neighbors>(NO_NEIGHBORS);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(lemmaBuckwalter !== null);
+  // Previous/Next changes this, not the route. See useEntryPager for why
+  // paging stopped going through the router.
+  const { current: lemmaKey, goTo, animation } = useEntryPager(lemmaBuckwalter);
+
+  const [loaded, setLoaded] = useState<LemmaView | null>(null);
+  const [neighbors, setNeighbors] = useState<KeyedNeighbors>(NO_KEYED_NEIGHBORS);
   // Owned here, not by InfoSheet: BottomSheet fills its parent, and the button
   // that opens it lives in the FlatList header. See InfoButton's docstring.
   const [infoOpen, setInfoOpen] = useState(false);
 
   useEffect(() => {
-    if (lemmaBuckwalter === null) {
-      setEntry(null);
-      setTotal(0);
-      setLoading(false);
+    if (lemmaKey === null) {
+      setLoaded(null);
       return;
     }
 
     let cancelled = false;
-    setLoading(true);
     (async () => {
       try {
         const db = await openCorpusDb();
         const client = createExpoSqliteClient(db as ExpoSqliteLike);
-        const found = await getLemmaScreen(client, lemmaBuckwalter, contentLanguage);
-        if (cancelled) return;
-        setEntry(found.entry);
-        setTotal(found.total);
+        const found = await getLemmaScreen(client, lemmaKey, contentLanguage);
+        if (!cancelled) setLoaded({ key: lemmaKey, entry: found.entry, total: found.total });
       } catch (cause) {
         // Same dead end as a lemma the corpus does not carry. Logged for logcat.
-        console.error('[lemma] load failed', { lemmaBuckwalter, cause });
-        if (!cancelled) {
-          setEntry(null);
-          setTotal(0);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
+        console.error('[lemma] load failed', { lemmaBuckwalter: lemmaKey, cause });
+        if (!cancelled) setLoaded({ key: lemmaKey, entry: null, total: 0 });
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [lemmaBuckwalter, contentLanguage]);
+  }, [lemmaKey, contentLanguage]);
 
   useEffect(() => {
-    if (lemmaBuckwalter === null || source === null) {
-      setNeighbors(NO_NEIGHBORS);
+    if (lemmaKey === null || source === null) {
+      setNeighbors(NO_KEYED_NEIGHBORS);
       return;
     }
 
-    // Cleared before the refetch, not left holding the last lemma's answer: if
-    // the route's params change in place the verb aggregate is the slowest
-    // query here, and stale arrows would page somewhere the reader never was.
-    // Dimmed for that window is the same state a deep link with no ranking
-    // shows, which the reader already understands.
-    setNeighbors(NO_NEIGHBORS);
-
+    // Not cleared before the refetch: the answer carries the lemma it belongs
+    // to, and the body dims the arrows itself when that does not match what is
+    // drawn. Clearing here would instead dim the *previous* lemma's arrows for
+    // as long as the next one takes to load -- and the verb aggregate is the
+    // slowest query on this screen.
     let cancelled = false;
     (async () => {
       try {
         const db = await openCorpusDb();
         const client = createExpoSqliteClient(db as ExpoSqliteLike);
-        const adjacent = await getAdjacentLemmas(client, lemmaBuckwalter, source);
-        if (!cancelled) setNeighbors(adjacent);
+        const adjacent = await getAdjacentLemmas(client, lemmaKey, source);
+        if (!cancelled) setNeighbors({ key: lemmaKey, value: adjacent });
       } catch (cause) {
         // Dimmed arrows, not a broken screen: paging is a convenience and the
         // entry itself has already loaded. Logged for logcat.
-        console.error('[lemma] neighbours failed', { lemmaBuckwalter, source, cause });
-        if (!cancelled) setNeighbors(NO_NEIGHBORS);
+        console.error('[lemma] neighbours failed', { lemmaBuckwalter: lemmaKey, source, cause });
+        if (!cancelled) setNeighbors(NO_KEYED_NEIGHBORS);
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [lemmaBuckwalter, source]);
+  }, [lemmaKey, source]);
 
   const loadPage = useCallback(
     async (offset: number, limit: number) => {
-      if (lemmaBuckwalter === null) return [];
+      if (lemmaKey === null) return [];
       const db = await openCorpusDb();
       const client = createExpoSqliteClient(db as ExpoSqliteLike);
-      return getLemmaOccurrences(client, lemmaBuckwalter, contentLanguage, offset, limit);
+      return getLemmaOccurrences(client, lemmaKey, contentLanguage, offset, limit);
     },
-    [lemmaBuckwalter, contentLanguage],
+    [lemmaKey, contentLanguage],
   );
 
-  // D4: the incoming lemma slides in from the side the reader pressed.
-  // Declared with the other hooks, above the early returns -- a render that
-  // bails early would otherwise change the hook order.
-  //
-  // Keyed on the loaded entry, not the param: the spinner below holds the
-  // first frame until the query lands, and a slide keyed on the param plays
-  // out under it. Same reasoning as the root screen.
-  const transition = useEntryTransition(entry ? lemmaBuckwalter : null);
+  // What the reader sees: the previous lemma stays until its replacement is
+  // ready, which is what the outgoing half of the page turn animates. Declared
+  // with the other hooks, above the early returns -- a render that bails early
+  // would otherwise change the hook order.
+  const view = useHeldEntry(loaded && loaded.key === lemmaKey ? loaded : null);
 
-  if (loading) {
+  const notFound = (
+    <View style={{ flex: 1, justifyContent: 'center', padding: 20 }}>
+      <Text accessibilityRole="alert" style={{ color: theme.mutedText, fontSize: typography.body }}>
+        {t(uiLocale, 'lemma.notFound')}
+      </Text>
+    </View>
+  );
+
+  if (lemmaKey === null) return notFound;
+
+  if (!view) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator />
@@ -158,15 +179,12 @@ export function LemmaScreen({ lemmaBuckwalter, source }: LemmaScreenProps) {
     );
   }
 
-  if (!entry) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', padding: 20 }}>
-        <Text accessibilityRole="alert" style={{ color: theme.mutedText, fontSize: typography.body }}>
-          {t(uiLocale, 'lemma.notFound')}
-        </Text>
-      </View>
-    );
-  }
+  if (!view.entry) return notFound;
+
+  // Named locally so the body below reads from one settled bundle rather than
+  // from three pieces of state that change at three different moments.
+  const { entry, total } = view;
+  const arrows = neighbors.key === view.key ? neighbors.value : NO_NEIGHBORS;
 
   // One style for every section label on this screen, so they cannot drift
   // apart the way the two chip rows in DictionaryScreen did.
@@ -182,15 +200,10 @@ export function LemmaScreen({ lemmaBuckwalter, source }: LemmaScreenProps) {
   // inside one is a nested VirtualizedList (see ConcordanceList, R2).
   const header = (
     <View style={{ gap: 16, paddingBottom: 14 }}>
-      {/* D1's slim bar. The stack's own transparent header draws the back
-          arrow above this; the rank the reader is paging through captions it,
-          which is what D3 moved out of the docked pager. */}
-      <SlimHeader
-        testID="lemma-header"
-        title={t(uiLocale, 'lemma.heading')}
-        caption={entry.transliteration}
-      />
-      <View style={{ paddingHorizontal: 16, gap: 16 }}>
+      {/* No slim bar: the owner cut it on 2026-08-27. Its caption was the
+          transliteration, which EntryHeader already draws under the headword,
+          so nothing moved and nothing was lost. */}
+      <View style={{ paddingTop: 8, paddingHorizontal: 16, gap: 16 }}>
         <EntryHeader
           uiLocale={uiLocale}
           arabic={entry.lemma}
@@ -198,19 +211,11 @@ export function LemmaScreen({ lemmaBuckwalter, source }: LemmaScreenProps) {
           count={entry.count}
           pager={
             <AdjacentNav
-              prev={neighbors.prev}
-              next={neighbors.next}
-              // Guarded rather than assumed non-null: a null source yields no
-              // neighbours, so this cannot fire -- but a future caller that
-              // changes that must not be able to emit the string '?from=null'.
-              onNavigate={
-                source
-                  ? (target, side) => {
-                      transition.markSide(side);
-                      router.replace(`/lemma/${encodeURIComponent(target)}?from=${source}`);
-                    }
-                  : () => {}
-              }
+              prev={arrows.prev}
+              next={arrows.next}
+              // Paging is a pager, not a trail: it changes what this screen
+              // shows and never touches the navigator. See useEntryPager.
+              onNavigate={goTo}
               label={t(uiLocale, 'lemma.adjacent')}
               uiLocale={uiLocale}
               testIDPrefix="lemma"
@@ -341,10 +346,20 @@ export function LemmaScreen({ lemmaBuckwalter, source }: LemmaScreenProps) {
         importantForAccessibility={infoOpen ? 'no-hide-descendants' : 'auto'}
       >
         {/* The whole screen moves, header and list together, which is what
-            makes it read as a pager rather than as a list that reloaded (D4).
+            makes it read as a pager rather than as a list that reloaded.
             Inside the a11y wrapper, not around it: the sheet's
-            no-hide-descendants has to keep covering the list. */}
-        <Animated.View style={[{ flex: 1 }, transition.style]}>
+            no-hide-descendants has to keep covering the list.
+
+            absoluteFill, not flex: reanimated keeps the outgoing lemma in the
+            native hierarchy until its exit finishes, and in a flex column that
+            second child would halve both their heights for the length of the
+            animation. */}
+        <Animated.View
+          key={view.key}
+          entering={animation.entering}
+          exiting={animation.exiting}
+          style={StyleSheet.absoluteFill}
+        >
           <ConcordanceList total={total} loadPage={loadPage} header={header} />
         </Animated.View>
       </View>

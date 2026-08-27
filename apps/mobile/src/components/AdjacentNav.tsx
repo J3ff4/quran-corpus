@@ -13,9 +13,10 @@ export interface AdjacentNavProps {
   prev: string | null;
   next: string | null;
   /** Called with the non-null target of whichever side was pressed, and which
-   *  side that was. The side is what the entry screens turn into a direction
-   *  for D4's slide -- the router cannot tell them, because paging is a
-   *  `replace` and a replaced route arrives with no direction of its own. */
+   *  side that was. Both screens hand this straight to `useEntryPager.goTo`:
+   *  the side is what decides which way the page turn travels, and paging
+   *  changes the screen's own state rather than navigating, so there is no
+   *  route change to recover a direction from either. */
   onNavigate: (target: string, side: 'prev' | 'next') => void;
   /** Names the toolbar for TalkBack: 'root.adjacent' or 'lemma.adjacent'. */
   label: string;
