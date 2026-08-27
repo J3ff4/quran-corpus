@@ -1,16 +1,76 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
 import { EMPTY_SEARCH_RESULT, type SearchResult } from '@quran-corpus/data/mobile';
+import { GlassSurface } from '@/components/GlassSurface';
+import { SnippetText } from '@/components/SnippetText';
 import { searchCorpus } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { t } from '@/i18n/uiStrings';
+import { usePressScale } from '@/motion/usePressScale';
 import { useAppSettings } from '@/settings/settingsStore';
-import { SnippetText } from '@/components/SnippetText';
-import { touchTargets } from '@/theme/tokens';
+import { fonts, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+/** One result row, whatever kind it is: a glass card that squeezes on press.
+ *
+ *  The three kinds differ in what they put inside it (mockup 1i), not in how
+ *  they are pressed -- and three copies of a Pressable is how one of them
+ *  gains a press affordance the other two miss.
+ *
+ *  `tinted` is the jump: an exact verse reference is the one result the reader
+ *  asked for by name, so it takes the accent wash rather than plain glass. The
+ *  wash's measured contrast assumes it sits directly on the page, so it
+ *  replaces the glass fill instead of layering over it. */
+function ResultCard({
+  testID,
+  accessibilityLabel,
+  onPress,
+  tinted = false,
+  children,
+}: {
+  testID: string;
+  accessibilityLabel?: string;
+  onPress: () => void;
+  tinted?: boolean;
+  children: React.ReactNode;
+}) {
+  const theme = useThemeColors();
+  const press = usePressScale();
+
+  return (
+    <AnimatedPressable
+      testID={testID}
+      accessibilityRole="button"
+      {...(accessibilityLabel ? { accessibilityLabel } : {})}
+      onPress={onPress}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
+      style={[press.style, { marginBottom: 9 }]}
+    >
+      <GlassSurface
+        style={{
+          shadowOpacity: 0,
+          elevation: 0,
+          minHeight: touchTargets.minimum,
+          paddingHorizontal: 18,
+          paddingVertical: 14,
+          gap: 9,
+          ...(tinted
+            ? { backgroundColor: theme.accentWash, borderColor: theme.accent }
+            : null),
+        }}
+      >
+        {children}
+      </GlassSurface>
+    </AnimatedPressable>
+  );
+}
 
 // Long enough that a fast typist runs one query rather than six, short enough
 // that results still feel attached to the keystroke. The DB is local, so this
@@ -99,7 +159,14 @@ export function SearchScreen() {
     router.push(`/surah/${jump.surah_id}${suffix}`);
   }, [result.jump]);
 
-  const heading = { color: theme.mutedText, fontSize: 12, letterSpacing: 1, marginTop: 20 };
+  const heading = {
+    color: theme.mutedText,
+    fontFamily: fonts.displaySemiBold,
+    fontSize: typography.caption,
+    letterSpacing: 1.2,
+    marginTop: 20,
+    marginBottom: 9,
+  } as const;
   const empty = query.trim().length === 0;
   // Reads the last *completed* query, not the box: while the user keeps
   // typing, the previous verdict and the previous hits both stay put instead
@@ -115,23 +182,25 @@ export function SearchScreen() {
   return (
     <View style={{ flex: 1 }}>
       <View style={{ padding: 16 }}>
-        <TextInput
-          testID="search-input"
-          value={query}
-          onChangeText={setQuery}
-          placeholder={t(uiLocale, 'search.placeholder')}
-          placeholderTextColor={theme.mutedText}
-          autoFocus
-          accessibilityLabel={t(uiLocale, 'search.title')}
-          style={{
-            color: theme.text,
-            borderColor: theme.border,
-            borderWidth: 1,
-            borderRadius: 12,
-            paddingHorizontal: 14,
-            minHeight: touchTargets.minimum,
-          }}
-        />
+        {/* Glass, and accent-bordered rather than hairline-bordered: the field
+            is autofocused, so it is always the focused control on this screen
+            and drawing it as one is honest (mockup 1i). */}
+        <GlassSurface style={{ borderColor: theme.accent, paddingHorizontal: 4 }}>
+          <TextInput
+            testID="search-input"
+            value={query}
+            onChangeText={setQuery}
+            placeholder={t(uiLocale, 'search.placeholder')}
+            placeholderTextColor={theme.mutedText}
+            autoFocus
+            accessibilityLabel={t(uiLocale, 'search.title')}
+            style={{
+              color: theme.text,
+              paddingHorizontal: 14,
+              minHeight: touchTargets.minimum,
+            }}
+          />
+        </GlassSurface>
       </View>
 
       <ScrollView
@@ -154,13 +223,15 @@ export function SearchScreen() {
         {result.jump ? (
           <>
             <Text accessibilityRole="header" style={heading}>{t(uiLocale, 'search.jump').toUpperCase()}</Text>
-            <Pressable
-              testID="search-jump"
-              accessibilityRole="button"
-              onPress={openJump}
-              style={{ paddingVertical: 14, minHeight: touchTargets.minimum }}
-            >
-              <Text style={{ color: theme.accent, fontSize: 17 }}>
+            <ResultCard testID="search-jump" onPress={openJump} tinted>
+              <Text
+                style={{
+                  color: theme.accent,
+                  fontSize: 20,
+                  fontWeight: '700',
+                  fontVariant: ['tabular-nums'],
+                }}
+              >
                 {/* A surah-name-only reference ("Al-Baqarah") has no ayah at
                     all -- openJump pushes the surah with no `?ayah=`, so
                     faking one here (the old `?? 1`) labelled a destination
@@ -169,7 +240,7 @@ export function SearchScreen() {
                   ? result.jump.surah_id
                   : `${result.jump.surah_id}:${result.jump.ayah_number}`}
               </Text>
-            </Pressable>
+            </ResultCard>
           </>
         ) : null}
 
@@ -177,25 +248,35 @@ export function SearchScreen() {
           <>
             <Text accessibilityRole="header" style={heading}>{t(uiLocale, 'search.verses').toUpperCase()}</Text>
             {result.verses.map((hit) => (
-              <Pressable
+              <ResultCard
                 key={`${hit.source}-${hit.surah_id}-${hit.ayah_number}`}
                 testID="search-verse"
-                accessibilityRole="button"
                 onPress={() => router.push(`/surah/${hit.surah_id}?ayah=${hit.ayah_number}`)}
-                style={{ paddingVertical: 12, minHeight: touchTargets.minimum }}
               >
-                <Text style={{ color: theme.mutedText, fontSize: 12 }}>
+                <Text
+                  style={{
+                    color: theme.accent,
+                    fontSize: typography.caption,
+                    fontWeight: '600',
+                    fontVariant: ['tabular-nums'],
+                  }}
+                >
                   {hit.surah_id}:{hit.ayah_number}
                 </Text>
                 <SnippetText
                   snippet={hit.snippet}
                   highlightColor={theme.accent}
+                  highlightBackground={theme.accentWash}
                   // Hafs only for the Arabic body -- a Russian or Uzbek
                   // snippet has no business in the Uthmani face, and
                   // `hit.source` is exactly what says which this is.
-                  style={hit.source === 'ar' ? { color: theme.text, fontFamily: 'Hafs' } : { color: theme.text }}
+                  style={
+                    hit.source === 'ar'
+                      ? { color: theme.text, fontFamily: fonts.arabic, fontSize: 22, writingDirection: 'rtl' }
+                      : { color: theme.text, fontSize: typography.body }
+                  }
                 />
-              </Pressable>
+              </ResultCard>
             ))}
           </>
         ) : null}
@@ -204,15 +285,48 @@ export function SearchScreen() {
           <>
             <Text accessibilityRole="header" style={heading}>{t(uiLocale, 'search.roots').toUpperCase()}</Text>
             {result.roots.map((root) => (
-              <Pressable
+              <ResultCard
                 key={root.root_buckwalter}
                 testID="search-root"
-                accessibilityRole="button"
+                // The card is one accessibility node, so without this it
+                // announces as the bare concatenation of a root and a number,
+                // with nothing to say what the number counts.
+                accessibilityLabel={`${root.root_arabic}, ${root.occurrence_count} ${t(uiLocale, 'dictionary.occurrences')}`}
                 onPress={() => router.push(`/root/${encodeURIComponent(root.root_buckwalter)}`)}
-                style={{ paddingVertical: 12, minHeight: touchTargets.minimum }}
               >
-                <Text style={{ color: theme.accent, fontSize: 17, fontFamily: 'Hafs' }}>{root.root_arabic}</Text>
-              </Pressable>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                  }}
+                >
+                  {/* Letter-spaced, as 1i draws it: a root is three
+                      consonants, not a word, and spacing them says so without
+                      a second line of explanation. */}
+                  <Text
+                    style={{
+                      color: theme.text,
+                      fontSize: 26,
+                      fontFamily: fonts.arabic,
+                      letterSpacing: 4,
+                      writingDirection: 'rtl',
+                    }}
+                  >
+                    {root.root_arabic}
+                  </Text>
+                  <Text
+                    style={{
+                      color: theme.mutedText,
+                      fontSize: typography.caption,
+                      fontVariant: ['tabular-nums'],
+                    }}
+                  >
+                    {root.occurrence_count}
+                  </Text>
+                </View>
+              </ResultCard>
             ))}
           </>
         ) : null}
