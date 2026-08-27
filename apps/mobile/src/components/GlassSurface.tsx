@@ -14,6 +14,21 @@ export interface GlassSurfaceProps {
 }
 
 /**
+ * The fill, hairline, highlight and shadow this theme's glass is made of.
+ *
+ * Exported because a few surfaces cannot be a <GlassSurface>: the alphabet
+ * tile and the filter chip are Pressables whose own background has to swap to
+ * the accent wash when selected, and wrapping each in a surface would put a
+ * translucent fill *behind* the wash -- the one thing the wash's measured
+ * contrast figures forbid. They take the recipe and paint it themselves rather
+ * than re-deriving `isDark` in three places.
+ */
+export function useGlassSkin() {
+  const theme = useThemeColors();
+  return theme.background === themeColors.dark.background ? glass.dark : glass.light;
+}
+
+/**
  * A card, bar or sheet made of fake glass: translucent fill, hairline border,
  * inset top highlight, drop shadow.
  *
@@ -26,9 +41,7 @@ export interface GlassSurfaceProps {
  * two themes. Add a variant when a screen actually needs a second one.
  */
 export function GlassSurface({ children, radius = 'card', style, testID }: GlassSurfaceProps) {
-  const theme = useThemeColors();
-  const isDark = theme.background === themeColors.dark.background;
-  const skin = isDark ? glass.dark : glass.light;
+  const skin = useGlassSkin();
 
   return (
     <View

@@ -5,7 +5,6 @@ import { DictionaryScreen } from './DictionaryScreen';
 
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
-  setOptions: vi.fn(),
   // Four roots, chosen so every Task 9 assertion below is reachable:
   // - ا has two roots (ابل, أرض via the hamza-seat fold) so cells[1] (ا) stays
   //   enabled and cells[0] (ء) stays disabled, which two pre-existing tests
@@ -22,11 +21,8 @@ const mocks = vi.hoisted(() => ({
   ] as unknown[],
 }));
 
-vi.mock('@/settings/settingsStore', () => ({ useAppSettings: () => ({ uiLocale: 'en' }) }));
-vi.mock('expo-router', () => ({
-  router: { push: mocks.push },
-  useNavigation: () => ({ setOptions: mocks.setOptions }),
-}));
+vi.mock('@/settings/settingsStore', () => ({ useAppSettings: () => ({ uiLocale: 'en', reduceMotion: false }) }));
+vi.mock('expo-router', () => ({ router: { push: mocks.push } }));
 vi.mock('@/components/icons/Icon', () => ({ Icon: () => null }));
 vi.mock('@/components/FrequencyList', () => ({
   FrequencyList: ({ kind }: { kind: string }) =>
@@ -45,7 +41,7 @@ vi.mock('@quran-corpus/mobile-data', async (importOriginal) => ({
 }));
 vi.mock('react-native', async () => {
   const React = await import('react');
-  const { host } = await import('@/testing/rnHosts.js');
+  const { host, AccessibilityInfo } = await import('@/testing/rnHosts.js');
 
   const Input = ({
     onChangeText,
@@ -96,6 +92,9 @@ vi.mock('react-native', async () => {
     );
 
   return {
+    // Every glass control on this screen squeezes on press, so they all reach
+    // useReducedMotion, which reads this on mount.
+    AccessibilityInfo,
     ActivityIndicator: () => React.createElement('span', { 'data-testid': 'spinner' }),
     FlatList: List,
     Pressable: host('button'),
@@ -132,7 +131,6 @@ async function renderLoadedWithLetters() {
 describe('DictionaryScreen', () => {
   beforeEach(() => {
     mocks.push.mockReset();
-    mocks.setOptions.mockReset();
   });
   afterEach(cleanup);
 
@@ -184,7 +182,7 @@ describe('DictionaryScreen', () => {
   it('labels the ranked pane "Most used", not a sort order', async () => {
     // "Frequent" read as a sort order next to Browse's own "By frequency" chip.
     await renderLoaded();
-    expect(screen.getByTestId('dictionary-pane-frequent').textContent).toBe('Most used');
+    expect(screen.getByTestId('segment-frequent').textContent).toBe('Most used');
   });
 
   it('hides the alphabet grid while there is search text, and brings it back', async () => {
@@ -301,19 +299,41 @@ describe('DictionaryScreen', () => {
     expect(cells[0]!.getAttribute('aria-disabled')).toBe('true');
   });
 
+  it('counts what is on screen in the header, not the whole corpus', async () => {
+    // D1 put the count in the slim bar, where it captions the list under it.
+    // A fixed corpus total there disagrees with the list the moment a letter
+    // or a query filters it, and disagrees silently.
+    await renderLoaded();
+    expect(screen.getByTestId('dictionary-header-caption').textContent).toBe('Roots · 4');
+
+    fireEvent.change(screen.getByTestId('dictionary-search'), { target: { value: 'ارض' } });
+
+    expect(screen.getByTestId('dictionary-header-caption').textContent).toBe('Roots · 1');
+  });
+
+  it('captions the ranked pane with its ordering, not a root count', async () => {
+    // Nothing on the ranked pane is a root once the Lemmas or Verbs chip is
+    // tapped, so the browse caption would be wrong there in two ways at once.
+    await renderLoaded();
+
+    fireEvent.click(screen.getByTestId('segment-frequent'));
+
+    expect(screen.getByTestId('dictionary-header-caption').textContent).toBe('By frequency');
+  });
+
   it('hides the grid on the Frequent pane', async () => {
     await renderLoaded();
 
-    fireEvent.click(screen.getByTestId('dictionary-pane-frequent'));
+    fireEvent.click(screen.getByTestId('segment-frequent'));
 
     expect(screen.queryAllByTestId('alphabet-cell')).toHaveLength(0);
-    expect(screen.getByTestId('dictionary-pane-frequent').getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByTestId('segment-frequent').getAttribute('aria-selected')).toBe('true');
     expect(screen.getByTestId('frequency-list')).toBeTruthy();
   });
 
   it('passes the selected chip down to the list', async () => {
     await renderLoaded();
-    fireEvent.click(screen.getByTestId('dictionary-pane-frequent'));
+    fireEvent.click(screen.getByTestId('segment-frequent'));
 
     fireEvent.click(screen.getByTestId('frequency-kind-verbs'));
 
@@ -325,7 +345,7 @@ describe('DictionaryScreen', () => {
 
   it('announces the chips as a labelled toolbar of buttons, not a radio group', async () => {
     await renderLoaded();
-    fireEvent.click(screen.getByTestId('dictionary-pane-frequent'));
+    fireEvent.click(screen.getByTestId('segment-frequent'));
 
     // These are Material filter chips: buttons carrying a selected state.
     // `radiogroup` claims radio children they deliberately are not, and it was
@@ -340,20 +360,5 @@ describe('DictionaryScreen', () => {
     // The two pills above are the tabs. The chips filtering one list must not
     // also read as tabs, or TalkBack announces five tabs across two groupings.
     expect(screen.getAllByRole('tab')).toHaveLength(2);
-  });
-
-  it('puts a working search button in the header', async () => {
-    await renderLoaded();
-
-    const headerRight = mocks.setOptions.mock.calls
-      .map(([options]) => options.headerRight)
-      .filter(Boolean)
-      .at(-1);
-    // Rendered, not merely registered: `headerRight: expect.any(Function)`
-    // passes just as well for a function returning null.
-    render(headerRight());
-    fireEvent.click(screen.getByTestId('open-search'));
-
-    expect(mocks.push).toHaveBeenCalledWith('/search');
   });
 });

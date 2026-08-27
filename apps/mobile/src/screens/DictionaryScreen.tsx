@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from 'react-native';
-import { router, useNavigation } from 'expo-router';
+import Animated from 'react-native-reanimated';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
 import {
   compareRootsArabic,
@@ -11,14 +11,84 @@ import {
 import { AlphabetGrid } from '@/components/AlphabetGrid';
 import { DictionaryRow } from '@/components/DictionaryRow';
 import { FrequencyList } from '@/components/FrequencyList';
-import { SearchHeaderButton } from '@/components/SearchHeaderButton';
+import { GlassSurface, useGlassSkin } from '@/components/GlassSurface';
+import { SegmentedControl } from '@/components/SegmentedControl';
+import { SlimHeader } from '@/components/SlimHeader';
 import { getAllRootsForBrowse } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { t } from '@/i18n/uiStrings';
+import { usePressScale } from '@/motion/usePressScale';
 import { useAppSettings } from '@/settings/settingsStore';
-import { touchTargets, typography } from '@/theme/tokens';
+import { radii, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+/**
+ * One Material filter chip in glass, selected or not.
+ *
+ * Both chip rows on this screen -- Browse's sort order and the ranked pane's
+ * kind -- were the same twenty lines twice, and the pair had already drifted
+ * apart once (the sort row lost its toolbar label). Selection is wash AND
+ * colour AND weight, never colour alone (§8, WCAG 1.4.1), plus
+ * accessibilityState.selected for TalkBack, which sees none of the three.
+ *
+ * accessibilityRole="button", not "tab": these filter one list. The two
+ * segments above are the tabs, and five tabs across two groupings is what
+ * TalkBack would otherwise announce.
+ */
+function FilterChip({
+  testID,
+  label,
+  selected,
+  onPress,
+}: {
+  testID: string;
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  const theme = useThemeColors();
+  const skin = useGlassSkin();
+  const press = usePressScale();
+
+  return (
+    <AnimatedPressable
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
+      style={[
+        press.style,
+        {
+          paddingHorizontal: 15,
+          minHeight: touchTargets.compact,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: radii.pill,
+          borderWidth: 1,
+          // The wash replaces the glass fill rather than layering over it: its
+          // measured 4.85:1 assumes it sits directly on the page.
+          backgroundColor: selected ? theme.accentWash : skin.fill,
+          borderColor: selected ? theme.accent : skin.border,
+        },
+      ]}
+    >
+      <Text
+        style={{
+          color: selected ? theme.accent : theme.mutedText,
+          fontSize: typography.caption,
+          fontWeight: selected ? '700' : '500',
+        }}
+      >
+        {label}
+      </Text>
+    </AnimatedPressable>
+  );
+}
 
 type Pane = 'browse' | 'frequent';
 type DictionarySort = 'alpha' | 'freq';
@@ -29,7 +99,6 @@ export function DictionaryScreen() {
   const { uiLocale } = useAppSettings();
   const theme = useThemeColors();
   const paddingBottom = useListBottomPadding();
-  const navigation = useNavigation();
   const [pane, setPane] = useState<Pane>('browse');
   const [kind, setKind] = useState<'roots' | 'lemmas' | 'verbs'>('roots');
   // null while loading; a bare TextInput/list must not read as "no roots" for
@@ -64,16 +133,6 @@ export function DictionaryScreen() {
       cancelled = true;
     };
   }, []);
-
-  // The third of the spec's three search entry points; the reader's and Home's
-  // landed in Task 3.
-  useEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <SearchHeaderButton uiLocale={uiLocale} onPress={() => router.push('/search')} />
-      ),
-    });
-  }, [navigation, uiLocale]);
 
   // Which letters have any root at all, folded out of the list already in
   // hand rather than fetched: both came from the same 1642-row GROUP_CONCAT
@@ -127,32 +186,42 @@ export function DictionaryScreen() {
     setLetter(null);
   }
 
+  const paneOptions = useMemo(
+    () =>
+      [
+        { value: 'browse', label: t(uiLocale, 'dictionary.browse') },
+        { value: 'frequent', label: t(uiLocale, 'dictionary.frequent') },
+      ] as const,
+    [uiLocale],
+  );
+
   return (
     <View style={{ flex: 1 }}>
-      <View style={{ flexDirection: 'row', padding: 16, gap: 8 }}>
-        {(['browse', 'frequent'] as const).map((option) => (
-          <Pressable
-            key={option}
-            testID={`dictionary-pane-${option}`}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: pane === option }}
-            onPress={() => setPane(option)}
-            style={{
-              flex: 1,
-              minHeight: touchTargets.minimum,
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: 10,
-              borderWidth: 1,
-              borderColor: theme.border,
-              backgroundColor: pane === option ? theme.accent : 'transparent',
-            }}
-          >
-            <Text style={{ color: pane === option ? theme.onAccent : theme.text }}>
-              {t(uiLocale, option === 'browse' ? 'dictionary.browse' : 'dictionary.frequent')}
-            </Text>
-          </Pressable>
-        ))}
+      {/* D1: a slim bar, not a masthead. The caption counts what is on screen,
+          so it follows the letter filter and the search box rather than
+          reporting a corpus total the list disagrees with. */}
+      <SlimHeader
+        testID="dictionary-header"
+        title={t(uiLocale, 'tabs.dictionary')}
+        caption={
+          pane === 'browse'
+            ? // Label first, count second, the way Home's counters read. The
+              // mockup's "1,642 roots" would be "1 roots" the moment a search
+              // isolates one -- and "1 корней" in Russian, which is wrong for
+              // three of its four count classes. No locale has to agree with a
+              // number in this order, and it reuses a string that already
+              // exists.
+              `${t(uiLocale, 'dictionary.kindRoots')} · ${visible.length}`
+            : t(uiLocale, 'dictionary.sortFreq')
+        }
+      />
+      <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12 }}>
+        <SegmentedControl
+          options={paneOptions}
+          value={pane}
+          onChange={setPane}
+          accessibilityLabel={t(uiLocale, 'tabs.dictionary')}
+        />
       </View>
 
       {pane === 'browse' ? (
@@ -162,16 +231,13 @@ export function DictionaryScreen() {
               render, so the input remounts. This has to be a sibling of the
               list, not inside it. */}
           <View style={{ paddingHorizontal: 16 }}>
-            {/* The border sits on the row, not the input, so the clear button
+            {/* The glass sits on the row, not on the input, so the clear button
                 reads as being inside the field. clearButtonMode is not an
                 option -- it is iOS-only and this app ships Android first. */}
-            <View
+            <GlassSurface
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                borderColor: theme.border,
-                borderWidth: 1,
-                borderRadius: 12,
                 paddingRight: 4,
               }}
             >
@@ -207,7 +273,7 @@ export function DictionaryScreen() {
                   <Text style={{ color: theme.mutedText, fontSize: typography.body }}>✕</Text>
                 </Pressable>
               ) : null}
-            </View>
+            </GlassSurface>
           </View>
 
           {rootsFailed ? (
@@ -238,29 +304,19 @@ export function DictionaryScreen() {
                   <View
                     accessibilityRole="toolbar"
                     accessibilityLabel={t(uiLocale, 'dictionary.sortFilter')}
-                    style={{ flexDirection: 'row', paddingHorizontal: 16, paddingBottom: 8, gap: 8 }}
+                    style={{ flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 10, gap: 8 }}
                   >
                     {(['alpha', 'freq'] as const).map((option) => (
-                      <Pressable
+                      <FilterChip
                         key={option}
                         testID={`dictionary-sort-${option}`}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: sort === option }}
+                        label={t(
+                          uiLocale,
+                          option === 'alpha' ? 'dictionary.sortAlpha' : 'dictionary.sortFreq',
+                        )}
+                        selected={sort === option}
                         onPress={() => setSortAndClearLetter(option)}
-                        style={{
-                          paddingHorizontal: 14,
-                          minHeight: touchTargets.minimum,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          borderRadius: 999,
-                          borderWidth: 1,
-                          borderColor: sort === option ? theme.accent : theme.border,
-                        }}
-                      >
-                        <Text style={{ color: sort === option ? theme.accent : theme.mutedText }}>
-                          {t(uiLocale, option === 'alpha' ? 'dictionary.sortAlpha' : 'dictionary.sortFreq')}
-                        </Text>
-                      </Pressable>
+                      />
                     ))}
                   </View>
                 </>
@@ -286,12 +342,16 @@ export function DictionaryScreen() {
                 <DictionaryRow
                   uiLocale={uiLocale}
                   arabic={item.root_arabic}
+                  translit={item.root_buckwalter}
                   count={item.occurrence_count}
                   href={`/root/${encodeURIComponent(item.root_buckwalter)}`}
                 />
               )}
               style={{ flex: 1 }}
-              contentContainerStyle={{ paddingBottom }}
+              // The rows carry their own side margins and the gap between
+              // them, because FrequencyList renders the same card and neither
+              // list should have to know the other's spacing.
+              contentContainerStyle={{ paddingTop: 4, paddingBottom }}
             />
           )}
         </>
@@ -309,36 +369,20 @@ export function DictionaryScreen() {
             style={{ flexDirection: 'row', paddingHorizontal: 16, gap: 8 }}
           >
             {(['roots', 'lemmas', 'verbs'] as const).map((option) => (
-              <Pressable
+              <FilterChip
                 key={option}
                 testID={`frequency-kind-${option}`}
-                // A filter chip over one list, not a pane switch -- the two
-                // pills above are the tabs. Android chips are buttons that
-                // carry a selected state.
-                accessibilityRole="button"
-                accessibilityState={{ selected: kind === option }}
+                label={t(
+                  uiLocale,
+                  option === 'roots'
+                    ? 'dictionary.kindRoots'
+                    : option === 'lemmas'
+                      ? 'dictionary.kindLemmas'
+                      : 'dictionary.kindVerbs',
+                )}
+                selected={kind === option}
                 onPress={() => setKind(option)}
-                style={{
-                  paddingHorizontal: 14,
-                  minHeight: touchTargets.minimum,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderRadius: 999,
-                  borderWidth: 1,
-                  borderColor: kind === option ? theme.accent : theme.border,
-                }}
-              >
-                <Text style={{ color: kind === option ? theme.accent : theme.mutedText }}>
-                  {t(
-                    uiLocale,
-                    option === 'roots'
-                      ? 'dictionary.kindRoots'
-                      : option === 'lemmas'
-                        ? 'dictionary.kindLemmas'
-                        : 'dictionary.kindVerbs',
-                  )}
-                </Text>
-              </Pressable>
+              />
             ))}
           </View>
           <FrequencyList kind={kind} />
