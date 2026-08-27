@@ -7,9 +7,46 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-08-26
+Updated: 2026-08-27
 
 ## Now
+
+### 🐛 FORM/LEMMA NFC MISMATCH — MERGED 2026-08-27 as `06db088` (PR #29)
+Owner report: root `Hqq`, form حَآقَّة, chip says 3 occurrences, filter says none.
+Corpus-wide **49 dead chips hiding 145 occurrences**, web + mobile alike.
+
+Cause: the derived-form filter joins `root_forms.form_arabic` to
+`word_segments.lemma` by exact string equality, and the two sides come from
+different pipelines. corpus.quran.com writes shadda before the vowel sharing its
+letter; NFC orders them the other way (fatha ccc 30, shadda ccc 33). Identical on
+screen, unequal in SQL. PR #50 fixed the lemma side only, behind a LIKE scope that
+left **12097 lemma rows + 1079 form rows** dirty — which is why it hid a month.
+
+Two repairs in `normalizeArabicJoinKeys` (was `normalizeLemmaMadda`):
+- NFC across `words.lemma`, `word_segments.lemma`, `root_forms.form_arabic`.
+  **Both sides in one pass, never one alone** — 1040 forms match today *only*
+  because both are non-NFC the same way. Pinned by a test. Fixes 31 chips.
+- Self-verifying re-spelling for the 14 forms where the page writes U+0622 and the
+  morphology writes dagger-alef + maddah (not canonically equivalent, so one side
+  must move). Fires only when the re-spelled string is a real lemma of that root,
+  so root `Amm`'s genuine آمِّين is untouched. Owner-approved display change.
+
+`corpus_dictionary.py` normalizes at the parse boundary now, so a re-scrape cannot
+reintroduce it. `scraper fix-lemma-madda` DELETED — narrow predecessor, false
+docstring, reported success while repairing neither side.
+
+**Dead chips 49 → 4** on both DBs. Live canonical DB healed (backup
+`~/quran-data/quran.db.bak-20260827-nfc`), mobile bundle regenerated, both
+re-verified. The 4 survivors are the corpus homograph index (`عَاد` vs `عَاد2`) —
+**issue #28**, needs a match-key column, i.e. a §12 schema conversation.
+
+§5 review run on the branch: 5 findings, 4 fixed (`837fe61` unguarded await could
+500 every SSR page on SQLITE_BUSY; `4dea4d1` scraper deletion; `420ccb9` hand-typed
+Arabic literal). 5th declined with the measurement kept (`e5b7705`): the unscoped
+scan costs **408ms/cold start**, accepted because SQLite has no NFC function and a
+stored marker fails open the same way the LIKE scope did — revisit if this is ever
+hosted somewhere that cold-starts per request. Ten mutation checks, all killed; one
+survived first and exposed a vacuous assertion in a test written minutes earlier.
 
 ### 🎨 M6 GLASS REDESIGN — M6a-M6f merged; M6g next (2026-08-26)
 Spec + 9 sub-phase plans: `docs/plans/phase-m6-glass-redesign.md` (+ `phase-m6a..i`).
