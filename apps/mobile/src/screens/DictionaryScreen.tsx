@@ -13,7 +13,6 @@ import { DictionaryRow } from '@/components/DictionaryRow';
 import { FrequencyList } from '@/components/FrequencyList';
 import { GlassSurface, useGlassSkin } from '@/components/GlassSurface';
 import { SegmentedControl } from '@/components/SegmentedControl';
-import { SlimHeader } from '@/components/SlimHeader';
 import { getAllRootsForBrowse } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { t } from '@/i18n/uiStrings';
@@ -197,14 +196,31 @@ export function DictionaryScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-      {/* D1: a slim bar, not a masthead. The caption counts what is on screen,
+      {/* No slim bar: the owner cut it on 2026-08-27, and the tab bar already
+          names this screen. Its caption stayed -- it counts what is on screen,
           so it follows the letter filter and the search box rather than
-          reporting a corpus total the list disagrees with. */}
-      <SlimHeader
-        testID="dictionary-header"
-        title={t(uiLocale, 'tabs.dictionary')}
-        caption={
-          pane === 'browse'
+          reporting a corpus total the list disagrees with -- and moved down
+          onto the segmented control's own row. */}
+      <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12, gap: 8 }}>
+        <SegmentedControl
+          options={paneOptions}
+          value={pane}
+          onChange={setPane}
+          accessibilityLabel={t(uiLocale, 'tabs.dictionary')}
+        />
+        <Text
+          testID="dictionary-count"
+          numberOfLines={1}
+          style={{
+            alignSelf: 'flex-end',
+            color: theme.mutedText,
+            fontSize: typography.caption,
+            // The count changes as the reader types. Proportional digits
+            // reflow the line on every keystroke.
+            fontVariant: ['tabular-nums'],
+          }}
+        >
+          {pane === 'browse'
             ? // Label first, count second, the way Home's counters read. The
               // mockup's "1,642 roots" would be "1 roots" the moment a search
               // isolates one -- and "1 корней" in Russian, which is wrong for
@@ -212,16 +228,8 @@ export function DictionaryScreen() {
               // number in this order, and it reuses a string that already
               // exists.
               `${t(uiLocale, 'dictionary.kindRoots')} · ${visible.length}`
-            : t(uiLocale, 'dictionary.sortFreq')
-        }
-      />
-      <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12 }}>
-        <SegmentedControl
-          options={paneOptions}
-          value={pane}
-          onChange={setPane}
-          accessibilityLabel={t(uiLocale, 'tabs.dictionary')}
-        />
+            : t(uiLocale, 'dictionary.sortFreq')}
+        </Text>
       </View>
 
       {pane === 'browse' ? (

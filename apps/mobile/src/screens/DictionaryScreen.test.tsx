@@ -304,11 +304,11 @@ describe('DictionaryScreen', () => {
     // A fixed corpus total there disagrees with the list the moment a letter
     // or a query filters it, and disagrees silently.
     await renderLoaded();
-    expect(screen.getByTestId('dictionary-header-caption').textContent).toBe('Roots · 4');
+    expect(screen.getByTestId('dictionary-count').textContent).toBe('Roots · 4');
 
     fireEvent.change(screen.getByTestId('dictionary-search'), { target: { value: 'ارض' } });
 
-    expect(screen.getByTestId('dictionary-header-caption').textContent).toBe('Roots · 1');
+    expect(screen.getByTestId('dictionary-count').textContent).toBe('Roots · 1');
   });
 
   it('captions the ranked pane with its ordering, not a root count', async () => {
@@ -318,7 +318,7 @@ describe('DictionaryScreen', () => {
 
     fireEvent.click(screen.getByTestId('segment-frequent'));
 
-    expect(screen.getByTestId('dictionary-header-caption').textContent).toBe('By frequency');
+    expect(screen.getByTestId('dictionary-count').textContent).toBe('By frequency');
   });
 
   it('hides the grid on the Frequent pane', async () => {
