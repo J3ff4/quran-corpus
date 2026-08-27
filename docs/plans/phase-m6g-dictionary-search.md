@@ -480,16 +480,15 @@ because three of them overturn decisions this plan made.
 
 | Check | Build | Date | Result | Notes |
 | --- | --- | --- | --- | --- |
-| 97 | — | — | **PENDING** | Page Next/Previous on a root: previous entry slides out as the next slides in, both moving together, no blank, no stutter. Back arrow does not move. |
-| 98 | — | — | **PENDING** | Same on the lemma screen, entered from Most used. |
-| 99 | — | — | **PENDING** | Reduced motion on: the two entries cross-fade, neither slides. |
-| 100 | — | — | **PENDING** | Dictionary, root and lemma have no slim bar; the count, the Buckwalter spelling and the reading are all still on screen. |
-| 101 | — | — | **PENDING** | Form chips: All lit with no filter, tinted per part of speech, tapping All clears a multi-chip selection. |
-| 102 | — | — | **PENDING** | Most used: chips clear of the #/count/form labels in both themes. |
+| 97 | Expo Go, `6498d63` | 2026-08-27 | PASS | Root قول → قوم and back. Captured with `PAGE_MS` temporarily at 4000 so `screencap` lands mid-flight (restored after). Both halves are on screen at once and moving together: قول (1722) travelling left while قوم (660) enters from the right, mirrored on Previous. No blank frame, no spinner, no stutter. The back arrow's bright pixels measure x 81..143 in **all six** frames of the burst — it does not move. |
+| 98 | Expo Go, `6498d63` | 2026-08-27 | PASS | Same, on the lemma screen entered from Most used → Lemmas: ٱللَّه (2699) → مَا (2177), frequency-rank order, both halves moving together. |
+| 99 | Expo Go, `6498d63` | 2026-08-27 | PASS | In-app Reduce animations on (the OS toggle is not reachable on this device — see `useReducedMotion`'s docstring), `FADE_MS` temporarily at 3000. Mid-transition frame shows قول and قوم **superimposed at the same position**, "1722 occurrences" and "660 occurrences" cross-fading over each other with zero horizontal displacement. Neither slides. |
+| 100 | Expo Go, `6498d63` | 2026-08-27 | PASS | No slim bar on any of the three. Dictionary: `Roots · 1642` hangs off the right end of the Alphabetical/By frequency row. Root: `qwl` sits on the headword plate beside the ق و ل tiles, `1722 occurrences` under it. Lemma: the reading `l-lahi` is under the headword, where it already was. |
+| 101 | Expo Go, `6498d63` | 2026-08-27 | PASS | ق-و-ل, six chips. All lit with no filter; chips tinted per part of speech (verbs warm, nouns blue, participle teal) and the tint is kept in the selected state. Multi-select قِيل 4 + قَآئِل 5 → concordance 9; tapping All cleared both and returned 1722. |
+| 102 | Expo Go, `6498d63` | 2026-08-27 | PARTIAL | Night theme: the Roots/Lemmas/Verbs row is clear of the `# COUNT FORM` labels, no touching. **Light theme not exercised** — the device dropped off wireless debugging before the theme switch. |
 
-Not run: the phone was locked when the work landed (02:32 local). §10 —
-implementation complete, verification pending is an unmet exit criterion, so
-M6g does not close until these six are recorded.
+Run 2026-08-27 over Expo Go, driven through `adb` on the owner's OnePlus 7 Pro
+(Android 12). §10's gate is met for 97-101; 102 is half-recorded.
 
 ## Owner review of the built screens, round 2 — 2026-08-27
 
@@ -550,8 +549,30 @@ Three more notes from the same device session. Clarified with
 
 | Check | Build | Date | Result | Notes |
 | --- | --- | --- | --- | --- |
-| 103 | — | — | **PENDING** | Dictionary: the caption sits at the right end of the chip row in both panes, no row of its own, not clipped at the largest font scale. |
-| 104 | — | — | **PENDING** | Pager arrows read as centred in their circles, both directions, both themes. |
-| 105 | — | — | **PENDING** | Letter cells light under the thumb and the list filters with them; alphabetical/by frequency and Browse/Most used switch without a stall. |
-| 106 | — | — | **PENDING** | Typing in the search box keeps up with the keyboard, no dropped characters. |
-| 107 | — | — | **PENDING** | Flipping Browse ↔ Most used redraws the ranked rows with no spinner, and the kind chips still switch the list. |
+| 103 | Expo Go, `6498d63` | 2026-08-27 | PARTIAL | Both panes carry the caption inline at the right end of their own chip row, no row of its own: `Roots · 1642` on Browse's alphabetical/by frequency row, `By frequency` on Most used' roots/lemmas/verbs row. **Largest font scale not exercised** — device dropped off before the font-scale pass. |
+| 104 | Expo Go, `6498d63` | 2026-08-27 | PARTIAL | Night theme, measured rather than eyeballed: the chevron's bright-pixel bounding box centres on (75.5, 73.5) and (73.5, 73.5) against a circle centre of (75.0, 75.0) — under 1.5 physical px at 640dpi, i.e. **under half a dp** in both axes, both directions. **Light theme not exercised.** |
+| 105 | Expo Go, `6498d63` | 2026-08-27 | PASS | ق lights with the accent border and wash and the list filters with it: 1642 → 80 roots, قبح/قبر at the top. Alphabetical ↔ By frequency switches with no perceptible stall (أله 2851, قول 1722, كون 1390 land immediately); gfxinfo over a letter tap shows 3 janky frames of 45, 90th percentile 18ms. Browse ↔ Most used likewise — see 107. |
+| 106 | — | — | **PENDING** | Typing in the search box keeps up with the keyboard, no dropped characters. Device dropped off wireless debugging before this ran. |
+| 107 | Expo Go, `6498d63` | 2026-08-27 | PASS | Kind chips switch the list (Roots → Lemmas مِن 3226 → Verbs قَالَ 1618). Flipping to Browse and back redrew the ranked rows **within 1s with no spinner** and with the Lemmas selection intact — the round-2 per-kind cache doing its job. |
+
+### What this run found
+
+**A blank pane on a kind's first load.** Selecting Lemmas for the first time
+left the pane empty — no rows, no header, **no spinner and no skeleton** — for
+somewhere between 2 and 7 seconds before the 1000 rows appeared. The cache
+means it only happens once per kind per launch, and check 107's re-flip is
+instant, so this is not the cached path regressing; it is the uncached path
+having no loading state at all. Expo Go's dev bundle is part of it (round 2
+left that unmeasured by owner's choice), but an empty pane is the wrong answer
+at any speed. Worth an issue before M7.
+
+**The alef-madda fix, confirmed on device.** ق-و-ل's `قَآئِل 5` chip filters the
+concordance to exactly 5 rows (12:10:2, 18:19:6, …). That chip is the class PR
+#29 repaired — the bundled DB was regenerated after that merge, and this is the
+end-to-end proof on hardware.
+
+**Harness note for the next run.** `adb shell input tap` sends down and up in
+the same event batch, and these `Pressable`s ignore it — a letter cell and a
+form chip both needed `input swipe X Y X Y 140` (200ms for the chips) to
+register. Two taps that looked like app defects were the harness. The
+segmented control and the sort chips do respond to a plain `tap`.
