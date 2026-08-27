@@ -44,6 +44,26 @@ describe('getDatabase', () => {
     }
   });
 
+  it('a failed join-key normalization does not fail init', async () => {
+    const getDatabase = await freshGetDatabase();
+    const data = await import('@quran-corpus/data');
+    // This pass is the one issuing write transactions now, so it is the call
+    // that loses the race for the write lock -- against the scraper, or against
+    // a second worker cold-starting on the same file. Unguarded it rejected the
+    // memoized init and 500'd every SSR page; the degraded state it replaces
+    // that with is the mismatched chips the app had before it ever ran.
+    vi.mocked(data.normalizeArabicJoinKeys).mockRejectedValueOnce(
+      new Error('SQLITE_BUSY: database is locked'),
+    );
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      await expect(getDatabase()).resolves.toEqual({ mock: 'client' });
+      expect(warn).toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('memoizes: repeated calls share one init', async () => {
     const getDatabase = await freshGetDatabase();
     const data = await import('@quran-corpus/data');
@@ -76,8 +96,10 @@ describe('getDatabase', () => {
       expect(data.normalizeArabicJoinKeys).toHaveBeenCalledTimes(1);
       // But NOT the root-rank backfill: the triggers that dirty that cache are
       // DDL this flag skips, so it could only ever find a clean cache and
-      // pretend to heal. Running it here would also make `next build` — which
-      // sets this flag — write to the live database it only reads.
+      // pretend to heal. (The self-heal above does write under this flag, and
+      // `next build` sets it — that is deliberate and noted at the call site.
+      // The backfill is excluded on its own merits, not to keep the build
+      // read-only, which it no longer is.)
       expect(data.backfillRootSortOrderIfStale).not.toHaveBeenCalled();
     } finally {
       if (prev === undefined) delete process.env['DB_SKIP_MIGRATIONS'];
