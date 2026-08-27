@@ -135,9 +135,23 @@ No new logic, so no new unit test and no mutation-check (§4's step applies to
 branches, loops, parsers and validators). The gate is the existing suites
 staying green plus device check 89.
 
-- [ ] **Step 1: Restyle, running `pnpm --filter @quran-corpus/mobile test` after each file**
-- [ ] **Step 2: Add a contrast assertion in `tokens.test.ts` for any new colour pairing**
-- [ ] **Step 3: Commit**
+- [x] **Step 1: Restyle, running `pnpm --filter @quran-corpus/mobile test` after each file**
+- [x] **Step 2: Add a contrast assertion in `tokens.test.ts` for any new colour pairing** —
+      none needed. Every pairing used (accent on the wash, body/muted/accent on
+      glass) is already measured in `tokens.test.ts`.
+- [x] **Step 3: Commit** — `fc2d76b`
+
+Two things this task settled that the later ones inherit:
+
+- `SlimHeader` is the D1 bar, shared. Tasks 3 and 4 take it rather than
+  drawing their own.
+- The dead `setOptions({ headerRight })` search button is gone (tab screens
+  run `headerShown: false`). **Open for the owner:** whether the Dictionary
+  tab needs its own global-search affordance, or whether Home and the reader
+  are enough. Not invented inside a restyle.
+- `FrequencyList`'s column-header row still uses the old flush-row padding, so
+  its labels no longer sit over the card columns. Task 4 fixes it -- the row
+  it labels is `DictionaryRow`, which moved in this task.
 
 ```bash
 git add apps/mobile/src/screens/DictionaryScreen.tsx apps/mobile/src/components/AlphabetGrid.tsx \
@@ -171,13 +185,25 @@ Two things that must not change while this is restyled:
 - `AdjacentNav` keeps `router.replace`, not `push` (M5c defect 10) — otherwise
   back walks every root the user browsed.
 
-- [ ] **Step 1: Restyle, suite green after each file**
-- [ ] **Step 2: Re-run the M5c chip and nav tests specifically**
+- [x] **Step 1: Restyle, suite green after each file**
+- [x] **Step 2: Re-run the M5c chip and nav tests specifically** — PASS (7/7).
+- [x] **Step 3: Commit** — `43f156f`
 
-Run: `pnpm --filter @quran-corpus/mobile test FormFilterChips AdjacentNav`
-Expected: PASS, unchanged.
+`EntryHeader` gained a `pager` slot for D3 and draws it as an overlay on the
+headword's own row. Threading the headword between the two buttons instead
+would have put a heading inside `AdjacentNav`'s labelled toolbar. The
+headword keeps a 46pt gutter each side so a long lemma cannot run under a
+chevron.
 
-- [ ] **Step 3: Commit**
+Icon-only chevrons mean the inflected Russian labels are the accessible name
+now, not visible text. `AdjacentNav.test.tsx` moved with them, from
+`textContent` to `aria-label` — same assertion, right attribute.
+
+**Not built, and deliberately:** mockup m6g-4 draws an "All" chip at the head
+of the form row. That is new behaviour (today an empty selection *is* All,
+with no control that clears several chips at once), and this sub-phase is a
+restyle. It is a good affordance and about fifteen minutes' work — owner's
+call.
 
 ```bash
 git add apps/mobile/app/root apps/mobile/src/components
@@ -205,9 +231,22 @@ a shadow per row at 1000 rows is not — use the flat variant (`GlassSurface` wi
 `style={{ shadowOpacity: 0 }}`) for list rows and reserve the shadow for
 plates. Note that in a comment.
 
-- [ ] **Step 1: Restyle, suite green after each file**
-- [ ] **Step 2: Scroll-test the 1000-row list in the device run (check 93)**
-- [ ] **Step 3: Commit**
+- [x] **Step 1: Restyle, suite green after each file**
+- [ ] **Step 2: Scroll-test the 1000-row list in the device run (check 93)** —
+      Task 6, on the owner's device.
+- [x] **Step 3: Commit** — `aae3f94`
+
+Two corrections to this task as written:
+
+- `SnippetText` is a **search** component (`SearchScreen` is its only caller),
+  so it moved to Task 5.
+- D3 wanted frame 3's "rank 41 of 200" in the slim bar. That rank is not on
+  the lemma screen: `getAdjacentLemmas` returns neighbours, not a position,
+  and M6g adds no queries. The bar is captioned with the reading instead. The
+  rank belongs to whoever adds the query.
+
+`DictionaryRow` is flat glass (`shadowOpacity: 0`, `elevation: 0`), set in
+Task 2 because Browse renders 1642 of the same row.
 
 ```bash
 git add apps/mobile/src/screens/LemmaScreen.tsx apps/mobile/app/lemma \
@@ -230,7 +269,7 @@ three visually distinct kinds — ayah hits, root hits, lemma hits — each kind
 with its own icon and its own section header. The three kinds already exist in
 the data; today they are styled almost identically.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```tsx
 it('labels each result kind distinctly', async () => {
@@ -243,17 +282,56 @@ it('labels each result kind distinctly', async () => {
 });
 ```
 
-- [ ] **Step 2: Run it, watch it fail, implement, re-run**
+- [x] **Step 2: Run it, watch it fail, implement, re-run**
 
 Arabic hits keep `fonts.arabic`; the existing `hit.source === 'ar'` branch in
 `SearchScreen.tsx:196` is what decides that — keep it.
 
-- [ ] **Step 3: Mutation-check (§4)**
+- [x] **Step 3: Mutation-check (§4)** — two mutants, both caught: every kind
+      under one header, and the root card without its count.
+- [x] **Step 4: Commit** — `90b3c0c`
 
-Render every kind under one header. Expected: the test FAILS. Restore by
-re-editing.
+**The test above, as this plan drafted it, asserts a screen that cannot
+exist.** It expects `['Ayahs', 'Roots', 'Words']`, but `SearchResult` carries
+`jump`, `verses` and `roots` — there is no lemma/"Words" arm in the data.
+Adding one is a `packages/data` query, which this sub-phase forbids outright
+and §5 would gate. The shipped test asserts the three kinds that do exist
+(`GO TO`, `VERSES`, `ROOTS`) and that each has its own affordance, which is
+what mockup `1i` is actually about.
 
-- [ ] **Step 4: Commit**
+That is the second time a brief has specified a literal assertion nobody
+could satisfy (`[[sdd-brief-can-specify-vacuous-tests]]`). Read a brief's
+test against the types before writing it.
+
+**Not built, and deliberately:** `1i` draws a "Clear" control in the search
+field. Skipped as new behaviour in a restyle — the keyboard already clears
+the box. Owner's call, like the All chip.
+
+---
+
+### Task 5b: The pager's directional transition (D4)
+
+**Files:**
+- Create: `apps/mobile/src/motion/useEntryTransition.ts` + its test
+- Modify: `apps/mobile/src/components/AdjacentNav.tsx`
+- Modify: `apps/mobile/app/root/[buckwalter].tsx`
+- Modify: `apps/mobile/src/screens/LemmaScreen.tsx`
+
+D4 is the only ruling that is behaviour rather than paint, and it had no task
+of its own. Commit `97bb956`.
+
+- [x] In-screen, not through the navigator. `router.replace` animates in no
+      direction and `push` is what M5c defect 10 forbids, so the screen
+      animates its own content on an entry-key change — which is also what
+      makes header and list move as one thing.
+- [x] `AdjacentNav` reports the side alongside the target; a replaced route
+      arrives with no direction of its own. The side is consumed once and
+      cleared, so a deep link or a concordance tap does not inherit it.
+- [x] Enter-only. Both screens already show a full-screen spinner while the
+      next entry loads, so there is no outgoing content left to animate.
+- [x] Reduced motion cross-fades (§8). The direction lives in a pure
+      `enterOffset()`; swapping the signs and dropping the reduced-motion
+      guard each fail a test.
 
 ```bash
 git add apps/mobile/src/screens/SearchScreen.tsx apps/mobile/app/search.tsx \
@@ -270,6 +348,12 @@ git commit -m "feat(mobile): glass search with three distinct result kinds"
 ```bash
 cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --profile preview
 ```
+
+EAS is quota-parked to **2026-09-01** (`[[expo-go-device-loop]]`). Nothing in
+89–96 needs a native module Expo Go lacks — they are all layout, motion and
+navigation — so run them over Expo Go rather than waiting for the build:
+`expo start --clear`, then the LAN URL. Only checks that need a real build
+(82, 83) stay parked.
 
 - [ ] **Step 2: Run checks 89–96 and record every result below.**
 
