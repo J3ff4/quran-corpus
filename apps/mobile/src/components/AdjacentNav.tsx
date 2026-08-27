@@ -12,8 +12,11 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 export interface AdjacentNavProps {
   prev: string | null;
   next: string | null;
-  /** Called with the non-null target of whichever side was pressed. */
-  onNavigate: (target: string) => void;
+  /** Called with the non-null target of whichever side was pressed, and which
+   *  side that was. The side is what the entry screens turn into a direction
+   *  for D4's slide -- the router cannot tell them, because paging is a
+   *  `replace` and a replaced route arrives with no direction of its own. */
+  onNavigate: (target: string, side: 'prev' | 'next') => void;
   /** Names the toolbar for TalkBack: 'root.adjacent' or 'lemma.adjacent'. */
   label: string;
   uiLocale: UiLocaleCode;
@@ -62,7 +65,7 @@ function PagerButton({
 }: {
   side: 'prev' | 'next';
   target: string | null;
-  onNavigate: (target: string) => void;
+  onNavigate: (target: string, side: 'prev' | 'next') => void;
   uiLocale: UiLocaleCode;
   testIDPrefix: 'root' | 'lemma';
 }) {
@@ -80,7 +83,7 @@ function PagerButton({
       // with nothing to announce where a control used to be.
       accessibilityState={{ disabled: target === null }}
       disabled={target === null}
-      onPress={target ? () => onNavigate(target) : undefined}
+      onPress={target ? () => onNavigate(target, side) : undefined}
       onPressIn={press.onPressIn}
       onPressOut={press.onPressOut}
       style={[

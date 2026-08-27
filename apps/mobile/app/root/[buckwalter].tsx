@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
 import type { RootEntry } from '@quran-corpus/data/mobile';
 import { AdjacentNav } from '@/components/AdjacentNav';
@@ -22,6 +23,7 @@ import { openUserDb } from '@/data/userDb';
 import { recordRootView } from '@/data/userRepository';
 import { localDay } from '@/home/counters';
 import { t } from '@/i18n/uiStrings';
+import { useEntryTransition } from '@/motion/useEntryTransition';
 import { useAppSettings } from '@/settings/settingsStore';
 import { fonts, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
@@ -213,6 +215,11 @@ export default function RootRoute() {
     [applied, contentLanguage],
   );
 
+  // D4: the incoming root slides in from the side the reader pressed. Declared
+  // with the other hooks, above the early returns -- a render that bails early
+  // would otherwise change the hook order.
+  const transition = useEntryTransition(buckwalter);
+
   const toggleForm = useCallback((formId: number) => {
     setSelected((current) =>
       current.includes(formId) ? current.filter((id) => id !== formId) : [...current, formId],
@@ -279,7 +286,10 @@ export default function RootRoute() {
               // backing out of every root they passed, and root screens are
               // outside the tab group, so there is no tab bar to escape to
               // either.
-              onNavigate={(target) => router.replace(`/root/${encodeURIComponent(target)}`)}
+              onNavigate={(target, side) => {
+              transition.markSide(side);
+              router.replace(`/root/${encodeURIComponent(target)}`);
+            }}
               label={t(uiLocale, 'root.adjacent')}
               uiLocale={uiLocale}
             />
@@ -376,12 +386,16 @@ export default function RootRoute() {
   );
 
   return (
-    <ConcordanceList
-      total={applied.total}
-      loadPage={loadPage}
-      header={header}
-      forms={forms}
-      countFailed={applied.failed}
-    />
+    // The whole screen moves, header and list together, which is what makes it
+    // read as a pager rather than as a list that reloaded (D4).
+    <Animated.View style={[{ flex: 1 }, transition.style]}>
+      <ConcordanceList
+        total={applied.total}
+        loadPage={loadPage}
+        header={header}
+        forms={forms}
+        countFailed={applied.failed}
+      />
+    </Animated.View>
   );
 }

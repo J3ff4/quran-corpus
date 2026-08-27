@@ -340,7 +340,11 @@ describe('LemmaScreen', () => {
     // accessibilityViewIsModal is iOS-only; without this the reader can swipe
     // straight past the sheet into the rows behind it.
     render(<LemmaScreen lemmaBuckwalter="qaAla" source={null} />);
-    const wrapper = () => screen.getByTestId('concordance').parentElement!;
+    // By testID, not by walking up from the list: the pager's animated wrapper
+    // now sits between them, and a parentElement chain would have to be
+    // re-counted every time the tree gains a level.
+    const wrapper = () => screen.getByTestId('lemma-content');
+    await screen.findByTestId('concordance');
     await waitFor(() => expect(wrapper().getAttribute('data-hidden-from-a11y')).toBeNull());
 
     fireEvent.click(screen.getByTestId('info-button'));

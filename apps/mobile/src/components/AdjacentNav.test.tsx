@@ -31,7 +31,10 @@ describe('AdjacentNav', () => {
     expect(onNavigate).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByTestId('root-next'));
-    expect(onNavigate).toHaveBeenCalledWith('ktb');
+    // The side travels with the target: paging is a router.replace, and a
+    // replaced route arrives with no direction of its own, so this callback is
+    // the only thing that can tell the screen which way to slide (D4).
+    expect(onNavigate).toHaveBeenCalledWith('ktb', 'next');
   });
 
   it('names its controls from the prefix so two screens can both use it', () => {

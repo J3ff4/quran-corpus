@@ -119,6 +119,7 @@ export function reactNativeTextMock() {
     ScrollView: host('div'),
     SectionList,
     StyleSheet,
+    useWindowDimensions,
     __layoutHandlers: layoutHandlers,
     __fireLayout: fireLayout,
   };
@@ -326,6 +327,16 @@ export const AccessibilityInfo = {
   isReduceMotionEnabled: async () => false,
   addEventListener: () => ({ remove: () => {} }),
 };
+
+/** A 390x844 window -- the frame every M6 mockup is drawn at.
+ *
+ *  Here rather than per suite for the same reason AccessibilityInfo is: the
+ *  entry-screen pager measures the window to slide the incoming entry a full
+ *  width, so both dictionary screens now reach it, and a suite without it
+ *  fails on `useWindowDimensions is not a function` rather than on anything
+ *  naming the screen. A suite that cares about the number declares its own.
+ */
+export const useWindowDimensions = () => ({ width: 390, height: 844, scale: 3, fontScale: 1 });
 
 /** Inert AppState for suites that mock react-native wholesale.
  *

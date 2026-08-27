@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { Link, router } from 'expo-router';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
 import {
@@ -17,6 +18,7 @@ import { SlimHeader } from '@/components/SlimHeader';
 import { getAdjacentLemmas, getLemmaOccurrences, getLemmaScreen } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { t } from '@/i18n/uiStrings';
+import { useEntryTransition } from '@/motion/useEntryTransition';
 import { useAppSettings } from '@/settings/settingsStore';
 import { fonts, radii, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
@@ -138,6 +140,11 @@ export function LemmaScreen({ lemmaBuckwalter, source }: LemmaScreenProps) {
     },
     [lemmaBuckwalter, contentLanguage],
   );
+
+  // D4: the incoming lemma slides in from the side the reader pressed.
+  // Declared with the other hooks, above the early returns -- a render that
+  // bails early would otherwise change the hook order.
+  const transition = useEntryTransition(lemmaBuckwalter);
 
   if (loading) {
     return (
@@ -321,8 +328,18 @@ export function LemmaScreen({ lemmaBuckwalter, source }: LemmaScreenProps) {
       {/* accessibilityViewIsModal is iOS-only, so on Android this is what stops
           TalkBack swiping into the list behind the sheet -- same pairing as
           WbwScreen. */}
-      <View style={{ flex: 1 }} importantForAccessibility={infoOpen ? 'no-hide-descendants' : 'auto'}>
-        <ConcordanceList total={total} loadPage={loadPage} header={header} />
+      <View
+        testID="lemma-content"
+        style={{ flex: 1 }}
+        importantForAccessibility={infoOpen ? 'no-hide-descendants' : 'auto'}
+      >
+        {/* The whole screen moves, header and list together, which is what
+            makes it read as a pager rather than as a list that reloaded (D4).
+            Inside the a11y wrapper, not around it: the sheet's
+            no-hide-descendants has to keep covering the list. */}
+        <Animated.View style={[{ flex: 1 }, transition.style]}>
+          <ConcordanceList total={total} loadPage={loadPage} header={header} />
+        </Animated.View>
       </View>
       {infoOpen ? (
         <InfoSheet
