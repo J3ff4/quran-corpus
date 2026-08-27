@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { router } from 'expo-router';
@@ -40,7 +41,7 @@ export interface DictionaryRowProps {
  *  Not a Link: the row is a three-column layout and expo-router's Link renders
  *  a Text on native, inside which a flexDirection View does not lay out --
  *  same reason FrequencyList gives. */
-export function DictionaryRow({
+function DictionaryRowBase({
   arabic,
   gloss,
   count,
@@ -128,3 +129,10 @@ export function DictionaryRow({
     </AnimatedPressable>
   );
 }
+
+/** Memoized: both lists hand this only primitives, and a letter tap or a
+ *  keystroke re-renders the screen above with the same rows still on it. Every
+ *  row is an Animated.Pressable carrying a shared value, so an unmemoized
+ *  re-render of the mounted window is what made a tap feel dead before the
+ *  list moved. */
+export const DictionaryRow = memo(DictionaryRowBase);

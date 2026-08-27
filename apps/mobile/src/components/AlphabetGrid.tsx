@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { ARABIC_ALPHABET_ORDER } from '@quran-corpus/data/mobile';
@@ -29,7 +30,7 @@ export interface AlphabetGridProps {
   onSelect: (letter: string) => void;
 }
 
-function Cell({
+function CellBase({
   letter,
   enabled,
   selected,
@@ -101,9 +102,15 @@ function Cell({
   );
 }
 
+/** Memoized, and the reason the grid takes an `onSelect(letter)` rather than a
+ *  per-cell closure: a letter tap changes `selected` on exactly two of the 29
+ *  cells, and without this every one of them re-renders -- each an
+ *  Animated.Pressable with a shared value behind it. */
+const Cell = memo(CellBase);
+
 /** The hijāʾī grid. Letters come from the shared order, so these buckets are
  *  the ones rootFirstLetter actually assigns. */
-export function AlphabetGrid({ uiLocale, available, activeLetter, onSelect }: AlphabetGridProps) {
+function AlphabetGridBase({ uiLocale, available, activeLetter, onSelect }: AlphabetGridProps) {
   return (
     <View
       accessibilityRole="list"
@@ -132,3 +139,7 @@ export function AlphabetGrid({ uiLocale, available, activeLetter, onSelect }: Al
     </View>
   );
 }
+
+/** Memoized too: typing in the search box above re-renders the screen that
+ *  holds this grid, and none of the four props change while it does. */
+export const AlphabetGrid = memo(AlphabetGridBase);

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import type { RootForm } from '@quran-corpus/data/mobile';
@@ -39,7 +40,7 @@ const CHIP = {
   borderWidth: 1,
 } as const;
 
-function AllChip({
+function AllChipBase({
   isSelected,
   onPress,
   uiLocale,
@@ -85,7 +86,7 @@ function AllChip({
   );
 }
 
-function FormChip({
+function FormChipBase({
   form,
   isSelected,
   onToggle,
@@ -159,6 +160,12 @@ function FormChip({
     </AnimatedPressable>
   );
 }
+
+/** Memoized: a chip tap re-renders the whole root screen, and a root with 22
+ *  forms is 23 Animated.Pressables that did not change. Both take the toggle
+ *  callback rather than a closure so the memo can actually bail. */
+const AllChip = memo(AllChipBase);
+const FormChip = memo(FormChipBase);
 
 /** The root's derived forms as tappable multi-select filter chips, headed by
  *  an All chip that clears the selection.
