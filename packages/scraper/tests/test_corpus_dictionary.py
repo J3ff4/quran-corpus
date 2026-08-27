@@ -263,7 +263,16 @@ def test_form_arabic_is_nfc_normalized() -> None:
     renders identically to its lemma and compares unequal: root Hqq's
     حَآقَّة counted three occurrences and filtered to none.
     """
-    scraped = "حَآقَّة"  # shadda before fatha
+    # Built from numeric codepoints, never a hand-typed literal: the whole
+    # assertion is the ORDER of two marks that render identically either way,
+    # so a literal is unreadable in an editor and invisible in a diff -- and one
+    # editor normalizing this file on save would quietly delete the test's
+    # subject. packages/data/tests/migrate.test.ts builds the other side of the
+    # same join the same way. The `form != scraped` assert below is what keeps
+    # this fail-closed if it ever stops being non-NFC.
+    fatha, shadda = chr(0x064E), chr(0x0651)
+    alef_madda = chr(0x0622)
+    scraped = "ح" + fatha + alef_madda + "ق" + shadda + fatha + "ة"
     html = (
         "<p>The triliteral root <i class='ab'>ha qaf qaf</i> "
         "(<span class='at'>ح ق ق</span>) occurs 287 times in the Quran, "
