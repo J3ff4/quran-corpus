@@ -34,6 +34,8 @@ body{margin:0;padding:40px 44px;background:#e9e5dc;font-family:'Helvetica Neue',
 .qc-chip-on{background:rgba(143,208,184,.18);border-color:rgba(143,208,184,.32);color:#8fd0b8}
 .qc-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .qc-nav{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:14px 16px 0;padding:12px 18px;border-radius:22px;background:rgba(255,255,255,.08);backdrop-filter:blur(30px) saturate(170%);border:1px solid rgba(255,255,255,.15)}
+.qc-pager{display:flex;align-items:center;justify-content:center;width:34px;height:34px;flex:none;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);font:400 17px/1 'Helvetica Neue',Helvetica,sans-serif;color:rgba(241,237,228,.75)}
+.qc-pager-off{opacity:.32}
 .qc-back{display:block;width:11px;height:11px;border-left:1.7px solid rgba(241,237,228,.8);border-bottom:1.7px solid rgba(241,237,228,.8);transform:rotate(45deg);margin-left:4px;flex:none}
 .qc-tabs{position:absolute;left:18px;right:18px;bottom:16px;display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-radius:26px;background:rgba(255,255,255,.09);backdrop-filter:blur(30px) saturate(170%);border:1px solid rgba(255,255,255,.16);box-shadow:0 14px 34px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.2)}
 .qc-tab{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:56px;font:500 10.5px/1 'Helvetica Neue',Helvetica,sans-serif;color:rgba(241,237,228,.6)}
@@ -61,7 +63,7 @@ body{margin:0;padding:40px 44px;background:#e9e5dc;font-family:'Helvetica Neue',
 
     <div class="qc-nav">
       <span class="qc-back"></span>
-      <div style="text-align:center;flex:1"><div class="qc-eyebrow">Most used &middot; lemmas</div></div>
+      <div style="text-align:center;flex:1"><div class="qc-eyebrow">Most used &middot; lemmas</div><div class="qc-mono" style="font-size:10px;margin-top:3px">rank 41 of 200</div></div>
       <span style="display:flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;border:1.4px solid rgba(241,237,228,.45);font:500 11px/1 Georgia,serif;color:rgba(241,237,228,.6);flex:none">i</span>
     </div>
 
@@ -70,8 +72,12 @@ body{margin:0;padding:40px 44px;background:#e9e5dc;font-family:'Helvetica Neue',
         <span class="qc-eyebrow">Lemma</span>
         <span style="font:500 11.5px/1 'Helvetica Neue',Helvetica,sans-serif;color:#8fd0b8">92 occurrences</span>
       </div>
-      <div class="qc-ar" style="font-size:40px;line-height:1.35;color:#f8f4ec;margin-top:6px;direction:rtl">قَوْل</div>
-      <div class="qc-row" style="margin-top:4px;align-items:baseline">
+      <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+        <span class="qc-pager">&lsaquo;</span>
+        <div class="qc-ar" style="flex:1;text-align:center;font-size:40px;line-height:1.35;color:#f8f4ec;direction:rtl">قَوْل</div>
+        <span class="qc-pager">&rsaquo;</span>
+      </div>
+      <div style="display:flex;justify-content:center;align-items:baseline;gap:9px;margin-top:6px">
         <span class="qc-serif" style="font-size:14.5px;color:rgba(241,237,228,.8)">qawlan</span>
         <span class="qc-pill qc-pos-n">noun &middot; 92</span>
       </div>
@@ -118,13 +124,16 @@ body{margin:0;padding:40px 44px;background:#e9e5dc;font-family:'Helvetica Neue',
         <div class="qc-ayah">&hellip; وَهُمْ يَتْلُونَ ٱلْكِتَٰبَ &middot; كَذَٰلِكَ <span class="qc-hl">قَوْلِهِمْ</span></div>
         <div class="qc-sub" style="font-size:11px;margin-top:8px">qawlihim &middot; their saying</div>
       </div>
+      <div class="qc-card" style="padding:14px 16px;opacity:.72">
+        <div class="qc-row">
+          <span class="qc-serif" style="font-size:12px;color:rgba(241,237,228,.7)">Al-Baqara</span>
+          <span style="font:500 11px/1 ui-monospace,Menlo,monospace;color:#8fd0b8">2:204</span>
+        </div>
+        <div class="qc-ayah">وَمِنَ ٱلنَّاسِ مَن يُعْجِبُكَ <span class="qc-hl">قَوْلُهُۥ</span> فِى ٱلْحَيَوٰةِ ٱلدُّنْيَا</div>
+        <div class="qc-sub" style="font-size:11px;margin-top:8px">qawluhu &middot; his speech</div>
+      </div>
     </div>
 
-    <div style="position:absolute;left:18px;right:18px;bottom:16px;display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-radius:26px;background:rgba(255,255,255,.09);backdrop-filter:blur(30px) saturate(170%);border:1px solid rgba(255,255,255,.16);box-shadow:0 14px 34px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.2)">
-      <span style="font:500 12px/1 'Helvetica Neue',Helvetica,sans-serif;color:rgba(241,237,228,.75)">&lsaquo; Previous</span>
-      <span class="qc-mono" style="font-size:10.5px">rank 41 of 200</span>
-      <span style="font:500 12px/1 'Helvetica Neue',Helvetica,sans-serif;color:rgba(241,237,228,.75)">Next &rsaquo;</span>
-    </div>
 </div>
 </body>
 </html>

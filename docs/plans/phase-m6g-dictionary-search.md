@@ -62,22 +62,50 @@ theme (the bundle's own default). Content comes from the real app, not from
 lorem: use root ق-و-ل, lemma `qawol`, and the frequency table's top rows, so the
 owner is reviewing real densities.
 
-- [ ] **Step 3: Show the owner and get approval** — SENT 2026-08-26, AWAITING
-
-Send the four files. Do not start Task 2 until they have been seen — a
-restyle built against an unapproved mockup is a restyle done twice.
+- [x] **Step 3: Show the owner and get approval** — APPROVED 2026-08-26 with
+      five changes, all applied to the frames
 
 Sent as a review page carrying all four frames at 1:1 plus the data behind
 each: https://claude.ai/code/artifact/93c4c8ce-fa97-4861-a55e-bbc1d75ebaf8
-Four questions are open on it, one per frame:
-1. Browse rows carry no English gloss — `getAllRoots` is `SELECT * FROM roots`,
-   which has no definition column. Enriching them is a new query, a different
-   sub-phase, and a §5 review. Leave sparse?
-2. The frequency table's proportional rail is the one thing added to a row.
-   Ranks 4-8 sit within 3% of each other and read as undifferentiated digits
-   without it. Keep?
-3. Lemma entry docks Previous/Next rather than ending the list with it.
-4. Six form chips wrap to two rows on قول. Acceptable, or collapse the filter?
+
+Owner rulings, binding on Tasks 2-6:
+
+- **D1 — no masthead on either dictionary pane.** The big "Dictionary /
+  1,642 roots" block is redundant and ugly. Both panes take the slim glass
+  bar frame 3 uses (`.qc-nav`: eyebrow left, count right). Buys back ~90dp,
+  which is one more root row above the fold.
+- **D2 — no proportional rail in the frequency table.** Rows carry rank,
+  count and form, nothing else. This answers the open question with a no.
+- **D3 — Previous/Next flanks the headword.** Chevrons sit either side of
+  the Arabic word inside the header; the docked bottom pager is gone. This
+  is `AdjacentNav`, shared, so the root screen changes with it. Frame 3's
+  "rank 41 of 200" moves into the slim bar, which is what it captions now.
+- **D4 — the pager animates directionally, whole screen.** Next slides the
+  incoming entry in from the right, Previous from the left. Header and list
+  move together, like a native pager. `router.replace` animates in no
+  direction, so the route has to change; `react-native-reanimated@4.5.1` and
+  `react-native-screens` are both already installed, so no §12 dependency
+  question. Respect `prefers-reduced-motion` (§8) — reduced motion falls
+  back to a cross-fade.
+- **D5 — the root screen keeps today's header.** Slim bar on top, then the
+  existing `EntryHeader`: big Arabic root, ق و ل letter pills in row-reverse,
+  occurrence count. Only the form chips take the new look, which the owner
+  called out as the better-looking part of the frame.
+
+Two open questions were answered by these and need no separate ruling: the
+frequency rail is out (D2), and the docked pager is out (D3). The chip-wrap
+question is moot — six chips over two rows is what the approved frame shows.
+
+**Correction to the browse-gloss question as it was originally asked.** It
+claimed enriching browse rows needs a new query and a §5 review, citing
+`getAllRoots`. Wrong function: `DictionaryScreen` calls
+`getAllRootsForBrowse` → `getRootSearchList`, whose payload already carries
+`gloss_blob`. The screen matches search against it and never renders it.
+`gloss_blob` is `GROUP_CONCAT(f.gloss, ' ')` over every form of the root, so
+it is a search haystack, not a display string — showing it raw would be
+worse than showing nothing. Displaying it *well* is the part that needs a
+query. Not in this sub-phase either way; recorded so the next reader does
+not re-derive it.
 
 - [x] **Step 4: Commit** — `4a592d2`
 
