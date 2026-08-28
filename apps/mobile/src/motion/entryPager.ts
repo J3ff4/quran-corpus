@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type Animated from 'react-native-reanimated';
 import {
   FadeIn,
@@ -78,7 +78,7 @@ export function pagerAnimation(side: PageSide, reduceMotion: boolean): PagerAnim
  * resets this.
  */
 export function useEntryPager(routeKey: string | null) {
-  const [current, setCurrent] = useState(routeKey);
+  const [state, setState] = useState({ key: routeKey, current: routeKey });
   const reduceMotion = useReducedMotion();
   // A ref, not state: it does not drive a render, and it is read during the
   // render that mounts the incoming entry -- which is the render that hands
@@ -86,18 +86,24 @@ export function useEntryPager(routeKey: string | null) {
   // paging does not remount the screen.
   const sideRef = useRef<PageSide>(null);
 
-  useEffect(() => {
+  // Reset during render, not in an effect. An effect runs after the render
+  // that saw the new route key, so for one commit this hook still reported the
+  // *previous* entry -- long enough for the screen above to fire a query for
+  // it, which its own cancellation flag then threw away. The one thing render
+  // may not do is write a ref another component can observe; this one is read
+  // two lines below, in this same render, by this same component.
+  if (state.key !== routeKey) {
     // No direction: this entry did not arrive from the pager.
     sideRef.current = null;
-    setCurrent(routeKey);
-  }, [routeKey]);
+    setState({ key: routeKey, current: routeKey });
+  }
 
   const goTo = useCallback((target: string, side: PageSide) => {
     sideRef.current = side;
-    setCurrent(target);
+    setState((currentState) => ({ ...currentState, current: target }));
   }, []);
 
-  return { current, goTo, animation: pagerAnimation(sideRef.current, reduceMotion) };
+  return { current: state.current, goTo, animation: pagerAnimation(sideRef.current, reduceMotion) };
 }
 
 /**
