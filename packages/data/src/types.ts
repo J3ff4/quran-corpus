@@ -77,8 +77,12 @@ export interface RootSearchItem {
   root_buckwalter: string;
   root_arabic: string;
   occurrence_count: number;
-  /** Space-joined form glosses for this root, lowercased at the call site for
-   *  search matching. Null when the root has no forms with a gloss. */
+  /** Space-joined text of every `root_definitions` row this root carries —
+   *  dictionary prose, not one-line glosses — lowercased at the call site and
+   *  substring-matched by the dictionary's meaning arm. Null only when the
+   *  root has no definition at all, which no root in the shipped corpus is.
+   *  Named for the `root_forms.gloss` strip it was built from until #31, when
+   *  that column turned out to be NULL corpus-wide. */
   gloss_blob: string | null;
 }
 

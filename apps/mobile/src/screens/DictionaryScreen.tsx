@@ -5,6 +5,7 @@ import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobil
 import {
   compareRootsArabic,
   foldRootArabic,
+  matchesRootQuery,
   rootFirstLetter,
   type RootSearchItem,
 } from '@quran-corpus/data/mobile';
@@ -241,18 +242,19 @@ export function DictionaryScreen() {
   // folding, no allocation beyond the result itself.
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = sort === 'freq' ? ordered.freq : ordered.alpha;
     if (q) {
-      // The Arabic arm folds the needle to match the folded haystack (hamza
-      // seat + inter-letter spaces), so `ارض` finds the stored `أرض` -- the
-      // same normalization searchRoots uses. The Latin arms stay raw:
-      // foldRootArabic('ktb') === 'ktb', and a folded Latin needle never
-      // occurs inside an Arabic haystack.
+      // Always the frequency order while a query is running, whatever the
+      // toggle says: matches come from anywhere in the corpus, and hijāʾī
+      // order buries the root a reader most likely meant among rarer
+      // homonyms. Matches web.
+      //
+      // The needle is folded once here, not once per row -- the haystack was
+      // folded when the payload landed. matchesRootQuery holds the three arms
+      // so this screen and the web browser cannot drift apart.
       const qf = foldRootArabic(q);
-      return list.filter(
-        (root) => root.folded.includes(qf) || root.bw.includes(q) || root.gloss.includes(q),
-      );
+      return ordered.freq.filter((root) => matchesRootQuery(root, q, qf));
     }
+    const list = sort === 'freq' ? ordered.freq : ordered.alpha;
     if (letter) return list.filter((root) => root.letter === letter);
     return list;
   }, [ordered, query, sort, letter]);

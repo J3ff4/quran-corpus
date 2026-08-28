@@ -6,6 +6,7 @@ import {
   rootFirstLetter,
   compareRootsArabic,
   foldRootArabic,
+  matchesRootQuery,
   type RootSearchItem,
 } from '@quran-corpus/data/client';
 import { RootListRow } from './RootListRow';
@@ -79,20 +80,29 @@ export function DictionaryBrowser({ roots, counts }: DictionaryBrowserProps) {
     let list = roots;
     if (letter) list = list.filter((r) => rootFirstLetter(r.root_arabic) === letter);
     if (q) {
-      // Arabic arm folds both sides (hamza seat + inter-letter spaces) so `ارض`
-      // finds the stored `أرض` — same normalization as server-side searchRoots.
-      // Latin arms stay raw: foldRootArabic('ktb') === 'ktb', and a folded Latin
-      // needle never occurs inside an Arabic haystack, so folding q is harmless.
+      // Three arms, shared with mobile and with server-side searchRoots: the
+      // Arabic one folds both sides (hamza seat + inter-letter spaces) so `ارض`
+      // finds the stored `أرض`, the Latin ones stay raw.
       const qf = foldRootArabic(q);
-      list = list.filter(
-        (r) =>
-          foldRootArabic(r.root_arabic).includes(qf) ||
-          r.root_buckwalter.toLowerCase().includes(q) ||
-          (r.gloss_blob?.toLowerCase().includes(q) ?? false),
+      list = list.filter((r) =>
+        matchesRootQuery(
+          {
+            folded: foldRootArabic(r.root_arabic),
+            bw: r.root_buckwalter.toLowerCase(),
+            gloss: r.gloss_blob?.toLowerCase() ?? '',
+          },
+          q,
+          qf,
+        ),
       );
     }
+    // A query always ranks by frequency, whatever the toggle says: matches come
+    // from anywhere in the corpus, and hijāʾī order buries the root a reader
+    // most likely meant among rarer homonyms — `mercy` puts رحم (339
+    // occurrences) below roots the Quran uses twice. Without a query the toggle
+    // is the only ordering signal there is, so it decides.
     return [...list].sort((a, b) =>
-      sort === 'freq'
+      sort === 'freq' || q
         ? b.occurrence_count - a.occurrence_count ||
           compareRootsArabic(a.root_arabic, b.root_arabic)
         : compareRootsArabic(a.root_arabic, b.root_arabic),

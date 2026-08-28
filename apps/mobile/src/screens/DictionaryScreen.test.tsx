@@ -183,6 +183,35 @@ describe('DictionaryScreen', () => {
     expect(screen.getAllByTestId('dictionary-row')).toHaveLength(1);
   });
 
+  it('ignores a meaning needle shorter than the floor', async () => {
+    // `me` sits inside both `mercy` and `camel` and nowhere else in the
+    // fixture. gloss_blob carries dictionary prose now, so a two-letter needle
+    // through the meaning arm keeps most of the corpus; three characters is
+    // where it starts filtering.
+    render(<DictionaryScreen />);
+    const box = await screen.findByTestId('dictionary-search');
+
+    fireEvent.change(box, { target: { value: 'mer' } });
+    expect(screen.getAllByTestId('dictionary-row')).toHaveLength(1);
+
+    fireEvent.change(box, { target: { value: 'me' } });
+    expect(screen.queryAllByTestId('dictionary-row')).toHaveLength(0);
+  });
+
+  it('ranks results by occurrence count while a query is running', async () => {
+    // Alphabetical is the default sort and puts ابل (339) before قول (1722);
+    // a query must invert that, because a match anywhere in the corpus is
+    // useless if the root the reader meant is filed under the later letter.
+    render(<DictionaryScreen />);
+
+    fireEvent.change(await screen.findByTestId('dictionary-search'), { target: { value: 'l' } });
+
+    const labels = screen.getAllByTestId('dictionary-row').map((r) => r.getAttribute('aria-label'));
+    expect(labels).toHaveLength(2);
+    expect(labels[0]).toContain('قول');
+    expect(labels[1]).toContain('ابل');
+  });
+
   it('labels the ranked pane "Most used", not a sort order', async () => {
     // "Frequent" read as a sort order next to Browse's own "By frequency" chip.
     await renderLoaded();

@@ -22,6 +22,11 @@ export {
   rootFirstLetter,
   ARABIC_ALPHABET_ORDER,
 } from './text/arabic.js';
+export {
+  MEANING_MIN_CHARS,
+  matchesRootQuery,
+  type RootSearchKeys,
+} from './text/rootSearch.js';
 export { trimConcordanceVerse } from './text/concordanceTrim.js';
 export type { TrimmedVerse } from './text/concordanceTrim.js';
 export { isSajdahAyah } from './text/sajdah.js';
