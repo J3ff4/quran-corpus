@@ -14,6 +14,7 @@ export type IconName =
   | 'back'
   | 'chevronLeft'
   | 'chevronRight'
+  | 'chevronDown'
   | 'play'
   | 'pause'
   | 'skipBack'
@@ -73,6 +74,8 @@ const PATHS: Record<IconName, string[]> = {
   // bearings -- it cannot be centred by the layout that holds it.
   chevronLeft: ['M15.5 5l-7 7 7 7'],
   chevronRight: ['M8.5 5l7 7-7 7'],
+  // The same chevron a quarter turn on, for a disclosure that is open.
+  chevronDown: ['M5 8.5l7 7 7-7'],
   // The recitation transport. Outlines, not filled shapes: every glyph above
   // is a stroke at `fill="none"`, and a solid triangle beside them would read
   // as a different icon set.
@@ -91,13 +94,21 @@ export function Icon({
   name,
   color,
   size = 24,
+  testID,
 }: {
   name: IconName;
   color: ColorValue;
   size?: number;
+  /** So a test can say *which* glyph was drawn without asserting on path data,
+   *  which is retuned whenever a chevron is re-centred. */
+  testID?: string;
 }) {
   return (
     <Svg
+      // Spread, not `testID={testID}`: exactOptionalPropertyTypes rejects an
+      // explicit undefined for an optional prop -- the same shape BrowseList's
+      // rows use.
+      {...(testID ? { testID } : {})}
       width={size}
       height={size}
       viewBox="0 0 24 24"

@@ -3,6 +3,7 @@ import { FlatList, Pressable, SectionList, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { GlassSurface } from './GlassSurface';
+import { Icon } from './icons/Icon';
 import { usePressScale } from '@/motion/usePressScale';
 import { fonts, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
@@ -23,12 +24,26 @@ export interface BrowseItem {
   /** Says what the row opens. A bare number announces as a number. */
   accessibilityLabel: string;
   testID?: string;
+  /** Present makes the row a disclosure: it draws a chevron and announces its
+   *  state. The row still owns what pressing it does -- BrowseList never
+   *  toggles anything itself, because the open set belongs to the screen. */
+  expanded?: boolean;
+  /** A child of a disclosure row: inset, and no medallion of its own. */
+  indent?: boolean;
   onPress: () => void;
 }
 
 export interface BrowseSection {
   title: string;
   data: BrowseItem[];
+  /** How many rows sit behind the header, which a collapsed one cannot
+   *  otherwise say. */
+  count?: number;
+  /** Together these make the header a disclosure button. `false` renders the
+   *  section with no rows -- emptied in this component rather than at the call
+   *  site, so a collapsed section cannot lose the header that reopens it. */
+  expanded?: boolean;
+  onToggle?: () => void;
 }
 
 function Row({ item }: { item: BrowseItem }) {
@@ -39,6 +54,9 @@ function Row({ item }: { item: BrowseItem }) {
     <AnimatedPressable
       accessibilityRole="button"
       accessibilityLabel={item.accessibilityLabel}
+      // Only on a disclosure. A surah row navigates, and announcing that as
+      // collapsed promises a disclosure that is not there.
+      {...(item.expanded === undefined ? {} : { accessibilityState: { expanded: item.expanded } })}
       onPress={item.onPress}
       onPressIn={press.onPressIn}
       onPressOut={press.onPressOut}
@@ -55,17 +73,23 @@ function Row({ item }: { item: BrowseItem }) {
           gap: 14,
         }}
       >
-        <Text
-          style={{
-            color: theme.accent,
-            fontFamily: fonts.displaySemiBold,
-            fontSize: typography.body,
-            minWidth: 34,
-            textAlign: 'center',
-          }}
-        >
-          {item.leading}
-        </Text>
+        {item.indent ? (
+          // No medallion on a child: the number belongs to the juz above it,
+          // and repeating it under every range reads as four juz.
+          <View style={{ width: 34 }} />
+        ) : (
+          <Text
+            style={{
+              color: theme.accent,
+              fontFamily: fonts.displaySemiBold,
+              fontSize: typography.body,
+              minWidth: 34,
+              textAlign: 'center',
+            }}
+          >
+            {item.leading}
+          </Text>
+        )}
         <View style={{ flex: 1, gap: 3 }}>
           <Text numberOfLines={1} style={{ color: theme.text, fontSize: 17, fontWeight: '600' }}>
             {item.title}
@@ -81,6 +105,14 @@ function Row({ item }: { item: BrowseItem }) {
             {item.arabic}
           </Text>
         ) : null}
+        {item.expanded === undefined ? null : (
+          <Icon
+            testID={`browse-chevron-${item.key}-${item.expanded ? 'chevronDown' : 'chevronRight'}`}
+            name={item.expanded ? 'chevronDown' : 'chevronRight'}
+            color={theme.mutedText}
+            size={18}
+          />
+        )}
       </GlassSurface>
     </AnimatedPressable>
   );
@@ -111,26 +143,72 @@ export function BrowseList({ items, sections }: BrowseListProps) {
   );
 
   if (sections) {
+    // Emptied here, not at the call site: a screen that filtered its own rows
+    // would have to remember to keep the header, and a section that loses its
+    // header can never be reopened.
+    const rendered = sections.map((section) =>
+      section.expanded === false ? { ...section, data: [] } : section,
+    );
+
     return (
       <SectionList
-        sections={sections}
+        sections={rendered}
         renderItem={({ item }) => <Row item={item} />}
-        renderSectionHeader={({ section }) => (
-          <Text
-            accessibilityRole="header"
-            style={{
-              color: theme.mutedText,
-              fontFamily: fonts.displaySemiBold,
-              fontSize: typography.caption,
-              letterSpacing: 1.2,
-              textTransform: 'uppercase',
-              paddingTop: 14,
-              paddingBottom: 6,
-            }}
-          >
-            {section.title}
-          </Text>
-        )}
+        renderSectionHeader={({ section }) => {
+          const label = (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+                paddingTop: 14,
+                paddingBottom: 6,
+              }}
+            >
+              {section.onToggle ? (
+                <Icon
+                  name={section.expanded === false ? 'chevronRight' : 'chevronDown'}
+                  color={theme.mutedText}
+                  size={16}
+                />
+              ) : null}
+              <Text
+                accessibilityRole="header"
+                style={{
+                  flex: 1,
+                  color: theme.mutedText,
+                  fontFamily: fonts.displaySemiBold,
+                  fontSize: typography.caption,
+                  letterSpacing: 1.2,
+                  textTransform: 'uppercase',
+                }}
+              >
+                {section.title}
+              </Text>
+              {section.count === undefined ? null : (
+                <Text style={{ color: theme.mutedText, fontSize: typography.caption }}>
+                  {String(section.count)}
+                </Text>
+              )}
+            </View>
+          );
+
+          if (!section.onToggle) return label;
+          return (
+            <Pressable
+              testID={`browse-section-${section.title}`}
+              accessibilityRole="button"
+              accessibilityLabel={section.title}
+              accessibilityState={{ expanded: section.expanded !== false }}
+              onPress={section.onToggle}
+              // The 48dp floor is what makes a strip of small caps a thumb
+              // target rather than a 26dp line.
+              style={{ minHeight: touchTargets.minimum, justifyContent: 'center' }}
+            >
+              {label}
+            </Pressable>
+          );
+        }}
         keyExtractor={(item) => item.key}
         stickySectionHeadersEnabled={false}
         contentContainerStyle={contentContainerStyle}
