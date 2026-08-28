@@ -1,7 +1,7 @@
 import React from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AdjacentNav } from './AdjacentNav';
+import { AdjacentNav, AdjacentNavButton } from './AdjacentNav';
 
 vi.mock('react-native', async () => (await import('@/testing/rnHosts.js')).reactNativeTextMock());
 // The chevrons squeeze on press, so they reach usePressScale ->
@@ -79,5 +79,29 @@ describe('AdjacentNav', () => {
     );
     expect(screen.getByTestId('lemma-previous').getAttribute('aria-label')).toBe('Предыдущая');
     expect(screen.getByTestId('lemma-next').getAttribute('aria-label')).toBe('Следующая');
+  });
+
+  it('names a surah chevron for a screen reader', () => {
+    render(
+      <AdjacentNavButton side="prev" target="1" onNavigate={vi.fn()} uiLocale="en" testIDPrefix="surah" />,
+    );
+
+    // A chevron announces as nothing on its own, and "Previous" alone does not
+    // say previous *what* when the same control shape also pages entries.
+    expect(screen.getByTestId('surah-previous')).toBeTruthy();
+    expect(screen.getByLabelText('Previous surah')).toBeTruthy();
+  });
+
+  it('disables a surah chevron that has nowhere to go', () => {
+    const onNavigate = vi.fn();
+    render(
+      <AdjacentNavButton side="next" target={null} onNavigate={onNavigate} uiLocale="en" testIDPrefix="surah" />,
+    );
+
+    const next = screen.getByTestId('surah-next') as HTMLButtonElement;
+    expect(next.getAttribute('aria-disabled')).toBe('true');
+    expect(next.disabled).toBe(true);
+    fireEvent.click(next);
+    expect(onNavigate).not.toHaveBeenCalled();
   });
 });

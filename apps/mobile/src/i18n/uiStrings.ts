@@ -120,6 +120,8 @@ export type UiStringKey =
   | 'lemma.close'
   | 'lemma.previous'
   | 'lemma.next'
+  | 'surah.previous'
+  | 'surah.next'
   | 'surahList.ayahsSuffix'
   | 'surahList.loadFailed'
   // Browse modes (M6c). `mode` names the segmented control itself; `juzLabel`
@@ -289,6 +291,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'lemma.close': 'Close',
     'lemma.previous': 'Previous',
     'lemma.next': 'Next',
+    'surah.previous': 'Previous surah',
+    'surah.next': 'Next surah',
     'surahList.ayahsSuffix': 'ayahs',
     'surahList.loadFailed': 'Unable to load surahs',
     'browse.mode': 'Browse by',
@@ -445,6 +449,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'lemma.close': 'Yopish',
     'lemma.previous': 'Oldingi',
     'lemma.next': 'Keyingi',
+    'surah.previous': 'Oldingi sura',
+    'surah.next': 'Keyingi sura',
     'surahList.ayahsSuffix': 'oyat',
     'surahList.loadFailed': 'Suralarni yuklab bo‘lmadi',
     'browse.mode': 'Saralash',
@@ -596,6 +602,9 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'lemma.close': 'Закрыть',
     'lemma.previous': 'Предыдущая',
     'lemma.next': 'Следующая',
+    // Feminine: сура agrees the way лемма does, not the way корень does.
+    'surah.previous': 'Предыдущая сура',
+    'surah.next': 'Следующая сура',
     'surahList.ayahsSuffix': 'аятов',
     'surahList.loadFailed': 'Не удалось загрузить суры',
     'browse.mode': 'Сортировка',
