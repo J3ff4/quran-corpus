@@ -476,7 +476,7 @@ because three of them overturn decisions this plan made.
 
 4. **The frequency kind chips touched the column labels.** Padding.
 
-### Verification log — pending
+### Verification log
 
 | Check | Build | Date | Result | Notes |
 | --- | --- | --- | --- | --- |
@@ -485,10 +485,14 @@ because three of them overturn decisions this plan made.
 | 99 | Expo Go, `6498d63` | 2026-08-27 | PASS | In-app Reduce animations on (the OS toggle is not reachable on this device — see `useReducedMotion`'s docstring), `FADE_MS` temporarily at 3000. Mid-transition frame shows قول and قوم **superimposed at the same position**, "1722 occurrences" and "660 occurrences" cross-fading over each other with zero horizontal displacement. Neither slides. |
 | 100 | Expo Go, `6498d63` | 2026-08-27 | PASS | No slim bar on any of the three. Dictionary: `Roots · 1642` hangs off the right end of the Alphabetical/By frequency row. Root: `qwl` sits on the headword plate beside the ق و ل tiles, `1722 occurrences` under it. Lemma: the reading `l-lahi` is under the headword, where it already was. |
 | 101 | Expo Go, `6498d63` | 2026-08-27 | PASS | ق-و-ل, six chips. All lit with no filter; chips tinted per part of speech (verbs warm, nouns blue, participle teal) and the tint is kept in the selected state. Multi-select قِيل 4 + قَآئِل 5 → concordance 9; tapping All cleared both and returned 1722. |
-| 102 | Expo Go, `6498d63` | 2026-08-27 | PARTIAL | Night theme: the Roots/Lemmas/Verbs row is clear of the `# COUNT FORM` labels, no touching. **Light theme not exercised** — the device dropped off wireless debugging before the theme switch. |
+| 102 | Expo Go, `6498d63` | 2026-08-27 / 28 | PASS | Both themes. Night: the Roots/Lemmas/Verbs row is clear of the `# COUNT FORM` labels, no touching. Light (2026-08-28), measured rather than eyeballed: the chip row's ink band ends at y 584 and the label row's begins at y 660 — a **76 physical px gap at 640dpi, 19dp**. Still clear at font scale 1.35, where the chips grow into but not through it. |
 
-Run 2026-08-27 over Expo Go, driven through `adb` on the owner's OnePlus 7 Pro
-(Android 12). §10's gate is met for 97-101; 102 is half-recorded.
+Run 2026-08-27, finished 2026-08-28, over Expo Go, driven through `adb` on the
+owner's OnePlus 7 Pro (Android 12) — same bundle both days, `6498d63`; the only
+commit between them was docs. **§10's gate is met for 97-107.** Two device
+settings were changed to run these checks and both are restored: the in-app
+Reduce animations switch (on for 99, now off) and the OS font scale (1.35 for
+103, now 1.0). The app's theme is back on System.
 
 ## Owner review of the built screens, round 2 — 2026-08-27
 
@@ -545,14 +549,14 @@ Three more notes from the same device session. Clarified with
    regardless. So the numbers above are the JS cost removed, not a device
    before/after.
 
-### Verification log — pending
+### Verification log
 
 | Check | Build | Date | Result | Notes |
 | --- | --- | --- | --- | --- |
-| 103 | Expo Go, `6498d63` | 2026-08-27 | PARTIAL | Both panes carry the caption inline at the right end of their own chip row, no row of its own: `Roots · 1642` on Browse's alphabetical/by frequency row, `By frequency` on Most used' roots/lemmas/verbs row. **Largest font scale not exercised** — device dropped off before the font-scale pass. |
-| 104 | Expo Go, `6498d63` | 2026-08-27 | PARTIAL | Night theme, measured rather than eyeballed: the chevron's bright-pixel bounding box centres on (75.5, 73.5) and (73.5, 73.5) against a circle centre of (75.0, 75.0) — under 1.5 physical px at 640dpi, i.e. **under half a dp** in both axes, both directions. **Light theme not exercised.** |
+| 103 | Expo Go, `6498d63` | 2026-08-27 / 28 | PASS, defect noted | Both panes carry the caption inline at the right end of their own chip row, no row of its own: `Roots · 1642` on Browse's alphabetical/by frequency row, `By frequency` on Most used' roots/lemmas/verbs row. At the device's **largest font scale (`font_scale` 1.35**, set through Display & brightness → Font & display size; `settings put system font_scale` is blocked without `WRITE_SECURE_SETTINGS`) the caption still does not take a row of its own, which is what this check asks. But it is **clipped by the screen edge on both panes** — Browse reads `Roots ·` with the count gone, Most used reads `By frequ` — with no ellipsis, wrap, or shrink. See *What this run found*. |
+| 104 | Expo Go, `6498d63` | 2026-08-27 / 28 | PASS | Both themes, measured rather than eyeballed. Night: the chevron's bright-pixel bounding box centres on (75.5, 73.5) and (73.5, 73.5) against a circle centre of (75.0, 75.0) — under 1.5 physical px at 640dpi, i.e. under half a dp. Light (2026-08-28): the circle measures 136 x 136 physical px — exactly `SIZE` 34dp at 4 px/dp — and the chevron's ink box centres on **(215.5, 573.5) against a circle centre of (215.5, 573.5)**, and (1223.5, 573.5) against (1223.5, 573.5). **Zero offset in both axes on both chevrons.** Still centred and clear of the headword at font scale 1.35. |
 | 105 | Expo Go, `6498d63` | 2026-08-27 | PASS | ق lights with the accent border and wash and the list filters with it: 1642 → 80 roots, قبح/قبر at the top. Alphabetical ↔ By frequency switches with no perceptible stall (أله 2851, قول 1722, كون 1390 land immediately); gfxinfo over a letter tap shows 3 janky frames of 45, 90th percentile 18ms. Browse ↔ Most used likewise — see 107. |
-| 106 | — | — | **PENDING** | Typing in the search box keeps up with the keyboard, no dropped characters. Device dropped off wireless debugging before this ran. |
+| 106 | Expo Go, `6498d63` | 2026-08-28 | PASS | Verified by reading the field back out of the accessibility tree rather than off a screenshot: `uiautomator dump` after each burst. 10 characters (`compassion`) dispatched back-to-back in one `input keyevent` batch arrive as exactly `compassion`; a 20-character burst arrives as exactly `abcdefghijklmnopqrst`, **20 of 20, in order**. The list keeps pace — the letter grid collapses, the clear affordance appears, and the count updates with the query (`qwl` → `Roots · 1`, قول 1722). No dropped or reordered characters at a rate no thumb can reach. |
 | 107 | Expo Go, `6498d63` | 2026-08-27 | PASS | Kind chips switch the list (Roots → Lemmas مِن 3226 → Verbs قَالَ 1618). Flipping to Browse and back redrew the ranked rows **within 1s with no spinner** and with the Lemmas selection intact — the round-2 per-kind cache doing its job. |
 
 ### What this run found
@@ -564,7 +568,31 @@ means it only happens once per kind per launch, and check 107's re-flip is
 instant, so this is not the cached path regressing; it is the uncached path
 having no loading state at all. Expo Go's dev bundle is part of it (round 2
 left that unmeasured by owner's choice), but an empty pane is the wrong answer
-at any speed. Worth an issue before M7.
+at any speed. Filed as issue #33.
+
+**The caption is clipped at the largest font scale.** At `font_scale` 1.35 the
+chip row eats the width and the caption is cut off by the screen edge rather
+than ellipsised, wrapped, or shrunk: Browse shows `Roots ·` with the count gone
+entirely, Most used shows `By frequ`. Check 103 asks only that the caption stay
+off a row of its own, and it does — but the count it exists to show is the part
+that disappears. The row is a plain horizontal layout with the caption last, so
+the fix is a `flexShrink`/`numberOfLines` on the caption or a scrollable chip
+row, and it trades against owner ruling D-round-2 ("inline, not its own row").
+That is the owner's call, so it is filed rather than fixed: issue #32.
+
+**Meaning search matches nothing — and this is not M6g's.** The placeholder
+reads "Search roots or meaning…", and the meaning arm is dead: `mercy` and
+`compassion` both return `Roots · 0` / "No roots found", while the
+transliteration arm is fine (`qwl` → قول 1722). The cause is upstream of both
+apps. `searchRoots` and `getRootSearchList` both read `root_forms.gloss`, and
+that column is **NULL for all 4657 rows** — in the bundled
+`apps/mobile/assets/db/quran.db` *and* in the live corpus at
+`~/quran-data/quran.db`. The glosses the app actually displays come from
+`root_definitions` (3221 rows, 8 of them matching "mercy"), which neither search
+path touches. So the same search is dead on web, and has been since before this
+phase. Out of scope here — M6g froze `packages/data` and adds no query — and
+the fix is a `packages/data` query change, which is a §5 trigger. Filed as
+issue #31.
 
 **The alef-madda fix, confirmed on device.** ق-و-ل's `قَآئِل 5` chip filters the
 concordance to exactly 5 rows (12:10:2, 18:19:6, …). That chip is the class PR
