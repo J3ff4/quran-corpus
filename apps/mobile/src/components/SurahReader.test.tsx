@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   headerLayout: null as ((height: number) => void) | null,
   scrollToIndex: vi.fn(),
   scrollToOffset: vi.fn(),
+  focusEffect: null as (() => void) | null,
   getReaderPosition: vi.fn((_surahId: number) => null as number | null),
   setReaderPosition: vi.fn((_surahId: number, _ayahNumber: number) => {}),
   push: vi.fn(),
@@ -76,6 +77,12 @@ vi.mock('react-native-reanimated', async () => {
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ setOptions: mocks.setOptions }),
   router: { push: mocks.push },
+  // Captured rather than run: the reader is focused again when the
+  // word-by-word screen it pushed is popped, and there is no navigator here to
+  // produce that event.
+  useFocusEffect: (callback: () => void) => {
+    mocks.focusEffect = callback;
+  },
 }));
 
 // Mocked rather than exercised through the real singleton: these assertions are
@@ -711,9 +718,24 @@ describe('SurahReader', () => {
     fireEvent.click(screen.getByTestId('segment-wbw'));
 
     // The surah on screen, not a hardcoded one: setOptions is re-run whenever
-    // data.surah.id changes.
-    expect(mocks.push).toHaveBeenCalledWith('/surah/2/words');
+    // data.surah.id changes. Nothing has been read yet, so the range starts at
+    // the top of the surah.
+    expect(mocks.push).toHaveBeenCalledWith('/surah/2/words?from=1');
   });
+  it('opens word-by-word at the ayah on screen', async () => {
+    const props = baseProps(readerData(10));
+    mocks.getReaderPosition.mockReturnValue(6);
+    render(<SurahReader {...props} />);
+
+    await waitFor(() => expect(mocks.setOptions).toHaveBeenCalled());
+    renderReaderHeader();
+    fireEvent.click(screen.getByTestId('segment-wbw'));
+
+    // The ayah on screen, not the route param: the param is where the reader
+    // was opened, which after any scrolling is not where the reader is.
+    expect(mocks.push).toHaveBeenCalledWith('/surah/1/words?from=6');
+  });
+
   it('docks the recitation bar on the ayah that played, and keeps it after it stops', () => {
     // The bar outliving playingAyah is the point: it goes null the moment the
     // recitation ends, and a bar that vanished with the last syllable would
@@ -961,7 +983,7 @@ describe('SurahReader', () => {
     fireEvent.click(screen.getByTestId('segment-wbw'));
 
     expect(screen.queryByTestId('word-sheet')).toBeNull();
-    expect(mocks.push).toHaveBeenCalledWith('/surah/1/words');
+    expect(mocks.push).toHaveBeenCalledWith('/surah/1/words?from=1');
   });
 
   /** The animated style the nav title would be wearing right now. */
@@ -1169,6 +1191,34 @@ describe('SurahReader shared reading position', () => {
     // on the index would not re-run and the second list would sit at offset 0.
     expect(mocks.scrollToIndex).toHaveBeenCalledTimes(2);
     expect(mocks.scrollToIndex).toHaveBeenLastCalledWith({ index: 4, animated: false });
+  });
+
+  it('re-lands on the ayah the word-by-word screen was left at', () => {
+    const props = baseProps(readerData(10));
+    render(<SurahReader {...props} />);
+    mocks.onViewableItemsChanged?.({ viewableItems: [{ item: props.data.ayahs[3] }] });
+    mocks.scrollToIndex.mockClear();
+
+    // The reader stays mounted behind the pushed screen, so coming back is a
+    // focus event and nothing else -- no remount, no changed prop.
+    mocks.getReaderPosition.mockReturnValue(7);
+    act(() => mocks.focusEffect?.());
+
+    expect(mocks.scrollToIndex).toHaveBeenCalledWith({ index: 6, animated: false });
+  });
+
+  it('does not re-land when the position is the ayah already on screen', () => {
+    const props = baseProps(readerData(10));
+    render(<SurahReader {...props} />);
+    mocks.onViewableItemsChanged?.({ viewableItems: [{ item: props.data.ayahs[3] }] });
+    mocks.scrollToIndex.mockClear();
+
+    mocks.getReaderPosition.mockReturnValue(4);
+    act(() => mocks.focusEffect?.());
+
+    // Otherwise every return to the reader jerks the list back to the top of
+    // the ayah it is already showing.
+    expect(mocks.scrollToIndex).not.toHaveBeenCalled();
   });
 
   it('lands once per mount, not twice', () => {

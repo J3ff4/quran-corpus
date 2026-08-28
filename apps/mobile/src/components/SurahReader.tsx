@@ -16,7 +16,7 @@ import {
   useAnimatedStyle,
   useSharedValue,
 } from 'react-native-reanimated';
-import { router, useNavigation } from 'expo-router';
+import { router, useFocusEffect, useNavigation } from 'expo-router';
 import { reciterById, splitBasmala, type Word } from '@quran-corpus/data/mobile';
 import type { ReaderAyah, SurahReaderData, WordSummary } from '@/data/corpusRepository';
 import { getReaderPosition, setReaderPosition } from '@/data/readerPosition';
@@ -291,7 +291,11 @@ export function SurahReader({
           }}
           onOpenWbw={() => {
             closeSheet();
-            router.push(`/surah/${data.surah.id}/words`);
+            // The ayah on screen, not the route param: the param is where the
+            // reader was *opened*, which after any scrolling is not where the
+            // reader is. Still validated at the route by parseAyahNumber --
+            // writing our own link does not make it trusted input (§3, OWASP).
+            router.push(`/surah/${data.surah.id}/words?from=${getReaderPosition(data.surah.id) ?? 1}`);
           }}
         />
       ),
@@ -424,6 +428,18 @@ export function SurahReader({
     // The nonce, not just the index: a mode switch re-lands on the same ayah,
     // so the index is unchanged and this effect would otherwise never re-run.
   }, [initialIndex, anchor.nonce]);
+
+  // Coming back from the word-by-word screen is a focus event: this screen
+  // stays mounted behind the pushed one, so no prop changes and the anchor's
+  // render-phase reset above never fires. Comparing against the ayah actually
+  // on screen is what keeps a focus from re-landing the list on itself.
+  useFocusEffect(
+    useCallback(() => {
+      const position = getReaderPosition(data.surah.id);
+      if (position === null || position === lastVisibleRef.current) return;
+      setAnchor((current) => ({ ...current, ayah: position, nonce: current.nonce + 1 }));
+    }, [data.surah.id]),
+  );
 
   // Records the miss and nothing else -- see the note above MAX_SCROLL_ATTEMPTS
   // for what the offset estimate that used to live here cost.

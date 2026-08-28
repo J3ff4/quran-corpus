@@ -17,11 +17,21 @@ const mocks = vi.hoisted(() => ({
   wbwDensity: 'hybrid' as 'hybrid' | 'dense',
   loadWordSummary: vi.fn(),
   push: vi.fn(),
+  getReaderPosition: vi.fn((_surahId: number) => null as number | null),
+  setReaderPosition: vi.fn((_surahId: number, _ayahNumber: number) => {}),
 }));
 
 vi.mock('expo-router', () => ({
   router: { push: mocks.push },
   useLocalSearchParams: () => mocks.params,
+}));
+
+// Mocked rather than exercised through the real singleton: this asserts what
+// the screen publishes, and the store has its own suite.
+vi.mock('@/data/readerPosition', () => ({
+  getReaderPosition: (surahId: number) => mocks.getReaderPosition(surahId),
+  setReaderPosition: (surahId: number, ayahNumber: number) =>
+    mocks.setReaderPosition(surahId, ayahNumber),
 }));
 
 vi.mock('@quran-corpus/mobile-data', () => ({
@@ -190,6 +200,8 @@ describe('word-by-word route', () => {
   afterEach(cleanup);
 
   beforeEach(() => {
+    mocks.getReaderPosition.mockReset().mockReturnValue(null);
+    mocks.setReaderPosition.mockReset();
     // Module-level, so without this a test renders the previous test's header
     // -- a pager wired to a screen that has already unmounted.
     mocks.params = { surahId: '2' };
@@ -309,6 +321,17 @@ describe('word-by-word route', () => {
     fireEvent.click(await screen.findByTestId('wbw-next'));
 
     await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenLastCalledWith(expect.anything(), 2, 11));
+  });
+
+  it('publishes the range it moves to as the shared reading position', async () => {
+    render(<WbwRoute />);
+    await screen.findAllByTestId('wbw-cell');
+
+    fireEvent.click(await screen.findByTestId('wbw-next'));
+
+    // So pressing back leaves the reader where this screen ended up rather
+    // than where it started (D46). The new range, not the old one.
+    await waitFor(() => expect(mocks.setReaderPosition).toHaveBeenCalledWith(2, 11));
   });
 
   it('starts over at the range the new params name after an in-app navigation', async () => {

@@ -15,6 +15,7 @@ import {
   type WordSummary,
 } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
+import { setReaderPosition } from '@/data/readerPosition';
 import { useWordSummaryLoader } from '@/data/useWordSummaryLoader';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings, type WbwDensity } from '@/settings/settingsStore';
@@ -54,7 +55,13 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
   const [page, setPage] = useState({ key: paramKey, from: initialFrom });
   if (page.key !== paramKey) setPage({ key: paramKey, from: initialFrom });
   const from = page.from;
-  const setFrom = (next: number) => setPage({ key: paramKey, from: next });
+  const setFrom = (next: number) => {
+    setPage({ key: paramKey, from: next });
+    // D46: the reader re-lands here when this screen is popped. Guarded on
+    // surahId because the store is scoped by surah, and a null id has no
+    // position to publish.
+    if (surahId !== null) setReaderPosition(surahId, next);
+  };
 
   const [wbw, setWbw] = useState<WbwScreenData | null>(null);
   // Fetched here rather than left to the sheet's loader: every layout now
