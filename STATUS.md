@@ -7,7 +7,7 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-08-27
+Updated: 2026-08-28
 
 ## Now
 
@@ -48,7 +48,7 @@ stored marker fails open the same way the LIKE scope did — revisit if this is 
 hosted somewhere that cold-starts per request. Ten mutation checks, all killed; one
 survived first and exposed a vacuous assertion in a test written minutes earlier.
 
-### 🎨 M6 GLASS REDESIGN — M6a-M6f merged; M6g next (2026-08-26)
+### 🎨 M6 GLASS REDESIGN — M6a-M6g merged; M6h next (2026-08-28)
 Spec + 9 sub-phase plans: `docs/plans/phase-m6-glass-redesign.md` (+ `phase-m6a..i`).
 40 owner decisions recorded there. §5 fires on M6b, M6c, M6f, M6h.
 
@@ -208,12 +208,43 @@ the owner's device is SDK 31.
 same build closes the identical last step on M6c, M6d and M6e; all four land
 together.
 
-**M6g next**, plan `docs/plans/phase-m6g-dictionary-search.md` (dictionary +
-search re-skin). Task 1 is four mockup HTML files under `docs/design/m6/`
-(lemma-entry, frequency, dictionary-browse, concordance) — UI only, no §5
-trigger — and its Step 3 gates Task 2 on the owner having seen them. M6e
-carry-forward item 1 (`DictionaryScreen`'s dead `setOptions({ headerRight })`)
-folds in here.
+**M6g MERGED to main 2026-08-28 as `e9e1be7` (PR #30, squash of 22 commits),**
+plan `docs/plans/phase-m6g-dictionary-search.md` (dictionary + search re-skin).
+UI only — no `packages/data` change, no new query, no §5 trigger. 654 tests,
+lint and type-check green. Two owner review rounds folded in; M6e carry-forward
+item 1 (`DictionaryScreen`'s dead `setOptions({ headerRight })`) closed here.
+
+**Device checks 97-107 all PASS** — §10's gate is met. Run over two sessions on
+the same bundle `6498d63` (2026-08-27, finished 2026-08-28) via Expo Go on the
+owner's OnePlus 7 Pro; wireless debugging dropped mid-run and the phone had
+taken a new DHCP lease, which cost a subnet sweep plus a port scan to find.
+Highlights: the pager runs as a true two-halves transition (both entries on
+screen in one frame, back arrow measured immovable across all six burst frames);
+reduced motion cross-fades with zero horizontal displacement; the light-theme
+chevron measures a **zero-pixel offset** from its circle's centre in both axes;
+a 20-character keyboard burst arrives intact and in order, read back out of the
+accessibility tree rather than off a screenshot. Both device settings changed to
+run the checks are restored (in-app Reduce animations, OS font scale).
+
+Three findings filed rather than fixed, **none of them M6g regressions**:
+- **#31 — the dictionary's meaning search matches nothing.** The box says
+  "Search roots or meaning…"; `mercy` and `compassion` both return 0 roots while
+  `qwl` returns قول 1722. `searchRoots` and `getRootSearchList` both read
+  `root_forms.gloss`, which is **NULL for all 4657 rows** in the mobile bundle
+  *and* the live corpus; the glosses on screen come from `root_definitions`,
+  which neither path touches. **Dead on web too, and older than this phase.**
+  The fix is a `packages/data` query change → §5 applies.
+- **#32 — the pane caption is clipped off-screen at `font_scale` 1.35**
+  (`Roots ·` with the count gone; `By frequ`). Check 103 asks only that it stay
+  off a row of its own, which it does, so 103 is a pass with the defect noted.
+  The fix trades against the owner's "inline, not its own row" ruling.
+- **#33 — a kind's first load shows an empty pane** with no spinner or skeleton
+  for 2-7s. Cached path is fine (107 re-flips in under 1s); the uncached path
+  has no loading state.
+
+**M6h next** (bookmarks + notes) — touches the on-device user DB, so **§5
+fires**. M6i (settings + about) opens with a Task 0 mockup pass needing owner
+approval before code.
 
 Two calls made in-flight, both in commit bodies:
 - Dark glass fill is the night page colour at 45%, NOT the mockup's white .075.
