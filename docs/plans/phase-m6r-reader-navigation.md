@@ -101,7 +101,7 @@ type is exported from `packages/data/src/mobile.ts` and additive is free here.
 - Produces: `JuzSurahRange { surahId: number; surahName: string; firstAyahNumber: number; lastAyahNumber: number; ayahCount: number }`
   and `JuzEntry.ranges: JuzSurahRange[]`, ordered in mushaf order. Task 3 reads both.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to the existing `describe('getJuzIndex')` in
 `packages/data/tests/browse.test.ts`. The fixture at the top of that file
@@ -146,12 +146,12 @@ crosses a surah boundary and has two ranges.
   });
 ```
 
-- [ ] **Step 2: Run them and watch them fail**
+- [x] **Step 2: Run them and watch them fail**
 
 Run: `pnpm --filter @quran-corpus/data test -- browse`
 Expected: FAIL — `rows[0].ranges` is `undefined`.
 
-- [ ] **Step 3: Replace the query**
+- [x] **Step 3: Replace the query**
 
 In `packages/data/src/queries/browse.ts`, add the type above `JuzEntry` and
 give `JuzEntry` its new field:
@@ -251,7 +251,7 @@ export async function getJuzIndex(client: QueryClient): Promise<JuzEntry[]> {
 }
 ```
 
-- [ ] **Step 4: Export the new type**
+- [x] **Step 4: Export the new type**
 
 `packages/data/src/mobile.ts:25` — add `JuzSurahRange` to the type export:
 
@@ -259,13 +259,13 @@ export async function getJuzIndex(client: QueryClient): Promise<JuzEntry[]> {
 export type { JuzEntry, JuzSurahRange, PageEntry, RevealedEntry } from './queries/browse.js';
 ```
 
-- [ ] **Step 5: Run the whole data suite**
+- [x] **Step 5: Run the whole data suite**
 
 Run: `pnpm --filter @quran-corpus/data test`
 Expected: PASS, including the four pre-existing `getJuzIndex` tests — the start
 ayah, the mid-surah start, the counts and the null-juz exclusion all still hold.
 
-- [ ] **Step 6: Mutation-check the ordering**
+- [x] **Step 6: Mutation-check the ordering**
 
 Change `ORDER BY a.juz, a.surah_id` to `ORDER BY a.juz, a.surah_id DESC`.
 
@@ -277,7 +277,7 @@ fix the test before restoring.
 Restore by re-editing the line back to `ORDER BY a.juz, a.surah_id`. **Do not**
 `git checkout` the file.
 
-- [ ] **Step 7: Mutation-check the accumulator**
+- [x] **Step 7: Mutation-check the accumulator**
 
 Change `existing.ayahCount += range.ayahCount;` to `existing.ayahCount = range.ayahCount;`.
 
@@ -287,13 +287,13 @@ Expected: FAIL on *counts the ayahs in each juz* (juz 1 reports 2, not 5) and on
 
 Restore by re-editing.
 
-- [ ] **Step 8: Re-export check**
+- [x] **Step 8: Re-export check**
 
 Run: `pnpm --filter @quran-corpus/data test -- mobile-entry`
 Expected: PASS. The mobile entry guard asserts the module graph, and this task
 adds no runtime import — the new type is erased.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add packages/data/src/queries/browse.ts packages/data/src/mobile.ts packages/data/tests/browse.test.ts
@@ -308,7 +308,7 @@ are the (juz, surah) groups, and the juz's start is the first group's
 first ayah rather than an aggregate over the whole juz."
 ```
 
-- [ ] **Step 10: STOP — §5 gate**
+- [x] **Step 10: STOP — §5 gate**
 
 This task changed `packages/data` queries, which is a §5 trigger. The agent
 cannot launch `/code-review`. Stop here, tell the owner the trigger and what
@@ -340,7 +340,7 @@ and a single abstraction for two call sites would be a knob, not a saving.
   - `BrowseSection.expanded?: boolean` and `BrowseSection.onToggle?: () => void` — together make the header a button; `expanded === false` renders the section with no rows. Omitted = a plain header, exactly today.
   - Icon name `'chevronDown'`.
 
-- [ ] **Step 1: Add the chevron glyph**
+- [x] **Step 1: Add the chevron glyph**
 
 `apps/mobile/src/components/icons/Icon.tsx` — add `| 'chevronDown'` to
 `IconName` after `'chevronRight'`, and to `PATHS`:
@@ -353,7 +353,7 @@ Same 24-box and same stroke as `chevronLeft`/`chevronRight`, rotated a quarter
 turn — drawn rather than a `‹` glyph for the reason recorded in AdjacentNav: a
 text chevron sits wherever its font's side bearings put it.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Create `apps/mobile/src/components/BrowseList.test.tsx`, following
 `SurahList.test.tsx`'s host-stub pattern:
@@ -439,12 +439,12 @@ vi.mock('./icons/Icon', () => ({
 }));
 ```
 
-- [ ] **Step 3: Run them and watch them fail**
+- [x] **Step 3: Run them and watch them fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test -- BrowseList`
 Expected: FAIL — the file has no chevron and `BrowseSection` has no `expanded`.
 
-- [ ] **Step 4: Extend the types**
+- [x] **Step 4: Extend the types**
 
 In `apps/mobile/src/components/BrowseList.tsx`:
 
@@ -480,7 +480,7 @@ export interface BrowseSection {
 }
 ```
 
-- [ ] **Step 5: Render the row chevron and the indent**
+- [x] **Step 5: Render the row chevron and the indent**
 
 Inside `Row`, add the import (`import { Icon } from './icons/Icon';`) and pass
 the disclosure state to the Pressable:
@@ -532,7 +532,7 @@ then after the `item.arabic` block, before `</GlassSurface>`:
         )}
 ```
 
-- [ ] **Step 6: Render the section header as a disclosure**
+- [x] **Step 6: Render the section header as a disclosure**
 
 Replace `renderSectionHeader` in the `SectionList` branch:
 
@@ -603,12 +603,12 @@ and empty a collapsed section's rows where the sections are handed to the list:
         sections={rendered}
 ```
 
-- [ ] **Step 7: Run the tests**
+- [x] **Step 7: Run the tests**
 
 Run: `pnpm --filter @quran-corpus/mobile test -- BrowseList`
 Expected: PASS, all seven.
 
-- [ ] **Step 8: Mutation-check the collapse**
+- [x] **Step 8: Mutation-check the collapse**
 
 Change `section.expanded === false ? { ...section, data: [] } : section` to
 `section`.
@@ -619,7 +619,7 @@ means the test asserts nothing.
 
 Restore by re-editing.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add apps/mobile/src/components/BrowseList.tsx apps/mobile/src/components/BrowseList.test.tsx apps/mobile/src/components/icons/Icon.tsx
@@ -645,7 +645,7 @@ navigates."
 - Consumes: `JuzEntry.ranges` (Task 1), `BrowseItem.expanded` / `.indent` (Task 2).
 - Produces: nothing later tasks read.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 The existing `juz3` fixture in `SurahsTab.test.tsx` needs `ranges`. Add them,
 then append tests. Find the fixture (near line 90) and give it:
@@ -703,13 +703,13 @@ New tests inside `describe('SurahsTab')`:
   });
 ```
 
-- [ ] **Step 2: Run them and watch them fail**
+- [x] **Step 2: Run them and watch them fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test -- SurahsTab`
 Expected: FAIL — tapping the juz row navigates today, so *does not navigate*
 and the two range tests fail.
 
-- [ ] **Step 3: Hold the open set**
+- [x] **Step 3: Hold the open set**
 
 In `SurahsScreen`, beside the existing `mode` state:
 
@@ -735,7 +735,7 @@ default view rather than whatever was left open two modes ago:
 (`setOpenEras` arrives in Task 4; write `onChangeMode` with both now and wire
 the `SegmentedControl` to `onChangeMode` instead of `setMode`.)
 
-- [ ] **Step 4: Build the rows**
+- [x] **Step 4: Build the rows**
 
 Replace the `juzItems` memo:
 
@@ -783,12 +783,12 @@ Replace the `juzItems` memo:
 `wbw.rangeLabel` is already "Ayahs" / "Oyatlar" / "Аяты" in all three locales —
 reused rather than adding a fourth key that would say the same word.
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 Run: `pnpm --filter @quran-corpus/mobile test -- SurahsTab`
 Expected: PASS, including the pre-existing cache and failure tests.
 
-- [ ] **Step 6: Mutation-check the toggle**
+- [x] **Step 6: Mutation-check the toggle**
 
 Change `if (!next.delete(entry.juz)) next.add(entry.juz);` to
 `next.add(entry.juz);`.
@@ -798,7 +798,7 @@ Expected: FAIL on *collapses a juz that is tapped again*.
 
 Restore by re-editing.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add apps/mobile/src/screens/SurahsScreen.tsx apps/mobile/src/screens/SurahsTab.test.tsx
@@ -822,7 +822,7 @@ under it are what open the reader."
 - Consumes: `BrowseSection.count` / `.expanded` / `.onToggle` (Task 2), `onChangeMode`/`setOpenEras` (Task 3 Step 3).
 - Produces: nothing.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```tsx
   it('opens the revealed tab with both eras expanded and counted', async () => {
@@ -860,12 +860,12 @@ under it are what open the reader."
   });
 ```
 
-- [ ] **Step 2: Run them and watch them fail**
+- [x] **Step 2: Run them and watch them fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test -- SurahsTab`
 Expected: FAIL — there is no `browse-section-Meccan`.
 
-- [ ] **Step 3: Hold the collapsed set**
+- [x] **Step 3: Hold the collapsed set**
 
 Beside `openJuz`:
 
@@ -875,7 +875,7 @@ Beside `openJuz`:
   const [openEras, setOpenEras] = useState<ReadonlySet<string>>(new Set());
 ```
 
-- [ ] **Step 4: Wire the sections**
+- [x] **Step 4: Wire the sections**
 
 In `revealedSections`, replace the two places a section is created and pushed.
 Where the item is built, leave it untouched; change the section push and add the
@@ -909,12 +909,12 @@ disclosure fields:
 section renders under; a language change clears every cached mode
 (`setData({})`) and re-runs this memo, so a stale key cannot outlive its label.
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 Run: `pnpm --filter @quran-corpus/mobile test -- SurahsTab`
 Expected: PASS.
 
-- [ ] **Step 6: Mutation-check the reset**
+- [x] **Step 6: Mutation-check the reset**
 
 In `onChangeMode`, delete `setOpenEras(new Set());`.
 
@@ -923,12 +923,12 @@ Expected: FAIL on *forgets the collapse when the mode changes and comes back*.
 
 Restore by re-editing.
 
-- [ ] **Step 7: Full mobile suite**
+- [x] **Step 7: Full mobile suite**
 
 Run: `pnpm --filter @quran-corpus/mobile test`
 Expected: PASS. 654 tests before this phase; the count grows.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add apps/mobile/src/screens/SurahsScreen.tsx apps/mobile/src/screens/SurahsTab.test.tsx
@@ -968,7 +968,7 @@ stays as it is.
   - `clearReaderPosition(): void` — tests only.
   Tasks 6 and 9 both read and write it.
 
-- [ ] **Step 1: Write the store's failing test**
+- [x] **Step 1: Write the store's failing test**
 
 `apps/mobile/src/data/readerPosition.test.ts`:
 
@@ -1001,12 +1001,12 @@ describe('readerPosition', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test -- readerPosition`
 Expected: FAIL — the module does not exist.
 
-- [ ] **Step 3: Write the store**
+- [x] **Step 3: Write the store**
 
 `apps/mobile/src/data/readerPosition.ts`:
 
@@ -1047,12 +1047,12 @@ export function clearReaderPosition(): void {
 }
 ```
 
-- [ ] **Step 4: Run it**
+- [x] **Step 4: Run it**
 
 Run: `pnpm --filter @quran-corpus/mobile test -- readerPosition`
 Expected: PASS.
 
-- [ ] **Step 5: Write the reader's failing test**
+- [x] **Step 5: Write the reader's failing test**
 
 Append to `apps/mobile/src/components/SurahReader.test.tsx`. Mock the store so
 the assertion is about what the reader does with it, not about the singleton:
@@ -1103,12 +1103,12 @@ Reuse whatever the existing file already has for rendering the reader and for
 capturing `scrollToIndex` / firing viewable items; add `renderReader`/`reader`
 helpers only if it does not.
 
-- [ ] **Step 6: Run them and watch them fail**
+- [x] **Step 6: Run them and watch them fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test -- SurahReader`
 Expected: FAIL — the reader neither writes nor reads the store.
 
-- [ ] **Step 7: Write the position on scroll**
+- [x] **Step 7: Write the position on scroll**
 
 In `SurahReader`, import the store and add a surah-id ref beside the existing
 ones (`onViewableItemsChanged` is a `useRef` callback created once, outside the
@@ -1152,7 +1152,7 @@ then in `onViewableItemsChanged`, alongside the existing reading-position call:
 Gated on `positionedRef` for exactly the reason the reading-position write is:
 the rows visible mid-landing are wherever the list happens to be.
 
-- [ ] **Step 8: Re-anchor on a mode switch**
+- [x] **Step 8: Re-anchor on a mode switch**
 
 Replace the `initialIndex` memo and add the anchor state above it:
 
@@ -1187,12 +1187,12 @@ Everything else in that effect is untouched: it already resets `positioned`,
 hides the list behind the spinner, retries the scroll and reveals only once
 nothing missed and the content height held still.
 
-- [ ] **Step 9: Run the tests**
+- [x] **Step 9: Run the tests**
 
 Run: `pnpm --filter @quran-corpus/mobile test -- SurahReader`
 Expected: PASS.
 
-- [ ] **Step 10: Mutation-check the nonce**
+- [x] **Step 10: Mutation-check the nonce**
 
 Remove `landingNonce` from the landing effect's dependency array.
 
@@ -1203,7 +1203,7 @@ never re-runs. A pass here means the test proves nothing about the actual bug.
 
 Restore by re-editing.
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add apps/mobile/src/data/readerPosition.ts apps/mobile/src/data/readerPosition.test.ts apps/mobile/src/components/SurahReader.tsx apps/mobile/src/components/SurahReader.test.tsx
@@ -1236,7 +1236,7 @@ translation card are nothing like the same height."
 - Consumes: `getReaderPosition` / `setReaderPosition` (Task 5).
 - Produces: nothing.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `SurahReader.test.tsx`:
 
@@ -1312,12 +1312,12 @@ In `WbwScreen.test.tsx`:
 Adjust `60` to whatever `wbwPageRange(51, ayahCount)` yields for the fixture in
 that file; the assertion is that the *new* `from` is published, not the old one.
 
-- [ ] **Step 2: Run them and watch them fail**
+- [x] **Step 2: Run them and watch them fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test -- SurahReader WbwScreen`
 Expected: FAIL — the push carries no query and nothing writes the store.
 
-- [ ] **Step 3: Carry the ayah out**
+- [x] **Step 3: Carry the ayah out**
 
 In `SurahReader`'s header effect, replace the `onOpenWbw` handler:
 
@@ -1336,7 +1336,7 @@ In `SurahReader`'s header effect, replace the `onOpenWbw` handler:
 writing our own link changes nothing about it being untrusted input at the
 boundary (§3, OWASP).
 
-- [ ] **Step 4: Carry the ayah back**
+- [x] **Step 4: Carry the ayah back**
 
 Add the focus effect to `SurahReader`, after the mode-switch effect:
 
@@ -1357,7 +1357,7 @@ Add the focus effect to `SurahReader`, after the mode-switch effect:
 
 with `import { router, useFocusEffect, useNavigation } from 'expo-router';`.
 
-- [ ] **Step 5: Publish the range from the word-by-word screen**
+- [x] **Step 5: Publish the range from the word-by-word screen**
 
 In `WbwScreen`, replace `setFrom`:
 
@@ -1373,12 +1373,12 @@ In `WbwScreen`, replace `setFrom`:
 
 with `import { setReaderPosition } from '@/data/readerPosition';`.
 
-- [ ] **Step 6: Run the tests**
+- [x] **Step 6: Run the tests**
 
 Run: `pnpm --filter @quran-corpus/mobile test -- SurahReader WbwScreen`
 Expected: PASS.
 
-- [ ] **Step 7: Mutation-check the focus guard**
+- [x] **Step 7: Mutation-check the focus guard**
 
 Change `if (position === null || position === lastVisibleRef.current) return;`
 to `if (position === null) return;`.
@@ -1389,7 +1389,7 @@ screen*.
 
 Restore by re-editing.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add apps/mobile/src/components/SurahReader.tsx apps/mobile/src/screens/WbwScreen.tsx apps/mobile/src/components/SurahReader.test.tsx apps/mobile/src/screens/WbwScreen.test.tsx
@@ -1421,7 +1421,7 @@ itself — the two-button toolbar — alone for the entry screens.
 - Produces: `AdjacentNavButton` (the renamed `PagerButton`), exported, with
   `testIDPrefix: 'root' | 'lemma' | 'surah'`. Tasks 8 and 9 both render it.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```tsx
   it('names a surah chevron for a screen reader', () => {
@@ -1444,12 +1444,12 @@ itself — the two-button toolbar — alone for the entry screens.
   });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test -- AdjacentNav`
 Expected: FAIL — `AdjacentNavButton` is not exported.
 
-- [ ] **Step 3: Add the strings**
+- [x] **Step 3: Add the strings**
 
 In `apps/mobile/src/i18n/uiStrings.ts`, add to `UiStringKey` beside the other
 `surah`-prefixed keys (or beside `surahList.*` if there are none):
@@ -1476,7 +1476,7 @@ and to each of the three locale tables:
 Russian inflects for gender — сура is feminine, so `Предыдущая`/`Следующая`,
 not the masculine forms `root.previous` carries for корень.
 
-- [ ] **Step 4: Export the button**
+- [x] **Step 4: Export the button**
 
 In `AdjacentNav.tsx`, extend the label map and rename the component:
 
@@ -1497,13 +1497,13 @@ The literal key strings stay written out per screen rather than assembled from
 `testIDPrefix` — `uiStrings.test.ts` greps the sources for the literal, and a
 runtime-built key is invisible to that dead-key check.
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 Run: `pnpm --filter @quran-corpus/mobile test -- AdjacentNav uiStrings`
 Expected: PASS. The dead-key check confirms both new keys are referenced and
 that all three locales carry them.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/mobile/src/components/AdjacentNav.tsx apps/mobile/src/i18n/uiStrings.ts apps/mobile/src/components/AdjacentNav.test.tsx
@@ -1530,7 +1530,7 @@ dictionary entries."
 - Consumes: `AdjacentNavButton` (Task 7), `useEntryPager` / `pagerAnimation` from `@/motion/entryPager`.
 - Produces: `ReaderHeaderProps.prevSurahId?: number | null`, `.nextSurahId?: number | null`, `.onPageSurah?: (surahId: number, side: 'prev' | 'next') => void`; the same three forwarded through `SurahReaderProps`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `ReaderHeader.test.tsx`:
 
@@ -1578,12 +1578,12 @@ dictionary entries."
 
 Match `renderRecitation`/`driver` to whatever that file already uses.
 
-- [ ] **Step 2: Run them and watch them fail**
+- [x] **Step 2: Run them and watch them fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test -- ReaderHeader ayahAudio`
 Expected: FAIL on all three.
 
-- [ ] **Step 3: Stop the audio when the surah changes**
+- [x] **Step 3: Stop the audio when the surah changes**
 
 In `apps/mobile/src/audio/ayahAudio.ts`, add above the existing unmount effect:
 
@@ -1607,7 +1607,7 @@ In `apps/mobile/src/audio/ayahAudio.ts`, add above the existing unmount effect:
   }, [surah]);
 ```
 
-- [ ] **Step 4: Draw the chevrons in the header**
+- [x] **Step 4: Draw the chevrons in the header**
 
 In `ReaderHeader.tsx`, add to `ReaderHeaderProps`:
 
@@ -1647,13 +1647,13 @@ fallback is to move the two chevrons onto the second row, flanking the mode
 chip — the bar is already two rows and stays one glass surface either way. Do
 not pre-emptively build the fallback.
 
-- [ ] **Step 5: Forward the props through `SurahReader`**
+- [x] **Step 5: Forward the props through `SurahReader`**
 
 Add the same three to `SurahReaderProps`, destructure them, and pass them to
 `<ReaderHeader>` in the header effect — adding `prevSurahId`, `nextSurahId` and
 `onPageSurah` to that effect's dependency array.
 
-- [ ] **Step 6: Page in place at the route**
+- [x] **Step 6: Page in place at the route**
 
 In `apps/mobile/app/surah/[surahId].tsx`, seed the pager from the validated
 route param and read the surah off it:
@@ -1701,12 +1701,12 @@ D47 is the two bounds: 1 and 114, no wrap. They are literals here rather than a
 query because 114 is a fact about the mushaf, and `parseSurahId` already
 enforces the same bound on the route.
 
-- [ ] **Step 7: Run the tests**
+- [x] **Step 7: Run the tests**
 
 Run: `pnpm --filter @quran-corpus/mobile test -- ReaderHeader ayahAudio SurahReader`
 Expected: PASS.
 
-- [ ] **Step 8: Mutation-check the bounds**
+- [x] **Step 8: Mutation-check the bounds**
 
 Change `surahId < 114` to `surahId <= 114`.
 
@@ -1724,7 +1724,7 @@ chevron offering it would open a reader that can only fail to load:
 
 Restore by re-editing, and confirm the new test fails under the mutation.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add apps/mobile/app/surah/\[surahId\].tsx apps/mobile/src/components/ReaderHeader.tsx apps/mobile/src/components/SurahReader.tsx apps/mobile/src/audio/ayahAudio.ts apps/mobile/src/components/ReaderHeader.test.tsx apps/mobile/src/audio/ayahAudio.test.ts
@@ -1751,7 +1751,7 @@ ayah under the new one."
 - Consumes: `AdjacentNavButton` (Task 7), `useEntryPager` (Task 8's pattern).
 - Produces: nothing.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```tsx
   it('pages to the next surah and restarts at its first ayah', async () => {
@@ -1777,12 +1777,12 @@ ayah under the new one."
   });
 ```
 
-- [ ] **Step 2: Run them and watch them fail**
+- [x] **Step 2: Run them and watch them fail**
 
 Run: `pnpm --filter @quran-corpus/mobile test -- WbwScreen`
 Expected: FAIL — there is no `surah-next`.
 
-- [ ] **Step 3: Page the surah**
+- [x] **Step 3: Page the surah**
 
 In `WbwScreen`, seed the pager from the prop and fold it into the existing
 param-key reset — the key already resets `from` when the route params change,
@@ -1813,7 +1813,7 @@ the page boundary:
   };
 ```
 
-- [ ] **Step 4: Draw the chevrons**
+- [x] **Step 4: Draw the chevrons**
 
 In the heading row, put the previous chevron before the surah name and the next
 one after the `VersePicker`, so the row is bounded by surah navigation with the
@@ -1833,12 +1833,12 @@ ayah pager inside it:
 `flexShrink: 1` and `numberOfLines={1}`, so it truncates rather than pushing a
 chevron off the edge.
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 Run: `pnpm --filter @quran-corpus/mobile test -- WbwScreen`
 Expected: PASS.
 
-- [ ] **Step 6: Mutation-check the reset**
+- [x] **Step 6: Mutation-check the reset**
 
 Change the reset in `setSurah` so the paged surah keeps the previous one's range:
 
@@ -1852,7 +1852,7 @@ it would ask for 3:50.
 
 Restore by re-editing.
 
-- [ ] **Step 7: Full gate**
+- [x] **Step 7: Full gate**
 
 There is no CI (issue #1), so this is the gate, run by hand:
 
@@ -1865,7 +1865,7 @@ pnpm --filter @quran-corpus/data test
 
 All four must be clean. `type-check` is `tsc --noEmit && tsc --noEmit -p tsconfig.test.json` — both halves.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add apps/mobile/src/screens/WbwScreen.tsx apps/mobile/src/screens/WbwScreen.test.tsx
@@ -1967,6 +1967,49 @@ git commit -m "docs(mobile): record the M6r device run"
 - Issue #31 (the dictionary's meaning search matches nothing), #32, #33, #28 —
   all filed, none of them touched here.
 
+## What changed against the plan
+
+Tasks 1-9 are implemented and committed; task 10 is the device run and has not
+happened. Seven things went differently from what this plan said, all folded in:
+
+- **Task 2** — asserting *which* chevron is drawn needed a handle. `Icon` gained
+  an optional `testID` and the shared `react-native-svg` stub now maps it to
+  `data-testid`, the way `rnHosts` already maps every other host. The
+  alternative was hard-coding glyph path data in a test, which is retuned
+  whenever a chevron is re-centred.
+- **Task 3** — the plan did not notice that *switches to the juz index and opens
+  the juz at the ayah it starts on* asserts the behaviour D41 removes. It was
+  rewritten to assert the row expands, and the navigation it moved to got its
+  own test.
+- **Task 5** — resolving the anchor in an effect was wrong, and the existing
+  retry-cap test caught it: state set after the landing effect had already run
+  against the seed made **every mount land twice**, the second scroll restarting
+  a sequence the first had begun (26 scrolls where the cap is 25). Replaced with
+  the render-phase reset `WbwScreen` already uses, plus a test that a mount
+  lands exactly once.
+- **Task 5** — the anchor is seeded from the route param only, never the store.
+  Consulting the store on mount would change what a fresh reader opens on, which
+  is beyond D46 and is what the existing landing tests encode.
+- **Task 6** — `WbwScreen` has no suite of its own; it is covered by
+  `src/test/routes/words.test.tsx`. Its tests went there.
+- **Task 7** — implementation landed before the tests, so the tests were
+  mutation-checked immediately rather than watched to fail first. Swapping the
+  `surah` label keys for the `lemma` ones fails both the label test and the
+  dead-key check. Locale completeness turns out to be enforced by `tsc`, not by
+  the suite -- verified by deleting the Uzbek pair, which type-check rejects.
+- **Task 8** — `SurahRoute.test.tsx` needed `AccessibilityInfo` and a
+  `react-native-reanimated` stub: the route now reaches `useEntryPager`, which
+  asks `useReducedMotion` which way a page turn should travel. The route also
+  gained the two paging tests the plan left as a conditional step.
+- Note for anyone running these commands: `pnpm --filter <pkg> test -- <name>`
+  does **not** filter to a suite -- it runs all of them. Read the summary line.
+
+Every mutation-check named in tasks 1-9 was run and bit, plus six the plan did
+not ask for (the `aria-expanded` guard, the era-count derivation, the audio
+stop, the two word-by-word bounds, and the load reading the paged surah rather
+than the prop).
+
 ## Verification log — pending
 
-Nothing has run yet.
+Task 10 has not run. No device was connected during implementation, so **§10's
+gate is unmet** and this phase is not complete.
