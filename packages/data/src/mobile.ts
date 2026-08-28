@@ -69,6 +69,11 @@ export {
   rootFirstLetter,
   ARABIC_ALPHABET_ORDER,
 } from './text/arabic.js';
+export {
+  MEANING_MIN_CHARS,
+  matchesRootQuery,
+  type RootSearchKeys,
+} from './text/rootSearch.js';
 // The root and lemma routes take a Buckwalter identifier straight off a deep
 // link, so they need the same charset and length caps the web routes use.
 // buckwalter.ts has no runtime imports, so this adds no edge to the Metro graph.

@@ -183,6 +183,35 @@ describe('DictionaryScreen', () => {
     expect(screen.getAllByTestId('dictionary-row')).toHaveLength(1);
   });
 
+  it('ignores a meaning needle shorter than the floor', async () => {
+    // `me` sits inside both `mercy` and `camel` and nowhere else in the
+    // fixture. gloss_blob carries dictionary prose now, so a two-letter needle
+    // through the meaning arm keeps most of the corpus; three characters is
+    // where it starts filtering.
+    render(<DictionaryScreen />);
+    const box = await screen.findByTestId('dictionary-search');
+
+    fireEvent.change(box, { target: { value: 'mer' } });
+    expect(screen.getAllByTestId('dictionary-row')).toHaveLength(1);
+
+    fireEvent.change(box, { target: { value: 'me' } });
+    expect(screen.queryAllByTestId('dictionary-row')).toHaveLength(0);
+  });
+
+  it('ranks results by occurrence count while a query is running', async () => {
+    // Alphabetical is the default sort and puts ابل (339) before قول (1722);
+    // a query must invert that, because a match anywhere in the corpus is
+    // useless if the root the reader meant is filed under the later letter.
+    render(<DictionaryScreen />);
+
+    fireEvent.change(await screen.findByTestId('dictionary-search'), { target: { value: 'l' } });
+
+    const labels = screen.getAllByTestId('dictionary-row').map((r) => r.getAttribute('aria-label'));
+    expect(labels).toHaveLength(2);
+    expect(labels[0]).toContain('قول');
+    expect(labels[1]).toContain('ابل');
+  });
+
   it('labels the ranked pane "Most used", not a sort order', async () => {
     // "Frequent" read as a sort order next to Browse's own "By frequency" chip.
     await renderLoaded();
@@ -218,6 +247,22 @@ describe('DictionaryScreen', () => {
     // Emptying the box restores the ق filter -- it was never cleared.
     fireEvent.change(screen.getByTestId('dictionary-search'), { target: { value: '' } });
     expect(screen.getAllByTestId('dictionary-row')).toHaveLength(1);
+  });
+
+  it('hides the sort toggle while a query is running, alongside the letter grid', async () => {
+    // The query forces the frequency order, so an "Alphabetical" chip left
+    // rendered `selected` would be describing an order the list is not in --
+    // and tapping it would change nothing on screen.
+    await renderLoaded();
+    expect(screen.getByTestId('dictionary-sort-alpha')).toBeTruthy();
+
+    fireEvent.change(screen.getByTestId('dictionary-search'), { target: { value: 'ارض' } });
+    expect(screen.queryByTestId('dictionary-sort-alpha')).toBeNull();
+    expect(screen.queryByTestId('dictionary-sort-freq')).toBeNull();
+
+    // Back with the grid once the box empties; the preference was never touched.
+    fireEvent.change(screen.getByTestId('dictionary-search'), { target: { value: '' } });
+    expect(screen.getByTestId('dictionary-sort-alpha')).toBeTruthy();
   });
 
   it('clears the search box from the button, which only exists when there is text', async () => {

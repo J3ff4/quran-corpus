@@ -83,6 +83,16 @@ beforeAll(async () => {
     sql: `INSERT INTO root_definitions (root_id,source,definition) VALUES (?,'lane','To be high')`,
     args: [smwId],
   });
+  // $Am carries a definition and no forms: the meaning arm reads
+  // root_definitions, so this is the row it has to find. `wretchedness` is
+  // chosen for its inner `hed`/`ed` pair, which the MEANING_MIN_CHARS tests
+  // below need; no root_buckwalter or root_arabic in this fixture contains
+  // either, so a hit can only have come through the definition.
+  const $AmId = r.rows[2]!['id'] as number;
+  await db.execute({
+    sql: `INSERT INTO root_definitions (root_id,source,definition) VALUES (?,'hanswehr','wretchedness, contempt, calamity')`,
+    args: [$AmId],
+  });
 });
 afterAll(() => db.close());
 
@@ -277,6 +287,36 @@ describe('roots queries', () => {
   it('searchRoots by buckwalter', async () => {
     expect((await searchRoots(db, 'smw')).length).toBe(1);
   });
+  it('searchRoots matches a root by its definition text', async () => {
+    // #31: this arm read root_forms.gloss, which is NULL for all 4657 rows in
+    // every shipped database, so it matched nothing corpus-wide.
+    expect((await searchRoots(db, 'calamity')).map((r) => r.root_buckwalter)).toEqual(['$Am']);
+  });
+  it('searchRoots drops the meaning arm below MEANING_MIN_CHARS', async () => {
+    // `hed` and `ed` both occur only inside $Am's definition, so the pair
+    // isolates the floor: three characters reach the prose, two do not.
+    expect((await searchRoots(db, 'hed')).map((r) => r.root_buckwalter)).toEqual(['$Am']);
+    expect(await searchRoots(db, 'ed')).toEqual([]);
+  });
+  it('searchRoots trims the query before every arm, not just the floor test', async () => {
+    // The floor gated on `q.trim()` while the LIKE pattern bound raw `q`, so a
+    // padded needle switched the meaning arm on and then matched nothing with
+    // it — the client filter, which trims first, found the root.
+    expect((await searchRoots(db, '  calamity  ')).map((r) => r.root_buckwalter)).toEqual(['$Am']);
+  });
+  it('searchRoots treats LIKE wildcards in the query as literal characters', async () => {
+    // Binding the needle as a parameter keeps it out of the SQL as syntax; it
+    // does not stop LIKE reading `%` and `_` as patterns. `%` matched the whole
+    // fixture, and `c_lamity` matched a definition containing neither string.
+    expect(await searchRoots(db, '%')).toEqual([]);
+    expect(await searchRoots(db, 'c_lamity')).toEqual([]);
+  });
+  it('searchRoots orders by occurrence count, most used first', async () => {
+    // Every root's Buckwalter or Arabic contains one of these, so the whole
+    // fixture comes back and only the order is under test: ktb 319, smw 5, $Am 3.
+    const hits = await searchRoots(db, '');
+    expect(hits.map((r) => r.root_buckwalter)).toEqual(['ktb', 'smw', '$Am']);
+  });
   it('getRootEntry bundles forms + definitions', async () => {
     const e = await getRootEntry(db, 'smw');
     expect(e?.forms.length).toBe(1);
@@ -316,19 +356,28 @@ describe('roots queries', () => {
   it('getRootArabicList returns every root_arabic', async () => {
     expect((await getRootArabicList(db)).sort()).toEqual(['س م و', 'ش أ م', 'ك ت ب']);
   });
-  it('getRootSearchList returns every root, ktb (no forms) with a null blob', async () => {
+  it('getRootSearchList returns every root, ktb (no definitions) with a null blob', async () => {
     const list = await getRootSearchList(db);
     expect(list.length).toBe(3);
     expect(list.find((r) => r.root_buckwalter === 'ktb')?.gloss_blob).toBeNull();
   });
-  it('getRootSearchList concatenates a root’s form glosses', async () => {
+  it('getRootSearchList builds the blob from definitions, not root_forms.gloss', async () => {
     const smwId = (await getRootByBuckwalter(db, 'smw'))!.id;
+    // A form gloss on the same root, which the blob must NOT pick up: this is
+    // the column #31 was reading, and it is empty in every shipped database.
     await db.execute({
-      sql: `INSERT INTO root_forms (root_id,sort_order,pos_label,gloss,occurrence_count) VALUES (?,1,'Noun','name',1),(?,2,'Noun','high place',1)`,
-      args: [smwId, smwId],
+      sql: `INSERT INTO root_forms (root_id,sort_order,pos_label,gloss,occurrence_count) VALUES (?,1,'Noun','formglosssentinel',1)`,
+      args: [smwId],
+    });
+    await db.execute({
+      sql: `INSERT INTO root_definitions (root_id,source,definition) VALUES (?,'hanswehr','name, appellation')`,
+      args: [smwId],
     });
     const smw = (await getRootSearchList(db)).find((r) => r.root_buckwalter === 'smw');
-    expect(smw?.gloss_blob).toBe('name high place');
+    // Both definitions, concatenated; the form gloss is absent.
+    expect(smw?.gloss_blob).toContain('To be high');
+    expect(smw?.gloss_blob).toContain('name, appellation');
+    expect(smw?.gloss_blob).not.toContain('formglosssentinel');
   });
   it('getRootConcordance batches ayah IDs (batchSize=1) without dropping words', async () => {
     // a2 in a second ayah; same root 'bat' matched in two ayahs -> two batches

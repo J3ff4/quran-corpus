@@ -3,9 +3,18 @@ import { getDatabase } from '../../lib/db';
 import { DictionaryBrowser } from '../../components/dictionary/DictionaryBrowser';
 import { letterCounts } from './letters';
 
-// The full root list (~1642 rows, ~100-150KB) renders once per request; all
+// The full root list (1642 rows) renders once per request; all
 // search/sort/letter filtering then happens client-side in DictionaryBrowser.
 // The service worker (NetworkFirst) still caches the response.
+//
+// 570KB of JSON since #31, up from ~100-150KB: the meaning arm searches
+// `root_definitions` now, and the 396KB of dictionary prose that carries has
+// to be on the client for a filter that runs without a round-trip. The route is
+// force-dynamic, so every hit re-runs the 1642-row GROUP_CONCAT over 3221
+// definition rows and re-serializes all of it into the flight stream, which
+// escapes on top of that figure. If that weight ever needs cutting, the lever
+// is moving the meaning arm server-side (debounced, via searchRoots) rather
+// than trimming the blob, which only loses matches.
 // Dynamic so the per-request CSP nonce reaches inline scripts (see app/page.tsx
 // and src/test/route-render-mode.test.ts).
 export const dynamic = 'force-dynamic';

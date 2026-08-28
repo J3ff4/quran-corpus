@@ -5,6 +5,7 @@ import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobil
 import {
   compareRootsArabic,
   foldRootArabic,
+  matchesRootQuery,
   rootFirstLetter,
   type RootSearchItem,
 } from '@quran-corpus/data/mobile';
@@ -241,18 +242,20 @@ export function DictionaryScreen() {
   // folding, no allocation beyond the result itself.
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = sort === 'freq' ? ordered.freq : ordered.alpha;
     if (q) {
-      // The Arabic arm folds the needle to match the folded haystack (hamza
-      // seat + inter-letter spaces), so `ارض` finds the stored `أرض` -- the
-      // same normalization searchRoots uses. The Latin arms stay raw:
-      // foldRootArabic('ktb') === 'ktb', and a folded Latin needle never
-      // occurs inside an Arabic haystack.
+      // Always the frequency order while a query is running, whatever the
+      // toggle says: matches come from anywhere in the corpus, and hijāʾī
+      // order buries the root a reader most likely meant among rarer
+      // homonyms. Matches web.
+      //
+      // The needle is folded once here, not once per row -- the haystack was
+      // folded when the payload landed. matchesRootQuery holds the three arms
+      // themselves; how they compose with the letter filter and the sort is
+      // this screen's business, and web now composes them the same way.
       const qf = foldRootArabic(q);
-      return list.filter(
-        (root) => root.folded.includes(qf) || root.bw.includes(q) || root.gloss.includes(q),
-      );
+      return ordered.freq.filter((root) => matchesRootQuery(root, q, qf));
     }
+    const list = sort === 'freq' ? ordered.freq : ordered.alpha;
     if (letter) return list.filter((root) => root.letter === letter);
     return list;
   }, [ordered, query, sort, letter]);
@@ -396,25 +399,34 @@ export function DictionaryScreen() {
                       gap: 8,
                     }}
                   >
-                    <View
-                      accessibilityRole="toolbar"
-                      accessibilityLabel={t(uiLocale, 'dictionary.sortFilter')}
-                      style={{ flexDirection: 'row', gap: 8 }}
-                    >
-                      {(['alpha', 'freq'] as const).map((option) => (
-                        <FilterChip
-                          key={option}
-                          value={option}
-                          testID={`dictionary-sort-${option}`}
-                          label={t(
-                            uiLocale,
-                            option === 'alpha' ? 'dictionary.sortAlpha' : 'dictionary.sortFreq',
-                          )}
-                          selected={sort === option}
-                          onSelect={setSortAndClearLetter}
-                        />
-                      ))}
-                    </View>
+                    {/* Hidden while searching, for the same reason the letter
+                        grid above is: a query fixes the order (frequency,
+                        always), so a toggle claiming to set it would sit there
+                        with "Alphabetical" lit over a frequency-ordered list
+                        and do nothing when tapped. The stored preference is
+                        untouched and comes back with the grid when the box
+                        empties. */}
+                    {searching ? null : (
+                      <View
+                        accessibilityRole="toolbar"
+                        accessibilityLabel={t(uiLocale, 'dictionary.sortFilter')}
+                        style={{ flexDirection: 'row', gap: 8 }}
+                      >
+                        {(['alpha', 'freq'] as const).map((option) => (
+                          <FilterChip
+                            key={option}
+                            value={option}
+                            testID={`dictionary-sort-${option}`}
+                            label={t(
+                              uiLocale,
+                              option === 'alpha' ? 'dictionary.sortAlpha' : 'dictionary.sortFreq',
+                            )}
+                            selected={sort === option}
+                            onSelect={setSortAndClearLetter}
+                          />
+                        ))}
+                      </View>
+                    )}
                     {/* Label first, count second, the way Home's counters read.
                         The mockup's "1,642 roots" would be "1 roots" the moment
                         a search isolates one -- and "1 корней" in Russian,

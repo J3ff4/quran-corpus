@@ -11,7 +11,7 @@ vi.mock('next/link', () => ({
 
 const roots: RootSearchItem[] = [
   { id: 1, root_buckwalter: 'ktb', root_arabic: 'ك ت ب', occurrence_count: 319, gloss_blob: 'write book' },
-  { id: 2, root_buckwalter: 'smw', root_arabic: 'س م و', occurrence_count: 5, gloss_blob: 'high name' },
+  { id: 2, root_buckwalter: 'smw', root_arabic: 'س م و', occurrence_count: 5, gloss_blob: 'high name, a written sign' },
   { id: 3, root_buckwalter: '$Am', root_arabic: 'ش أ م', occurrence_count: 3, gloss_blob: null },
 ];
 const counts = { س: 1, ش: 1, ك: 1 };
@@ -55,6 +55,74 @@ describe('DictionaryBrowser', () => {
     fireEvent.change(screen.getByRole('searchbox', { name: /search/i }), { target: { value: 'smw' } });
     expect(rowsOrder()).toHaveLength(1);
     expect(screen.getByText('س م و')).toBeInTheDocument();
+  });
+
+  it('ignores a meaning needle shorter than the floor', () => {
+    // `ok` sits inside `book` and nowhere else in the fixture. gloss_blob
+    // carries dictionary prose now, so a two-letter needle through the meaning
+    // arm keeps most of the corpus; three characters is where it filters.
+    render(<DictionaryBrowser roots={roots} counts={counts} />);
+    const box = screen.getByRole('searchbox', { name: /search/i });
+
+    fireEvent.change(box, { target: { value: 'ook' } });
+    expect(rowsOrder()).toHaveLength(1);
+
+    fireEvent.change(box, { target: { value: 'ok' } });
+    // No list at all is the empty state; the "No roots found." line itself
+    // types in over time, so the absence of rows is what is assertable here.
+    expect(screen.queryByRole('list')).toBeNull();
+  });
+
+  it('ranks results by occurrence count while a query is running', () => {
+    // Alphabetical is the default sort and puts س م و (5) before ك ت ب (319).
+    // A query must invert that: `wri` matches both roots' meaning text, and
+    // the one a reader is likeliest to want has to lead rather than fall
+    // wherever the hijāʾī order drops it.
+    render(<DictionaryBrowser roots={roots} counts={counts} />);
+    fireEvent.change(screen.getByRole('searchbox', { name: /search/i }), {
+      target: { value: 'wri' },
+    });
+    const texts = rowsOrder().map((a) => a.textContent ?? '');
+    expect(texts).toHaveLength(2);
+    expect(texts[0]).toContain('ك ت ب');
+    expect(texts[1]).toContain('س م و');
+  });
+
+  it('bypasses an active letter while searching, and restores it when the box empties', () => {
+    // Intersecting a letter with a query filtered invisibly: the grid is hidden
+    // while searching, so a reader who had narrowed to ش and then typed would
+    // get "No roots found." with nothing on screen explaining why. Mobile has
+    // always bypassed the letter here; this is web catching up.
+    render(<DictionaryBrowser roots={roots} counts={counts} />);
+    fireEvent.click(screen.getByRole('button', { name: 'ش' }));
+    expect(rowsOrder()).toHaveLength(1);
+
+    const box = screen.getByRole('searchbox', { name: /search/i });
+    // `book` is filed under ك, not the selected ش.
+    fireEvent.change(box, { target: { value: 'book' } });
+    expect(rowsOrder()).toHaveLength(1);
+    expect(screen.getByText('ك ت ب')).toBeInTheDocument();
+
+    // Bypassed, not cleared.
+    fireEvent.change(box, { target: { value: '' } });
+    expect(rowsOrder()).toHaveLength(1);
+    expect(screen.getByText('ش أ م')).toBeInTheDocument();
+  });
+
+  it('hides the letter grid and the sort toggle while a query is running', () => {
+    // A query fixes both scope and order, so leaving "Alphabetical" lit over a
+    // frequency-ordered list is the control describing something the list is
+    // not doing — and clicking it would change nothing on screen.
+    render(<DictionaryBrowser roots={roots} counts={counts} />);
+    expect(screen.getByRole('button', { name: /alphabetical/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ش' })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole('searchbox', { name: /search/i }), {
+      target: { value: 'book' },
+    });
+    expect(screen.queryByRole('button', { name: /alphabetical/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /by frequency/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'ش' })).toBeNull();
   });
 
   // The branch stores corpus's hamza seat (ArD -> أرض). A bare-alif keyboard

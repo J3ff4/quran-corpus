@@ -10,6 +10,7 @@ import type {
 } from '../types.js';
 import { compareRootsArabic, foldRootArabic, foldRootArabicSql } from '../text/arabic.js';
 import { stripQuranicAnnotations } from '../text/normalize.js';
+import { MEANING_MIN_CHARS } from '../text/rootSearch.js';
 import { assertPagingBounds, buildVerseWordsByAyah } from './concordance.js';
 
 function rowToRoot(r: QueryRow): Root {
@@ -169,15 +170,28 @@ export async function getRootArabicList(db: QueryClient): Promise<string[]> {
   return res.rows.map((r) => r['root_arabic'] as string);
 }
 
-/** Every root plus a concatenated gloss blob, for a one-shot static payload
- *  that the dictionary page's client-side search can filter by meaning
- *  without a per-keystroke server round-trip. */
+/** Every root plus a concatenated meaning blob, for a one-shot payload that
+ *  the dictionary's client-side search can filter by meaning without a
+ *  per-keystroke round-trip.
+ *
+ *  The blob is every `root_definitions` row a root carries — Hans Wehr, Lane,
+ *  the corpus form strip, the editorial glosses — and NOT `root_forms.gloss`,
+ *  which it read until #31. That column is NULL for all 4657 rows in every
+ *  database we ship, so the meaning arm silently matched nothing corpus-wide
+ *  on both web and mobile; nothing ever populated it.
+ *
+ *  Every source, not just the highest-ranked one the root page displays:
+ *  رحم's Hans Wehr entry is "uterus; womb; relationship, kinship" (the modern
+ *  sense) and only its Lane entry carries "mercy", so a blob built off
+ *  DEFINITION_SOURCE_RANK's winner would still fail the query that opened the
+ *  issue. All 1642 roots have at least one definition, so no root drops out of
+ *  the meaning arm entirely. */
 export async function getRootSearchList(db: QueryClient): Promise<RootSearchItem[]> {
   const res = await db.execute(
     `SELECT r.id, r.root_buckwalter, r.root_arabic, r.occurrence_count,
-            GROUP_CONCAT(f.gloss, ' ') AS gloss_blob
+            GROUP_CONCAT(d.definition, ' ') AS gloss_blob
      FROM roots r
-     LEFT JOIN root_forms f ON f.root_id = r.id
+     LEFT JOIN root_definitions d ON d.root_id = r.id
      GROUP BY r.id
      ORDER BY r.root_arabic`,
   );
@@ -198,20 +212,51 @@ export async function getRootsByFrequency(db: QueryClient, limit = 200): Promise
   return res.rows.map(rowToRoot);
 }
 
+/** Escapes the LIKE metacharacters in a user-supplied needle, for a statement
+ *  that declares `ESCAPE '\\'`. SQLite treats a backslash as an ordinary
+ *  character in string literals, so it is only special because the statement
+ *  says it is. `%` and `_` must be escaped, and the escape character itself
+ *  first, or an input ending in a backslash escapes the closing wildcard. */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
+/** SQL search over the same three arms `matchesRootQuery` filters with: root
+ *  spelling, Buckwalter, and meaning from `root_definitions` (per #31 — see
+ *  `getRootSearchList`), ordered by frequency.
+ *
+ *  Nothing in this repo calls it — both dictionaries ship the whole root list
+ *  and filter it in memory, so the arms that run in front of a reader are
+ *  `matchesRootQuery`'s. It stays exported for a caller that has to search
+ *  without shipping the list (the documented lever for the web payload), and
+ *  the shared `MEANING_MIN_CHARS` is what keeps its floor from drifting away
+ *  from theirs. */
 export async function searchRoots(db: QueryClient, q: string): Promise<Root[]> {
-  const like = `%${q}%`;
+  // Trimmed once, here, and used for every arm and for the floor test alike.
+  // Gating on `q.trim()` while binding raw `q` let `'  mercy  '` turn the
+  // meaning arm on and then match nothing with it.
+  const needle = q.trim();
+  // `%` and `_` are LIKE metacharacters, so a reader searching for a literal
+  // one would otherwise get a wildcard. Parameter binding stops them reaching
+  // SQL as syntax; it does not stop them being read as patterns.
+  const like = `%${escapeLike(needle)}%`;
   // Arabic is matched on the folded form of BOTH sides: the stored spelling is
   // corpus orthography (`أرض`) but most keyboards produce bare alef first, and
   // a pasted root may still carry inter-letter spaces.
-  const arabicLike = `%${foldRootArabic(q)}%`;
+  const arabicLike = `%${escapeLike(foldRootArabic(needle))}%`;
+  // Below the floor the meaning arm is dropped from the statement entirely
+  // rather than passed a needle that matches everything. The two fragments are
+  // string literals chosen by a boolean; the needle itself only ever reaches
+  // SQL as a bound parameter.
+  const meaning = needle.length >= MEANING_MIN_CHARS;
   const res = await db.execute({
     sql: `SELECT DISTINCT r.* FROM roots r
-          LEFT JOIN root_forms f ON f.root_id = r.id
-          WHERE r.root_buckwalter LIKE ?
-             OR ${foldRootArabicSql('r.root_arabic')} LIKE ?
-             OR f.gloss LIKE ?
+          ${meaning ? 'LEFT JOIN root_definitions d ON d.root_id = r.id' : ''}
+          WHERE r.root_buckwalter LIKE ? ESCAPE '\\'
+             OR ${foldRootArabicSql('r.root_arabic')} LIKE ? ESCAPE '\\'
+             ${meaning ? `OR d.definition LIKE ? ESCAPE '\\'` : ''}
           ORDER BY r.occurrence_count DESC LIMIT 100`,
-    args: [like, arabicLike, like],
+    args: meaning ? [like, arabicLike, like] : [like, arabicLike],
   });
   return res.rows.map(rowToRoot);
 }

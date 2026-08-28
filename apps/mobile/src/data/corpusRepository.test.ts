@@ -295,7 +295,7 @@ function createFakeClient({
       // carry that too, and both would then silently receive this fixture
       // instead of hitting the throw below. The GROUP_CONCAT is unique to
       // getRootSearchList.
-      if (sql.includes("GROUP_CONCAT(f.gloss")) {
+      if (sql.includes('GROUP_CONCAT(d.definition')) {
         // Fixture order is SQL's binary ORDER BY root_arabic: أ (U+0623) sorts
         // before ا (U+0627), so a seated root lands ahead of a bare one no
         // matter what the second radical is. Handing these back unsorted is
