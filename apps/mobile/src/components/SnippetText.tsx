@@ -9,11 +9,21 @@ const END = '';
 export interface SnippetTextProps {
   snippet: string;
   highlightColor: string;
+  /** Wash behind the matched tokens. Optional: the weight below is the signal
+   *  that is not colour (WCAG 1.4.1), so a caller with nowhere to put a wash
+   *  still marks the match legibly. Same treatment ConcordanceList gives its
+   *  own matched word. */
+  highlightBackground?: string;
   style?: TextStyle;
 }
 
 /** One FTS snippet with its matched tokens tinted. */
-export function SnippetText({ snippet, highlightColor, style }: SnippetTextProps) {
+export function SnippetText({
+  snippet,
+  highlightColor,
+  highlightBackground,
+  style,
+}: SnippetTextProps) {
   const parts = snippet.split(START);
 
   return (
@@ -25,7 +35,14 @@ export function SnippetText({ snippet, highlightColor, style }: SnippetTextProps
           // Index keys: the parts have no identity of their own, and the whole
           // list is rebuilt on every new snippet.
           <Text key={index}>
-            <Text testID="snippet-mark" style={{ color: highlightColor, fontWeight: '700' }}>
+            <Text
+              testID="snippet-mark"
+              style={{
+                color: highlightColor,
+                fontWeight: '700',
+                ...(highlightBackground ? { backgroundColor: highlightBackground } : null),
+              }}
+            >
               {matched}
             </Text>
             {rest.join(END)}

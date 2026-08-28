@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/settings/settingsStore', () => ({
-  useAppSettings: () => ({ uiLocale: 'en', contentLanguage: 'ru' }),
+  useAppSettings: () => ({ uiLocale: 'en', contentLanguage: 'ru', reduceMotion: false }),
 }));
 vi.mock('@/data/corpusRepository', () => ({ searchCorpus: mocks.searchCorpus }));
 vi.mock('@/data/openCorpusDb', () => ({ openCorpusDb: () => Promise.resolve({}) }));
@@ -19,7 +19,7 @@ vi.mock('expo-router', () => ({ router: { push: mocks.push } }));
 
 vi.mock('react-native', async () => {
   const React = await import('react');
-  const { host } = await import('@/testing/rnHosts.js');
+  const { host, AccessibilityInfo } = await import('@/testing/rnHosts.js');
   const Input = ({ onChangeText, value, placeholder, testID }: {
     onChangeText?: (text: string) => void;
     value?: string;
@@ -33,6 +33,9 @@ vi.mock('react-native', async () => {
       onChange: (event: { target: { value: string } }) => onChangeText?.(event.target.value),
     });
   return {
+    // Every result card squeezes on press, so they reach useReducedMotion,
+    // which reads this on mount.
+    AccessibilityInfo,
     ActivityIndicator: host('div'),
     Pressable: host('button'),
     ScrollView: host('div'),
@@ -313,5 +316,47 @@ describe('SearchScreen', () => {
     // R4: an FTS5 build problem must not look identical to an unmatched word,
     // or the first device run reports a data fault instead of a build one.
     await waitFor(() => expect(screen.getByText('Unable to search')).toBeTruthy());
+  });
+
+  it('labels each result kind distinctly, and gives each its own affordance', async () => {
+    // Mockup 1i's whole point: three kinds, three affordances. Before this
+    // they were three near-identical lists of rows under three headers that
+    // differed only in wording.
+    //
+    // Three kinds, not the four the plan's draft test named: SearchResult
+    // carries jump, verses and roots. There is no lemma/"Words" arm in the
+    // data, and adding one is a packages/data query -- out of scope for M6g
+    // by its own constraint, and a §5 trigger besides.
+    mocks.searchCorpus.mockResolvedValue({
+      jump: {
+        surah_id: 2,
+        ayah_number: 255,
+        text_uthmani: '',
+        words: [],
+        highlightPosition: null,
+      },
+      verses: [{ surah_id: 1, ayah_number: 1, source: 'ar', snippet: 'bismi' }],
+      roots: [{ id: 7, root_buckwalter: 'rHm', root_arabic: 'رحم', occurrence_count: 339 }],
+    });
+    render(<SearchScreen />);
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'rHm' } });
+    await act(async () => {
+      await settle();
+    });
+
+    expect(screen.getAllByRole('header').map((header) => header.textContent)).toEqual([
+      'GO TO',
+      'VERSES',
+      'ROOTS',
+    ]);
+    // Each kind reachable by its own testID, so a kind that silently stopped
+    // rendering is a failure here rather than a header with nothing under it.
+    expect(screen.getByTestId('search-jump')).toBeTruthy();
+    expect(screen.getByTestId('search-verse')).toBeTruthy();
+    expect(screen.getByTestId('search-root')).toBeTruthy();
+    // The root row carries its occurrence count; the verse row carries its
+    // reference. Neither used to show anything but the headword.
+    expect(screen.getByTestId('search-root').textContent).toContain('339');
+    expect(screen.getByTestId('search-verse').textContent).toContain('1:1');
   });
 });

@@ -340,7 +340,11 @@ describe('LemmaScreen', () => {
     // accessibilityViewIsModal is iOS-only; without this the reader can swipe
     // straight past the sheet into the rows behind it.
     render(<LemmaScreen lemmaBuckwalter="qaAla" source={null} />);
-    const wrapper = () => screen.getByTestId('concordance').parentElement!;
+    // By testID, not by walking up from the list: the pager's animated wrapper
+    // now sits between them, and a parentElement chain would have to be
+    // re-counted every time the tree gains a level.
+    const wrapper = () => screen.getByTestId('lemma-content');
+    await screen.findByTestId('concordance');
     await waitFor(() => expect(wrapper().getAttribute('data-hidden-from-a11y')).toBeNull());
 
     fireEvent.click(screen.getByTestId('info-button'));
@@ -377,10 +381,34 @@ describe('LemmaScreen', () => {
     expect(screen.queryByTestId('lemma-no-definition')).toBeNull();
   });
 
-  it('counts the concordance in its heading', async () => {
+  it('reads the lemma under the headword, and omits the line when there is none', async () => {
+    // The slim bar that used to caption itself with this went on 2026-08-27.
+    // Nothing moved: EntryHeader already drew the reading under the headword,
+    // which is where a reading belongs. A line with nothing in it opens a gap
+    // between the headword and the sense chips.
+    render(<LemmaScreen lemmaBuckwalter="qaAla" source={null} />);
+    expect((await screen.findByTestId('entry-translit')).textContent).toBe('qāla');
+
+    cleanup();
+    mocks.getLemmaScreen.mockResolvedValue({
+      entry: { ...LEMMA, transliteration: null },
+      total: LEMMA.count,
+    });
+    render(<LemmaScreen lemmaBuckwalter="qaAla" source={null} />);
+
+    await screen.findByTestId('concordance-heading');
+    expect(screen.queryByTestId('entry-translit')).toBeNull();
+  });
+
+  it('counts the concordance beside its heading', async () => {
+    // The count moved out of the heading string into its own node when the row
+    // became an eyebrow with a right-aligned total (m6g-3/-4). Both halves are
+    // still asserted: the heading alone says nothing about size, and a bare
+    // number says nothing about what it counts.
     mocks.getLemmaScreen.mockResolvedValue({ entry: LEMMA, total: 1722 });
     render(<LemmaScreen lemmaBuckwalter="qaAla" source={null} />);
-    expect((await screen.findByTestId('concordance-heading')).textContent).toContain('Concordance (1722)');
+    expect((await screen.findByTestId('concordance-heading')).textContent).toBe('Concordance');
+    expect(screen.getByTestId('concordance-count').textContent).toBe('1722');
   });
 
   it('pages through the ranking it was entered from', async () => {
@@ -395,14 +423,29 @@ describe('LemmaScreen', () => {
     expect(mocks.getAdjacentLemmas.mock.calls[0]!.slice(1)).toEqual(['brk', 'verbs']);
 
     fireEvent.click(await screen.findByTestId('lemma-next'));
-    expect(mocks.replace).toHaveBeenCalledWith('/lemma/ktb?from=verbs');
+    // In place, not through the router: `replace` remounted the screen, which
+    // dropped the direction the tap had just recorded and left the pager with
+    // no outgoing lemma to animate (M6g check 92, and the owner's 2026-08-27
+    // ruling that both halves have to move).
+    await waitFor(() =>
+      expect(mocks.getLemmaScreen).toHaveBeenLastCalledWith(expect.anything(), 'ktb', 'ru'),
+    );
+    expect(mocks.replace).not.toHaveBeenCalled();
+    expect(mocks.push).not.toHaveBeenCalled();
+    // The ranking still travels with the neighbour query after paging: it is
+    // what decides where the next Next goes.
+    await waitFor(() =>
+      expect(mocks.getAdjacentLemmas).toHaveBeenLastCalledWith(expect.anything(), 'ktb', 'verbs'),
+    );
   });
 
-  it('drops the old neighbours while the new lemma is still resolving', async () => {
-    // A lemma change in place -- router.replace, or a deep link landing on the
-    // mounted route -- refetches, and the verb aggregate is the slowest query
-    // on this screen. Held-over arrows would point at the PREVIOUS lemma's
-    // neighbours, so Next would navigate somewhere the reader never was.
+  it('dims the arrows until the neighbours belong to the lemma on screen', async () => {
+    // The verb aggregate is the slowest query here, so the entry regularly
+    // lands first. Held-over arrows would point at the PREVIOUS lemma's
+    // neighbours, so Next would page somewhere the reader never was. The
+    // neighbours carry the lemma they were taken for and the screen compares
+    // it -- rather than clearing on every change, which dimmed the outgoing
+    // lemma's own arrows for the whole of the wait.
     mocks.getAdjacentLemmas.mockResolvedValue({ prev: 'qwl', next: 'ktb' });
     const { rerender } = render(<LemmaScreen lemmaBuckwalter="brk" source="verbs" />);
     await waitFor(() =>

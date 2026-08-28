@@ -1,6 +1,7 @@
-import { Text, View } from 'react-native';
+import { Text } from 'react-native';
 import { definitionSourceLabel } from '@quran-corpus/data/mobile';
 import { ClampedText } from '@/components/ClampedText';
+import { GlassSurface } from '@/components/GlassSurface';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
@@ -23,17 +24,9 @@ export function DefinitionCard({ definition, source, uiLocale }: DefinitionCardP
   const label = source ? definitionSourceLabel(source) : null;
 
   return (
-    <View
+    <GlassSurface
       testID="definition-card"
-      style={{
-        borderWidth: 1,
-        borderColor: theme.border,
-        backgroundColor: theme.surface,
-        borderRadius: 12,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        gap: 6,
-      }}
+      style={{ paddingHorizontal: 16, paddingVertical: 14, gap: 6 }}
     >
       <ClampedText
         uiLocale={uiLocale}
@@ -50,6 +43,6 @@ export function DefinitionCard({ definition, source, uiLocale }: DefinitionCardP
       >
         {definition}
       </ClampedText>
-    </View>
+    </GlassSurface>
   );
 }

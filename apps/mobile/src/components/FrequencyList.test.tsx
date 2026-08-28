@@ -1,7 +1,7 @@
 import React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { FrequencyList } from './FrequencyList';
+import { FrequencyList, resetFrequencyCache } from './FrequencyList';
 
 const mocks = vi.hoisted(() => ({ getFrequencyRows: vi.fn(), push: vi.fn() }));
 
@@ -18,8 +18,11 @@ vi.mock('@quran-corpus/mobile-data', () => ({ createExpoSqliteClient: () => ({})
 vi.mock('expo-router', () => ({ router: { push: mocks.push } }));
 vi.mock('react-native', async () => {
   const React = await import('react');
-  const { host } = await import('@/testing/rnHosts.js');
+  const { host, AccessibilityInfo } = await import('@/testing/rnHosts.js');
   return {
+    // DictionaryRow squeezes on press, so it reaches useReducedMotion, which
+    // reads this on mount.
+    AccessibilityInfo,
     ActivityIndicator: () => React.createElement('span', null, 'loading'),
     Pressable: host('button'),
     Text: host('span'),
@@ -38,6 +41,9 @@ vi.mock('react-native', async () => {
 
 describe('FrequencyList', () => {
   beforeEach(() => {
+    // The component caches rows per kind for the life of the process, so every
+    // test that counts queries has to start from an empty one.
+    resetFrequencyCache();
     mocks.getFrequencyRows.mockReset();
     mocks.push.mockReset();
     mocks.getFrequencyRows.mockResolvedValue([]);
@@ -62,6 +68,29 @@ describe('FrequencyList', () => {
     // showing roots under a heading that says lemmas.
     await waitFor(() => expect(mocks.getFrequencyRows).toHaveBeenCalledTimes(2));
     expect(mocks.getFrequencyRows.mock.calls.at(-1)![1]).toBe('lemmas');
+  });
+
+  it('serves a kind it has already fetched without querying again', async () => {
+    // This component is torn down and remounted every time the reader flips
+    // between Browse and Most used. The bundled DB is opened query_only, so a
+    // second query for the same kind can only return what the first one did.
+    mocks.getFrequencyRows.mockResolvedValue([
+      { arabic: 'قول', count: 1722, href: '/root/qwl', gloss: null },
+    ]);
+    const first = render(<FrequencyList kind="roots" />);
+    await waitFor(() => expect(mocks.getFrequencyRows).toHaveBeenCalledTimes(1));
+    first.unmount();
+
+    render(<FrequencyList kind="roots" />);
+
+    expect(screen.getByText('1722')).toBeTruthy();
+    await waitFor(() => expect(mocks.getFrequencyRows).toHaveBeenCalledTimes(1));
+    // Deliberately NOT asserting that no spinner appeared. render() flushes
+    // effects inside act(), so the cache hit in the effect lands before this
+    // test can look -- which makes the render-time seeding of `rows`/`loading`
+    // indistinguishable from doing it in the effect here, and an assertion
+    // about it would pass with the seed deleted. The seed earns its place one
+    // frame at a time on a real device; see its comment in the component.
   });
 
   it('renders each row with its count and routes it', async () => {

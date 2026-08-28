@@ -7,18 +7,22 @@ import { useThemeColors } from '@/theme/themeContext';
 
 export interface SearchHeaderButtonProps {
   /** Passed in rather than read from the settings store, because SurahReader
-   *  -- one of the two callers -- takes uiLocale as a prop by design and its
-   *  test mocks the store as `{ arabicScale, reduceMotion }` with no uiLocale.
-   *  A store read here would hand t() an undefined locale in that suite. */
+   *  -- the caller -- takes uiLocale as a prop by design and its test mocks
+   *  the store as `{ arabicScale, reduceMotion }` with no uiLocale. A store
+   *  read here would hand t() an undefined locale in that suite. */
   uiLocale: UiLocaleCode;
-  /** The reader closes its word sheet before pushing; the dictionary tab just
-   *  pushes. That difference is the only reason this takes a callback rather
-   *  than routing itself. */
+  /** The reader closes its word sheet before pushing, which is why this takes
+   *  a callback rather than routing itself. */
   onPress: () => void;
 }
 
-/** The header magnifier, two of the spec's three search entry points. (Home's
- *  is a full-width pill with placeholder text, a different control.) */
+/** The reader's header magnifier. One of the spec's search entry points;
+ *  Home's is a full-width pill with placeholder text, a different control.
+ *
+ *  The Dictionary tab was the third. Its copy went through
+ *  navigation.setOptions({ headerRight }), which publishes into nothing on a
+ *  tab screen (headerShown: false since M6a), so it had been invisible for a
+ *  sub-phase before M6g deleted it. */
 export function SearchHeaderButton({ uiLocale, onPress }: SearchHeaderButtonProps) {
   const theme = useThemeColors();
 

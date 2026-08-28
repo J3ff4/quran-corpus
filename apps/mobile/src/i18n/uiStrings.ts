@@ -86,6 +86,14 @@ export type UiStringKey =
   // concordance heading. Same toolbar-not-radiogroup reasoning as the
   // Frequent pane's kind chips: the chips multi-select.
   | 'root.formsFilter'
+  // The chip at the head of the form-filter row that clears the selection.
+  // Empty selection already meant "every form"; nothing offered a single tap
+  // back to it once several chips were lit (mockup m6g-4).
+  | 'root.formsAll'
+  // Noun for the form count beside that label, read as "Forms · 6". Label
+  // first, count second: Russian needs a different noun form for 2 and for 6,
+  // and no locale has to agree with a number in this order.
+  | 'root.formsCount'
   // Root screen's concordance heading, read as "Concordance (1722)". t() has
   // no interpolation, so the count is concatenated at the call site.
   | 'concordance.heading'
@@ -269,6 +277,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'root.next': 'Next',
     'root.adjacent': 'Adjacent roots',
     'root.formsFilter': 'Filter by form',
+    'root.formsAll': 'All',
+    'root.formsCount': 'forms',
     'lemma.notFound': 'This lemma is not in the corpus',
     'lemma.translatedAs': 'Translated as',
     'lemma.aboutTranslations': 'About these translations',
@@ -423,6 +433,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'root.next': 'Keyingi',
     'root.adjacent': 'Qo‘shni o‘zaklar',
     'root.formsFilter': 'Shakl bo‘yicha filtr',
+    'root.formsAll': 'Barchasi',
+    'root.formsCount': 'shakllar',
     'lemma.notFound': 'Bu lemma korpusda yo‘q',
     'lemma.translatedAs': 'Tarjimasi',
     'lemma.aboutTranslations': 'Bu tarjimalar haqida',
@@ -572,6 +584,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'root.next': 'Следующий',
     'root.adjacent': 'Соседние корни',
     'root.formsFilter': 'Фильтр по форме',
+    'root.formsAll': 'Все',
+    'root.formsCount': 'формы',
     'lemma.notFound': 'Этой леммы нет в корпусе',
     'lemma.translatedAs': 'Переводится как',
     'lemma.aboutTranslations': 'Об этих переводах',

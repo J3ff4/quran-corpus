@@ -223,14 +223,20 @@ describe('RootRoute', () => {
     expect((await screen.findByTestId('entry-count')).textContent).toBe('1722 occurrences');
   });
 
-  it('links Previous and Next to the hijāʾī neighbours', async () => {
+  it('pages to the hijāʾī neighbour in place, without navigating', async () => {
     mocks.getAdjacentRoots.mockResolvedValue({ prev: 'qtl', next: 'qwm' });
     render(<RootRoute />);
     fireEvent.click(await screen.findByTestId('root-next'));
-    // replace, not push: five taps of Next used to leave six screens on the
-    // stack, and root screens are outside the tab group -- back was the only
-    // way out, six times over.
-    expect(mocks.replace).toHaveBeenCalledWith('/root/qwm');
+    // The next root's queries run...
+    await waitFor(() =>
+      expect(mocks.getRootScreen).toHaveBeenLastCalledWith(expect.anything(), 'qwm'),
+    );
+    // ...and the navigator is not involved at all. It used to be a `replace`,
+    // which remounted the screen: that destroyed the root being paged away
+    // from before the incoming one rendered, leaving the pager nothing to
+    // slide out, and ran the navigator's own push transition -- the one that
+    // was animating the back arrow -- over the top of it.
+    expect(mocks.replace).not.toHaveBeenCalled();
     expect(mocks.push).not.toHaveBeenCalled();
   });
 
@@ -270,12 +276,15 @@ describe('RootRoute', () => {
     expect(await screen.findByTestId('root-no-definition')).toBeTruthy();
   });
 
-  it('counts the concordance in its heading', async () => {
+  it('counts the concordance beside its heading', async () => {
+    // The count moved out of the heading string and into its own node when the
+    // row became an eyebrow with a right-aligned total (m6g-4). Both halves
+    // still have to be on screen: the heading alone says nothing about size,
+    // and a bare number says nothing about what it counts.
     mocks.getRootOccurrenceCount.mockResolvedValue(1722);
     render(<RootRoute />);
-    expect((await screen.findByTestId('concordance-heading')).textContent).toBe(
-      'Concordance (1722)',
-    );
+    expect((await screen.findByTestId('concordance-heading')).textContent).toBe('Concordance');
+    expect(screen.getByTestId('concordance-count').textContent).toBe('1722');
   });
 
   it('narrows the concordance to the selected forms', async () => {
@@ -295,7 +304,7 @@ describe('RootRoute', () => {
     render(<RootRoute />);
     fireEvent.click((await screen.findAllByTestId('form-chip'))[0]!);
     await waitFor(() =>
-      expect(screen.getByTestId('concordance-heading').textContent).toBe('Concordance (92)'),
+      expect(screen.getByTestId('concordance-count').textContent).toBe('92'),
     );
   });
 
@@ -347,6 +356,14 @@ describe('RootRoute', () => {
             releaseCount = resolve;
           }),
       );
+    // A visibly different second root, so "the new headword under the old
+    // total" is a state this test can actually see. With one fixture for both
+    // roots the mixed render is indistinguishable from the correct one, and
+    // the assertion below passes whether or not the gate exists.
+    mocks.getRootScreen.mockResolvedValueOnce(rootEntry).mockResolvedValueOnce({
+      ...rootEntry,
+      root: { id: 8, root_buckwalter: 'qwm', root_arabic: 'قوم', occurrence_count: 3 },
+    });
     const { rerender } = render(<RootRoute />);
     await waitFor(() => expect(screen.getByTestId('concordance-total').textContent).toBe('1722'));
 
@@ -354,12 +371,20 @@ describe('RootRoute', () => {
     rerender(<RootRoute />);
 
     await waitFor(() => expect(mocks.getRootScreen).toHaveBeenCalledTimes(2));
-    expect(screen.queryByTestId('concordance-total')).toBeNull();
+    // The previous root stays whole -- its own headword, its own total, its
+    // own rows -- until the new one's count lands. It is not replaced
+    // piecemeal, and it is not blanked to a spinner either: holding it is what
+    // leaves the pager something to slide out.
+    expect(screen.getByTestId('root-buckwalter').textContent).toBe('{qwl');
+    expect(screen.getByTestId('entry-count').textContent).toBe('1722 occurrences');
+    expect(screen.getByTestId('concordance-total').textContent).toBe('1722');
+    expect(mocks.getRootOccurrences.mock.calls.some((call) => call[1] === 'qwm')).toBe(false);
 
     await act(async () => {
       releaseCount(3);
     });
     await waitFor(() => expect(screen.getByTestId('concordance-total').textContent).toBe('3'));
+    expect(screen.getByTestId('root-buckwalter').textContent).toBe('qwm');
   });
 
   it('restarts the list once per filter change, against the count taken for it', async () => {

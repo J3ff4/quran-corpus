@@ -4,10 +4,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ARABIC_ALPHABET_ORDER } from '@quran-corpus/data/mobile';
 import { AlphabetGrid } from './AlphabetGrid';
 
-vi.mock('react-native', async () => {
-  const { host } = await import('@/testing/rnHosts.js');
-  return { Pressable: host('button'), Text: host('span'), View: host('div') };
-});
+vi.mock('react-native', async () => (await import('@/testing/rnHosts.js')).reactNativeTextMock());
+// A tile squeezes on press, so it reaches usePressScale -> useReducedMotion,
+// which reads the in-app setting as well as the system one; the real store
+// opens expo-secure-store, which jsdom has no counterpart for.
+vi.mock('@/settings/settingsStore', () => ({ useAppSettings: () => ({ uiLocale: 'en', reduceMotion: false }) }));
 
 const ALL = new Set(ARABIC_ALPHABET_ORDER);
 

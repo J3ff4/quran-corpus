@@ -47,19 +47,32 @@ vi.mock('react-native-safe-area-context', () => ({
 // nothing here asserts on a frame, and the timing branch that *is* worth
 // testing (reduced motion) lives in the pure nextPressScale.
 vi.mock('react-native-reanimated', async () => {
-  const React = await import('react');
   const { host } = await import('@/testing/rnHosts.js');
   return {
     default: {
       createAnimatedComponent: (Component: unknown) => Component,
-      View: ({ children, ...props }: { children?: React.ReactNode }) =>
-        React.createElement('div', props, children),
+      // Through the host shim, like Animated.Text below and for a second
+      // reason as well: an Animated.View is where a component puts an
+      // animated style, which arrives as `style={[layout, animatedStyle]}`,
+      // and React DOM throws "'set' on proxy" trying to assign into a style
+      // array. host() flattens it.
+      View: host('div'),
       // Through the same host shim the plain <Text> uses, not a raw spread:
       // an Animated.Text is where a component puts a label it also animates
       // (the reader's fading surah name), and a raw spread renders testID and
       // accessibilityLabel as unknown DOM attributes that no query can reach.
       Text: host('span'),
     },
+    // Layout-animation builders, for the dictionary pager. Chainable because
+    // the app configures them (`SlideInRight.duration(260)`), and inert
+    // because jsdom has no animation to run -- the direction they encode is
+    // asserted in motion/entryPager.test.ts against its own mock, and the
+    // components only have to render.
+    ...Object.fromEntries(
+      ['FadeIn', 'FadeOut', 'SlideInLeft', 'SlideInRight', 'SlideOutLeft', 'SlideOutRight'].map(
+        (name) => [name, { duration: () => ({ name }) }],
+      ),
+    ),
     useSharedValue: (initial: number) => ({ value: initial }),
     useAnimatedStyle: (factory: () => unknown) => factory(),
     withTiming: (toValue: number) => toValue,
