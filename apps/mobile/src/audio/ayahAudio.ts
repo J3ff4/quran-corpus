@@ -392,6 +392,24 @@ export function useRecitation(
     if (ayah !== null && ayah > 1) startAyah(ayah - 1);
   }
 
+  // Paging to another surah is a state change, not a remount (D48), so the
+  // driver survives it still loaded with the previous surah's ayah. Left alone
+  // it keeps sounding under the new surah, and the docked bar offers a pause
+  // for an ayah that is no longer on screen.
+  //
+  // The driver is paused, not destroyed: destroying belongs to unmount below,
+  // and rebuilding a player for the next tap costs a visible delay before the
+  // first syllable.
+  useEffect(() => {
+    return () => {
+      driverRef.current?.pause();
+      ayahRef.current = null;
+      finishedRef.current = false;
+      soundedRef.current = false;
+      setState(IDLE);
+    };
+  }, [surah]);
+
   useEffect(() => {
     return () => {
       const driver = driverRef.current;

@@ -1,6 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 import { useRecitation } from '@/audio/ayahAudio';
 import { SurahReader } from '@/components/SurahReader';
@@ -12,6 +13,7 @@ import { openUserDb } from '@/data/userDb';
 import { useWordSummaryLoader } from '@/data/useWordSummaryLoader';
 import { getBookmarks, recordReadingDay, recordReadingPosition, setBookmark } from '@/data/userRepository';
 import { localDay } from '@/home/counters';
+import { useEntryPager } from '@/motion/entryPager';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
 import { useThemeColors } from '@/theme/themeContext';
@@ -22,7 +24,15 @@ function errorTextStyle(danger: string) {
 
 export default function SurahRoute() {
   const params = useLocalSearchParams<{ surahId: string; ayah?: string }>();
-  const surahId = useMemo(() => parseSurahId(params.surahId), [params.surahId]);
+  const routeSurahId = useMemo(() => parseSurahId(params.surahId), [params.surahId]);
+  // The same pager the dictionary entries use, for the same reason: expo-router
+  // remounts a [param] screen when `replace` changes the param, which destroys
+  // the outgoing screen before the incoming one renders and runs the
+  // navigator's own transition over the top. Paging is state, not navigation
+  // (D48), so back returns to the surah list rather than walking every surah
+  // paged through.
+  const pager = useEntryPager(routeSurahId === null ? null : String(routeSurahId));
+  const surahId = pager.current === null ? null : Number(pager.current);
   // Bookmarks and the Home tab's continue link both carry the ayah they mean.
   // Validated the same way as surahId -- it arrives from a URL, so it is
   // untrusted input even when we are the only ones writing the links.
@@ -193,6 +203,15 @@ export default function SurahRoute() {
 
   return (
     <View style={{ flex: 1 }}>
+      <Animated.View
+        // Keyed by surah so reanimated sees one view leave as another arrives;
+        // without the key React would reconcile them into a single view and
+        // there would be nothing to animate.
+        key={surahId}
+        entering={pager.animation.entering}
+        exiting={pager.animation.exiting}
+        style={{ flex: 1 }}
+      >
       <SurahReader
         data={reader}
         bookmarkedAyahs={bookmarks}
@@ -222,7 +241,14 @@ export default function SurahRoute() {
         onReadingAyah={(ayahNumber) => {
           readingRecorder?.record(ayahNumber);
         }}
+        // 1 and 114 are facts about the mushaf, and parseSurahId enforces the
+        // same bound on the route. D47: no wrapping, so an end is a dead arrow
+        // rather than a jump to the other end of the book.
+        prevSurahId={surahId !== null && surahId > 1 ? surahId - 1 : null}
+        nextSurahId={surahId !== null && surahId < 114 ? surahId + 1 : null}
+        onPageSurah={(target, side) => pager.goTo(String(target), side)}
       />
+      </Animated.View>
       {/* Live regions: a bookmark or playback failure happens after the tap,
           with nothing taking focus, so TalkBack would otherwise never announce
           that the action the user just took did not work. */}

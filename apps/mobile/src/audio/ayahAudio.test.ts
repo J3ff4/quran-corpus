@@ -398,6 +398,39 @@ describe('useRecitation', () => {
 });
 
 /** A RecitationDriver that records what the controller asked it to do. */
+describe('paging to another surah', () => {
+  it('stops the recitation when the surah changes under it', () => {
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 2, ayahCount: 286, player, continuous: false });
+    r.toggleAyah(50);
+    expect(r.state().playing).toBe(true);
+
+    r.changeSurah(3);
+
+    // Paging in place does not remount the hook, so without this the driver
+    // keeps sounding al-Baqarah 50 under Aal-Imran, and the docked bar offers
+    // a pause for an ayah that is no longer on screen.
+    expect(player.pauses).toBe(1);
+    expect(r.state().playing).toBe(false);
+    expect(r.state().ayah).toBeNull();
+  });
+
+  it('leaves the driver alive so the next tap does not rebuild a player', () => {
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 2, ayahCount: 286, player, continuous: false });
+    r.toggleAyah(50);
+
+    r.changeSurah(3);
+    r.toggleAyah(1);
+
+    // One create, then a replace: destroying on every page turn would cost a
+    // visible delay before the first syllable of the new surah.
+    expect(player.created).toHaveLength(1);
+    expect(player.destroyed).toBe(0);
+    expect(player.replaced.at(-1)).toContain('003001');
+  });
+});
+
 function fakePlayer({
   duration = 30,
   announcePlaying = true,
@@ -502,13 +535,17 @@ function renderRecitation({
   continuous: boolean;
   reciterId?: string;
 }) {
+  // The surah is a hook prop, not a closure: paging between surahs does not
+  // remount this hook, so the only way to model it is to rerender with a
+  // different one.
+  let props = { reciter: reciterId, surahId: surah };
   const hook = renderHook(
-    ({ reciter }: { reciter: string }) =>
-      useRecitation(surah, ayahCount, reciter, {
+    ({ reciter, surahId }: { reciter: string; surahId: number }) =>
+      useRecitation(surahId, ayahCount, reciter, {
         surahName: 'Al-Fatihah',
         createDriver: player.create,
       }),
-    { initialProps: { reciter: reciterId } },
+    { initialProps: props },
   );
   if (continuous) act(() => hook.result.current.setContinuous(true));
 
@@ -519,7 +556,18 @@ function renderRecitation({
     skipNext: () => act(() => hook.result.current.skipNext()),
     skipPrevious: () => act(() => hook.result.current.skipPrevious()),
     /** The setting changing under the hook, the way the reciter sheet does. */
-    changeReciter: (reciter: string) => act(() => hook.rerender({ reciter })),
+    changeReciter: (reciter: string) =>
+      act(() => {
+        props = { ...props, reciter };
+        hook.rerender(props);
+      }),
+    /** The reader paging to another surah, which is a state change and not a
+     *  remount. */
+    changeSurah: (surahId: number) =>
+      act(() => {
+        props = { ...props, surahId };
+        hook.rerender(props);
+      }),
     unmount: hook.unmount,
   };
 }

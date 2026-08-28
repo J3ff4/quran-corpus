@@ -5,6 +5,7 @@ import SurahRoute from '../../app/surah/[surahId]';
 import { deferred } from '../testing/deferred';
 
 const mocks = vi.hoisted(() => ({
+  params: { surahId: '2' } as Record<string, string>,
   setBookmark: vi.fn(),
   recordReadingPosition: vi.fn(),
   recordReadingDay: vi.fn(),
@@ -14,7 +15,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('expo-router', () => ({
-  useLocalSearchParams: () => ({ surahId: '2' }),
+  useLocalSearchParams: () => mocks.params,
 }));
 
 vi.mock('@quran-corpus/mobile-data', () => ({
@@ -43,16 +44,25 @@ vi.mock('@/components/SurahReader', async () => {
     // `loadWords` is destructured and driven, not dropped: a function prop a
     // mock omits renders nothing, so no assertion in this file could ever see
     // it and the route's own loader would sit unexercised (F1).
-    SurahReader: ({ onToggleBookmark, onReadingAyah, bookmarkedAyahs, loadWords }: {
+    SurahReader: ({ onToggleBookmark, onReadingAyah, bookmarkedAyahs, loadWords, prevSurahId, nextSurahId, onPageSurah }: {
       onToggleBookmark: (ayahNumber: number) => void;
       onReadingAyah?: (ayahNumber: number) => void;
       bookmarkedAyahs: Set<number>;
       loadWords: (ayahId: number) => Promise<unknown[]>;
+      prevSurahId?: number | null;
+      nextSurahId?: number | null;
+      onPageSurah?: (surahId: number, side: 'prev' | 'next') => void;
     }) =>
       React.createElement(
         'div',
         null,
         React.createElement('span', null, 'reader-content'),
+        React.createElement('span', null, `adjacent:${prevSurahId ?? 'none'}/${nextSurahId ?? 'none'}`),
+        React.createElement(
+          'button',
+          { onClick: () => nextSurahId && onPageSurah?.(nextSurahId, 'next') },
+          'page next',
+        ),
         React.createElement('span', null, `bookmarked:${[...bookmarkedAyahs].sort((a, b) => a - b).join(',')}`),
         React.createElement('button', { onClick: () => onToggleBookmark(255) }, 'bookmark'),
         React.createElement('button', { onClick: () => onToggleBookmark(257) }, 'bookmark other'),
@@ -106,6 +116,32 @@ vi.mock('react-native', async () => {
     ActivityIndicator: () => React.createElement('span', null, 'loading'),
     Text: ({ children }: { children?: React.ReactNode }) => React.createElement('span', null, children),
     View: ({ children }: { children?: React.ReactNode }) => React.createElement('div', null, children),
+    // Reached since the route pages between surahs: useEntryPager asks
+    // useReducedMotion which way the page turn should travel, and that reads
+    // the OS flag.
+    AccessibilityInfo: {
+      isReduceMotionEnabled: () => Promise.resolve(false),
+      addEventListener: () => ({ remove: () => {} }),
+    },
+  };
+});
+
+// The page turn is a layout animation on a view that wraps the whole reader.
+// The real package's JS entry pulls in a worklets runtime jsdom has no
+// counterpart for; nothing here asserts on the animation, only that the reader
+// still renders inside it.
+vi.mock('react-native-reanimated', async () => {
+  const React = await import('react');
+  const View = ({ children }: { children?: React.ReactNode }) =>
+    React.createElement('div', null, children);
+  return {
+    default: { View, createAnimatedComponent: (Component: unknown) => Component },
+    FadeIn: { duration: () => ({}) },
+    FadeOut: { duration: () => ({}) },
+    SlideInLeft: { duration: () => ({}) },
+    SlideInRight: { duration: () => ({}) },
+    SlideOutLeft: { duration: () => ({}) },
+    SlideOutRight: { duration: () => ({}) },
   };
 });
 
@@ -123,6 +159,39 @@ describe('SurahRoute', () => {
     mocks.getSurahReader.mockResolvedValue(readerFixture);
     mocks.getWordsForAyah.mockReset();
     mocks.getWordsForAyah.mockResolvedValue([]);
+    mocks.params = { surahId: '2' };
+  });
+
+  it('offers the surah either side, and neither past the ends of the mushaf', async () => {
+    render(<SurahRoute />);
+    expect(await screen.findByText('adjacent:1/3')).toBeTruthy();
+
+    cleanup();
+    mocks.params = { surahId: '1' };
+    render(<SurahRoute />);
+    expect(await screen.findByText('adjacent:none/2')).toBeTruthy();
+
+    cleanup();
+    mocks.params = { surahId: '114' };
+    render(<SurahRoute />);
+    // D47: no wrapping. 115 is not a surah, and an arrow offering it would
+    // open a reader that can only fail to load.
+    expect(await screen.findByText('adjacent:113/none')).toBeTruthy();
+  });
+
+  it('pages to the next surah without navigating', async () => {
+    render(<SurahRoute />);
+    await screen.findByText('reader-content');
+
+    fireEvent.click(screen.getByText('page next'));
+
+    // The surah changes in place (D48): a new load, no push. Pushing would
+    // grow the back stack, so leaving five surahs later would take five
+    // presses.
+    await waitFor(() =>
+      expect(mocks.getSurahReader).toHaveBeenLastCalledWith(expect.anything(), 3, 'en'),
+    );
+    expect(await screen.findByText('adjacent:2/4')).toBeTruthy();
   });
 
   it('retranslates a load failure when the UI language changes', async () => {

@@ -93,4 +93,34 @@ describe('ReaderHeader', () => {
 
     expect(screen.getByTestId('reader-title').textContent).toBe('Al-Baqarah');
   });
+
+  it('pages to the next surah', () => {
+    const onPageSurah = vi.fn();
+    renderHeader({ prevSurahId: 1, nextSurahId: 3, onPageSurah });
+
+    fireEvent.click(screen.getByTestId('surah-next'));
+
+    expect(onPageSurah).toHaveBeenCalledWith(3, 'next');
+  });
+
+  it('dims the chevron at the ends of the mushaf rather than hiding it', () => {
+    const onPageSurah = vi.fn();
+    renderHeader({ prevSurahId: null, nextSurahId: 2, onPageSurah });
+
+    fireEvent.click(screen.getByTestId('surah-previous'));
+
+    // D47: disabled, not hidden. An arrow that vanishes slides the other one
+    // under the thumb, and TalkBack loses the control entirely.
+    expect(onPageSurah).not.toHaveBeenCalled();
+    expect(screen.getByTestId('surah-previous')).toBeTruthy();
+    expect(screen.getByTestId('surah-next')).toBeTruthy();
+  });
+
+  it('draws no surah chevrons at all when the screen cannot page', () => {
+    renderHeader();
+
+    // The dictionary reaches this header through no path today, but a header
+    // with two dead controls is worse than one without them.
+    expect(screen.queryByTestId('surah-previous')).toBeNull();
+  });
 });

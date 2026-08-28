@@ -82,6 +82,10 @@ interface SurahReaderProps {
   onToggleBookmark: (ayahNumber: number) => void;
   onToggleAudio: (ayahNumber: number) => void;
   onReadingAyah?: (ayahNumber: number) => void;
+  /** Forwarded to the header's surah chevrons. Omitted draws none. */
+  prevSurahId?: number | null;
+  nextSurahId?: number | null;
+  onPageSurah?: (surahId: number, side: 'prev' | 'next') => void;
 }
 
 // Ayah cards are variable height (Arabic runs wrap differently per ayah), so
@@ -179,6 +183,12 @@ export function SurahReader({
   onToggleBookmark,
   onToggleAudio,
   onReadingAyah,
+  // Defaulted rather than forwarded as undefined: exactOptionalPropertyTypes
+  // rejects an explicit undefined for an optional prop, and null is what the
+  // header already reads as "no surah that way".
+  prevSurahId = null,
+  nextSurahId = null,
+  onPageSurah,
 }: SurahReaderProps) {
   const theme = useThemeColors();
   const arabicSizes = useArabicSizes();
@@ -272,6 +282,9 @@ export function SurahReader({
           mode={readerMode}
           onChangeMode={onChangeReaderMode}
           uiLocale={uiLocale}
+          prevSurahId={prevSurahId}
+          nextSurahId={nextSurahId}
+          {...(onPageSurah ? { onPageSurah } : {})}
           onBack={() => {
             closeSheet();
             navigation.goBack();
@@ -312,6 +325,9 @@ export function SurahReader({
     onChangeReaderMode,
     data.surah.id,
     data.surah.name_translit,
+    prevSurahId,
+    nextSurahId,
+    onPageSurah,
   ]);
 
   const onScroll = useCallback(
