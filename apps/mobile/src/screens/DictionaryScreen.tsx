@@ -250,7 +250,8 @@ export function DictionaryScreen() {
       //
       // The needle is folded once here, not once per row -- the haystack was
       // folded when the payload landed. matchesRootQuery holds the three arms
-      // so this screen and the web browser cannot drift apart.
+      // themselves; how they compose with the letter filter and the sort is
+      // this screen's business, and web now composes them the same way.
       const qf = foldRootArabic(q);
       return ordered.freq.filter((root) => matchesRootQuery(root, q, qf));
     }
@@ -398,25 +399,34 @@ export function DictionaryScreen() {
                       gap: 8,
                     }}
                   >
-                    <View
-                      accessibilityRole="toolbar"
-                      accessibilityLabel={t(uiLocale, 'dictionary.sortFilter')}
-                      style={{ flexDirection: 'row', gap: 8 }}
-                    >
-                      {(['alpha', 'freq'] as const).map((option) => (
-                        <FilterChip
-                          key={option}
-                          value={option}
-                          testID={`dictionary-sort-${option}`}
-                          label={t(
-                            uiLocale,
-                            option === 'alpha' ? 'dictionary.sortAlpha' : 'dictionary.sortFreq',
-                          )}
-                          selected={sort === option}
-                          onSelect={setSortAndClearLetter}
-                        />
-                      ))}
-                    </View>
+                    {/* Hidden while searching, for the same reason the letter
+                        grid above is: a query fixes the order (frequency,
+                        always), so a toggle claiming to set it would sit there
+                        with "Alphabetical" lit over a frequency-ordered list
+                        and do nothing when tapped. The stored preference is
+                        untouched and comes back with the grid when the box
+                        empties. */}
+                    {searching ? null : (
+                      <View
+                        accessibilityRole="toolbar"
+                        accessibilityLabel={t(uiLocale, 'dictionary.sortFilter')}
+                        style={{ flexDirection: 'row', gap: 8 }}
+                      >
+                        {(['alpha', 'freq'] as const).map((option) => (
+                          <FilterChip
+                            key={option}
+                            value={option}
+                            testID={`dictionary-sort-${option}`}
+                            label={t(
+                              uiLocale,
+                              option === 'alpha' ? 'dictionary.sortAlpha' : 'dictionary.sortFreq',
+                            )}
+                            selected={sort === option}
+                            onSelect={setSortAndClearLetter}
+                          />
+                        ))}
+                      </View>
+                    )}
                     {/* Label first, count second, the way Home's counters read.
                         The mockup's "1,642 roots" would be "1 roots" the moment
                         a search isolates one -- and "1 корней" in Russian,

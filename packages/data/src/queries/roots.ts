@@ -212,27 +212,49 @@ export async function getRootsByFrequency(db: QueryClient, limit = 200): Promise
   return res.rows.map(rowToRoot);
 }
 
-/** The server-side twin of the client filter in both dictionaries: same three
- *  arms, same meaning source (`root_definitions`, per #31 — see
- *  `getRootSearchList`), same `MEANING_MIN_CHARS` floor, ordered by frequency
- *  so the roots a reader is likeliest to want lead the results. */
+/** Escapes the LIKE metacharacters in a user-supplied needle, for a statement
+ *  that declares `ESCAPE '\\'`. SQLite treats a backslash as an ordinary
+ *  character in string literals, so it is only special because the statement
+ *  says it is. `%` and `_` must be escaped, and the escape character itself
+ *  first, or an input ending in a backslash escapes the closing wildcard. */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
+/** SQL search over the same three arms `matchesRootQuery` filters with: root
+ *  spelling, Buckwalter, and meaning from `root_definitions` (per #31 — see
+ *  `getRootSearchList`), ordered by frequency.
+ *
+ *  Nothing in this repo calls it — both dictionaries ship the whole root list
+ *  and filter it in memory, so the arms that run in front of a reader are
+ *  `matchesRootQuery`'s. It stays exported for a caller that has to search
+ *  without shipping the list (the documented lever for the web payload), and
+ *  the shared `MEANING_MIN_CHARS` is what keeps its floor from drifting away
+ *  from theirs. */
 export async function searchRoots(db: QueryClient, q: string): Promise<Root[]> {
-  const like = `%${q}%`;
+  // Trimmed once, here, and used for every arm and for the floor test alike.
+  // Gating on `q.trim()` while binding raw `q` let `'  mercy  '` turn the
+  // meaning arm on and then match nothing with it.
+  const needle = q.trim();
+  // `%` and `_` are LIKE metacharacters, so a reader searching for a literal
+  // one would otherwise get a wildcard. Parameter binding stops them reaching
+  // SQL as syntax; it does not stop them being read as patterns.
+  const like = `%${escapeLike(needle)}%`;
   // Arabic is matched on the folded form of BOTH sides: the stored spelling is
   // corpus orthography (`أرض`) but most keyboards produce bare alef first, and
   // a pasted root may still carry inter-letter spaces.
-  const arabicLike = `%${foldRootArabic(q)}%`;
+  const arabicLike = `%${escapeLike(foldRootArabic(needle))}%`;
   // Below the floor the meaning arm is dropped from the statement entirely
   // rather than passed a needle that matches everything. The two fragments are
-  // string literals chosen by a boolean; `q` itself only ever reaches SQL as a
-  // bound parameter.
-  const meaning = q.trim().length >= MEANING_MIN_CHARS;
+  // string literals chosen by a boolean; the needle itself only ever reaches
+  // SQL as a bound parameter.
+  const meaning = needle.length >= MEANING_MIN_CHARS;
   const res = await db.execute({
     sql: `SELECT DISTINCT r.* FROM roots r
           ${meaning ? 'LEFT JOIN root_definitions d ON d.root_id = r.id' : ''}
-          WHERE r.root_buckwalter LIKE ?
-             OR ${foldRootArabicSql('r.root_arabic')} LIKE ?
-             ${meaning ? 'OR d.definition LIKE ?' : ''}
+          WHERE r.root_buckwalter LIKE ? ESCAPE '\\'
+             OR ${foldRootArabicSql('r.root_arabic')} LIKE ? ESCAPE '\\'
+             ${meaning ? `OR d.definition LIKE ? ESCAPE '\\'` : ''}
           ORDER BY r.occurrence_count DESC LIMIT 100`,
     args: meaning ? [like, arabicLike, like] : [like, arabicLike],
   });

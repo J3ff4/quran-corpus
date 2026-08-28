@@ -88,6 +88,43 @@ describe('DictionaryBrowser', () => {
     expect(texts[1]).toContain('س م و');
   });
 
+  it('bypasses an active letter while searching, and restores it when the box empties', () => {
+    // Intersecting a letter with a query filtered invisibly: the grid is hidden
+    // while searching, so a reader who had narrowed to ش and then typed would
+    // get "No roots found." with nothing on screen explaining why. Mobile has
+    // always bypassed the letter here; this is web catching up.
+    render(<DictionaryBrowser roots={roots} counts={counts} />);
+    fireEvent.click(screen.getByRole('button', { name: 'ش' }));
+    expect(rowsOrder()).toHaveLength(1);
+
+    const box = screen.getByRole('searchbox', { name: /search/i });
+    // `book` is filed under ك, not the selected ش.
+    fireEvent.change(box, { target: { value: 'book' } });
+    expect(rowsOrder()).toHaveLength(1);
+    expect(screen.getByText('ك ت ب')).toBeInTheDocument();
+
+    // Bypassed, not cleared.
+    fireEvent.change(box, { target: { value: '' } });
+    expect(rowsOrder()).toHaveLength(1);
+    expect(screen.getByText('ش أ م')).toBeInTheDocument();
+  });
+
+  it('hides the letter grid and the sort toggle while a query is running', () => {
+    // A query fixes both scope and order, so leaving "Alphabetical" lit over a
+    // frequency-ordered list is the control describing something the list is
+    // not doing — and clicking it would change nothing on screen.
+    render(<DictionaryBrowser roots={roots} counts={counts} />);
+    expect(screen.getByRole('button', { name: /alphabetical/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ش' })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole('searchbox', { name: /search/i }), {
+      target: { value: 'book' },
+    });
+    expect(screen.queryByRole('button', { name: /alphabetical/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /by frequency/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'ش' })).toBeNull();
+  });
+
   // The branch stores corpus's hamza seat (ArD -> أرض). A bare-alif keyboard
   // spelling must still find it — same folding the server-side searchRoots does.
   it('typing folds the hamza seat (ارض finds أرض)', () => {

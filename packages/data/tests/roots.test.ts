@@ -298,6 +298,19 @@ describe('roots queries', () => {
     expect((await searchRoots(db, 'hed')).map((r) => r.root_buckwalter)).toEqual(['$Am']);
     expect(await searchRoots(db, 'ed')).toEqual([]);
   });
+  it('searchRoots trims the query before every arm, not just the floor test', async () => {
+    // The floor gated on `q.trim()` while the LIKE pattern bound raw `q`, so a
+    // padded needle switched the meaning arm on and then matched nothing with
+    // it — the client filter, which trims first, found the root.
+    expect((await searchRoots(db, '  calamity  ')).map((r) => r.root_buckwalter)).toEqual(['$Am']);
+  });
+  it('searchRoots treats LIKE wildcards in the query as literal characters', async () => {
+    // Binding the needle as a parameter keeps it out of the SQL as syntax; it
+    // does not stop LIKE reading `%` and `_` as patterns. `%` matched the whole
+    // fixture, and `c_lamity` matched a definition containing neither string.
+    expect(await searchRoots(db, '%')).toEqual([]);
+    expect(await searchRoots(db, 'c_lamity')).toEqual([]);
+  });
   it('searchRoots orders by occurrence count, most used first', async () => {
     // Every root's Buckwalter or Arabic contains one of these, so the whole
     // fixture comes back and only the order is under test: ktb 319, smw 5, $Am 3.

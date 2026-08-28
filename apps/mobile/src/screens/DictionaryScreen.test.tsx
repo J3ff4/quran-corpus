@@ -249,6 +249,22 @@ describe('DictionaryScreen', () => {
     expect(screen.getAllByTestId('dictionary-row')).toHaveLength(1);
   });
 
+  it('hides the sort toggle while a query is running, alongside the letter grid', async () => {
+    // The query forces the frequency order, so an "Alphabetical" chip left
+    // rendered `selected` would be describing an order the list is not in --
+    // and tapping it would change nothing on screen.
+    await renderLoaded();
+    expect(screen.getByTestId('dictionary-sort-alpha')).toBeTruthy();
+
+    fireEvent.change(screen.getByTestId('dictionary-search'), { target: { value: 'ارض' } });
+    expect(screen.queryByTestId('dictionary-sort-alpha')).toBeNull();
+    expect(screen.queryByTestId('dictionary-sort-freq')).toBeNull();
+
+    // Back with the grid once the box empties; the preference was never touched.
+    fireEvent.change(screen.getByTestId('dictionary-search'), { target: { value: '' } });
+    expect(screen.getByTestId('dictionary-sort-alpha')).toBeTruthy();
+  });
+
   it('clears the search box from the button, which only exists when there is text', async () => {
     await renderLoaded();
     const box = screen.getByTestId('dictionary-search');

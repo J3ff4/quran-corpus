@@ -75,10 +75,17 @@ export function DictionaryBrowser({ roots, counts }: DictionaryBrowserProps) {
     setLimit(PAGE);
   }, [query, sort, letter]);
 
+  const searching = query.trim().length > 0;
+
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     let list = roots;
-    if (letter) list = list.filter((r) => rootFirstLetter(r.root_arabic) === letter);
+    // The letter is bypassed while a query is running, not intersected with it
+    // — mobile has always done this, and the letter grid is hidden below for
+    // the same reason: narrowing to ك and searching `mercy` filtered
+    // invisibly, against a control the reader could no longer see. Bypassed
+    // rather than cleared, so emptying the box puts them back where they were.
+    if (letter && !q) list = list.filter((r) => rootFirstLetter(r.root_arabic) === letter);
     if (q) {
       // Three arms, shared with mobile and with server-side searchRoots: the
       // Arabic one folds both sides (hamza seat + inter-letter spaces) so `ارض`
@@ -96,11 +103,19 @@ export function DictionaryBrowser({ roots, counts }: DictionaryBrowserProps) {
         ),
       );
     }
-    // A query always ranks by frequency, whatever the toggle says: matches come
-    // from anywhere in the corpus, and hijāʾī order buries the root a reader
-    // most likely meant among rarer homonyms — `mercy` puts رحم (339
-    // occurrences) below roots the Quran uses twice. Without a query the toggle
-    // is the only ordering signal there is, so it decides.
+    // A query always ranks by frequency: matches come from anywhere in the
+    // corpus, and hijāʾī order buries the root a reader most likely meant among
+    // rarer homonyms — `mercy` would put رحم (339 occurrences) below roots the
+    // Quran uses twice.
+    //
+    // Frequency is corpus frequency, not match quality, so it is only reliably
+    // right for the root and Buckwalter arms. On the meaning arm a root whose
+    // Lane entry mentions the word in passing outranks the root that means it:
+    // `camel` matches 44 roots and puts جمل thirteenth, behind بين ("she-camel",
+    // 523). Ranking that properly needs a match score or FTS, not a different
+    // sort key. Without a query the toggle is the only ordering signal there
+    // is, so it decides — and while there is one it is hidden rather than left
+    // claiming an order it no longer sets.
     return [...list].sort((a, b) =>
       sort === 'freq' || q
         ? b.occurrence_count - a.occurrence_count ||
@@ -122,37 +137,45 @@ export function DictionaryBrowser({ roots, counts }: DictionaryBrowserProps) {
         />
       </form>
 
-      <AlphabetGrid
-        counts={counts}
-        {...(letter ? { activeLetter: letter } : {})}
-        onSelect={(l) => setLetter((prev) => (prev === l ? undefined : l))}
-      />
+      {/* Both controls are hidden while a query is running: the query fixes the
+          scope (whole corpus) and the order (frequency), so a lit letter cell
+          and a lit "Alphabetical" would each be describing something the list
+          is not doing. Matches mobile, which hides its grid on the same flag. */}
+      {searching ? null : (
+        <>
+          <AlphabetGrid
+            counts={counts}
+            {...(letter ? { activeLetter: letter } : {})}
+            onSelect={(l) => setLetter((prev) => (prev === l ? undefined : l))}
+          />
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        {/* Switching sort clears the letter filter — matches the original
-            server-driven behavior (phase-08D spec: sort links omitted
-            `letter`), not just a side effect of query-param plumbing. */}
-        <button
-          type="button"
-          onClick={() => {
-            setSort('alpha');
-            setLetter(undefined);
-          }}
-          className={`${toggleBase} ${sort === 'alpha' ? toggleActive : toggleIdle}`}
-        >
-          Alphabetical
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setSort('freq');
-            setLetter(undefined);
-          }}
-          className={`${toggleBase} ${sort === 'freq' ? toggleActive : toggleIdle}`}
-        >
-          By frequency
-        </button>
-      </div>
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            {/* Switching sort clears the letter filter — matches the original
+                server-driven behavior (phase-08D spec: sort links omitted
+                `letter`), not just a side effect of query-param plumbing. */}
+            <button
+              type="button"
+              onClick={() => {
+                setSort('alpha');
+                setLetter(undefined);
+              }}
+              className={`${toggleBase} ${sort === 'alpha' ? toggleActive : toggleIdle}`}
+            >
+              Alphabetical
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSort('freq');
+                setLetter(undefined);
+              }}
+              className={`${toggleBase} ${sort === 'freq' ? toggleActive : toggleIdle}`}
+            >
+              By frequency
+            </button>
+          </div>
+        </>
+      )}
 
       <div className="mb-6 flex flex-wrap gap-2">
         <Link href="/dictionary/lemma-frequency" className={toolLink}>

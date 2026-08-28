@@ -8,11 +8,21 @@
 /** Shortest query the meaning arm will answer.
  *
  *  `gloss_blob` is dictionary prose — Hans Wehr's concise glosses plus Lane's
- *  full classical entries, up to 1479 characters for one root — so a one- or
- *  two-letter needle is inside nearly every root: `he` occurs in 1019 of the
- *  corpus's 1642 blobs, and a filter that keeps 62% of the list is not a
- *  filter. The root and Buckwalter arms have no such problem (they match short
- *  strings against short strings, `qw` finds قول), so they keep matching from
+ *  full classical entries, up to 1479 characters for one root — matched as a
+ *  plain substring, so a short needle is inside nearly every root: `he` hits
+ *  1019 of the corpus's 1642 blobs (62%).
+ *
+ *  Three is where the words a reader actually searches for become selective —
+ *  `sun` 2.9%, `eye` 2.1%, `camel` 2.7% — not where the noise stops. English
+ *  function-word fragments stay useless at this length (`ing` 53%, `the` 46%,
+ *  `and` 34%), but those only ever appear in passing while a longer word is
+ *  being typed, and raising the floor to four would cost the short content
+ *  words permanently. The real fix for the fragments is word-boundary matching
+ *  or FTS, which is a change to how the arm matches, not to how long it waits;
+ *  a length gate cannot make `the` mean "theft".
+ *
+ *  The root and Buckwalter arms have no such problem — they match short
+ *  strings against short strings, `qw` finds قول — so they keep matching from
  *  the first character and only the meaning arm waits. */
 export const MEANING_MIN_CHARS = 3;
 
