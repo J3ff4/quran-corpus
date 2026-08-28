@@ -48,6 +48,55 @@ stored marker fails open the same way the LIKE scope did — revisit if this is 
 hosted somewhere that cold-starts per request. Ten mutation checks, all killed; one
 survived first and exposed a vacuous assertion in a test written minutes earlier.
 
+### 🐛 DICTIONARY MEANING SEARCH — MERGED 2026-08-28 as `a131804` (PR #36)
+Issue 31. Meaning arm read `root_forms.gloss`, NULL for all 4657 rows in every
+shipped DB → matched nothing corpus-wide, web + mobile, since before M6g.
+`mercy` returned 0 roots.
+
+Haystack now = `root_definitions`, **all sources not the top-ranked one**: رحم's
+Hans Wehr entry is "uterus; womb; relationship, kinship", only Lane says mercy.
+Live: `mercy` 0→8 roots رحم first, `compassion` 0→9 رحم first, `qwl` unchanged.
+
+Two consequences, both deliberate:
+- **3-char floor on the meaning arm** (`MEANING_MIN_CHARS`). Prose matched as
+  plain substring, so `he` hits 1019/1642 blobs. Three = where content words get
+  selective (`sun` 2.9%, `eye` 2.1%). Root/Buckwalter arms unaffected, `qw` still
+  finds قول.
+- **A query ranks by occurrence count**, whatever the sort toggle says.
+
+Three arms shared in `packages/data/src/text/rootSearch.ts` (`matchesRootQuery`) —
+zero runtime imports, so no client-bundle or Metro edge. Both apps import it.
+
+Second commit = the §5 `/code-review` pass, 7 findings, 5 fixed:
+`searchRoots` gated on `q.trim()` but bound raw `q` (padded needle armed the
+meaning arm then matched nothing); `%`/`_` reached LIKE unescaped as wildcards
+(now `ESCAPE '\'`); sort toggle stayed lit over an order it no longer set (hidden
+while searching, both apps); web intersected letter+query while mobile bypassed
+(web bypasses now, both hide the grid); 3 overclaiming comments corrected.
+
+2 declined: re-ranking meaning matches by match quality (frequency is corpus
+frequency — `camel` puts جمل 13th behind بين "she-camel" 523 — but popular-first
+is the specified design; real fix = match score or FTS), and deleting the
+caller-less `searchRoots` (exported API + the documented payload lever).
+
+**Residue:** substring match over Lane prose is noisy — `light` 79 roots led by
+بين/أرض ("come to light", "alighting"). Word-boundary matching measured (79→42,
+نور second, zero recall lost) and NOT shipped: `searchRoots`'s SQL LIKE can't
+mirror it, and a divergent 2nd implementation is what `rootSearch.ts` prevents.
+Logged against issue 31's thread, not half-built.
+
+**Payload:** web dictionary page ~150KB → 570,620 bytes of JSON (~120KB gzip),
+396KB of it prose over 3221 definition rows, re-serialized per hit
+(`force-dynamic`). Lever = debounced server-side meaning arm, not a trimmed blob.
+
+Gate: type-check 6/6, lint 2/2, 424 data + 484 web + 657 mobile. 10 mutations,
+each killed exactly its own test. CodeRabbit posted a GREEN status that was the
+**skip** signature ("does not receive automatic review"), 0 findings — advisory,
+gated nothing.
+
+**DEVICE GATE UNRUN** (§10): type `mercy` in the dictionary box on hardware,
+confirm sort chips vanish while searching and return when the box clears.
+
 ### 🎨 M6 GLASS REDESIGN — M6a-M6g merged; M6h next (2026-08-28)
 Spec + 9 sub-phase plans: `docs/plans/phase-m6-glass-redesign.md` (+ `phase-m6a..i`).
 40 owner decisions recorded there. §5 fires on M6b, M6c, M6f, M6h.
