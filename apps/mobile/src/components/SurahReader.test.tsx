@@ -74,16 +74,24 @@ vi.mock('react-native-reanimated', async () => {
   };
 });
 
-vi.mock('expo-router', () => ({
-  useNavigation: () => ({ setOptions: mocks.setOptions }),
-  router: { push: mocks.push },
-  // Captured rather than run: the reader is focused again when the
-  // word-by-word screen it pushed is popped, and there is no navigator here to
-  // produce that event.
-  useFocusEffect: (callback: () => void) => {
-    mocks.focusEffect = callback;
-  },
-}));
+vi.mock('expo-router', async () => {
+  const { useEffect } = await import('react');
+  return {
+    useNavigation: () => ({ setOptions: mocks.setOptions }),
+    router: { push: mocks.push },
+    // Run on mount AND captured for later. The real hook fires on mount too,
+    // and a double that only captured hid the case the reader has to ignore --
+    // a mount finding a stale position in the module singleton. Calling the
+    // captured one afterwards is then a genuine RE-focus, which is what coming
+    // back from the word-by-word screen is.
+    useFocusEffect: (callback: () => void) => {
+      mocks.focusEffect = callback;
+      useEffect(() => {
+        callback();
+      }, [callback]);
+    },
+  };
+});
 
 // Mocked rather than exercised through the real singleton: these assertions are
 // about what the reader does with a position, and the store has its own suite.
@@ -1205,6 +1213,18 @@ describe('SurahReader shared reading position', () => {
     act(() => mocks.focusEffect?.());
 
     expect(mocks.scrollToIndex).toHaveBeenCalledWith({ index: 6, animated: false });
+  });
+
+  it('honours the ayah it was opened with over a stale shared position', () => {
+    // The store is a module singleton that outlives the screen: reading 2:200,
+    // backing out and then tapping a bookmark for 2:5 finds 200 still in it.
+    // The mount's focus must not act on that -- the anchor has already been
+    // seeded from the route, and the route is what the reader asked for.
+    mocks.getReaderPosition.mockReturnValue(200);
+    render(<SurahReader {...baseProps(readerData(250))} initialAyahNumber={5} />);
+
+    expect(mocks.scrollToIndex).toHaveBeenCalledWith({ index: 4, animated: false });
+    expect(mocks.scrollToIndex).not.toHaveBeenCalledWith({ index: 199, animated: false });
   });
 
   it('does not re-land when the position is the ayah already on screen', () => {

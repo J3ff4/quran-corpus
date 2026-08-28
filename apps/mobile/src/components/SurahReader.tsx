@@ -211,6 +211,8 @@ export function SurahReader({
   // FlatList from outside the React tree off a ref that never re-reads props,
   // so it cannot see the state.
   const positionedRef = useRef(false);
+  // Whether this mount has been focused before -- see the focus effect below.
+  const focusedRef = useRef(false);
   const [positioned, setPositioned] = useState(false);
 
   const [languageOpen, setLanguageOpen] = useState(false);
@@ -451,6 +453,17 @@ export function SurahReader({
   // on screen is what keeps a focus from re-landing the list on itself.
   useFocusEffect(
     useCallback(() => {
+      // Re-focus only. useFocusEffect also fires on mount, and the shared
+      // position is a module singleton that outlives this screen -- so on the
+      // first pass it holds wherever this surah was last read, which is not
+      // where the caller asked to go. Reading 2:200, backing out and then
+      // tapping a bookmark for 2:5 opened 2:5 and immediately jumped to 2:200.
+      // The anchor above has already been seeded from the route by now, and
+      // that is the seed a fresh mount is supposed to honour.
+      if (!focusedRef.current) {
+        focusedRef.current = true;
+        return;
+      }
       const position = getReaderPosition(data.surah.id);
       if (position === null || position === lastVisibleRef.current) return;
       setAnchor((current) => ({ ...current, ayah: position, nonce: current.nonce + 1 }));
