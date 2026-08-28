@@ -22,7 +22,7 @@ export {
 export { getAllSurahs, getSurahById } from './queries/surahs.js';
 export { getAyahsBySurah, getAyahWithWords } from './queries/ayahs.js';
 export { getJuzIndex, getPageIndex, getRevealedIndex } from './queries/browse.js';
-export type { JuzEntry, PageEntry, RevealedEntry } from './queries/browse.js';
+export type { JuzEntry, JuzSurahRange, PageEntry, RevealedEntry } from './queries/browse.js';
 export {
   getWordsByAyah,
   getWordsBySurah,
