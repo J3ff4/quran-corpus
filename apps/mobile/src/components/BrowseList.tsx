@@ -198,7 +198,13 @@ export function BrowseList({ items, sections }: BrowseListProps) {
             <Pressable
               testID={`browse-section-${section.title}`}
               accessibilityRole="button"
-              accessibilityLabel={section.title}
+              // The count is a non-focusable child of this button, so a screen
+              // reader announces the label and never reaches it. Appending the
+              // bare number rather than "86 surahs" keeps the announcement
+              // equal to what is on screen and needs no per-locale noun.
+              accessibilityLabel={
+                section.count === undefined ? section.title : `${section.title}, ${section.count}`
+              }
               accessibilityState={{ expanded: section.expanded !== false }}
               onPress={section.onToggle}
               // The 48dp floor is what makes a strip of small caps a thumb

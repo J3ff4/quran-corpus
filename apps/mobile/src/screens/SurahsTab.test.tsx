@@ -287,6 +287,19 @@ describe('SurahsTab', () => {
     expect(screen.getByTestId('browse-section-Meccan').textContent).toContain('1');
   });
 
+  it('announces the era count that the header button hides', async () => {
+    // The count renders as a non-focusable child of the header button, so a
+    // screen reader stops at the button's label and never reaches it. A
+    // collapsed era would then say nothing about how much it is hiding.
+    render(<SurahsTab />);
+    await screen.findByText('Al-Fatihah');
+    fireEvent.click(screen.getByTestId('segment-revealed'));
+
+    expect((await screen.findByTestId('browse-section-Meccan')).getAttribute('aria-label')).toBe(
+      'Meccan, 1',
+    );
+  });
+
   it('collapses one era without touching the other', async () => {
     render(<SurahsTab />);
     await screen.findByText('Al-Fatihah');
