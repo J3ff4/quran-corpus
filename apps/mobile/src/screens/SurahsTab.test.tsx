@@ -273,6 +273,59 @@ describe('SurahsTab', () => {
     expect(headers.map((header) => header.textContent)).toEqual(['Meccan', 'Medinan']);
   });
 
+  it('opens the revealed list with both eras expanded and counted', async () => {
+    render(<SurahsTab />);
+    await screen.findByText('Al-Fatihah');
+
+    fireEvent.click(screen.getByTestId('segment-revealed'));
+
+    // D43: exactly the list it already was, plus a chevron and a count.
+    expect(await screen.findByText('Al-Alaq')).toBeTruthy();
+    expect(screen.getByText('Al-Baqara')).toBeTruthy();
+    expect(screen.getByTestId('browse-section-Meccan').getAttribute('aria-expanded')).toBe('true');
+    // D45: one surah in each era in this fixture, and the header says so.
+    expect(screen.getByTestId('browse-section-Meccan').textContent).toContain('1');
+  });
+
+  it('collapses one era without touching the other', async () => {
+    render(<SurahsTab />);
+    await screen.findByText('Al-Fatihah');
+    fireEvent.click(screen.getByTestId('segment-revealed'));
+
+    fireEvent.click(await screen.findByTestId('browse-section-Meccan'));
+
+    expect(screen.queryByText('Al-Alaq')).toBeNull();
+    expect(screen.getByText('Al-Baqara')).toBeTruthy();
+    // The header survives its own collapse, or there is nothing to reopen.
+    expect(screen.getByTestId('browse-section-Meccan')).toBeTruthy();
+  });
+
+  it('reopens an era that is tapped again', async () => {
+    render(<SurahsTab />);
+    await screen.findByText('Al-Fatihah');
+    fireEvent.click(screen.getByTestId('segment-revealed'));
+    fireEvent.click(await screen.findByTestId('browse-section-Meccan'));
+    expect(screen.queryByText('Al-Alaq')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('browse-section-Meccan'));
+
+    expect(screen.getByText('Al-Alaq')).toBeTruthy();
+  });
+
+  it('forgets a collapsed era when the mode changes and comes back', async () => {
+    render(<SurahsTab />);
+    await screen.findByText('Al-Fatihah');
+    fireEvent.click(screen.getByTestId('segment-revealed'));
+    fireEvent.click(await screen.findByTestId('browse-section-Meccan'));
+    expect(screen.queryByText('Al-Alaq')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('segment-surah'));
+    fireEvent.click(screen.getByTestId('segment-revealed'));
+
+    // D44: nothing is persisted, and the mode arrives in its default state.
+    expect(await screen.findByText('Al-Alaq')).toBeTruthy();
+  });
+
   it('loads each mode once and keeps it while the tab stays mounted', async () => {
     render(<SurahsTab />);
     await screen.findByText('Al-Fatihah');

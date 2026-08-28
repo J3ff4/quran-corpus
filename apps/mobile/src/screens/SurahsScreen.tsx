@@ -68,6 +68,10 @@ export function SurahsScreen() {
   // component state and nowhere else -- leaving the mode resets it, and nothing
   // is persisted.
   const [openJuz, setOpenJuz] = useState<ReadonlySet<number>>(new Set());
+  // Which eras are *collapsed*, not which are open: D43 arrives with both
+  // expanded, so an empty set is the default and nothing has to be seeded when
+  // the rows land.
+  const [collapsedEras, setCollapsedEras] = useState<ReadonlySet<string>>(new Set());
   const [data, setData] = useState<Partial<BrowseData>>({});
   const [error, setError] = useState<string | null>(null);
 
@@ -116,6 +120,7 @@ export function SurahsScreen() {
   // only because they happen to be empty at both moments.
   const onChangeMode = useCallback((next: BrowseMode) => {
     setOpenJuz(new Set());
+    setCollapsedEras(new Set());
     setMode(next);
   }, []);
 
@@ -200,10 +205,29 @@ export function SurahsScreen() {
         onPress: () => openAyah(entry.surahId, 1),
       };
       if (current?.title === title) current.data.push(item);
-      else sections.push({ title, data: [item] });
+      else
+        sections.push({
+          title,
+          data: [item],
+          count: 0,
+          expanded: !collapsedEras.has(title),
+          onToggle: () =>
+            setCollapsedEras((currentSet) => {
+              const next = new Set(currentSet);
+              if (!next.delete(title)) next.add(title);
+              return next;
+            }),
+        });
     }
+    // Counted after the loop rather than incremented alongside each push: the
+    // count is the section's own length, and two places that both have to be
+    // right is one place too many.
+    for (const section of sections) section.count = section.data.length;
     return sections;
-  }, [data.revealed, uiLocale]);
+    // collapsedEras keys on the translated era title, which is also what the
+    // header renders. A language change clears every cached mode, so a stale
+    // key cannot outlive the label it was taken from.
+  }, [collapsedEras, data.revealed, uiLocale]);
 
   const options = useMemo(
     () =>
