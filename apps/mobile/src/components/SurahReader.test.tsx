@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   headerLayout: null as ((height: number) => void) | null,
   scrollToIndex: vi.fn(),
   scrollToOffset: vi.fn(),
+  getReaderPosition: vi.fn((_surahId: number) => null as number | null),
+  setReaderPosition: vi.fn((_surahId: number, _ayahNumber: number) => {}),
   push: vi.fn(),
   setOptions: vi.fn(),
   // Every worklet registered this render, not just the last: usePressScale
@@ -74,6 +76,13 @@ vi.mock('react-native-reanimated', async () => {
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ setOptions: mocks.setOptions }),
   router: { push: mocks.push },
+}));
+
+// Mocked rather than exercised through the real singleton: these assertions are
+// about what the reader does with a position, and the store has its own suite.
+vi.mock('@/data/readerPosition', () => ({
+  getReaderPosition: (surahId: number) => mocks.getReaderPosition(surahId),
+  setReaderPosition: (surahId: number, ayahNumber: number) => mocks.setReaderPosition(surahId, ayahNumber),
 }));
 
 // The sheet has its own suite; stubbed here so this one covers the wiring --
@@ -221,6 +230,8 @@ describe('SurahReader', () => {
     mocks.headerLayout = null;
     mocks.animatedStyles = [];
     mocks.reduceMotion = false;
+    mocks.getReaderPosition.mockReset().mockReturnValue(null);
+    mocks.setReaderPosition.mockReset();
   });
 
   afterEach(cleanup);
@@ -1086,6 +1097,89 @@ function withAyah1(surahId: number, textUthmani: string) {
   };
 }
 
+
+describe('SurahReader shared reading position', () => {
+  // Its own hooks: this is a sibling describe, so the suite's outer beforeEach
+  // does not reach it, and a scroll from the previous test leaks into the next
+  // assertion.
+  beforeEach(() => {
+    mocks.scrollToIndex.mockClear();
+    mocks.getReaderPosition.mockReset().mockReturnValue(null);
+    mocks.setReaderPosition.mockReset();
+  });
+
+  afterEach(cleanup);
+
+  it('records the first visible ayah as the shared position', () => {
+    const props = baseProps(readerData(10));
+    render(<SurahReader {...props} />);
+
+    mocks.onViewableItemsChanged?.({ viewableItems: [{ item: props.data.ayahs[3] }] });
+
+    // Surah 1 in this fixture; ayah 4 is the fourth row.
+    expect(mocks.setReaderPosition).toHaveBeenCalledWith(1, 4);
+  });
+
+  it('does not record an ayah the landing scroll is merely passing over', () => {
+    const props = baseProps(readerData(10));
+    render(<SurahReader {...props} initialAyahNumber={8} />);
+
+    mocks.onViewableItemsChanged?.({ viewableItems: [{ item: props.data.ayahs[2] }] });
+
+    // The rows visible mid-landing are wherever the list happens to be. The
+    // saved reading position is gated on exactly this, and a shared position
+    // written from an un-landed list would then re-land the reader on it.
+    expect(mocks.setReaderPosition).not.toHaveBeenCalled();
+  });
+
+  it('lands on the shared position when the reader mode changes', () => {
+    const props = baseProps(readerData(10));
+    const { rerender } = render(<SurahReader {...props} readerMode="translation" />);
+    expect(mocks.scrollToIndex).not.toHaveBeenCalled();
+
+    mocks.getReaderPosition.mockReturnValue(5);
+    rerender(<SurahReader {...props} readerMode="mushaf" />);
+
+    // The plate wrapping the list is MushafPlate in one mode and Fragment in
+    // the other, so React unmounts the FlatList and the replacement starts at
+    // offset 0. Without the re-anchor the reader lands on ayah 1.
+    expect(mocks.scrollToIndex).toHaveBeenCalledWith({ index: 4, animated: false });
+  });
+
+  it('does not re-anchor when the store has nothing for this surah', () => {
+    const props = baseProps(readerData(10));
+    const { rerender } = render(<SurahReader {...props} readerMode="translation" />);
+
+    rerender(<SurahReader {...props} readerMode="mushaf" />);
+
+    expect(mocks.scrollToIndex).not.toHaveBeenCalled();
+  });
+
+  it('re-lands on every switch, though the target ayah never changes', () => {
+    const props = baseProps(readerData(10));
+    const { rerender } = render(<SurahReader {...props} readerMode="translation" />);
+
+    mocks.getReaderPosition.mockReturnValue(5);
+    rerender(<SurahReader {...props} readerMode="mushaf" />);
+    expect(mocks.scrollToIndex).toHaveBeenCalledTimes(1);
+
+    rerender(<SurahReader {...props} readerMode="translation" />);
+
+    // The whole point of the nonce: index 4 both times, so an effect keyed only
+    // on the index would not re-run and the second list would sit at offset 0.
+    expect(mocks.scrollToIndex).toHaveBeenCalledTimes(2);
+    expect(mocks.scrollToIndex).toHaveBeenLastCalledWith({ index: 4, animated: false });
+  });
+
+  it('lands once per mount, not twice', () => {
+    render(<SurahReader {...baseProps(readerData(10))} initialAyahNumber={5} />);
+
+    // Resolving the anchor in an effect set state after the landing effect had
+    // already run against the seed, so every mount began a second sequence on
+    // top of the first.
+    expect(mocks.scrollToIndex).toHaveBeenCalledTimes(1);
+  });
+});
 
 function baseProps(data: ReturnType<typeof readerData>) {
   return {
