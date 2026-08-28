@@ -63,6 +63,11 @@ export function SurahsScreen() {
   const { uiLocale } = useAppSettings();
   const theme = useThemeColors();
   const [mode, setMode] = useState<BrowseMode>('surah');
+  // A Set, not a single open juz: an accordion that shuts one juz to open
+  // another hides a range the reader was comparing against. D44 keeps this in
+  // component state and nowhere else -- leaving the mode resets it, and nothing
+  // is persisted.
+  const [openJuz, setOpenJuz] = useState<ReadonlySet<number>>(new Set());
   const [data, setData] = useState<Partial<BrowseData>>({});
   const [error, setError] = useState<string | null>(null);
 
@@ -105,23 +110,61 @@ export function SurahsScreen() {
     setData({});
   }, [uiLocale]);
 
+  // Cleared here rather than in an effect keyed on `mode`: an
+  // effect would also fire on the first render and on a language change, and
+  // clearing them there is indistinguishable from clearing them on the switch
+  // only because they happen to be empty at both moments.
+  const onChangeMode = useCallback((next: BrowseMode) => {
+    setOpenJuz(new Set());
+    setMode(next);
+  }, []);
+
   const openSurah = useCallback((surah: SurahListItem) => {
     router.push({ pathname: '/surah/[surahId]', params: { surahId: String(surah.id) } });
   }, []);
 
-  const juzItems = useMemo<BrowseItem[]>(
-    () =>
-      (data.juz ?? []).map((entry) => ({
+  const juzItems = useMemo<BrowseItem[]>(() => {
+    const rows: BrowseItem[] = [];
+    for (const entry of data.juz ?? []) {
+      const expanded = openJuz.has(entry.juz);
+      rows.push({
         key: `juz-${entry.juz}`,
         testID: `browse-juz-${entry.juz}`,
         leading: String(entry.juz),
         title: `${t(uiLocale, 'browse.juzLabel')} ${entry.juz}`,
-        subtitle: `${entry.surahName} ${entry.startAyahNumber} · ${entry.ayahCount} ${t(uiLocale, 'surahList.ayahsSuffix')}`,
-        accessibilityLabel: `${t(uiLocale, 'browse.juzLabel')} ${entry.juz}, ${t(uiLocale, 'browse.opensAt')} ${entry.surahName} ${entry.startAyahNumber}`,
-        onPress: () => openAyah(entry.startSurahId, entry.startAyahNumber),
-      })),
-    [data.juz, uiLocale],
-  );
+        // The old "opens at" subtitle is gone: the ranges under the row say
+        // where the juz starts *and* where it ends, which that only half said.
+        // D45 keeps the total.
+        subtitle: `${entry.ayahCount} ${t(uiLocale, 'surahList.ayahsSuffix')}`,
+        accessibilityLabel: `${t(uiLocale, 'browse.juzLabel')} ${entry.juz}, ${entry.ayahCount} ${t(uiLocale, 'surahList.ayahsSuffix')}`,
+        expanded,
+        onPress: () =>
+          setOpenJuz((current) => {
+            const next = new Set(current);
+            // delete reports whether it removed anything, so this is one lookup
+            // rather than a has() and a branch that can drift from it.
+            if (!next.delete(entry.juz)) next.add(entry.juz);
+            return next;
+          }),
+      });
+
+      if (!expanded) continue;
+      for (const range of entry.ranges) {
+        rows.push({
+          key: `juz-${entry.juz}-surah-${range.surahId}`,
+          testID: `browse-juz-${entry.juz}-surah-${range.surahId}`,
+          leading: '',
+          indent: true,
+          title: `${range.surahName} ${range.firstAyahNumber}–${range.lastAyahNumber}`,
+          // 'Ayahs' rather than a fourth key saying the same word -- the
+          // word-by-word pager already carries it in all three locales.
+          accessibilityLabel: `${range.surahName}, ${t(uiLocale, 'wbw.rangeLabel')} ${range.firstAyahNumber}–${range.lastAyahNumber}`,
+          onPress: () => openAyah(range.surahId, range.firstAyahNumber),
+        });
+      }
+    }
+    return rows;
+  }, [data.juz, openJuz, uiLocale]);
 
   const pageItems = useMemo<BrowseItem[]>(
     () =>
@@ -179,7 +222,7 @@ export function SurahsScreen() {
         <SegmentedControl
           options={options}
           value={mode}
-          onChange={setMode}
+          onChange={onChangeMode}
           accessibilityLabel={t(uiLocale, 'browse.mode')}
         />
       </View>
