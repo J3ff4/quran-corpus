@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Text, View } from 'react-native';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 import type { Word } from '@quran-corpus/data/mobile';
+import { AdjacentNavButton } from '@/components/AdjacentNav';
 import { SegmentedControl } from '@/components/SegmentedControl';
 import { VersePicker } from '@/components/VersePicker';
 import { WbwDense } from '@/components/WbwDense';
@@ -18,6 +19,7 @@ import { openCorpusDb } from '@/data/openCorpusDb';
 import { setReaderPosition } from '@/data/readerPosition';
 import { useWordSummaryLoader } from '@/data/useWordSummaryLoader';
 import { t } from '@/i18n/uiStrings';
+import { useEntryPager } from '@/motion/entryPager';
 import { useAppSettings, type WbwDensity } from '@/settings/settingsStore';
 import { typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
@@ -51,16 +53,31 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
   // route, so a plain `useState(initialFrom)` keeps whatever page the reader
   // last paged to: opening surah 3's word-by-word after paging surah 2 to ayah
   // 21 lands on 3:21. The same staleness bit /dictionary/[root] on web.
-  const paramKey = `${surahId}:${initialFrom}`;
+  // The same pager the reader and the dictionary entries use: paging is state,
+  // not navigation (D48), so the prop stays on the surah this screen was
+  // *opened* with and this is the surah it is actually showing.
+  const pager = useEntryPager(surahId === null ? null : String(surahId));
+  const currentSurahId = pager.current === null ? null : Number(pager.current);
+
+  const paramKey = `${currentSurahId}:${initialFrom}`;
   const [page, setPage] = useState({ key: paramKey, from: initialFrom });
   if (page.key !== paramKey) setPage({ key: paramKey, from: initialFrom });
   const from = page.from;
   const setFrom = (next: number) => {
     setPage({ key: paramKey, from: next });
-    // D46: the reader re-lands here when this screen is popped. Guarded on
-    // surahId because the store is scoped by surah, and a null id has no
-    // position to publish.
-    if (surahId !== null) setReaderPosition(surahId, next);
+    // D46: the reader re-lands here when this screen is popped. Guarded on the
+    // surah because the store is scoped by it, and a null id has no position
+    // to publish.
+    if (currentSurahId !== null) setReaderPosition(currentSurahId, next);
+  };
+
+  const setSurah = (target: number, side: 'prev' | 'next') => {
+    pager.goTo(String(target), side);
+    // A new surah starts at its beginning: the range belongs to the surah it
+    // was read in, and Aal-Imran has no ayah 250. Written straight to the page
+    // rather than left to the key above, which only resets on a *param*
+    // change and this is not one.
+    setPage({ key: `${target}:${initialFrom}`, from: 1 });
   };
 
   const [wbw, setWbw] = useState<WbwScreenData | null>(null);
@@ -80,7 +97,7 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
     let cancelled = false;
 
     async function load() {
-      if (!surahId) {
+      if (!currentSurahId) {
         setError(t(uiLocale, 'reader.invalidSurah'));
         setLoading(false);
         return;
@@ -92,10 +109,10 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
       try {
         const corpusDb = await openCorpusDb();
         const client = createExpoSqliteClient(corpusDb as ExpoSqliteLike);
-        const data = await getWbwScreen(client, surahId, from);
+        const data = await getWbwScreen(client, currentSurahId, from);
         // Sequential: the gloss query is per surah and only worth issuing once
         // the range query has proved the surah exists.
-        const surahGlosses = await getSurahGlosses(client, surahId, contentLanguage);
+        const surahGlosses = await getSurahGlosses(client, currentSurahId, contentLanguage);
         if (!cancelled) {
           setCorpusClient(client);
           setWbw(data);
@@ -103,7 +120,7 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
         }
       } catch (cause) {
         // See the note in app/(tabs)/surahs.tsx: logged for logcat, never shown.
-        console.error('[wbw] load failed', { surahId, from, cause });
+        console.error('[wbw] load failed', { surahId: currentSurahId, from, cause });
         if (!cancelled) setError(t(uiLocale, 'reader.loadFailed'));
       } finally {
         if (!cancelled) setLoading(false);
@@ -114,9 +131,9 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
     return () => {
       cancelled = true;
     };
-  }, [contentLanguage, from, surahId, uiLocale]);
+  }, [contentLanguage, currentSurahId, from, uiLocale]);
 
-  const loadWordSummary = useWordSummaryLoader(corpusClient, surahId, contentLanguage);
+  const loadWordSummary = useWordSummaryLoader(corpusClient, currentSurahId, contentLanguage);
 
   // Taps are cheap and the grid puts ~150 of them on screen at once, so two can
   // easily be in flight together. Without the sequence check the sheet shows
@@ -194,6 +211,15 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
               gap: 12,
             }}
           >
+            <AdjacentNavButton
+              side="prev"
+              target={
+                currentSurahId !== null && currentSurahId > 1 ? String(currentSurahId - 1) : null
+              }
+              onNavigate={(target, side) => setSurah(Number(target), side)}
+              uiLocale={uiLocale}
+              testIDPrefix="surah"
+            />
             <Text
               accessibilityRole="header"
               // Clamped and shrinkable: 'Al-Munafiqoon' beside the pager
@@ -210,6 +236,18 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
               ayahCount={wbw.surah.ayah_count}
               uiLocale={uiLocale}
               onRange={(nextFrom) => setFrom(nextFrom)}
+            />
+            {/* The row is bounded by surah navigation with the ayah pager
+                inside it (D49), so the two orders of movement do not read as
+                one control. */}
+            <AdjacentNavButton
+              side="next"
+              target={
+                currentSurahId !== null && currentSurahId < 114 ? String(currentSurahId + 1) : null
+              }
+              onNavigate={(target, side) => setSurah(Number(target), side)}
+              uiLocale={uiLocale}
+              testIDPrefix="surah"
             />
           </View>
           <SegmentedControl

@@ -349,6 +349,31 @@ describe('word-by-word route', () => {
     await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenLastCalledWith(expect.anything(), 3, 1));
   });
 
+  it('pages to the next surah and restarts at its first ayah', async () => {
+    mocks.params = { surahId: '2', from: '50' };
+    render(<WbwRoute />);
+    await screen.findAllByTestId('wbw-cell');
+
+    fireEvent.click(screen.getByTestId('surah-next'));
+
+    // Not 3:50: the range belongs to the surah it was read in, and a surah
+    // shorter than the range would render empty.
+    await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenLastCalledWith(expect.anything(), 3, 1));
+  });
+
+  it('dims the previous chevron in al-Fatihah', async () => {
+    mocks.params = { surahId: '1' };
+    render(<WbwRoute />);
+    await screen.findAllByTestId('wbw-cell');
+    const calls = mocks.getWbwScreen.mock.calls.length;
+
+    fireEvent.click(screen.getByTestId('surah-previous'));
+
+    // D47: disabled, not hidden -- still there for TalkBack to announce.
+    expect(screen.getByTestId('surah-previous')).toBeTruthy();
+    expect(mocks.getWbwScreen.mock.calls.length).toBe(calls);
+  });
+
   it('opens the sheet on the word that was tapped', async () => {
     render(<WbwRoute />);
     const cells = await screen.findAllByTestId('wbw-cell');
