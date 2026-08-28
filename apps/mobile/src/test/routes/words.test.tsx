@@ -361,6 +361,27 @@ describe('word-by-word route', () => {
     await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenLastCalledWith(expect.anything(), 3, 1));
   });
 
+  it('keeps the outgoing surah on screen while the next one loads', async () => {
+    render(<WbwRoute />);
+    await screen.findAllByTestId('wbw-cell');
+
+    const pending = deferred<WbwScreenData>();
+    mocks.getWbwScreen.mockReturnValue(pending.promise);
+    fireEvent.click(screen.getByTestId('surah-next'));
+    await waitFor(() =>
+      expect(mocks.getWbwScreen).toHaveBeenLastCalledWith(expect.anything(), 3, 1),
+    );
+
+    // Blanking to the spinner leaves reanimated no outgoing view, so the page
+    // turn this screen shares with the reader was silently a jump.
+    expect(screen.queryByTestId('loading')).toBeNull();
+    expect(screen.getAllByTestId('wbw-cell').length).toBeGreaterThan(0);
+
+    await act(async () => {
+      pending.resolve(screenData());
+    });
+  });
+
   it('dims the previous chevron in al-Fatihah', async () => {
     mocks.params = { surahId: '1' };
     render(<WbwRoute />);

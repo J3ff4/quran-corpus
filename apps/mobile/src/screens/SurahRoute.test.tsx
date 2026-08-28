@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   uiLocale: 'en',
   getSurahReader: vi.fn(),
   getWordsForAyah: vi.fn(),
+  pageSurahProps: [] as ((surahId: number, side: 'prev' | 'next') => void)[],
 }));
 
 vi.mock('expo-router', () => ({
@@ -44,7 +45,7 @@ vi.mock('@/components/SurahReader', async () => {
     // `loadWords` is destructured and driven, not dropped: a function prop a
     // mock omits renders nothing, so no assertion in this file could ever see
     // it and the route's own loader would sit unexercised (F1).
-    SurahReader: ({ onToggleBookmark, onReadingAyah, bookmarkedAyahs, loadWords, prevSurahId, nextSurahId, onPageSurah }: {
+    SurahReader: ({ onToggleBookmark, onReadingAyah, bookmarkedAyahs, loadWords, prevSurahId, nextSurahId, onPageSurah, initialAyahNumber }: {
       onToggleBookmark: (ayahNumber: number) => void;
       onReadingAyah?: (ayahNumber: number) => void;
       bookmarkedAyahs: Set<number>;
@@ -52,11 +53,17 @@ vi.mock('@/components/SurahReader', async () => {
       prevSurahId?: number | null;
       nextSurahId?: number | null;
       onPageSurah?: (surahId: number, side: 'prev' | 'next') => void;
-    }) =>
-      React.createElement(
+      initialAyahNumber?: number | null;
+    }) => {
+      // Recorded rather than asserted here: the route rebuilds the reader's
+      // whole header when this changes identity, and it re-renders on every
+      // playback tick, so its stability is the thing worth pinning.
+      if (onPageSurah) mocks.pageSurahProps.push(onPageSurah);
+      return React.createElement(
         'div',
         null,
         React.createElement('span', null, 'reader-content'),
+        React.createElement('span', null, `anchor:${initialAyahNumber ?? 'none'}`),
         React.createElement('span', null, `adjacent:${prevSurahId ?? 'none'}/${nextSurahId ?? 'none'}`),
         React.createElement(
           'button',
@@ -68,7 +75,8 @@ vi.mock('@/components/SurahReader', async () => {
         React.createElement('button', { onClick: () => onToggleBookmark(257) }, 'bookmark other'),
         React.createElement('button', { onClick: () => onReadingAyah?.(256) }, 'read ayah'),
         React.createElement('button', { onClick: () => void loadWords(8) }, 'open word sheet'),
-      ),
+      );
+    },
   };
 });
 
@@ -160,6 +168,7 @@ describe('SurahRoute', () => {
     mocks.getWordsForAyah.mockReset();
     mocks.getWordsForAyah.mockResolvedValue([]);
     mocks.params = { surahId: '2' };
+    mocks.pageSurahProps.length = 0;
   });
 
   it('offers the surah either side, and neither past the ends of the mushaf', async () => {
@@ -192,6 +201,56 @@ describe('SurahRoute', () => {
       expect(mocks.getSurahReader).toHaveBeenLastCalledWith(expect.anything(), 3, 'en'),
     );
     expect(await screen.findByText('adjacent:2/4')).toBeTruthy();
+  });
+
+  it('does not carry the opened ayah into the surah it pages to', async () => {
+    mocks.params = { surahId: '2', ayah: '50' };
+    render(<SurahRoute />);
+    expect(await screen.findByText('anchor:50')).toBeTruthy();
+
+    fireEvent.click(screen.getByText('page next'));
+    await waitFor(() =>
+      expect(mocks.getSurahReader).toHaveBeenLastCalledWith(expect.anything(), 3, 'en'),
+    );
+
+    // Paging is state, so ?ayah= does not change with the surah. Handed on, a
+    // bookmark that opened Al-Baqarah at 2:50 landed Aal-Imran on 3:50.
+    expect(await screen.findByText('anchor:none')).toBeTruthy();
+  });
+
+  it('keeps the outgoing surah on screen while the next one loads', async () => {
+    render(<SurahRoute />);
+    await screen.findByText('reader-content');
+
+    const pending = deferred<typeof readerFixture>();
+    mocks.getSurahReader.mockReturnValue(pending.promise);
+    fireEvent.click(screen.getByText('page next'));
+    await waitFor(() =>
+      expect(mocks.getSurahReader).toHaveBeenLastCalledWith(expect.anything(), 3, 'en'),
+    );
+
+    // Blanking to the spinner here leaves reanimated no outgoing view, so the
+    // page turn is a jump with a spinner in the middle rather than two halves
+    // moving together.
+    expect(screen.queryByText('loading')).toBeNull();
+    expect(screen.getByText('reader-content')).toBeTruthy();
+
+    await act(async () => {
+      pending.resolve(readerFixture);
+    });
+  });
+
+  it('hands the reader a page-turn callback that survives a re-render', async () => {
+    const { rerender } = render(<SurahRoute />);
+    await screen.findByText('reader-content');
+    const first = mocks.pageSurahProps.at(-1);
+
+    rerender(<SurahRoute />);
+    await screen.findByText('reader-content');
+
+    // A fresh closure per render re-runs the effect that publishes the header,
+    // and this route re-renders several times a second while audio plays.
+    expect(mocks.pageSurahProps.at(-1)).toBe(first);
   });
 
   it('retranslates a load failure when the UI language changes', async () => {

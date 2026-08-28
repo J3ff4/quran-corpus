@@ -13,7 +13,7 @@ import { openUserDb } from '@/data/userDb';
 import { useWordSummaryLoader } from '@/data/useWordSummaryLoader';
 import { getBookmarks, recordReadingDay, recordReadingPosition, setBookmark } from '@/data/userRepository';
 import { localDay } from '@/home/counters';
-import { useEntryPager } from '@/motion/entryPager';
+import { useEntryPager, useHeldEntry } from '@/motion/entryPager';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
 import { useThemeColors } from '@/theme/themeContext';
@@ -36,11 +36,32 @@ export default function SurahRoute() {
   // Bookmarks and the Home tab's continue link both carry the ayah they mean.
   // Validated the same way as surahId -- it arrives from a URL, so it is
   // untrusted input even when we are the only ones writing the links.
-  const initialAyahNumber = useMemo(() => parseAyahNumber(params.ayah), [params.ayah]);
+  const routeAyahNumber = useMemo(() => parseAyahNumber(params.ayah), [params.ayah]);
   const { contentLanguage, setContentLanguage, uiLocale, readerMode, setReaderMode, reciterId, setReciterId } =
     useAppSettings();
   const theme = useThemeColors();
-  const [reader, setReader] = useState<SurahReaderData | null>(null);
+  // The surah it was loaded FOR, carried with it. Not read back off the
+  // payload: what makes the held copy safe is that it answers the request the
+  // pager is on, and only the caller knows which request that was.
+  const [reader, setReader] = useState<{ surahId: number; data: SurahReaderData } | null>(null);
+  // The surah kept on screen while the next one loads, the same way the
+  // dictionary entries page. Without it the chevron read as: the outgoing
+  // surah remounts at its top (the key below changes a render before the load
+  // effect fires), then a spinner, then the new surah -- three states where
+  // the ruling asks for one slide. The id check is what stops it holding a
+  // surah the pager has already left.
+  const heldReader = useHeldEntry(reader && reader.surahId === surahId ? reader : null);
+  const held = heldReader?.data ?? null;
+  // What is *on screen*, which during a page turn is not yet what the pager
+  // points at. Bookmark and reading-position writes both belong to the surah
+  // the reader is actually looking at.
+  const displayedSurahId = heldReader?.surahId ?? null;
+  // Only while the surah on screen is still the one the route named. Paging is
+  // state, so the params do not change when the surah does: carried across,
+  // a bookmark opening Al-Baqarah at 2:50 landed the next surah on 3:50.
+  // Against the displayed surah rather than the pager's, so the outgoing
+  // reader is not re-anchored during the frames it is still sliding out.
+  const initialAyahNumber = displayedSurahId === routeSurahId ? routeAyahNumber : null;
   // ayahCount is what stops continuous play at the end of the surah, so it
   // comes from the loaded surah rather than a constant; 0 until the reader
   // loads, which is also the window in which nothing can be tapped to play.
@@ -48,8 +69,8 @@ export default function SurahRoute() {
   // Switching reciter mid-surah changes the voice from the NEXT ayah, not this
   // one: the hook reads reciterId when it starts an ayah, and the one already
   // sounding keeps its source (device check 87).
-  const audio = useRecitation(surahId, reader?.surah.ayah_count ?? 0, reciterId, {
-    surahName: reader?.surah.name_translit,
+  const audio = useRecitation(surahId, reader?.data.surah.ayah_count ?? 0, reciterId, {
+    surahName: reader?.data.surah.name_translit,
   });
   // Kept so the reader can query words for the ayahs scrolling into view,
   // rather than reopening the database on every tap.
@@ -64,12 +85,12 @@ export default function SurahRoute() {
   const [bookmarkError, setBookmarkError] = useState<string | null>(null);
   const [readingError, setReadingError] = useState<string | null>(null);
   const readingRecorder = useMemo(() => {
-    if (!surahId) return null;
+    if (!displayedSurahId) return null;
     return createLatestReadingPositionRecorder(async (ayahNumber) => {
       setReadingError(null);
       const userDb = await openUserDb();
       const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
-      await recordReadingPosition(userClient, surahId, ayahNumber);
+      await recordReadingPosition(userClient, displayedSurahId, ayahNumber);
       // Decision 22: any reading counts, and this write already fires on the
       // reader's scroll, so it is the one place that sees every read without a
       // second listener to keep in step.
@@ -83,7 +104,7 @@ export default function SurahRoute() {
         console.error('[home] reading-day write failed', { cause });
       }
     }, () => setReadingError(t(uiLocale, 'reader.positionFailed')));
-  }, [surahId, uiLocale]);
+  }, [displayedSurahId, uiLocale]);
 
   useEffect(() => {
     let cancelled = false;
@@ -113,7 +134,7 @@ export default function SurahRoute() {
 
         if (!cancelled) {
           setCorpusClient(client);
-          setReader(data);
+          setReader({ surahId, data });
           setBookmarks(
             new Set(
               savedBookmarks
@@ -144,6 +165,16 @@ export default function SurahRoute() {
   // screen, which opens the same sheet off the same database.
   const loadWordSummary = useWordSummaryLoader(corpusClient, surahId, contentLanguage);
 
+  // useCallback, not an inline closure: this prop is in the dependency array of
+  // the effect that publishes the header (SurahReader), and this component
+  // re-renders on every playback tick. A fresh closure per render rebuilt the
+  // whole header and dispatched setOptions into the navigator several times a
+  // second while audio played.
+  const onPageSurah = useCallback(
+    (target: number, side: 'prev' | 'next') => pager.goTo(String(target), side),
+    [pager.goTo],
+  );
+
   const loadWords = useCallback(
     async (ayahId: number) => {
       if (!corpusClient) return [];
@@ -153,7 +184,7 @@ export default function SurahRoute() {
   );
 
   async function toggleBookmark(ayahNumber: number) {
-    if (!surahId) return;
+    if (!displayedSurahId) return;
     const nextBookmarked = !bookmarks.has(ayahNumber);
     setBookmarks((current) => {
       const next = new Set(current);
@@ -166,9 +197,9 @@ export default function SurahRoute() {
       setBookmarkError(null);
       const userDb = await openUserDb();
       const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
-      await setBookmark(userClient, surahId, ayahNumber, nextBookmarked);
+      await setBookmark(userClient, displayedSurahId, ayahNumber, nextBookmarked);
     } catch (cause) {
-      console.error('[reader] bookmark write failed', { surahId, ayahNumber, cause });
+      console.error('[reader] bookmark write failed', { surahId: displayedSurahId, ayahNumber, cause });
       // Undo this ayah only, off the current set. Restoring a snapshot taken
       // before the write would also revert any toggle that landed while this
       // one was in flight, leaving the list disagreeing with SQLite until the
@@ -183,7 +214,9 @@ export default function SurahRoute() {
     }
   }
 
-  if (loading) {
+  // Only while there is nothing to hold -- the first load of the screen. A
+  // page turn keeps the outgoing surah up, which is what reanimated slides out.
+  if (loading && !held) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator />
@@ -191,7 +224,7 @@ export default function SurahRoute() {
     );
   }
 
-  if (error || !reader) {
+  if (error || !held) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', padding: 20 }}>
         <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ color: theme.danger }}>
@@ -207,13 +240,13 @@ export default function SurahRoute() {
         // Keyed by surah so reanimated sees one view leave as another arrives;
         // without the key React would reconcile them into a single view and
         // there would be nothing to animate.
-        key={surahId}
+        key={displayedSurahId}
         entering={pager.animation.entering}
         exiting={pager.animation.exiting}
         style={{ flex: 1 }}
       >
       <SurahReader
-        data={reader}
+        data={held}
         bookmarkedAyahs={bookmarks}
         playingAyah={audio.playing ? audio.ayah : null}
         audioEnabled
@@ -246,7 +279,7 @@ export default function SurahRoute() {
         // rather than a jump to the other end of the book.
         prevSurahId={surahId !== null && surahId > 1 ? surahId - 1 : null}
         nextSurahId={surahId !== null && surahId < 114 ? surahId + 1 : null}
-        onPageSurah={(target, side) => pager.goTo(String(target), side)}
+        onPageSurah={onPageSurah}
       />
       </Animated.View>
       {/* Live regions: a bookmark or playback failure happens after the tap,

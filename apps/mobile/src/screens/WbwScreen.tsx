@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Text, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 import type { Word } from '@quran-corpus/data/mobile';
 import { AdjacentNavButton } from '@/components/AdjacentNav';
@@ -19,7 +20,7 @@ import { openCorpusDb } from '@/data/openCorpusDb';
 import { setReaderPosition } from '@/data/readerPosition';
 import { useWordSummaryLoader } from '@/data/useWordSummaryLoader';
 import { t } from '@/i18n/uiStrings';
-import { useEntryPager } from '@/motion/entryPager';
+import { useEntryPager, useHeldEntry } from '@/motion/entryPager';
 import { useAppSettings, type WbwDensity } from '@/settings/settingsStore';
 import { typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
@@ -68,7 +69,7 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
     // D46: the reader re-lands here when this screen is popped. Guarded on the
     // surah because the store is scoped by it, and a null id has no position
     // to publish.
-    if (currentSurahId !== null) setReaderPosition(currentSurahId, next);
+    if (displayedSurahId !== null) setReaderPosition(displayedSurahId, next);
   };
 
   const setSurah = (target: number, side: 'prev' | 'next') => {
@@ -80,7 +81,10 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
     setPage({ key: `${target}:${initialFrom}`, from: 1 });
   };
 
-  const [wbw, setWbw] = useState<WbwScreenData | null>(null);
+  // Carries the surah it was loaded FOR: see the note on the reader route. The
+  // held copy is only safe while it answers the request the pager is on, and
+  // the payload is not what says which request that was.
+  const [wbw, setWbw] = useState<{ surahId: number; data: WbwScreenData } | null>(null);
   // Fetched here rather than left to the sheet's loader: every layout now
   // prints a gloss under every word, so the map is needed to RENDER the
   // screen, not just to answer a tap. useWordSummaryLoader keeps its own copy
@@ -92,6 +96,13 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<OpenWord | null>(null);
+  // The surah kept on screen while the next one loads, the same as the reader
+  // and the dictionary entries. Without it a page turn blanked to a spinner,
+  // so there was never an outgoing screen for reanimated to slide out and the
+  // pager the comment above claims was silently a plain jump.
+  const heldWbw = useHeldEntry(wbw && wbw.surahId === currentSurahId ? wbw : null);
+  const view = heldWbw?.data ?? null;
+  const displayedSurahId = heldWbw?.surahId ?? null;
 
   useEffect(() => {
     let cancelled = false;
@@ -115,7 +126,7 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
         const surahGlosses = await getSurahGlosses(client, currentSurahId, contentLanguage);
         if (!cancelled) {
           setCorpusClient(client);
-          setWbw(data);
+          setWbw({ surahId: currentSurahId, data });
           setGlosses(surahGlosses);
         }
       } catch (cause) {
@@ -133,7 +144,7 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
     };
   }, [contentLanguage, currentSurahId, from, uiLocale]);
 
-  const loadWordSummary = useWordSummaryLoader(corpusClient, currentSurahId, contentLanguage);
+  const loadWordSummary = useWordSummaryLoader(corpusClient, displayedSurahId, contentLanguage);
 
   // Taps are cheap and the grid puts ~150 of them on screen at once, so two can
   // easily be in flight together. Without the sequence check the sheet shows
@@ -160,7 +171,9 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
     setOpen(null);
   }
 
-  if (loading) {
+  // Only with nothing to hold -- the screen's first load. A page turn keeps
+  // the outgoing surah up, which is the half that slides out.
+  if (loading && !view) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator />
@@ -168,7 +181,7 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
     );
   }
 
-  if (error || !wbw) {
+  if (error || !view) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', padding: 20 }}>
         <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ color: theme.danger }}>
@@ -184,8 +197,13 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
           TalkBack swiping into the grid behind the sheet (CLAUDE.md §8, WCAG
           AA). The pager is inside it now that it renders in the screen, so it
           is hidden along with everything else rather than unmounted. */}
-      <View
+      <Animated.View
         testID="wbw-screen"
+        // Keyed by surah so reanimated sees one leave as the other arrives;
+        // reconciled into a single view there would be nothing to animate.
+        key={displayedSurahId}
+        entering={pager.animation.entering}
+        exiting={pager.animation.exiting}
         style={{ flex: 1 }}
         importantForAccessibility={open ? 'no-hide-descendants' : 'auto'}
       >
@@ -228,12 +246,12 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
               numberOfLines={1}
               style={{ color: theme.text, fontSize: typography.title, fontWeight: '700', flexShrink: 1 }}
             >
-              {wbw.surah.name_translit}
+              {view.surah.name_translit}
             </Text>
             <VersePicker
-              from={wbw.from}
-              to={wbw.to}
-              ayahCount={wbw.surah.ayah_count}
+              from={view.from}
+              to={view.to}
+              ayahCount={view.surah.ayah_count}
               uiLocale={uiLocale}
               onRange={(nextFrom) => setFrom(nextFrom)}
             />
@@ -261,7 +279,10 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
           />
         </View>
         <FlatList
-          data={wbw.pages}
+          // Held across a range change now that the screen no longer blanks,
+          // so without this the new range opens at the old one's scroll offset.
+          key={view.from}
+          data={view.pages}
           keyExtractor={(page) => String(page.ayahNumber)}
           renderItem={({ item }) => {
             const layoutProps = {
@@ -279,7 +300,7 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingBottom }}
         />
-      </View>
+      </Animated.View>
       <WordSheet
         summary={open?.summary ?? null}
         uiLocale={uiLocale}
@@ -288,7 +309,7 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
           if (!open) return;
           const ayahNumber = open.ayahNumber;
           closeSheet();
-          router.push(`/word/${wbw.surah.id}/${ayahNumber}/${word.position}`);
+          router.push(`/word/${displayedSurahId}/${ayahNumber}/${word.position}`);
         }}
         onOpenRoot={(rootBuckwalter) => {
           closeSheet();
