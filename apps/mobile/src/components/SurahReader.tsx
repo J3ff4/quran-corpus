@@ -417,6 +417,18 @@ export function SurahReader({
       if (cancelled) return;
       positionedRef.current = true;
       setPositioned(true);
+      // The landing *is* the reading position, and nothing else will record
+      // it. onViewableItemsChanged ignores every frame of the jump on purpose
+      // (positionedRef is false throughout, so the ayahs it flies over are not
+      // written), and no scroll follows the reveal to fire one afterwards. So
+      // without this the store still holds wherever this surah was last read,
+      // and the next mode switch re-anchors to that instead of the ayah the
+      // caller asked for -- opening /surah/2?ayah=50 from a bookmark and
+      // tapping Translation landed on 2:1.
+      if (anchor.ayah !== null) {
+        lastVisibleRef.current = anchor.ayah;
+        setReaderPosition(data.surah.id, anchor.ayah);
+      }
     };
 
     const attempt = () => {

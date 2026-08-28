@@ -461,6 +461,29 @@ describe('SurahReader', () => {
     }
   });
 
+  it('records the ayah the deep-link landing settled on', async () => {
+    // Nothing else records it. onViewableItemsChanged is muted for the whole
+    // jump (see the test above), and no scroll follows the reveal to fire one
+    // afterwards -- so without this write the shared position still holds the
+    // previous reading of this surah, and the first mode switch re-anchors
+    // there. On the device, opening /surah/2?ayah=50 and tapping Translation
+    // landed on 2:1.
+    vi.useFakeTimers();
+    try {
+      render(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />);
+      // Not before the landing: mid-jump the list is wherever it happens to be.
+      expect(mocks.setReaderPosition).not.toHaveBeenCalled();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
+
+      expect(mocks.setReaderPosition).toHaveBeenCalledWith(1, 255);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('fetches words for ayahs that scroll into view, plus a lookahead', async () => {
     const loadWords = vi.fn(async (ayahId: number) => surahWords(ayahId));
     render(<SurahReader {...baseProps(readerData(10))} loadWords={loadWords} />);
