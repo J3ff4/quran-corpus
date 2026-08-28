@@ -70,8 +70,11 @@ export function SurahsScreen() {
   const [openJuz, setOpenJuz] = useState<ReadonlySet<number>>(new Set());
   // Which eras are *collapsed*, not which are open: D43 arrives with both
   // expanded, so an empty set is the default and nothing has to be seeded when
-  // the rows land.
-  const [collapsedEras, setCollapsedEras] = useState<ReadonlySet<string>>(new Set());
+  // the rows land. Keyed on RevealedEntry['revelationType'], which does not
+  // change with the UI language.
+  const [collapsedEras, setCollapsedEras] = useState<ReadonlySet<RevealedEntry['revelationType']>>(
+    new Set(),
+  );
   const [data, setData] = useState<Partial<BrowseData>>({});
   const [error, setError] = useState<string | null>(null);
 
@@ -193,7 +196,11 @@ export function SurahsScreen() {
     // mis-cut if the chronology were ever replaced.
     const sections: BrowseSection[] = [];
     for (const entry of rows) {
-      const title = t(uiLocale, entry.revelationType === 'meccan' ? 'browse.meccan' : 'browse.medinan');
+      // The era itself, not its label: the label is translated, so a set keyed
+      // on it silently re-expanded every collapsed section on a language
+      // switch and left the old language's key behind for good.
+      const era = entry.revelationType;
+      const title = t(uiLocale, era === 'meccan' ? 'browse.meccan' : 'browse.medinan');
       const current = sections.at(-1);
       const item: BrowseItem = {
         key: `revealed-${entry.surahId}`,
@@ -210,11 +217,11 @@ export function SurahsScreen() {
           title,
           data: [item],
           count: 0,
-          expanded: !collapsedEras.has(title),
+          expanded: !collapsedEras.has(era),
           onToggle: () =>
             setCollapsedEras((currentSet) => {
               const next = new Set(currentSet);
-              if (!next.delete(title)) next.add(title);
+              if (!next.delete(era)) next.add(era);
               return next;
             }),
         });
@@ -224,9 +231,6 @@ export function SurahsScreen() {
     // right is one place too many.
     for (const section of sections) section.count = section.data.length;
     return sections;
-    // collapsedEras keys on the translated era title, which is also what the
-    // header renders. A language change clears every cached mode, so a stale
-    // key cannot outlive the label it was taken from.
   }, [collapsedEras, data.revealed, uiLocale]);
 
   const options = useMemo(

@@ -312,6 +312,24 @@ describe('SurahsTab', () => {
     expect(screen.getByText('Al-Alaq')).toBeTruthy();
   });
 
+  it('keeps an era collapsed when the UI language changes', async () => {
+    const { rerender } = render(<SurahsTab />);
+    await screen.findByText('Al-Fatihah');
+    fireEvent.click(screen.getByTestId('segment-revealed'));
+    fireEvent.click(await screen.findByTestId('browse-section-Meccan'));
+    expect(screen.queryByText('Al-Alaq')).toBeNull();
+
+    mocks.uiLocale = 'uz';
+    rerender(<SurahsTab />);
+    await screen.findByTestId('browse-section-Makkiy');
+
+    // Keyed on the era, not on its label: keyed on the label the switch
+    // silently reopened every collapsed section and stranded the old
+    // language's key in the set for good.
+    expect(screen.queryByText('Al-Alaq')).toBeNull();
+    expect(screen.getByTestId('browse-section-Makkiy').getAttribute('aria-expanded')).toBe('false');
+  });
+
   it('forgets a collapsed era when the mode changes and comes back', async () => {
     render(<SurahsTab />);
     await screen.findByText('Al-Fatihah');
