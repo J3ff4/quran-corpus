@@ -2045,7 +2045,71 @@ screen rather than the one the pager has moved to. Six new tests, every one
 mutation-checked. Gate after the fixes: mobile 75 files / 702 tests, data 30 /
 415, lint and type-check clean.
 
-## Verification log — pending
+## Verification log — device run 2026-08-28
 
-Task 10 has not run. No device was connected during implementation, so **§10's
-gate is unmet** and this phase is not complete.
+OnePlus 7 Pro, Android 12 / SDK 31, 1440x3120 @ 640dpi, Expo Go over adb-wifi.
+Metro restarted with `--clear` (watcher is dead in this container). Driven by
+screenshot + `input tap`; **20 of 24 checks pass, 2 deferred, 2 defects found
+and fixed.**
+
+| Check | Result |
+|-------|--------|
+| 124 | PASS — 30 rows, all collapsed, counts as subtitles. **D42 confirmed** |
+| 125-128 | PASS — expands in place to the two ranges, reader does not open; both juz stay open independently; collapse leaves the row |
+| 129 | PASS — Juz→Surah→Juz clears every expansion. **D44 confirmed** |
+| 130-132 | PASS — both eras expanded with 86/28; collapse raises Medinan under the Meccan header; re-expand is byte-identical |
+| 133 | PASS (after fix) — see defect 1 |
+| 134 | PASS — re-anchors within 1-3 ayahs; drifts back a little each switch because it lands on the topmost *fully* visible row |
+| 135, 136 | PASS — Words opens on the page holding the reader's ayah; back lands the reader exactly on 2:55 |
+| 137 | PASS — opened at 2:1, immediate switch stays at 2:1 |
+| 138 | PASS — captured mid-slide with PAGE_MS temporarily at 2600: outgoing surah exits left, incoming enters from the right, both moving together, **header completely stationary** (no `router.replace` remount, no native header transition) |
+| 139 | PASS — one back press returns to the list after five page turns. **D48 confirmed** |
+| 140 | PASS — previous dimmed at surah 1, next dimmed at 114, neither vanishes |
+| 141 | PASS — paging stops playback; bar clears; `dumpsys audio` shows no started player |
+| 142 | PASS — Words chevrons page surah and open at ayah 1 |
+| 143, 144 | **DEFERRED** (owner, 2026-08-28). Labels and `accessibilityState.expanded` verified in the tree and in source; the spoken output is unconfirmed |
+| 145 | PASS — with Remove animations on, the two surahs cross-fade superimposed in place, no horizontal displacement |
+| 146 | MARGINAL — `Al-Baqara` fits, `Al-Muddaththir` truncates to `Al-Muddat…` at max font scale. Owner ruled: leave it, do not build the second-row fallback |
+| 147 | PASS — both chevrons legible on dark |
+
+### Defects found and fixed
+
+1. **Deep-link position was never recorded** (`SurahReader.tsx`). Opening
+   `/surah/2?ayah=50` and switching mode landed on 2:1.
+   `onViewableItemsChanged` ignores the whole programmatic jump by design
+   (`positionedRef` is false throughout, so the ayahs it flies over are not
+   written) and no scroll follows the reveal to fire one afterwards — so the
+   store kept its previous value and the mode switch re-anchored there. The
+   landing now writes the ayah it settled on. Hand-scrolling always worked,
+   which is why it survived implementation. Re-verified on device against a
+   store deliberately seeded to ayah 1.
+2. **Era counts were silent to TalkBack** (`BrowseList.tsx`). The count is a
+   `focusable=false` child of a header button labelled only `Meccan`, so it was
+   never announced, while juz rows correctly say "Juz 1, 148 ayahs". The label
+   is now `Meccan, 86` — the bare number, matching what is on screen, so no
+   per-locale noun is needed.
+
+Both shipped with a test; both mutations failed exactly the new test and
+nothing else. Gate after the fixes: mobile 75 files / 704 tests, lint and
+type-check clean. Neither touches `packages/data`, a trust boundary, or the
+on-device user DB (`readerPosition` is an in-memory module singleton), so §5
+does not fire.
+
+### Observations, not defects
+
+- Repeated mode switching drifts back an ayah or two per switch — it re-anchors
+  on the topmost fully-visible row. Deliberate (re-anchoring beats preserving
+  offset when row heights differ), noted so it is not re-reported.
+- Entering the app **cold** via an external deep link leaves the reader as the
+  stack root, so the header back arrow reports `GO_BACK was not handled by any
+  navigator`. Unreachable from in-app navigation. Outside this phase.
+- `screenrecord` is present but will not exec on this OxygenOS build (rc=127),
+  and `input tap` dispatch latency exceeds a 260 ms animation — so animation
+  checks need the duration temporarily lengthened, not a recording.
+- OxygenOS does not write the Font size slider to `system font_scale`; that key
+  still reads 1.0 at maximum. Verify font scaling by pixels, not by the key.
+
+### Outstanding
+
+**§10's gate is not fully met.** 143 and 144 are deferred at the owner's
+direction; M6r is complete except for those two.
