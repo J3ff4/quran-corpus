@@ -2009,6 +2009,42 @@ not ask for (the `aria-expanded` guard, the era-count derivation, the audio
 stop, the two word-by-word bounds, and the load reading the paged surah rather
 than the prop).
 
+## §5 independent review — one pass, run 2026-08-28
+
+Ran on the branch as a whole (the §5 trigger was Task 1's `packages/data`
+change). Seven findings, all real, all fixed in `288b460`, `0f81489`,
+`2d11a8f`, `0ca1fff`. None declined. Nothing was raised against the juz query
+itself.
+
+- **Paging carried `?ayah=`** — a bookmark opening 2:50, then the next chevron,
+  landed Aal-Imran on 3:50. The param belongs to the surah the route named.
+- **`useFocusEffect` fires on mount** — and the shared position is a module
+  singleton that outlives the screen, so a bookmark for 2:5 opened after
+  reading 2:200 jumped straight back to 2:200. The suite's expo-router double
+  only captured the callback, so no test could have seen it; it now runs on
+  mount as the real hook does.
+- **`onPageSurah` was an inline closure** in the dependency array of the effect
+  that publishes the reader's header, on a route that re-renders on every
+  playback tick.
+- **The page turn never had two halves** — both screens returned a spinner
+  while loading, so the outgoing surah was gone before the incoming one
+  existed. The reader additionally remounted the old surah at its top for a
+  frame, because the key changes a render before the load effect fires. Fixed
+  with `useHeldEntry`, which the dictionary entries already used.
+- **Word-by-word never used `pager.animation`** — D48's claim was false; the
+  screen now renders inside the animated view.
+- **`useEntryPager` reset in an effect**, so one committed render still
+  reported the entry the route had left, and both screens fired a query for it.
+- **`collapsedEras` was keyed on the translated label**, and the comment saying
+  a language change cleared it was wrong. Keyed on `revelationType` now.
+
+Two things the fixes dragged in, neither reported: the held copy now carries
+the surah it was loaded FOR (the payload's own id is not evidence of which
+request it answers), and bookmark/reading-position writes name the surah on
+screen rather than the one the pager has moved to. Six new tests, every one
+mutation-checked. Gate after the fixes: mobile 75 files / 702 tests, data 30 /
+415, lint and type-check clean.
+
 ## Verification log — pending
 
 Task 10 has not run. No device was connected during implementation, so **§10's
