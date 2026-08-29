@@ -38,31 +38,47 @@ export function FrequencyList({ kind }: FrequencyListProps) {
   const { uiLocale } = useAppSettings();
   const theme = useThemeColors();
   const paddingBottom = useListBottomPadding();
-  // Seeded from the cache during render, not in an effect: an effect runs after
-  // paint, so a revisit would still show one frame of spinner over rows that
-  // were ready before it started -- the same reason useHeldEntry writes its ref
-  // during render. Not covered by a test: RTL flushes effects inside act(), so
-  // the effect's cache hit below always lands before an assertion can see the
-  // difference. Deleting these two seeds passes every test in this file and
-  // costs a spinner flash on every flip to Most used.
-  const [rows, setRows] = useState<FrequencyRow[]>(() => cache.get(kind) ?? []);
-  const [loading, setLoading] = useState(() => !cache.has(kind));
-  const [failed, setFailed] = useState(false);
+  // What is loaded, tagged with the kind it belongs to -- not a bare row array
+  // plus a separate loading flag.
+  //
+  // With the flag, a chip tap re-rendered before its effect ran: for that
+  // commit `rows` still held the previous kind's rows and `loading` was still
+  // false, so the pane painted one kind's data under another kind's header,
+  // and remounted the FlatList underneath it (the list is keyed by kind). Only
+  // afterwards did the effect set the spinner. Deriving both from the tag
+  // instead means a kind with nothing loaded reads as loading in the same
+  // commit as the tap, with no window where it reads as anything else (#33).
+  //
+  // Read during render rather than in an effect for the same reason the seed
+  // was: an effect runs after paint, so a revisit would still show a frame of
+  // spinner over rows that were ready before it started.
+  const [loaded, setLoaded] = useState<{ kind: FrequencyListProps['kind']; rows: FrequencyRow[] } | null>(
+    () => {
+      const hit = cache.get(kind);
+      return hit ? { kind, rows: hit } : null;
+    },
+  );
+  // Tagged by kind for the same reason `loaded` is: an untagged flag left the
+  // previous kind's error on screen until the effect cleared it.
+  const [failedKind, setFailedKind] = useState<FrequencyListProps['kind'] | null>(null);
+
+  const cached = cache.get(kind);
+  const rows = loaded?.kind === kind ? loaded.rows : (cached ?? null);
+  const failed = failedKind === kind;
+  const loading = rows === null && !failed;
 
   useEffect(() => {
     let cancelled = false;
     const hit = cache.get(kind);
     if (hit) {
-      // A kind change, with that kind already in hand: adopt it and ask
-      // nothing. The seed above only covers the kind this component mounted
-      // with.
-      setRows(hit);
-      setLoading(false);
-      setFailed(false);
+      // A kind change, with that kind already in hand. The render above is
+      // already showing these rows off the cache; this only records which kind
+      // they belong to so a later cache clear does not strand them.
+      setLoaded({ kind, rows: hit });
+      setFailedKind(null);
       return;
     }
-    setLoading(true);
-    setFailed(false);
+    setFailedKind(null);
     (async () => {
       try {
         const db = await openCorpusDb();
@@ -71,15 +87,10 @@ export function FrequencyList({ kind }: FrequencyListProps) {
         // Cached whether or not this mount is still interested: the rows are
         // correct for the kind regardless of who asked.
         cache.set(kind, found);
-        if (!cancelled) setRows(found);
+        if (!cancelled) setLoaded({ kind, rows: found });
       } catch (cause) {
         console.error('[dictionary] frequency load failed', { kind, cause });
-        if (!cancelled) {
-          setRows([]);
-          setFailed(true);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setFailedKind(kind);
       }
     })();
 

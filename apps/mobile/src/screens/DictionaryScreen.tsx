@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
 import {
@@ -112,6 +112,45 @@ const FilterChip = memo(FilterChipBase) as typeof FilterChipBase;
  * Outside the chip row's own toolbar element on purpose -- inside it, TalkBack
  * would count a caption as one of the controls the toolbar contains.
  */
+/**
+ * A chip toolbar that scrolls sideways instead of pushing the caption off the
+ * screen.
+ *
+ * At the device's largest font scale the chips size to their own text, consume
+ * the whole row, and the caption beside them is simply painted past the right
+ * edge -- no ellipsis, no wrap. `Roots · 1642` became `Roots ·`, losing exactly
+ * the part the caption exists for (#32). The owner chose scrolling over
+ * wrapping the caption or shrinking the chips: the count stays whole and the
+ * controls keep their full labels, at the cost of the last chip sitting off
+ * the edge until the row is dragged.
+ *
+ * The toolbar role stays on the inner View. On the ScrollView it would make
+ * TalkBack announce a scroll container as the group of controls.
+ */
+function ChipToolbar({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <ScrollView
+      testID="chip-scroller"
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      // flexGrow 0 so it claims no more than its content, flexShrink 1 so the
+      // caption wins the row when there is not enough of it to go round.
+      // Without the shrink the ScrollView takes its content's full width and
+      // nothing is left for the caption -- the defect, with a scroll bar.
+      style={{ flexGrow: 0, flexShrink: 1 }}
+      contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+    >
+      <View
+        accessibilityRole="toolbar"
+        accessibilityLabel={label}
+        style={{ flexDirection: 'row', gap: 8 }}
+      >
+        {children}
+      </View>
+    </ScrollView>
+  );
+}
+
 function PaneCaption({ text }: { text: string }) {
   const theme = useThemeColors();
 
@@ -121,6 +160,9 @@ function PaneCaption({ text }: { text: string }) {
       numberOfLines={1}
       style={{
         marginLeft: 'auto',
+        // The chip row yields, this does not: shrinking here is what put the
+        // count off-screen in the first place.
+        flexShrink: 0,
         color: theme.mutedText,
         fontSize: typography.caption,
         // The count changes as the reader types. Proportional digits reflow
@@ -407,11 +449,7 @@ export function DictionaryScreen() {
                         untouched and comes back with the grid when the box
                         empties. */}
                     {searching ? null : (
-                      <View
-                        accessibilityRole="toolbar"
-                        accessibilityLabel={t(uiLocale, 'dictionary.sortFilter')}
-                        style={{ flexDirection: 'row', gap: 8 }}
-                      >
+                      <ChipToolbar label={t(uiLocale, 'dictionary.sortFilter')}>
                         {(['alpha', 'freq'] as const).map((option) => (
                           <FilterChip
                             key={option}
@@ -425,7 +463,7 @@ export function DictionaryScreen() {
                             onSelect={setSortAndClearLetter}
                           />
                         ))}
-                      </View>
+                      </ChipToolbar>
                     )}
                     {/* Label first, count second, the way Home's counters read.
                         The mockup's "1,642 roots" would be "1 roots" the moment
@@ -478,11 +516,7 @@ export function DictionaryScreen() {
           <View
             style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, gap: 8 }}
           >
-            <View
-              accessibilityRole="toolbar"
-              accessibilityLabel={t(uiLocale, 'dictionary.kindFilter')}
-              style={{ flexDirection: 'row', gap: 8 }}
-            >
+            <ChipToolbar label={t(uiLocale, 'dictionary.kindFilter')}>
               {(['roots', 'lemmas', 'verbs'] as const).map((option) => (
                 <FilterChip
                   key={option}
@@ -500,7 +534,7 @@ export function DictionaryScreen() {
                   onSelect={setKind}
                 />
               ))}
-            </View>
+            </ChipToolbar>
             <PaneCaption text={t(uiLocale, 'dictionary.sortFreq')} />
           </View>
           <FrequencyList kind={kind} />

@@ -16,6 +16,22 @@ import { useThemeColors } from '@/theme/themeContext';
 // splash -> blank -> spinner for the several seconds the copy takes.
 void SplashScreen.preventAutoHideAsync();
 
+/**
+ * The tab group anchors the root stack, so a deep link opens on top of it
+ * rather than as the stack's only route.
+ *
+ * Without this, launching cold into `/surah/2?ayah=50` left the reader as the
+ * root: the header still drew its back arrow, and pressing it produced
+ * `The action 'GO_BACK' was not handled by any navigator` and went nowhere
+ * (#35). In-app navigation was never affected -- every route there pushes onto
+ * a real stack -- which is why it took an external link to surface.
+ *
+ * `anchor` is the expo-router 57 spelling; `initialRouteName` is still read as
+ * a fallback, but writing the deprecated name would be pinning this to the
+ * older behaviour.
+ */
+export const unstable_settings = { anchor: '(tabs)' };
+
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useCorpusFonts();
   const [corpusReady, setCorpusReady] = useState(false);

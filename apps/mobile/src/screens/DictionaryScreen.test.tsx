@@ -102,6 +102,7 @@ vi.mock('react-native', async () => {
     ActivityIndicator: () => React.createElement('span', { 'data-testid': 'spinner' }),
     FlatList: List,
     Pressable: host('button'),
+    ScrollView: host('div'),
     Text: host('span'),
     TextInput: Input,
     View: host('div'),
@@ -425,5 +426,29 @@ describe('DictionaryScreen', () => {
     // The two pills above are the tabs. The chips filtering one list must not
     // also read as tabs, or TalkBack announces five tabs across two groupings.
     expect(screen.getAllByRole('tab')).toHaveLength(2);
+  });
+
+  it('yields the chip row, not the caption, when the row runs out of width', async () => {
+    await renderLoaded();
+
+    // At the device's largest font scale the chips size to their own text and
+    // consume the row; the caption was painted past the right edge, cutting
+    // `Roots · 1642` down to `Roots ·` -- losing the count, which is the only
+    // reason the caption is there (#32). The chips scroll instead.
+    const scroller = screen.getByTestId('chip-scroller');
+    expect(scroller.style.flexShrink).toBe('1');
+    expect(scroller.style.flexGrow).toBe('0');
+    expect(screen.getByTestId('dictionary-count').style.flexShrink).toBe('0');
+  });
+
+  it('keeps the chips reachable as a labelled toolbar inside the scroller', async () => {
+    await renderLoaded();
+
+    // The role belongs to the inner View: moved onto the ScrollView, TalkBack
+    // announces a scroll container as the group of controls.
+    const scroller = screen.getByTestId('chip-scroller');
+    const toolbar = scroller.querySelector('[role="toolbar"]');
+    expect(toolbar).not.toBeNull();
+    expect(toolbar!.querySelectorAll('button').length).toBeGreaterThan(1);
   });
 });
