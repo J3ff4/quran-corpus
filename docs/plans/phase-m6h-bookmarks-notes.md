@@ -37,7 +37,7 @@ Inherited from the umbrella plan. Sub-phase specifics:
   template that reaches a logger.
 - **Decision 30/31:** one note per bookmark, 500 characters, plain text,
   stripped and capped in `packages/data`.
-- Branch: `feat/m6h-bookmarks-notes`. Device checks 97-102.
+- Branch: `feat/m6h-bookmarks-notes`. Device checks 148-153.
 
 ---
 
@@ -448,20 +448,20 @@ cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --prof
 
 | # | Check | Pass condition |
 | --- | --- | --- |
-| 97 | **Upgrade over the M6g build without clearing app data** | Every existing bookmark is still there, now with an empty note. This is the migration's real test |
-| 98 | Scroll a list of 60+ bookmarks | Every row is reachable; the last clears the tab pill |
-| 99 | Add, edit and clear a note | Persists across an app restart; clearing keeps the bookmark |
-| 100 | Type past 500 characters | Input stops at 500; the counter reaches 0; nothing is silently lost |
-| 101 | A note in Arabic, Uzbek and Russian | Stored and redisplayed intact, correct direction |
-| 102 | All three tabs | Recent is newest-first; By surah is grouped under surah headers; With notes lists only noted bookmarks |
+| 148 | **Upgrade over the M6r build without clearing app data** | Every existing bookmark is still there, now with an empty note. This is the migration's real test |
+| 149 | Scroll a list of 60+ bookmarks | Every row is reachable; the last clears the tab pill |
+| 150 | Add, edit and clear a note | Persists across an app restart; clearing keeps the bookmark |
+| 151 | Type past 500 characters | Input stops at 500; the counter reaches 0; nothing is silently lost |
+| 152 | A note in Arabic, Uzbek and Russian | Stored and redisplayed intact, correct direction |
+| 153 | All three tabs | Recent is newest-first; By surah is grouped under surah headers; With notes lists only noted bookmarks |
 
 ## Verification Log
 
 | Check | Build | Date | Result | Notes |
 | --- | --- | --- | --- | --- |
-| 97 | | | | |
-| 98 | | | | |
-| 99 | | | | |
-| 100 | | | | |
-| 101 | | | | |
-| 102 | | | | |
+| 148 | | | | |
+| 149 | | | | |
+| 150 | | | | |
+| 151 | | | | |
+| 152 | | | | |
+| 153 | | | | |
