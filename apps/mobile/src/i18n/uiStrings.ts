@@ -11,6 +11,12 @@ export type UiStringKey =
   | 'menu.bookmarks'
   | 'menu.settings'
   | 'menu.about'
+  | 'menu.lede'
+  | 'menu.bookmarksSub'
+  | 'menu.settingsSub'
+  | 'menu.aboutSub'
+  | 'menu.deviceHeading'
+  | 'menu.deviceNote'
   | 'wbw.title'
   | 'wbw.previous'
   | 'wbw.next'
@@ -246,6 +252,12 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'menu.bookmarks': 'Bookmarks',
     'menu.settings': 'Settings',
     'menu.about': 'About & credits',
+    'menu.lede': 'Bookmarks, settings, and where every word of this app came from.',
+    'menu.bookmarksSub': 'Saved ayahs and the notes on them',
+    'menu.settingsSub': 'Reading, recitation, appearance, language',
+    'menu.aboutSub': 'Sources, licences and version',
+    'menu.deviceHeading': 'On this device',
+    'menu.deviceNote': 'Nothing you save leaves the phone. Bookmarks, notes and settings live in one file here, and they survive app updates.',
     'wbw.title': 'Word by word',
     'wbw.previous': 'Previous ayahs',
     'wbw.next': 'Next ayahs',
@@ -422,6 +434,12 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'menu.bookmarks': 'Xatcho‘plar',
     'menu.settings': 'Sozlamalar',
     'menu.about': 'Dastur haqida',
+    'menu.lede': 'Xatcho‘plar, sozlamalar va ilova ma’lumotlari qayerdan olingani.',
+    'menu.bookmarksSub': 'Saqlangan oyatlar va ulardagi izohlar',
+    'menu.settingsSub': 'O‘qish, qiroat, ko‘rinish, til',
+    'menu.aboutSub': 'Manbalar, litsenziyalar va versiya',
+    'menu.deviceHeading': 'Shu qurilmada',
+    'menu.deviceNote': 'Saqlanganlar telefondan chiqmaydi. Xatcho‘plar, izohlar va sozlamalar shu yerdagi bitta faylda saqlanadi va ilova yangilanganda ham qoladi.',
     'wbw.title': 'So‘zma-so‘z',
     'wbw.previous': 'Oldingi oyatlar',
     'wbw.next': 'Keyingi oyatlar',
@@ -593,6 +611,12 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'menu.bookmarks': 'Закладки',
     'menu.settings': 'Настройки',
     'menu.about': 'О приложении',
+    'menu.lede': 'Закладки, настройки и источники каждого слова в приложении.',
+    'menu.bookmarksSub': 'Сохранённые аяты и заметки к ним',
+    'menu.settingsSub': 'Чтение, чтец, оформление, язык',
+    'menu.aboutSub': 'Источники, лицензии и версия',
+    'menu.deviceHeading': 'На этом устройстве',
+    'menu.deviceNote': 'Ничего из сохранённого не покидает телефон. Закладки, заметки и настройки хранятся в одном файле здесь и сохраняются при обновлении приложения.',
     'wbw.title': 'Пословно',
     'wbw.previous': 'Предыдущие аяты',
     'wbw.next': 'Следующие аяты',
