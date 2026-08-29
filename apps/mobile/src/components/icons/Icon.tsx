@@ -5,6 +5,7 @@ export type IconName =
   | 'home'
   | 'book'
   | 'bookmark'
+  | 'note'
   | 'settings'
   | 'words'
   | 'translate'
@@ -38,6 +39,11 @@ const PATHS: Record<IconName, string[]> = {
     'M20 5a2 2 0 0 0-2-2h-5v18h5a2 2 0 0 0 2-2z',
   ],
   bookmark: ['M6 3.5h12a1 1 0 0 1 1 1V21l-7-4.2L5 21V4.5a1 1 0 0 1 1-1z'],
+  // No web counterpart -- notes are a mobile feature. Drawn to the same 24-box
+  // and 1.8 stroke as the rest, and kept to straight segments so it stays a
+  // clean silhouette when `filled` closes it: body from nib to ferrule, then
+  // the ferrule line across it.
+  note: ['M4 20l1-4L16 5l3 3L8 19l-4 1z', 'M14.5 6.5l3 3'],
   settings: [
     'M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z',
     'M19.4 13a7.6 7.6 0 0 0 0-2l2-1.5-2-3.4-2.3 1a7.6 7.6 0 0 0-1.7-1l-.4-2.6h-4l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.3-1-2 3.4 2 1.5a7.6 7.6 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7.6 7.6 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.6 7.6 0 0 0 1.7-1l2.3 1 2-3.4z',
@@ -100,11 +106,17 @@ export function Icon({
   name,
   color,
   size = 24,
+  filled = false,
   testID,
 }: {
   name: IconName;
   color: ColorValue;
   size?: number;
+  /** Fill the glyph in its own colour as well as stroking it. The reader uses
+   *  it for on/off state -- a filled bookmark is saved, an outline one is not.
+   *  State must not ride on colour alone (WCAG 1.4.1), and once the labels
+   *  became icons the fill is the second channel that used to be the wording. */
+  filled?: boolean;
   /** So a test can say *which* glyph was drawn without asserting on path data,
    *  which is retuned whenever a chevron is re-centred. */
   testID?: string;
@@ -118,7 +130,7 @@ export function Icon({
       width={size}
       height={size}
       viewBox="0 0 24 24"
-      fill="none"
+      fill={filled ? color : 'none'}
       stroke={color}
       strokeWidth={1.8}
       strokeLinecap="round"

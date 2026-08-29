@@ -309,9 +309,9 @@ describe('BookmarksTab', () => {
   });
 
   it('distinguishes an annotated row from an empty one by more than its label', async () => {
-    // The label already differs, so TalkBack was fine; both glyphs were '✎' in
-    // the same muted colour, so a sighted user could not tell which rows carry
-    // a note. Same pair the reader uses.
+    // The label already differs, so TalkBack was fine; both glyphs used to be
+    // '✎' in the same muted colour, so a sighted user could not tell which rows
+    // carry a note. Now one glyph, filled or not -- same pair the reader uses.
     const userClient = requireUserClient();
     await setBookmark(userClient, 2, 255, true);
     await setBookmark(userClient, 2, 1, true);
@@ -319,8 +319,12 @@ describe('BookmarksTab', () => {
 
     render(<BookmarksTab />);
 
-    expect((await screen.findByLabelText('Edit note')).textContent).toBe('✐');
-    expect(screen.getByLabelText('Add note').textContent).toBe('✎');
+    const annotated = (await screen.findByLabelText('Edit note')).querySelector('svg');
+    const empty = screen.getByLabelText('Add note').querySelector('svg');
+    // Asserted as "filled vs not", not as two colours: colour alone would be a
+    // 1.4.1 failure and would also pass if both were accent.
+    expect(annotated?.getAttribute('fill')).not.toBe('none');
+    expect(empty?.getAttribute('fill')).toBe('none');
   });
 
   it('keeps the bookmark when a note is cleared', async () => {

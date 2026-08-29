@@ -1,9 +1,10 @@
 import { Link } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, SectionList, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, SectionList, Text, View } from 'react-native';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 
 import { GlassSurface } from '@/components/GlassSurface';
+import { Icon } from '@/components/icons/Icon';
 import { NoteEditor } from '@/components/NoteEditor';
 import { SegmentedControl } from '@/components/SegmentedControl';
 import { getBookmarkAyahTexts, getSurahList } from '@/data/corpusRepository';
@@ -301,24 +302,34 @@ function BookmarkRow({
         >
           {coordinate}
         </Link>
-        <Text
+        <Pressable
+          testID={`bookmark-note-${bookmark.surahId}-${bookmark.ayahNumber}`}
           accessibilityRole="button"
-          // The label distinguishes the two states, because the icon alone does
+          // The label distinguishes the two states, because the glyph alone does
           // not reach TalkBack.
           accessibilityLabel={t(uiLocale, bookmark.note === null ? 'bookmarks.addNote' : 'bookmarks.editNote')}
           onPress={onEditNote}
+          // A tap target, not a text run: the ✎/✐ pair this replaced was two
+          // font glyphs that rendered at whatever weight the system face had,
+          // beside two SVG controls in the reader doing the same job.
           style={{
-            // Same pair the reader uses (AyahCard, MushafAyah): a filled nib in
-            // the accent for a note that exists, an outline in muted for one to
-            // be written. Both branches were the same glyph in the same colour,
-            // so the row said nothing to a sighted user.
-            color: bookmark.note === null ? theme.mutedText : theme.accent,
-            paddingHorizontal: 8,
-            paddingVertical: 4,
+            minWidth: touchTargets.minimum,
+            minHeight: touchTargets.minimum,
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
-          {bookmark.note === null ? '✎' : '✐'}
-        </Text>
+          {/* Same pair the reader uses (AyahCard, MushafAyah): filled in the
+              accent for a note that exists, outline in muted for one still to
+              be written. */}
+          <Icon
+            testID={`bookmark-note-icon-${bookmark.surahId}-${bookmark.ayahNumber}`}
+            name="note"
+            filled={bookmark.note !== null}
+            color={bookmark.note === null ? theme.mutedText : theme.accent}
+            size={20}
+          />
+        </Pressable>
       </View>
       {text ? (
         <Text
