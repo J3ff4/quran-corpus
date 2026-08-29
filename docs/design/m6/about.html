@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<title>About</title>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri+Quran&display=swap" rel="stylesheet">
+<style>
+/* Recipe lifted verbatim from `Quran Corpus Glass.dc.html` (frames 1d/1h/1i) so
+   these sit beside the owner's own frames. Classes rather than the bundle's
+   inline attributes -- same pixels, a quarter of the bytes -- and every one is
+   `qc-` prefixed so a frame pasted back into that document cannot collide with
+   its `dv-` classes. */
+/* Both faces are served from the repo, so a frame renders correctly with no
+   network. Amiri Quran stays on Google Fonts as the Arabic fallback only. */
+@font-face{font-family:'Hafs';src:url('../../../apps/mobile/assets/fonts/hafs.18.woff2') format('woff2');font-display:swap}
+@font-face{font-family:'Newsreader';src:url('../../../apps/mobile/assets/fonts/Newsreader-Regular.ttf') format('truetype');font-weight:400;font-display:swap}
+@font-face{font-family:'Newsreader';src:url('../../../apps/mobile/assets/fonts/Newsreader-SemiBold.ttf') format('truetype');font-weight:600;font-display:swap}
+body{margin:0;padding:40px 44px;background:#e9e5dc;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+.qc-label{display:flex;align-items:baseline;gap:8px;font:400 11.5px/1.3 'Helvetica Neue',Helvetica,sans-serif;color:rgba(31,26,20,.6);margin:0 0 9px}
+.qc-id{font:600 10.5px/1 ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(31,26,20,.09);color:#1f1a14;border-radius:5px}
+.qc-frame{width:390px;height:844px;border-radius:46px;overflow:hidden;position:relative;background-color:#151412;box-shadow:0 26px 60px rgba(31,26,20,.32);color:#f1ede4}
+.qc-status{display:flex;align-items:center;justify-content:space-between;padding:16px 26px 0;font:500 13px/1 'Helvetica Neue',Helvetica,sans-serif;color:rgba(241,237,228,.85)}
+.qc-batt{display:block;width:22px;height:10px;border:1.4px solid rgba(241,237,228,.7);border-radius:3px}
+.qc-hero{border-radius:26px;background:rgba(255,255,255,.08);backdrop-filter:blur(30px) saturate(170%);border:1px solid rgba(255,255,255,.15);box-shadow:0 16px 38px rgba(0,0,0,.36),inset 0 1px 0 rgba(255,255,255,.2)}
+.qc-card{border-radius:20px;background:rgba(255,255,255,.055);backdrop-filter:blur(18px) saturate(145%);border:1px solid rgba(255,255,255,.1)}
+.qc-card-on{background:rgba(143,208,184,.1);border-color:rgba(143,208,184,.26)}
+.qc-eyebrow{font:400 10.5px/1 ui-monospace,Menlo,monospace;letter-spacing:.1em;text-transform:uppercase;color:rgba(241,237,228,.5)}
+.qc-mono{font:400 11.5px/1 ui-monospace,Menlo,monospace;color:rgba(241,237,228,.5)}
+.qc-serif{font-family:'Newsreader',Georgia,serif;font-weight:400}
+.qc-ar{font-family:'Hafs','Amiri Quran',serif}
+.qc-sub{font:400 12.5px/1.5 'Helvetica Neue',Helvetica,sans-serif;color:rgba(241,237,228,.7)}
+.qc-chip{padding:8px 13px;border-radius:11px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);font:500 11.5px/1 'Helvetica Neue',Helvetica,sans-serif;color:rgba(241,237,228,.8)}
+.qc-chip-on{background:rgba(143,208,184,.18);border-color:rgba(143,208,184,.32);color:#8fd0b8}
+.qc-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.qc-nav{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:14px 16px 0;padding:12px 18px;border-radius:22px;background:rgba(255,255,255,.08);backdrop-filter:blur(30px) saturate(170%);border:1px solid rgba(255,255,255,.15)}
+.qc-back{display:block;width:11px;height:11px;border-left:1.7px solid rgba(241,237,228,.8);border-bottom:1.7px solid rgba(241,237,228,.8);transform:rotate(45deg);margin-left:4px;flex:none}
+.qc-tabs{position:absolute;left:18px;right:18px;bottom:16px;display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-radius:26px;background:rgba(255,255,255,.09);backdrop-filter:blur(30px) saturate(170%);border:1px solid rgba(255,255,255,.16);box-shadow:0 14px 34px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.2)}
+.qc-tab{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:56px;font:500 10.5px/1 'Helvetica Neue',Helvetica,sans-serif;color:rgba(241,237,228,.6)}
+.qc-tab-on{color:#8fd0b8}
+.qc-i-read{display:block;width:17px;height:14px;border:1.6px solid currentColor;border-radius:3px}
+.qc-i-browse{display:block;width:15px;height:15px;border:1.6px solid currentColor;border-radius:50%}
+.qc-i-dict{display:block;width:14px;height:14px;border:1.6px solid currentColor;transform:rotate(45deg);border-radius:2px}
+.qc-i-more{display:flex;flex-direction:column;gap:3px;width:16px}
+.qc-i-more span{display:block;height:1.6px;background:currentColor}
+/* POS buckets -- the same four the reader's segment pills use. */
+.qc-pos-v{background:rgba(255,154,143,.12);border-color:rgba(255,154,143,.24);color:#ff9a8f}
+.qc-pos-n{background:rgba(127,176,255,.12);border-color:rgba(127,176,255,.24);color:#7fb0ff}
+.qc-pos-vn{background:rgba(195,176,232,.12);border-color:rgba(195,176,232,.24);color:#c3b0e8}
+.qc-pos-adj{background:rgba(232,196,119,.12);border-color:rgba(232,196,119,.26);color:#e8c477}
+.qc-pill{padding:5px 10px;border-radius:8px;font:500 10.5px/1 'Helvetica Neue',Helvetica,sans-serif}
+.qc-hl{background:rgba(111,217,184,.2);border-radius:6px;padding:1px 4px}
+.qc-ayah{font-family:'Hafs','Amiri Quran',serif;font-size:23px;line-height:1.95;direction:rtl;text-align:right;color:#f8f4ec;margin-top:9px}
+</style>
+
+<style>
+/* M6i additions to the bundle recipe. Everything above is lifted verbatim from
+   `Quran Corpus Glass.dc.html`; these are anatomy the bundle never had a frame
+   for -- a settings row, a switch, and a grouped card. */
+.qc-group{border-radius:20px;background:rgba(255,255,255,.055);backdrop-filter:blur(18px) saturate(145%);border:1px solid rgba(255,255,255,.1);padding:2px 15px}
+.qc-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.07)}
+.qc-item:last-child{border-bottom:none}
+.qc-item-label{font:500 13px/1.25 'Helvetica Neue',Helvetica,sans-serif;color:#f1ede4}
+.qc-item-sub{font:400 11px/1.35 'Helvetica Neue',Helvetica,sans-serif;color:rgba(241,237,228,.5);margin-top:3px}
+.qc-seg{display:flex;gap:5px;flex-wrap:wrap;margin:8px 0 1px}
+.qc-seg span{padding:6px 11px;border-radius:9px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);font:500 11px/1 'Helvetica Neue',Helvetica,sans-serif;color:rgba(241,237,228,.62)}
+.qc-seg span.on{background:rgba(143,208,184,.18);border-color:rgba(143,208,184,.34);color:#8fd0b8;font-weight:600}
+/* Never colour alone (WCAG 1.4.1): the knob position carries the state and the
+   accent only reinforces it -- the rule ChoiceOption's filled bullet follows. */
+.qc-sw{width:42px;height:24px;border-radius:12px;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.14);position:relative;flex:none}
+.qc-sw i{position:absolute;top:2px;left:3px;width:18px;height:18px;border-radius:50%;background:rgba(241,237,228,.55);display:block}
+.qc-sw.on{background:rgba(143,208,184,.26);border-color:rgba(143,208,184,.4)}
+.qc-sw.on i{left:auto;right:3px;background:#8fd0b8}
+.qc-chev{display:block;width:8px;height:8px;border-top:1.6px solid rgba(241,237,228,.45);border-right:1.6px solid rgba(241,237,228,.45);transform:rotate(45deg);flex:none}
+.qc-sect{font:400 10.5px/1 ui-monospace,Menlo,monospace;letter-spacing:.11em;text-transform:uppercase;color:rgba(241,237,228,.42);margin:15px 20px 7px}
+.qc-h1{font-family:'Newsreader',Georgia,serif;font-weight:600;font-size:27px;line-height:1.1;color:#f8f4ec;margin:12px 20px 2px}
+.qc-lede{font:400 12px/1.5 'Helvetica Neue',Helvetica,sans-serif;color:rgba(241,237,228,.55);margin:0 20px}
+.qc-body{font:400 11.5px/1.55 'Helvetica Neue',Helvetica,sans-serif;color:rgba(241,237,228,.62)}
+.qc-warn{margin:10px 18px 0;padding:11px 14px;border-radius:14px;background:rgba(232,140,119,.13);border:1px solid rgba(232,140,119,.3);font:500 11.5px/1.45 'Helvetica Neue',Helvetica,sans-serif;color:#e8ab99}
+/* The one thing the current About screen already says, kept: a source whose
+   licence nobody has cleared yet must say so rather than carry a term we made
+   up (CLAUDE.md §11). */
+.qc-pending{display:inline-block;margin-top:5px;padding:3px 8px;border-radius:7px;background:rgba(232,196,119,.12);border:1px solid rgba(232,196,119,.26);font:500 9.5px/1.2 'Helvetica Neue',Helvetica,sans-serif;color:#e8c477}
+.qc-i-menu{display:flex;flex-direction:column;gap:3px;width:16px}
+.qc-i-menu span{display:block;height:1.6px;background:currentColor}
+.qc-glyph{width:34px;height:34px;border-radius:12px;background:rgba(143,208,184,.14);border:1px solid rgba(143,208,184,.24);display:flex;align-items:center;justify-content:center;flex:none;color:#8fd0b8}
+</style>
+</head>
+
+<body>
+<div class="qc-label"><span class="qc-id">m6i-3</span>About &amp; credits &mdash; top of the screen, and scrolled to the audio and typeface notices</div>
+<div style="display:flex;gap:30px;flex-wrap:wrap;align-items:flex-start">
+<div><div class="qc-frame" style="background-image:radial-gradient(110% 50% at 24% -6%,rgba(31,111,91,.5),rgba(31,111,91,0) 62%),radial-gradient(100% 60% at 90% 88%,rgba(18,70,58,.5),rgba(18,70,58,0) 70%)">
+    <div class="qc-status"><span>9:41</span><span class="qc-batt"></span></div>
+    <div class="qc-h1">About</div>
+    <div class="qc-lede">Quran Corpus 0.9.0. Every word of this app&#8217;s data came from somewhere, and this is where it says so.</div>
+
+    <div class="qc-sect">Text and translation</div>
+    <div class="qc-group" style="margin:0 18px">
+        <div class="qc-item">
+          <span style="flex:1">
+            <span style="display:block" class="qc-item-label">Tanzil</span>
+            <span style="display:block;margin-top:4px" class="qc-item-sub">Uthmani Quran text.</span>
+            <span class="qc-pending">Licence approval pending</span>
+          </span>
+        </div>
+        <div class="qc-item">
+          <span style="flex:1">
+            <span style="display:block" class="qc-item-label">corpus.quran.com</span>
+            <span style="display:block;margin-top:4px" class="qc-item-sub">Word-by-word morphology and grammar. GNU General Public License.</span>
+            
+          </span>
+        </div>
+        <div class="qc-item">
+          <span style="flex:1">
+            <span style="display:block" class="qc-item-label">QuranEnc</span>
+            <span style="display:block;margin-top:4px" class="qc-item-sub">Translations, including the Russian sets.</span>
+            <span class="qc-pending">Licence approval pending</span>
+          </span>
+        </div>
+    </div>
+
+    <div class="qc-sect">Dictionary</div>
+    <div class="qc-group" style="margin:0 18px">
+        <div class="qc-item">
+          <span style="flex:1">
+            <span style="display:block" class="qc-item-label">Lane&#8217;s Lexicon</span>
+            <span style="display:block;margin-top:4px" class="qc-item-sub">Root definitions, via qurandev/roots. Public domain.</span>
+            
+          </span>
+        </div>
+        <div class="qc-item">
+          <span style="flex:1">
+            <span style="display:block" class="qc-item-label">Hans Wehr</span>
+            <span style="display:block;margin-top:4px" class="qc-item-sub">Concise modern glosses, shown first on a root entry.</span>
+            <span class="qc-pending">Licence approval pending</span>
+          </span>
+        </div>
+        <div class="qc-item">
+          <span style="flex:1">
+            <span style="display:block" class="qc-item-label">Editorial glosses</span>
+            <span style="display:block;margin-top:4px" class="qc-item-sub">Fourteen roots written for this app where no source covered them.</span>
+            
+          </span>
+        </div>
+    </div>
+
+    <div class="qc-tabs" style="padding:12px 14px">
+      <div class="qc-tab" style="min-width:48px;font-size:9.5px"><span style="display:block;width:15px;height:14px;border:1.6px solid currentColor;border-radius:3px"></span><span>Home</span></div>
+      <div class="qc-tab" style="min-width:48px;font-size:9.5px"><span class="qc-i-read"></span><span>Surahs</span></div>
+      <div class="qc-tab" style="min-width:48px;font-size:9.5px"><span style="display:block;width:15px;height:15px;border:1.6px solid currentColor;border-radius:50%"></span><span>Words</span></div>
+      <div class="qc-tab" style="min-width:48px;font-size:9.5px"><span class="qc-i-dict"></span><span>Dictionary</span></div>
+      <div class="qc-tab qc-tab-on" style="min-width:48px;font-size:9.5px"><span class="qc-i-menu"><span></span><span></span><span></span></span><span>More</span></div>
+      </div>
+</div><div class="qc-label" style="margin:9px 0 0;font-size:11px">Top</div></div>
+<div><div class="qc-frame" style="background-image:radial-gradient(110% 50% at 24% -6%,rgba(31,111,91,.5),rgba(31,111,91,0) 62%),radial-gradient(100% 60% at 90% 88%,rgba(18,70,58,.5),rgba(18,70,58,0) 70%)">
+    <div class="qc-status"><span>9:41</span><span class="qc-batt"></span></div>
+<div class="qc-nav"><span class="qc-back"></span><span class="qc-eyebrow">About</span><span style="width:11px"></span></div>
+
+    <div class="qc-sect">Recitation</div>
+    <div class="qc-group" style="margin:0 18px">
+        <div class="qc-item">
+          <span style="flex:1">
+            <span style="display:block" class="qc-item-label">everyayah.com</span>
+            <span style="display:block" class="qc-item-sub">Streamed per-ayah audio. Ten reciters, chosen in Settings:</span>
+            <span style="display:block;margin-top:7px"><span style="display:block" class="qc-body">Mahmoud Khalil Al-Husary (Murattal)</span><span style="display:block" class="qc-body">Al-Husary (Muallim)</span><span style="display:block" class="qc-body">Al-Husary (Mujawwad)</span><span style="display:block" class="qc-body">Mohamed Siddiq El-Minshawi (Murattal)</span><span style="display:block" class="qc-body">El-Minshawi (Mujawwad)</span><span style="display:block" class="qc-body">Abdul Basit (Murattal)</span><span style="display:block" class="qc-body">Abdurrahman As-Sudais</span><span style="display:block" class="qc-body">Saud Al-Shuraim</span><span style="display:block" class="qc-body">Abu Bakr Al-Shatri</span><span style="display:block" class="qc-body">Muhammad Ayyoub</span></span>
+          </span>
+        </div>
+    </div>
+
+    <div class="qc-sect">Typefaces</div>
+    <div class="qc-group" style="margin:0 18px">
+        <div class="qc-item">
+          <span style="flex:1">
+            <span style="display:block" class="qc-item-label">Newsreader</span>
+            <span style="display:block;margin-top:4px" class="qc-item-sub">SIL Open Font License 1.1. Copyright 2019 The Newsreader Project Authors. The full licence text ships with the app.</span>
+            
+          </span>
+        </div>
+        <div class="qc-item">
+          <span style="flex:1">
+            <span style="display:block" class="qc-item-label">Hafs</span>
+            <span style="display:block;margin-top:4px" class="qc-item-sub">The Arabic face the Quran text itself is set in.</span>
+            <span class="qc-pending">Licence approval pending</span>
+          </span>
+        </div>
+    </div>
+
+    <div class="qc-tabs" style="padding:12px 14px">
+      <div class="qc-tab" style="min-width:48px;font-size:9.5px"><span style="display:block;width:15px;height:14px;border:1.6px solid currentColor;border-radius:3px"></span><span>Home</span></div>
+      <div class="qc-tab" style="min-width:48px;font-size:9.5px"><span class="qc-i-read"></span><span>Surahs</span></div>
+      <div class="qc-tab" style="min-width:48px;font-size:9.5px"><span style="display:block;width:15px;height:15px;border:1.6px solid currentColor;border-radius:50%"></span><span>Words</span></div>
+      <div class="qc-tab" style="min-width:48px;font-size:9.5px"><span class="qc-i-dict"></span><span>Dictionary</span></div>
+      <div class="qc-tab qc-tab-on" style="min-width:48px;font-size:9.5px"><span class="qc-i-menu"><span></span><span></span><span></span></span><span>More</span></div>
+      </div>
+</div><div class="qc-label" style="margin:9px 0 0;font-size:11px">Scrolled &mdash; ten reciters and the OFL notice</div></div>
+</div>
+</body>
+</html>

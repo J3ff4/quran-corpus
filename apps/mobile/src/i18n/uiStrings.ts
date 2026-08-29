@@ -11,6 +11,12 @@ export type UiStringKey =
   | 'menu.bookmarks'
   | 'menu.settings'
   | 'menu.about'
+  | 'menu.lede'
+  | 'menu.bookmarksSub'
+  | 'menu.settingsSub'
+  | 'menu.aboutSub'
+  | 'menu.deviceHeading'
+  | 'menu.deviceNote'
   | 'wbw.title'
   | 'wbw.previous'
   | 'wbw.next'
@@ -163,8 +169,6 @@ export type UiStringKey =
   | 'settings.language'
   | 'settings.theme'
   | 'settings.about'
-  | 'settings.analyticsOn'
-  | 'settings.analyticsOff'
   | 'settings.storageUnavailable'
   | 'settings.themeSystem'
   | 'settings.themeLight'
@@ -174,10 +178,20 @@ export type UiStringKey =
   | 'settings.arabicSizeMedium'
   | 'settings.arabicSizeLarge'
   | 'settings.arabicSizeXlarge'
-  | 'settings.reduceMotionOn'
-  | 'settings.reduceMotionOff'
+  | 'settings.arabicSizeHint'
+  | 'settings.wbwDensity'
+  | 'settings.wbwDensityHint'
+  | 'settings.continuousHint'
+  | 'settings.reduceMotion'
+  | 'settings.reduceMotionHint'
+  | 'settings.analytics'
+  | 'settings.analyticsHint'
+  | 'settings.interface'
+  | 'settings.groupReading'
+  | 'settings.groupRecitation'
+  | 'settings.groupAppearance'
+  | 'settings.groupPrivacy'
   | 'about.title'
-  | 'about.credits'
   | 'about.sourceApprovalIncomplete'
   | 'about.sourceArabic'
   | 'about.sourceEnglish'
@@ -185,6 +199,15 @@ export type UiStringKey =
   | 'about.sourceRussian'
   | 'about.sourceHafs'
   | 'about.sourceAudio'
+  | 'about.sourceCorpus'
+  | 'about.sourceLane'
+  | 'about.sourceHansWehr'
+  | 'about.sourceEditorial'
+  | 'about.sourceNewsreader'
+  | 'about.groupText'
+  | 'about.groupDictionary'
+  | 'about.groupRecitation'
+  | 'about.groupTypefaces'
   | 'search.title'
   | 'search.placeholder'
   | 'search.jump'
@@ -246,6 +269,12 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'menu.bookmarks': 'Bookmarks',
     'menu.settings': 'Settings',
     'menu.about': 'About & credits',
+    'menu.lede': 'Bookmarks, settings, and where every word of this app came from.',
+    'menu.bookmarksSub': 'Saved ayahs and the notes on them',
+    'menu.settingsSub': 'Reading, recitation, appearance, language',
+    'menu.aboutSub': 'Sources, licences and version',
+    'menu.deviceHeading': 'On this device',
+    'menu.deviceNote': 'Nothing you save leaves the phone. Bookmarks, notes and settings live in one file here, and they survive app updates.',
     'wbw.title': 'Word by word',
     'wbw.previous': 'Previous ayahs',
     'wbw.next': 'Next ayahs',
@@ -349,8 +378,6 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.language': 'Language',
     'settings.theme': 'Theme',
     'settings.about': 'About and credits',
-    'settings.analyticsOn': 'Analytics: On',
-    'settings.analyticsOff': 'Analytics: Off',
     'settings.storageUnavailable': 'Settings cannot be saved right now. Changes may be lost when you close the app.',
     'settings.themeSystem': 'System',
     'settings.themeLight': 'Light',
@@ -360,19 +387,38 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.arabicSizeMedium': 'Medium',
     'settings.arabicSizeLarge': 'Large',
     'settings.arabicSizeXlarge': 'Extra large',
-    'settings.reduceMotionOn': 'Reduce animations: on',
-    'settings.reduceMotionOff': 'Reduce animations: off',
+    'settings.arabicSizeHint': 'Scales the Quran text, not the interface',
+    'settings.wbwDensity': 'Word by word',
+    'settings.wbwDensityHint': 'How the words screen packs its cells',
+    'settings.continuousHint': 'Keep going to the next ayah',
+    'settings.reduceMotion': 'Reduce animations',
+    'settings.reduceMotionHint': 'Adds to your system setting, never overrides it',
+    'settings.analytics': 'Analytics',
+    'settings.analyticsHint': 'Nothing leaves the device today; this only stores the preference',
+    'settings.interface': 'Interface',
+    'settings.groupReading': 'Reading',
+    'settings.groupRecitation': 'Recitation',
+    'settings.groupAppearance': 'Appearance',
+    'settings.groupPrivacy': 'Privacy',
     'about.title': 'About Quran Corpus',
-    'about.credits': 'Credits',
     'about.sourceApprovalIncomplete': 'Source approval incomplete',
-    'about.sourceArabic': 'Arabic Quran text: Tanzil Uthmani XML via existing PWA importer. Source approval incomplete.',
-    'about.sourceEnglish': 'English translation: Saheeh International. Source approval incomplete.',
-    'about.sourceUzbek': 'Uzbek translation: Muhammad Sodik Muhammad Yusuf. Source approval incomplete.',
-    'about.sourceRussian': 'Russian translation: Abu Adel. Source approval incomplete.',
-    'about.sourceHafs': 'Hafs font: apps/mobile/assets/fonts/hafs.18.woff2. Source approval incomplete.',
+    'about.sourceArabic': 'Uthmani Quran text, from Tanzil.',
+    'about.sourceEnglish': 'The English translation the reader shows.',
+    'about.sourceUzbek': 'The Uzbek translation the reader shows.',
+    'about.sourceRussian': 'The Russian translation the reader shows.',
+    'about.sourceHafs': 'The Arabic face the Quran text itself is set in.',
     // Names the host, not a reciter: ten of them are selectable now, so a
     // single hard-coded name would be wrong for nine of the choices.
-    'about.sourceAudio': 'Recitation: everyayah.com, reciter chosen in Settings. Source approval incomplete.',
+    'about.sourceAudio': 'Streamed per-ayah audio. The voice is chosen in Settings; every reciter the app can play is listed below.',
+    'about.sourceCorpus': 'Word-by-word morphology and grammar. GNU General Public License.',
+    'about.sourceLane': 'Root definitions, via qurandev/roots. Public domain.',
+    'about.sourceHansWehr': 'Concise modern glosses, shown first on a root entry.',
+    'about.sourceEditorial': 'Roots written for this app, where no source covered them.',
+    'about.sourceNewsreader': 'SIL Open Font License 1.1. Copyright 2020 The Newsreader Project Authors.',
+    'about.groupText': 'Text and translation',
+    'about.groupDictionary': 'Dictionary',
+    'about.groupRecitation': 'Recitation',
+    'about.groupTypefaces': 'Typefaces',
     'search.title': 'Search',
     'search.placeholder': 'Verse, word or root',
     'search.jump': 'Go to',
@@ -422,6 +468,12 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'menu.bookmarks': 'Xatcho‘plar',
     'menu.settings': 'Sozlamalar',
     'menu.about': 'Dastur haqida',
+    'menu.lede': 'Xatcho‘plar, sozlamalar va ilova ma’lumotlari qayerdan olingani.',
+    'menu.bookmarksSub': 'Saqlangan oyatlar va ulardagi izohlar',
+    'menu.settingsSub': 'O‘qish, qiroat, ko‘rinish, til',
+    'menu.aboutSub': 'Manbalar, litsenziyalar va versiya',
+    'menu.deviceHeading': 'Shu qurilmada',
+    'menu.deviceNote': 'Saqlanganlar telefondan chiqmaydi. Xatcho‘plar, izohlar va sozlamalar shu yerdagi bitta faylda saqlanadi va ilova yangilanganda ham qoladi.',
     'wbw.title': 'So‘zma-so‘z',
     'wbw.previous': 'Oldingi oyatlar',
     'wbw.next': 'Keyingi oyatlar',
@@ -525,8 +577,6 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.language': 'Til',
     'settings.theme': 'Mavzu',
     'settings.about': 'Ilova va manbalar',
-    'settings.analyticsOn': 'Tahlil: yoqilgan',
-    'settings.analyticsOff': 'Tahlil: o‘chirilgan',
     'settings.storageUnavailable': 'Sozlamalarni hozir saqlab bo‘lmaydi. Ilovani yopganingizda o‘zgarishlar yo‘qolishi mumkin.',
     'settings.themeSystem': 'Tizim',
     'settings.themeLight': 'Yorug‘',
@@ -536,17 +586,36 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.arabicSizeMedium': 'O‘rtacha',
     'settings.arabicSizeLarge': 'Katta',
     'settings.arabicSizeXlarge': 'Juda katta',
-    'settings.reduceMotionOn': 'Animatsiyalarni kamaytirish: yoqilgan',
-    'settings.reduceMotionOff': 'Animatsiyalarni kamaytirish: o‘chirilgan',
+    'settings.arabicSizeHint': 'Qur’on matnini kattalashtiradi, interfeysni emas',
+    'settings.wbwDensity': 'So‘zma-so‘z',
+    'settings.wbwDensityHint': 'So‘zlar ekranidagi katakchalar zichligi',
+    'settings.continuousHint': 'Keyingi oyatga o‘tib davom etadi',
+    'settings.reduceMotion': 'Animatsiyalarni kamaytirish',
+    'settings.reduceMotionHint': 'Tizim sozlamasiga qo‘shiladi, uni bekor qilmaydi',
+    'settings.analytics': 'Tahlil',
+    'settings.analyticsHint': 'Hozircha qurilmadan hech narsa chiqmaydi; faqat tanlov saqlanadi',
+    'settings.interface': 'Interfeys',
+    'settings.groupReading': 'O‘qish',
+    'settings.groupRecitation': 'Qiroat',
+    'settings.groupAppearance': 'Ko‘rinish',
+    'settings.groupPrivacy': 'Maxfiylik',
     'about.title': 'Quran Corpus haqida',
-    'about.credits': 'Manbalar',
     'about.sourceApprovalIncomplete': 'Manba tasdig‘i tugallanmagan',
-    'about.sourceArabic': 'Arabcha Qur’on matni: mavjud PWA importeri orqali Tanzil Uthmani XML. Manba tasdig‘i tugallanmagan.',
-    'about.sourceEnglish': 'Inglizcha tarjima: Saheeh International. Manba tasdig‘i tugallanmagan.',
-    'about.sourceUzbek': 'O‘zbekcha tarjima: Muhammad Sodik Muhammad Yusuf. Manba tasdig‘i tugallanmagan.',
-    'about.sourceRussian': 'Ruscha tarjima: Abu Adel. Manba tasdig‘i tugallanmagan.',
-    'about.sourceHafs': 'Hafs shrifti: apps/mobile/assets/fonts/hafs.18.woff2. Manba tasdig‘i tugallanmagan.',
-    'about.sourceAudio': 'Qiroat: everyayah.com, qori Sozlamalarda tanlanadi. Manba tasdig‘i tugallanmagan.',
+    'about.sourceArabic': 'Usmoniy yozuvidagi Qur’on matni, Tanzil’dan.',
+    'about.sourceEnglish': 'O‘quvchi ko‘rsatadigan inglizcha tarjima.',
+    'about.sourceUzbek': 'O‘quvchi ko‘rsatadigan o‘zbekcha tarjima.',
+    'about.sourceRussian': 'O‘quvchi ko‘rsatadigan ruscha tarjima.',
+    'about.sourceHafs': 'Qur’on matni shu arabcha shriftda teriladi.',
+    'about.sourceAudio': 'Har bir oyat uchun oqim orqali audio. Qori Sozlamalarda tanlanadi; ilova ijro eta oladigan barcha qorilar quyida.',
+    'about.sourceCorpus': 'So‘zma-so‘z morfologiya va grammatika. GNU General Public License.',
+    'about.sourceLane': 'O‘zak ta’riflari, qurandev/roots orqali. Jamoat mulki.',
+    'about.sourceHansWehr': 'Qisqa zamonaviy ma’nolar, o‘zak sahifasida birinchi ko‘rsatiladi.',
+    'about.sourceEditorial': 'Hech bir manba qamrab olmagan o‘zaklar shu ilova uchun yozilgan.',
+    'about.sourceNewsreader': 'SIL Open Font License 1.1. Copyright 2020 The Newsreader Project Authors.',
+    'about.groupText': 'Matn va tarjima',
+    'about.groupDictionary': 'Lug‘at',
+    'about.groupRecitation': 'Qiroat',
+    'about.groupTypefaces': 'Shriftlar',
     'search.title': 'Qidiruv',
     'search.placeholder': 'Oyat, so‘z yoki o‘zak',
     'search.jump': 'O‘tish',
@@ -593,6 +662,12 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'menu.bookmarks': 'Закладки',
     'menu.settings': 'Настройки',
     'menu.about': 'О приложении',
+    'menu.lede': 'Закладки, настройки и источники каждого слова в приложении.',
+    'menu.bookmarksSub': 'Сохранённые аяты и заметки к ним',
+    'menu.settingsSub': 'Чтение, чтец, оформление, язык',
+    'menu.aboutSub': 'Источники, лицензии и версия',
+    'menu.deviceHeading': 'На этом устройстве',
+    'menu.deviceNote': 'Ничего из сохранённого не покидает телефон. Закладки, заметки и настройки хранятся в одном файле здесь и сохраняются при обновлении приложения.',
     'wbw.title': 'Пословно',
     'wbw.previous': 'Предыдущие аяты',
     'wbw.next': 'Следующие аяты',
@@ -697,8 +772,6 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.language': 'Язык',
     'settings.theme': 'Тема',
     'settings.about': 'О приложении и источниках',
-    'settings.analyticsOn': 'Аналитика: включена',
-    'settings.analyticsOff': 'Аналитика: выключена',
     'settings.storageUnavailable': 'Настройки сейчас не сохраняются. Изменения могут быть потеряны при закрытии приложения.',
     'settings.themeSystem': 'Система',
     'settings.themeLight': 'Светлая',
@@ -708,17 +781,36 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.arabicSizeMedium': 'Средний',
     'settings.arabicSizeLarge': 'Крупный',
     'settings.arabicSizeXlarge': 'Очень крупный',
-    'settings.reduceMotionOn': 'Меньше анимации: включено',
-    'settings.reduceMotionOff': 'Меньше анимации: выключено',
+    'settings.arabicSizeHint': 'Увеличивает текст Корана, а не интерфейс',
+    'settings.wbwDensity': 'Пословный разбор',
+    'settings.wbwDensityHint': 'Насколько плотно расположены слова на экране разбора',
+    'settings.continuousHint': 'Продолжать со следующего аята',
+    'settings.reduceMotion': 'Меньше анимации',
+    'settings.reduceMotionHint': 'Добавляется к системной настройке, не отменяет её',
+    'settings.analytics': 'Аналитика',
+    'settings.analyticsHint': 'Сейчас ничего не покидает устройство; хранится только сама настройка',
+    'settings.interface': 'Интерфейс',
+    'settings.groupReading': 'Чтение',
+    'settings.groupRecitation': 'Чтение вслух',
+    'settings.groupAppearance': 'Оформление',
+    'settings.groupPrivacy': 'Конфиденциальность',
     'about.title': 'О Quran Corpus',
-    'about.credits': 'Источники',
     'about.sourceApprovalIncomplete': 'Подтверждение источников не завершено',
-    'about.sourceArabic': 'Арабский текст Корана: Tanzil Uthmani XML через существующий PWA-импортер. Подтверждение источника не завершено.',
-    'about.sourceEnglish': 'Английский перевод: Saheeh International. Подтверждение источника не завершено.',
-    'about.sourceUzbek': 'Узбекский перевод: Muhammad Sodik Muhammad Yusuf. Подтверждение источника не завершено.',
-    'about.sourceRussian': 'Русский перевод: Abu Adel. Подтверждение источника не завершено.',
-    'about.sourceHafs': 'Шрифт Hafs: apps/mobile/assets/fonts/hafs.18.woff2. Подтверждение источника не завершено.',
-    'about.sourceAudio': 'Чтение: everyayah.com, чтец выбирается в настройках. Подтверждение источника не завершено.',
+    'about.sourceArabic': 'Текст Корана в написании усмани, из Tanzil.',
+    'about.sourceEnglish': 'Английский перевод, который показывает читалка.',
+    'about.sourceUzbek': 'Узбекский перевод, который показывает читалка.',
+    'about.sourceRussian': 'Русский перевод, который показывает читалка.',
+    'about.sourceHafs': 'Арабский шрифт, которым набран сам текст Корана.',
+    'about.sourceAudio': 'Потоковое аудио по аятам. Чтец выбирается в настройках; ниже перечислены все, кого приложение может воспроизвести.',
+    'about.sourceCorpus': 'Пословная морфология и грамматика. GNU General Public License.',
+    'about.sourceLane': 'Определения корней, через qurandev/roots. Общественное достояние.',
+    'about.sourceHansWehr': 'Краткие современные значения, показываются первыми на странице корня.',
+    'about.sourceEditorial': 'Корни, написанные для этого приложения там, где их не покрыл ни один источник.',
+    'about.sourceNewsreader': 'SIL Open Font License 1.1. Copyright 2020 The Newsreader Project Authors.',
+    'about.groupText': 'Текст и перевод',
+    'about.groupDictionary': 'Словарь',
+    'about.groupRecitation': 'Чтение',
+    'about.groupTypefaces': 'Шрифты',
     'search.title': 'Поиск',
     'search.placeholder': 'Аят, слово или корень',
     'search.jump': 'Перейти',

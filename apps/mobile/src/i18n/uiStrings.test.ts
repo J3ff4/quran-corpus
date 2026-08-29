@@ -14,6 +14,10 @@ const ALLOWED_COLLISIONS: Partial<Record<UiStringKey, readonly ('uz' | 'ru')[]>>
   'browse.juzLabel': ['uz'],
   // Same again: "Mushaf" is the Arabic muṣḥaf, spelled the same in Uzbek.
   'reader.modeMushaf': ['uz'],
+  // The OFL requires its notice to be reproduced, and reproducing it means the
+  // English wording -- a translated licence notice is not the notice. The
+  // sentence around it is the credit; this string IS the legal text.
+  'about.sourceNewsreader': ['uz', 'ru'],
 };
 
 // Concatenate every .ts/.tsx source file under src/ and app/, except the

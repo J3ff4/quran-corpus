@@ -1,35 +1,72 @@
 import React from 'react';
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MenuScreen } from './MenuScreen';
+
+const mocks = vi.hoisted(() => ({ push: vi.fn() }));
 
 vi.mock('@/settings/settingsStore', () => ({
   useAppSettings: () => ({ uiLocale: 'en' }),
 }));
 
-vi.mock('expo-router', async () => {
-  const React = await import('react');
+vi.mock('expo-constants', () => ({
+  default: { expoConfig: { version: '1.2.3' } },
+}));
+
+vi.mock('expo-router', () => ({
+  router: { push: (...args: unknown[]) => mocks.push(...args) },
+}));
+
+vi.mock('react-native', async () => {
+  const { host, StyleSheet } = await import('@/testing/rnHosts.js');
   return {
-    Link: ({ href, children }: { href: string; children: React.ReactNode }) =>
-      React.createElement('a', { href }, children),
+    AccessibilityInfo: {
+      isReduceMotionEnabled: async () => false,
+      addEventListener: () => ({ remove: () => {} }),
+    },
+    Pressable: host('button'),
+    ScrollView: host('div'),
+    StyleSheet,
+    Text: host('span'),
+    View: host('div'),
   };
 });
 
-vi.mock('react-native', async () => {
-  const { host } = await import('@/testing/rnHosts.js');
-  return { Text: host('span'), View: host('div'), ScrollView: host('div') };
-});
-
 describe('MenuScreen', () => {
+  beforeEach(() => mocks.push.mockReset());
   afterEach(cleanup);
 
-  it('links to bookmarks, settings and about', () => {
+  it('opens bookmarks, settings and about', () => {
     render(<MenuScreen />);
 
     // The three destinations the tab bar gave up a slot for. A missing row
     // here is a screen the user can no longer reach at all.
-    expect(screen.getByText('Bookmarks').closest('a')?.getAttribute('href')).toBe('/bookmarks');
-    expect(screen.getByText('Settings').closest('a')?.getAttribute('href')).toBe('/settings');
-    expect(screen.getByText('About & credits').closest('a')?.getAttribute('href')).toBe('/about');
+    for (const [icon, href] of [
+      ['bookmark', '/bookmarks'],
+      ['settings', '/settings'],
+      ['info', '/about'],
+    ]) {
+      fireEvent.click(screen.getByTestId(`menu-row-${icon}`));
+      expect(mocks.push).toHaveBeenLastCalledWith(href);
+    }
+  });
+
+  it('names each row with what is behind it', () => {
+    render(<MenuScreen />);
+
+    // Label, not hint: TalkBack reads a hint only after a pause, so a row that
+    // announces as the bare word "Settings" says nothing about what is inside.
+    expect(screen.getByTestId('menu-row-settings').getAttribute('aria-label')).toBe(
+      'Settings. Reading, recitation, appearance, language',
+    );
+  });
+
+  it('reads the version from the app config', () => {
+    render(<MenuScreen />);
+
+    // Asserted against the mocked config rather than a literal: this line
+    // exists to be quoted back in a bug report, and a hardcoded version is
+    // wrong one release after it is typed.
+    expect(screen.getByTestId('app-version').textContent).toBe('Quran Corpus 1.2.3');
   });
 });

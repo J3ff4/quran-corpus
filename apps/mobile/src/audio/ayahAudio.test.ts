@@ -544,10 +544,12 @@ function renderRecitation({
       useRecitation(surahId, ayahCount, reciter, {
         surahName: 'Al-Fatihah',
         createDriver: player.create,
+        // A prop, not a setter call: continuous play is a saved setting the
+        // caller owns (M6i), so the only way to model it is to pass it in.
+        continuous,
       }),
     { initialProps: props },
   );
-  if (continuous) act(() => hook.result.current.setContinuous(true));
 
   return {
     state: () => hook.result.current,

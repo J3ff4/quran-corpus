@@ -5,6 +5,7 @@ import SurahRoute from '../../app/surah/[surahId]';
 import { deferred } from '../testing/deferred';
 
 const mocks = vi.hoisted(() => ({
+  setContinuousPlay: vi.fn(),
   params: { surahId: '2' } as Record<string, string>,
   setBookmark: vi.fn(),
   recordReadingPosition: vi.fn(),
@@ -34,7 +35,6 @@ vi.mock('@/audio/ayahAudio', () => ({
     durationSec: Number.NaN,
     error: null,
     continuous: false,
-    setContinuous: vi.fn(),
     toggleAyah: vi.fn(),
     seekTo: vi.fn(),
     skipNext: vi.fn(),
@@ -142,6 +142,10 @@ vi.mock('@/settings/settingsStore', () => ({
     contentLanguage: 'en',
     setContentLanguage: vi.fn(),
     uiLocale: mocks.uiLocale,
+    // The reader reads continuous play from the settings store now rather than
+    // from the recitation hook's own state (M6i).
+    continuousPlay: false,
+    setContinuousPlay: mocks.setContinuousPlay,
   }),
 }));
 

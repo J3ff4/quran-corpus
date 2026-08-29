@@ -74,8 +74,17 @@ export default function SurahRoute() {
   // Validated the same way as surahId -- it arrives from a URL, so it is
   // untrusted input even when we are the only ones writing the links.
   const routeAyahNumber = useMemo(() => parseAyahNumber(params.ayah), [params.ayah]);
-  const { contentLanguage, setContentLanguage, uiLocale, readerMode, setReaderMode, reciterId, setReciterId } =
-    useAppSettings();
+  const {
+    contentLanguage,
+    setContentLanguage,
+    uiLocale,
+    readerMode,
+    setReaderMode,
+    reciterId,
+    setReciterId,
+    continuousPlay,
+    setContinuousPlay,
+  } = useAppSettings();
   const theme = useThemeColors();
   // The surah it was loaded FOR, carried with it. Not read back off the
   // payload: what makes the held copy safe is that it answers the request the
@@ -108,6 +117,7 @@ export default function SurahRoute() {
   // sounding keeps its source (device check 87).
   const audio = useRecitation(surahId, reader?.data.surah.ayah_count ?? 0, reciterId, {
     surahName: reader?.data.surah.name_translit,
+    continuous: continuousPlay,
   });
   // Kept so the reader can query words for the ayahs scrolling into view,
   // rather than reopening the database on every tap.
@@ -357,7 +367,10 @@ export default function SurahRoute() {
           onSkipNext: audio.skipNext,
           onSkipPrevious: audio.skipPrevious,
           onSeek: audio.seekTo,
-          onToggleContinuous: () => audio.setContinuous(!audio.continuous),
+          // Straight to the setting: the bar and the Settings switch are two
+          // views of one stored value, not two toggles that have to be kept
+          // in step.
+          onToggleContinuous: () => setContinuousPlay(!continuousPlay),
         }}
         uiLocale={uiLocale}
         contentLanguage={contentLanguage}

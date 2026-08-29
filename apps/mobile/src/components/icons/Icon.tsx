@@ -10,6 +10,7 @@ export type IconName =
   | 'translate'
   | 'dictionary'
   | 'menu'
+  | 'info'
   | 'search'
   | 'back'
   | 'chevronLeft'
@@ -59,6 +60,11 @@ const PATHS: Record<IconName, string[]> = {
     'M12 6v14',
   ],
   menu: ['M4 6h16M4 12h16M4 18h16'],
+  // The About row's glyph, and the only one of the three Menu rows with no
+  // icon already. Ring plus stem plus a zero-length dot: the dot is drawn as a
+  // 0.2-unit segment rather than a filled circle so it takes the same round
+  // cap and stroke width as everything else in the set.
+  info: ['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z', 'M12 11v6', 'M12 7.4v.2'],
   // Circle plus handle, matching web's SearchTrigger (circle cx=11 cy=11 r=7,
   // handle from 20,20). The circle is drawn as two arcs closing back on
   // itself, the same technique `translate`'s outer ring above uses.
