@@ -192,7 +192,6 @@ export type UiStringKey =
   | 'settings.groupAppearance'
   | 'settings.groupPrivacy'
   | 'about.title'
-  | 'about.credits'
   | 'about.sourceApprovalIncomplete'
   | 'about.sourceArabic'
   | 'about.sourceEnglish'
@@ -200,6 +199,15 @@ export type UiStringKey =
   | 'about.sourceRussian'
   | 'about.sourceHafs'
   | 'about.sourceAudio'
+  | 'about.sourceCorpus'
+  | 'about.sourceLane'
+  | 'about.sourceHansWehr'
+  | 'about.sourceEditorial'
+  | 'about.sourceNewsreader'
+  | 'about.groupText'
+  | 'about.groupDictionary'
+  | 'about.groupRecitation'
+  | 'about.groupTypefaces'
   | 'search.title'
   | 'search.placeholder'
   | 'search.jump'
@@ -393,16 +401,24 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.groupAppearance': 'Appearance',
     'settings.groupPrivacy': 'Privacy',
     'about.title': 'About Quran Corpus',
-    'about.credits': 'Credits',
     'about.sourceApprovalIncomplete': 'Source approval incomplete',
-    'about.sourceArabic': 'Arabic Quran text: Tanzil Uthmani XML via existing PWA importer. Source approval incomplete.',
-    'about.sourceEnglish': 'English translation: Saheeh International. Source approval incomplete.',
-    'about.sourceUzbek': 'Uzbek translation: Muhammad Sodik Muhammad Yusuf. Source approval incomplete.',
-    'about.sourceRussian': 'Russian translation: Abu Adel. Source approval incomplete.',
-    'about.sourceHafs': 'Hafs font: apps/mobile/assets/fonts/hafs.18.woff2. Source approval incomplete.',
+    'about.sourceArabic': 'Uthmani Quran text, from Tanzil.',
+    'about.sourceEnglish': 'English translation: Saheeh International.',
+    'about.sourceUzbek': 'Uzbek translation: Muhammad Sodik Muhammad Yusuf.',
+    'about.sourceRussian': 'Russian translation: Abu Adel.',
+    'about.sourceHafs': 'The Arabic face the Quran text itself is set in.',
     // Names the host, not a reciter: ten of them are selectable now, so a
     // single hard-coded name would be wrong for nine of the choices.
-    'about.sourceAudio': 'Recitation: everyayah.com, reciter chosen in Settings. Source approval incomplete.',
+    'about.sourceAudio': 'Streamed per-ayah audio. The voice is chosen in Settings; every reciter the app can play is listed below.',
+    'about.sourceCorpus': 'Word-by-word morphology and grammar. GNU General Public License.',
+    'about.sourceLane': 'Root definitions, via qurandev/roots. Public domain.',
+    'about.sourceHansWehr': 'Concise modern glosses, shown first on a root entry.',
+    'about.sourceEditorial': 'Fourteen roots written for this app, where no source covered them.',
+    'about.sourceNewsreader': 'SIL Open Font License 1.1. Copyright 2020 The Newsreader Project Authors.',
+    'about.groupText': 'Text and translation',
+    'about.groupDictionary': 'Dictionary',
+    'about.groupRecitation': 'Recitation',
+    'about.groupTypefaces': 'Typefaces',
     'search.title': 'Search',
     'search.placeholder': 'Verse, word or root',
     'search.jump': 'Go to',
@@ -584,14 +600,22 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.groupAppearance': 'Ko‘rinish',
     'settings.groupPrivacy': 'Maxfiylik',
     'about.title': 'Quran Corpus haqida',
-    'about.credits': 'Manbalar',
     'about.sourceApprovalIncomplete': 'Manba tasdig‘i tugallanmagan',
-    'about.sourceArabic': 'Arabcha Qur’on matni: mavjud PWA importeri orqali Tanzil Uthmani XML. Manba tasdig‘i tugallanmagan.',
-    'about.sourceEnglish': 'Inglizcha tarjima: Saheeh International. Manba tasdig‘i tugallanmagan.',
-    'about.sourceUzbek': 'O‘zbekcha tarjima: Muhammad Sodik Muhammad Yusuf. Manba tasdig‘i tugallanmagan.',
-    'about.sourceRussian': 'Ruscha tarjima: Abu Adel. Manba tasdig‘i tugallanmagan.',
-    'about.sourceHafs': 'Hafs shrifti: apps/mobile/assets/fonts/hafs.18.woff2. Manba tasdig‘i tugallanmagan.',
-    'about.sourceAudio': 'Qiroat: everyayah.com, qori Sozlamalarda tanlanadi. Manba tasdig‘i tugallanmagan.',
+    'about.sourceArabic': 'Usmoniy yozuvidagi Qur’on matni, Tanzil’dan.',
+    'about.sourceEnglish': 'Inglizcha tarjima: Saheeh International.',
+    'about.sourceUzbek': 'O‘zbekcha tarjima: Muhammad Sodiq Muhammad Yusuf.',
+    'about.sourceRussian': 'Ruscha tarjima: Abu Adel.',
+    'about.sourceHafs': 'Qur’on matni shu arabcha shriftda teriladi.',
+    'about.sourceAudio': 'Har bir oyat uchun oqim orqali audio. Qori Sozlamalarda tanlanadi; ilova ijro eta oladigan barcha qorilar quyida.',
+    'about.sourceCorpus': 'So‘zma-so‘z morfologiya va grammatika. GNU General Public License.',
+    'about.sourceLane': 'O‘zak ta’riflari, qurandev/roots orqali. Jamoat mulki.',
+    'about.sourceHansWehr': 'Qisqa zamonaviy ma’nolar, o‘zak sahifasida birinchi ko‘rsatiladi.',
+    'about.sourceEditorial': 'O‘n to‘rtta o‘zak shu ilova uchun yozilgan, hech bir manba ularni qamrab olmagani uchun.',
+    'about.sourceNewsreader': 'SIL Open Font License 1.1. Copyright 2020 The Newsreader Project Authors.',
+    'about.groupText': 'Matn va tarjima',
+    'about.groupDictionary': 'Lug‘at',
+    'about.groupRecitation': 'Qiroat',
+    'about.groupTypefaces': 'Shriftlar',
     'search.title': 'Qidiruv',
     'search.placeholder': 'Oyat, so‘z yoki o‘zak',
     'search.jump': 'O‘tish',
@@ -771,14 +795,22 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.groupAppearance': 'Оформление',
     'settings.groupPrivacy': 'Конфиденциальность',
     'about.title': 'О Quran Corpus',
-    'about.credits': 'Источники',
     'about.sourceApprovalIncomplete': 'Подтверждение источников не завершено',
-    'about.sourceArabic': 'Арабский текст Корана: Tanzil Uthmani XML через существующий PWA-импортер. Подтверждение источника не завершено.',
-    'about.sourceEnglish': 'Английский перевод: Saheeh International. Подтверждение источника не завершено.',
-    'about.sourceUzbek': 'Узбекский перевод: Muhammad Sodik Muhammad Yusuf. Подтверждение источника не завершено.',
-    'about.sourceRussian': 'Русский перевод: Abu Adel. Подтверждение источника не завершено.',
-    'about.sourceHafs': 'Шрифт Hafs: apps/mobile/assets/fonts/hafs.18.woff2. Подтверждение источника не завершено.',
-    'about.sourceAudio': 'Чтение: everyayah.com, чтец выбирается в настройках. Подтверждение источника не завершено.',
+    'about.sourceArabic': 'Текст Корана в написании усмани, из Tanzil.',
+    'about.sourceEnglish': 'Английский перевод: Saheeh International.',
+    'about.sourceUzbek': 'Узбекский перевод: Muhammad Sodik Muhammad Yusuf.',
+    'about.sourceRussian': 'Русский перевод: Abu Adel.',
+    'about.sourceHafs': 'Арабский шрифт, которым набран сам текст Корана.',
+    'about.sourceAudio': 'Потоковое аудио по аятам. Чтец выбирается в настройках; ниже перечислены все, кого приложение может воспроизвести.',
+    'about.sourceCorpus': 'Пословная морфология и грамматика. GNU General Public License.',
+    'about.sourceLane': 'Определения корней, через qurandev/roots. Общественное достояние.',
+    'about.sourceHansWehr': 'Краткие современные значения, показываются первыми на странице корня.',
+    'about.sourceEditorial': 'Четырнадцать корней написаны для этого приложения, где их не покрыл ни один источник.',
+    'about.sourceNewsreader': 'SIL Open Font License 1.1. Copyright 2020 The Newsreader Project Authors.',
+    'about.groupText': 'Текст и перевод',
+    'about.groupDictionary': 'Словарь',
+    'about.groupRecitation': 'Чтение',
+    'about.groupTypefaces': 'Шрифты',
     'search.title': 'Поиск',
     'search.placeholder': 'Аят, слово или корень',
     'search.jump': 'Перейти',
