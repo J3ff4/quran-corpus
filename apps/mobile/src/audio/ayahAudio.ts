@@ -164,6 +164,9 @@ export interface RecitationOptions {
   /** Named on the lock screen (device check 82). */
   surahName?: string | undefined;
   createDriver?: CreateRecitationDriver | undefined;
+  /** Whether to run on into the next ayah. Owned by the caller, because it is
+   *  a saved setting (M6i) and this hook remounts on every reader entry. */
+  continuous?: boolean | undefined;
 }
 
 /**
@@ -183,7 +186,11 @@ export function useRecitation(
   options: RecitationOptions = {},
 ) {
   const [state, setState] = useState<RecitationState>(IDLE);
-  const [continuous, setContinuous] = useState(false);
+  // Read from options, not held here. It used to be useState(false), which was
+  // fine while the reader's own toggle was the only way to set it; now that
+  // Settings offers it, a copy in here would reset on every reader mount and
+  // then disagree with the switch the user had just moved.
+  const continuous = options.continuous ?? false;
 
   const driverRef = useRef<RecitationDriver | null>(null);
   // The ayah the *driver* is on, which is not always the one in state: a status
@@ -419,5 +426,5 @@ export function useRecitation(
     };
   }, []);
 
-  return { ...state, continuous, setContinuous, toggleAyah, seekTo, skipNext, skipPrevious };
+  return { ...state, continuous, toggleAyah, seekTo, skipNext, skipPrevious };
 }

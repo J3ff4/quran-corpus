@@ -169,8 +169,6 @@ export type UiStringKey =
   | 'settings.language'
   | 'settings.theme'
   | 'settings.about'
-  | 'settings.analyticsOn'
-  | 'settings.analyticsOff'
   | 'settings.storageUnavailable'
   | 'settings.themeSystem'
   | 'settings.themeLight'
@@ -180,8 +178,19 @@ export type UiStringKey =
   | 'settings.arabicSizeMedium'
   | 'settings.arabicSizeLarge'
   | 'settings.arabicSizeXlarge'
-  | 'settings.reduceMotionOn'
-  | 'settings.reduceMotionOff'
+  | 'settings.arabicSizeHint'
+  | 'settings.wbwDensity'
+  | 'settings.wbwDensityHint'
+  | 'settings.continuousHint'
+  | 'settings.reduceMotion'
+  | 'settings.reduceMotionHint'
+  | 'settings.analytics'
+  | 'settings.analyticsHint'
+  | 'settings.interface'
+  | 'settings.groupReading'
+  | 'settings.groupRecitation'
+  | 'settings.groupAppearance'
+  | 'settings.groupPrivacy'
   | 'about.title'
   | 'about.credits'
   | 'about.sourceApprovalIncomplete'
@@ -361,8 +370,6 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.language': 'Language',
     'settings.theme': 'Theme',
     'settings.about': 'About and credits',
-    'settings.analyticsOn': 'Analytics: On',
-    'settings.analyticsOff': 'Analytics: Off',
     'settings.storageUnavailable': 'Settings cannot be saved right now. Changes may be lost when you close the app.',
     'settings.themeSystem': 'System',
     'settings.themeLight': 'Light',
@@ -372,8 +379,19 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.arabicSizeMedium': 'Medium',
     'settings.arabicSizeLarge': 'Large',
     'settings.arabicSizeXlarge': 'Extra large',
-    'settings.reduceMotionOn': 'Reduce animations: on',
-    'settings.reduceMotionOff': 'Reduce animations: off',
+    'settings.arabicSizeHint': 'Scales the Quran text, not the interface',
+    'settings.wbwDensity': 'Word by word',
+    'settings.wbwDensityHint': 'How the words screen packs its cells',
+    'settings.continuousHint': 'Keep going to the next ayah',
+    'settings.reduceMotion': 'Reduce animations',
+    'settings.reduceMotionHint': 'Adds to your system setting, never overrides it',
+    'settings.analytics': 'Analytics',
+    'settings.analyticsHint': 'Off, and nothing is sent anywhere today',
+    'settings.interface': 'Interface',
+    'settings.groupReading': 'Reading',
+    'settings.groupRecitation': 'Recitation',
+    'settings.groupAppearance': 'Appearance',
+    'settings.groupPrivacy': 'Privacy',
     'about.title': 'About Quran Corpus',
     'about.credits': 'Credits',
     'about.sourceApprovalIncomplete': 'Source approval incomplete',
@@ -543,8 +561,6 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.language': 'Til',
     'settings.theme': 'Mavzu',
     'settings.about': 'Ilova va manbalar',
-    'settings.analyticsOn': 'Tahlil: yoqilgan',
-    'settings.analyticsOff': 'Tahlil: o‘chirilgan',
     'settings.storageUnavailable': 'Sozlamalarni hozir saqlab bo‘lmaydi. Ilovani yopganingizda o‘zgarishlar yo‘qolishi mumkin.',
     'settings.themeSystem': 'Tizim',
     'settings.themeLight': 'Yorug‘',
@@ -554,8 +570,19 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.arabicSizeMedium': 'O‘rtacha',
     'settings.arabicSizeLarge': 'Katta',
     'settings.arabicSizeXlarge': 'Juda katta',
-    'settings.reduceMotionOn': 'Animatsiyalarni kamaytirish: yoqilgan',
-    'settings.reduceMotionOff': 'Animatsiyalarni kamaytirish: o‘chirilgan',
+    'settings.arabicSizeHint': 'Qur’on matnini kattalashtiradi, interfeysni emas',
+    'settings.wbwDensity': 'So‘zma-so‘z',
+    'settings.wbwDensityHint': 'So‘zlar ekranidagi katakchalar zichligi',
+    'settings.continuousHint': 'Keyingi oyatga o‘tib davom etadi',
+    'settings.reduceMotion': 'Animatsiyalarni kamaytirish',
+    'settings.reduceMotionHint': 'Tizim sozlamasiga qo‘shiladi, uni bekor qilmaydi',
+    'settings.analytics': 'Tahlil',
+    'settings.analyticsHint': 'O‘chirilgan, hozircha hech narsa yuborilmaydi',
+    'settings.interface': 'Interfeys',
+    'settings.groupReading': 'O‘qish',
+    'settings.groupRecitation': 'Qiroat',
+    'settings.groupAppearance': 'Ko‘rinish',
+    'settings.groupPrivacy': 'Maxfiylik',
     'about.title': 'Quran Corpus haqida',
     'about.credits': 'Manbalar',
     'about.sourceApprovalIncomplete': 'Manba tasdig‘i tugallanmagan',
@@ -721,8 +748,6 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.language': 'Язык',
     'settings.theme': 'Тема',
     'settings.about': 'О приложении и источниках',
-    'settings.analyticsOn': 'Аналитика: включена',
-    'settings.analyticsOff': 'Аналитика: выключена',
     'settings.storageUnavailable': 'Настройки сейчас не сохраняются. Изменения могут быть потеряны при закрытии приложения.',
     'settings.themeSystem': 'Система',
     'settings.themeLight': 'Светлая',
@@ -732,8 +757,19 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.arabicSizeMedium': 'Средний',
     'settings.arabicSizeLarge': 'Крупный',
     'settings.arabicSizeXlarge': 'Очень крупный',
-    'settings.reduceMotionOn': 'Меньше анимации: включено',
-    'settings.reduceMotionOff': 'Меньше анимации: выключено',
+    'settings.arabicSizeHint': 'Увеличивает текст Корана, а не интерфейс',
+    'settings.wbwDensity': 'Пословный разбор',
+    'settings.wbwDensityHint': 'Насколько плотно расположены слова на экране разбора',
+    'settings.continuousHint': 'Продолжать со следующего аята',
+    'settings.reduceMotion': 'Меньше анимации',
+    'settings.reduceMotionHint': 'Добавляется к системной настройке, не отменяет её',
+    'settings.analytics': 'Аналитика',
+    'settings.analyticsHint': 'Выключена, и сейчас ничего никуда не отправляется',
+    'settings.interface': 'Интерфейс',
+    'settings.groupReading': 'Чтение',
+    'settings.groupRecitation': 'Чтение вслух',
+    'settings.groupAppearance': 'Оформление',
+    'settings.groupPrivacy': 'Конфиденциальность',
     'about.title': 'О Quran Corpus',
     'about.credits': 'Источники',
     'about.sourceApprovalIncomplete': 'Подтверждение источников не завершено',

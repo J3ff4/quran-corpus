@@ -475,6 +475,20 @@ describe('loadPersistedAppSettings', () => {
     await expect(loadPersistedAppSettings(userClient)).resolves.toMatchObject({ reduceMotion: true });
   });
 
+  it('reads continuousPlay as on only for the exact stored "true"', async () => {
+    // Same String(value) hazard reduceMotion documents above, on a setting the
+    // reader now takes as the only source of truth: useRecitation holds no copy
+    // of its own, so a stored off that read as on would run the whole surah.
+    const userClient = requireSettingsClient();
+    await saveSetting(userClient, 'continuousPlay', 'false');
+
+    await expect(loadPersistedAppSettings(userClient)).resolves.toMatchObject({ continuousPlay: false });
+
+    await saveSetting(userClient, 'continuousPlay', 'true');
+
+    await expect(loadPersistedAppSettings(userClient)).resolves.toMatchObject({ continuousPlay: true });
+  });
+
   it('restores a persisted reader mode', async () => {
     const userClient = requireSettingsClient();
     await saveSetting(userClient, 'readerMode', 'mushaf');

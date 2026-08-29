@@ -31,6 +31,10 @@ export interface AppSettings {
   reduceMotion: boolean;
   readerMode: ReaderMode;
   wbwDensity: WbwDensity;
+  /** Whether recitation runs on into the next ayah. Saved rather than held in
+   *  useRecitation, because Settings offers it: a second copy inside the reader
+   *  would reset on every mount and disagree with the switch the user moved. */
+  continuousPlay: boolean;
   /** A `Reciter.id`, never a folder. Validated against the shared table on the
    *  way in, because it ends up as a path segment in the audio URL. */
   reciterId: string;
@@ -45,6 +49,7 @@ export interface AppSettingsContextValue extends AppSettings {
   setReduceMotion: (reduce: boolean) => void;
   setReaderMode: (mode: ReaderMode) => void;
   setWbwDensity: (density: WbwDensity) => void;
+  setContinuousPlay: (enabled: boolean) => void;
   setReciterId: (id: string) => void;
   /** Set while the settings database cannot be opened, so a screen can say so
    *  instead of letting changes look saved when nothing is being persisted. */
@@ -60,6 +65,7 @@ const defaultSettings: AppSettings = {
   reduceMotion: false,
   readerMode: 'translation',
   wbwDensity: 'hybrid',
+  continuousPlay: false,
   reciterId: DEFAULT_RECITER_ID,
 };
 
@@ -77,7 +83,7 @@ const AppSettingsContext = createContext<AppSettingsContextValue | null>(null);
 // change -- the owner's report was that the Arabic dominated the card at any
 // system size. System scaling still composes on top; nothing here sets
 // allowFontScaling.
-const settingKeys = ['uiLocale', 'contentLanguage', 'theme', 'analyticsEnabled', 'arabicScale', 'reduceMotion', 'readerMode', 'wbwDensity', 'reciterId'] as const;
+const settingKeys = ['uiLocale', 'contentLanguage', 'theme', 'analyticsEnabled', 'arabicScale', 'reduceMotion', 'readerMode', 'wbwDensity', 'continuousPlay', 'reciterId'] as const;
 
 function isUiLocale(value: string | null): value is UiLocaleCode {
   return uiLocales.some((locale) => locale.code === value);
@@ -129,6 +135,7 @@ export async function loadPersistedAppSettings(client: MobileDataClient): Promis
   const reduceMotion = persisted.reduceMotion;
   const persistedReaderMode = persisted.readerMode;
   const persistedWbwDensity = persisted.wbwDensity;
+  const continuousPlay = persisted.continuousPlay;
   const persistedReciterId = persisted.reciterId;
 
   return {
@@ -140,6 +147,11 @@ export async function loadPersistedAppSettings(client: MobileDataClient): Promis
     reduceMotion: reduceMotion === 'true',
     readerMode: isReaderMode(persistedReaderMode) ? persistedReaderMode : defaultSettings.readerMode,
     wbwDensity: isWbwDensity(persistedWbwDensity) ? persistedWbwDensity : defaultSettings.wbwDensity,
+    // Same 'true' comparison the other two booleans take, and for the same
+    // reason: settingValue stores String(value), so anything that is not
+    // exactly 'true' -- including a row this build wrote before the key
+    // existed -- reads as off.
+    continuousPlay: continuousPlay === 'true',
     reciterId: isReciterId(persistedReciterId) ? persistedReciterId : defaultSettings.reciterId,
   };
 }
@@ -343,6 +355,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       setReduceMotion: (reduceMotion) => updateSetting('reduceMotion', reduceMotion),
       setReaderMode: (readerMode) => updateSetting('readerMode', readerMode),
       setWbwDensity: (wbwDensity) => updateSetting('wbwDensity', wbwDensity),
+      setContinuousPlay: (continuousPlay) => updateSetting('continuousPlay', continuousPlay),
       // Guarded on the way in as well as on the way out. The sheet only ever
       // offers real ids, but this setter is public and the value it stores is
       // read back into a URL builder on the next launch -- rejecting here is
