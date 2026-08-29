@@ -97,7 +97,7 @@ gated nothing.
 **DEVICE GATE UNRUN** (§10): type `mercy` in the dictionary box on hardware,
 confirm sort chips vanish while searching and return when the box clears.
 
-### 🎨 M6 GLASS REDESIGN — M6a-M6g merged; M6h next (2026-08-28)
+### 🎨 M6 GLASS REDESIGN — M6a-M6g + M6r merged; M6h next (2026-08-29)
 Spec + 9 sub-phase plans: `docs/plans/phase-m6-glass-redesign.md` (+ `phase-m6a..i`).
 40 owner decisions recorded there. §5 fires on M6b, M6c, M6f, M6h.
 
@@ -290,6 +290,50 @@ Three findings filed rather than fixed, **none of them M6g regressions**:
 - **#33 — a kind's first load shows an empty pane** with no spinner or skeleton
   for 2-7s. Cached path is fine (107 re-flips in under 1s); the uncached path
   has no loading state.
+
+### M6r reader navigation — MERGED 2026-08-29 as `421c08b` (PR #37)
+D41-D50. Juz rows expand in place into the surah ranges they cover (new
+`getJuzSurahRanges` in `packages/data/queries/browse.ts`, ranges from the corpus
+not a table in the app); Meccan/Medinan sections collapse; **one** reading
+position shared by mushaf/translation/words (`readerPosition`, in-memory module
+singleton) instead of three; prev/next surah chevrons paging in place with the
+header stationary — never `router.replace`, which remounts and kills the refs
+AND the exit animation.
+
+**§5 pass: 7 findings, all real, all fixed, none declined.** Nothing raised
+against the juz query. Worth remembering:
+- Paging carried `?ayah=` across the surah boundary (bookmark 2:50 + next → 3:50).
+- `useFocusEffect` fires on mount + the shared position outlives the screen →
+  bookmark 2:5 after reading 2:200 jumped to 2:200. The expo-router double only
+  captured the callback, so **no test could have caught it**; double now runs on
+  mount like the real hook.
+- Page turn had no two halves — both screens spinner'd, so the outgoing surah was
+  gone before the incoming existed. `useHeldEntry` (dictionary already had it).
+- D48's claim that WbW used `pager.animation` was FALSE.
+- `collapsedEras` keyed on the translated label, with a comment claiming a
+  language change cleared it. Keyed on `revelationType` now.
+
+**Device run 2026-08-28** (OnePlus 7 Pro, SDK 31, Expo Go): **20/24 pass, 2
+defects found+fixed, 2 deferred.** Table in the plan doc.
+- Defect 1: deep-link landing never recorded its position (`/surah/2?ayah=50` +
+  mode switch → 2:1). `onViewableItemsChanged` ignores the programmatic jump by
+  design and no scroll follows to fire one. Hand-scrolling always worked, which
+  is why implementation survived it.
+- Defect 2: era counts silent to TalkBack — count is a `focusable=false` child of
+  a button labelled only `Meccan`. Label is `Meccan, 86` now.
+- **143/144 DEFERRED** (owner) → issue 34. Labels + `accessibilityState.expanded`
+  verified in tree and source; spoken output unconfirmed. §10 met except those.
+- **146 MARGINAL, not a pass**: `Al-Muddaththir` → `Al-Muddat…` beside the
+  chevrons at max font scale. Owner ruled leave it, no second-row fallback.
+
+Gate on the branch **merged with main** (main had moved under it): clean merge,
+427 data / 707 mobile / 484 web, lint + type-check clean. Every review fix and
+both device defects mutation-checked.
+
+Device gotchas worth keeping: `screenrecord` won't exec on this OxygenOS build
+(rc=127) and `input tap` latency exceeds a 260ms animation — lengthen PAGE_MS
+temporarily, don't record. OxygenOS does NOT write the Font size slider to
+`system font_scale` (still reads 1.0 at max) — verify scaling by pixels.
 
 **M6h next** (bookmarks + notes) — touches the on-device user DB, so **§5
 fires**. M6i (settings + about) opens with a Task 0 mockup pass needing owner
