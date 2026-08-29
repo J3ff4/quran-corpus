@@ -460,13 +460,30 @@ cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --prof
 
 | Check | Build | Date | Result | Notes |
 | --- | --- | --- | --- | --- |
-| 148 | | | | |
-| 149 | | | | |
-| 150 | | | | |
-| 151 | | | | |
-| 152 | | | | |
-| 153 | | | | |
-| 154 | | | | |
+| 148 | Expo Go (dev) | 2026-08-29 | BLOCKED | Not exercisable off an APK. The Expo Go sandbox holds no pre-M6h user DB, so there is nothing for the migration to migrate. Owed to the EAS window (opens 2026-09-01). The 66 bookmarks this run left on the device are deliberate: they are the "before" state that run needs. |
+| 149 | Expo Go (dev) | 2026-08-29 | PASS | 66 bookmarks across Al-Baqara. Every row reachable by scroll; the last (2:1) clears the bottom inset with room to spare. |
+| 150 | Expo Go (dev) | 2026-08-29 | PASS | Added, edited and cleared. Survived a force-stop and relaunch. Clearing kept the bookmark (count held at 66) and dropped the row from With notes. |
+| 151 | Expo Go (dev) | 2026-08-29 | PASS | 600 characters typed in 100-char runs; the field stopped at exactly 500 (the sixth run never landed), the counter reached 0, nothing was trimmed out of the middle. |
+| 152 | Expo Go (dev) | 2026-08-29 | PASS after fix | Arabic, Russian and Uzbek all stored and redisplayed intact. Direction was wrong: an Arabic note rendered flush left, because Android takes a Text's gravity from the layout direction and all three UI locales are LTR. Fixed by aligning the note on its own first-strong character (`i18n/textDirection.ts`); re-checked on device, Arabic right, Cyrillic and Latin left. |
+| 153 | Expo Go (dev) | 2026-08-29 | PASS | Recent is `created_at` DESC. Note that `CURRENT_TIMESTAMP` is second-granular, so a burst of bookmarks ties; the comparator's ascending-ayah tie-break is what makes the order deterministic, and it was visibly doing so. By surah grouped under an Al-Baqara header, ascending. With notes listed only the noted rows. |
+| 154 | Expo Go (dev) | 2026-08-29 | PASS | Confirm appeared on a noted bookmark; Cancel kept both; Delete removed both, and re-bookmarking the same ayah came back with an empty note. No dialog on a note-less bookmark -- it went straight through. |
+
+### Defects found and fixed in this run
+
+- **Bookmark row's only tap target is the coordinate.** Measured 81x76px on a
+  640dpi device -- 20x19dp, under Android's 48dp and under WCAG 2.2 SC 2.5.8's
+  24x24 -- and tapping the card itself does nothing, so the row looks inert.
+  Padded to the 48dp floor (192x192px re-measured).
+- **Note direction** -- see check 152.
+- **Ayah action row clipped in Russian and Uzbek** (found on the M6i sweep,
+  fixed in the same pass): see phase-m6i's log.
+
+### Open, for the owner
+
+The delete confirm is the stock Android `Alert` -- a white system dialog over
+the glass design, in the OS's own type. Functionally correct; visually it is the
+one surface in the app that does not belong to it. Replacing it means owning a
+modal, which is a design call rather than a defect.
 
 ## Deviations
 
