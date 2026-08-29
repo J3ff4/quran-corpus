@@ -2,6 +2,7 @@ import React from 'react';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RECITERS } from '@quran-corpus/data/mobile';
+import { selectedTranslators } from '@quran-corpus/mobile-data';
 import AboutTab from '../../app/about';
 
 vi.mock('@/settings/settingsStore', () => ({
@@ -30,6 +31,17 @@ describe('AboutTab', () => {
     // The list is the whole set, not a prefix of it: an implementation that
     // rendered RECITERS.slice(0, 3) would satisfy a loop over three names.
     expect(screen.getByTestId('reciter-credits').children).toHaveLength(RECITERS.length);
+  });
+
+  it('credits the translators the bundled DB actually carries', () => {
+    render(<AboutTab />);
+
+    // Same rule as the reciters above: the name is read from the shared table
+    // create-m1-reader-db.ts validates the DB against, so swapping a translator
+    // cannot leave this screen crediting the previous one (§11).
+    for (const [language, translator] of Object.entries(selectedTranslators)) {
+      expect(screen.getByText(translator), `missing ${language}`).toBeTruthy();
+    }
   });
 
   it('carries the OFL notice for the display face', () => {

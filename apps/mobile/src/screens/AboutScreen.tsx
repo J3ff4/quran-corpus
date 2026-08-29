@@ -1,6 +1,7 @@
 import Constants from 'expo-constants';
 import { ScrollView, Text, View } from 'react-native';
 import { RECITERS } from '@quran-corpus/data/mobile';
+import { selectedTranslators, type SelectedTranslatorLanguage } from '@quran-corpus/mobile-data';
 
 import { GlassSurface } from '@/components/GlassSurface';
 import type { UiLocaleCode } from '@/i18n/languages';
@@ -20,15 +21,33 @@ interface Credit {
   pending?: boolean;
 }
 
+/** Keyed by language rather than listed, so adding a fourth translation to the
+ *  shared table is a type error here instead of a credit nobody notices is
+ *  missing. The translator's own name never appears in these strings -- it is
+ *  read from selectedTranslators below, for the same reason the reciters are
+ *  read from RECITERS: swapping a translator and regenerating the DB would
+ *  otherwise leave this screen crediting the wrong person (§11). */
+const TRANSLATION_BODIES: Record<SelectedTranslatorLanguage, UiStringKey> = {
+  en: 'about.sourceEnglish',
+  uz: 'about.sourceUzbek',
+  ru: 'about.sourceRussian',
+};
+
+const TRANSLATION_CREDITS: Credit[] = Object.entries(TRANSLATION_BODIES).map(
+  ([language, body]) => ({
+    name: selectedTranslators[language as SelectedTranslatorLanguage],
+    body,
+    pending: true,
+  }),
+);
+
 const GROUPS: { title: UiStringKey; credits: Credit[] }[] = [
   {
     title: 'about.groupText',
     credits: [
       { name: 'Tanzil', body: 'about.sourceArabic', pending: true },
       { name: 'corpus.quran.com', body: 'about.sourceCorpus' },
-      { name: 'Saheeh International', body: 'about.sourceEnglish', pending: true },
-      { name: 'Muhammad Sodik Muhammad Yusuf', body: 'about.sourceUzbek', pending: true },
-      { name: 'Abu Adel', body: 'about.sourceRussian', pending: true },
+      ...TRANSLATION_CREDITS,
     ],
   },
   {
@@ -69,7 +88,7 @@ export function AboutScreen() {
       </Text>
 
       {GROUPS.map((group) => (
-        <CreditGroup key={group.title} title={t(uiLocale, group.title)} uiLocale={uiLocale}>
+        <CreditGroup key={group.title} title={t(uiLocale, group.title)}>
           {group.credits.map((credit, index) => (
             <CreditRow
               key={credit.name}
@@ -81,7 +100,7 @@ export function AboutScreen() {
         </CreditGroup>
       ))}
 
-      <CreditGroup title={t(uiLocale, 'about.groupRecitation')} uiLocale={uiLocale}>
+      <CreditGroup title={t(uiLocale, 'about.groupRecitation')}>
         <CreditRow
           credit={{ name: 'everyayah.com', body: 'about.sourceAudio', pending: true }}
           uiLocale={uiLocale}
@@ -103,7 +122,7 @@ export function AboutScreen() {
         </CreditRow>
       </CreditGroup>
 
-      <CreditGroup title={t(uiLocale, 'about.groupTypefaces')} uiLocale={uiLocale}>
+      <CreditGroup title={t(uiLocale, 'about.groupTypefaces')}>
         {TYPEFACES.map((credit, index) => (
           <CreditRow
             key={credit.name}
@@ -122,7 +141,6 @@ function CreditGroup({
   children,
 }: {
   title: string;
-  uiLocale: UiLocaleCode;
   children: React.ReactNode;
 }) {
   const theme = useThemeColors();
