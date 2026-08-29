@@ -267,7 +267,17 @@ export function normalizeNote(raw: unknown): string | null {
   const cleaned = raw.replace(CONTROL_CHARS, '').trim();
 
   if (cleaned.length === 0) return null;
-  return cleaned.slice(0, NOTE_MAX_LENGTH);
+  if (cleaned.length <= NOTE_MAX_LENGTH) return cleaned;
+
+  // slice counts UTF-16 units, so a cut landing between the halves of a
+  // surrogate pair -- any emoji, and everything above U+FFFF -- would store a
+  // lone surrogate: renders as tofu, and is not a well-formed string for
+  // anything that later indexes this column. The validation boundary must not
+  // be the layer that manufactures malformed text.
+  const capped = cleaned.slice(0, NOTE_MAX_LENGTH);
+  const lastUnit = capped.charCodeAt(NOTE_MAX_LENGTH - 1);
+  const splitPair = lastUnit >= 0xd800 && lastUnit <= 0xdbff;
+  return splitPair ? capped.slice(0, -1) : capped;
 }
 
 /** Attach a note to a bookmark, or clear it with null. */

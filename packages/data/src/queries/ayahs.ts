@@ -103,5 +103,11 @@ export async function getAyahPreviews(
     );
   }
 
+  // Sorted here, not only by the per-chunk ORDER BY: past PREVIEW_CHUNK
+  // coordinates the chunks are appended in input order, so the SQL alone
+  // orders each chunk and not the whole. The doc contract above is what a
+  // second caller will rely on, and it has to hold at 401 coordinates too.
+  previews.sort((a, b) => a.surah_id - b.surah_id || a.ayah_number - b.ayah_number);
+
   return previews;
 }

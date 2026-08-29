@@ -426,6 +426,19 @@ describe('normalizeNote', () => {
     expect(normalizeNote(`     ${'x'.repeat(500)}`)).toHaveLength(NOTE_MAX_LENGTH);
   });
 
+  it('never cuts an emoji in half at the cap', () => {
+    // 499 plain characters then an emoji: the pair straddles the 500th UTF-16
+    // unit, so a plain slice keeps the high half alone -- tofu on screen, and
+    // a string that is not well formed for anything that later indexes this
+    // column. Dropping the whole pair is the only correct cut.
+    const note = normalizeNote(`${'x'.repeat(499)}\u{1F4D6}${'y'.repeat(50)}`);
+
+    expect(note).toHaveLength(499);
+    expect(note?.endsWith('x')).toBe(true);
+    // The real check: no unpaired surrogate survived the cut.
+    expect([...(note ?? '')].join('')).toBe(note);
+  });
+
   it('strips control characters but keeps Arabic, Cyrillic and newlines', () => {
     // Plain text (decision 30). A note renders straight into a <Text>, so this
     // is not an escaping problem -- it is about not persisting bytes that make

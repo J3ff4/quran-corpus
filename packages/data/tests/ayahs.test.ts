@@ -145,6 +145,29 @@ describe('getAyahPreviews', () => {
     expect(previews.map((p) => `${p.surah_id}:${p.ayah_number}`)).toContain('1:1');
   });
 
+  it('orders across chunk boundaries, not only within one', async () => {
+    // The per-chunk ORDER BY sorts each statement's rows; it cannot sort rows
+    // that came from an earlier statement. 400 copies of 2:1 fill the first
+    // chunk, so 1:1 is answered by the second -- and unsorted it lands last,
+    // which is the opposite of the documented mushaf order.
+    const statements: string[] = [];
+    const counting: QueryClient = {
+      async execute(statement) {
+        statements.push(typeof statement === 'string' ? statement : statement.sql);
+        return db.execute(statement);
+      },
+    };
+    const filler = Array.from({ length: 400 }, () => ({ surahId: 2, ayahNumber: 1 }));
+
+    const previews = await getAyahPreviews(counting, [...filler, { surahId: 1, ayahNumber: 1 }]);
+
+    // Asserted, not assumed: if the chunk size ever grows past 401 this all
+    // arrives in one statement, SQL sorts it, and the ordering assertion below
+    // would pass while testing nothing.
+    expect(statements).toHaveLength(2);
+    expect(previews.map((p) => `${p.surah_id}:${p.ayah_number}`)).toEqual(['1:1', '2:1']);
+  });
+
   it('refuses a non-integer coordinate instead of silently matching nothing', async () => {
     await expect(
       getAyahPreviews(db, [{ surahId: 2, ayahNumber: '255' as unknown as number }]),
