@@ -295,11 +295,32 @@ describe('BookmarksTab', () => {
     fireEvent.click(screen.getByLabelText('Save'));
 
     await screen.findByText('Unable to save the note');
+    // Rendered by NoteEditor, which is the only component carrying this
+    // testID. On device the sheet is a <Modal> in its own native window, so an
+    // alert on the list behind it is drawn under the sheet and announced to
+    // nobody; jsdom inlines the Modal, so the testID is what tells the two
+    // apart here.
+    expect(screen.getByTestId('note-error')).toBeTruthy();
     const everythingLogged = logged.mock.calls.map((call) => JSON.stringify(call)).join(' ');
     expect(everythingLogged).not.toContain(secret);
     // ...but the coordinate IS logged, or the line is useless for debugging.
     expect(everythingLogged).toContain('255');
     logged.mockRestore();
+  });
+
+  it('distinguishes an annotated row from an empty one by more than its label', async () => {
+    // The label already differs, so TalkBack was fine; both glyphs were '✎' in
+    // the same muted colour, so a sighted user could not tell which rows carry
+    // a note. Same pair the reader uses.
+    const userClient = requireUserClient();
+    await setBookmark(userClient, 2, 255, true);
+    await setBookmark(userClient, 2, 1, true);
+    await setBookmarkNote(userClient, 2, 255, 'throne');
+
+    render(<BookmarksTab />);
+
+    expect((await screen.findByLabelText('Edit note')).textContent).toBe('✐');
+    expect(screen.getByLabelText('Add note').textContent).toBe('✎');
   });
 
   it('keeps the bookmark when a note is cleared', async () => {

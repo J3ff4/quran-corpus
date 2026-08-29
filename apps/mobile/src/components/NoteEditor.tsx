@@ -21,11 +21,16 @@ export interface NoteEditorProps {
   /** The stored note, or null when there is none. Seeds the draft. */
   note: string | null;
   uiLocale: UiLocaleCode;
+  /** A failed write, rendered inside the sheet. It has to live here rather than
+   *  on the screen behind: BottomSheet renders into a <Modal>, which is its own
+   *  native window, so an alert on the screen underneath is announced to
+   *  nobody and drawn behind the sheet the user is still looking at. */
+  error?: string | null;
   onCancel: () => void;
   onSave: (note: string) => void;
 }
 
-export function NoteEditor({ surahId, ayahNumber, note, uiLocale, onCancel, onSave }: NoteEditorProps) {
+export function NoteEditor({ surahId, ayahNumber, note, uiLocale, error, onCancel, onSave }: NoteEditorProps) {
   const theme = useThemeColors();
   const [draft, setDraft] = useState(note ?? '');
 
@@ -62,6 +67,16 @@ export function NoteEditor({ surahId, ayahNumber, note, uiLocale, onCancel, onSa
         <Text testID="note-counter" style={{ color: theme.mutedText }}>
           {`${t(uiLocale, 'bookmarks.noteCounter')} · ${NOTE_MAX_LENGTH - draft.length}`}
         </Text>
+        {error ? (
+          <Text
+            testID="note-error"
+            accessibilityRole="alert"
+            accessibilityLiveRegion="polite"
+            style={{ color: theme.danger }}
+          >
+            {error}
+          </Text>
+        ) : null}
         <View style={{ flexDirection: 'row', gap: 12, justifyContent: 'flex-end' }}>
           <Text
             accessibilityRole="button"

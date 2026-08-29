@@ -42,6 +42,9 @@ export type UiStringKey =
   // Prefixes the remaining-character count, read as "Characters left, 43".
   | 'bookmarks.noteCounter'
   | 'bookmarks.notePlaceholder'
+  | 'bookmarks.discardNoteTitle'
+  | 'bookmarks.discardNoteBody'
+  | 'bookmarks.discardNoteConfirm'
   | 'bookmarks.save'
   | 'bookmarks.cancel'
   | 'bookmarks.entryPrefix'
@@ -265,6 +268,9 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'bookmarks.noteFailed': 'Unable to save the note',
     'bookmarks.noteCounter': 'Characters left',
     'bookmarks.notePlaceholder': 'Write a note',
+    'bookmarks.discardNoteTitle': 'Delete this bookmark?',
+    'bookmarks.discardNoteBody': 'Its note will be deleted with it. This cannot be undone.',
+    'bookmarks.discardNoteConfirm': 'Delete',
     'bookmarks.save': 'Save',
     'bookmarks.cancel': 'Cancel',
     'bookmarks.entryPrefix': 'Open',
@@ -438,6 +444,9 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'bookmarks.noteFailed': 'Izohni saqlab bo‘lmadi',
     'bookmarks.noteCounter': 'Qolgan belgilar',
     'bookmarks.notePlaceholder': 'Izoh yozing',
+    'bookmarks.discardNoteTitle': 'Bu xatcho‘p o‘chirilsinmi?',
+    'bookmarks.discardNoteBody': 'Izoh ham u bilan birga o‘chiriladi. Buni qaytarib bo‘lmaydi.',
+    'bookmarks.discardNoteConfirm': 'O‘chirish',
     'bookmarks.save': 'Saqlash',
     'bookmarks.cancel': 'Bekor qilish',
     'bookmarks.entryPrefix': 'Ochish',
@@ -606,6 +615,9 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'bookmarks.noteFailed': 'Не удалось сохранить заметку',
     'bookmarks.noteCounter': 'Осталось символов',
     'bookmarks.notePlaceholder': 'Напишите заметку',
+    'bookmarks.discardNoteTitle': 'Удалить эту закладку?',
+    'bookmarks.discardNoteBody': 'Заметка будет удалена вместе с ней. Отменить это нельзя.',
+    'bookmarks.discardNoteConfirm': 'Удалить',
     'bookmarks.save': 'Сохранить',
     'bookmarks.cancel': 'Отмена',
     'bookmarks.entryPrefix': 'Открыть',

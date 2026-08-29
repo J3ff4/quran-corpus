@@ -197,11 +197,6 @@ export function BookmarksScreen() {
             {error}
           </Text>
         ) : null}
-        {noteError ? (
-          <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ color: theme.danger }}>
-            {noteError}
-          </Text>
-        ) : null}
       </View>
 
       {!loading && !error && visible.length === 0 ? (
@@ -250,6 +245,10 @@ export function BookmarksScreen() {
           ayahNumber={editing.ayahNumber}
           note={editing.note}
           uiLocale={uiLocale}
+          // Inside the sheet, not on the list behind it: the sheet is a <Modal>
+          // and stays open after a failed write, so an alert on this screen is
+          // covered and never announced.
+          error={noteError}
           onCancel={() => setEditing(null)}
           onSave={(note) => {
             void saveNote(editing, note);
@@ -294,9 +293,17 @@ function BookmarkRow({
           // not reach TalkBack.
           accessibilityLabel={t(uiLocale, bookmark.note === null ? 'bookmarks.addNote' : 'bookmarks.editNote')}
           onPress={onEditNote}
-          style={{ color: theme.mutedText, paddingHorizontal: 8, paddingVertical: 4 }}
+          style={{
+            // Same pair the reader uses (AyahCard, MushafAyah): a filled nib in
+            // the accent for a note that exists, an outline in muted for one to
+            // be written. Both branches were the same glyph in the same colour,
+            // so the row said nothing to a sighted user.
+            color: bookmark.note === null ? theme.mutedText : theme.accent,
+            paddingHorizontal: 8,
+            paddingVertical: 4,
+          }}
         >
-          {bookmark.note === null ? '✎' : '✎'}
+          {bookmark.note === null ? '✎' : '✐'}
         </Text>
       </View>
       {text ? (
