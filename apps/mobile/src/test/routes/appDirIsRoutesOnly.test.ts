@@ -1,4 +1,5 @@
 import { readdirSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -24,5 +25,23 @@ describe('app/ directory', () => {
     // broken, because nothing here reads the bundler's view of app/.
     // Route tests belong in this directory and import the route by path.
     expect(sourceFiles(APP_DIR).filter((f) => /\.test\.tsx?$/.test(f))).toEqual([]);
+  });
+});
+
+describe('root stack', () => {
+  it('anchors the stack on the tab group', async () => {
+    // Read as source rather than imported: app/_layout.tsx pulls
+    // expo-splash-screen, expo-router and the corpus DB into the module graph,
+    // and this assertion is about a routing constant, not about mounting the
+    // app.
+    //
+    // Without the anchor a cold deep link into /surah/:id leaves the reader as
+    // the stack's only route: the header still draws a back arrow, and it
+    // reports `GO_BACK was not handled by any navigator` and goes nowhere
+    // (#35). This cannot prove the navigator's runtime behaviour -- only a
+    // device can -- but it does pin the constant that produces it.
+    const layout = await readFile(path.join(APP_DIR, '_layout.tsx'), 'utf8');
+
+    expect(layout).toMatch(/export const unstable_settings = \{ anchor: '\(tabs\)' \}/);
   });
 });
