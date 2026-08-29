@@ -33,7 +33,7 @@ Inherited from the umbrella plan. Sub-phase specifics:
   `1a`-`1k` and `2a`-`2d`; none is Menu, Settings or About. Owner ruling
   2026-08-24: draw them first. Task 0 below is that, and it gates everything
   after it.
-- Branch: `feat/m6i-settings-about`. Device checks 103-107.
+- Branch: `feat/m6i-settings-about`. Device checks 155-159.
 
 ---
 
@@ -65,7 +65,7 @@ turns into a wall of pills.
 
 Do not start Task 1 until they have been seen.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add docs/design/m6
@@ -145,7 +145,7 @@ it('offers every control M6 added', () => {
 Remove the `storageError` branch. Expected: the first test FAILS. Restore by
 re-editing.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/mobile/app/settings.tsx apps/mobile/src/screens/SettingsScreen.tsx \
@@ -200,7 +200,7 @@ it('carries the OFL notice for the display face', () => {
 Hardcode a two-reciter list. Expected: the first test FAILS. Restore by
 re-editing.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/mobile/app/about.tsx apps/mobile/src/i18n/uiStrings.ts
@@ -216,14 +216,14 @@ git commit -m "feat(mobile): credit every M6 source in About"
 - Modify: `STATUS.md`
 - Modify: `docs/plans/phase-m6-glass-redesign.md`
 
-- [ ] **Step 1: Fill the umbrella verification log** — every sub-phase's branch,
+- [x] **Step 1: Fill the umbrella verification log** — every sub-phase's branch,
   build and device-run result. Verify each against `git log` and the PR list
   rather than against what the ledger says (§14).
-- [ ] **Step 2: Update README's "Current Status"** with the M6 checklist state,
+- [x] **Step 2: Update README's "Current Status"** with the M6 checklist state,
   and confirm the M2/M3/M4 rows still read as superseded by M6a.
-- [ ] **Step 3: Update STATUS.md.** Short. Write ledger prose at the end, never
+- [x] **Step 3: Update STATUS.md.** Short. Write ledger prose at the end, never
   inside an open PR (`[[ledger-prose-feeds-review-rounds]]`).
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add README.md STATUS.md docs/plans/phase-m6-glass-redesign.md
@@ -240,22 +240,60 @@ git commit -m "docs: close out the M6 glass redesign"
 cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --profile preview
 ```
 
-- [ ] **Step 2: Run checks 103-107 and record every result below.**
+- [ ] **Step 2: Run checks 155-159 and record every result below.**
 
 | # | Check | Pass condition |
 | --- | --- | --- |
-| 103 | Menu, both themes | Three rows, each opening the right screen; matches the Task 0 mockup |
-| 104 | Change every setting, kill the app, reopen | Every one persisted |
-| 105 | Switch UI locale to Uzbek, then Russian | No English strings anywhere in Menu, Settings or About |
-| 106 | About | Every source named; the OFL notice present; nothing truncated |
-| 107 | Full pass over all nine sub-phases' screens in one session | Nothing from an earlier sub-phase regressed; the app reads as one design |
+| 155 | Menu, both themes | Three rows, each opening the right screen; matches the Task 0 mockup |
+| 156 | Change every setting, kill the app, reopen | Every one persisted |
+| 157 | Switch UI locale to Uzbek, then Russian | No English strings anywhere in Menu, Settings or About |
+| 158 | About | Every source named; the OFL notice present; nothing truncated |
+| 159 | Full pass over all nine sub-phases' screens in one session | Nothing from an earlier sub-phase regressed; the app reads as one design |
 
 ## Verification Log
 
 | Check | Build | Date | Result | Notes |
 | --- | --- | --- | --- | --- |
-| 103 | | | | |
-| 104 | | | | |
-| 105 | | | | |
-| 106 | | | | |
-| 107 | | | | |
+| 155 | | | | |
+| 156 | | | | |
+| 157 | | | | |
+| 158 | | | | |
+| 159 | | | | |
+
+## Deviations
+
+Recorded at merge, not during the PR (`[[ledger-prose-feeds-review-rounds]]`).
+
+- **The plan's "no §5 trigger" line was wrong.** Task 2 adds `continuousPlay` to
+  the on-device settings table, and §5 fires on anything writing the user DB.
+  The review ran on the finished branch and found five things; four were fixed
+  in `61597ef` and one was escalated to the owner (below).
+- **Device checks renumbered 103–107 to 155–159.** 103–107 were already spent on
+  M6g, whose run ran past its own header's 89–96 and finished at 107. Same
+  collision M6h hit and fixed by moving to 148–154. The renumber happened at
+  close-out, so nothing has been run against the old numbers.
+- **Continuous play changed owner.** The plan seeded `useRecitation`'s
+  `useState` from the setting; the hook remounts on every reader entry, so the
+  copy would have reset while Settings still read on. `continuous` is now a
+  caller-owned prop and the hook no longer returns `setContinuous` — one stored
+  value, two views.
+- **Four locale strings deleted** (`settings.analyticsOn`/`Off`,
+  `reduceMotionOn`/`Off`). `accessibilityRole="switch"` announces its own state;
+  a label that spelled the state out again got read twice and could disagree
+  with the knob.
+- **Translator credits derived, not typed.** The §5 review found About retyping
+  the three names while `selectedTranslators` already exports them — the same
+  map `create-m1-reader-db.ts` validates the bundled DB against. The drift had
+  started: the uz locale said "Muhammad Sodiq", en and ru said "Muhammad Sodik".
+
+### Open, escalated to the owner
+
+`about.sourceCorpus` names the GPL for corpus.quran.com morphology but the app
+ships no licence text, link, or source offer — while Newsreader's OFL notice is
+reproduced verbatim and test-guarded on the same screen. A licence-compliance
+ruling, not a code call. Issue #39.
+
+Merged as `72a17a5` (squash of PR #40).
+
+**Not met:** the device run has not happened, and §10 makes it the gate for this
+milestone. `eas build` is blocked until 2026-09-01.

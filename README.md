@@ -283,14 +283,20 @@ browse by hijāʾī letter, frequency lists for roots/lemmas/verbs, and paged
 concordances on the root and lemma screens. M5 and M5c followed; their checks
 34-47 all passed on 2026-08-23.
 
-**M6 (glass redesign) is in progress** — see
-`docs/plans/phase-m6-glass-redesign.md` for the spec and the nine sub-phase
-plans. M6a (design system and app chrome) is implemented on
-`feat/m6a-design-system`; its device run happened on 2026-08-24 through Expo Go
-(no APK — EAS is unavailable until 2026-09-01). Checks 49-52 pass; 48 **failed**
-and is parked to M6b for a re-run against real cards; 53-54 move to the
-sub-phase that first uses the serif and the press-scale. Two chrome-inset
-defects were found and fixed in `746ddaf`.
+**M6 (glass redesign): all nine sub-phases are merged, and the milestone is
+not complete.** See `docs/plans/phase-m6-glass-redesign.md` for the spec, the
+sub-phase map and the filled verification log. M6a through M6g ran on hardware
+between 2026-08-24 and 2026-08-28 and passed, with three known gaps: check 55
+deferred, and checks 82 (media controls) and 83 blocked because Expo Go cannot
+exercise lock-screen controls. **M6h (bookmarks and notes, checks 148-154) and
+M6i (settings, about and menu, checks 155-159) have never been run on a device.**
+
+Every M6 device run so far went through Expo Go rather than a `preview` APK —
+EAS has been unavailable since before M6a and the window opens **2026-09-01**.
+Same JS and the same phone, but not a release binary, so the whole checklist is
+owed a re-run against the APK when the window opens. §10 is explicit that
+"implementation complete, verification pending" is an unmet exit criterion, so
+M6 stays open until that run is recorded.
 
 Three sets of checks are **superseded by M6**, because the screens they test are
 being redrawn. They were never run and are not going to be; the record of that
@@ -301,4 +307,7 @@ stays here rather than being deleted:
 - M4's checks 28-33 — dictionary and search are rebuilt in M6g.
 
 Everything they covered is re-tested against the redesigned screens by checks
-48-107, which are distributed across the nine M6 sub-phase plans.
+48-107 and 120-159, which are distributed across the nine M6 sub-phase plans
+plus M6r (reader navigation, a repair pass over M6c and M6d). The gap at
+108-119 is not a hole in the coverage — the numbers were skipped when M6g's run
+ran past its own 89-96 header and finished at 107.

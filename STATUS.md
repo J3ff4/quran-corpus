@@ -7,7 +7,7 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-08-28
+Updated: 2026-08-29
 
 ## Now
 
@@ -97,9 +97,10 @@ gated nothing.
 **DEVICE GATE UNRUN** (§10): type `mercy` in the dictionary box on hardware,
 confirm sort chips vanish while searching and return when the box clears.
 
-### 🎨 M6 GLASS REDESIGN — M6a-M6h + M6r merged; M6i next (2026-08-29)
+### 🎨 M6 GLASS REDESIGN — ALL 9 SUB-PHASES MERGED; DEVICE GATE OPEN (2026-08-29)
 Spec + 9 sub-phase plans: `docs/plans/phase-m6-glass-redesign.md` (+ `phase-m6a..i`).
-40 owner decisions recorded there. §5 fires on M6b, M6c, M6f, M6h.
+40 owner decisions recorded there. §5 fired on M6b, M6c, M6f, M6h, M6i.
+Umbrella verification log now FILLED — read it there, not here.
 
 **M6a MERGED to main 2026-08-25 as `7168e71` (PR #20).** Bloom backdrop,
 GlassSurface, Newsreader, press-scale hook, floating tab pill; 506 tests green.
@@ -371,8 +372,48 @@ the delete confirm). `eas build` blocked until the EAS quota parks clear
 2026-09-01. "Implementation complete, verification pending" is an unmet exit
 criterion, not a pass.
 
-**M6i next** (settings + about) — opens with a Task 0 mockup pass needing owner
-approval before code.
+### M6i settings + about — MERGED 2026-08-29 as `72a17a5` (PR #40)
+Menu, Settings, About — 5 commits, +1757/-318, 741 tests green.
+Task 0 mockups (`docs/design/m6/{menu,settings,about}.html`) owner-approved
+before code, per M6 decision 5.
+
+Menu = 3 glass rows + device-privacy card + version from app config. Settings =
+5 groups; WBW density, reciter and continuous play reachable for the first time.
+About = grouped credits, reciters from `RECITERS`, OFL notice verbatim.
+
+**Plan's "no §5 trigger" was WRONG** — Task 2 writes `continuousPlay` to the
+on-device settings table. Review ran: 5 findings, 4 fixed in `61597ef`.
+- Translator names were retyped while `selectedTranslators` already exports
+  them; drift had started (uz "Sodiq" vs en/ru "Sodik"). Now derived.
+- `analyticsHint` claimed "Off" beside a switch the user can turn on.
+- `about.sourceEditorial` hardcoded "Fourteen roots" in 3 locales.
+- `CreditGroup` took a required prop it never read.
+
+**Continuous play changed owner.** Was `useState` in `useRecitation`, which
+remounts every reader entry, so it reset while Settings would have read on. Now
+the stored setting, passed in as a prop; hook no longer returns `setContinuous`.
+
+**Device checks renumbered 103-107 -> 155-159.** 103-107 were already spent:
+M6g's run ran past its own 89-96 header and finished at 107. Same collision M6h
+hit. Nothing was ever run against the old numbers.
+
+**DECLINED to owner:** corpus.quran.com's GPL is named on About but no licence
+text, link or source offer ships — while Newsreader's OFL notice is verbatim and
+test-guarded on the same screen. Licence-compliance ruling, not a code call.
+**Issue #39.**
+
+**NOT MET — §10 gate is open.** No device run: checks 155-159. Same EAS block.
+
+---
+
+### M6 CLOSE-OUT — what is actually owed
+Umbrella log filled + re-verified against `gh pr list`/`git log` (§14).
+- **M6a-M6g ran on hardware, pass**, with 3 known gaps: 55 deferred, 82 + 83
+  blocked (Expo Go cannot exercise lock-screen controls).
+- **M6h (148-154) and M6i (155-159) never ran at all.**
+- **No sub-phase ever ran on a release APK** — all nine went through Expo Go.
+  The whole 48-107 / 120-159 checklist is owed a re-run against the APK.
+- Window opens **2026-09-01**. Until that run is recorded, M6 is not complete.
 
 Two calls made in-flight, both in commit bodies:
 - Dark glass fill is the night page colour at 45%, NOT the mockup's white .075.

@@ -158,9 +158,9 @@ Every sub-phase task's requirements implicitly include this section.
 | M6d Reader | `phase-m6d-reader.md` | `feat/m6d-reader` | no | 65–72 |
 | M6e Word-by-word | `phase-m6e-wbw.md` | `feat/m6e-wbw` | no | 73–78 |
 | M6f Audio | `phase-m6f-audio.md` | `feat/m6f-audio` | **yes** | 79–88 |
-| M6g Dictionary + search | `phase-m6g-dictionary-search.md` | `feat/m6g-dictionary-search` | no | 89–96 |
-| M6h Bookmarks + notes | `phase-m6h-bookmarks-notes.md` | `feat/m6h-bookmarks-notes` | **yes** | 97–102 |
-| M6i Settings, About, Menu | `phase-m6i-settings-about.md` | `feat/m6i-settings-about` | no | 103–107 |
+| M6g Dictionary + search | `phase-m6g-dictionary-search.md` | `feat/m6g-dictionary-search` | no | 89–107 |
+| M6h Bookmarks + notes | `phase-m6h-bookmarks-notes.md` | `feat/m6h-bookmarks-notes` | **yes** | 148–154 |
+| M6i Settings, About, Menu | `phase-m6i-settings-about.md` | `feat/m6i-settings-about` | **yes** | 155–159 |
 
 Order is fixed and confirmed by the owner. M6b consumes M6a's primitives; M6e
 consumes M6d's mode chip; M6f consumes M6d's reader chrome.
@@ -205,14 +205,30 @@ M6a Task 8 rewrites `docs/PRD-android-first-mobile-app.md` §10:
 
 ## Verification Log
 
-| Sub-phase | Branch | APK | Device run | Result |
-| --- | --- | --- | --- | --- |
-| M6a | | | | |
-| M6b | | | | |
-| M6c | | | | |
-| M6d | | | | |
-| M6e | | | | |
-| M6f | | | | |
-| M6g | | | | |
-| M6h | | | | |
-| M6i | | | | |
+Every row below was re-verified against `gh pr list --state all` and `git log`
+rather than against the ledger (§14). No sub-phase ever ran on a release APK:
+EAS has been unavailable since before M6a, so every device run went through Expo
+Go on the owner's phone — same JS, same hardware, not a release binary.
+
+| Sub-phase | Merge | PR | Checks | Device run | Result |
+| --- | --- | --- | --- | --- | --- |
+| M6a | `7168e71` | #20 | 48–54 | 2026-08-24, Expo Go | 4 pass, 1 fail parked to M6b (48, glass legibility), 2 not exercisable (53–54, no consumer yet) |
+| M6b | `8ac1348` | #21 | 55–60 | 2026-08-24, Expo Go | 5 pass + check 48 re-run **pass**; 55 deferred |
+| M6c | `764c232` | #22 | 61–64 | 2026-08-25, Expo Go | 4/4 pass |
+| M6d | `d4d73d4` | #23 | 65–72 | 2026-08-25, Expo Go | 8/8 pass (72 after a fix) |
+| M6e | `9c0f86d` | #24 | 73–78 | 2026-08-25, Expo Go | 6/6 pass |
+| M6f | `d4d695d`, `865cdf4` | #26, #27 | 79–88 | 2026-08-26, Expo Go | 8 pass, 2 **blocked** (82 controls, 83 — Expo Go cannot test lock-screen controls); 86 after fix `8c625b1` |
+| M6g | `e9e1be7` | #30 | 89–107 | 2026-08-27/28, Expo Go | pass, with 92 failing first and passing after `c4f9780`; ran past its own header's 89–96 and finished at 107 |
+| M6h | `37fa508` | #38 | 148–154 | **not run** | `eas build` blocked until 2026-09-01 |
+| M6i | `72a17a5` | #40 | 155–159 | **not run** | same block |
+
+Also merged inside the M6 window, outside the sub-phase map: **M6r** reader
+navigation (`421c08b`, #37, checks 120–147) — a repair pass over M6c/M6d rather
+than a numbered sub-phase.
+
+**M6 is not complete.** §10: a milestone is not complete until its device
+checklist has been run on real hardware and recorded here. Two sub-phases (M6h,
+M6i) plus check 55 and the two Expo Go-blocked audio checks are outstanding, and
+none of the nine ran on a release APK. Everything above is "implementation
+complete, verification pending", which §10 calls an unmet exit criterion — not a
+pass. The build window opens **2026-09-01**.
