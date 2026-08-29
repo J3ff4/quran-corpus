@@ -431,13 +431,23 @@ describe('getSurahGlosses', () => {
     // sheet shows "no translation" for the entire corpus -- with no error.
     const glosses = await getSurahGlosses(createFakeClient(), 2, 'en');
 
-    expect(glosses.get(2002)).toBe('that');
+    expect(glosses.get(2002)?.text).toBe('that');
     expect(glosses.size).toBeGreaterThan(0);
-    expect([...glosses.values()].every((value) => typeof value === 'string')).toBe(true);
+    expect([...glosses.values()].every((value) => typeof value.text === 'string')).toBe(true);
   });
 
   it('prefers the requested language over the English fallback', async () => {
-    expect((await getSurahGlosses(createFakeClient(), 2, 'ru')).get(2002)).toBe('это');
+    expect((await getSurahGlosses(createFakeClient(), 2, 'ru')).get(2002)?.text).toBe('это');
+  });
+
+  it('flags only the words that fell back to another language', async () => {
+    // Both branches from one call, because this is the whole decision: word
+    // 2001 has an `en` row and no `ru` one, word 2002 has both. Flagging every
+    // word, or none, would satisfy a test that only looked at one of them.
+    const glosses = await getSurahGlosses(createFakeClient(), 2, 'ru');
+
+    expect(glosses.get(2001)).toEqual({ text: 'Alif Lam Meem', lang: 'en', isFallback: true });
+    expect(glosses.get(2002)).toEqual({ text: 'это', lang: 'ru', isFallback: false });
   });
 
   it('returns an empty map for a surah with no glosses at all', async () => {
@@ -450,11 +460,11 @@ describe('getWordSummary', () => {
     const client = createFakeClient();
     const [word] = await getWordsForAyah(client, 201);
 
-    const summary = await getWordSummary(client, word!, 'Alif Lam Meem');
+    const summary = await getWordSummary(client, word!, { text: 'Alif Lam Meem', lang: 'en', isFallback: false });
 
     expect(summary.word.id).toBe(2001);
     expect(summary.segments).toHaveLength(2);
-    expect(summary.gloss).toBe('Alif Lam Meem');
+    expect(summary.gloss?.text).toBe('Alif Lam Meem');
   });
 
   it('returns the segments in segment_index order', async () => {
@@ -496,7 +506,7 @@ describe('getWordAtLocation', () => {
 
     expect(byLocation!.word.id).toBe(2001);
     expect(byLocation!.segments).toHaveLength(2);
-    expect(byLocation!.gloss).toBe('Alif Lam Meem');
+    expect(byLocation!.gloss?.text).toBe('Alif Lam Meem');
   });
 
   it('returns null for coordinates that do not exist', async () => {

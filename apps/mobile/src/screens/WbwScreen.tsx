@@ -14,6 +14,7 @@ import {
   getSurahGlosses,
   getWbwScreen,
   type WbwScreenData,
+  type Gloss,
   type WordSummary,
 } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
@@ -91,7 +92,7 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
   // because the reader shares it -- one duplicate query per surah, off the
   // first-paint path, in exchange for not threading a cache through two
   // screens.
-  const [glosses, setGlosses] = useState<Map<number, string>>(new Map());
+  const [glosses, setGlosses] = useState<Map<number, Gloss>>(new Map());
   const [corpusClient, setCorpusClient] = useState<MobileDataClient | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

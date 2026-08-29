@@ -2,7 +2,7 @@ import React from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Word, WordSegment } from '@quran-corpus/data/mobile';
-import type { WordSummary } from '@/data/corpusRepository';
+import type { Gloss, WordSummary } from '@/data/corpusRepository';
 import { WordSheet } from './WordSheet';
 
 const mocks = vi.hoisted(() => ({
@@ -125,7 +125,7 @@ function summary(
     root?: string | null;
     rootArabic?: string | null;
     segments?: WordSegment[];
-    gloss?: string | null;
+    gloss?: Gloss | null;
   } = {},
 ): WordSummary {
   return {
@@ -136,7 +136,10 @@ function summary(
       root: overrides.rootArabic ?? null,
     },
     segments: overrides.segments ?? [seg(1, 'N')],
-    gloss: overrides.gloss === undefined ? 'the entirely merciful' : overrides.gloss,
+    gloss:
+      overrides.gloss === undefined
+        ? { text: 'the entirely merciful', lang: 'en', isFallback: false }
+        : overrides.gloss,
   };
 }
 
@@ -177,7 +180,7 @@ describe('WordSheet', () => {
   });
 
   it('shows the gloss when there is one', () => {
-    render(<WordSheet summary={summary({ gloss: 'the most merciful' })} {...handlers} />);
+    render(<WordSheet summary={summary({ gloss: { text: 'the most merciful', lang: 'en', isFallback: false } })} {...handlers} />);
 
     expect(screen.getByText('the most merciful')).toBeTruthy();
   });
@@ -257,5 +260,24 @@ describe('WordSheet', () => {
     for (const id of ['full-analysis', 'root-link']) {
       expect(Number(screen.getByTestId(id).style.minHeight.replace('px', ''))).toBeGreaterThanOrEqual(48);
     }
+  });
+
+  it('marks a gloss that fell back to another language', () => {
+    render(
+      <WordSheet
+        summary={summary({ gloss: { text: 'the Entirely Merciful', lang: 'en', isFallback: true } })}
+        {...handlers}
+      />,
+    );
+
+    // Web has always done this (WordPopover renders `({glossLang})`); mobile
+    // dropped gloss_lang on the way through and showed English as Russian.
+    expect(screen.getByTestId('gloss-lang-en').textContent).toBe('(en)');
+  });
+
+  it('does not mark a gloss already in the requested language', () => {
+    render(<WordSheet summary={summary({})} {...handlers} />);
+
+    expect(screen.queryByTestId('gloss-lang-en')).toBeNull();
   });
 });

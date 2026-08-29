@@ -2,6 +2,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
+import { GlossLangTag } from '@/components/GlossLangTag';
 import { SegmentedWord } from '@/components/SegmentedWord';
 import { SegmentPill } from '@/components/SegmentPill';
 import { getWordAtLocation, type WordSummary } from '@/data/corpusRepository';
@@ -103,8 +104,15 @@ export default function WordDetailRoute() {
           {word.transliteration}
         </Text>
       ) : null}
+      {/* The tag is nested inside the gloss rather than set beside it so the two
+          wrap as one phrase. Safe here where it would not be on an Arabic run:
+          nesting Text breaks shaping across the boundary, and a gloss is never
+          Arabic. */}
       <Text style={{ color: gloss ? theme.text : theme.mutedText, fontSize: typography.body }}>
-        {gloss ?? t(uiLocale, 'word.noGloss')}
+        {gloss?.text ?? t(uiLocale, 'word.noGloss')}
+        {gloss?.isFallback ? ' ' : ''}
+        <GlossLangTag gloss={gloss} uiLocale={uiLocale} fontSize={typography.caption} />
+
       </Text>
 
       <View style={{ gap: 8 }}>

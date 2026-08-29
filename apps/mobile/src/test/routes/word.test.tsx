@@ -82,7 +82,7 @@ const word: Word = {
 const summary = {
   word,
   segments: [segment(1, 'ٱل', 'DET'), segment(2, 'لَّهُ', 'PN')],
-  gloss: 'Allah',
+  gloss: { text: 'Allah', lang: 'en', isFallback: false },
 };
 
 describe('word detail route', () => {
@@ -171,6 +171,27 @@ describe('word detail route', () => {
 
     expect(await screen.findByText('nominative masculine noun')).toBeTruthy();
     expect(container.textContent).not.toContain('mangled');
+  });
+
+  it('marks a gloss that fell back to another language', async () => {
+    // The third surface that prints a gloss. Sheet and grid have their own
+    // guards; without one here the full-analysis screen was the one place the
+    // mark could be dropped and every suite stay green.
+    mocks.getWordAtLocation.mockResolvedValue({
+      ...summary,
+      gloss: { text: 'Allah', lang: 'en', isFallback: true },
+    });
+
+    render(<WordDetailRoute />);
+
+    expect((await screen.findByTestId('gloss-lang-en')).textContent).toBe('(en)');
+  });
+
+  it('leaves a gloss in the requested language unmarked', async () => {
+    render(<WordDetailRoute />);
+
+    await screen.findByText('Allah');
+    expect(screen.queryByTestId('gloss-lang-en')).toBeNull();
   });
 
   it('falls back to the no-gloss line when the word has no translation', async () => {

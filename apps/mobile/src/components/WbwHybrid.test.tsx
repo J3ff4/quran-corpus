@@ -2,7 +2,7 @@ import React from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Word, WordSegment } from '@quran-corpus/data/mobile';
-import type { WbwPage } from '@/data/corpusRepository';
+import type { Gloss, WbwPage } from '@/data/corpusRepository';
 
 vi.mock('react-native', async () => {
   const { host } = await import('@/testing/rnHosts.js');
@@ -79,17 +79,19 @@ function pageWithUnanalysedWord(): WbwPage {
   };
 }
 
+const gloss = (text: string, lang = 'en', isFallback = false): Gloss => ({ text, lang, isFallback });
+
 const GLOSSES = new Map([
-  [1, 'Allah'],
-  [2, 'not'],
-  [3, 'god'],
+  [1, gloss('Allah')],
+  [2, gloss('not')],
+  [3, gloss('god')],
 ]);
 
 function renderHybrid({
   page: wbwPage = page(3),
   glosses = GLOSSES,
   onWordPress = vi.fn(),
-}: { page?: WbwPage; glosses?: Map<number, string>; onWordPress?: (word: Word) => void } = {}) {
+}: { page?: WbwPage; glosses?: Map<number, Gloss>; onWordPress?: (word: Word) => void } = {}) {
   const result = render(
     <ThemeContext.Provider value={themeColors.dark}>
       <WbwHybrid page={wbwPage} uiLocale="en" glosses={glosses} onWordPress={onWordPress} />

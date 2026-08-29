@@ -190,19 +190,44 @@ export async function getWordsForAyah(client: MobileDataClient, ayahId: number):
 // getGlossesWithFallback takes a SURAH id, not a word-id list, so glosses are
 // fetched once per surah and cached rather than queried per word tap. Its rows
 // carry `gloss_text`, not `text`.
+/**
+ * One word's gloss, with the language it is actually written in.
+ *
+ * `word_glosses` carries `en` and `uz` rows and no `ru` at all, while `ru` is a
+ * selectable content language -- so a reader on Russian gets the English gloss
+ * for every word. getGlossesWithFallback tags each row with the language it
+ * fell back to precisely so the UI can say so; dropping that tag rendered
+ * English as if it were Russian, with nothing on screen admitting it (#12).
+ *
+ * `isFallback` is decided here rather than at each render site because this is
+ * the one place that knows which language was asked for. The three surfaces
+ * that print a gloss would otherwise each need the requested language threaded
+ * down to them, and a fourth would silently forget to.
+ */
+export interface Gloss {
+  text: string;
+  lang: string;
+  isFallback: boolean;
+}
+
 export async function getSurahGlosses(
   client: MobileDataClient,
   surahId: number,
   languageCode: ContentLanguageCode,
-): Promise<Map<number, string>> {
+): Promise<Map<number, Gloss>> {
   const glosses = await getGlossesWithFallback(client, surahId, languageCode);
-  return new Map(glosses.map((gloss) => [gloss.word_id, gloss.gloss_text]));
+  return new Map(
+    glosses.map((gloss) => [
+      gloss.word_id,
+      { text: gloss.gloss_text, lang: gloss.gloss_lang, isFallback: gloss.gloss_lang !== languageCode },
+    ]),
+  );
 }
 
 export interface WordSummary {
   word: Word;
   segments: WordSegment[];
-  gloss: string | null;
+  gloss: Gloss | null;
 }
 
 /** Takes the whole `Word` rather than an id because every caller already holds
@@ -210,7 +235,7 @@ export interface WordSummary {
 export async function getWordSummary(
   client: MobileDataClient,
   word: Word,
-  gloss: string | null,
+  gloss: Gloss | null,
 ): Promise<WordSummary> {
   const segments = await getSegmentsByWordIds(client, [word.id]);
   return {

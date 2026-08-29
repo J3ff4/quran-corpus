@@ -8,6 +8,7 @@ import { useThemeColors } from '@/theme/themeContext';
 import { useArabicSizes } from '@/theme/useArabicSizes';
 import { BottomSheet } from './BottomSheet';
 import { SegmentedWord } from './SegmentedWord';
+import { GlossLangTag } from './GlossLangTag';
 import { SegmentPill } from './SegmentPill';
 
 const actionStyle = {
@@ -41,8 +42,15 @@ export function WordSheet({ summary, uiLocale, onClose, onOpenDetail, onOpenRoot
   return (
     <BottomSheet onClose={onClose} closeLabel={t(uiLocale, 'word.close')}>
       <SegmentedWord word={word} segments={segments} fontSize={sizes.title} />
+      {/* The tag is nested inside the gloss rather than set beside it so the two
+          wrap as one phrase. Safe here where it would not be on an Arabic run:
+          nesting Text breaks shaping across the boundary, and a gloss is never
+          Arabic. */}
       <Text style={{ color: gloss ? theme.text : theme.mutedText, fontSize: typography.body }}>
-        {gloss ?? t(uiLocale, 'word.noGloss')}
+        {gloss?.text ?? t(uiLocale, 'word.noGloss')}
+        {gloss?.isFallback ? ' ' : ''}
+        <GlossLangTag gloss={gloss} uiLocale={uiLocale} fontSize={typography.caption} />
+
       </Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         {segments.map((segment) => (

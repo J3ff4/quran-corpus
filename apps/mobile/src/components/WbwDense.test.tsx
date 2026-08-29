@@ -2,7 +2,7 @@ import React from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Word, WordSegment } from '@quran-corpus/data/mobile';
-import type { WbwPage } from '@/data/corpusRepository';
+import type { Gloss, WbwPage } from '@/data/corpusRepository';
 
 vi.mock('react-native', async () => {
   const { host } = await import('@/testing/rnHosts.js');
@@ -80,17 +80,19 @@ function pageWithUnanalysedWord(): WbwPage {
   };
 }
 
+const gloss = (text: string, lang = 'en', isFallback = false): Gloss => ({ text, lang, isFallback });
+
 const GLOSSES = new Map([
-  [1, 'Allah'],
-  [2, 'not'],
-  [3, 'god'],
+  [1, gloss('Allah')],
+  [2, gloss('not')],
+  [3, gloss('god')],
 ]);
 
 function renderDense({
   page: wbwPage = page(3),
   glosses = GLOSSES,
   onWordPress = vi.fn(),
-}: { page?: WbwPage; glosses?: Map<number, string>; onWordPress?: (word: Word) => void } = {}) {
+}: { page?: WbwPage; glosses?: Map<number, Gloss>; onWordPress?: (word: Word) => void } = {}) {
   const result = render(
     <ThemeContext.Provider value={themeColors.dark}>
       <WbwDense page={wbwPage} uiLocale="en" glosses={glosses} onWordPress={onWordPress} />
@@ -121,7 +123,7 @@ describe('WbwDense', () => {
   });
 
   it('clamps the gloss to a single line', () => {
-    renderDense({ glosses: new Map([[1, 'the Sustainer of all existence, ever-living']]) });
+    renderDense({ glosses: new Map([[1, gloss('the Sustainer of all existence, ever-living')]]) });
 
     // The density mode's whole point. A two-line gloss makes this the hybrid
     // layout with tighter padding.
@@ -166,5 +168,22 @@ describe('WbwDense', () => {
     const run = container.querySelector<HTMLElement>('[data-testid="wbw-dense-run"]')!;
     expect(run.style.flexDirection).toBe('row-reverse');
     expect(run.style.flexWrap).toBe('wrap');
+  });
+
+  it('marks a gloss that fell back to another language', () => {
+    // word_glosses carries no `ru` rows at all, so a reader on Russian gets the
+    // English gloss for every word. Unmarked, the screen presents English as
+    // Russian -- the defect in #12.
+    renderDense({ glosses: new Map([[1, gloss('Allah', 'en', true)]]) });
+
+    expect(screen.getByTestId('gloss-lang-en').textContent).toBe('(en)');
+  });
+
+  it('leaves a gloss in the requested language unmarked', () => {
+    // The mark has to be absent on the common path, or it is noise rather than
+    // information: on English every gloss would carry it.
+    renderDense({ glosses: new Map([[1, gloss('Allah', 'en', false)]]) });
+
+    expect(screen.queryByTestId('gloss-lang-en')).toBeNull();
   });
 });
