@@ -12,7 +12,10 @@ const mocks = vi.hoisted(() => ({
   uiLocale: 'en',
   getSurahReader: vi.fn(),
   getWordsForAyah: vi.fn(),
+  getBookmarks: vi.fn(),
+  setBookmarkNote: vi.fn(),
   pageSurahProps: [] as ((surahId: number, side: 'prev' | 'next') => void)[],
+  alerts: [] as { title: string; body: string; buttons: { text: string; onPress?: () => void }[] }[],
 }));
 
 vi.mock('expo-router', () => ({
@@ -45,8 +48,10 @@ vi.mock('@/components/SurahReader', async () => {
     // `loadWords` is destructured and driven, not dropped: a function prop a
     // mock omits renders nothing, so no assertion in this file could ever see
     // it and the route's own loader would sit unexercised (F1).
-    SurahReader: ({ onToggleBookmark, onReadingAyah, bookmarkedAyahs, loadWords, prevSurahId, nextSurahId, onPageSurah, initialAyahNumber }: {
+    SurahReader: ({ onToggleBookmark, onEditNote, notesByAyah, onReadingAyah, bookmarkedAyahs, loadWords, prevSurahId, nextSurahId, onPageSurah, initialAyahNumber }: {
       onToggleBookmark: (ayahNumber: number) => void;
+      onEditNote?: (ayahNumber: number) => void;
+      notesByAyah?: Map<number, string | null>;
       onReadingAyah?: (ayahNumber: number) => void;
       bookmarkedAyahs: Set<number>;
       loadWords: (ayahId: number) => Promise<unknown[]>;
@@ -71,12 +76,33 @@ vi.mock('@/components/SurahReader', async () => {
           'page next',
         ),
         React.createElement('span', null, `bookmarked:${[...bookmarkedAyahs].sort((a, b) => a - b).join(',')}`),
+        React.createElement('span', null, `note:${notesByAyah?.get(255) ?? 'none'}`),
+        React.createElement('button', { onClick: () => onEditNote?.(255) }, 'edit note'),
         React.createElement('button', { onClick: () => onToggleBookmark(255) }, 'bookmark'),
         React.createElement('button', { onClick: () => onToggleBookmark(257) }, 'bookmark other'),
         React.createElement('button', { onClick: () => onReadingAyah?.(256) }, 'read ayah'),
         React.createElement('button', { onClick: () => void loadWords(8) }, 'open word sheet'),
       );
     },
+  };
+});
+
+vi.mock('@/components/NoteEditor', async () => {
+  const React = await import('react');
+  return {
+    // The sheet itself reaches reanimated and gesture-handler, which do not
+    // parse under this transform; BookmarksTab.test.tsx covers its behaviour.
+    // What matters here is that the route opens it for the right ayah and
+    // hands what is typed to the write.
+    NoteEditor: ({ surahId, ayahNumber, note, error, onSave }: { surahId: number; ayahNumber: number; note: string | null; error?: string | null; onSave: (note: string) => void }) =>
+      React.createElement(
+        'div',
+        null,
+        React.createElement('span', null, `editing:${ayahNumber}:${note ?? 'none'}`),
+        React.createElement('span', null, `sheet-surah:${surahId}`),
+        React.createElement('span', null, `sheet-error:${error ?? 'none'}`),
+        React.createElement('button', { onClick: () => onSave('  the throne verse  ') }, 'save note'),
+      ),
   };
 });
 
@@ -104,7 +130,8 @@ vi.mock('@/data/corpusRepository', () => ({
 }));
 
 vi.mock('@/data/userRepository', () => ({
-  getBookmarks: async () => [],
+  getBookmarks: (...args: unknown[]) => mocks.getBookmarks(...args),
+  setBookmarkNote: (...args: unknown[]) => mocks.setBookmarkNote(...args),
   setBookmark: (...args: unknown[]) => mocks.setBookmark(...args),
   recordReadingPosition: (...args: unknown[]) => mocks.recordReadingPosition(...args),
   recordReadingDay: (...args: unknown[]) => mocks.recordReadingDay(...args),
@@ -130,6 +157,19 @@ vi.mock('react-native', async () => {
     AccessibilityInfo: {
       isReduceMotionEnabled: () => Promise.resolve(false),
       addEventListener: () => ({ remove: () => {} }),
+    },
+    // Recorded rather than auto-answered: the confirm before a note is deleted
+    // has to be shown to have been asked, and each test drives whichever
+    // button it is about. Auto-resolving here would make "was it asked at all"
+    // untestable.
+    Alert: {
+      alert: (
+        title: string,
+        body: string,
+        buttons: { text: string; onPress?: () => void }[],
+      ) => {
+        mocks.alerts.push({ title, body, buttons });
+      },
     },
   };
 });
@@ -167,8 +207,212 @@ describe('SurahRoute', () => {
     mocks.getSurahReader.mockResolvedValue(readerFixture);
     mocks.getWordsForAyah.mockReset();
     mocks.getWordsForAyah.mockResolvedValue([]);
+    mocks.getBookmarks.mockReset();
+    mocks.getBookmarks.mockResolvedValue([]);
+    mocks.setBookmarkNote.mockReset();
     mocks.params = { surahId: '2' };
     mocks.pageSurahProps.length = 0;
+    mocks.alerts.length = 0;
+  });
+
+  it('opens the note editor for the ayah the reader asked about', async () => {
+    mocks.getBookmarks.mockResolvedValue([
+      { surahId: 2, ayahNumber: 255, note: 'throne', createdAt: '2026-08-29T00:00:00Z' },
+      // A different surah's bookmark must not reach this reader's map.
+      { surahId: 3, ayahNumber: 5, note: 'elsewhere', createdAt: '2026-08-29T00:00:00Z' },
+    ]);
+
+    render(<SurahRoute />);
+    expect(await screen.findByText('note:throne')).toBeTruthy();
+    // 3:5 must not reach this reader. Unfiltered it arrives as ayah 5 of THIS
+    // surah -- a bookmark on an ayah the reader never marked, with someone
+    // else's note hanging off it.
+    expect(screen.getByText('bookmarked:255')).toBeTruthy();
+
+    fireEvent.click(screen.getByText('edit note'));
+    expect(screen.getByText('editing:255:throne')).toBeTruthy();
+  });
+
+  it('hands the typed note to the write and shows back what was stored', async () => {
+    mocks.getBookmarks.mockResolvedValue([
+      { surahId: 2, ayahNumber: 255, note: null, createdAt: '2026-08-29T00:00:00Z' },
+    ]);
+
+    render(<SurahRoute />);
+    await screen.findByText('note:none');
+    fireEvent.click(screen.getByText('edit note'));
+
+    mocks.getBookmarks.mockResolvedValue([
+      { surahId: 2, ayahNumber: 255, note: 'the throne verse', createdAt: '2026-08-29T00:00:00Z' },
+    ]);
+    fireEvent.click(screen.getByText('save note'));
+
+    // The padding the editor sent is gone, because the row is re-read after the
+    // write rather than assumed -- normalizeNote decides what is stored.
+    expect(await screen.findByText('note:the throne verse')).toBeTruthy();
+    expect(mocks.setBookmarkNote).toHaveBeenCalledWith(expect.anything(), 2, 255, '  the throne verse  ');
+  });
+
+  it('asks before deleting a bookmark that carries a note', async () => {
+    mocks.getBookmarks.mockResolvedValue([
+      { surahId: 2, ayahNumber: 255, note: 'throne', createdAt: '2026-08-29T00:00:00Z' },
+    ]);
+
+    render(<SurahRoute />);
+    await screen.findByText('note:throne');
+    fireEvent.click(screen.getByText('bookmark'));
+
+    // Nothing has been written or removed yet: the question comes first, so
+    // cancelling costs nothing.
+    await waitFor(() => expect(mocks.alerts).toHaveLength(1));
+    expect(mocks.setBookmark).not.toHaveBeenCalled();
+    expect(screen.getByText('bookmarked:255')).toBeTruthy();
+
+    const confirm = mocks.alerts[0]?.buttons.find((button) => button.text === 'Delete');
+    await act(async () => {
+      confirm?.onPress?.();
+    });
+
+    await waitFor(() =>
+      expect(mocks.setBookmark).toHaveBeenCalledWith(expect.anything(), 2, 255, false),
+    );
+  });
+
+  it('leaves the bookmark and its note alone when the confirm is cancelled', async () => {
+    mocks.getBookmarks.mockResolvedValue([
+      { surahId: 2, ayahNumber: 255, note: 'throne', createdAt: '2026-08-29T00:00:00Z' },
+    ]);
+
+    render(<SurahRoute />);
+    await screen.findByText('note:throne');
+    fireEvent.click(screen.getByText('bookmark'));
+    await waitFor(() => expect(mocks.alerts).toHaveLength(1));
+
+    const cancel = mocks.alerts[0]?.buttons.find((button) => button.text === 'Cancel');
+    await act(async () => {
+      cancel?.onPress?.();
+    });
+
+    expect(mocks.setBookmark).not.toHaveBeenCalled();
+    expect(screen.getByText('bookmarked:255')).toBeTruthy();
+    expect(screen.getByText('note:throne')).toBeTruthy();
+  });
+
+  it('does not ask when the bookmark being removed has no note', async () => {
+    mocks.getBookmarks.mockResolvedValue([
+      { surahId: 2, ayahNumber: 255, note: null, createdAt: '2026-08-29T00:00:00Z' },
+    ]);
+
+    render(<SurahRoute />);
+    await screen.findByText('note:none');
+    fireEvent.click(screen.getByText('bookmark'));
+
+    // A dialog on every un-bookmark would be an interruption on the common
+    // path; there is nothing to lose when the row carries no text.
+    await waitFor(() =>
+      expect(mocks.setBookmark).toHaveBeenCalledWith(expect.anything(), 2, 255, false),
+    );
+    expect(mocks.alerts).toHaveLength(0);
+  });
+
+  it('restores the note, not an empty one, when the delete write fails', async () => {
+    mocks.getBookmarks.mockResolvedValue([
+      { surahId: 2, ayahNumber: 255, note: 'throne', createdAt: '2026-08-29T00:00:00Z' },
+    ]);
+    mocks.setBookmark.mockRejectedValue(new Error('bookmark write boom'));
+
+    render(<SurahRoute />);
+    await screen.findByText('note:throne');
+    fireEvent.click(screen.getByText('bookmark'));
+    await waitFor(() => expect(mocks.alerts).toHaveLength(1));
+    await act(async () => {
+      mocks.alerts[0]?.buttons.find((button) => button.text === 'Delete')?.onPress?.();
+    });
+
+    // The DELETE failed, so the row and its note are still in SQLite. Coming
+    // back as an empty note would have the editor seed a blank draft over text
+    // that was never lost.
+    await waitFor(() => expect(screen.getByText('Unable to update bookmark')).toBeTruthy());
+    expect(screen.getByText('bookmarked:255')).toBeTruthy();
+    expect(screen.getByText('note:throne')).toBeTruthy();
+  });
+
+  it('shows a failed note write inside the sheet, not on the reader behind it', async () => {
+    mocks.getBookmarks.mockResolvedValue([
+      { surahId: 2, ayahNumber: 255, note: null, createdAt: '2026-08-29T00:00:00Z' },
+    ]);
+    mocks.setBookmarkNote.mockRejectedValue(new Error('note write boom'));
+
+    render(<SurahRoute />);
+    await screen.findByText('note:none');
+    fireEvent.click(screen.getByText('edit note'));
+    fireEvent.click(screen.getByText('save note'));
+
+    // The sheet is a <Modal> in its own native window: an alert rendered on the
+    // reader is drawn behind it and announced to nobody.
+    await waitFor(() =>
+      expect(screen.getByText('sheet-error:Unable to save the note')).toBeTruthy(),
+    );
+    expect(screen.queryByText('Unable to save the note')).toBeNull();
+  });
+
+  it('closes the note sheet when the reader pages to another surah', async () => {
+    mocks.getBookmarks.mockResolvedValue([
+      { surahId: 2, ayahNumber: 255, note: 'throne', createdAt: '2026-08-29T00:00:00Z' },
+    ]);
+
+    render(<SurahRoute />);
+    await screen.findByText('note:throne');
+    fireEvent.click(screen.getByText('edit note'));
+    expect(screen.getByText('editing:255:throne')).toBeTruthy();
+
+    // The sheet is state, not navigation, so it survives a page turn unless the
+    // route clears it -- left open it edits an ayah number against the surah
+    // the reader has already left.
+    await act(async () => {
+      fireEvent.click(screen.getByText('page next'));
+    });
+
+    // Matched on the sheet existing at all, not on its text. Asserting
+    // `editing:255:throne` is gone passes with the sheet still mounted: the new
+    // surah's bookmark map has no 255, so it re-renders as `editing:255:none`
+    // and the assertion succeeds while the bug is fully present.
+    expect(screen.queryByText(/^editing:/)).toBeNull();
+  });
+
+  it('writes a note against the surah on screen, not the one being paged to', async () => {
+    mocks.getBookmarks.mockResolvedValue([
+      { surahId: 2, ayahNumber: 255, note: null, createdAt: '2026-08-29T00:00:00Z' },
+    ]);
+
+    render(<SurahRoute />);
+    await screen.findByText('note:none');
+
+    // Mid page turn the outgoing surah is still mounted and still interactive,
+    // so `surahId` is already 3 while the reader shows 2. A note saved here
+    // belongs to 2:255; against 3 it lands on another surah's bookmark, or
+    // throws on an ayah number surah 3 does not reach.
+    const pending = deferred<typeof readerFixture>();
+    mocks.getSurahReader.mockReturnValue(pending.promise);
+    fireEvent.click(screen.getByText('page next'));
+    await waitFor(() =>
+      expect(mocks.getSurahReader).toHaveBeenLastCalledWith(expect.anything(), 3, 'en'),
+    );
+
+    // Opened DURING the turn, which is what makes this reachable: the held
+    // reader is on screen with its pen, so the sheet can be opened after
+    // `surahId` has already moved on.
+    fireEvent.click(screen.getByText('edit note'));
+    expect(screen.getByText('sheet-surah:2')).toBeTruthy();
+    fireEvent.click(screen.getByText('save note'));
+
+    await waitFor(() =>
+      expect(mocks.setBookmarkNote).toHaveBeenCalledWith(expect.anything(), 2, 255, '  the throne verse  '),
+    );
+
+    await act(async () => {
+      pending.resolve(readerFixture);
+    });
   });
 
   it('offers the surah either side, and neither past the ends of the mushaf', async () => {

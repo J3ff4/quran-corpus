@@ -58,6 +58,11 @@ export type ReaderRecitation = Omit<
 interface SurahReaderProps {
   data: SurahReaderData;
   bookmarkedAyahs: Set<number>;
+  /** ayah number -> its note, for the ayahs that carry one. Separate from
+   *  bookmarkedAyahs rather than replacing it: a bookmark with no note is the
+   *  common case, and folding the two would make every existing caller build a
+   *  map to say nothing. */
+  notesByAyah?: Map<number, string | null>;
   playingAyah: number | null;
   audioEnabled: boolean;
   recitation: ReaderRecitation;
@@ -80,6 +85,7 @@ interface SurahReaderProps {
   loadWords?: (ayahId: number) => Promise<Word[]>;
   loadWordSummary?: (word: Word) => Promise<WordSummary>;
   onToggleBookmark: (ayahNumber: number) => void;
+  onEditNote?: (ayahNumber: number) => void;
   onToggleAudio: (ayahNumber: number) => void;
   onReadingAyah?: (ayahNumber: number) => void;
   /** Forwarded to the header's surah chevrons. Omitted draws none. */
@@ -169,6 +175,7 @@ const EMPTY_WORDS: Word[] = [];
 export function SurahReader({
   data,
   bookmarkedAyahs,
+  notesByAyah,
   playingAyah,
   audioEnabled,
   recitation,
@@ -181,6 +188,7 @@ export function SurahReader({
   loadWords,
   loadWordSummary,
   onToggleBookmark,
+  onEditNote,
   onToggleAudio,
   onReadingAyah,
   // Defaulted rather than forwarded as undefined: exactOptionalPropertyTypes
@@ -668,10 +676,15 @@ export function SurahReader({
             arabicText: item.ayah.text_uthmani,
             words: wordsByAyah.get(item.ayah.id) ?? EMPTY_WORDS,
             bookmarked: bookmarkedAyahs.has(item.ayah.ayah_number),
+            note: notesByAyah?.get(item.ayah.ayah_number) ?? null,
             playing: playingAyah === item.ayah.ayah_number,
             uiLocale,
             audioDisabled: !audioEnabled,
             onToggleBookmark,
+            // Spread conditionally: exactOptionalPropertyTypes distinguishes
+            // "absent" from "present and undefined", and the renderers declare
+            // the prop optional rather than optional-or-undefined.
+            ...(onEditNote ? { onEditNote } : {}),
             onToggleAudio,
             onWordPress,
           };

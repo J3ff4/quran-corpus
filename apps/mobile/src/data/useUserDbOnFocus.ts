@@ -9,6 +9,13 @@ export interface UserDbLoadState<T> {
   data: T | null;
   loading: boolean;
   error: string | null;
+  /** Re-read now, without waiting for the next focus or resume.
+   *
+   *  For a screen that writes to the same database it is reading: after a
+   *  write, what is on screen must be what was stored, not what the screen
+   *  hoped was stored. Patching local state instead would show the note the
+   *  user typed rather than the note `normalizeNote` kept. */
+  reload: () => void;
 }
 
 /**
@@ -40,6 +47,11 @@ export function useUserDbOnFocus<T>(
   // Held in a ref so callers may pass an inline closure without the focus
   // effect re-subscribing on every render.
   const loadRef = useRef(load);
+  // The focused read, exposed for `reload`. Assigned inside the effect because
+  // that is where the cancellation flag and the generation counter live: a
+  // reload has to be the *same* run those guard, or its result could land after
+  // a blur that was supposed to have silenced it.
+  const runRef = useRef<() => void>(() => {});
   useEffect(() => {
     loadRef.current = load;
   }, [load]);
@@ -75,6 +87,7 @@ export function useUserDbOnFocus<T>(
         }
       }
 
+      runRef.current = run;
       run();
       // Subscribed only while focused, so a backgrounded app does not re-read
       // the DB once per blurred screen.
@@ -84,10 +97,15 @@ export function useUserDbOnFocus<T>(
 
       return () => {
         cancelled = true;
+        // Back to a no-op: a reload fired after blur would otherwise re-read
+        // the database for a screen that is no longer listening.
+        runRef.current = () => {};
         resumed.remove();
       };
     }, [fallbackMessage]),
   );
 
-  return { data, loading, error };
+  const reload = useCallback(() => runRef.current(), []);
+
+  return { data, loading, error, reload };
 }

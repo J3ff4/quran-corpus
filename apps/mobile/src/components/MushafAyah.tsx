@@ -14,10 +14,13 @@ export interface MushafAyahProps {
   /** Empty until the reader has fetched this ayah's words; see AyahText. */
   words: Word[];
   bookmarked: boolean;
+  /** See AyahCard: only ever non-null on a bookmarked ayah. */
+  note?: string | null;
   playing: boolean;
   uiLocale: UiLocaleCode;
   audioDisabled?: boolean;
   onToggleBookmark: (ayahNumber: number) => void;
+  onEditNote?: (ayahNumber: number) => void;
   onToggleAudio: (ayahNumber: number) => void;
   onWordPress: (word: Word) => void;
 }
@@ -41,10 +44,12 @@ export function MushafAyah({
   arabicText,
   words,
   bookmarked,
+  note = null,
   playing,
   uiLocale,
   audioDisabled = false,
   onToggleBookmark,
+  onEditNote,
   onToggleAudio,
   onWordPress,
 }: MushafAyahProps) {
@@ -77,6 +82,22 @@ export function MushafAyah({
             {bookmarked ? t(uiLocale, 'reader.removeBookmark') : t(uiLocale, 'reader.bookmark')}
           </Text>
         </Pressable>
+        {/* Present in both renderers, for the reason the bookmark is: losing it
+            here would mean the two modes differ in what you can DO, not just
+            in what you see. */}
+        {bookmarked && onEditNote ? (
+          <Pressable
+            testID={`ayah-${surahId}-${ayahNumber}-note`}
+            accessibilityRole="button"
+            accessibilityLabel={t(uiLocale, note === null ? 'bookmarks.addNote' : 'bookmarks.editNote')}
+            onPress={() => onEditNote(ayahNumber)}
+            style={controlStyle}
+          >
+            <Text style={{ color: note === null ? theme.mutedText : theme.accent, fontSize: typography.caption }}>
+              {note === null ? '✎' : '✐'}
+            </Text>
+          </Pressable>
+        ) : null}
         <Pressable
           testID={`ayah-${surahId}-${ayahNumber}-audio`}
           accessibilityRole="button"

@@ -279,14 +279,20 @@ export function FlatList({
   data,
   renderItem,
   keyExtractor,
+  testID,
 }: {
   data?: readonly unknown[];
   renderItem: (info: { item: unknown; index: number }) => React.ReactNode;
   keyExtractor?: (item: unknown, index: number) => string;
+  // Forwarded so a suite can assert WHICH container a screen used. "The rows
+  // are a virtualizing list, not a plain View" is a real regression -- it is
+  // how rows past the first screenful became unreachable on device -- and it
+  // is not observable from the rows themselves.
+  testID?: string;
 }) {
   return React.createElement(
     'div',
-    null,
+    { 'data-testid': testID },
     (data ?? []).map((item, index) =>
       React.createElement('div', { key: keyExtractor?.(item, index) ?? index }, renderItem({ item, index })),
     ),
@@ -298,15 +304,18 @@ export function SectionList({
   renderItem,
   renderSectionHeader,
   keyExtractor,
+  testID,
 }: {
   sections?: readonly { title: string; data: readonly unknown[] }[];
   renderItem: (info: { item: unknown; index: number }) => React.ReactNode;
   renderSectionHeader?: (info: { section: { title: string; data: readonly unknown[] } }) => React.ReactNode;
   keyExtractor?: (item: unknown, index: number) => string;
+  /** See FlatList above. */
+  testID?: string;
 }) {
   return React.createElement(
     'div',
-    null,
+    { 'data-testid': testID },
     (sections ?? []).map((section, sectionIndex) =>
       React.createElement(
         'div',

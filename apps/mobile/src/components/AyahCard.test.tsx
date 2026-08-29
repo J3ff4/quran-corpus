@@ -60,6 +60,67 @@ describe('AyahCard', () => {
     expect(onToggleAudio).toHaveBeenCalledWith(1);
   });
 
+  it('offers a note only on a bookmarked ayah', () => {
+    const onEditNote = vi.fn();
+
+    const { rerender } = render(
+      <AyahCard
+        {...baseProps}
+        ayahNumber={255}
+        arabicText="Arabic text"
+        translationText={null}
+        bookmarked={false}
+        playing={false}
+        uiLocale="en"
+        onToggleBookmark={() => {}}
+        onToggleAudio={() => {}}
+        onEditNote={onEditNote}
+      />,
+    );
+    // setBookmarkNote is an UPDATE, never an upsert, so a note written against
+    // an unbookmarked ayah lands nowhere. Offering one here would be an
+    // affordance that silently does nothing.
+    expect(screen.queryByTestId('ayah-2-255-note')).toBeNull();
+
+    rerender(
+      <AyahCard
+        {...baseProps}
+        ayahNumber={255}
+        arabicText="Arabic text"
+        translationText={null}
+        bookmarked
+        playing={false}
+        uiLocale="en"
+        onToggleBookmark={() => {}}
+        onToggleAudio={() => {}}
+        onEditNote={onEditNote}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('ayah-2-255-note'));
+    expect(onEditNote).toHaveBeenCalledWith(255);
+  });
+
+  it('distinguishes an ayah that already has a note by label, not colour alone', () => {
+    render(
+      <AyahCard
+        {...baseProps}
+        ayahNumber={255}
+        arabicText="Arabic text"
+        translationText={null}
+        bookmarked
+        note="the throne verse"
+        playing={false}
+        uiLocale="en"
+        onToggleBookmark={() => {}}
+        onToggleAudio={() => {}}
+        onEditNote={() => {}}
+      />,
+    );
+
+    // WCAG 1.4.1 and TalkBack both: the pen glyph says nothing on its own.
+    expect(screen.getByTestId('ayah-2-255-note').getAttribute('aria-label')).toBe('Edit note');
+  });
+
   it('announces the disabled audio control and the bookmarked state', () => {
     const onToggleAudio = vi.fn();
 

@@ -4,6 +4,7 @@
 // app, which CLAUDE.md §2 forbids -- packages/data is the single source of truth
 // for both the schema and the statements that read it.
 export {
+  NOTE_MAX_LENGTH,
   countDistinctRootsViewed,
   getBookmarks,
   getLastReadingPosition,
@@ -16,6 +17,7 @@ export {
   recordRootView,
   saveSetting,
   setBookmark,
+  setBookmarkNote,
   type Bookmark,
   type ReadingPosition,
 } from '@quran-corpus/data/user-db';

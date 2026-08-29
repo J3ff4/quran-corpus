@@ -79,6 +79,19 @@ export const USER_DB_MIGRATIONS: readonly { version: number; statements: readonl
        )`,
     ],
   },
+  {
+    version: 3,
+    // Additive and non-destructive: a nullable column, no UPDATE, no
+    // rebuild-and-copy, no DROP. The file is on a phone and survives app
+    // updates, so a build that predates this must still open it -- which a new
+    // nullable column allows.
+    //
+    // This is also the one statement in this file that is NOT idempotent:
+    // ALTER TABLE ADD COLUMN throws `duplicate column name` on a second run.
+    // That is exactly what the version gate above is for, and why
+    // migrateUserDb must never be made to swallow an error.
+    statements: ['ALTER TABLE bookmarks ADD COLUMN note TEXT'],
+  },
 ];
 
 /** The version a file is at once every migration above has been applied. */
@@ -184,6 +197,12 @@ function assertAyahCoordinate(surahId: number, ayahNumber: number): void {
 export interface Bookmark {
   surahId: number;
   ayahNumber: number;
+  /** The user's note, or null when there is none. Normalised by
+   *  `normalizeNote` before it was stored, so it is already plain text. */
+  note: string | null;
+  /** The `created_at` the table has always written, returned since M6h: the
+   *  Recent tab orders on it. */
+  createdAt: string;
 }
 
 export interface ReadingPosition {
@@ -221,9 +240,73 @@ export async function setBookmark(
   });
 }
 
+export const NOTE_MAX_LENGTH = 500;
+
+/** C0 and C1 control characters, minus the two whitespace ones a note may
+ *  legitimately contain. Written as escapes, never as literal bytes. */
+const CONTROL_CHARS = new RegExp('[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]', 'g');
+
+/**
+ * Clean a user-supplied note into what may be stored, or null for "no note".
+ *
+ * This is the write boundary for a shared API (CLAUDE.md §3, §5). The screen is
+ * one caller; a later caller -- an import, a share target -- will not repeat the
+ * checks, and a note is the only untrusted string this database holds.
+ *
+ * Control characters go because a note is rendered into a <Text> and stored in a
+ * column a future search may index. \n and \t are deliberately kept: a
+ * multi-line note is a normal thing to write. The cap is applied after trimming,
+ * so trailing whitespace cannot eat the allowance.
+ */
+export function normalizeNote(raw: unknown): string | null {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw !== 'string') {
+    throw new TypeError(`note must be a string or null, got ${typeof raw}`);
+  }
+
+  const cleaned = raw.replace(CONTROL_CHARS, '').trim();
+
+  if (cleaned.length === 0) return null;
+  if (cleaned.length <= NOTE_MAX_LENGTH) return cleaned;
+
+  // slice counts UTF-16 units, so a cut landing between the halves of a
+  // surrogate pair -- any emoji, and everything above U+FFFF -- would store a
+  // lone surrogate: renders as tofu, and is not a well-formed string for
+  // anything that later indexes this column. The validation boundary must not
+  // be the layer that manufactures malformed text.
+  const capped = cleaned.slice(0, NOTE_MAX_LENGTH);
+  const lastUnit = capped.charCodeAt(NOTE_MAX_LENGTH - 1);
+  const splitPair = lastUnit >= 0xd800 && lastUnit <= 0xdbff;
+  return splitPair ? capped.slice(0, -1) : capped;
+}
+
+/** Attach a note to a bookmark, or clear it with null. */
+export async function setBookmarkNote(
+  client: QueryClient,
+  surahId: number,
+  ayahNumber: number,
+  note: string | null,
+): Promise<void> {
+  assertAyahCoordinate(surahId, ayahNumber);
+  const value = normalizeNote(note);
+
+  // UPDATE, not upsert: a note belongs to a bookmark that already exists. An
+  // INSERT here would create a bookmark the user never made -- visible in no
+  // tab that filters on anything, and removable from nothing.
+  await client.execute({
+    sql: 'UPDATE bookmarks SET note = ? WHERE surah_id = ? AND ayah_number = ?',
+    args: [value, surahId, ayahNumber],
+  });
+}
+
+/** Every bookmark, in mushaf order.
+ *
+ *  The order is the By-surah tab's order, and it stays: the Recent tab sorts
+ *  the same rows in the screen rather than paying for a second query over a
+ *  list this size. */
 export async function getBookmarks(client: QueryClient): Promise<Bookmark[]> {
   const result = await client.execute(`
-    SELECT surah_id, ayah_number
+    SELECT surah_id, ayah_number, note, created_at
     FROM bookmarks
     ORDER BY surah_id, ayah_number
   `);
@@ -231,6 +314,11 @@ export async function getBookmarks(client: QueryClient): Promise<Bookmark[]> {
   return result.rows.map((row) => ({
     surahId: Number(row.surah_id),
     ayahNumber: Number(row.ayah_number),
+    // Read back through the same normaliser that wrote it. A row can predate
+    // the current rules, or arrive from a file edited outside the app, and the
+    // screen renders whatever this returns.
+    note: normalizeNote(row.note === null || row.note === undefined ? null : String(row.note)),
+    createdAt: String(row.created_at),
   }));
 }
 

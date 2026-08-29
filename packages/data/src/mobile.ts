@@ -20,7 +20,8 @@ export {
   type Reciter,
 } from './audio.js';
 export { getAllSurahs, getSurahById } from './queries/surahs.js';
-export { getAyahsBySurah, getAyahWithWords } from './queries/ayahs.js';
+export { getAyahPreviews, getAyahsBySurah, getAyahWithWords } from './queries/ayahs.js';
+export type { AyahPreview } from './queries/ayahs.js';
 export { getJuzIndex, getPageIndex, getRevealedIndex } from './queries/browse.js';
 export type { JuzEntry, JuzSurahRange, PageEntry, RevealedEntry } from './queries/browse.js';
 export {

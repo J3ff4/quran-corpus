@@ -2,6 +2,7 @@ import { selectedTranslators, type MobileDataClient } from '@quran-corpus/mobile
 import {
   countLemmaConcordance,
   countRootConcordance,
+  getAyahPreviews,
   getAyahsBySurah,
   getAllSurahs,
   getGlossesWithFallback,
@@ -506,4 +507,21 @@ export async function searchCorpus(
     language: languageCode,
     translator: translatorByLanguage[languageCode],
   });
+}
+
+/** The ayah text behind a list of bookmarks, keyed `surah:ayah`.
+ *
+ *  One query for the whole list. The per-surah readers cannot answer this
+ *  without loading every surah involved, which on a phone is the difference
+ *  between a list that appears and one that arrives a surah at a time. A
+ *  coordinate whose row is missing is simply absent from the map, so the row
+ *  renders its coordinate and no text rather than failing.
+ */
+export async function getBookmarkAyahTexts(
+  client: MobileDataClient,
+  coordinates: readonly { surahId: number; ayahNumber: number }[],
+): Promise<Map<string, string>> {
+  if (coordinates.length === 0) return new Map();
+  const previews = await getAyahPreviews(client, coordinates);
+  return new Map(previews.map((p) => [`${p.surah_id}:${p.ayah_number}`, p.text_uthmani]));
 }

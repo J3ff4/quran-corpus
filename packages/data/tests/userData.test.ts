@@ -9,12 +9,15 @@ import {
   getBookmarks,
   getReadingDays,
   getRootViewsByDay,
+  NOTE_MAX_LENGTH,
   isIsoDay,
   migrateUserDb,
+  normalizeNote,
   recordReadingDay,
   recordReadingPosition,
   recordRootView,
   setBookmark,
+  setBookmarkNote,
 } from '../src/userData.js';
 
 /** Records what reached the driver, so a rejected write can be shown to have
@@ -192,7 +195,9 @@ describe('migrateUserDb', () => {
 
     // The whole reason this is versioned rather than a schema rewrite: the
     // file is on the owner's phone and predates every migration in the list.
-    expect(await getBookmarks(db)).toEqual([{ surahId: 2, ayahNumber: 255 }]);
+    expect(await getBookmarks(db)).toEqual([
+      { surahId: 2, ayahNumber: 255, note: null, createdAt: expect.any(String) },
+    ]);
 
     db.close();
   });
@@ -390,6 +395,158 @@ describe('root views', () => {
     // no row at all would make this NaN and render as a blank counter.
     expect(await countDistinctRootsViewed(db)).toBe(0);
     expect(await getRootViewsByDay(db, '2026-08-24')).toEqual([]);
+
+    db.close();
+  });
+});
+
+
+describe('normalizeNote', () => {
+  it('trims and keeps ordinary text', () => {
+    expect(normalizeNote('  a note about 2:255  ')).toBe('a note about 2:255');
+  });
+
+  it('treats an empty or whitespace-only note as no note', () => {
+    // Otherwise "clear the note" writes a row the With-notes tab then lists as
+    // a note with nothing in it.
+    for (const blank of ['', '   ', '\n\t ', null, undefined]) {
+      expect(normalizeNote(blank)).toBeNull();
+    }
+  });
+
+  it('caps at 500 characters', () => {
+    expect(normalizeNote('x'.repeat(600))).toHaveLength(NOTE_MAX_LENGTH);
+  });
+
+  it('caps after trimming, so padding cannot eat the allowance', () => {
+    // LEADING padding, deliberately. Trailing padding proves nothing: slicing
+    // before the trim still leaves 500 characters once the tail is cut, so the
+    // assertion passes either way. Five leading spaces are what a cap applied
+    // in the wrong order actually eats -- it would return 495.
+    expect(normalizeNote(`     ${'x'.repeat(500)}`)).toHaveLength(NOTE_MAX_LENGTH);
+  });
+
+  it('never cuts an emoji in half at the cap', () => {
+    // 499 plain characters then an emoji: the pair straddles the 500th UTF-16
+    // unit, so a plain slice keeps the high half alone -- tofu on screen, and
+    // a string that is not well formed for anything that later indexes this
+    // column. Dropping the whole pair is the only correct cut.
+    const note = normalizeNote(`${'x'.repeat(499)}\u{1F4D6}${'y'.repeat(50)}`);
+
+    expect(note).toHaveLength(499);
+    expect(note?.endsWith('x')).toBe(true);
+    // The real check: no unpaired surrogate survived the cut.
+    expect([...(note ?? '')].join('')).toBe(note);
+  });
+
+  it('strips control characters but keeps Arabic, Cyrillic and newlines', () => {
+    // Plain text (decision 30). A note renders straight into a <Text>, so this
+    // is not an escaping problem -- it is about not persisting bytes that make
+    // the row unreadable, or unsearchable if the column is ever indexed.
+    expect(normalizeNote('note\u0007here')).toBe('notehere');
+    expect(normalizeNote('Заметка ملاحظة')).toBe('Заметка ملاحظة');
+    expect(normalizeNote('line one\nline two')).toBe('line one\nline two');
+  });
+
+  it('refuses a non-string that is not null', () => {
+    for (const bad of [42, {}, [], true]) {
+      expect(() => normalizeNote(bad as never)).toThrow(TypeError);
+    }
+  });
+});
+
+describe('setBookmarkNote', () => {
+  it('validates the coordinate like every other write', async () => {
+    const db = memoryUserDb();
+    await db.executeMultiple(USER_DB_SCHEMA);
+    await migrateUserDb(db);
+
+    // al-Fatiha has 7 ayahs. 286 is al-Baqara's count, and the row would store
+    // cleanly and then open nothing.
+    await expect(setBookmarkNote(db, 1, 286, 'x')).rejects.toThrow(RangeError);
+
+    db.close();
+  });
+
+  it('does not create a bookmark that does not exist', async () => {
+    const db = memoryUserDb();
+    await db.executeMultiple(USER_DB_SCHEMA);
+    await migrateUserDb(db);
+
+    await setBookmarkNote(db, 2, 255, 'orphan');
+    // A note is an attribute of a bookmark. Writing one for an unbookmarked
+    // ayah would make it invisible in every tab and undeletable from the UI.
+    expect(await getBookmarks(db)).toEqual([]);
+
+    db.close();
+  });
+
+  it('round-trips a note on an existing bookmark', async () => {
+    const db = memoryUserDb();
+    await db.executeMultiple(USER_DB_SCHEMA);
+    await migrateUserDb(db);
+    await setBookmark(db, 2, 255, true);
+
+    await setBookmarkNote(db, 2, 255, '  the throne verse  ');
+
+    expect(await getBookmarks(db)).toEqual([
+      { surahId: 2, ayahNumber: 255, note: 'the throne verse', createdAt: expect.any(String) },
+    ]);
+
+    db.close();
+  });
+
+  it('clears a note without removing the bookmark', async () => {
+    const db = memoryUserDb();
+    await db.executeMultiple(USER_DB_SCHEMA);
+    await migrateUserDb(db);
+    await setBookmark(db, 2, 255, true);
+    await setBookmarkNote(db, 2, 255, 'temp');
+
+    await setBookmarkNote(db, 2, 255, null);
+
+    expect(await getBookmarks(db)).toEqual([
+      { surahId: 2, ayahNumber: 255, note: null, createdAt: expect.any(String) },
+    ]);
+
+    db.close();
+  });
+});
+
+describe('migration 3 — the note column', () => {
+  it('adds the column to a populated pre-migration file without touching the rows', async () => {
+    const db = memoryUserDb();
+    await db.executeMultiple(USER_DB_SCHEMA);
+    // The owner's real data, written by the shipped build.
+    await setBookmark(db, 2, 255, true);
+    await db.execute('PRAGMA user_version = 2');
+
+    await migrateUserDb(db);
+
+    expect(await getBookmarks(db)).toEqual([
+      { surahId: 2, ayahNumber: 255, note: null, createdAt: expect.any(String) },
+    ]);
+    // ALTER TABLE ADD COLUMN is the one statement in this file that is NOT
+    // idempotent -- it throws `duplicate column name` on a second run. This is
+    // what the version gate is for, and why migrateUserDb must never be made to
+    // swallow an error.
+    await expect(migrateUserDb(db)).resolves.toBe(USER_DB_VERSION);
+
+    db.close();
+  });
+
+  it('leaves an older build able to read the migrated file', async () => {
+    const db = memoryUserDb();
+    await db.executeMultiple(USER_DB_SCHEMA);
+    await migrateUserDb(db);
+
+    // Additive only: no UPDATE, no rebuild-and-copy, no DROP, and the new
+    // column is nullable. A build that predates migration 3 selects the columns
+    // it knows about and still gets its row. The user DB lives on a phone and
+    // survives app updates, so a downgrade is a real path.
+    await setBookmark(db, 2, 255, true);
+    const old = await db.execute('SELECT surah_id, ayah_number FROM bookmarks');
+    expect(old.rows).toHaveLength(1);
 
     db.close();
   });

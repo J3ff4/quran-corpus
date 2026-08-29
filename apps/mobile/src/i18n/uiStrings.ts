@@ -24,6 +24,29 @@ export type UiStringKey =
   | 'wbw.densityDense'
   | 'morphology.noHistory'
   | 'bookmarks.empty'
+  // Names the tab group for TalkBack: the three segment labels below name
+  // orderings, so the group needs its own word.
+  | 'bookmarks.sort'
+  | 'bookmarks.tabRecent'
+  | 'bookmarks.tabBySurah'
+  | 'bookmarks.tabWithNotes'
+  // "on this device", never "synced": nothing leaves the phone (decision 34),
+  // and a caption claiming otherwise is a promise the app does not keep.
+  | 'bookmarks.onThisDevice'
+  | 'bookmarks.ayahsLabel'
+  | 'bookmarks.surahsLabel'
+  | 'bookmarks.noNotes'
+  | 'bookmarks.addNote'
+  | 'bookmarks.editNote'
+  | 'bookmarks.noteFailed'
+  // Prefixes the remaining-character count, read as "Characters left, 43".
+  | 'bookmarks.noteCounter'
+  | 'bookmarks.notePlaceholder'
+  | 'bookmarks.discardNoteTitle'
+  | 'bookmarks.discardNoteBody'
+  | 'bookmarks.discardNoteConfirm'
+  | 'bookmarks.save'
+  | 'bookmarks.cancel'
   | 'bookmarks.entryPrefix'
   | 'bookmarks.loadFailed'
   | 'home.continue'
@@ -232,6 +255,24 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'wbw.densityDense': 'Dense',
     'morphology.noHistory': 'No reading history yet',
     'bookmarks.empty': 'No bookmarks yet',
+    'bookmarks.sort': 'Order bookmarks',
+    'bookmarks.tabRecent': 'Recent',
+    'bookmarks.tabBySurah': 'By surah',
+    'bookmarks.tabWithNotes': 'With notes',
+    'bookmarks.onThisDevice': 'on this device',
+    'bookmarks.ayahsLabel': 'ayahs',
+    'bookmarks.surahsLabel': 'surahs',
+    'bookmarks.noNotes': 'No notes yet',
+    'bookmarks.addNote': 'Add note',
+    'bookmarks.editNote': 'Edit note',
+    'bookmarks.noteFailed': 'Unable to save the note',
+    'bookmarks.noteCounter': 'Characters left',
+    'bookmarks.notePlaceholder': 'Write a note',
+    'bookmarks.discardNoteTitle': 'Delete this bookmark?',
+    'bookmarks.discardNoteBody': 'Its note will be deleted with it. This cannot be undone.',
+    'bookmarks.discardNoteConfirm': 'Delete',
+    'bookmarks.save': 'Save',
+    'bookmarks.cancel': 'Cancel',
     'bookmarks.entryPrefix': 'Open',
     'bookmarks.loadFailed': 'Unable to load bookmarks',
     'home.continue': 'Continue reading',
@@ -390,6 +431,24 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'wbw.densityDense': 'Zich',
     'morphology.noHistory': 'Hali o‘qish tarixi yo‘q',
     'bookmarks.empty': 'Hali xatcho‘p yo‘q',
+    'bookmarks.sort': 'Xatcho‘plar tartibi',
+    'bookmarks.tabRecent': 'Oxirgi',
+    'bookmarks.tabBySurah': 'Sura bo‘yicha',
+    'bookmarks.tabWithNotes': 'Izohli',
+    'bookmarks.onThisDevice': 'shu qurilmada',
+    'bookmarks.ayahsLabel': 'oyat',
+    'bookmarks.surahsLabel': 'sura',
+    'bookmarks.noNotes': 'Hali izoh yo‘q',
+    'bookmarks.addNote': 'Izoh qo‘shish',
+    'bookmarks.editNote': 'Izohni tahrirlash',
+    'bookmarks.noteFailed': 'Izohni saqlab bo‘lmadi',
+    'bookmarks.noteCounter': 'Qolgan belgilar',
+    'bookmarks.notePlaceholder': 'Izoh yozing',
+    'bookmarks.discardNoteTitle': 'Bu xatcho‘p o‘chirilsinmi?',
+    'bookmarks.discardNoteBody': 'Izoh ham u bilan birga o‘chiriladi. Buni qaytarib bo‘lmaydi.',
+    'bookmarks.discardNoteConfirm': 'O‘chirish',
+    'bookmarks.save': 'Saqlash',
+    'bookmarks.cancel': 'Bekor qilish',
     'bookmarks.entryPrefix': 'Ochish',
     'bookmarks.loadFailed': 'Xatcho‘plarni yuklab bo‘lmadi',
     'home.continue': 'O‘qishni davom ettirish',
@@ -543,6 +602,24 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'wbw.densityDense': 'Плотно',
     'morphology.noHistory': 'Истории чтения пока нет',
     'bookmarks.empty': 'Закладок пока нет',
+    'bookmarks.sort': 'Порядок закладок',
+    'bookmarks.tabRecent': 'Недавние',
+    'bookmarks.tabBySurah': 'По сурам',
+    'bookmarks.tabWithNotes': 'С заметками',
+    'bookmarks.onThisDevice': 'на этом устройстве',
+    'bookmarks.ayahsLabel': 'аятов',
+    'bookmarks.surahsLabel': 'сур',
+    'bookmarks.noNotes': 'Заметок пока нет',
+    'bookmarks.addNote': 'Добавить заметку',
+    'bookmarks.editNote': 'Изменить заметку',
+    'bookmarks.noteFailed': 'Не удалось сохранить заметку',
+    'bookmarks.noteCounter': 'Осталось символов',
+    'bookmarks.notePlaceholder': 'Напишите заметку',
+    'bookmarks.discardNoteTitle': 'Удалить эту закладку?',
+    'bookmarks.discardNoteBody': 'Заметка будет удалена вместе с ней. Отменить это нельзя.',
+    'bookmarks.discardNoteConfirm': 'Удалить',
+    'bookmarks.save': 'Сохранить',
+    'bookmarks.cancel': 'Отмена',
     'bookmarks.entryPrefix': 'Открыть',
     'bookmarks.loadFailed': 'Не удалось загрузить закладки',
     'home.continue': 'Продолжить чтение',
