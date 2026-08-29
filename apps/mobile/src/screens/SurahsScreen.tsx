@@ -63,6 +63,18 @@ export function SurahsScreen() {
   const { uiLocale } = useAppSettings();
   const theme = useThemeColors();
   const [mode, setMode] = useState<BrowseMode>('surah');
+  // A Set, not a single open juz: an accordion that shuts one juz to open
+  // another hides a range the reader was comparing against. D44 keeps this in
+  // component state and nowhere else -- leaving the mode resets it, and nothing
+  // is persisted.
+  const [openJuz, setOpenJuz] = useState<ReadonlySet<number>>(new Set());
+  // Which eras are *collapsed*, not which are open: D43 arrives with both
+  // expanded, so an empty set is the default and nothing has to be seeded when
+  // the rows land. Keyed on RevealedEntry['revelationType'], which does not
+  // change with the UI language.
+  const [collapsedEras, setCollapsedEras] = useState<ReadonlySet<RevealedEntry['revelationType']>>(
+    new Set(),
+  );
   const [data, setData] = useState<Partial<BrowseData>>({});
   const [error, setError] = useState<string | null>(null);
 
@@ -105,23 +117,62 @@ export function SurahsScreen() {
     setData({});
   }, [uiLocale]);
 
+  // Cleared here rather than in an effect keyed on `mode`: an
+  // effect would also fire on the first render and on a language change, and
+  // clearing them there is indistinguishable from clearing them on the switch
+  // only because they happen to be empty at both moments.
+  const onChangeMode = useCallback((next: BrowseMode) => {
+    setOpenJuz(new Set());
+    setCollapsedEras(new Set());
+    setMode(next);
+  }, []);
+
   const openSurah = useCallback((surah: SurahListItem) => {
     router.push({ pathname: '/surah/[surahId]', params: { surahId: String(surah.id) } });
   }, []);
 
-  const juzItems = useMemo<BrowseItem[]>(
-    () =>
-      (data.juz ?? []).map((entry) => ({
+  const juzItems = useMemo<BrowseItem[]>(() => {
+    const rows: BrowseItem[] = [];
+    for (const entry of data.juz ?? []) {
+      const expanded = openJuz.has(entry.juz);
+      rows.push({
         key: `juz-${entry.juz}`,
         testID: `browse-juz-${entry.juz}`,
         leading: String(entry.juz),
         title: `${t(uiLocale, 'browse.juzLabel')} ${entry.juz}`,
-        subtitle: `${entry.surahName} ${entry.startAyahNumber} · ${entry.ayahCount} ${t(uiLocale, 'surahList.ayahsSuffix')}`,
-        accessibilityLabel: `${t(uiLocale, 'browse.juzLabel')} ${entry.juz}, ${t(uiLocale, 'browse.opensAt')} ${entry.surahName} ${entry.startAyahNumber}`,
-        onPress: () => openAyah(entry.startSurahId, entry.startAyahNumber),
-      })),
-    [data.juz, uiLocale],
-  );
+        // The old "opens at" subtitle is gone: the ranges under the row say
+        // where the juz starts *and* where it ends, which that only half said.
+        // D45 keeps the total.
+        subtitle: `${entry.ayahCount} ${t(uiLocale, 'surahList.ayahsSuffix')}`,
+        accessibilityLabel: `${t(uiLocale, 'browse.juzLabel')} ${entry.juz}, ${entry.ayahCount} ${t(uiLocale, 'surahList.ayahsSuffix')}`,
+        expanded,
+        onPress: () =>
+          setOpenJuz((current) => {
+            const next = new Set(current);
+            // delete reports whether it removed anything, so this is one lookup
+            // rather than a has() and a branch that can drift from it.
+            if (!next.delete(entry.juz)) next.add(entry.juz);
+            return next;
+          }),
+      });
+
+      if (!expanded) continue;
+      for (const range of entry.ranges) {
+        rows.push({
+          key: `juz-${entry.juz}-surah-${range.surahId}`,
+          testID: `browse-juz-${entry.juz}-surah-${range.surahId}`,
+          leading: '',
+          indent: true,
+          title: `${range.surahName} ${range.firstAyahNumber}–${range.lastAyahNumber}`,
+          // 'Ayahs' rather than a fourth key saying the same word -- the
+          // word-by-word pager already carries it in all three locales.
+          accessibilityLabel: `${range.surahName}, ${t(uiLocale, 'wbw.rangeLabel')} ${range.firstAyahNumber}–${range.lastAyahNumber}`,
+          onPress: () => openAyah(range.surahId, range.firstAyahNumber),
+        });
+      }
+    }
+    return rows;
+  }, [data.juz, openJuz, uiLocale]);
 
   const pageItems = useMemo<BrowseItem[]>(
     () =>
@@ -145,7 +196,11 @@ export function SurahsScreen() {
     // mis-cut if the chronology were ever replaced.
     const sections: BrowseSection[] = [];
     for (const entry of rows) {
-      const title = t(uiLocale, entry.revelationType === 'meccan' ? 'browse.meccan' : 'browse.medinan');
+      // The era itself, not its label: the label is translated, so a set keyed
+      // on it silently re-expanded every collapsed section on a language
+      // switch and left the old language's key behind for good.
+      const era = entry.revelationType;
+      const title = t(uiLocale, era === 'meccan' ? 'browse.meccan' : 'browse.medinan');
       const current = sections.at(-1);
       const item: BrowseItem = {
         key: `revealed-${entry.surahId}`,
@@ -157,10 +212,26 @@ export function SurahsScreen() {
         onPress: () => openAyah(entry.surahId, 1),
       };
       if (current?.title === title) current.data.push(item);
-      else sections.push({ title, data: [item] });
+      else
+        sections.push({
+          title,
+          data: [item],
+          count: 0,
+          expanded: !collapsedEras.has(era),
+          onToggle: () =>
+            setCollapsedEras((currentSet) => {
+              const next = new Set(currentSet);
+              if (!next.delete(era)) next.add(era);
+              return next;
+            }),
+        });
     }
+    // Counted after the loop rather than incremented alongside each push: the
+    // count is the section's own length, and two places that both have to be
+    // right is one place too many.
+    for (const section of sections) section.count = section.data.length;
     return sections;
-  }, [data.revealed, uiLocale]);
+  }, [collapsedEras, data.revealed, uiLocale]);
 
   const options = useMemo(
     () =>
@@ -179,7 +250,7 @@ export function SurahsScreen() {
         <SegmentedControl
           options={options}
           value={mode}
-          onChange={setMode}
+          onChange={onChangeMode}
           accessibilityLabel={t(uiLocale, 'browse.mode')}
         />
       </View>

@@ -22,9 +22,9 @@ export interface AdjacentNavProps {
   /** Names the toolbar for TalkBack: 'root.adjacent' or 'lemma.adjacent'. */
   label: string;
   uiLocale: UiLocaleCode;
-  /** Which of the two screens this is: names the controls in tests, and picks
-   *  the locale keys for the labels. */
-  testIDPrefix?: 'root' | 'lemma';
+  /** Which screen this is: names the controls in tests, and picks the locale
+   *  keys for the labels. */
+  testIDPrefix?: 'root' | 'lemma' | 'surah';
 }
 
 /** Previous/Next between two entries of the same kind. Shared by the root
@@ -40,16 +40,22 @@ export interface AdjacentNavProps {
  *  two buttons and nothing else.
  *
  *  The labels are keyed per screen rather than shared, because Russian
- *  inflects them: "Предыдущий" agrees with корень (m.) and "Предыдущая" with
- *  лемма (f.), so one pair of strings cannot serve both. English and Uzbek
- *  carry the same words in both. They are the accessible name now rather than
- *  visible text: a chevron on its own announces as nothing. */
+ *  inflects them: "Предыдущий" agrees with корень (m.), "Предыдущая" with
+ *  лемма and сура (f.), so one pair of strings cannot serve all three. English
+ *  and Uzbek carry the same words throughout. They are the accessible name now
+ *  rather than visible text: a chevron on its own announces as nothing.
+ *
+ *  The two reading screens use `AdjacentNavButton` directly rather than this
+ *  toolbar: both put the chevrons in a row that already holds other content --
+ *  the reader's back arrow and actions, word-by-word's verse picker -- which a
+ *  component owning the whole row cannot host. */
 /** Written out per screen rather than built from `testIDPrefix`: a key
  *  assembled at runtime is invisible to the dead-key check in
  *  uiStrings.test.ts, which greps the sources for the literal. */
 const LABEL_KEYS = {
   root: { prev: 'root.previous', next: 'root.next' },
   lemma: { prev: 'lemma.previous', next: 'lemma.next' },
+  surah: { prev: 'surah.previous', next: 'surah.next' },
 } as const;
 
 /** Chevron diameter. Under touchTargets.compact on purpose: it sits inside the
@@ -58,7 +64,7 @@ const LABEL_KEYS = {
  *  leaves the headword no room to be the largest thing on the screen. */
 const SIZE = 34;
 
-function PagerButton({
+export function AdjacentNavButton({
   side,
   target,
   onNavigate,
@@ -69,7 +75,7 @@ function PagerButton({
   target: string | null;
   onNavigate: (target: string, side: 'prev' | 'next') => void;
   uiLocale: UiLocaleCode;
-  testIDPrefix: 'root' | 'lemma';
+  testIDPrefix: 'root' | 'lemma' | 'surah';
 }) {
   const theme = useThemeColors();
   const skin = useGlassSkin();
@@ -136,7 +142,7 @@ export function AdjacentNav({
       style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
     >
       {(['prev', 'next'] as const).map((side) => (
-        <PagerButton
+        <AdjacentNavButton
           key={side}
           side={side}
           target={side === 'prev' ? prev : next}

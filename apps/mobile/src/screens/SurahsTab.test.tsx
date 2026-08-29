@@ -80,6 +80,13 @@ const juz3 = {
   startAyahNumber: 253,
   surahName: 'Al-Baqara',
   ayahCount: 126,
+  // The real juz 3: the tail of al-Baqarah, then most of Aal-Imran. Two ranges
+  // rather than one, because a juz that never leaves its surah cannot tell a
+  // list that renders every range from one that renders only the first.
+  ranges: [
+    { surahId: 2, surahName: 'Al-Baqara', firstAyahNumber: 253, lastAyahNumber: 286, ayahCount: 34 },
+    { surahId: 3, surahName: 'Aal-Imran', firstAyahNumber: 1, lastAyahNumber: 92, ayahCount: 92 },
+  ],
 };
 const page300 = { page: 300, startSurahId: 18, startAyahNumber: 54, surahName: 'Al-Kahf' };
 const alAlaq = {
@@ -172,19 +179,75 @@ describe('SurahsTab', () => {
     expect(mocks.getJuzIndex).not.toHaveBeenCalled();
   });
 
-  it('switches to the juz index and opens the juz at the ayah it starts on', async () => {
+  it('opens the juz index with every juz collapsed', async () => {
     render(<SurahsTab />);
     await screen.findByText('Al-Fatihah');
 
     fireEvent.click(screen.getByTestId('segment-juz'));
 
+    // D42: a 30-row index is the point of this mode. The ranges are what
+    // navigate, and none of them is on screen yet.
+    expect(await screen.findByTestId('browse-juz-3')).toBeTruthy();
+    expect(screen.queryByText('Al-Baqara 253–286')).toBeNull();
+  });
+
+  it('expands a juz into its surah ranges instead of navigating', async () => {
+    render(<SurahsTab />);
+    await screen.findByText('Al-Fatihah');
+    fireEvent.click(screen.getByTestId('segment-juz'));
+
     fireEvent.click(await screen.findByTestId('browse-juz-3'));
-    // Decisions 18 and 20: every mode lands on a real ayah in the existing
-    // reader. Opening at 2:1 would be a real ayah and the wrong one.
+
+    expect(await screen.findByText('Al-Baqara 253–286')).toBeTruthy();
+    // Both ranges, not just the one the juz opens on -- the second is the
+    // whole reason this row expands (juz 3 runs on into Aal-Imran).
+    expect(screen.getByText('Aal-Imran 1–92')).toBeTruthy();
+    // D41: the row is a disclosure and nothing else.
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it('opens the reader at the range that was tapped', async () => {
+    render(<SurahsTab />);
+    await screen.findByText('Al-Fatihah');
+    fireEvent.click(screen.getByTestId('segment-juz'));
+    fireEvent.click(await screen.findByTestId('browse-juz-3'));
+
+    fireEvent.click(await screen.findByText('Aal-Imran 1–92'));
+
+    // Decisions 18 and 20 still hold: every mode lands on a real ayah in the
+    // existing reader, and it is the range's own first ayah rather than the
+    // juz's.
     expect(mocks.push).toHaveBeenCalledWith({
       pathname: '/surah/[surahId]',
-      params: { surahId: '2', ayah: '253' },
+      params: { surahId: '3', ayah: '1' },
     });
+  });
+
+  it('collapses a juz that is tapped again', async () => {
+    render(<SurahsTab />);
+    await screen.findByText('Al-Fatihah');
+    fireEvent.click(screen.getByTestId('segment-juz'));
+    fireEvent.click(await screen.findByTestId('browse-juz-3'));
+    expect(await screen.findByText('Al-Baqara 253–286')).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId('browse-juz-3'));
+
+    expect(screen.queryByText('Al-Baqara 253–286')).toBeNull();
+  });
+
+  it('forgets which juz were open when the mode changes and comes back', async () => {
+    render(<SurahsTab />);
+    await screen.findByText('Al-Fatihah');
+    fireEvent.click(screen.getByTestId('segment-juz'));
+    fireEvent.click(await screen.findByTestId('browse-juz-3'));
+    expect(await screen.findByText('Al-Baqara 253–286')).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId('segment-surah'));
+    fireEvent.click(screen.getByTestId('segment-juz'));
+
+    // D44: nothing is persisted, and the mode arrives in its default state.
+    expect(await screen.findByTestId('browse-juz-3')).toBeTruthy();
+    expect(screen.queryByText('Al-Baqara 253–286')).toBeNull();
   });
 
   it('opens a page at the ayah that page starts on', async () => {
@@ -208,6 +271,90 @@ describe('SurahsTab', () => {
 
     const headers = await screen.findAllByRole('header');
     expect(headers.map((header) => header.textContent)).toEqual(['Meccan', 'Medinan']);
+  });
+
+  it('opens the revealed list with both eras expanded and counted', async () => {
+    render(<SurahsTab />);
+    await screen.findByText('Al-Fatihah');
+
+    fireEvent.click(screen.getByTestId('segment-revealed'));
+
+    // D43: exactly the list it already was, plus a chevron and a count.
+    expect(await screen.findByText('Al-Alaq')).toBeTruthy();
+    expect(screen.getByText('Al-Baqara')).toBeTruthy();
+    expect(screen.getByTestId('browse-section-Meccan').getAttribute('aria-expanded')).toBe('true');
+    // D45: one surah in each era in this fixture, and the header says so.
+    expect(screen.getByTestId('browse-section-Meccan').textContent).toContain('1');
+  });
+
+  it('announces the era count that the header button hides', async () => {
+    // The count renders as a non-focusable child of the header button, so a
+    // screen reader stops at the button's label and never reaches it. A
+    // collapsed era would then say nothing about how much it is hiding.
+    render(<SurahsTab />);
+    await screen.findByText('Al-Fatihah');
+    fireEvent.click(screen.getByTestId('segment-revealed'));
+
+    expect((await screen.findByTestId('browse-section-Meccan')).getAttribute('aria-label')).toBe(
+      'Meccan, 1',
+    );
+  });
+
+  it('collapses one era without touching the other', async () => {
+    render(<SurahsTab />);
+    await screen.findByText('Al-Fatihah');
+    fireEvent.click(screen.getByTestId('segment-revealed'));
+
+    fireEvent.click(await screen.findByTestId('browse-section-Meccan'));
+
+    expect(screen.queryByText('Al-Alaq')).toBeNull();
+    expect(screen.getByText('Al-Baqara')).toBeTruthy();
+    // The header survives its own collapse, or there is nothing to reopen.
+    expect(screen.getByTestId('browse-section-Meccan')).toBeTruthy();
+  });
+
+  it('reopens an era that is tapped again', async () => {
+    render(<SurahsTab />);
+    await screen.findByText('Al-Fatihah');
+    fireEvent.click(screen.getByTestId('segment-revealed'));
+    fireEvent.click(await screen.findByTestId('browse-section-Meccan'));
+    expect(screen.queryByText('Al-Alaq')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('browse-section-Meccan'));
+
+    expect(screen.getByText('Al-Alaq')).toBeTruthy();
+  });
+
+  it('keeps an era collapsed when the UI language changes', async () => {
+    const { rerender } = render(<SurahsTab />);
+    await screen.findByText('Al-Fatihah');
+    fireEvent.click(screen.getByTestId('segment-revealed'));
+    fireEvent.click(await screen.findByTestId('browse-section-Meccan'));
+    expect(screen.queryByText('Al-Alaq')).toBeNull();
+
+    mocks.uiLocale = 'uz';
+    rerender(<SurahsTab />);
+    await screen.findByTestId('browse-section-Makkiy');
+
+    // Keyed on the era, not on its label: keyed on the label the switch
+    // silently reopened every collapsed section and stranded the old
+    // language's key in the set for good.
+    expect(screen.queryByText('Al-Alaq')).toBeNull();
+    expect(screen.getByTestId('browse-section-Makkiy').getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('forgets a collapsed era when the mode changes and comes back', async () => {
+    render(<SurahsTab />);
+    await screen.findByText('Al-Fatihah');
+    fireEvent.click(screen.getByTestId('segment-revealed'));
+    fireEvent.click(await screen.findByTestId('browse-section-Meccan'));
+    expect(screen.queryByText('Al-Alaq')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('segment-surah'));
+    fireEvent.click(screen.getByTestId('segment-revealed'));
+
+    // D44: nothing is persisted, and the mode arrives in its default state.
+    expect(await screen.findByText('Al-Alaq')).toBeTruthy();
   });
 
   it('loads each mode once and keeps it while the tab stays mounted', async () => {

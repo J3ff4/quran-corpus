@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -111,6 +112,29 @@ describe('useEntryPager', () => {
 
     expect(result.current.current).toBe('qyl');
     expect(result.current.animation).toEqual({});
+  });
+
+  it('reports the new route on the first commit that sees it', () => {
+    // Committed renders only -- a render React throws away cannot start a
+    // query. Resetting in an effect committed the PREVIOUS entry once first,
+    // which was long enough for the screen above to load it and throw the
+    // result away.
+    const committed: (string | null)[] = [];
+    const { rerender } = renderHook(
+      ({ key }) => {
+        const pager = useEntryPager(key);
+        useEffect(() => {
+          committed.push(pager.current);
+        });
+        return pager;
+      },
+      { initialProps: { key: 'qwl' as string | null } },
+    );
+
+    committed.length = 0;
+    rerender({ key: 'qyl' });
+
+    expect(committed).toEqual(['qyl']);
   });
 });
 

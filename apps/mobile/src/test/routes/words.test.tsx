@@ -17,11 +17,21 @@ const mocks = vi.hoisted(() => ({
   wbwDensity: 'hybrid' as 'hybrid' | 'dense',
   loadWordSummary: vi.fn(),
   push: vi.fn(),
+  getReaderPosition: vi.fn((_surahId: number) => null as number | null),
+  setReaderPosition: vi.fn((_surahId: number, _ayahNumber: number) => {}),
 }));
 
 vi.mock('expo-router', () => ({
   router: { push: mocks.push },
   useLocalSearchParams: () => mocks.params,
+}));
+
+// Mocked rather than exercised through the real singleton: this asserts what
+// the screen publishes, and the store has its own suite.
+vi.mock('@/data/readerPosition', () => ({
+  getReaderPosition: (surahId: number) => mocks.getReaderPosition(surahId),
+  setReaderPosition: (surahId: number, ayahNumber: number) =>
+    mocks.setReaderPosition(surahId, ayahNumber),
 }));
 
 vi.mock('@quran-corpus/mobile-data', () => ({
@@ -190,6 +200,8 @@ describe('word-by-word route', () => {
   afterEach(cleanup);
 
   beforeEach(() => {
+    mocks.getReaderPosition.mockReset().mockReturnValue(null);
+    mocks.setReaderPosition.mockReset();
     // Module-level, so without this a test renders the previous test's header
     // -- a pager wired to a screen that has already unmounted.
     mocks.params = { surahId: '2' };
@@ -311,6 +323,17 @@ describe('word-by-word route', () => {
     await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenLastCalledWith(expect.anything(), 2, 11));
   });
 
+  it('publishes the range it moves to as the shared reading position', async () => {
+    render(<WbwRoute />);
+    await screen.findAllByTestId('wbw-cell');
+
+    fireEvent.click(await screen.findByTestId('wbw-next'));
+
+    // So pressing back leaves the reader where this screen ended up rather
+    // than where it started (D46). The new range, not the old one.
+    await waitFor(() => expect(mocks.setReaderPosition).toHaveBeenCalledWith(2, 11));
+  });
+
   it('starts over at the range the new params name after an in-app navigation', async () => {
     // expo-router reuses this component for the next push to the same route,
     // so a paged-to position survives unless the params reset it -- opening
@@ -324,6 +347,52 @@ describe('word-by-word route', () => {
     rerender(<WbwRoute />);
 
     await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenLastCalledWith(expect.anything(), 3, 1));
+  });
+
+  it('pages to the next surah and restarts at its first ayah', async () => {
+    mocks.params = { surahId: '2', from: '50' };
+    render(<WbwRoute />);
+    await screen.findAllByTestId('wbw-cell');
+
+    fireEvent.click(screen.getByTestId('surah-next'));
+
+    // Not 3:50: the range belongs to the surah it was read in, and a surah
+    // shorter than the range would render empty.
+    await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenLastCalledWith(expect.anything(), 3, 1));
+  });
+
+  it('keeps the outgoing surah on screen while the next one loads', async () => {
+    render(<WbwRoute />);
+    await screen.findAllByTestId('wbw-cell');
+
+    const pending = deferred<WbwScreenData>();
+    mocks.getWbwScreen.mockReturnValue(pending.promise);
+    fireEvent.click(screen.getByTestId('surah-next'));
+    await waitFor(() =>
+      expect(mocks.getWbwScreen).toHaveBeenLastCalledWith(expect.anything(), 3, 1),
+    );
+
+    // Blanking to the spinner leaves reanimated no outgoing view, so the page
+    // turn this screen shares with the reader was silently a jump.
+    expect(screen.queryByTestId('loading')).toBeNull();
+    expect(screen.getAllByTestId('wbw-cell').length).toBeGreaterThan(0);
+
+    await act(async () => {
+      pending.resolve(screenData());
+    });
+  });
+
+  it('dims the previous chevron in al-Fatihah', async () => {
+    mocks.params = { surahId: '1' };
+    render(<WbwRoute />);
+    await screen.findAllByTestId('wbw-cell');
+    const calls = mocks.getWbwScreen.mock.calls.length;
+
+    fireEvent.click(screen.getByTestId('surah-previous'));
+
+    // D47: disabled, not hidden -- still there for TalkBack to announce.
+    expect(screen.getByTestId('surah-previous')).toBeTruthy();
+    expect(mocks.getWbwScreen.mock.calls.length).toBe(calls);
   });
 
   it('opens the sheet on the word that was tapped', async () => {

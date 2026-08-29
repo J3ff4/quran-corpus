@@ -11,7 +11,11 @@ vi.mock('react-native-svg', async () => {
   const el = (tag: string) =>
     ({ children, ...props }: { children?: React.ReactNode }) =>
       React.createElement(tag, props, children);
-  const Svg = el('svg');
+  // testID -> data-testid, the same mapping rnHosts applies to every other
+  // host: without it an icon's handle lands as a stray `testid` attribute and
+  // getByTestId never sees it.
+  const Svg = ({ children, testID, ...props }: { children?: React.ReactNode; testID?: string }) =>
+    React.createElement('svg', { ...props, 'data-testid': testID }, children);
   return {
     default: Svg,
     Svg,

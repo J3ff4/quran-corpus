@@ -16,9 +16,10 @@ import {
   useAnimatedStyle,
   useSharedValue,
 } from 'react-native-reanimated';
-import { router, useNavigation } from 'expo-router';
+import { router, useFocusEffect, useNavigation } from 'expo-router';
 import { reciterById, splitBasmala, type Word } from '@quran-corpus/data/mobile';
 import type { ReaderAyah, SurahReaderData, WordSummary } from '@/data/corpusRepository';
+import { getReaderPosition, setReaderPosition } from '@/data/readerPosition';
 import type { ContentLanguageCode, UiLocaleCode } from '@/i18n/languages';
 import type { ReaderMode } from '@/settings/settingsStore';
 
@@ -81,6 +82,10 @@ interface SurahReaderProps {
   onToggleBookmark: (ayahNumber: number) => void;
   onToggleAudio: (ayahNumber: number) => void;
   onReadingAyah?: (ayahNumber: number) => void;
+  /** Forwarded to the header's surah chevrons. Omitted draws none. */
+  prevSurahId?: number | null;
+  nextSurahId?: number | null;
+  onPageSurah?: (surahId: number, side: 'prev' | 'next') => void;
 }
 
 // Ayah cards are variable height (Arabic runs wrap differently per ayah), so
@@ -178,6 +183,12 @@ export function SurahReader({
   onToggleBookmark,
   onToggleAudio,
   onReadingAyah,
+  // Defaulted rather than forwarded as undefined: exactOptionalPropertyTypes
+  // rejects an explicit undefined for an optional prop, and null is what the
+  // header already reads as "no surah that way".
+  prevSurahId = null,
+  nextSurahId = null,
+  onPageSurah,
 }: SurahReaderProps) {
   const theme = useThemeColors();
   const arabicSizes = useArabicSizes();
@@ -200,6 +211,8 @@ export function SurahReader({
   // FlatList from outside the React tree off a ref that never re-reads props,
   // so it cannot see the state.
   const positionedRef = useRef(false);
+  // Whether this mount has been focused before -- see the focus effect below.
+  const focusedRef = useRef(false);
   const [positioned, setPositioned] = useState(false);
 
   const [languageOpen, setLanguageOpen] = useState(false);
@@ -271,6 +284,9 @@ export function SurahReader({
           mode={readerMode}
           onChangeMode={onChangeReaderMode}
           uiLocale={uiLocale}
+          prevSurahId={prevSurahId}
+          nextSurahId={nextSurahId}
+          {...(onPageSurah ? { onPageSurah } : {})}
           onBack={() => {
             closeSheet();
             navigation.goBack();
@@ -290,7 +306,11 @@ export function SurahReader({
           }}
           onOpenWbw={() => {
             closeSheet();
-            router.push(`/surah/${data.surah.id}/words`);
+            // The ayah on screen, not the route param: the param is where the
+            // reader was *opened*, which after any scrolling is not where the
+            // reader is. Still validated at the route by parseAyahNumber --
+            // writing our own link does not make it trusted input (§3, OWASP).
+            router.push(`/surah/${data.surah.id}/words?from=${getReaderPosition(data.surah.id) ?? 1}`);
           }}
         />
       ),
@@ -307,6 +327,9 @@ export function SurahReader({
     onChangeReaderMode,
     data.surah.id,
     data.surah.name_translit,
+    prevSurahId,
+    nextSurahId,
+    onPageSurah,
   ]);
 
   const onScroll = useCallback(
@@ -329,10 +352,42 @@ export function SurahReader({
     return splitBasmala(first.ayah.text_uthmani, { surahId: data.surah.id, ayahNumber: 1 }).basmala;
   }, [data.ayahs, data.surah.id]);
 
+  // The ayah the list must land on, and how many landings have been demanded.
+  //
+  // `Plate` below is MushafPlate in one mode and Fragment in the other, so the
+  // element type at that position changes on a mode switch and React unmounts
+  // the FlatList. The replacement starts at offset 0 with only the route param
+  // to land on -- absent whenever the reader was opened from the surah list --
+  // which is what sent a reader on 2:50 back to 2:1. Keeping the list mounted
+  // would not have fixed it either: a mushaf ayah and a translation card are
+  // nothing like the same height, so the preserved pixel offset points at a
+  // different ayah.
+  //
+  // `nonce` exists because the re-landing target is usually the ayah already
+  // being read, so an effect keyed on the index alone would never re-run.
+  //
+  // Reset during render rather than in an effect, the same shape WbwScreen uses
+  // for its page: an effect would set state *after* the landing effect had
+  // already run against the seed, so every mount landed twice -- the second
+  // scroll restarting a sequence the first had begun.
+  const anchorKey = `${data.surah.id}:${readerMode}:${initialAyahNumber ?? ''}`;
+  const [anchor, setAnchor] = useState(() => ({
+    key: anchorKey,
+    ayah: initialAyahNumber ?? null,
+    nonce: 0,
+  }));
+  if (anchor.key !== anchorKey) {
+    setAnchor({
+      key: anchorKey,
+      ayah: getReaderPosition(data.surah.id) ?? initialAyahNumber ?? null,
+      nonce: anchor.nonce + 1,
+    });
+  }
+
   const initialIndex = useMemo(() => {
-    if (!initialAyahNumber) return -1;
-    return data.ayahs.findIndex((item) => item.ayah.ayah_number === initialAyahNumber);
-  }, [data.ayahs, initialAyahNumber]);
+    if (!anchor.ayah) return -1;
+    return data.ayahs.findIndex((item) => item.ayah.ayah_number === anchor.ayah);
+  }, [data.ayahs, anchor.ayah]);
 
   useEffect(() => {
     // -1 means the ayah is not in this surah; 0 means the list already opens
@@ -362,6 +417,18 @@ export function SurahReader({
       if (cancelled) return;
       positionedRef.current = true;
       setPositioned(true);
+      // The landing *is* the reading position, and nothing else will record
+      // it. onViewableItemsChanged ignores every frame of the jump on purpose
+      // (positionedRef is false throughout, so the ayahs it flies over are not
+      // written), and no scroll follows the reveal to fire one afterwards. So
+      // without this the store still holds wherever this surah was last read,
+      // and the next mode switch re-anchors to that instead of the ayah the
+      // caller asked for -- opening /surah/2?ayah=50 from a bookmark and
+      // tapping Translation landed on 2:1.
+      if (anchor.ayah !== null) {
+        lastVisibleRef.current = anchor.ayah;
+        setReaderPosition(data.surah.id, anchor.ayah);
+      }
     };
 
     const attempt = () => {
@@ -388,7 +455,32 @@ export function SurahReader({
       cancelled = true;
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
     };
-  }, [initialIndex]);
+    // The nonce, not just the index: a mode switch re-lands on the same ayah,
+    // so the index is unchanged and this effect would otherwise never re-run.
+  }, [initialIndex, anchor.nonce]);
+
+  // Coming back from the word-by-word screen is a focus event: this screen
+  // stays mounted behind the pushed one, so no prop changes and the anchor's
+  // render-phase reset above never fires. Comparing against the ayah actually
+  // on screen is what keeps a focus from re-landing the list on itself.
+  useFocusEffect(
+    useCallback(() => {
+      // Re-focus only. useFocusEffect also fires on mount, and the shared
+      // position is a module singleton that outlives this screen -- so on the
+      // first pass it holds wherever this surah was last read, which is not
+      // where the caller asked to go. Reading 2:200, backing out and then
+      // tapping a bookmark for 2:5 opened 2:5 and immediately jumped to 2:200.
+      // The anchor above has already been seeded from the route by now, and
+      // that is the seed a fresh mount is supposed to honour.
+      if (!focusedRef.current) {
+        focusedRef.current = true;
+        return;
+      }
+      const position = getReaderPosition(data.surah.id);
+      if (position === null || position === lastVisibleRef.current) return;
+      setAnchor((current) => ({ ...current, ayah: position, nonce: current.nonce + 1 }));
+    }, [data.surah.id]),
+  );
 
   // Records the miss and nothing else -- see the note above MAX_SCROLL_ATTEMPTS
   // for what the offset estimate that used to live here cost.
@@ -403,6 +495,12 @@ export function SurahReader({
   const onReadingAyahRef = useRef(onReadingAyah);
   const loadWordsRef = useRef(loadWords);
   const ayahsRef = useRef(data.ayahs);
+  // onViewableItemsChanged is a ref callback built once, outside the React
+  // tree, so it cannot close over a prop.
+  const surahIdRef = useRef(data.surah.id);
+  // The ayah actually on screen. Read when the reader is focused again, to tell
+  // "the word-by-word screen moved us" from "nothing changed".
+  const lastVisibleRef = useRef<number | null>(null);
   // In an effect, not during render: a render React discards would otherwise
   // leave the ref pointing at a callback that never committed, and FlatList
   // calls onViewableItemsChanged outside the React tree, so it would happily
@@ -411,7 +509,8 @@ export function SurahReader({
     onReadingAyahRef.current = onReadingAyah;
     loadWordsRef.current = loadWords;
     ayahsRef.current = data.ayahs;
-  }, [onReadingAyah, loadWords, data.ayahs]);
+    surahIdRef.current = data.surah.id;
+  }, [onReadingAyah, loadWords, data.ayahs, data.surah.id]);
 
   const [wordsByAyah, setWordsByAyah] = useState<Map<number, Word[]>>(new Map());
   // Separate from the state map, and written before the await:
@@ -453,7 +552,12 @@ export function SurahReader({
     // are wherever the list happens to be, and recording one overwrites the
     // saved reading position with an ayah nobody read.
     if (positionedRef.current && firstVisibleAyah) {
-      onReadingAyahRef.current?.(firstVisibleAyah.ayah.ayah_number);
+      const ayahNumber = firstVisibleAyah.ayah.ayah_number;
+      lastVisibleRef.current = ayahNumber;
+      // Synchronous and in memory, unlike onReadingAyah, which debounces a
+      // SQLite write. This is what the other two renderings read.
+      setReaderPosition(surahIdRef.current, ayahNumber);
+      onReadingAyahRef.current?.(ayahNumber);
     }
     for (const token of viewableItems) {
       const item = token.item as ReaderAyah | undefined;

@@ -2,6 +2,7 @@ import { Pressable, View, type StyleProp, type TextStyle } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AdjacentNavButton } from './AdjacentNav';
 import { GlassSurface } from './GlassSurface';
 import { SearchHeaderButton } from './SearchHeaderButton';
 import { SegmentedControl } from './SegmentedControl';
@@ -33,6 +34,14 @@ export interface ReaderHeaderProps {
   onOpenSearch: () => void;
   onBack: () => void;
   uiLocale: UiLocaleCode;
+  /** The surah either side of this one in mushaf order, or null at 1 and 114.
+   *  Numbers rather than a boolean pair, so the header hands the caller the
+   *  surah it means and nothing downstream re-derives it. */
+  prevSurahId?: number | null;
+  nextSurahId?: number | null;
+  /** Omitted draws no chevrons at all: a header with two dead controls is
+   *  worse than one without them. */
+  onPageSurah?: (surahId: number, side: 'prev' | 'next') => void;
 }
 
 /**
@@ -60,6 +69,9 @@ export function ReaderHeader({
   onOpenSearch,
   onBack,
   uiLocale,
+  prevSurahId,
+  nextSurahId,
+  onPageSurah,
 }: ReaderHeaderProps) {
   const theme = useThemeColors();
   const insets = useSafeAreaInsets();
@@ -91,6 +103,18 @@ export function ReaderHeader({
           >
             <Icon name="back" color={theme.text} />
           </Pressable>
+          {/* Flanking the name (D47), the same control the dictionary entries
+              page with. Paging is state, not navigation, so the button hands
+              back the surah it means and the screen above changes to it. */}
+          {onPageSurah ? (
+            <AdjacentNavButton
+              side="prev"
+              target={prevSurahId ? String(prevSurahId) : null}
+              onNavigate={(target, side) => onPageSurah(Number(target), side)}
+              uiLocale={uiLocale}
+              testIDPrefix="surah"
+            />
+          ) : null}
           {/* Always mounted, at opacity 0 while the list's heading is on
               screen: TalkBack then always has the surah name in the bar, which
               is what a screen reader wants, and the fade costs no re-render. */}
@@ -110,6 +134,15 @@ export function ReaderHeader({
           >
             {surahName}
           </Animated.Text>
+          {onPageSurah ? (
+            <AdjacentNavButton
+              side="next"
+              target={nextSurahId ? String(nextSurahId) : null}
+              onNavigate={(target, side) => onPageSurah(Number(target), side)}
+              uiLocale={uiLocale}
+              testIDPrefix="surah"
+            />
+          ) : null}
           {/* Both actions close the word sheet before they act -- see the
               handlers in SurahReader. This button sits above the sheet's
               backdrop, so leaving it mounted holds the ayah list at

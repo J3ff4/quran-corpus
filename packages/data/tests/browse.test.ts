@@ -98,6 +98,42 @@ describe('getJuzIndex', () => {
     expect(rows.every((r) => Number.isInteger(r.juz))).toBe(true);
     expect(rows).toHaveLength(3);
   });
+
+  it('reports the surah ranges a juz covers, in mushaf order', async () => {
+    const rows = await getJuzIndex(db);
+
+    // Juz 1 is 1:1-1:3 then 2:1-2:2 (see the fixture header).
+    expect(rows[0]?.ranges).toEqual([
+      { surahId: 1, surahName: 'Al-Fatihah', firstAyahNumber: 1, lastAyahNumber: 3, ayahCount: 3 },
+      { surahId: 2, surahName: 'Al-Baqarah', firstAyahNumber: 1, lastAyahNumber: 2, ayahCount: 2 },
+    ]);
+  });
+
+  it('orders the ranges by surah, not by ayahs.id', async () => {
+    const rows = await getJuzIndex(db);
+
+    // Surah 1's ayahs carry ids 20-22, above every other row -- what a
+    // delete-and-re-import leaves behind. A query that ordered by id would put
+    // Al-Baqarah first here and the juz would claim to open at 2:1.
+    expect(rows[0]?.ranges.map((range) => range.surahId)).toEqual([1, 2]);
+    // Juz 3 is 2:9 then 3:1-3:2: one ayah of al-Baqarah, then Aal-Imran.
+    expect(rows[2]?.ranges).toEqual([
+      { surahId: 2, surahName: 'Al-Baqarah', firstAyahNumber: 9, lastAyahNumber: 9, ayahCount: 1 },
+      { surahId: 3, surahName: 'Aal-Imran', firstAyahNumber: 1, lastAyahNumber: 2, ayahCount: 2 },
+    ]);
+  });
+
+  it('keeps the start ayah and the total agreeing with the ranges', async () => {
+    const rows = await getJuzIndex(db);
+
+    for (const row of rows) {
+      const first = row.ranges[0];
+      expect(first).toBeDefined();
+      expect(row.startSurahId).toBe(first?.surahId);
+      expect(row.startAyahNumber).toBe(first?.firstAyahNumber);
+      expect(row.ayahCount).toBe(row.ranges.reduce((total, range) => total + range.ayahCount, 0));
+    }
+  });
 });
 
 describe('getPageIndex', () => {
