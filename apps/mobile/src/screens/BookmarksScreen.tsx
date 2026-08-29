@@ -1,17 +1,16 @@
 import { Link } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, SectionList, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, SectionList, Text, View } from 'react-native';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 
-import { BottomSheet } from '@/components/BottomSheet';
 import { GlassSurface } from '@/components/GlassSurface';
+import { NoteEditor } from '@/components/NoteEditor';
 import { SegmentedControl } from '@/components/SegmentedControl';
 import { getBookmarkAyahTexts, getSurahList } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { useUserDbOnFocus } from '@/data/useUserDbOnFocus';
 import { openUserDb } from '@/data/userDb';
 import {
-  NOTE_MAX_LENGTH,
   getBookmarks,
   setBookmarkNote,
   type Bookmark,
@@ -19,7 +18,7 @@ import {
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
-import { radii, typography } from '@/theme/tokens';
+import { typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
@@ -247,7 +246,9 @@ export function BookmarksScreen() {
 
       {editing ? (
         <NoteEditor
-          bookmark={editing}
+          surahId={editing.surahId}
+          ayahNumber={editing.ayahNumber}
+          note={editing.note}
           uiLocale={uiLocale}
           onCancel={() => setEditing(null)}
           onSave={(note) => {
@@ -312,75 +313,5 @@ function BookmarkRow({
         </Text>
       ) : null}
     </GlassSurface>
-  );
-}
-
-function NoteEditor({
-  bookmark,
-  uiLocale,
-  onCancel,
-  onSave,
-}: {
-  bookmark: Bookmark;
-  uiLocale: UiLocaleCode;
-  onCancel: () => void;
-  onSave: (note: string) => void;
-}) {
-  const theme = useThemeColors();
-  const [draft, setDraft] = useState(bookmark.note ?? '');
-
-  return (
-    <BottomSheet onClose={onCancel} closeLabel={t(uiLocale, 'bookmarks.cancel')}>
-      <View style={{ padding: 16, gap: 12 }}>
-        <Text accessibilityRole="header" style={{ color: theme.text, fontWeight: '700' }}>
-          {`${bookmark.surahId}:${bookmark.ayahNumber}`}
-        </Text>
-        <TextInput
-          testID="note-input"
-          value={draft}
-          onChangeText={setDraft}
-          multiline
-          // A convenience, not the validation -- normalizeNote is (§3, §5). It
-          // stops the counter going negative; it does not decide what is stored.
-          maxLength={NOTE_MAX_LENGTH}
-          placeholder={t(uiLocale, 'bookmarks.notePlaceholder')}
-          placeholderTextColor={theme.mutedText}
-          accessibilityLabel={t(uiLocale, bookmark.note === null ? 'bookmarks.addNote' : 'bookmarks.editNote')}
-          style={{
-            color: theme.text,
-            borderColor: theme.border,
-            borderWidth: 1,
-            borderRadius: radii.card,
-            padding: 12,
-            minHeight: 96,
-            textAlignVertical: 'top',
-          }}
-        />
-        {/* Counted down, not up: silently truncating at the boundary is the
-            version where a long note loses its end with nothing on screen
-            having said so. */}
-        <Text testID="note-counter" style={{ color: theme.mutedText }}>
-          {`${t(uiLocale, 'bookmarks.noteCounter')} · ${NOTE_MAX_LENGTH - draft.length}`}
-        </Text>
-        <View style={{ flexDirection: 'row', gap: 12, justifyContent: 'flex-end' }}>
-          <Text
-            accessibilityRole="button"
-            accessibilityLabel={t(uiLocale, 'bookmarks.cancel')}
-            onPress={onCancel}
-            style={{ color: theme.mutedText, padding: 8 }}
-          >
-            {t(uiLocale, 'bookmarks.cancel')}
-          </Text>
-          <Text
-            accessibilityRole="button"
-            accessibilityLabel={t(uiLocale, 'bookmarks.save')}
-            onPress={() => onSave(draft)}
-            style={{ color: theme.accent, fontWeight: '700', padding: 8 }}
-          >
-            {t(uiLocale, 'bookmarks.save')}
-          </Text>
-        </View>
-      </View>
-    </BottomSheet>
   );
 }

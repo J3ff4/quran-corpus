@@ -23,10 +23,14 @@ export interface AyahCardProps {
   words: Word[];
   translationText: string | null;
   bookmarked: boolean;
+  /** This ayah's note, or null for none. Only ever non-null on a bookmarked
+   *  ayah -- a note is an attribute of a bookmark. */
+  note?: string | null;
   playing: boolean;
   uiLocale: UiLocaleCode;
   audioDisabled?: boolean;
   onToggleBookmark: (ayahNumber: number) => void;
+  onEditNote?: (ayahNumber: number) => void;
   onToggleAudio: (ayahNumber: number) => void;
   onWordPress: (word: Word) => void;
 }
@@ -38,10 +42,12 @@ export function AyahCard({
   words,
   translationText,
   bookmarked,
+  note = null,
   playing,
   uiLocale,
   audioDisabled = false,
   onToggleBookmark,
+  onEditNote,
   onToggleAudio,
   onWordPress,
 }: AyahCardProps) {
@@ -70,6 +76,24 @@ export function AyahCard({
               {bookmarked ? t(uiLocale, 'reader.removeBookmark') : t(uiLocale, 'reader.bookmark')}
             </Text>
           </Pressable>
+          {/* Only on a bookmarked ayah. setBookmarkNote is an UPDATE, never an
+              upsert, so a note written against an unbookmarked ayah would land
+              nowhere -- an affordance that silently does nothing. */}
+          {bookmarked && onEditNote ? (
+            <Pressable
+              testID={`ayah-${surahId}-${ayahNumber}-note`}
+              accessibilityRole="button"
+              // The two states differ by label, not by colour alone: the icon
+              // itself says nothing to TalkBack.
+              accessibilityLabel={t(uiLocale, note === null ? 'bookmarks.addNote' : 'bookmarks.editNote')}
+              onPress={() => onEditNote(ayahNumber)}
+              style={pressableStyle}
+            >
+              <Text style={{ color: note === null ? theme.mutedText : theme.accent }}>
+                {note === null ? '✎' : '✐'}
+              </Text>
+            </Pressable>
+          ) : null}
           <Pressable
             testID={`ayah-${surahId}-${ayahNumber}-audio`}
             accessibilityRole="button"

@@ -4,6 +4,7 @@ import { ActivityIndicator, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 import { useRecitation } from '@/audio/ayahAudio';
+import { NoteEditor } from '@/components/NoteEditor';
 import { SurahReader } from '@/components/SurahReader';
 import { getSurahReader, getWordsForAyah, type SurahReaderData } from '@/data/corpusRepository';
 import { createLatestReadingPositionRecorder } from '@/data/latestReadingPositionRecorder';
@@ -11,7 +12,13 @@ import { openCorpusDb } from '@/data/openCorpusDb';
 import { parseAyahNumber, parseSurahId } from '@/data/routeParams';
 import { openUserDb } from '@/data/userDb';
 import { useWordSummaryLoader } from '@/data/useWordSummaryLoader';
-import { getBookmarks, recordReadingDay, recordReadingPosition, setBookmark } from '@/data/userRepository';
+import {
+  getBookmarks,
+  recordReadingDay,
+  recordReadingPosition,
+  setBookmark,
+  setBookmarkNote,
+} from '@/data/userRepository';
 import { localDay } from '@/home/counters';
 import { useEntryPager, useHeldEntry } from '@/motion/entryPager';
 import { t } from '@/i18n/uiStrings';
@@ -75,7 +82,12 @@ export default function SurahRoute() {
   // Kept so the reader can query words for the ayahs scrolling into view,
   // rather than reopening the database on every tap.
   const [corpusClient, setCorpusClient] = useState<MobileDataClient | null>(null);
-  const [bookmarks, setBookmarks] = useState<Set<number>>(new Set());
+  // ayah number -> its note. Presence is the bookmark; the value is the note,
+  // null when there is none. One map rather than a Set plus a second map: the
+  // two would be written from the same rows and could disagree.
+  const [bookmarks, setBookmarks] = useState<Map<number, string | null>>(new Map());
+  const [editingNote, setEditingNote] = useState<number | null>(null);
+  const bookmarkedAyahs = useMemo(() => new Set(bookmarks.keys()), [bookmarks]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Two error slots, not one. Reading-position writes are driven by scrolling,
@@ -136,10 +148,10 @@ export default function SurahRoute() {
           setCorpusClient(client);
           setReader({ surahId, data });
           setBookmarks(
-            new Set(
+            new Map(
               savedBookmarks
                 .filter((bookmark) => bookmark.surahId === surahId)
-                .map((bookmark) => bookmark.ayahNumber),
+                .map((bookmark) => [bookmark.ayahNumber, bookmark.note]),
             ),
           );
         }
@@ -187,8 +199,8 @@ export default function SurahRoute() {
     if (!displayedSurahId) return;
     const nextBookmarked = !bookmarks.has(ayahNumber);
     setBookmarks((current) => {
-      const next = new Set(current);
-      if (nextBookmarked) next.add(ayahNumber);
+      const next = new Map(current);
+      if (nextBookmarked) next.set(ayahNumber, null);
       else next.delete(ayahNumber);
       return next;
     });
@@ -205,12 +217,40 @@ export default function SurahRoute() {
       // one was in flight, leaving the list disagreeing with SQLite until the
       // next focus reload.
       setBookmarks((current) => {
-        const next = new Set(current);
+        const next = new Map(current);
         if (nextBookmarked) next.delete(ayahNumber);
-        else next.add(ayahNumber);
+        else next.set(ayahNumber, null);
         return next;
       });
       setBookmarkError(t(uiLocale, 'reader.bookmarkFailed'));
+    }
+  }
+
+  async function saveNote(ayahNumber: number, note: string) {
+    if (!surahId) return;
+    try {
+      setBookmarkError(null);
+      const userDb = await openUserDb();
+      const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
+      await setBookmarkNote(userClient, surahId, ayahNumber, note);
+      // Read back rather than assume: normalizeNote trims, caps and strips, so
+      // the stored note is not always the typed one, and the pen's filled/empty
+      // state is driven by what is actually in the row.
+      const saved = await getBookmarks(userClient);
+      const stored = saved.find(
+        (bookmark) => bookmark.surahId === surahId && bookmark.ayahNumber === ayahNumber,
+      );
+      setBookmarks((current) => {
+        const next = new Map(current);
+        if (next.has(ayahNumber)) next.set(ayahNumber, stored?.note ?? null);
+        return next;
+      });
+      setEditingNote(null);
+    } catch (cause) {
+      // The note is never logged: decision 34, nothing new leaves the device,
+      // and a note is exactly the kind of string a log line swallows.
+      console.error('[reader] note write failed', { surahId, ayahNumber, cause });
+      setBookmarkError(t(uiLocale, 'bookmarks.noteFailed'));
     }
   }
 
@@ -247,7 +287,8 @@ export default function SurahRoute() {
       >
       <SurahReader
         data={held}
-        bookmarkedAyahs={bookmarks}
+        bookmarkedAyahs={bookmarkedAyahs}
+        notesByAyah={bookmarks}
         playingAyah={audio.playing ? audio.ayah : null}
         audioEnabled
         recitation={{
@@ -270,6 +311,7 @@ export default function SurahRoute() {
         loadWords={loadWords}
         loadWordSummary={loadWordSummary}
         onToggleBookmark={toggleBookmark}
+        onEditNote={(ayahNumber) => setEditingNote(ayahNumber)}
         onToggleAudio={audio.toggleAyah}
         onReadingAyah={(ayahNumber) => {
           readingRecorder?.record(ayahNumber);
@@ -285,6 +327,18 @@ export default function SurahRoute() {
       {/* Live regions: a bookmark or playback failure happens after the tap,
           with nothing taking focus, so TalkBack would otherwise never announce
           that the action the user just took did not work. */}
+      {editingNote !== null ? (
+        <NoteEditor
+          surahId={surahId ?? 0}
+          ayahNumber={editingNote}
+          note={bookmarks.get(editingNote) ?? null}
+          uiLocale={uiLocale}
+          onCancel={() => setEditingNote(null)}
+          onSave={(note) => {
+            void saveNote(editingNote, note);
+          }}
+        />
+      ) : null}
       {bookmarkError ? (
         <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={errorTextStyle(theme.danger)}>
           {bookmarkError}

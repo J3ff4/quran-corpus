@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   uiLocale: 'en',
   getSurahReader: vi.fn(),
   getWordsForAyah: vi.fn(),
+  getBookmarks: vi.fn(),
+  setBookmarkNote: vi.fn(),
   pageSurahProps: [] as ((surahId: number, side: 'prev' | 'next') => void)[],
 }));
 
@@ -45,8 +47,10 @@ vi.mock('@/components/SurahReader', async () => {
     // `loadWords` is destructured and driven, not dropped: a function prop a
     // mock omits renders nothing, so no assertion in this file could ever see
     // it and the route's own loader would sit unexercised (F1).
-    SurahReader: ({ onToggleBookmark, onReadingAyah, bookmarkedAyahs, loadWords, prevSurahId, nextSurahId, onPageSurah, initialAyahNumber }: {
+    SurahReader: ({ onToggleBookmark, onEditNote, notesByAyah, onReadingAyah, bookmarkedAyahs, loadWords, prevSurahId, nextSurahId, onPageSurah, initialAyahNumber }: {
       onToggleBookmark: (ayahNumber: number) => void;
+      onEditNote?: (ayahNumber: number) => void;
+      notesByAyah?: Map<number, string | null>;
       onReadingAyah?: (ayahNumber: number) => void;
       bookmarkedAyahs: Set<number>;
       loadWords: (ayahId: number) => Promise<unknown[]>;
@@ -71,12 +75,31 @@ vi.mock('@/components/SurahReader', async () => {
           'page next',
         ),
         React.createElement('span', null, `bookmarked:${[...bookmarkedAyahs].sort((a, b) => a - b).join(',')}`),
+        React.createElement('span', null, `note:${notesByAyah?.get(255) ?? 'none'}`),
+        React.createElement('button', { onClick: () => onEditNote?.(255) }, 'edit note'),
         React.createElement('button', { onClick: () => onToggleBookmark(255) }, 'bookmark'),
         React.createElement('button', { onClick: () => onToggleBookmark(257) }, 'bookmark other'),
         React.createElement('button', { onClick: () => onReadingAyah?.(256) }, 'read ayah'),
         React.createElement('button', { onClick: () => void loadWords(8) }, 'open word sheet'),
       );
     },
+  };
+});
+
+vi.mock('@/components/NoteEditor', async () => {
+  const React = await import('react');
+  return {
+    // The sheet itself reaches reanimated and gesture-handler, which do not
+    // parse under this transform; BookmarksTab.test.tsx covers its behaviour.
+    // What matters here is that the route opens it for the right ayah and
+    // hands what is typed to the write.
+    NoteEditor: ({ ayahNumber, note, onSave }: { ayahNumber: number; note: string | null; onSave: (note: string) => void }) =>
+      React.createElement(
+        'div',
+        null,
+        React.createElement('span', null, `editing:${ayahNumber}:${note ?? 'none'}`),
+        React.createElement('button', { onClick: () => onSave('  the throne verse  ') }, 'save note'),
+      ),
   };
 });
 
@@ -104,7 +127,8 @@ vi.mock('@/data/corpusRepository', () => ({
 }));
 
 vi.mock('@/data/userRepository', () => ({
-  getBookmarks: async () => [],
+  getBookmarks: (...args: unknown[]) => mocks.getBookmarks(...args),
+  setBookmarkNote: (...args: unknown[]) => mocks.setBookmarkNote(...args),
   setBookmark: (...args: unknown[]) => mocks.setBookmark(...args),
   recordReadingPosition: (...args: unknown[]) => mocks.recordReadingPosition(...args),
   recordReadingDay: (...args: unknown[]) => mocks.recordReadingDay(...args),
@@ -167,8 +191,49 @@ describe('SurahRoute', () => {
     mocks.getSurahReader.mockResolvedValue(readerFixture);
     mocks.getWordsForAyah.mockReset();
     mocks.getWordsForAyah.mockResolvedValue([]);
+    mocks.getBookmarks.mockReset();
+    mocks.getBookmarks.mockResolvedValue([]);
+    mocks.setBookmarkNote.mockReset();
     mocks.params = { surahId: '2' };
     mocks.pageSurahProps.length = 0;
+  });
+
+  it('opens the note editor for the ayah the reader asked about', async () => {
+    mocks.getBookmarks.mockResolvedValue([
+      { surahId: 2, ayahNumber: 255, note: 'throne', createdAt: '2026-08-29T00:00:00Z' },
+      // A different surah's bookmark must not reach this reader's map.
+      { surahId: 3, ayahNumber: 5, note: 'elsewhere', createdAt: '2026-08-29T00:00:00Z' },
+    ]);
+
+    render(<SurahRoute />);
+    expect(await screen.findByText('note:throne')).toBeTruthy();
+    // 3:5 must not reach this reader. Unfiltered it arrives as ayah 5 of THIS
+    // surah -- a bookmark on an ayah the reader never marked, with someone
+    // else's note hanging off it.
+    expect(screen.getByText('bookmarked:255')).toBeTruthy();
+
+    fireEvent.click(screen.getByText('edit note'));
+    expect(screen.getByText('editing:255:throne')).toBeTruthy();
+  });
+
+  it('hands the typed note to the write and shows back what was stored', async () => {
+    mocks.getBookmarks.mockResolvedValue([
+      { surahId: 2, ayahNumber: 255, note: null, createdAt: '2026-08-29T00:00:00Z' },
+    ]);
+
+    render(<SurahRoute />);
+    await screen.findByText('note:none');
+    fireEvent.click(screen.getByText('edit note'));
+
+    mocks.getBookmarks.mockResolvedValue([
+      { surahId: 2, ayahNumber: 255, note: 'the throne verse', createdAt: '2026-08-29T00:00:00Z' },
+    ]);
+    fireEvent.click(screen.getByText('save note'));
+
+    // The padding the editor sent is gone, because the row is re-read after the
+    // write rather than assumed -- normalizeNote decides what is stored.
+    expect(await screen.findByText('note:the throne verse')).toBeTruthy();
+    expect(mocks.setBookmarkNote).toHaveBeenCalledWith(expect.anything(), 2, 255, '  the throne verse  ');
   });
 
   it('offers the surah either side, and neither past the ends of the mushaf', async () => {
