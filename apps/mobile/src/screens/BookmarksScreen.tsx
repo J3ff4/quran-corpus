@@ -16,9 +16,10 @@ import {
   type Bookmark,
 } from '@/data/userRepository';
 import type { UiLocaleCode } from '@/i18n/languages';
+import { textAlignFor } from '@/i18n/textDirection';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
-import { typography } from '@/theme/tokens';
+import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
@@ -283,7 +284,20 @@ function BookmarkRow({
           }}
           accessibilityRole="link"
           accessibilityLabel={`${t(uiLocale, 'bookmarks.entryPrefix')} ${coordinate}`}
-          style={{ color: theme.accent, fontWeight: '700' }}
+          // Padded to the 48dp floor. The text alone is a ~20dp box, and it is
+          // the row's ONLY way into the reader -- measured at 81x76px on a
+          // 640dpi device, under Android's 48dp and under WCAG 2.2 SC 2.5.8's
+          // 24x24 (device, 2026-08-29). Padding grows the Text's own layout
+          // box, which is what a Text with onPress takes presses in.
+          style={{
+            color: theme.accent,
+            fontWeight: '700',
+            minWidth: touchTargets.minimum,
+            minHeight: touchTargets.minimum,
+            paddingVertical: 14,
+            paddingRight: 12,
+            textAlignVertical: 'center',
+          }}
         >
           {coordinate}
         </Link>
@@ -315,7 +329,14 @@ function BookmarkRow({
         </Text>
       ) : null}
       {bookmark.note !== null ? (
-        <Text numberOfLines={3} style={{ color: theme.mutedText }}>
+        // Aligned by what the reader wrote, not by the interface locale: an
+        // Arabic note shapes correctly but sat flush left, because Android
+        // resolves a Text's gravity from the layout direction and the app is
+        // LTR in all three UI locales (device, 2026-08-29).
+        <Text
+          numberOfLines={3}
+          style={{ color: theme.mutedText, textAlign: textAlignFor(bookmark.note) }}
+        >
           {bookmark.note}
         </Text>
       ) : null}

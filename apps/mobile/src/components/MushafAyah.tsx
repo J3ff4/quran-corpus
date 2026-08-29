@@ -70,7 +70,9 @@ export function MushafAyah({
           </Text>
         }
       />
-      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
+      {/* Wraps for the same reason AyahCard's row does: the labels are longer
+          in Uzbek and Russian than the row is wide. */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 10 }}>
         <Pressable
           testID={`ayah-${surahId}-${ayahNumber}-bookmark`}
           accessibilityRole="button"

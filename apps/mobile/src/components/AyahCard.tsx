@@ -58,7 +58,12 @@ export function AyahCard({
     <GlassSurface style={{ marginHorizontal: 16, marginBottom: 11, padding: 20, gap: 14 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <AyahMedallion n={ayahNumber} uiLocale={uiLocale} />
-        <View style={{ flexDirection: 'row', gap: 10 }}>
+        {/* Shrinks and wraps rather than running off the card. These are text
+            labels, and the card is fixed-width: "Remove bookmark · Play" fits
+            in English and clipped the Play control clean off the right edge in
+            Russian and Uzbek, whose verbs are half again as long (device,
+            2026-08-29). GlassSurface clips its overflow, so nothing warned. */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', flexShrink: 1, gap: 10 }}>
           <Pressable
             // Same testID MushafAyah gives its own bookmark: the reader swaps
             // renderers by mode, and a test that reaches for one handle has to
