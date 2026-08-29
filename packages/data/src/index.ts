@@ -1,7 +1,8 @@
 export { createDatabase } from './db.js';
 export { runMigrations, normalizeArabicJoinKeys } from './migrate.js';
 export { getAllSurahs, getSurahById } from './queries/surahs.js';
-export { getAyahsBySurah, getAyahWithWords } from './queries/ayahs.js';
+export { getAyahPreviews, getAyahsBySurah, getAyahWithWords } from './queries/ayahs.js';
+export type { AyahPreview } from './queries/ayahs.js';
 export {
   getWordsByAyah,
   getWordsBySurah,
