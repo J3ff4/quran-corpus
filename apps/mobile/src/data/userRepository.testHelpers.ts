@@ -8,6 +8,8 @@ import type { MobileDataClient, SqlValue } from '@quran-corpus/mobile-data';
 type BookmarkRow = {
   surah_id: number;
   ayah_number: number;
+  note: string | null;
+  created_at: string;
 };
 
 type HistoryRow = {
@@ -27,7 +29,26 @@ export function createMemoryUserClient(): MobileDataClient {
 
       if (sql.startsWith('INSERT INTO bookmarks')) {
         const [surahId, ayahNumber] = args as SqlValue[];
-        bookmarks.set(`${surahId}:${ayahNumber}`, { surah_id: Number(surahId), ayah_number: Number(ayahNumber) });
+        const key = `${surahId}:${ayahNumber}`;
+        // ON CONFLICT DO NOTHING in the real statement: re-bookmarking must not
+        // reset created_at, or the Recent tab reorders on a no-op tap.
+        if (!bookmarks.has(key)) {
+          bookmarks.set(key, {
+            surah_id: Number(surahId),
+            ayah_number: Number(ayahNumber),
+            note: null,
+            created_at: new Date().toISOString(),
+          });
+        }
+        return { rows: [] };
+      }
+
+      if (sql.startsWith('UPDATE bookmarks SET note')) {
+        const [note, surahId, ayahNumber] = args as SqlValue[];
+        // UPDATE, never an insert -- the real statement cannot create a
+        // bookmark, and a fake that does would hide exactly that difference.
+        const row = bookmarks.get(`${surahId}:${ayahNumber}`);
+        if (row) row.note = note === null || note === undefined ? null : String(note);
         return { rows: [] };
       }
 
