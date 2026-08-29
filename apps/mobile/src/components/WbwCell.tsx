@@ -4,12 +4,17 @@ import { radii, touchTargets, typography } from '@/theme/tokens';
 import { useArabicSizes } from '@/theme/useArabicSizes';
 import { useThemeColors } from '@/theme/themeContext';
 
+import type { Gloss } from '@/data/corpusRepository';
+import type { UiLocaleCode } from '@/i18n/languages';
+
+import { GlossLangTag } from './GlossLangTag';
 import { SegmentedWord } from './SegmentedWord';
 
 export interface WbwCellProps {
   word: Word;
   segments: WordSegment[];
-  gloss: string | null;
+  gloss: Gloss | null;
+  uiLocale: UiLocaleCode;
   /** Dense drops the POS tag row; the two 2c layouts keep it. */
   showPos?: boolean;
   /** Dense clamps the gloss to one line -- that is the whole density mode. */
@@ -29,6 +34,7 @@ export function WbwCell({
   word,
   segments,
   gloss,
+  uiLocale,
   showPos = true,
   glossLines = 2,
   compact = false,
@@ -70,8 +76,10 @@ export function WbwCell({
         numberOfLines={glossLines}
         style={{ color: theme.text, fontSize: typography.caption - 1, textAlign: 'center' }}
       >
-        {gloss ?? ''}
+        {gloss?.text ?? ''}
       </Text>
+      <GlossLangTag gloss={gloss} uiLocale={uiLocale} fontSize={typography.caption - 3} />
+
     </Pressable>
   );
 }

@@ -55,7 +55,11 @@ vi.mock('@/data/corpusRepository', async (importOriginal) => {
     // Every layout prints a gloss per word, so the screen fetches the surah's
     // gloss map before it renders. Stubbed here because the real one runs SQL
     // against openCorpusDb's stub object.
-    getSurahGlosses: async () => new Map<number, string>([[1, 'Allah'], [2, 'not']]),
+    getSurahGlosses: async () =>
+      new Map<number, CorpusRepository.Gloss>([
+        [1, { text: 'Allah', lang: 'en', isFallback: false }],
+        [2, { text: 'not', lang: 'en', isFallback: false }],
+      ]),
   };
 });
 

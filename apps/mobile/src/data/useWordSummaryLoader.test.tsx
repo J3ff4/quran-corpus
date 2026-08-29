@@ -2,6 +2,7 @@ import React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MobileDataClient } from '@quran-corpus/mobile-data';
+import type { Gloss } from './corpusRepository';
 import type { Word } from '@quran-corpus/data/mobile';
 import type { ContentLanguageCode } from '@/i18n/languages';
 import { useWordSummaryLoader } from './useWordSummaryLoader';
@@ -37,7 +38,7 @@ function Probe({
         data-testid="tap"
         onClick={() => {
           load(word)
-            .then((summary) => setGloss(summary.gloss ?? 'none'))
+            .then((summary) => setGloss(summary.gloss?.text ?? 'none'))
             .catch((cause: Error) => setGloss(`error: ${cause.message}`));
         }}
       />
@@ -58,10 +59,10 @@ describe('useWordSummaryLoader', () => {
     mocks.getWordSummary.mockReset();
     mocks.getSurahGlosses.mockImplementation(
       async (_client: unknown, _surahId: number, language: string) =>
-        new Map([[2001, `gloss-${language}`]]),
+        new Map([[2001, { text: `gloss-${language}`, lang: language, isFallback: false }]]),
     );
     mocks.getWordSummary.mockImplementation(
-      async (_client: unknown, w: Word, gloss: string | null) => ({ word: w, segments: [], gloss }),
+      async (_client: unknown, w: Word, gloss: Gloss | null) => ({ word: w, segments: [], gloss }),
     );
   });
 

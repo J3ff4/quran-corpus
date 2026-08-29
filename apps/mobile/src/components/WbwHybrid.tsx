@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 import type { Word } from '@quran-corpus/data/mobile';
-import type { WbwPage } from '@/data/corpusRepository';
+import type { Gloss, WbwPage } from '@/data/corpusRepository';
 import type { UiLocaleCode } from '@/i18n/languages';
 
 import { AyahMedallion } from './AyahMedallion';
@@ -12,7 +12,7 @@ export interface WbwHybridProps {
   page: WbwPage;
   uiLocale: UiLocaleCode;
   /** Keyed by `word.id`, the whole surah's map -- see getSurahGlosses. */
-  glosses: Map<number, string>;
+  glosses: Map<number, Gloss>;
   onWordPress: (word: Word) => void;
 }
 
@@ -39,6 +39,7 @@ export function WbwHybrid({ page, uiLocale, glosses, onWordPress }: WbwHybridPro
       // plausible on screen -- the grid this replaces carried the same warning.
       segments={page.segments.get(word.id) ?? []}
       gloss={glosses.get(word.id) ?? null}
+      uiLocale={uiLocale}
       onPress={() => onWordPress(word)}
     />
   ));

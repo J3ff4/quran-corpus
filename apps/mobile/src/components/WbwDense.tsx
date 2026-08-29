@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 import type { Word } from '@quran-corpus/data/mobile';
-import type { WbwPage } from '@/data/corpusRepository';
+import type { Gloss, WbwPage } from '@/data/corpusRepository';
 import type { UiLocaleCode } from '@/i18n/languages';
 
 import { AyahMedallion } from './AyahMedallion';
@@ -11,7 +11,7 @@ export interface WbwDenseProps {
   page: WbwPage;
   uiLocale: UiLocaleCode;
   /** Keyed by `word.id`, the whole surah's map -- see getSurahGlosses. */
-  glosses: Map<number, string>;
+  glosses: Map<number, Gloss>;
   onWordPress: (word: Word) => void;
 }
 
@@ -49,6 +49,7 @@ export function WbwDense({ page, uiLocale, glosses, onWordPress }: WbwDenseProps
             // This word's own segments and gloss -- see the note in WbwHybrid.
             segments={page.segments.get(word.id) ?? []}
             gloss={glosses.get(word.id) ?? null}
+            uiLocale={uiLocale}
             showPos={false}
             glossLines={1}
             compact

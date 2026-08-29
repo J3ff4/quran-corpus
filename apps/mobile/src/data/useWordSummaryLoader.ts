@@ -3,7 +3,7 @@ import type { MobileDataClient } from '@quran-corpus/mobile-data';
 import type { Word } from '@quran-corpus/data/mobile';
 import type { ContentLanguageCode } from '@/i18n/languages';
 
-import { getSurahGlosses, getWordSummary, type WordSummary } from './corpusRepository';
+import { getSurahGlosses, getWordSummary, type Gloss, type WordSummary } from './corpusRepository';
 
 /**
  * Load one word's sheet payload, reusing the surah's glosses across taps.
@@ -21,7 +21,7 @@ export function useWordSummaryLoader(
   surahId: number | null,
   contentLanguage: ContentLanguageCode,
 ): (word: Word) => Promise<WordSummary> {
-  const glossesRef = useRef<{ key: string; glosses: Map<number, string> } | null>(null);
+  const glossesRef = useRef<{ key: string; glosses: Map<number, Gloss> } | null>(null);
 
   return useCallback(
     async (word: Word) => {
@@ -30,13 +30,12 @@ export function useWordSummaryLoader(
       // language while a surah is open otherwise keeps serving the glosses
       // fetched for the previous one.
       const key = `${surahId}:${contentLanguage}`;
-      if (glossesRef.current?.key !== key) {
-        glossesRef.current = {
-          key,
-          glosses: await getSurahGlosses(client, surahId, contentLanguage),
-        };
+      let cached = glossesRef.current;
+      if (cached?.key !== key) {
+        cached = { key, glosses: await getSurahGlosses(client, surahId, contentLanguage) };
+        glossesRef.current = cached;
       }
-      return getWordSummary(client, word, glossesRef.current.glosses.get(word.id) ?? null);
+      return getWordSummary(client, word, cached.glosses.get(word.id) ?? null);
     },
     [client, contentLanguage, surahId],
   );

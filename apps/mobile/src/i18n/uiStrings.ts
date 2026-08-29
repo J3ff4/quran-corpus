@@ -96,6 +96,7 @@ export type UiStringKey =
   | 'word.fullAnalysis'
   | 'word.root'
   | 'word.noGloss'
+  | 'word.glossLanguage'
   | 'word.close'
   | 'word.segments'
   | 'word.grammar'
@@ -338,6 +339,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'word.fullAnalysis': 'Full analysis',
     'word.root': 'Root',
     'word.noGloss': 'No translation for this word',
+    'word.glossLanguage': 'Gloss language',
     'word.close': 'Close',
     'word.segments': 'Segments',
     'word.grammar': 'Grammar',
@@ -537,6 +539,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'word.fullAnalysis': 'To‘liq tahlil',
     'word.root': 'O‘zak',
     'word.noGloss': 'Bu so‘z uchun tarjima yo‘q',
+    'word.glossLanguage': 'Gloss tili',
     'word.close': 'Yopish',
     'word.segments': 'Bo‘laklar',
     'word.grammar': 'Grammatika',
@@ -731,6 +734,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'word.fullAnalysis': 'Полный разбор',
     'word.root': 'Корень',
     'word.noGloss': 'Нет перевода для этого слова',
+    'word.glossLanguage': 'Язык глоссы',
     'word.close': 'Закрыть',
     'word.segments': 'Сегменты',
     'word.grammar': 'Грамматика',
