@@ -190,4 +190,24 @@ describe('FrequencyList', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
     expect(screen.getByRole('alert').textContent).toBe('Unable to load the list');
   });
+
+  it('does not show one kind\u2019s rows under another kind\u2019s heading', async () => {
+    // The defect behind #33: rows and the loading flag were separate, and the
+    // flag was only raised by an effect -- which runs after paint. For that
+    // commit the pane rendered the previous kind's rows, and remounted the
+    // list under them, before anything said it was loading. Held observable
+    // here by leaving the second query in flight: the effect cannot paper over
+    // the window if it never gets an answer.
+    mocks.getFrequencyRows.mockResolvedValueOnce([
+      { href: '/root/qwl', rank: 1, count: 1722, arabic: '\u0642\u0648\u0644', gloss: 'to say' },
+    ]);
+    const { rerender } = render(<FrequencyList kind="roots" />);
+    await waitFor(() => expect(screen.getByText('to say')).toBeTruthy());
+
+    mocks.getFrequencyRows.mockImplementationOnce(() => new Promise(() => {}));
+    rerender(<FrequencyList kind="lemmas" />);
+
+    expect(screen.queryByText('to say')).toBeNull();
+    expect(screen.getByText('loading')).toBeTruthy();
+  });
 });
