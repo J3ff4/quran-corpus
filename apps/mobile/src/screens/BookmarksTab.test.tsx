@@ -274,6 +274,34 @@ describe('BookmarksTab', () => {
     await waitFor(() => expect(screen.getByText('the throne verse')).toBeTruthy());
   });
 
+  it('never puts the note itself into a log line when the write fails', async () => {
+    // Decision 34: nothing new leaves the device. A note is exactly the kind of
+    // string a log swallows -- telemetry.ts's own comment records
+    // `source: <a user's note>` slipping past a key-only filter. The failure
+    // path is the one that reaches for context, so it is the one to pin.
+    const userClient = requireUserClient();
+    await setBookmark(userClient, 2, 255, true);
+
+    render(<BookmarksTab />);
+    fireEvent.click(await screen.findByLabelText('Add note'));
+
+    const secret = 'a private reflection';
+    mocks.openUserDb = async () => {
+      throw new Error('database is locked');
+    };
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    fireEvent.change(screen.getByTestId('note-input'), { target: { value: secret } });
+    fireEvent.click(screen.getByLabelText('Save'));
+
+    await screen.findByText('Unable to save the note');
+    const everythingLogged = logged.mock.calls.map((call) => JSON.stringify(call)).join(' ');
+    expect(everythingLogged).not.toContain(secret);
+    // ...but the coordinate IS logged, or the line is useless for debugging.
+    expect(everythingLogged).toContain('255');
+    logged.mockRestore();
+  });
+
   it('keeps the bookmark when a note is cleared', async () => {
     const userClient = requireUserClient();
     await setBookmark(userClient, 2, 255, true);
