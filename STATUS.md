@@ -97,7 +97,7 @@ gated nothing.
 **DEVICE GATE UNRUN** (§10): type `mercy` in the dictionary box on hardware,
 confirm sort chips vanish while searching and return when the box clears.
 
-### 🎨 M6 GLASS REDESIGN — M6a-M6g + M6r merged; M6h next (2026-08-29)
+### 🎨 M6 GLASS REDESIGN — M6a-M6h + M6r merged; M6i next (2026-08-29)
 Spec + 9 sub-phase plans: `docs/plans/phase-m6-glass-redesign.md` (+ `phase-m6a..i`).
 40 owner decisions recorded there. §5 fires on M6b, M6c, M6f, M6h.
 
@@ -335,8 +335,43 @@ Device gotchas worth keeping: `screenrecord` won't exec on this OxygenOS build
 temporarily, don't record. OxygenOS does NOT write the Font size slider to
 `system font_scale` (still reads 1.0 at max) — verify scaling by pixels.
 
-**M6h next** (bookmarks + notes) — touches the on-device user DB, so **§5
-fires**. M6i (settings + about) opens with a Task 0 mockup pass needing owner
+### M6h bookmarks + notes — MERGED 2026-08-29 as `37fa508` (PR #38)
+Migration 3 adds a nullable `note TEXT` to `bookmarks` — additive only, and the
+one non-idempotent statement in `userData.ts`. `normalizeNote` is the write
+boundary (trim, cap 500, strip C0/C1, keep \n and \t); `setBookmarkNote` is an
+UPDATE and never an upsert. New `getAyahPreviews` in `packages/data` answers
+"text for a scattered list of coordinates" — the plan specified the text and
+provisioned no query, and the only existing path loads a whole surah per
+bookmark. Three-tab screen (Recent / By surah / With notes) over FlatList and
+SectionList; a pen on bookmarked ayahs in both reader renderers.
+
+**§5 pass: 8 findings, all real, all fixed in one pass, none declined.** Table
+in the plan doc. The two that mattered:
+- `saveNote` wrote against the pager's target surah, not the one on screen. The
+  held reader stays interactive during a page turn, so a note saved mid-turn
+  landed on another surah's bookmark — or threw on an ayah number the incoming
+  surah does not reach. Every other write in that file already used
+  `displayedSurahId`.
+- Un-bookmarking an annotated ayah destroyed the note with the row: one tap, no
+  undo, on a device DB. Confirm added, but only when the row carries a note.
+  **Product call taken during the review pass rather than asked about** —
+  reversible in one commit.
+
+Six vacuous tests caught by mutation across the phase, one of them in the review
+pass itself: "the sheet closed on a page turn" passed with the sheet fully
+mounted, because the new surah's bookmark map re-rendered it with different
+text. Asserting on text rather than on the element existing is the shape to
+watch.
+
+Gate at merge: 447 data / 728 mobile / 484 web / 12 mobile-data, lint +
+type-check clean.
+
+**NOT MET — §10 gate is open.** No device run: checks 148-154 (154 is new, for
+the delete confirm). `eas build` blocked until the EAS quota parks clear
+2026-09-01. "Implementation complete, verification pending" is an unmet exit
+criterion, not a pass.
+
+**M6i next** (settings + about) — opens with a Task 0 mockup pass needing owner
 approval before code.
 
 Two calls made in-flight, both in commit bodies:

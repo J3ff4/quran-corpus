@@ -89,7 +89,7 @@ ayah_number` stays: that is exactly the By-surah tab's order, and the Recent tab
 sorts the same rows in the screen rather than paying for a second query.
 `setBookmark`'s signature is unchanged.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 describe('normalizeNote', () => {
@@ -176,12 +176,12 @@ describe('migration 3', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `pnpm --filter @quran-corpus/data test -t normalizeNote`
 Expected: FAIL — no such export.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```ts
 export const NOTE_MAX_LENGTH = 500;
@@ -248,7 +248,7 @@ swallow an error.
 
 Update `getBookmarks` to select and map `note`.
 
-- [ ] **Step 4: Run the tests, then mutation-check (§4)**
+- [x] **Step 4: Run the tests, then mutation-check (§4)**
 
 Run: `pnpm --filter @quran-corpus/data test` -> PASS.
 Then change `.slice(0, NOTE_MAX_LENGTH)` to return `cleaned`. Expected: the cap
@@ -256,7 +256,7 @@ test FAILS. Restore by re-editing. Repeat for the UPDATE-not-upsert choice:
 change it to an upsert and confirm "does not create a bookmark that does not
 exist" FAILS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/data/src/userData.ts packages/data/tests/userData.test.ts \
@@ -284,7 +284,7 @@ New `uiStrings` keys: `bookmarks.tabRecent`, `bookmarks.tabBySurah`,
 `bookmarks.addNote`, `bookmarks.editNote`, `bookmarks.noteFailed`,
 `bookmarks.noteCounter` (all three locales).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```tsx
 it('scrolls past the first screenful', async () => {
@@ -355,7 +355,7 @@ it('keeps the bookmark when a note is cleared', async () => {
 });
 ```
 
-- [ ] **Step 2: Run them, watch them fail, implement, re-run**
+- [x] **Step 2: Run them, watch them fail, implement, re-run**
 
 - Three tabs via `SegmentedControl`: Recent, By surah, With notes (Task 1).
 - Recent and With notes are `FlatList`s; By surah is a `SectionList` with a
@@ -372,12 +372,12 @@ it('keeps the bookmark when a note is cleared', async () => {
 - After a note write, refresh the list from the DB rather than patching local
   state, so what is on screen is what was stored after normalisation.
 
-- [ ] **Step 3: Mutation-check (§4)**
+- [x] **Step 3: Mutation-check (§4)**
 
 Make the Notes tab render every bookmark. Expected: the second test FAILS.
 Restore by re-editing.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/mobile/app/bookmarks.tsx apps/mobile/src/screens/BookmarksScreen.tsx \
@@ -398,7 +398,7 @@ A bookmarked ayah's card gets a note affordance — an outline pen when there is
 no note, a filled one when there is, opening the same editor sheet. Reuse the
 component from Task 3; do not build a second editor.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```tsx
 it('offers a note only on a bookmarked ayah', () => {
@@ -414,11 +414,11 @@ it('offers a note only on a bookmarked ayah', () => {
 });
 ```
 
-- [ ] **Step 2: Run it, watch it fail, implement, re-run, mutation-check**
+- [x] **Step 2: Run it, watch it fail, implement, re-run, mutation-check**
 
 Render the affordance unconditionally. Expected: the test FAILS. Restore.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add apps/mobile/src/components
@@ -429,14 +429,14 @@ git commit -m "feat(mobile): add a note from the reader"
 
 ### Task 5: §5 stop, then build
 
-- [ ] **Step 1: Self-review.** Three questions, answered out loud in the commit
+- [x] **Step 1: Self-review.** Three questions, answered out loud in the commit
   or the PR body: is the migration additive; is every note write normalised in
   `packages/data`; can a note reach telemetry, a log line or a crash report?
-- [ ] **Step 2: Stop and ask the owner to run `/code-review`** — user-DB schema
+- [x] **Step 2: Stop and ask the owner to run `/code-review`** — user-DB schema
   change plus a UGC trust boundary (§5). Plain `/code-review`; never `ultra`
   unprompted.
-- [ ] **Step 3: Act on the findings.** One pass.
-- [ ] **Step 4: Build.**
+- [x] **Step 3: Act on the findings.** One pass.
+- [ ] **Step 4: Build.** BLOCKED — EAS quota parked until 2026-09-01.
 
 ```bash
 cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --profile preview
@@ -454,6 +454,7 @@ cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --prof
 | 151 | Type past 500 characters | Input stops at 500; the counter reaches 0; nothing is silently lost |
 | 152 | A note in Arabic, Uzbek and Russian | Stored and redisplayed intact, correct direction |
 | 153 | All three tabs | Recent is newest-first; By surah is grouped under surah headers; With notes lists only noted bookmarks |
+| 154 | Un-bookmark an ayah that carries a note | A confirm appears; Cancel keeps both the bookmark and its text; Delete removes both. No dialog when the bookmark has no note |
 
 ## Verification Log
 
@@ -465,3 +466,51 @@ cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --prof
 | 151 | | | | |
 | 152 | | | | |
 | 153 | | | | |
+| 154 | | | | |
+
+## Deviations
+
+Recorded at merge, not during the PR — ledger prose inside an open PR drew 30
+of 60 findings on #75.
+
+- **Task 3 had no query for the ayah text it specified.** Nothing in
+  `packages/data` answered "text for a scattered list of coordinates", and the
+  only existing path loads a whole surah per bookmark. Owner chose a batch
+  query: `getAyahPreviews` (`4a94994`), which widened the §5 scope.
+- **Migration literal shape.** Plan wrote `{version, sql}`; the real type is
+  `{version, statements[]}`.
+- **`useUserDbOnFocus` gained `reload`.** First screen that writes what it
+  reads. The alternative was a fourth private copy of the load logic.
+- **`NoteEditor` extracted to its own component** so the reader and the list
+  open the same sheet rather than two that drift (§3).
+- **`rnHosts` list shims now forward `testID`**, so a suite can assert which
+  container a screen mounted.
+- **Device checks renumbered** 97–102 to 148–153; 97–107 were already spent on
+  M6g. Check 148's upgrade baseline is the M6r build (`8c3da7f`).
+- **Check 154 added at merge** for the delete confirm, which did not exist when
+  the plan was written.
+
+## Review Log
+
+`/code-review` (plain, §5) on `feat/m6h-bookmarks-notes`, 2026-08-29. Eight
+findings, all real, all fixed in one pass (`2bf488e`, `628ecf9`). Nothing
+declined.
+
+| Finding | Fix |
+| --- | --- |
+| `saveNote` wrote against the pager's target surah, not the one on screen | `displayedSurahId`, like every other write in the file |
+| The note sheet survived a page turn | Cleared when the surah changes |
+| A failed delete rolled the note back as empty | Restores the captured note |
+| Un-bookmarking destroyed a note with one tap, no undo | Confirm when the row carries a note |
+| `getAyahPreviews` ordering held only within a chunk | Sorted once after the loop |
+| The note cap could cut an emoji in half | Drops the whole surrogate pair |
+| A note-write error rendered behind the sheet's `<Modal>` | Rendered inside the sheet |
+| Both bookmarks-list pens were the same glyph and colour | The reader's own pair |
+
+The confirm dialog is a product decision taken during the review pass rather
+than asked about. Reversible in one commit if the owner wants it out.
+
+Merged as `37fa508` (squash of PR #38).
+
+**Not met:** the device run has not happened, and §10 makes it the gate for this
+milestone. `eas build` is blocked until 2026-09-01.
