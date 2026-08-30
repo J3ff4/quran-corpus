@@ -11,9 +11,13 @@ vi.mock('@/settings/settingsStore', () => ({
 }));
 
 vi.mock('react-native', async () => {
-  const { host } = await import('@/testing/rnHosts.js');
+  const { AccessibilityInfo, host } = await import('@/testing/rnHosts.js');
 
   return {
+    // The control row's reveal reads the reduce-motion flag, so this suite
+    // reaches AccessibilityInfo now. Without it the render fails on an
+    // undefined module member rather than on anything naming the card.
+    AccessibilityInfo,
     Pressable: host('button'),
     Text: host('span'),
     View: host('div'),

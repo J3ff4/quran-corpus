@@ -34,10 +34,11 @@ interface HostProps {
   accessible?: unknown;
   contentContainerStyle?: unknown;
   // Reanimated's layout-animation builders, on an Animated.View. Nothing in
-  // jsdom can run one, and spread onto a DOM node React warns about both on
-  // every render of either entry screen.
+  // jsdom can run one, and spread onto a DOM node React warns about all three
+  // on every render of either entry screen or any ayah.
   entering?: unknown;
   exiting?: unknown;
+  layout?: unknown;
   horizontal?: unknown;
   importantForAccessibility?: unknown;
   onContentSizeChange?: unknown;
@@ -206,6 +207,7 @@ export function host(tag: string) {
     contentContainerStyle: _contentContainerStyle,
     entering: _entering,
     exiting: _exiting,
+    layout: _layout,
     horizontal: _horizontal,
     importantForAccessibility,
     onContentSizeChange: _onContentSizeChange,

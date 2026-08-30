@@ -1,12 +1,9 @@
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import type { Word } from '@quran-corpus/data/mobile';
 import type { UiLocaleCode } from '@/i18n/languages';
-import { t } from '@/i18n/uiStrings';
-import { touchTargets } from '@/theme/tokens';
-import { useThemeColors } from '@/theme/themeContext';
+import { AyahControls } from './AyahControls';
 import { AyahMedallion } from './AyahMedallion';
 import { AyahText } from './AyahText';
-import { Icon } from './icons/Icon';
 
 export interface MushafAyahProps {
   surahId: number;
@@ -34,10 +31,10 @@ export interface MushafAyahProps {
  * read as separate cards, and mushaf mode exists to make them read as one
  * page (mockup `1e`). Decision 20: continuous scroll, NOT fixed 15-line pages.
  *
- * The bookmark and play controls stay, because losing them would mean the two
- * modes differ in what you can *do* rather than in what you see. They sit
- * below the run at low emphasis, and they carry the same testIDs as the card's
- * so the reader's own tests exercise whichever renderer is mounted.
+ * The controls stay, because losing them would mean the two modes differ in
+ * what you can *do* rather than in what you see. They sit below the run at low
+ * emphasis, and they are the same AyahControls the card draws, so the two
+ * renderers cannot drift.
  */
 export function MushafAyah({
   surahId,
@@ -54,8 +51,6 @@ export function MushafAyah({
   onToggleAudio,
   onWordPress,
 }: MushafAyahProps) {
-  const theme = useThemeColors();
-
   return (
     <View style={{ paddingHorizontal: 20, paddingVertical: 10, gap: 6 }}>
       <AyahText
@@ -71,75 +66,23 @@ export function MushafAyah({
           </Text>
         }
       />
-      {/* The same three glyphs AyahCard carries, for the same reason: the two
-          renderers must not differ in what you can DO, and words here were
-          locale-sized. */}
-      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 4 }}>
-        <Pressable
-          testID={`ayah-${surahId}-${ayahNumber}-bookmark`}
-          accessibilityRole="button"
-          accessibilityState={{ selected: bookmarked }}
-          // Was the visible text; naming it keeps TalkBack unchanged now that
-          // the control is a shape. See AyahCard.
-          accessibilityLabel={bookmarked ? t(uiLocale, 'reader.removeBookmark') : t(uiLocale, 'reader.bookmark')}
-          onPress={() => onToggleBookmark(ayahNumber)}
-          style={controlStyle}
-        >
-          <Icon
-            testID={`ayah-${surahId}-${ayahNumber}-bookmark-icon`}
-            name="bookmark"
-            filled={bookmarked}
-            color={bookmarked ? theme.accent : theme.mutedText}
-            size={20}
-          />
-        </Pressable>
-        {/* Present in both renderers, for the reason the bookmark is: losing it
-            here would mean the two modes differ in what you can DO, not just
-            in what you see. */}
-        {bookmarked && onEditNote ? (
-          <Pressable
-            testID={`ayah-${surahId}-${ayahNumber}-note`}
-            accessibilityRole="button"
-            accessibilityLabel={t(uiLocale, note === null ? 'bookmarks.addNote' : 'bookmarks.editNote')}
-            onPress={() => onEditNote(ayahNumber)}
-            style={controlStyle}
-          >
-            <Icon
-              testID={`ayah-${surahId}-${ayahNumber}-note-icon`}
-              name="note"
-              filled={note !== null}
-              color={note === null ? theme.mutedText : theme.accent}
-              size={20}
-            />
-          </Pressable>
-        ) : null}
-        <Pressable
-          testID={`ayah-${surahId}-${ayahNumber}-audio`}
-          accessibilityRole="button"
-          // Without this TalkBack announces an ordinary button whose press does
-          // nothing when audio is unconfigured.
-          accessibilityState={{ disabled: audioDisabled }}
-          accessibilityLabel={playing ? t(uiLocale, 'reader.pause') : t(uiLocale, 'reader.play')}
-          disabled={audioDisabled}
-          onPress={() => onToggleAudio(ayahNumber)}
-          style={controlStyle}
-        >
-          <Icon
-            testID={`ayah-${surahId}-${ayahNumber}-audio-icon`}
-            name={playing ? 'pause' : 'play'}
-            filled={!playing}
-            color={audioDisabled ? theme.mutedText : theme.accent}
-            size={20}
-          />
-        </Pressable>
+      <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+        <AyahControls
+          surahId={surahId}
+          ayahNumber={ayahNumber}
+          bookmarked={bookmarked}
+          note={note}
+          playing={playing}
+          uiLocale={uiLocale}
+          audioDisabled={audioDisabled}
+          // A point smaller than the card's: here the row sits under the
+          // Arabic run at low emphasis rather than in a card header.
+          size={20}
+          onToggleBookmark={onToggleBookmark}
+          onEditNote={onEditNote}
+          onToggleAudio={onToggleAudio}
+        />
       </View>
     </View>
   );
 }
-
-const controlStyle = {
-  minHeight: touchTargets.minimum,
-  minWidth: touchTargets.minimum,
-  justifyContent: 'center',
-  alignItems: 'center',
-} as const;
