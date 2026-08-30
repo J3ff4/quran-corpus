@@ -219,16 +219,18 @@ Go on the owner's phone — same JS, same hardware, not a release binary.
 | M6e | `9c0f86d` | #24 | 73–78 | 2026-08-25, Expo Go | 6/6 pass |
 | M6f | `d4d695d`, `865cdf4` | #26, #27 | 79–88 | 2026-08-26, Expo Go | 8 pass, 2 **blocked** (82 controls, 83 — Expo Go cannot test lock-screen controls); 86 after fix `8c625b1` |
 | M6g | `e9e1be7` | #30 | 89–107 | 2026-08-27/28, Expo Go | pass, with 92 failing first and passing after `c4f9780`; ran past its own header's 89–96 and finished at 107 |
-| M6h | `37fa508` | #38 | 148–154 | **not run** | `eas build` blocked until 2026-09-01 |
-| M6i | `72a17a5` | #40 | 155–159 | **not run** | same block |
+| M6h | `37fa508` | #38 | 148–154 | 2026-08-29, Expo Go | 149–154 pass (152 after a fix), 1 **blocked** (148 — an APK-upgrade check by definition; the Expo Go sandbox holds no pre-M6h user DB to migrate); two defects fixed in `d9860e0` |
+| M6i | `72a17a5` | #40 | 155–159 | 2026-08-29, Expo Go | 155–158 pass; 159 failed on three defects, all fixed and re-checked in the same session (`d9860e0`, `14e8fa9`) |
 
 Also merged inside the M6 window, outside the sub-phase map: **M6r** reader
 navigation (`421c08b`, #37, checks 120–147) — a repair pass over M6c/M6d rather
 than a numbered sub-phase.
 
 **M6 is not complete.** §10: a milestone is not complete until its device
-checklist has been run on real hardware and recorded here. Two sub-phases (M6h,
-M6i) plus check 55 and the two Expo Go-blocked audio checks are outstanding, and
-none of the nine ran on a release APK. Everything above is "implementation
-complete, verification pending", which §10 calls an unmet exit criterion — not a
-pass. The build window opens **2026-09-01**.
+checklist has been run on real hardware and recorded here. All nine sub-phases
+have now run, but four checks are still outstanding — 55 (deferred), 82 and 83
+(Expo Go cannot exercise lock-screen controls) and 148 (needs an APK to build
+its own pre-upgrade DB) — and **none of the nine ran on a release APK**, so the
+whole checklist is owed a re-run against one. Everything above is
+"implementation complete, verification pending", which §10 calls an unmet exit
+criterion — not a pass. The build window opens **2026-09-01**.

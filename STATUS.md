@@ -7,7 +7,7 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-08-29
+Updated: 2026-08-30
 
 ## Now
 
@@ -467,6 +467,28 @@ M6a-M6g regressed. Two things for the owner, neither a defect: with Translation
 75,539 `uz` gloss rows and zero `ru` — PR #41's mark telling the truth, and the
 truth is a screenful; and the delete confirm is still the stock white Android
 dialog over the glass design.
+
+### Post-M6i device-run fixes — MERGED 2026-08-30 as `14e8fa9` (PR #44)
+The three defects 159 turned up, plus the two from M6h's run, in one branch
+(`d9860e0` inside it). Reader controls also became icons in the same PR.
+Issue #43 (bookmarks plural agreement — Russian needs a three-form rule) was
+named in the merge subject in prose, NOT as a closing keyword: the auto-close
+parser ignores negation, and it has closed issues twice already. Verified open
+after the merge.
+
+### Bookmark note reveal — MERGED 2026-08-30 as `43f53a8` (PR #45)
+Tapping the bookmark reveals the note control: row slides left, pencil zooms
+in, glyph pulses once. `src/motion/bookmarkReveal.ts` holds it as pure
+decision functions + one hook. Reduced motion returns undefined builders, not
+zero-duration ones — reanimated runs a zero-duration layout animation, which
+is its own frame of jitter inside a FlatList on Android.
+
+`layout` only fires when a view's own frame moves in parent coordinates, so it
+sits on the row and the trailing audio control, never on the bookmark itself.
+
+The three-control row was copy-pasted into `AyahCard` and `MushafAyah` and had
+been edited in lockstep three times; now one `AyahControls` (§3), hence -180
+lines. Checked on device by the owner. No §5 trigger (UI + tests only).
 
 ---
 
