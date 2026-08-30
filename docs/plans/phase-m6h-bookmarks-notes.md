@@ -529,5 +529,6 @@ than asked about. Reversible in one commit if the owner wants it out.
 
 Merged as `37fa508` (squash of PR #38).
 
-**Not met:** the device run has not happened, and §10 makes it the gate for this
-milestone. `eas build` is blocked until 2026-09-01.
+**Partly met:** the device run happened on 2026-08-29 and is logged above, but
+it went through Expo Go rather than a release APK, which §10 makes the gate for
+this milestone. `eas build` is blocked until 2026-09-01.

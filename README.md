@@ -285,11 +285,13 @@ concordances on the root and lemma screens. M5 and M5c followed; their checks
 
 **M6 (glass redesign): all nine sub-phases are merged, and the milestone is
 not complete.** See `docs/plans/phase-m6-glass-redesign.md` for the spec, the
-sub-phase map and the filled verification log. M6a through M6g ran on hardware
-between 2026-08-24 and 2026-08-28 and passed, with three known gaps: check 55
-deferred, and checks 82 (media controls) and 83 blocked because Expo Go cannot
-exercise lock-screen controls. **M6h (bookmarks and notes, checks 148-154) and
-M6i (settings, about and menu, checks 155-159) have never been run on a device.**
+sub-phase map and the filled verification log. All nine ran on hardware between
+2026-08-24 and 2026-08-29 and passed, with four known gaps: check 55 deferred,
+checks 82 (media controls) and 83 blocked because Expo Go cannot exercise
+lock-screen controls, and check 148 blocked because it is an upgrade-migration
+check and the Expo Go sandbox holds no pre-M6h user DB to migrate. M6h (checks
+148-154) and M6i (155-159) ran on 2026-08-29; 159 failed on three defects, all
+fixed and re-checked in the same session.
 
 Every M6 device run so far went through Expo Go rather than a `preview` APK —
 EAS has been unavailable since before M6a and the window opens **2026-09-01**.
