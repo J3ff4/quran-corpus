@@ -305,6 +305,37 @@ Three findings filed rather than fixed, **none of them M6g regressions**:
   #31. Keep closing verbs away from issue numbers, and audit every number a
   squash merge mentions, not only the intended ones.
 
+### Reader controls became icons — device 2026-08-30 (`3bcc721`, branch `fix/m6-device-run`)
+Bookmark / note / play in both reader renderers and the pencil on the bookmarks
+list are glyphs now, not words. Verified on the OnePlus 7 Pro over Expo Go in
+all four combinations that mattered — dark+English, light+Русский, translation
+mode and mushaf mode:
+
+- All three controls sit inside the card. The clip that opened this fix
+  (`Удалить закладку · Воспроизвести` overflowing `GlassSurface`) cannot recur:
+  glyphs are the same width in every locale.
+- Filled = state. Outline bookmark → filled on tap; outline pencil → filled once
+  a note exists. Legible in both themes.
+- Every Pressable dumps as 192px = **48dp** on device (`uiautomator`), so the
+  targets survived the shrink from text to glyph.
+- Delete-confirm still fires, correctly localised, and still renders as the
+  stock white Material `Alert` over the glass design — the owner review noted at
+  M6h is still owed.
+
+Two things found that the icon work did not cause:
+- **Filed #43** — the bookmarks header reads `1 ayahs · 1 surahs`, and
+  `2 аятов · 1 сур` in Russian. Plural-only labels concatenated to a count
+  (`BookmarksScreen.tsx:178`). Predates M6h's merge.
+- **The 66 bookmarks left on the phone for check 148 are gone.** The device DB
+  held one row on open. Expo Go has not been reinstalled since 2026-08-24
+  (`firstInstallTime`/`lastUpdateTime` both predate the run that wrote them),
+  the scope key is pinned by `extra.eas.projectId` in `app.json`, and
+  `USER_DB_MIGRATIONS` is additive-only with no DELETE or DROP — so nothing in
+  our code explains it, and Expo Go's own scoped storage is the remaining
+  suspect. **Check 148 has lost its "before" state and cannot be run as
+  written**; the APK run has to establish a fresh pre-upgrade DB first. One more
+  reason the sandbox is not the gate.
+
 ### Gloss-language sweep — device 2026-08-29
 With Translation = Русский, every word-by-word gloss shows `(en)`. Correct
 behaviour, ugly truth: the corpus carries 77,429 `en` and 75,539 `uz` gloss rows
