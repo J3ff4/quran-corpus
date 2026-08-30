@@ -478,12 +478,84 @@ cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --prof
 - **Ayah action row clipped in Russian and Uzbek** (found on the M6i sweep,
   fixed in the same pass): see phase-m6i's log.
 
+## Follow-up: bookmarks screen polish (2026-08-30)
+
+Owner report after living with the screen: no way to delete a bookmark from it,
+only the coordinate opened the ayah, the first Recent card sat flush against the
+segmented control, a bare `2:255` names an ayah only to someone who knows the
+surah order, and the tab pill snapped rather than travelled.
+
+Decided with the owner before implementing: **both** a delete icon and swipe-left
+(swipe alone is an invisible affordance and TalkBack cannot perform one, WCAG
+2.5.1); confirm **only** when a note would be lost, which is exactly check 154's
+rule; `Al-Baqara 2:255` in the two flat tabs and the bare coordinate under
+By surah, whose header already carries the name; and a sliding pill rather than a
+cross-fade.
+
+Two things followed from the diff rather than from the report. The confirm is a
+**glass `ConfirmSheet`**, and the reader's `Alert.alert` was moved onto it as
+well -- a second confirmation with its own look and its own copy is the §3
+violation this screen would otherwise have introduced, and it retires the stock
+white Material dialog that has been an open owner question since M6h. The pill's
+geometry is a pure `motion/segmentedPill.ts`, because `onLayout` never fires
+under jsdom and the arithmetic is otherwise untestable.
+
+`SegmentedControl` is shared by five call sites, so 166 sweeps all of them.
+
+| # | Check | Pass condition |
+| --- | --- | --- |
+| 160 | Bookmarks → Recent, look at the first card | It clears the segmented control above it; it does not sit flush against it |
+| 161 | Tap a card on its Arabic text, its note, and its empty space | Each opens the reader at that ayah. Tapping the note or delete icon does **not** navigate |
+| 162 | Trash icon on a bookmark with **no** note | Row goes at once, no sheet, the header count drops. Force-stop and relaunch: still gone |
+| 163 | Trash icon on a bookmark **with** a note | A glass sheet appears, not a white Material dialog. Cancel keeps the row and its text; Delete removes both |
+| 164 | Swipe a row left | A red delete panel is revealed; tapping it behaves as 162/163. A partial swipe released springs back and deletes nothing. Swiping never fights the list's vertical scroll |
+| 165 | Compare the three tabs | Recent and With notes read `Al-Baqara 2:255`; By surah reads `2:255` under an `Al-Baqara` header |
+| 166 | Switch tabs in **all five** segmented controls (Bookmarks, Dictionary, Surahs, word-by-word, the reader header) | The accent pill slides between segments -- it does not fade or jump. On mount it is already in place, with no travel. With reduce-animations on it jumps with no slide |
+| 167 | TalkBack, swipe through one bookmark row | Three separate targets: the link (`Open Al-Baqara 2:255`), `Add note`/`Edit note`, `Delete bookmark`. The card being pressable must not collapse them into one |
+| 168 | Reader: un-bookmark an ayah that carries a note | The same glass sheet as 163, not the Material dialog M6h shipped |
+
+### Review round (§5, `/code-review`, 2026-08-30)
+
+Triggered by the DELETE path this adds to the on-device user DB. Six findings,
+no high-severity correctness defect; all six taken, none declined.
+
+- The note and delete icons were two 48dp targets sharing an edge, and an
+  un-noted delete does not confirm -- a tap wide of "Add note" removed the row.
+  8pt gap.
+- `requestDelete` did not clear `deleteError`, so a failure on one row opened
+  the next row's sheet already reporting it.
+- The pill was placed in an effect, i.e. after the commit that mounts it: a
+  control opening on a value other than the first option painted one frame at
+  segment 0 and jumped. Reachable in the reader header, which opens on the
+  persisted mode. Placed in the `onLayout` handler instead.
+- The swipe panel filled 88pt with `theme.danger`, which the dark palette tunes
+  to be readable error *text* on night -- a pale pink block reading as a
+  highlight. New `dangerFill` / `onDangerFill` tokens.
+- `ReanimatedSwipeable`'s container is `overflow: hidden`, clipping the card's
+  drop shadow. `containerStyle` opens it; the action panel is absoluteFill-
+  clipped in its own right, so it stays put.
+- `ConfirmSheet`'s buttons were padded `<Text>` runs, ~33dp against the 48
+  `touchTargets.minimum` encodes. Pressables now.
+
+Checks 164, 166 and 167 are device-only by construction: `rnHosts` drops
+`accessible`, `onLayout` never fires under jsdom, and the swipe wrapper is
+mocked out (the gesture itself is covered nowhere but hardware).
+
+### Verification log
+
+| Check | Build | Date | Result | Notes |
+| --- | --- | --- | --- | --- |
+| 160-168 | | | NOT RUN | Owed on the same APK run as 148. |
+
 ### Open, for the owner
 
-The delete confirm is the stock Android `Alert` -- a white system dialog over
-the glass design, in the OS's own type. Functionally correct; visually it is the
-one surface in the app that does not belong to it. Replacing it means owning a
-modal, which is a design call rather than a defect.
+Closed 2026-08-30 by the follow-up above: the stock Android `Alert` is gone,
+replaced by `ConfirmSheet`, so nothing in this flow draws OS chrome any more.
+
+Still open: `NoteEditor`'s own Cancel/Save are padded `<Text>` runs, about 33dp
+tall against the 48 `touchTargets.minimum` encodes. `ConfirmSheet` was copied
+from it and has been sized up; the original has not, because it is outside this
+diff and neither button is destructive.
 
 ## Deviations
 
