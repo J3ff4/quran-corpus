@@ -1,9 +1,10 @@
 import { Link } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, SectionList, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, SectionList, Text, View } from 'react-native';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 
 import { GlassSurface } from '@/components/GlassSurface';
+import { Icon } from '@/components/icons/Icon';
 import { NoteEditor } from '@/components/NoteEditor';
 import { SegmentedControl } from '@/components/SegmentedControl';
 import { getBookmarkAyahTexts, getSurahList } from '@/data/corpusRepository';
@@ -16,9 +17,10 @@ import {
   type Bookmark,
 } from '@/data/userRepository';
 import type { UiLocaleCode } from '@/i18n/languages';
+import { textAlignFor } from '@/i18n/textDirection';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
-import { typography } from '@/theme/tokens';
+import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
@@ -283,28 +285,51 @@ function BookmarkRow({
           }}
           accessibilityRole="link"
           accessibilityLabel={`${t(uiLocale, 'bookmarks.entryPrefix')} ${coordinate}`}
-          style={{ color: theme.accent, fontWeight: '700' }}
+          // Padded to the 48dp floor. The text alone is a ~20dp box, and it is
+          // the row's ONLY way into the reader -- measured at 81x76px on a
+          // 640dpi device, under Android's 48dp and under WCAG 2.2 SC 2.5.8's
+          // 24x24 (device, 2026-08-29). Padding grows the Text's own layout
+          // box, which is what a Text with onPress takes presses in.
+          style={{
+            color: theme.accent,
+            fontWeight: '700',
+            minWidth: touchTargets.minimum,
+            minHeight: touchTargets.minimum,
+            paddingVertical: 14,
+            paddingRight: 12,
+            textAlignVertical: 'center',
+          }}
         >
           {coordinate}
         </Link>
-        <Text
+        <Pressable
+          testID={`bookmark-note-${bookmark.surahId}-${bookmark.ayahNumber}`}
           accessibilityRole="button"
-          // The label distinguishes the two states, because the icon alone does
+          // The label distinguishes the two states, because the glyph alone does
           // not reach TalkBack.
           accessibilityLabel={t(uiLocale, bookmark.note === null ? 'bookmarks.addNote' : 'bookmarks.editNote')}
           onPress={onEditNote}
+          // A tap target, not a text run: the ✎/✐ pair this replaced was two
+          // font glyphs that rendered at whatever weight the system face had,
+          // beside two SVG controls in the reader doing the same job.
           style={{
-            // Same pair the reader uses (AyahCard, MushafAyah): a filled nib in
-            // the accent for a note that exists, an outline in muted for one to
-            // be written. Both branches were the same glyph in the same colour,
-            // so the row said nothing to a sighted user.
-            color: bookmark.note === null ? theme.mutedText : theme.accent,
-            paddingHorizontal: 8,
-            paddingVertical: 4,
+            minWidth: touchTargets.minimum,
+            minHeight: touchTargets.minimum,
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
-          {bookmark.note === null ? '✎' : '✐'}
-        </Text>
+          {/* Same pair the reader uses (AyahCard, MushafAyah): filled in the
+              accent for a note that exists, outline in muted for one still to
+              be written. */}
+          <Icon
+            testID={`bookmark-note-icon-${bookmark.surahId}-${bookmark.ayahNumber}`}
+            name="note"
+            filled={bookmark.note !== null}
+            color={bookmark.note === null ? theme.mutedText : theme.accent}
+            size={20}
+          />
+        </Pressable>
       </View>
       {text ? (
         <Text
@@ -315,7 +340,14 @@ function BookmarkRow({
         </Text>
       ) : null}
       {bookmark.note !== null ? (
-        <Text numberOfLines={3} style={{ color: theme.mutedText }}>
+        // Aligned by what the reader wrote, not by the interface locale: an
+        // Arabic note shapes correctly but sat flush left, because Android
+        // resolves a Text's gravity from the layout direction and the app is
+        // LTR in all three UI locales (device, 2026-08-29).
+        <Text
+          numberOfLines={3}
+          style={{ color: theme.mutedText, textAlign: textAlignFor(bookmark.note) }}
+        >
           {bookmark.note}
         </Text>
       ) : null}

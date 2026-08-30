@@ -254,11 +254,40 @@ cd apps/mobile && pnpm prebuild:assert-db && eas build --platform android --prof
 
 | Check | Build | Date | Result | Notes |
 | --- | --- | --- | --- | --- |
-| 155 | | | | |
-| 156 | | | | |
-| 157 | | | | |
-| 158 | | | | |
-| 159 | | | | |
+| 155 | Expo Go (dev) | 2026-08-29 | PASS | Three rows in both themes; each opened its own screen. Version line present on Menu and About. |
+| 156 | Expo Go (dev) | 2026-08-29 | PASS | Eight settings changed at once (Arabic size, word-by-word density, continuous play, theme, reduce animations, interface locale, translation locale, analytics), force-stop, relaunch: all eight came back, and so did the reading position. |
+| 157 | Expo Go (dev) | 2026-08-29 | PASS | Uzbek then Russian across Menu, Settings and About. The only Latin left is what should be: proper nouns (reciters, translators, Tanzil, Lane's Lexicon) and licence names quoted verbatim ("GNU General Public License", the SIL OFL notice). |
+| 158 | Expo Go (dev) | 2026-08-29 | PASS | Every source named across all four groups, all ten reciters rendered from RECITERS, the OFL notice reproduced in full, nothing truncated. Issue #39 is unchanged by this run: the corpus.quran.com row still states the GPL with no licence text, link or source offer, and carries no pending pill. |
+| 159 | Expo Go (dev) | 2026-08-29 | FAIL, then PASS after fixes | Three defects, all fixed and re-checked on device in the same session -- see below. |
+
+### Defects found on the full pass
+
+1. **The tab bar was see-through.** `GlassSurface`'s fill is 45% in dark and 85%
+   in light, and the tab pill floats over a scrolling page, so ayah text read
+   straight through the labels on Home, Surahs, Morphology and Dictionary --
+   worst in light mode. `RecitationBar` had already solved exactly this in M6d
+   with an opaque backing under the glass; `GlassTabBar` never got one. Fixed
+   the same way, re-checked: the bar now reads as a surface, not a window.
+2. **The ayah action row clipped in Russian and Uzbek.** "Bookmark · Play" fits
+   in English; "Удалить закладку · Воспроизвести" does not, and `GlassSurface`
+   clips its overflow, so the Play control was sliced off at the card edge with
+   no warning. Uzbek is longer still ("Xatcho'pni olib tashlash", "Ijro etish").
+   The row now shrinks and wraps, in both renderers. Nothing is clipped; the
+   audio control drops to a second line when it has to.
+3. **The bookmark row's tap target** -- see phase-m6h's log.
+
+Everything else held: nothing from M6a-M6g regressed, and the app reads as one
+design in both themes and all three locales.
+
+### Worth the owner's eye, not defects
+
+- With **Translation = Русский** every word-by-word gloss carries `(en)`,
+  because the corpus has 77,429 `en` and 75,539 `uz` gloss rows and **zero**
+  `ru`. That is PR #41's fallback mark working exactly as designed and telling
+  the truth -- but the truth is a screen of `(en)`. The fix is gloss data, not
+  the mark.
+- The Russian tab label truncates to "Морфолог…". One line is deliberate; the
+  word is simply longer than a fifth of the bar.
 
 ## Deviations
 

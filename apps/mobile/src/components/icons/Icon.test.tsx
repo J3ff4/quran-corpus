@@ -22,6 +22,17 @@ describe('Icon', () => {
     expect(container.querySelector('svg')?.getAttribute('stroke')).toBe('#5aa58d');
   });
 
+  it('fills only when asked, and in the glyph\'s own colour', () => {
+    // The reader carries state on the fill: a filled bookmark is saved, an
+    // outline one is not. Colour alone would be a WCAG 1.4.1 failure, so the
+    // fill is load-bearing rather than decoration.
+    const { container, rerender } = render(<Icon name="bookmark" color="#5aa58d" />);
+    expect(container.querySelector('svg')?.getAttribute('fill')).toBe('none');
+
+    rerender(<Icon name="bookmark" color="#5aa58d" filled />);
+    expect(container.querySelector('svg')?.getAttribute('fill')).toBe('#5aa58d');
+  });
+
   it('has a glyph for every tab', () => {
     for (const name of ['home', 'book', 'bookmark', 'settings'] as const) {
       const { container } = render(<Icon name={name} color="#000000" />);

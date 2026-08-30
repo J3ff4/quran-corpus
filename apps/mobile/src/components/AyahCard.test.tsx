@@ -60,6 +60,53 @@ describe('AyahCard', () => {
     expect(onToggleAudio).toHaveBeenCalledWith(1);
   });
 
+  it('draws the state, not just the label', () => {
+    // The controls are glyphs now, so the accessible name is no longer the
+    // visible difference. A saved bookmark is a FILLED bookmark and a playing
+    // ayah is a pause bar -- swap either and a sighted reader is told the
+    // opposite of the truth while every name assertion still passes.
+    const { rerender, container } = render(
+      <AyahCard
+        {...baseProps}
+        ayahNumber={1}
+        arabicText="Arabic text"
+        translationText={null}
+        bookmarked={false}
+        playing={false}
+        uiLocale="en"
+        onToggleBookmark={vi.fn()}
+        onToggleAudio={vi.fn()}
+      />,
+    );
+
+    const bookmarkFill = () =>
+      container.querySelector('[data-testid="ayah-2-1-bookmark-icon"]')?.getAttribute('fill') ??
+      screen.getByLabelText('Bookmark').querySelector('svg')?.getAttribute('fill');
+    expect(bookmarkFill()).toBe('none');
+
+    rerender(
+      <AyahCard
+        {...baseProps}
+        ayahNumber={1}
+        arabicText="Arabic text"
+        translationText={null}
+        bookmarked
+        playing
+        uiLocale="en"
+        onToggleBookmark={vi.fn()}
+        onToggleAudio={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByLabelText('Remove bookmark').querySelector('svg')?.getAttribute('fill'),
+    ).not.toBe('none');
+    // Pause is two bars: two paths where play is one triangle. Asserting the
+    // count rather than the path data, which is retuned when a glyph is
+    // re-centred.
+    expect(screen.getByLabelText('Pause').querySelectorAll('path')).toHaveLength(2);
+  });
+
   it('offers a note only on a bookmarked ayah', () => {
     const onEditNote = vi.fn();
 

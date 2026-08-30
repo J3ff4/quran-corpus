@@ -292,6 +292,55 @@ Three findings filed rather than fixed, **none of them M6g regressions**:
   for 2-7s. Cached path is fine (107 re-flips in under 1s); the uncached path
   has no loading state.
 
+### Post-M6 device fixes — MERGED 2026-08-29 (PRs #41, #42)
+- `d1f1e9a` (#41) — fallback-language glosses now carry the language they are
+  actually in. One `GlossLangTag` for all three gloss surfaces; renders nothing
+  when the gloss is in the requested language. Closed #12.
+- `dd389f3` (#42) — dictionary chip row, frequency-pane stale kind, deep-link
+  back stack. Closed #32 and #35.
+- **#33 was closed by the merge and reopened by hand.** The PR body said "This
+  does not close #33"; GitHub's linked-issue parser is lexical, matched the
+  `close #33` inside it, and ignored the negation — the sentence written to keep
+  the issue open is what closed it. Same family as the ledger commit that closed
+  #31. Keep closing verbs away from issue numbers, and audit every number a
+  squash merge mentions, not only the intended ones.
+
+### Reader controls became icons — device 2026-08-30 (`3bcc721`, branch `fix/m6-device-run`)
+Bookmark / note / play in both reader renderers and the pencil on the bookmarks
+list are glyphs now, not words. Verified on the OnePlus 7 Pro over Expo Go in
+all four combinations that mattered — dark+English, light+Русский, translation
+mode and mushaf mode:
+
+- All three controls sit inside the card. The clip that opened this fix
+  (`Удалить закладку · Воспроизвести` overflowing `GlassSurface`) cannot recur:
+  glyphs are the same width in every locale.
+- Filled = state. Outline bookmark → filled on tap; outline pencil → filled once
+  a note exists. Legible in both themes.
+- Every Pressable dumps as 192px = **48dp** on device (`uiautomator`), so the
+  targets survived the shrink from text to glyph.
+- Delete-confirm still fires, correctly localised, and still renders as the
+  stock white Material `Alert` over the glass design — the owner review noted at
+  M6h is still owed.
+
+Two things found that the icon work did not cause:
+- **Filed #43** — the bookmarks header reads `1 ayahs · 1 surahs`, and
+  `2 аятов · 1 сур` in Russian. Plural-only labels concatenated to a count
+  (`BookmarksScreen.tsx:178`). Predates M6h's merge.
+- **The 66 bookmarks left on the phone for check 148 are gone.** The device DB
+  held one row on open. Expo Go has not been reinstalled since 2026-08-24
+  (`firstInstallTime`/`lastUpdateTime` both predate the run that wrote them),
+  the scope key is pinned by `extra.eas.projectId` in `app.json`, and
+  `USER_DB_MIGRATIONS` is additive-only with no DELETE or DROP — so nothing in
+  our code explains it, and Expo Go's own scoped storage is the remaining
+  suspect. **Check 148 has lost its "before" state and cannot be run as
+  written**; the APK run has to establish a fresh pre-upgrade DB first. One more
+  reason the sandbox is not the gate.
+
+### Gloss-language sweep — device 2026-08-29
+With Translation = Русский, every word-by-word gloss shows `(en)`. Correct
+behaviour, ugly truth: the corpus carries 77,429 `en` and 75,539 `uz` gloss rows
+and **zero** `ru`. Fixing it is a data problem, not a UI one.
+
 ### M6r reader navigation — MERGED 2026-08-29 as `421c08b` (PR #37)
 D41-D50. Juz rows expand in place into the surah ranges they cover (new
 `getJuzSurahRanges` in `packages/data/queries/browse.ts`, ranges from the corpus
@@ -367,10 +416,15 @@ watch.
 Gate at merge: 447 data / 728 mobile / 484 web / 12 mobile-data, lint +
 type-check clean.
 
-**NOT MET — §10 gate is open.** No device run: checks 148-154 (154 is new, for
-the delete confirm). `eas build` blocked until the EAS quota parks clear
-2026-09-01. "Implementation complete, verification pending" is an unmet exit
-criterion, not a pass.
+**Device run 2026-08-29 (Expo Go, OnePlus 7 Pro): 149-154 pass, 148 blocked.**
+148 needs an APK upgrade over the M6r build and the Expo Go sandbox has no
+pre-M6h user DB to migrate, so it is owed to the EAS window (2026-09-01). The
+66 bookmarks the run left on the phone are deliberate — they are the "before"
+state 148 needs. Two defects found and fixed in the same session: an Arabic note
+rendered flush left (Android takes gravity from the layout direction, and all
+three UI locales are LTR), and the row's only tap target was the coordinate
+text at 20x19dp — under Android's 48dp and under WCAG 2.2 SC 2.5.8's 24x24.
+Full log in the plan file.
 
 ### M6i settings + about — MERGED 2026-08-29 as `72a17a5` (PR #40)
 Menu, Settings, About — 5 commits, +1757/-318, 741 tests green.
@@ -402,7 +456,17 @@ text, link or source offer ships — while Newsreader's OFL notice is verbatim a
 test-guarded on the same screen. Licence-compliance ruling, not a code call.
 **Issue #39.**
 
-**NOT MET — §10 gate is open.** No device run: checks 155-159. Same EAS block.
+**Device run 2026-08-29 (Expo Go): 155-158 pass, 159 failed then passed after
+fixes.** 159 found three defects, all fixed and re-checked on hardware the same
+session: the tab bar was see-through over scrolling text on every tab screen
+(RecitationBar had solved this in M6d with an opaque backing; GlassTabBar never
+got one), the ayah action row clipped the Play control in Russian and Uzbek
+where English fits, and the bookmark row's tap target (above). Nothing from
+M6a-M6g regressed. Two things for the owner, neither a defect: with Translation
+= Русский every gloss shows `(en)`, because the corpus has 77,429 `en` and
+75,539 `uz` gloss rows and zero `ru` — PR #41's mark telling the truth, and the
+truth is a screenful; and the delete confirm is still the stock white Android
+dialog over the glass design.
 
 ---
 
@@ -410,9 +474,11 @@ test-guarded on the same screen. Licence-compliance ruling, not a code call.
 Umbrella log filled + re-verified against `gh pr list`/`git log` (§14).
 - **M6a-M6g ran on hardware, pass**, with 3 known gaps: 55 deferred, 82 + 83
   blocked (Expo Go cannot exercise lock-screen controls).
-- **M6h (148-154) and M6i (155-159) never ran at all.**
-- **No sub-phase ever ran on a release APK** — all nine went through Expo Go.
-  The whole 48-107 / 120-159 checklist is owed a re-run against the APK.
+- **M6h (149-154) and M6i (155-159) ran 2026-08-29 and pass**, after three
+  defects found on 159 and two on M6h were fixed in the same session. **148 is
+  still open** — it is an APK-upgrade check by definition.
+- **No sub-phase has ever run on a release APK** — all nine went through Expo
+  Go. The whole 48-107 / 120-159 checklist is owed a re-run against the APK.
 - Window opens **2026-09-01**. Until that run is recorded, M6 is not complete.
 
 Two calls made in-flight, both in commit bodies:

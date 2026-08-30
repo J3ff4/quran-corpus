@@ -2,10 +2,11 @@ import { Pressable, Text, View } from 'react-native';
 import type { Word } from '@quran-corpus/data/mobile';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
-import { touchTargets, typography } from '@/theme/tokens';
+import { touchTargets } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { AyahMedallion } from './AyahMedallion';
 import { AyahText } from './AyahText';
+import { Icon } from './icons/Icon';
 
 export interface MushafAyahProps {
   surahId: number;
@@ -70,17 +71,27 @@ export function MushafAyah({
           </Text>
         }
       />
-      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
+      {/* The same three glyphs AyahCard carries, for the same reason: the two
+          renderers must not differ in what you can DO, and words here were
+          locale-sized. */}
+      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 4 }}>
         <Pressable
           testID={`ayah-${surahId}-${ayahNumber}-bookmark`}
           accessibilityRole="button"
           accessibilityState={{ selected: bookmarked }}
+          // Was the visible text; naming it keeps TalkBack unchanged now that
+          // the control is a shape. See AyahCard.
+          accessibilityLabel={bookmarked ? t(uiLocale, 'reader.removeBookmark') : t(uiLocale, 'reader.bookmark')}
           onPress={() => onToggleBookmark(ayahNumber)}
           style={controlStyle}
         >
-          <Text style={{ color: bookmarked ? theme.accent : theme.mutedText, fontSize: typography.caption }}>
-            {bookmarked ? t(uiLocale, 'reader.removeBookmark') : t(uiLocale, 'reader.bookmark')}
-          </Text>
+          <Icon
+            testID={`ayah-${surahId}-${ayahNumber}-bookmark-icon`}
+            name="bookmark"
+            filled={bookmarked}
+            color={bookmarked ? theme.accent : theme.mutedText}
+            size={20}
+          />
         </Pressable>
         {/* Present in both renderers, for the reason the bookmark is: losing it
             here would mean the two modes differ in what you can DO, not just
@@ -93,9 +104,13 @@ export function MushafAyah({
             onPress={() => onEditNote(ayahNumber)}
             style={controlStyle}
           >
-            <Text style={{ color: note === null ? theme.mutedText : theme.accent, fontSize: typography.caption }}>
-              {note === null ? '✎' : '✐'}
-            </Text>
+            <Icon
+              testID={`ayah-${surahId}-${ayahNumber}-note-icon`}
+              name="note"
+              filled={note !== null}
+              color={note === null ? theme.mutedText : theme.accent}
+              size={20}
+            />
           </Pressable>
         ) : null}
         <Pressable
@@ -104,13 +119,18 @@ export function MushafAyah({
           // Without this TalkBack announces an ordinary button whose press does
           // nothing when audio is unconfigured.
           accessibilityState={{ disabled: audioDisabled }}
+          accessibilityLabel={playing ? t(uiLocale, 'reader.pause') : t(uiLocale, 'reader.play')}
           disabled={audioDisabled}
           onPress={() => onToggleAudio(ayahNumber)}
           style={controlStyle}
         >
-          <Text style={{ color: audioDisabled ? theme.mutedText : theme.accent, fontSize: typography.caption }}>
-            {playing ? t(uiLocale, 'reader.pause') : t(uiLocale, 'reader.play')}
-          </Text>
+          <Icon
+            testID={`ayah-${surahId}-${ayahNumber}-audio-icon`}
+            name={playing ? 'pause' : 'play'}
+            filled={!playing}
+            color={audioDisabled ? theme.mutedText : theme.accent}
+            size={20}
+          />
         </Pressable>
       </View>
     </View>
