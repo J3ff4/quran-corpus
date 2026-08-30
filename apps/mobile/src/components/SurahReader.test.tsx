@@ -54,7 +54,26 @@ vi.mock('react-native-reanimated', async () => {
     // createAnimatedComponent joined Text here when the reader took over its
     // own header: ReaderHeader renders SegmentedControl, whose segments are
     // animated Pressables.
-    default: { Text: AnimatedText, createAnimatedComponent: (Component: unknown) => Component },
+    // View joined Text and createAnimatedComponent when the reader's control
+    // row gained its note reveal: AyahControls is an Animated.View carrying a
+    // layout animation, and a missing one renders as undefined.
+    default: {
+      Text: AnimatedText,
+      View: host('div'),
+      createAnimatedComponent: (Component: unknown) => Component,
+    },
+    // Inert builders and an inert sequence, for that same reveal. Which
+    // builder each case picks is asserted in motion/bookmarkReveal.test.ts;
+    // this screen only has to render.
+    ...Object.fromEntries(
+      ['ZoomIn', 'ZoomOut', 'LinearTransition'].map((name) => {
+        const builder: unknown = new Proxy({ name }, { get: (target, key) => (key === 'name' ? target.name : () => builder) });
+        return [name, builder];
+      }),
+    ),
+    Easing: { out: (fn: unknown) => fn, ease: undefined },
+    withTiming: (toValue: number) => toValue,
+    withSequence: (...steps: number[]) => steps[steps.length - 1],
     useSharedValue: (initial: number) => React.useRef({ value: initial }).current,
     useAnimatedStyle: (worklet: () => never) => {
       mocks.animatedStyles.push(worklet as unknown as () => Record<string, unknown>);

@@ -67,20 +67,39 @@ vi.mock('react-native-reanimated', async () => {
       // accessibilityLabel as unknown DOM attributes that no query can reach.
       Text: host('span'),
     },
-    // Layout-animation builders, for the dictionary pager. Chainable because
-    // the app configures them (`SlideInRight.duration(260)`), and inert
-    // because jsdom has no animation to run -- the direction they encode is
-    // asserted in motion/entryPager.test.ts against its own mock, and the
+    // Layout-animation builders, for the dictionary pager and the reader's
+    // note reveal. Chainable through a proxy rather than a literal
+    // `{ duration }`, because the app configures them by fluent chain
+    // (`SlideInRight.duration(260)`, `LinearTransition.duration(200).easing(...)`)
+    // and a chain that ends at the first call returns undefined for the next
+    // one. Inert because jsdom has no animation to run -- which builder each
+    // case picks is asserted in motion/entryPager.test.ts and
+    // motion/bookmarkReveal.test.ts against their own mocks, and the
     // components only have to render.
     ...Object.fromEntries(
-      ['FadeIn', 'FadeOut', 'SlideInLeft', 'SlideInRight', 'SlideOutLeft', 'SlideOutRight'].map(
-        (name) => [name, { duration: () => ({ name }) }],
-      ),
+      [
+        'FadeIn',
+        'FadeOut',
+        'SlideInLeft',
+        'SlideInRight',
+        'SlideOutLeft',
+        'SlideOutRight',
+        'ZoomIn',
+        'ZoomOut',
+        'LinearTransition',
+      ].map((name) => {
+        const builder: unknown = new Proxy({ name }, { get: (target, key) => (key === 'name' ? target.name : () => builder) });
+        return [name, builder];
+      }),
     ),
     useSharedValue: (initial: number) => ({ value: initial }),
     useAnimatedStyle: (factory: () => unknown) => factory(),
     withTiming: (toValue: number) => toValue,
     withSpring: (toValue: number) => toValue,
+    // Resolves to its last step, like withTiming resolves to its target: the
+    // pulse's SHAPE is asserted in motion/bookmarkReveal.test.ts, which
+    // records the steps instead.
+    withSequence: (...steps: number[]) => steps[steps.length - 1],
     Easing: { bezier: () => undefined, out: (fn: unknown) => fn, ease: undefined },
   };
 });
