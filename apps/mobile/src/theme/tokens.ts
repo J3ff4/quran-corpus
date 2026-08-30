@@ -46,6 +46,11 @@ export const themeColors = {
     // accent on it is 4.82:1, so a tinted match clears AA for body text.
     accentWash: '#e0e8e1',
     danger: colors.danger, // 6.9:1 on paper
+    // The same red as a FILL rather than as text -- the swipe-to-delete panel
+    // is 88pt of solid colour, not a line of type. Light mode can reuse the
+    // brand red, because `danger` here is already dark enough to carry white.
+    dangerFill: colors.danger,
+    onDangerFill: '#ffffff', // 7.3:1 on dangerFill
     onAccent: '#ffffff', // 6.0:1 on accent
     // Same hexes web uses, and the same background (#faf8f3 = paper-50), so
     // the light-mode ratios in packages/config/theme/palette.ts carry over
@@ -72,6 +77,12 @@ export const themeColors = {
     // is exactly the text a user must be able to read, so the night palette
     // takes a lighter red rather than reusing the brand one.
     danger: '#e88b8b', // 7.4:1 on night
+    // NOT `danger` above. That red was lightened specifically so error *text*
+    // clears AA on night; as an 88pt fill it paints a pale pink block, which
+    // reads as a highlight rather than as the destructive action it is. A fill
+    // wants the opposite treatment -- dark enough to carry light ink.
+    dangerFill: '#a33a3a',
+    onDangerFill: colors.nightText, // 5.6:1 on dangerFill
     // Not white: white on the night accent is 2.9:1. Dark ink on that mint is
     // the readable pairing.
     onAccent: colors.night, // 6.3:1 on accent

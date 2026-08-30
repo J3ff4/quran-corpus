@@ -1,8 +1,10 @@
-import { Link } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { Link, useRouter } from 'expo-router';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, SectionList, Text, View } from 'react-native';
+import Swipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 
+import { ConfirmSheet } from '@/components/ConfirmSheet';
 import { GlassSurface } from '@/components/GlassSurface';
 import { Icon } from '@/components/icons/Icon';
 import { NoteEditor } from '@/components/NoteEditor';
@@ -13,6 +15,7 @@ import { useUserDbOnFocus } from '@/data/useUserDbOnFocus';
 import { openUserDb } from '@/data/userDb';
 import {
   getBookmarks,
+  setBookmark,
   setBookmarkNote,
   type Bookmark,
 } from '@/data/userRepository';
@@ -20,7 +23,7 @@ import type { UiLocaleCode } from '@/i18n/languages';
 import { textAlignFor } from '@/i18n/textDirection';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
-import { touchTargets, typography } from '@/theme/tokens';
+import { radii, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
@@ -77,6 +80,10 @@ export function BookmarksScreen() {
   const [tab, setTab] = useState<BookmarkTab>('recent');
   const [editing, setEditing] = useState<Bookmark | null>(null);
   const [noteError, setNoteError] = useState<string | null>(null);
+  /** The bookmark a confirm sheet is open for. Only ever a noted one -- see
+   *  requestDelete. */
+  const [confirming, setConfirming] = useState<Bookmark | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const load = useCallback(loadBookmarksData, []);
   const { data, loading, error, reload } = useUserDbOnFocus(
@@ -147,16 +154,62 @@ export function BookmarksScreen() {
     }
   }
 
+  async function deleteBookmark(bookmark: Bookmark) {
+    try {
+      setDeleteError(null);
+      const userDb = await openUserDb();
+      const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
+      await setBookmark(userClient, bookmark.surahId, bookmark.ayahNumber, false);
+      setConfirming(null);
+      // Re-read rather than splice the row out of local state: the row is gone
+      // because the DELETE ran, and a list that drops it optimistically shows a
+      // bookmark as deleted that a failed write left in place.
+      reload();
+    } catch (cause) {
+      // Coordinate only, never the note -- same reason saveNote logs neither.
+      console.error('[bookmarks] delete failed', {
+        surahId: bookmark.surahId,
+        ayahNumber: bookmark.ayahNumber,
+        cause,
+      });
+      setDeleteError(t(uiLocale, 'bookmarks.deleteFailed'));
+    }
+  }
+
+  /** Confirm only where something unrecoverable is at stake.
+   *
+   *  A bookmark with no note is one tap in the reader to make again, so a sheet
+   *  in front of it is a tax on the common case. A note is text the reader
+   *  typed, and nothing on this device can get it back -- the user DB has no
+   *  undo and nothing leaves the phone (decision 34).
+   */
+  function requestDelete(bookmark: Bookmark) {
+    // Cleared here, not only in deleteBookmark: the sheet is handed
+    // `deleteError`, so a failure left over from some earlier row would open
+    // the confirmation already reporting a write that has not run yet.
+    setDeleteError(null);
+    if (bookmark.note === null) void deleteBookmark(bookmark);
+    else setConfirming(bookmark);
+  }
+
   const renderRow = useCallback(
     ({ item }: { item: Bookmark }) => (
       <BookmarkRow
         bookmark={item}
         text={texts.get(keyOf(item)) ?? null}
+        // Named in the two flat tabs, not in By surah: that tab already carries
+        // the name in its section header, and repeating it in every row under
+        // it is the header read twice.
+        surahName={tab === 'surah' ? null : surahNames.get(item.surahId) ?? null}
         uiLocale={uiLocale}
         onEditNote={() => setEditing(item)}
+        onDelete={() => requestDelete(item)}
       />
     ),
-    [texts, uiLocale],
+    // requestDelete is redeclared every render and closes over nothing that
+    // changes, so it stays out of the deps: listing it would rebuild the row
+    // callback on every render and defeat the memo.
+    [texts, surahNames, tab, uiLocale],
   );
 
   const visible = tab === 'notes' ? noted : recent;
@@ -199,6 +252,20 @@ export function BookmarksScreen() {
             {error}
           </Text>
         ) : null}
+        {/* A delete that failed with no sheet open -- the un-noted path, which
+            deletes without confirming. When a sheet IS open the same string goes
+            inside it instead, because a <Modal> is its own native window and an
+            alert behind it is announced to nobody. */}
+        {deleteError && !confirming ? (
+          <Text
+            testID="bookmark-delete-error"
+            accessibilityRole="alert"
+            accessibilityLiveRegion="polite"
+            style={{ color: theme.danger }}
+          >
+            {deleteError}
+          </Text>
+        ) : null}
       </View>
 
       {!loading && !error && visible.length === 0 ? (
@@ -228,6 +295,7 @@ export function BookmarksScreen() {
             </Text>
           )}
           style={{ flex: 1 }}
+          // No paddingTop here: the first section header already carries 14.
           contentContainerStyle={{ paddingBottom, paddingHorizontal: 16, gap: 10 }}
         />
       ) : (
@@ -237,7 +305,9 @@ export function BookmarksScreen() {
           keyExtractor={(item) => `${tab}-${keyOf(item)}`}
           renderItem={renderRow}
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingBottom, paddingHorizontal: 16, gap: 10 }}
+          // paddingTop, unlike the SectionList above: nothing here heads the
+          // list, so the first card sat flush against the segmented control.
+          contentContainerStyle={{ paddingTop: 10, paddingBottom, paddingHorizontal: 16, gap: 10 }}
         />
       )}
 
@@ -257,100 +327,215 @@ export function BookmarksScreen() {
           }}
         />
       ) : null}
+
+      {confirming ? (
+        <ConfirmSheet
+          title={t(uiLocale, 'bookmarks.discardNoteTitle')}
+          body={t(uiLocale, 'bookmarks.discardNoteBody')}
+          confirmLabel={t(uiLocale, 'bookmarks.discardNoteConfirm')}
+          uiLocale={uiLocale}
+          error={deleteError}
+          onCancel={() => {
+            setConfirming(null);
+            setDeleteError(null);
+          }}
+          onConfirm={() => {
+            void deleteBookmark(confirming);
+          }}
+        />
+      ) : null}
     </View>
   );
 }
 
+/** The swipe-revealed delete panel's width, and the gap between it and the
+ *  card it slides out from. */
+const SWIPE_ACTION_WIDTH = 88;
+const SWIPE_ACTION_GAP = 8;
+
 function BookmarkRow({
   bookmark,
   text,
+  surahName,
   uiLocale,
   onEditNote,
+  onDelete,
 }: {
   bookmark: Bookmark;
   text: string | null;
+  /** The transliterated surah name, or null to show the bare coordinate. */
+  surahName: string | null;
   uiLocale: UiLocaleCode;
   onEditNote: () => void;
+  onDelete: () => void;
 }) {
   const theme = useThemeColors();
+  const router = useRouter();
+  const swipe = useRef<SwipeableMethods>(null);
   const coordinate = `${bookmark.surahId}:${bookmark.ayahNumber}`;
+  // "Al-Baqara 2:255", not "2:255": the number alone identifies the ayah only
+  // to someone who already knows the surah order.
+  const label = surahName ? `${surahName} ${coordinate}` : coordinate;
+
+  // One href, two consumers -- the Link below and the card's own press. Writing
+  // it twice is how the two paths end up navigating to different places.
+  const href = {
+    pathname: '/surah/[surahId]',
+    params: { surahId: String(bookmark.surahId), ayah: String(bookmark.ayahNumber) },
+  } as const;
+
+  function deleteFromSwipe() {
+    // Closed first: the sheet the confirm path opens leaves this row on screen
+    // behind it, and a row still held open under a sheet is what the user comes
+    // back to after cancelling.
+    swipe.current?.close();
+    onDelete();
+  }
 
   return (
-    <GlassSurface testID={`bookmark-row-${bookmark.surahId}-${bookmark.ayahNumber}`} style={{ padding: 14, gap: 8 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <Link
-          href={{
-            pathname: '/surah/[surahId]',
-            params: { surahId: String(bookmark.surahId), ayah: String(bookmark.ayahNumber) },
-          }}
-          accessibilityRole="link"
-          accessibilityLabel={`${t(uiLocale, 'bookmarks.entryPrefix')} ${coordinate}`}
-          // Padded to the 48dp floor. The text alone is a ~20dp box, and it is
-          // the row's ONLY way into the reader -- measured at 81x76px on a
-          // 640dpi device, under Android's 48dp and under WCAG 2.2 SC 2.5.8's
-          // 24x24 (device, 2026-08-29). Padding grows the Text's own layout
-          // box, which is what a Text with onPress takes presses in.
-          style={{
-            color: theme.accent,
-            fontWeight: '700',
-            minWidth: touchTargets.minimum,
-            minHeight: touchTargets.minimum,
-            paddingVertical: 14,
-            paddingRight: 12,
-            textAlignVertical: 'center',
-          }}
-        >
-          {coordinate}
-        </Link>
+    <Swipeable
+      ref={swipe}
+      friction={2}
+      rightThreshold={40}
+      // No overshoot: the panel is a fixed-width target, and letting the row
+      // travel past it opens a gap the delete control does not fill.
+      overshootRight={false}
+      // The library's own container is overflow:hidden, which clips the card's
+      // drop shadow -- the one thing separating a glass card from the bloom.
+      // The action panel is absoluteFill-clipped in its own right, so opening
+      // this up lets the shadow through without letting the panel escape.
+      containerStyle={{ overflow: 'visible' }}
+      renderRightActions={() => (
         <Pressable
-          testID={`bookmark-note-${bookmark.surahId}-${bookmark.ayahNumber}`}
+          testID={`bookmark-swipe-delete-${bookmark.surahId}-${bookmark.ayahNumber}`}
           accessibilityRole="button"
-          // The label distinguishes the two states, because the glyph alone does
-          // not reach TalkBack.
-          accessibilityLabel={t(uiLocale, bookmark.note === null ? 'bookmarks.addNote' : 'bookmarks.editNote')}
-          onPress={onEditNote}
-          // A tap target, not a text run: the ✎/✐ pair this replaced was two
-          // font glyphs that rendered at whatever weight the system face had,
-          // beside two SVG controls in the reader doing the same job.
+          accessibilityLabel={t(uiLocale, 'bookmarks.delete')}
+          onPress={deleteFromSwipe}
           style={{
-            minWidth: touchTargets.minimum,
-            minHeight: touchTargets.minimum,
+            width: SWIPE_ACTION_WIDTH,
+            marginLeft: SWIPE_ACTION_GAP,
+            borderRadius: radii.card,
+            // dangerFill, not danger: `danger` is tuned to be readable error
+            // TEXT on night, and as a solid panel it is a pale pink block.
+            backgroundColor: theme.dangerFill,
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          {/* Same pair the reader uses (AyahCard, MushafAyah): filled in the
-              accent for a note that exists, outline in muted for one still to
-              be written. */}
-          <Icon
-            testID={`bookmark-note-icon-${bookmark.surahId}-${bookmark.ayahNumber}`}
-            name="note"
-            filled={bookmark.note !== null}
-            color={bookmark.note === null ? theme.mutedText : theme.accent}
-            size={20}
-          />
+          <Icon name="trash" color={theme.onDangerFill} size={22} />
         </Pressable>
-      </View>
-      {text ? (
-        <Text
-          numberOfLines={2}
-          style={{ color: theme.text, fontSize: typography.body, textAlign: 'right', writingDirection: 'rtl' }}
+      )}
+    >
+      <GlassSurface testID={`bookmark-row-${bookmark.surahId}-${bookmark.ayahNumber}`}>
+        {/* The whole card opens the ayah, not just the coordinate: the coordinate
+            alone measured 81x76px on a 640dpi device (2026-08-29), and even
+            padded to 48dp it left most of a card the reader would reasonably
+            tap doing nothing.
+
+            accessible={false} on purpose. A Pressable is accessible by default,
+            and an accessible container COLLAPSES its children on Android --
+            which would take the note and delete buttons off TalkBack entirely.
+            So the card is the sighted target, and the three controls inside it
+            stay three separate screen-reader targets. rnHosts drops the prop,
+            so no unit test can catch a regression here; it is a device check. */}
+        <Pressable
+          testID={`bookmark-card-${bookmark.surahId}-${bookmark.ayahNumber}`}
+          accessible={false}
+          onPress={() => router.push(href)}
+          style={{ padding: 14, gap: 8 }}
         >
-          {text}
-        </Text>
-      ) : null}
-      {bookmark.note !== null ? (
-        // Aligned by what the reader wrote, not by the interface locale: an
-        // Arabic note shapes correctly but sat flush left, because Android
-        // resolves a Text's gravity from the layout direction and the app is
-        // LTR in all three UI locales (device, 2026-08-29).
-        <Text
-          numberOfLines={3}
-          style={{ color: theme.mutedText, textAlign: textAlignFor(bookmark.note) }}
-        >
-          {bookmark.note}
-        </Text>
-      ) : null}
-    </GlassSurface>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <Link
+              href={href}
+              accessibilityRole="link"
+              accessibilityLabel={`${t(uiLocale, 'bookmarks.entryPrefix')} ${label}`}
+              // No touch-target padding any more: the card behind it is the
+              // target, and padding here only pushed the row's own controls
+              // apart.
+              style={{ color: theme.accent, fontWeight: '700', flexShrink: 1 }}
+              numberOfLines={1}
+            >
+              {label}
+            </Link>
+            {/* A gap, because the right-hand control deletes. Un-noted
+                bookmarks delete straight out with no confirmation, so two 48dp
+                targets sharing an edge means a tap a few points wide of "Add
+                note" removes the row -- and the user DB has no undo. */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Pressable
+                testID={`bookmark-note-${bookmark.surahId}-${bookmark.ayahNumber}`}
+                accessibilityRole="button"
+                // The label distinguishes the two states, because the glyph alone does
+                // not reach TalkBack.
+                accessibilityLabel={t(uiLocale, bookmark.note === null ? 'bookmarks.addNote' : 'bookmarks.editNote')}
+                onPress={onEditNote}
+                // A tap target, not a text run: the ✎/✐ pair this replaced was two
+                // font glyphs that rendered at whatever weight the system face had,
+                // beside two SVG controls in the reader doing the same job.
+                style={{
+                  minWidth: touchTargets.minimum,
+                  minHeight: touchTargets.minimum,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {/* Same pair the reader uses (AyahCard, MushafAyah): filled in the
+                    accent for a note that exists, outline in muted for one still to
+                    be written. */}
+                <Icon
+                  testID={`bookmark-note-icon-${bookmark.surahId}-${bookmark.ayahNumber}`}
+                  name="note"
+                  filled={bookmark.note !== null}
+                  color={bookmark.note === null ? theme.mutedText : theme.accent}
+                  size={20}
+                />
+              </Pressable>
+              {/* A visible control as well as the swipe. Swipe alone is an
+                  invisible affordance, and TalkBack cannot perform one at all
+                  (WCAG 2.5.1) -- the gesture is the shortcut, this is the way. */}
+              <Pressable
+                testID={`bookmark-delete-${bookmark.surahId}-${bookmark.ayahNumber}`}
+                accessibilityRole="button"
+                accessibilityLabel={t(uiLocale, 'bookmarks.delete')}
+                onPress={onDelete}
+                style={{
+                  minWidth: touchTargets.minimum,
+                  minHeight: touchTargets.minimum,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Icon
+                  testID={`bookmark-delete-icon-${bookmark.surahId}-${bookmark.ayahNumber}`}
+                  name="trash"
+                  color={theme.mutedText}
+                  size={20}
+                />
+              </Pressable>
+            </View>
+          </View>
+          {text ? (
+            <Text
+              numberOfLines={2}
+              style={{ color: theme.text, fontSize: typography.body, textAlign: 'right', writingDirection: 'rtl' }}
+            >
+              {text}
+            </Text>
+          ) : null}
+          {bookmark.note !== null ? (
+            // Aligned by what the reader wrote, not by the interface locale: an
+            // Arabic note shapes correctly but sat flush left, because Android
+            // resolves a Text's gravity from the layout direction and the app is
+            // LTR in all three UI locales (device, 2026-08-29).
+            <Text
+              numberOfLines={3}
+              style={{ color: theme.mutedText, textAlign: textAlignFor(bookmark.note) }}
+            >
+              {bookmark.note}
+            </Text>
+          ) : null}
+        </Pressable>
+      </GlassSurface>
+    </Swipeable>
   );
 }

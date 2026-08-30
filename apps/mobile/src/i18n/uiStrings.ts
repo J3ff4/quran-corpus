@@ -45,6 +45,8 @@ export type UiStringKey =
   | 'bookmarks.addNote'
   | 'bookmarks.editNote'
   | 'bookmarks.noteFailed'
+  | 'bookmarks.delete'
+  | 'bookmarks.deleteFailed'
   // Prefixes the remaining-character count, read as "Characters left, 43".
   | 'bookmarks.noteCounter'
   | 'bookmarks.notePlaceholder'
@@ -296,6 +298,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'bookmarks.addNote': 'Add note',
     'bookmarks.editNote': 'Edit note',
     'bookmarks.noteFailed': 'Unable to save the note',
+    'bookmarks.delete': 'Delete bookmark',
+    'bookmarks.deleteFailed': 'Unable to delete the bookmark',
     'bookmarks.noteCounter': 'Characters left',
     'bookmarks.notePlaceholder': 'Write a note',
     'bookmarks.discardNoteTitle': 'Delete this bookmark?',
@@ -496,6 +500,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'bookmarks.addNote': 'Izoh qo‘shish',
     'bookmarks.editNote': 'Izohni tahrirlash',
     'bookmarks.noteFailed': 'Izohni saqlab bo‘lmadi',
+    'bookmarks.delete': 'Xatcho‘pni o‘chirish',
+    'bookmarks.deleteFailed': 'Xatcho‘pni o‘chirib bo‘lmadi',
     'bookmarks.noteCounter': 'Qolgan belgilar',
     'bookmarks.notePlaceholder': 'Izoh yozing',
     'bookmarks.discardNoteTitle': 'Bu xatcho‘p o‘chirilsinmi?',
@@ -691,6 +697,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'bookmarks.addNote': 'Добавить заметку',
     'bookmarks.editNote': 'Изменить заметку',
     'bookmarks.noteFailed': 'Не удалось сохранить заметку',
+    'bookmarks.delete': 'Удалить закладку',
+    'bookmarks.deleteFailed': 'Не удалось удалить закладку',
     'bookmarks.noteCounter': 'Осталось символов',
     'bookmarks.notePlaceholder': 'Напишите заметку',
     'bookmarks.discardNoteTitle': 'Удалить эту закладку?',

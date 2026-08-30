@@ -2,7 +2,7 @@ import React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMemoryUserClient } from '../data/userRepository.testHelpers';
-import { setBookmark, setBookmarkNote } from '../data/userRepository';
+import { getBookmarks, setBookmark, setBookmarkNote } from '../data/userRepository';
 import BookmarksTab from '../../app/bookmarks';
 
 const mocks = vi.hoisted(() => ({
@@ -15,6 +15,9 @@ const mocks = vi.hoisted(() => ({
    *  renders identically here, which is exactly the regression being guarded
    *  against. */
   listsUsed: [] as string[],
+  /** Router pushes from a card press, so the whole-card target can be told
+   *  apart from the coordinate Link inside it. */
+  pushed: [] as unknown[][],
 }));
 
 vi.mock('@quran-corpus/mobile-data', () => ({
@@ -51,6 +54,9 @@ vi.mock('expo-router', async () => {
   return {
     Link: ({ children, accessibilityLabel }: { children?: React.ReactNode; accessibilityLabel?: string }) =>
       React.createElement('a', { 'aria-label': accessibilityLabel }, children),
+    // The card's own press goes through the router; the Link inside it is what
+    // TalkBack focuses. Both carry the same href -- see BookmarkRow.
+    useRouter: () => ({ push: (...args: unknown[]) => mocks.pushed.push(args) }),
     useFocusEffect: (callback: () => void | (() => void)) => {
       React.useEffect(() => {
         mocks.focusCallbacks.push(callback);
@@ -59,6 +65,14 @@ vi.mock('expo-router', async () => {
     },
   };
 });
+
+// The swipe-to-delete wrapper. Renders the row and nothing else: the gesture
+// itself is device-gated like every other one in this app (BottomSheet.test.tsx
+// owns the only gesture assertions), and its delete panel calls exactly the
+// handler the in-row control does -- which is what the suite below drives.
+vi.mock('react-native-gesture-handler/ReanimatedSwipeable', () => ({
+  default: ({ children }: { children?: React.ReactNode }) => children,
+}));
 
 // BottomSheet reaches reanimated and gesture-handler, neither of which parses
 // under the test transform. The sheet's own behaviour is covered by
@@ -150,6 +164,7 @@ describe('BookmarksTab', () => {
     mocks.focusCallbacks = [];
     mocks.ayahTexts = new Map();
     mocks.listsUsed = [];
+    mocks.pushed = [];
   });
 
   afterEach(cleanup);
@@ -165,7 +180,7 @@ describe('BookmarksTab', () => {
       mocks.focusCallbacks.at(-1)?.();
     });
 
-    await waitFor(() => expect(screen.getByLabelText('Open 2:255')).toBeTruthy());
+    await waitFor(() => expect(screen.getByLabelText('Open Al-Baqara 2:255')).toBeTruthy());
   });
 
   it('renders the failure and clears the spinner when the user DB cannot open', async () => {
@@ -325,6 +340,176 @@ describe('BookmarksTab', () => {
     // 1.4.1 failure and would also pass if both were accent.
     expect(annotated?.getAttribute('fill')).not.toBe('none');
     expect(empty?.getAttribute('fill')).toBe('none');
+  });
+
+  it('names the surah in the flat tabs and leaves it to the header under By surah', async () => {
+    // "2:255" identifies the ayah only to someone who already knows the surah
+    // order. Under By surah the section header carries the name, so a row that
+    // repeated it would be the header read twice.
+    const userClient = requireUserClient();
+    await setBookmark(userClient, 2, 255, true);
+
+    render(<BookmarksTab />);
+    await screen.findByTestId('bookmark-row-2-255');
+    expect(screen.getByLabelText('Open Al-Baqara 2:255')).toBeTruthy();
+
+    fireEvent.click(screen.getByText('By surah'));
+
+    expect(screen.getByLabelText('Open 2:255')).toBeTruthy();
+    expect(screen.queryByLabelText('Open Al-Baqara 2:255')).toBeNull();
+  });
+
+  it('opens the ayah from anywhere on the card, not only the coordinate', async () => {
+    // The coordinate alone measured 81x76px on a 640dpi device (2026-08-29).
+    // The card is the target now; the Link inside it is what TalkBack focuses.
+    const userClient = requireUserClient();
+    await setBookmark(userClient, 2, 255, true);
+
+    render(<BookmarksTab />);
+    // Reached by testID rather than by role: the card is accessible={false} on
+    // purpose, because an accessible container collapses its children on
+    // Android and would take the note and delete buttons off TalkBack.
+    //
+    // React DOM warns "<button> cannot contain a nested <button>" here. That is
+    // the shim, not the app: rnHosts renders every Pressable as a <button>, and
+    // React Native has no such restriction -- a control inside a pressable card
+    // is the layout this row is.
+    fireEvent.click(await screen.findByTestId('bookmark-card-2-255'));
+
+    expect(mocks.pushed).toHaveLength(1);
+    expect(JSON.stringify(mocks.pushed[0])).toContain('255');
+  });
+
+  it('deletes an un-noted bookmark without asking', async () => {
+    const userClient = requireUserClient();
+    await setBookmark(userClient, 2, 255, true);
+    await setBookmark(userClient, 1, 1, true);
+
+    render(<BookmarksTab />);
+    await screen.findByTestId('bookmark-row-2-255');
+
+    fireEvent.click(screen.getByTestId('bookmark-delete-2-255'));
+
+    // Gone from the list AND gone from the database. The list alone would pass
+    // against a row spliced out of local state by a write that never ran.
+    await waitFor(() => expect(rowIds()).toEqual(['bookmark-row-1-1']));
+    expect(await getBookmarks(userClient)).toHaveLength(1);
+  });
+
+  it('asks before deleting a bookmark whose note would go with it', async () => {
+    const userClient = requireUserClient();
+    await setBookmark(userClient, 2, 255, true);
+    await setBookmarkNote(userClient, 2, 255, 'throne');
+
+    render(<BookmarksTab />);
+    await screen.findByTestId('bookmark-row-2-255');
+
+    fireEvent.click(screen.getByTestId('bookmark-delete-2-255'));
+
+    // The sheet is up and nothing has been written yet -- the half that makes
+    // this a confirmation rather than a notification.
+    expect(screen.getByText('Delete this bookmark?')).toBeTruthy();
+    expect(rowIds()).toEqual(['bookmark-row-2-255']);
+    expect(await getBookmarks(userClient)).toHaveLength(1);
+
+    fireEvent.click(screen.getByTestId('confirm-accept'));
+
+    await waitFor(() => expect(rowIds()).toEqual([]));
+    expect(await getBookmarks(userClient)).toHaveLength(0);
+  });
+
+  it('keeps the bookmark and its note when the confirmation is cancelled', async () => {
+    const userClient = requireUserClient();
+    await setBookmark(userClient, 2, 255, true);
+    await setBookmarkNote(userClient, 2, 255, 'throne');
+
+    render(<BookmarksTab />);
+    await screen.findByTestId('bookmark-row-2-255');
+    fireEvent.click(screen.getByTestId('bookmark-delete-2-255'));
+
+    fireEvent.click(screen.getByTestId('confirm-cancel'));
+
+    expect(screen.queryByText('Delete this bookmark?')).toBeNull();
+    expect(rowIds()).toEqual(['bookmark-row-2-255']);
+    expect(screen.getByText('throne')).toBeTruthy();
+  });
+
+  it('leaves the row in place and says so when the delete write fails', async () => {
+    const userClient = requireUserClient();
+    await setBookmark(userClient, 2, 255, true);
+
+    render(<BookmarksTab />);
+    await screen.findByTestId('bookmark-row-2-255');
+
+    mocks.openUserDb = async () => {
+      throw new Error('database is locked');
+    };
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    fireEvent.click(screen.getByTestId('bookmark-delete-2-255'));
+
+    await screen.findByTestId('bookmark-delete-error');
+    // Still there: a list that dropped the row optimistically would show a
+    // bookmark as deleted that is still in the database.
+    expect(rowIds()).toEqual(['bookmark-row-2-255']);
+    logged.mockRestore();
+  });
+
+  it('does not carry a previous failure into the next bookmark\'s confirmation', async () => {
+    const userClient = requireUserClient();
+    await setBookmark(userClient, 1, 1, true);
+    await setBookmark(userClient, 2, 255, true);
+    await setBookmarkNote(userClient, 2, 255, 'throne');
+
+    render(<BookmarksTab />);
+    await screen.findByTestId('bookmark-row-2-255');
+
+    const working = mocks.openUserDb;
+    mocks.openUserDb = async () => {
+      throw new Error('database is locked');
+    };
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    // The un-noted row deletes with no confirmation, so this failure lands on
+    // the list itself.
+    fireEvent.click(screen.getByTestId('bookmark-delete-1-1'));
+    await screen.findByTestId('bookmark-delete-error');
+    mocks.openUserDb = working;
+
+    // A different row, a different write. The sheet must not open already
+    // reporting a failure that belongs to the row above it.
+    fireEvent.click(screen.getByTestId('bookmark-delete-2-255'));
+
+    await screen.findByText('Delete this bookmark?');
+    expect(screen.queryByTestId('confirm-error')).toBeNull();
+    expect(screen.queryByTestId('bookmark-delete-error')).toBeNull();
+    logged.mockRestore();
+  });
+
+  it('keeps the confirmation open, with the reason inside it, when that write fails', async () => {
+    // The sheet is a <Modal> -- its own native window. A sheet that closed on
+    // failure would drop the user back to a list still showing the bookmark
+    // with nothing to say why, and an alert left on the list behind an open
+    // sheet is drawn under it and announced to nobody.
+    const userClient = requireUserClient();
+    await setBookmark(userClient, 2, 255, true);
+    await setBookmarkNote(userClient, 2, 255, 'throne');
+
+    render(<BookmarksTab />);
+    await screen.findByTestId('bookmark-row-2-255');
+    fireEvent.click(screen.getByTestId('bookmark-delete-2-255'));
+
+    mocks.openUserDb = async () => {
+      throw new Error('database is locked');
+    };
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    fireEvent.click(screen.getByTestId('confirm-accept'));
+
+    await screen.findByTestId('confirm-error');
+    expect(screen.getByText('Delete this bookmark?')).toBeTruthy();
+    expect(rowIds()).toEqual(['bookmark-row-2-255']);
+    logged.mockRestore();
   });
 
   it('keeps the bookmark when a note is cleared', async () => {

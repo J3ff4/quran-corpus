@@ -1,7 +1,10 @@
-import { Pressable, Text, View } from 'react-native';
-import Animated from 'react-native-reanimated';
+import { useEffect, useRef, useState } from 'react';
+import { Pressable, Text, View, type LayoutChangeEvent } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
 import { GlassSurface } from './GlassSurface';
+import { PILL_SPRING, SEGMENT_GAP, pillOffset, segmentWidth } from '@/motion/segmentedPill';
+import { useReducedMotion } from '@/motion/useReducedMotion';
 import { usePressScale } from '@/motion/usePressScale';
 import { radii, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
@@ -63,9 +66,10 @@ function Segment<T extends string>({
           minHeight: touchTargets.compact,
           paddingHorizontal: 8,
           borderRadius: radii.pill,
-          // The wash's contrast figures assume it sits directly on the page,
-          // so nothing may paint behind this segment.
-          backgroundColor: selected ? theme.accentWash : 'transparent',
+          // No background of its own any more: the wash is one pill that
+          // travels between segments (see below). A per-segment background
+          // would paint a second wash under the travelling one for the frame
+          // the two overlap.
         },
       ]}
     >
@@ -89,6 +93,41 @@ export function SegmentedControl<T extends string>({
   onChange,
   accessibilityLabel,
 }: SegmentedControlProps<T>) {
+  const theme = useThemeColors();
+  const reduceMotion = useReducedMotion();
+  const [rowWidth, setRowWidth] = useState(0);
+  const offset = useSharedValue(0);
+  // Whether the pill has been put somewhere at least once. A ref, not state:
+  // it drives no render, and its only job is to keep the first placement from
+  // travelling -- without it every mount slides the pill in from the left edge
+  // of the row, which reads as the control loading rather than responding.
+  const placed = useRef(false);
+
+  // Clamped rather than left at -1: a value not in `options` is a caller bug,
+  // and parking the pill under the first segment is a wrong highlight, where a
+  // negative offset is the pill off the side of the control entirely.
+  const index = Math.max(
+    0,
+    options.findIndex((option) => option.value === value),
+  );
+  const width = segmentWidth(rowWidth, options.length);
+
+  useEffect(() => {
+    if (width === 0) return;
+    const target = pillOffset(index, width);
+    if (placed.current && !reduceMotion) {
+      offset.value = withSpring(target, PILL_SPRING);
+    } else {
+      // Also the reduced-motion branch, which gets no substitute fade (§8):
+      // the wash simply is on the selected segment, which is the state the
+      // travel was only ever decorating.
+      offset.value = target;
+      placed.current = true;
+    }
+  }, [index, width, reduceMotion, offset]);
+
+  const pillStyle = useAnimatedStyle(() => ({ transform: [{ translateX: offset.value }] }));
+
   return (
     <GlassSurface radius="pill" style={{ padding: 4 }}>
       {/* The label lives here rather than on each option: four segments each
@@ -103,8 +142,47 @@ export function SegmentedControl<T extends string>({
       <View
         accessibilityRole="tablist"
         accessibilityLabel={accessibilityLabel}
-        style={{ flexDirection: 'row', gap: 4 }}
+        onLayout={(event: LayoutChangeEvent) => {
+          const measured = event.nativeEvent.layout.width;
+          setRowWidth(measured);
+          // Placed here rather than left to the effect below. The effect runs
+          // after the commit that mounts the pill, so a control whose value is
+          // not the first option -- the reader header opens on the persisted
+          // mode, which can be `mushaf` -- would paint one frame with the wash
+          // under segment 0 and then jump. Setting the offset in the same
+          // handler as the width means the pill's first frame is already right.
+          const first = segmentWidth(measured, options.length);
+          if (!placed.current && first > 0) {
+            offset.value = pillOffset(index, first);
+            placed.current = true;
+          }
+        }}
+        style={{ flexDirection: 'row', gap: SEGMENT_GAP }}
       >
+        {/* One wash that slides, rather than one per segment that fades. Behind
+            the segments in paint order and pointerEvents="none", so it can
+            never take a press meant for the tab it is sitting on.
+
+            The wash's contrast figures assume it sits directly on the page, so
+            nothing may paint behind this pill -- which is why the segments no
+            longer carry a background of their own. */}
+        {width > 0 ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              {
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width,
+                borderRadius: radii.pill,
+                backgroundColor: theme.accentWash,
+              },
+              pillStyle,
+            ]}
+          />
+        ) : null}
         {options.map((option) => (
           <Segment
             key={option.value}
