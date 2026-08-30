@@ -21,7 +21,8 @@ export type IconName =
   | 'pause'
   | 'skipBack'
   | 'skipForward'
-  | 'repeat';
+  | 'repeat'
+  | 'trash';
 
 /**
  * Path data ported verbatim from web so the two products draw one glyph set:
@@ -100,6 +101,17 @@ const PATHS: Record<IconName, string[]> = {
   // a one-unit stub under a detached arrowhead, which drew two arrows passing
   // each other rather than a cycle (device, 2026-08-26).
   repeat: ['M17 2l4 4-4 4', 'M3 12v-2a4 4 0 0 1 4-4h14', 'M7 22l-4-4 4-4', 'M21 12v2a4 4 0 0 1-4 4H3'],
+  // Deleting a bookmark. Lid, handle, tapered body and two ribs -- drawn to the
+  // same 24-box and 1.8 stroke as the rest, and never rendered `filled`: a
+  // solid bin beside the outline set would read as a different icon set, and
+  // the fill channel here carries no state (a delete control has none).
+  trash: [
+    'M4 7h16',
+    'M10 4h4a1 1 0 0 1 1 1v2H9V5a1 1 0 0 1 1-1z',
+    'M6.5 7l.8 12a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9L17.5 7',
+    'M10.5 11v6',
+    'M13.5 11v6',
+  ],
 };
 
 export function Icon({

@@ -16,7 +16,6 @@ const mocks = vi.hoisted(() => ({
   getBookmarks: vi.fn(),
   setBookmarkNote: vi.fn(),
   pageSurahProps: [] as ((surahId: number, side: 'prev' | 'next') => void)[],
-  alerts: [] as { title: string; body: string; buttons: { text: string; onPress?: () => void }[] }[],
 }));
 
 vi.mock('expo-router', () => ({
@@ -106,6 +105,34 @@ vi.mock('@/components/NoteEditor', async () => {
   };
 });
 
+vi.mock('@/components/ConfirmSheet', async () => {
+  const React = await import('react');
+  return {
+    // Mocked for the reason NoteEditor is: the real sheet reaches reanimated
+    // and gesture-handler through BottomSheet, neither of which parses under
+    // this transform. What matters here is that the route puts the question up
+    // before it writes, and which button it wires to which outcome.
+    ConfirmSheet: ({
+      title,
+      confirmLabel,
+      onConfirm,
+      onCancel,
+    }: {
+      title: string;
+      confirmLabel: string;
+      onConfirm: () => void;
+      onCancel: () => void;
+    }) =>
+      React.createElement(
+        'div',
+        null,
+        React.createElement('span', null, `confirm:${title}`),
+        React.createElement('button', { onClick: onConfirm }, confirmLabel),
+        React.createElement('button', { onClick: onCancel }, 'confirm cancel'),
+      ),
+  };
+});
+
 vi.mock('@/data/openCorpusDb', () => ({
   openCorpusDb: async () => ({}),
 }));
@@ -162,19 +189,6 @@ vi.mock('react-native', async () => {
       isReduceMotionEnabled: () => Promise.resolve(false),
       addEventListener: () => ({ remove: () => {} }),
     },
-    // Recorded rather than auto-answered: the confirm before a note is deleted
-    // has to be shown to have been asked, and each test drives whichever
-    // button it is about. Auto-resolving here would make "was it asked at all"
-    // untestable.
-    Alert: {
-      alert: (
-        title: string,
-        body: string,
-        buttons: { text: string; onPress?: () => void }[],
-      ) => {
-        mocks.alerts.push({ title, body, buttons });
-      },
-    },
   };
 });
 
@@ -216,7 +230,6 @@ describe('SurahRoute', () => {
     mocks.setBookmarkNote.mockReset();
     mocks.params = { surahId: '2' };
     mocks.pageSurahProps.length = 0;
-    mocks.alerts.length = 0;
   });
 
   it('opens the note editor for the ayah the reader asked about', async () => {
@@ -268,13 +281,12 @@ describe('SurahRoute', () => {
 
     // Nothing has been written or removed yet: the question comes first, so
     // cancelling costs nothing.
-    await waitFor(() => expect(mocks.alerts).toHaveLength(1));
+    await screen.findByText('confirm:Delete this bookmark?');
     expect(mocks.setBookmark).not.toHaveBeenCalled();
     expect(screen.getByText('bookmarked:255')).toBeTruthy();
 
-    const confirm = mocks.alerts[0]?.buttons.find((button) => button.text === 'Delete');
     await act(async () => {
-      confirm?.onPress?.();
+      fireEvent.click(screen.getByText('Delete'));
     });
 
     await waitFor(() =>
@@ -290,13 +302,13 @@ describe('SurahRoute', () => {
     render(<SurahRoute />);
     await screen.findByText('note:throne');
     fireEvent.click(screen.getByText('bookmark'));
-    await waitFor(() => expect(mocks.alerts).toHaveLength(1));
+    await screen.findByText('confirm:Delete this bookmark?');
 
-    const cancel = mocks.alerts[0]?.buttons.find((button) => button.text === 'Cancel');
     await act(async () => {
-      cancel?.onPress?.();
+      fireEvent.click(screen.getByText('confirm cancel'));
     });
 
+    expect(screen.queryByText('confirm:Delete this bookmark?')).toBeNull();
     expect(mocks.setBookmark).not.toHaveBeenCalled();
     expect(screen.getByText('bookmarked:255')).toBeTruthy();
     expect(screen.getByText('note:throne')).toBeTruthy();
@@ -316,7 +328,7 @@ describe('SurahRoute', () => {
     await waitFor(() =>
       expect(mocks.setBookmark).toHaveBeenCalledWith(expect.anything(), 2, 255, false),
     );
-    expect(mocks.alerts).toHaveLength(0);
+    expect(screen.queryByText('confirm:Delete this bookmark?')).toBeNull();
   });
 
   it('restores the note, not an empty one, when the delete write fails', async () => {
@@ -328,9 +340,9 @@ describe('SurahRoute', () => {
     render(<SurahRoute />);
     await screen.findByText('note:throne');
     fireEvent.click(screen.getByText('bookmark'));
-    await waitFor(() => expect(mocks.alerts).toHaveLength(1));
+    await screen.findByText('confirm:Delete this bookmark?');
     await act(async () => {
-      mocks.alerts[0]?.buttons.find((button) => button.text === 'Delete')?.onPress?.();
+      fireEvent.click(screen.getByText('Delete'));
     });
 
     // The DELETE failed, so the row and its note are still in SQLite. Coming

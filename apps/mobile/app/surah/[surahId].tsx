@@ -1,9 +1,10 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 import { useRecitation } from '@/audio/ayahAudio';
+import { ConfirmSheet } from '@/components/ConfirmSheet';
 import { NoteEditor } from '@/components/NoteEditor';
 import { SurahReader } from '@/components/SurahReader';
 import { getSurahReader, getWordsForAyah, type SurahReaderData } from '@/data/corpusRepository';
@@ -21,42 +22,12 @@ import {
 } from '@/data/userRepository';
 import { localDay } from '@/home/counters';
 import { useEntryPager, useHeldEntry } from '@/motion/entryPager';
-import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
 import { useThemeColors } from '@/theme/themeContext';
 
 function errorTextStyle(danger: string) {
   return { color: danger, padding: 20 };
-}
-
-/** Ask before un-bookmarking an ayah that carries a note.
- *
- *  A note lives on the bookmark row, so removing the bookmark deletes it, and
- *  the user database is on the owner's phone with no undo and no server copy
- *  (CLAUDE.md §5, decision 34). One mistaken tap on the bookmark icon would
- *  otherwise destroy text the user typed. Alert is React Native's own dialog,
- *  and this is the Android convention for a destructive action.
- *
- *  Resolves false on dismiss as well as cancel: a tap outside the dialog is not
- *  consent to delete.
- */
-function confirmDiscardNote(uiLocale: UiLocaleCode): Promise<boolean> {
-  return new Promise((resolve) => {
-    Alert.alert(
-      t(uiLocale, 'bookmarks.discardNoteTitle'),
-      t(uiLocale, 'bookmarks.discardNoteBody'),
-      [
-        { text: t(uiLocale, 'bookmarks.cancel'), style: 'cancel', onPress: () => resolve(false) },
-        {
-          text: t(uiLocale, 'bookmarks.discardNoteConfirm'),
-          style: 'destructive',
-          onPress: () => resolve(true),
-        },
-      ],
-      { cancelable: true, onDismiss: () => resolve(false) },
-    );
-  });
 }
 
 export default function SurahRoute() {
@@ -127,6 +98,9 @@ export default function SurahRoute() {
   // two would be written from the same rows and could disagree.
   const [bookmarks, setBookmarks] = useState<Map<number, string | null>>(new Map());
   const [editingNote, setEditingNote] = useState<number | null>(null);
+  /** The ayah a discard confirmation is open for. Only ever one that carries a
+   *  note -- see toggleBookmark. */
+  const [discarding, setDiscarding] = useState<number | null>(null);
   const bookmarkedAyahs = useMemo(() => new Set(bookmarks.keys()), [bookmarks]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -244,18 +218,15 @@ export default function SurahRoute() {
     [corpusClient],
   );
 
-  async function toggleBookmark(ayahNumber: number) {
+  /** The bookmark half of a toggle, once it is settled that it should happen.
+   *
+   *  Split from toggleBookmark because the confirmation is a sheet rather than
+   *  a promise: the decision returns to the render, and this is what the sheet
+   *  calls back into. `previousNote` is passed rather than re-read, because by
+   *  then the confirmation has been on screen and the map may have moved on.
+   */
+  async function applyToggle(ayahNumber: number, nextBookmarked: boolean, previousNote: string | null) {
     if (!displayedSurahId) return;
-    const nextBookmarked = !bookmarks.has(ayahNumber);
-    const previousNote = bookmarks.get(ayahNumber) ?? null;
-
-    // The row is the note's only home, so un-bookmarking deletes hand-written
-    // text with one tap and the device DB has no undo (CLAUDE.md §5). Asked
-    // before the optimistic update, so a cancel leaves the screen untouched.
-    if (!nextBookmarked && previousNote !== null) {
-      const discard = await confirmDiscardNote(uiLocale);
-      if (!discard) return;
-    }
 
     setBookmarks((current) => {
       const next = new Map(current);
@@ -286,6 +257,22 @@ export default function SurahRoute() {
       });
       setBookmarkError(t(uiLocale, 'reader.bookmarkFailed'));
     }
+  }
+
+  function toggleBookmark(ayahNumber: number) {
+    if (!displayedSurahId) return;
+    const nextBookmarked = !bookmarks.has(ayahNumber);
+    const previousNote = bookmarks.get(ayahNumber) ?? null;
+
+    // The row is the note's only home, so un-bookmarking deletes hand-written
+    // text with one tap and the device DB has no undo (CLAUDE.md §5). Asked
+    // before the optimistic update, so a cancel leaves the screen untouched.
+    if (!nextBookmarked && previousNote !== null) {
+      setDiscarding(ayahNumber);
+      return;
+    }
+
+    void applyToggle(ayahNumber, nextBookmarked, previousNote);
   }
 
   async function saveNote(ayahNumber: number, note: string) {
@@ -407,6 +394,29 @@ export default function SurahRoute() {
           onCancel={() => setEditingNote(null)}
           onSave={(note) => {
             void saveNote(editingNote, note);
+          }}
+        />
+      ) : null}
+      {/* The same sheet the bookmarks screen asks with, rather than the stock
+          Alert this replaced: Alert draws the platform's own white Material
+          card over a glass app, and it was the one piece of chrome in M6 that
+          never matched (§8). One confirmation, two call sites -- a second one
+          here is a second set of words to keep in step (§3).
+
+          No `error` prop: the sheet is gone by the time the write runs, and
+          the reader already surfaces a failed bookmark write in the live
+          region below. */}
+      {discarding !== null ? (
+        <ConfirmSheet
+          title={t(uiLocale, 'bookmarks.discardNoteTitle')}
+          body={t(uiLocale, 'bookmarks.discardNoteBody')}
+          confirmLabel={t(uiLocale, 'bookmarks.discardNoteConfirm')}
+          uiLocale={uiLocale}
+          onCancel={() => setDiscarding(null)}
+          onConfirm={() => {
+            const ayahNumber = discarding;
+            setDiscarding(null);
+            void applyToggle(ayahNumber, false, bookmarks.get(ayahNumber) ?? null);
           }}
         />
       ) : null}
