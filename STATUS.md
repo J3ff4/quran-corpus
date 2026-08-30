@@ -490,6 +490,40 @@ The three-control row was copy-pasted into `AyahCard` and `MushafAyah` and had
 been edited in lockstep three times; now one `AyahControls` (§3), hence -180
 lines. Checked on device by the owner. No §5 trigger (UI + tests only).
 
+### Bookmarks screen polish — MERGED 2026-08-30 as `31cba0d` (PR #47)
+Five owner reports on the bookmarks screen. Delete has two affordances wired to
+one handler: a trash control and swipe-left. Swipe alone is invisible and
+TalkBack cannot perform it (WCAG 2.5.1). **No `packages/data` change** —
+`setBookmark(..., false)` already DELETEs.
+
+Confirm only where a note would be lost (check 154's rule). The confirm is a
+glass `ConfirmSheet`, and the reader's `Alert.alert` moved onto it too — two
+confirmations with different looks for one decision is the §3 duplication.
+**That retires the stock white Material dialog, open since M6h.**
+
+Whole card opens the ayah; the coordinate alone was 81x76px on 640dpi.
+`accessible={false}` on the card is load-bearing: an accessible container
+COLLAPSES its children on Android, which would take the note + delete controls
+off TalkBack. `rnHosts` drops the prop, so no unit test can catch a regression
+— device check 167 only.
+
+`Al-Baqara 2:255` in Recent/With notes; By surah keeps the bare coordinate.
+Tab pill slides (one travelling wash, `motion/segmentedPill.ts` pure geometry —
+`onLayout` never fires under jsdom). Five call sites, not six: `AlphabetGrid`
+only mentions `SegmentedControl` in a comment.
+
+§5 ran (on-device user-DB DELETE). 6 findings, **all 6 taken, none declined**:
+icons shared an edge in front of an unconfirmed delete; a stale `deleteError`
+opened the next row's sheet already reporting it; the pill placed in an effect
+painted one frame at segment 0 (reachable in the reader header, which opens on
+the persisted mode); `theme.danger` as an 88pt fill is a pale pink block on
+night — new `dangerFill`/`onDangerFill`; `ReanimatedSwipeable`'s
+`overflow: hidden` clipped the card shadow; `ConfirmSheet` buttons were ~33dp.
+9 mutants, all killed, one only after a gap-filling test.
+
+**Device checks 160-168 NOT RUN** — owed on the same APK run as 148.
+Still open, smaller: `NoteEditor`'s own buttons are ~33dp (not destructive).
+
 ---
 
 ### M6 CLOSE-OUT — what is actually owed
@@ -498,7 +532,10 @@ Umbrella log filled + re-verified against `gh pr list`/`git log` (§14).
   blocked (Expo Go cannot exercise lock-screen controls).
 - **M6h (149-154) and M6i (155-159) ran 2026-08-29 and pass**, after three
   defects found on 159 and two on M6h were fixed in the same session. **148 is
-  still open** — it is an APK-upgrade check by definition.
+  still open** — it is an APK-upgrade check by definition, and its 66-bookmark
+  "before" state vanished from Expo Go 2026-08-30, so the APK run must build
+  its own pre-upgrade DB.
+- **160-168 (bookmarks polish, PR #47) NOT RUN**, owed on that same APK run.
 - **No sub-phase has ever run on a release APK** — all nine went through Expo
   Go. The whole 48-107 / 120-159 checklist is owed a re-run against the APK.
 - Window opens **2026-09-01**. Until that run is recorded, M6 is not complete.
