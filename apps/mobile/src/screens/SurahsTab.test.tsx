@@ -176,7 +176,83 @@ describe('SurahsTab', () => {
     render(<SurahsTab />);
 
     expect(await screen.findByText('Al-Fatihah')).toBeTruthy();
+  });
+
+  it('leaves the other modes alone until the visible list has landed', async () => {
+    const pending = deferred<SurahListItem[]>();
+    mocks.getSurahList.mockReset().mockReturnValue(pending.promise);
+
+    render(<SurahsTab />);
+
+    // The surah list is the query the reader is waiting on; three more against
+    // the same connection in front of it would push the screen they asked for
+    // further away.
     expect(mocks.getJuzIndex).not.toHaveBeenCalled();
+    expect(mocks.getPageIndex).not.toHaveBeenCalled();
+    expect(mocks.getRevealedIndex).not.toHaveBeenCalled();
+
+    pending.resolve([alFatihah]);
+    await waitFor(() => expect(mocks.getJuzIndex).toHaveBeenCalled());
+  });
+
+  it('prefetches every other mode once the visible list has painted', async () => {
+    render(<SurahsTab />);
+    expect(await screen.findByText('Al-Fatihah')).toBeTruthy();
+
+    await waitFor(() => expect(mocks.getJuzIndex).toHaveBeenCalled());
+    await waitFor(() => expect(mocks.getPageIndex).toHaveBeenCalled());
+    await waitFor(() => expect(mocks.getRevealedIndex).toHaveBeenCalled());
+  });
+
+  it('switches to a prefetched mode without showing a spinner', async () => {
+    render(<SurahsTab />);
+    expect(await screen.findByText('Al-Fatihah')).toBeTruthy();
+    await waitFor(() => expect(mocks.getJuzIndex).toHaveBeenCalled());
+    // The rows, not the call: the state that decides the spinner is the cached
+    // data, and asserting on the query alone would pass while it was in flight.
+    await waitFor(() => expect(mocks.getPageIndex).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByTestId('segment-page'));
+
+    // Synchronously, in the same tick as the press. This is the whole point of
+    // the prefetch: the ~460ms page query is already done, so the list is there
+    // on the first frame after the switch rather than behind a spinner.
+    expect(screen.queryByText('loading')).toBeNull();
+    expect(screen.getByTestId('browse-page-300')).toBeTruthy();
+  });
+
+  it('queries each mode once, however often it is switched to', async () => {
+    render(<SurahsTab />);
+    expect(await screen.findByText('Al-Fatihah')).toBeTruthy();
+    await waitFor(() => expect(mocks.getJuzIndex).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByTestId('segment-juz'));
+    fireEvent.click(screen.getByTestId('segment-surah'));
+    fireEvent.click(screen.getByTestId('segment-juz'));
+
+    // The prefetch must not re-run a mode it already holds, and switching to a
+    // cached mode must not re-query it either -- 604 page rows per tap is what
+    // the cache exists to prevent.
+    expect(mocks.getJuzIndex).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the list on screen when a background prefetch fails', async () => {
+    mocks.getPageIndex.mockReset().mockRejectedValue(new Error('disk gone'));
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    render(<SurahsTab />);
+    expect(await screen.findByText('Al-Fatihah')).toBeTruthy();
+    await waitFor(() => expect(mocks.getRevealedIndex).toHaveBeenCalled());
+
+    // The reader did not ask for the page index. Blanking the list they ARE
+    // reading to report that some other list failed is worse than letting page
+    // mode load again, with its spinner, if they ever switch to it.
+    expect(screen.getByText('Al-Fatihah')).toBeTruthy();
+    // By role, not by copy: an assertion against a guessed string passes
+    // whatever the screen is showing, which is how it first went in.
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByText('Unable to load surahs')).toBeNull();
+    logged.mockRestore();
   });
 
   it('opens the juz index with every juz collapsed', async () => {

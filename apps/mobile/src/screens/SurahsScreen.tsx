@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
 
@@ -109,6 +109,53 @@ export function SurahsScreen() {
       cancelled = true;
     };
   }, [mode, loaded, uiLocale]);
+
+  // Always the latest, so the prefetch below can skip a mode that landed while
+  // it was working without taking `data` as a dependency -- which would tear
+  // the loop down and restart it after every single mode it loaded.
+  const dataRef = useRef(data);
+  dataRef.current = data;
+
+  // The other three modes, fetched in the background once the visible one has
+  // painted.
+  //
+  // Without this the first switch to each mode showed a spinner on an empty
+  // screen for the length of its query -- ~460ms for the 604-row page index --
+  // and since a mode is only ever loaded once per mount, every reader paid it
+  // once per mode per visit.
+  //
+  // Started only after `loaded`, and one query at a time: these run on the same
+  // connection the visible list just used, and firing all three at mount would
+  // put them in front of the query the reader is actually waiting for.
+  //
+  // A failure here is logged and dropped rather than raised into `error`. The
+  // reader did not ask for these, and blanking the list they *are* reading to
+  // report that some other list failed is worse than letting that mode load
+  // again, with its spinner, if they ever switch to it.
+  useEffect(() => {
+    if (!loaded) return;
+    let cancelled = false;
+
+    async function prefetch() {
+      const db = await openCorpusDb();
+      const client = createExpoSqliteClient(db as ExpoSqliteLike);
+      for (const next of Object.keys(LOADERS) as BrowseMode[]) {
+        if (cancelled) return;
+        if (dataRef.current[next] !== undefined) continue;
+        try {
+          const rows = await LOADERS[next](client);
+          if (!cancelled) setData((current) => ({ ...current, [next]: rows }));
+        } catch (cause) {
+          console.error(`[browse] ${next} prefetch failed`, cause);
+        }
+      }
+    }
+
+    void prefetch();
+    return () => {
+      cancelled = true;
+    };
+  }, [loaded, uiLocale]);
 
   // Language change invalidates every cached mode: the subtitles are
   // localized, and keeping them would leave three of the four lists in the
