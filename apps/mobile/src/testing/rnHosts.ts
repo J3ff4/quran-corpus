@@ -54,10 +54,19 @@ interface HostProps {
   pointerEvents?: unknown;
 }
 
-/** RN accepts `style={[a, b]}`; the DOM does not. */
+/** RN accepts `style={[a, b]}`; the DOM does not.
+ *
+ *  A Pressable also accepts `style={(state) => ...}` and calls it itself with
+ *  the press state. List rows use that form, because it is press feedback that
+ *  costs no animation node per row, and a function handed straight to the DOM
+ *  is stringified -- React then rejects it with "The `style` prop expects a
+ *  mapping from style properties to values, not a string", which names neither
+ *  the component nor the prop's real shape. Resolved at rest, since nothing in
+ *  jsdom is holding a finger down. */
 function flattenStyle(style: unknown): Record<string, unknown> | undefined {
-  if (!Array.isArray(style)) return style as Record<string, unknown> | undefined;
-  return Object.assign({}, ...style.flat(Infinity).filter(Boolean));
+  const resolved = typeof style === 'function' ? (style as (state: { pressed: boolean }) => unknown)({ pressed: false }) : style;
+  if (!Array.isArray(resolved)) return resolved as Record<string, unknown> | undefined;
+  return Object.assign({}, ...resolved.flat(Infinity).filter(Boolean));
 }
 
 /**

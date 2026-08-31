@@ -1,15 +1,13 @@
 import { useMemo } from 'react';
 import { FlatList, Pressable, SectionList, Text, View } from 'react-native';
-import Animated from 'react-native-reanimated';
 
 import { GlassSurface } from './GlassSurface';
 import { Icon } from './icons/Icon';
-import { usePressScale } from '@/motion/usePressScale';
+import { usePressScaleStyle } from '@/motion/usePressScale';
 import { fonts, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export interface BrowseItem {
   /** Unique within its own mode. Modes are never mixed in one list, but the
@@ -48,19 +46,17 @@ export interface BrowseSection {
 
 function Row({ item }: { item: BrowseItem }) {
   const theme = useThemeColors();
-  const press = usePressScale();
+  const pressStyle = usePressScaleStyle();
 
   return (
-    <AnimatedPressable
+    <Pressable
       accessibilityRole="button"
       accessibilityLabel={item.accessibilityLabel}
       // Only on a disclosure. A surah row navigates, and announcing that as
       // collapsed promises a disclosure that is not there.
       {...(item.expanded === undefined ? {} : { accessibilityState: { expanded: item.expanded } })}
       onPress={item.onPress}
-      onPressIn={press.onPressIn}
-      onPressOut={press.onPressOut}
-      style={press.style}
+      style={pressStyle}
       {...(item.testID ? { testID: item.testID } : {})}
     >
       <GlassSurface
@@ -114,7 +110,7 @@ function Row({ item }: { item: BrowseItem }) {
           />
         )}
       </GlassSurface>
-    </AnimatedPressable>
+    </Pressable>
   );
 }
 

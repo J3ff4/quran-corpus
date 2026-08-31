@@ -1,16 +1,14 @@
 import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import Animated from 'react-native-reanimated';
 import { router } from 'expo-router';
 
 import { GlassSurface } from './GlassSurface';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
-import { usePressScale } from '@/motion/usePressScale';
+import { usePressScaleStyle } from '@/motion/usePressScale';
 import { fonts, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export interface DictionaryRowProps {
   arabic: string;
@@ -51,20 +49,18 @@ function DictionaryRowBase({
   uiLocale,
 }: DictionaryRowProps) {
   const theme = useThemeColors();
-  const press = usePressScale();
+  const pressStyle = usePressScaleStyle();
   const ranked = rank !== undefined;
 
   return (
-    <AnimatedPressable
+    <Pressable
       testID="dictionary-row"
       accessibilityRole="link"
       // Without a name the row announces as the bare concatenation of its
       // children, with nothing to say the trailing number is a count.
       accessibilityLabel={`${arabic}${gloss ? ` ${gloss}` : ''}, ${count} ${t(uiLocale, 'dictionary.occurrences')}`}
       onPress={() => router.push(href)}
-      onPressIn={press.onPressIn}
-      onPressOut={press.onPressOut}
-      style={[press.style, { marginHorizontal: 16, marginBottom: 8 }]}
+      style={(state) => [pressStyle(state), { marginHorizontal: 16, marginBottom: 8 }]}
     >
       <GlassSurface
         style={{
@@ -126,7 +122,7 @@ function DictionaryRowBase({
           {arabic}
         </Text>
       </GlassSurface>
-    </AnimatedPressable>
+    </Pressable>
   );
 }
 
