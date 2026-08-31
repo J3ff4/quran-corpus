@@ -27,11 +27,22 @@ vi.mock('./BottomSheet', async () => {
 vi.mock('react-native', async () => {
   const { host } = await import('@/testing/rnHosts.js');
   return {
+    // Reached through useReducedMotion, which SheetRow's press-scale style
+    // calls on every render.
+    AccessibilityInfo: {
+      isReduceMotionEnabled: async () => false,
+      addEventListener: () => ({ remove: () => {} }),
+    },
     Pressable: host('button'),
+    ScrollView: host('div'),
     Text: host('span'),
     View: host('div'),
   };
 });
+
+vi.mock('@/settings/settingsStore', () => ({
+  useAppSettings: () => ({ reduceMotion: false }),
+}));
 
 const props = {
   current: 'husary',
@@ -116,5 +127,16 @@ describe('ReciterSheet', () => {
     render(<ReciterSheet {...props} />);
 
     expect(screen.getByText('Choose reciter')).toBeTruthy();
+  });
+
+  it('marks the active reciter with a check, not a text bullet', () => {
+    // Brief names 'abdulbasit-murattal'; RECITERS' real id is 'abdul-basit'
+    // (packages/data/src/audio.ts) -- using the id that actually exists so
+    // this asserts a real selected row, not a no-op against zero matches.
+    render(<ReciterSheet {...props} current="abdul-basit" />);
+    // The bullets were literal ● / ○ characters in a Text run, beside an SVG
+    // icon set that has had a check since M6j task 1.
+    expect(screen.queryByText(/●|○/)).toBeNull();
+    expect(screen.getByTestId('icon-check')).toBeTruthy();
   });
 });
