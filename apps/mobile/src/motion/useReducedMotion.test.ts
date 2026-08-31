@@ -1,9 +1,20 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-// Static, not a top-level `await import`: vi.mock is hoisted above the imports
-// either way, and the await form is a syntax error under the CommonJS
-// tsconfig.test.json program even though vitest runs it happily.
-import { useReducedMotion } from './useReducedMotion';
+
+/** The hook, from a module that has not been used yet.
+ *
+ *  The read and the listener are now module state shared by every caller --
+ *  that is the whole point of it -- so a suite that imported it once would
+ *  carry one test's resolved value and live subscribers into the next. Each
+ *  test gets its own copy instead. Imported inside a test body rather than at
+ *  the top: a top-level `await import` is a syntax error under the CommonJS
+ *  tsconfig.test.json program, even though vitest runs it happily.
+ */
+async function freshHook() {
+  vi.resetModules();
+  const module = await import('./useReducedMotion');
+  return module.useReducedMotion;
+}
 
 const listeners: Record<string, (value: boolean) => void> = {};
 const remove = vi.fn();
@@ -29,13 +40,35 @@ vi.mock('react-native', () => ({
 
 describe('useReducedMotion', () => {
   beforeEach(() => {
+    for (const key of Object.keys(listeners)) delete listeners[key];
     remove.mockClear();
     isReduceMotionEnabled.mockClear();
     isReduceMotionEnabled.mockResolvedValue(true);
     mocks.settings = { reduceMotion: false };
   });
 
+  it('costs one native read and one subscription no matter how many callers', async () => {
+    const useReducedMotion = await freshHook();
+    // Every browse row calls usePressScale, which calls this. A per-caller
+    // subscription means a screenful of rows fires a screenful of async
+    // AccessibilityInfo reads and then re-renders each row when its own read
+    // resolves -- all of it on the JS thread, during the commit that mounts
+    // the list. That is what makes a tab switch stutter on Surahs and
+    // Dictionary and not on Bookmarks, whose rows do not use it.
+    const rows = Array.from({ length: 30 }, () => renderHook(() => useReducedMotion()));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(isReduceMotionEnabled).toHaveBeenCalledTimes(1);
+    expect(Object.keys(listeners)).toHaveLength(1);
+    // And every caller still gets the answer.
+    expect(rows.every((row) => row.result.current === true)).toBe(true);
+
+  });
+
   it('reports the system setting once it resolves', async () => {
+    const useReducedMotion = await freshHook();
     const { result } = renderHook(() => useReducedMotion());
 
     // Starts false: isReduceMotionEnabled is async, and defaulting to `true`
@@ -46,6 +79,7 @@ describe('useReducedMotion', () => {
   });
 
   it('follows a change made while the app is running', async () => {
+    const useReducedMotion = await freshHook();
     const { result } = renderHook(() => useReducedMotion());
     await act(async () => {});
 
@@ -62,6 +96,7 @@ describe('useReducedMotion', () => {
     // app needs its own way to reach this state (device report, 2026-08-16).
     isReduceMotionEnabled.mockResolvedValue(false);
     mocks.settings.reduceMotion = true;
+    const useReducedMotion = await freshHook();
 
     const { result } = renderHook(() => useReducedMotion());
     await act(async () => {});
@@ -74,6 +109,7 @@ describe('useReducedMotion', () => {
     // lose that because an in-app switch defaults off.
     isReduceMotionEnabled.mockResolvedValue(true);
     mocks.settings.reduceMotion = false;
+    const useReducedMotion = await freshHook();
 
     const { result } = renderHook(() => useReducedMotion());
     await act(async () => {});
@@ -83,6 +119,7 @@ describe('useReducedMotion', () => {
 
   it('animates when neither source asks for reduced motion', async () => {
     isReduceMotionEnabled.mockResolvedValue(false);
+    const useReducedMotion = await freshHook();
 
     const { result } = renderHook(() => useReducedMotion());
     await act(async () => {});
@@ -90,12 +127,23 @@ describe('useReducedMotion', () => {
     expect(result.current).toBe(false);
   });
 
-  it('removes its listener on unmount', async () => {
-    const { unmount } = renderHook(() => useReducedMotion());
+  it('survives a screen change without re-reading anything', async () => {
+    // A tab switch unmounts the old list's rows BEFORE the new list's mount,
+    // so a refcounted subscription passes through zero on every switch: the
+    // listener goes, the next row pays for a fresh async read, and its resolve
+    // wakes every subscriber in the app. That was a stutter on each switch.
+    const useReducedMotion = await freshHook();
+    const first = renderHook(() => useReducedMotion());
+    await act(async () => {});
+    expect(isReduceMotionEnabled).toHaveBeenCalledTimes(1);
+
+    first.unmount();
+    const second = renderHook(() => useReducedMotion());
     await act(async () => {});
 
-    unmount();
-
-    expect(remove).toHaveBeenCalled();
+    // Still one read, still one listener, and the new caller already knows.
+    expect(isReduceMotionEnabled).toHaveBeenCalledTimes(1);
+    expect(remove).not.toHaveBeenCalled();
+    expect(second.result.current).toBe(true);
   });
 });
