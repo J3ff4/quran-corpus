@@ -388,8 +388,8 @@ export default function SurahRoute() {
         <NoteEditor
           surahId={displayedSurahId ?? 0}
           ayahNumber={editingNote}
-          // `held` is what `displayedSurahId` above is derived from, so the
-          // caption and the coordinate name the same surah -- the one on
+          // `held` and `displayedSurahId` above are both read off heldReader,
+          // so the caption and the coordinate name the same surah -- the one on
           // screen -- by construction rather than by coincidence.
           surahName={held?.surah.name_translit ?? null}
           note={bookmarks.get(editingNote) ?? null}
