@@ -3,7 +3,7 @@ import { Pressable, Text, View, type LayoutChangeEvent } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
 import { GlassSurface } from './GlassSurface';
-import { PILL_SPRING, SEGMENT_GAP, pillOffset, segmentWidth } from '@/motion/segmentedPill';
+import { PILL_SETTLE_MS, PILL_SPRING, SEGMENT_GAP, pillOffset, segmentWidth } from '@/motion/segmentedPill';
 import { useReducedMotion } from '@/motion/useReducedMotion';
 import { usePressScale } from '@/motion/usePressScale';
 import { radii, touchTargets, typography } from '@/theme/tokens';
@@ -97,34 +97,71 @@ export function SegmentedControl<T extends string>({
   const reduceMotion = useReducedMotion();
   const [rowWidth, setRowWidth] = useState(0);
   const offset = useSharedValue(0);
-  // Whether the pill has been put somewhere at least once. A ref, not state:
-  // it drives no render, and its only job is to keep the first placement from
-  // travelling -- without it every mount slides the pill in from the left edge
-  // of the row, which reads as the control loading rather than responding.
-  const placed = useRef(false);
+  // The offset the pill was last sent to, or null before the first placement.
+  // A ref, not state: it drives no render. It does two jobs -- it keeps the
+  // first placement from travelling (without it every mount slides the pill in
+  // from the left edge, which reads as the control loading rather than
+  // responding), and it lets the effect below tell "already there" from "needs
+  // to move", so a press that has already started the travel is not restarted.
+  const applied = useRef<number | null>(null);
+  // The segment the user pressed, held until the caller's `value` catches up.
+  //
+  // `onChange` is deferred (see the press handler), so for PILL_SETTLE_MS the
+  // prop still names the old segment. Without this the wash would arrive under
+  // a segment whose label was still grey and light while the segment it left
+  // stayed bold and accented -- the selection would read as being in two
+  // places. Cleared, not left standing, so the prop remains the authority: a
+  // caller that ignores `onChange` gets the pill and the label both put back.
+  const [optimistic, setOptimistic] = useState<T | null>(null);
+  const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Nothing to flush on unmount: firing `onChange` at a parent that is going
+  // away sets state on a dead screen, and the mode it would have applied is
+  // one the user navigated off before it landed.
+  useEffect(
+    () => () => {
+      if (pending.current) clearTimeout(pending.current);
+    },
+    [],
+  );
+  // The row width the pill was last placed against. A width change is a
+  // resize, not a selection, and springing the pill across a rotation would
+  // animate a layout event.
+  const measured = useRef(0);
 
   // Clamped rather than left at -1: a value not in `options` is a caller bug,
   // and parking the pill under the first segment is a wrong highlight, where a
   // negative offset is the pill off the side of the control entirely.
+  const shown = optimistic ?? value;
   const index = Math.max(
     0,
-    options.findIndex((option) => option.value === value),
+    options.findIndex((option) => option.value === shown),
   );
   const width = segmentWidth(rowWidth, options.length);
 
+  // Puts the pill at `target`, and remembers that it did.
+  function place(target: number, animate: boolean) {
+    // The reduced-motion branch gets no substitute fade (§8): the wash simply
+    // is on the selected segment, which is the state the travel was only ever
+    // decorating.
+    offset.value = animate ? withSpring(target, PILL_SPRING) : target;
+    applied.current = target;
+  }
+
+  // Deliberately without a dependency array. `value` is the authority on where
+  // the pill belongs, and this runs after every render to enforce that -- which
+  // covers the press below having already started the travel (target equals
+  // what was applied, so nothing restarts) and a caller that ignores `onChange`
+  // (the value never moved, so the pill is put back).
   useEffect(() => {
+    if (optimistic !== null && optimistic === value) setOptimistic(null);
     if (width === 0) return;
+    const resized = measured.current !== width;
+    measured.current = width;
     const target = pillOffset(index, width);
-    if (placed.current && !reduceMotion) {
-      offset.value = withSpring(target, PILL_SPRING);
-    } else {
-      // Also the reduced-motion branch, which gets no substitute fade (§8):
-      // the wash simply is on the selected segment, which is the state the
-      // travel was only ever decorating.
-      offset.value = target;
-      placed.current = true;
-    }
-  }, [index, width, reduceMotion, offset]);
+    if (applied.current === target) return;
+    place(target, applied.current !== null && !reduceMotion && !resized);
+  });
 
   const pillStyle = useAnimatedStyle(() => ({ transform: [{ translateX: offset.value }] }));
 
@@ -143,19 +180,16 @@ export function SegmentedControl<T extends string>({
         accessibilityRole="tablist"
         accessibilityLabel={accessibilityLabel}
         onLayout={(event: LayoutChangeEvent) => {
-          const measured = event.nativeEvent.layout.width;
-          setRowWidth(measured);
+          const measuredRow = event.nativeEvent.layout.width;
+          setRowWidth(measuredRow);
           // Placed here rather than left to the effect below. The effect runs
           // after the commit that mounts the pill, so a control whose value is
           // not the first option -- the reader header opens on the persisted
           // mode, which can be `mushaf` -- would paint one frame with the wash
           // under segment 0 and then jump. Setting the offset in the same
           // handler as the width means the pill's first frame is already right.
-          const first = segmentWidth(measured, options.length);
-          if (!placed.current && first > 0) {
-            offset.value = pillOffset(index, first);
-            placed.current = true;
-          }
+          const first = segmentWidth(measuredRow, options.length);
+          if (applied.current === null && first > 0) place(pillOffset(index, first), false);
         }}
         style={{ flexDirection: 'row', gap: SEGMENT_GAP }}
       >
@@ -183,15 +217,40 @@ export function SegmentedControl<T extends string>({
             ]}
           />
         ) : null}
-        {options.map((option) => (
+        {options.map((option, optionIndex) => (
           <Segment
             key={option.value}
             option={option}
-            selected={option.value === value}
+            selected={option.value === shown}
             // Re-selecting is a no-op, not a re-query: every caller reloads on
             // change, and a tab-mash would refetch 604 rows per tap.
             onPress={() => {
-              if (option.value !== value) onChange(option.value);
+              if (option.value === shown) return;
+              // Started here rather than left to the effect above, which runs
+              // only after the commit that `onChange` causes. That commit
+              // rebuilds the screen's list -- 604 surahs, the whole letter
+              // index -- and the spring's opening frames were being spent
+              // inside it, which is the stutter on Surahs and Dictionary.
+              // Starting first puts the travel on the UI thread before React
+              // re-renders at all; the effect then finds it already in place.
+              const animate = applied.current !== null && !reduceMotion;
+              if (width > 0) place(pillOffset(optionIndex, width), animate);
+              if (pending.current) clearTimeout(pending.current);
+              // Held until the pill lands. See PILL_SETTLE_MS for the frame
+              // measurements; the short version is that the caller's re-render
+              // mounts on the UI thread, which is the thread the spring is
+              // travelling on, so doing both at once costs the travel a
+              // 45-89ms hole. With no travel to protect there is nothing to
+              // wait for, so reduced motion applies it straight away.
+              if (!animate) {
+                onChange(option.value);
+                return;
+              }
+              setOptimistic(option.value);
+              pending.current = setTimeout(() => {
+                pending.current = null;
+                onChange(option.value);
+              }, PILL_SETTLE_MS);
             }}
           />
         ))}
