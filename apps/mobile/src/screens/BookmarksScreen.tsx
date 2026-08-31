@@ -2,6 +2,7 @@ import { Link, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, SectionList, Text, View } from 'react-native';
 import Swipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
+import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 
 import { ConfirmSheet } from '@/components/ConfirmSheet';
@@ -22,6 +23,15 @@ import {
 import type { UiLocaleCode } from '@/i18n/languages';
 import { textAlignFor } from '@/i18n/textDirection';
 import { t } from '@/i18n/uiStrings';
+import {
+  ICON_MIN_SCALE,
+  ICON_THRESHOLD,
+  PANEL_GAP,
+  PANEL_WIDTH,
+  iconProgress,
+  iconScale,
+  panelWidth,
+} from '@/motion/swipePanel';
 import { useAppSettings } from '@/settings/settingsStore';
 import { radii, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
@@ -348,10 +358,87 @@ export function BookmarksScreen() {
   );
 }
 
-/** The swipe-revealed delete panel's width, and the gap between it and the
- *  card it slides out from. */
-const SWIPE_ACTION_WIDTH = 88;
-const SWIPE_ACTION_GAP = 8;
+/** The delete panel that a right-swipe uncovers.
+ *
+ *  Its own component, not an inline render, because it holds two animated
+ *  styles and a component is the only place hooks may live. The two values
+ *  come from the library: `progress` is 0..1 across the panel's width, and
+ *  `translation` is the row's translateX, negative here.
+ *
+ *  The outer Pressable keeps its full width at rest even though nothing is
+ *  drawn in it. ReanimatedSwipeable measures the actions it renders to decide
+ *  how far the row may travel (`rightWidth`, read on gesture start), so a
+ *  panel that started at width 0 would measure 0 and the row would not open at
+ *  all. The growing part is therefore an inner view inside a box of constant
+ *  size.
+ */
+function SwipeDeleteAction({
+  progress,
+  translation,
+  label,
+  testID,
+  onPress,
+}: {
+  progress: SharedValue<number>;
+  translation: SharedValue<number>;
+  label: string;
+  testID: string;
+  onPress: () => void;
+}) {
+  const theme = useThemeColors();
+
+  // Read on this side of the worklet boundary, deliberately. A worklet closes
+  // over the identifiers its body names, and a module constant reached only
+  // from inside another worklet's default argument is not one of them -- see
+  // the note at the top of motion/swipePanel.
+  const gap = PANEL_GAP;
+  const max = PANEL_WIDTH;
+  const threshold = ICON_THRESHOLD;
+  const minScale = ICON_MIN_SCALE;
+
+  const fill = useAnimatedStyle(() => ({ width: panelWidth(translation.value, gap, max) }));
+  const glyph = useAnimatedStyle(() => {
+    const arriving = iconProgress(progress.value, threshold);
+    return { opacity: arriving, transform: [{ scale: iconScale(arriving, minScale) }] };
+  });
+
+  return (
+    <Pressable
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={{ width: PANEL_WIDTH, marginLeft: PANEL_GAP }}
+    >
+      {/* Pinned to the right edge and grown leftwards, so the panel's leading
+          edge tracks the card and its trailing edge stays put. Grown from the
+          left instead, the whole panel would slide in from off-screen while
+          the gap it is filling opens from the other side. */}
+      <Animated.View
+        style={[
+          {
+            position: 'absolute',
+            right: 0,
+            top: 0,
+            bottom: 0,
+            borderRadius: radii.card,
+            overflow: 'hidden',
+            alignItems: 'center',
+            justifyContent: 'center',
+            // dangerFill, not danger: `danger` is tuned to be readable error
+            // TEXT on night, and as a solid panel it is a pale pink block.
+            backgroundColor: theme.dangerFill,
+          },
+          fill,
+        ]}
+      >
+        <Animated.View style={glyph}>
+          <Icon name="trash" color={theme.onDangerFill} size={22} />
+        </Animated.View>
+      </Animated.View>
+    </Pressable>
+  );
+}
 
 function BookmarkRow({
   bookmark,
@@ -405,25 +492,14 @@ function BookmarkRow({
       // The action panel is absoluteFill-clipped in its own right, so opening
       // this up lets the shadow through without letting the panel escape.
       containerStyle={{ overflow: 'visible' }}
-      renderRightActions={() => (
-        <Pressable
+      renderRightActions={(progress, translation) => (
+        <SwipeDeleteAction
+          progress={progress}
+          translation={translation}
+          label={t(uiLocale, 'bookmarks.delete')}
           testID={`bookmark-swipe-delete-${bookmark.surahId}-${bookmark.ayahNumber}`}
-          accessibilityRole="button"
-          accessibilityLabel={t(uiLocale, 'bookmarks.delete')}
           onPress={deleteFromSwipe}
-          style={{
-            width: SWIPE_ACTION_WIDTH,
-            marginLeft: SWIPE_ACTION_GAP,
-            borderRadius: radii.card,
-            // dangerFill, not danger: `danger` is tuned to be readable error
-            // TEXT on night, and as a solid panel it is a pale pink block.
-            backgroundColor: theme.dangerFill,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Icon name="trash" color={theme.onDangerFill} size={22} />
-        </Pressable>
+        />
       )}
     >
       <GlassSurface testID={`bookmark-row-${bookmark.surahId}-${bookmark.ayahNumber}`}>

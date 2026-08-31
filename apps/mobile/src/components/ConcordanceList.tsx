@@ -1,20 +1,18 @@
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
-import Animated from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { trimConcordanceVerse, type ConcordanceEntry, type RootForm } from '@quran-corpus/data/mobile';
 
 import { GlassSurface } from './GlassSurface';
 import { t } from '@/i18n/uiStrings';
 import type { UiLocaleCode } from '@/i18n/languages';
-import { usePressScale } from '@/motion/usePressScale';
+import { usePressScaleStyle } from '@/motion/usePressScale';
 import { useAppSettings } from '@/settings/settingsStore';
 import { formColorFor } from '@/theme/formTint';
 import { fonts, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 // One screenful and a bit: large enough that a scroll rarely waits, small
 // enough that the first page lands immediately on a hot root.
@@ -51,7 +49,7 @@ function ConcordanceRow({
   uiLocale: UiLocaleCode;
 }) {
   const theme = useThemeColors();
-  const press = usePressScale();
+  const pressStyle = usePressScaleStyle();
   // Per-row, not lifted: each row's expansion is independent, and this only
   // works because the row is its own component -- a renderItem closure can't
   // hold hook state across FlatList's re-renders.
@@ -81,7 +79,7 @@ function ConcordanceRow({
         gap: 6,
       }}
     >
-      <AnimatedPressable
+      <Pressable
         testID="concordance-row"
         accessibilityRole="link"
         // Pressable is one accessibility node, so this label replaces the
@@ -93,9 +91,7 @@ function ConcordanceRow({
         // the Arabic they annotate, and a longer label buys nothing here.
         accessibilityLabel={`${item.surah_id}:${item.ayah_number}:${item.position}${item.gloss ? `, ${item.gloss}` : ''}, ${shown.map((word) => word.text_arabic).join(' ')}`}
         onPress={() => router.push(`/surah/${item.surah_id}?ayah=${item.ayah_number}`)}
-        onPressIn={press.onPressIn}
-        onPressOut={press.onPressOut}
-        style={[press.style, { gap: 6, minHeight: touchTargets.minimum }]}
+        style={(state) => [pressStyle(state), { gap: 6, minHeight: touchTargets.minimum }]}
       >
         <View
           // RTL, as in AlphabetGrid and FrequencyList: the Arabic takes the
@@ -226,7 +222,7 @@ function ConcordanceRow({
           ))}
           {trimmed.truncatedAfter && !expanded ? <Text style={{ color: theme.border }}> …</Text> : ''}
         </Text>
-      </AnimatedPressable>
+      </Pressable>
 
       {/* Outside the Pressable above, deliberately: the row is one
           accessibility node whose label replaces its subtree, so a nested

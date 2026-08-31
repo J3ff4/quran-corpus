@@ -54,10 +54,19 @@ interface HostProps {
   pointerEvents?: unknown;
 }
 
-/** RN accepts `style={[a, b]}`; the DOM does not. */
+/** RN accepts `style={[a, b]}`; the DOM does not.
+ *
+ *  A Pressable also accepts `style={(state) => ...}` and calls it itself with
+ *  the press state. List rows use that form, because it is press feedback that
+ *  costs no animation node per row, and a function handed straight to the DOM
+ *  is stringified -- React then rejects it with "The `style` prop expects a
+ *  mapping from style properties to values, not a string", which names neither
+ *  the component nor the prop's real shape. Resolved at rest, since nothing in
+ *  jsdom is holding a finger down. */
 function flattenStyle(style: unknown): Record<string, unknown> | undefined {
-  if (!Array.isArray(style)) return style as Record<string, unknown> | undefined;
-  return Object.assign({}, ...style.flat(Infinity).filter(Boolean));
+  const resolved = typeof style === 'function' ? (style as (state: { pressed: boolean }) => unknown)({ pressed: false }) : style;
+  if (!Array.isArray(resolved)) return resolved as Record<string, unknown> | undefined;
+  return Object.assign({}, ...resolved.flat(Infinity).filter(Boolean));
 }
 
 /**
@@ -192,6 +201,32 @@ export const StyleSheet = {
   hairlineWidth: 1,
 };
 
+interface LayoutEvent {
+  nativeEvent: { layout: { width: number; height: number; x: number; y: number } };
+}
+
+let autoLayout: { width: number; height: number } | null = null;
+
+/**
+ * Make every shimmed host fire `onLayout` once on mount, with this box.
+ *
+ * Off by default, and opt-in per suite rather than global: jsdom lays nothing
+ * out, so a component's width-driven branches are dead in tests unless
+ * something fires the measurement -- but switching it on everywhere changes
+ * what components that do their own layout maths see (BottomSheet computes its
+ * dismiss threshold from the measured height), and those suites are asserting
+ * on real behaviour with their own fixtures. A suite that needs a measured box
+ * asks for one and clears it after.
+ *
+ * Added for SegmentedControl, whose press handler defers `onChange` only once
+ * the row has a width. With no measurement it took the unmeasured path on
+ * every render, so the deferral shipped untested behind a green suite
+ * (2026-08-31).
+ */
+export function setAutoLayout(size: { width: number; height: number } | null) {
+  autoLayout = size;
+}
+
 export function host(tag: string) {
   return function Host({
     accessibilityLabel,
@@ -213,7 +248,7 @@ export function host(tag: string) {
     onContentSizeChange: _onContentSizeChange,
     showsHorizontalScrollIndicator: _showsHorizontalScrollIndicator,
     numberOfLines,
-    onLayout: _onLayout,
+    onLayout,
     // usePressScale's handlers. Dropped rather than mapped: there is no DOM
     // event for a press phase, and React logs "does not recognize the
     // onPressIn prop" for every card on every render if they are spread.
@@ -223,6 +258,14 @@ export function host(tag: string) {
     pointerEvents: _pointerEvents,
     ...props
   }: HostProps) {
+    // Fires only when a suite has asked for a measured box; see setAutoLayout.
+    React.useEffect(() => {
+      if (autoLayout === null || typeof onLayout !== 'function') return;
+      (onLayout as (event: LayoutEvent) => void)({
+        nativeEvent: { layout: { ...autoLayout, x: 0, y: 0 } },
+      });
+    }, [onLayout]);
+
     return React.createElement(
       tag,
       {

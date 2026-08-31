@@ -535,7 +535,12 @@ Umbrella log filled + re-verified against `gh pr list`/`git log` (§14).
   still open** — it is an APK-upgrade check by definition, and its 66-bookmark
   "before" state vanished from Expo Go 2026-08-30, so the APK run must build
   its own pre-upgrade DB.
-- **160-168 (bookmarks polish, PR #47) NOT RUN**, owed on that same APK run.
+- **160-168 (bookmarks polish, PR #47) ran 2026-08-31 on Expo Go: all nine
+  PASS** (log in `docs/plans/phase-m6h-bookmarks-notes.md`). The pill was
+  measured in pixels, not eyeballed: `dangerFill` samples `#a33a3a`, the
+  `ConfirmSheet` buttons measure 48dp, and the reader header mounts with the
+  pill already on the persisted segment. Still owed against the APK like
+  everything else here.
 - **No sub-phase has ever run on a release APK** — all nine went through Expo
   Go. The whole 48-107 / 120-159 checklist is owed a re-run against the APK.
 - Window opens **2026-09-01**. Until that run is recorded, M6 is not complete.

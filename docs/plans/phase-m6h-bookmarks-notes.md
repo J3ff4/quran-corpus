@@ -537,6 +537,50 @@ no high-severity correctness defect; all six taken, none declined.
 - `ConfirmSheet`'s buttons were padded `<Text>` runs, ~33dp against the 48
   `touchTargets.minimum` encodes. Pressables now.
 
+### Device run 2026-08-31 (Expo Go, OnePlus 7 Pro) -- checks 160-168
+
+All nine PASS. Driven over adb; the pill's position was measured in pixels from
+`screencap`, not eyeballed.
+
+| Check | Build | Date | Result | Notes |
+| --- | --- | --- | --- | --- |
+| 160 | Expo Go (dev) | 2026-08-31 | PASS | 60px (15dp) between the control's bottom edge and the first card's top, measured at true scroll top. |
+| 161 | Expo Go (dev) | 2026-08-31 | PASS | Arabic text, note text and empty card space each opened the reader anchored on that ayah (3:7, 35:3, 3:7). The pen opened the note sheet with no navigation; the trash deleted with no navigation. |
+| 162 | Expo Go (dev) | 2026-08-31 | PASS | Row gone at once, no sheet, header 9 -> 8. Force-stopped and relaunched: still 8, row still absent. |
+| 163 | Expo Go (dev) | 2026-08-31 | PASS | Glass `ConfirmSheet` with a grabber, not a Material dialog. Cancel kept row and note text; Delete removed both, 8 -> 7. Both buttons measured 192px = **48dp**, confirming the §5 touch-target fix on hardware (they were ~33dp before). |
+| 164 | Expo Go (dev) | 2026-08-31 | PASS | Partial swipe released sprang back and deleted nothing. Full swipe revealed an 88x129dp panel; tapping it deleted an un-noted row outright and raised the sheet on a noted one. Vertical scroll unaffected afterwards. The panel samples **`#a33a3a`** -- the new dark `dangerFill`, not the `#e88b8b` error-text red. |
+| 165 | Expo Go (dev) | 2026-08-31 | PASS | Recent and With notes read `Fatir 35:3`; By surah reads `3:7` under an `Aal-Imran` header. |
+| 166 | Expo Go (dev) | 2026-08-31 | PASS | See the pill traces below. All five call sites. |
+| 167 | Expo Go (dev) | 2026-08-31 | PASS | `uiautomator` shows the link (`Open Al-Anam 6:9`), `Edit note` and `Delete bookmark` as separate focusable nodes -- not collapsed. The card is a fourth stop carrying the ayah text and note, which is what announces the content, since the Arabic `TextView` is `focusable=false`. |
+| 168 | Expo Go (dev) | 2026-08-31 | PASS | Un-bookmarking a noted ayah in the reader raised the same `ConfirmSheet` (same testIDs, same 48dp buttons), not M6h's `Alert`. |
+
+**How 166 was measured.** A tap-then-`screencap` lands after a 260ms spring, so
+`PILL_SPRING` was temporarily slowed to `{damping: 18, stiffness: 8, mass: 2}`
+(~4s of travel), the pill's x-extent read off each frame, and the constant
+restored afterwards -- the trap-1c method, and the constant is back at
+`{damping: 22, stiffness: 240, mass: 0.7}`.
+
+| Control | Trace (pill centre, px) | Reads as |
+| --- | --- | --- |
+| Bookmarks | 290 -> 773 -> 1115 -> 1148 | Slides; width held at 412 throughout, so one pill translating, not a cross-fade |
+| Dictionary | 397 -> 680 -> 1040 | Slides, width 583 |
+| Surahs | 236 -> 723 -> 1201 | Slides, width 261 |
+| Reader header | already 720 on mount, never moved | **The §5 fix.** Opens on the persisted `translation`, and with a 4s spring a mount at segment 0 would have been caught mid-travel. Seen three times, on three separate mounts |
+| Words (Verse/Dense) | 1045 -> 393 -> 1045 | Endpoints land on the segment centres (394/1046); also mounted already on `dense`, the non-first option |
+
+Reduce-animations was toggled on **while the spring was still slowed**: the same
+tap that took 4s animated put the pill at its target inside 0.5s. That is the
+reduced-motion branch bypassing the spring, not a fast spring.
+
+**Damage note.** A tap aimed at the tab bar at (1241, 2884) landed on a row's
+trash icon -- the Bookmarks screen is pushed from Menu and has no tab bar there
+-- and deleted `3:7` and `17:3`. Both were un-noted, so 162's no-confirm path
+took them silently. Both were restored by re-bookmarking; no note text existed
+to lose, but their `created_at` is now 2026-08-31, so they sort first in Recent.
+
+Measured in passing, not a check: `NoteEditor`'s Cancel/Save are **140px = 35dp**
+against the 48 `touchTargets.minimum`, confirming the open item below on device.
+
 Checks 164, 166 and 167 are device-only by construction: `rnHosts` drops
 `accessible`, `onLayout` never fires under jsdom, and the swipe wrapper is
 mocked out (the gesture itself is covered nowhere but hardware).

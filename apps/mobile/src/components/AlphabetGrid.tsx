@@ -1,16 +1,14 @@
 import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import Animated from 'react-native-reanimated';
 import { ARABIC_ALPHABET_ORDER } from '@quran-corpus/data/mobile';
 
 import { useGlassSkin } from './GlassSurface';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
-import { usePressScale } from '@/motion/usePressScale';
+import { usePressScaleStyle } from '@/motion/usePressScale';
 import { fonts, radii, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export interface AlphabetGridProps {
   /** A prop rather than a store read, for the same reason SearchHeaderButton
@@ -43,20 +41,18 @@ function CellBase({
 }) {
   const theme = useThemeColors();
   const skin = useGlassSkin();
-  const press = usePressScale();
+  const pressStyle = usePressScaleStyle();
 
   return (
-    <AnimatedPressable
+    <Pressable
       testID="alphabet-cell"
       accessibilityRole="button"
       accessibilityLabel={letter}
       accessibilityState={{ disabled: !enabled, selected }}
       disabled={!enabled}
       onPress={enabled ? () => onSelect(letter) : undefined}
-      onPressIn={press.onPressIn}
-      onPressOut={press.onPressOut}
-      style={[
-        press.style,
+      style={(state) => [
+        pressStyle(state),
         {
           // Ten across on a phone, and never eleven: at 8% of the row each,
           // ten tiles plus their gaps fit inside every width from a 360dp
@@ -98,7 +94,7 @@ function CellBase({
       >
         {letter}
       </Text>
-    </AnimatedPressable>
+    </Pressable>
   );
 }
 
