@@ -1,5 +1,6 @@
 import { Pressable, Text, View } from 'react-native';
 import { BottomSheet } from '@/components/BottomSheet';
+import { Icon } from '@/components/icons/Icon';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
 import { touchTargets, typography } from '@/theme/tokens';
@@ -47,7 +48,7 @@ export function InfoButton({ label, expanded, onPress }: InfoButtonProps) {
         justifyContent: 'center',
       }}
     >
-      <Text style={{ color: theme.mutedText, fontSize: typography.body }}>ⓘ</Text>
+      <Icon testID="icon-info" name="info" color={theme.mutedText} size={20} />
     </Pressable>
   );
 }

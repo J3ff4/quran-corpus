@@ -69,6 +69,14 @@ describe('InfoButton', () => {
 
     expect(screen.queryByTestId('sheet')).toBeNull();
   });
+
+  it('draws the info affordance as an icon, not a font glyph', () => {
+    render(<InfoButton label="About this list" expanded={false} onPress={() => {}} />);
+    // Same defect as the ✎/✐ pair bookmarks replaced: a font glyph renders at
+    // whatever weight the system face has, beside a drawn icon set.
+    expect(screen.queryByText('ⓘ')).toBeNull();
+    expect(screen.getByTestId('icon-info')).toBeTruthy();
+  });
 });
 
 describe('InfoSheet', () => {
