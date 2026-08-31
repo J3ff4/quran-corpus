@@ -33,6 +33,13 @@ describe('SheetRow', () => {
     expect(screen.getByTestId('icon-check')).toBeTruthy();
   });
 
+  it('tints the selected row (D52)', () => {
+    // The fill is a spec bullet of its own; the check-icon test above passes
+    // with the backgroundColor deleted.
+    render(<SheetRow label="Abdul Basit" role="radio" selected onPress={() => {}} testID="r" />);
+    expect(screen.getByTestId('r').style.backgroundColor).toBe('rgb(224, 232, 225)');
+  });
+
   it('draws no check on an unselected row', () => {
     render(<SheetRow label="As-Sudais" role="radio" onPress={() => {}} testID="r" />);
     expect(screen.queryByTestId('icon-check')).toBeNull();

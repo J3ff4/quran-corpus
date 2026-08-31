@@ -50,6 +50,9 @@ describe('SheetActions', () => {
     // (the dangerFill note in BookmarksScreen).
     render(<SheetActions {...base} tone="danger" confirmTestID="k" />);
     expect(screen.getByTestId('k').style.backgroundColor).toBe('');
+    // And it IS danger-coloured, not merely unfilled: without this the tone
+    // could collapse to plain accent text and the whole suite stayed green.
+    expect(screen.getByText('Save').style.color).toBe('rgb(159, 45, 45)');
   });
 
   it('names both buttons for a screen reader', () => {

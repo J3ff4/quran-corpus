@@ -421,8 +421,9 @@ describe('SurahRoute', () => {
     // `surahId` has already moved on.
     fireEvent.click(screen.getByText('edit note'));
     expect(screen.getByText('sheet-surah:2')).toBeTruthy();
-    // Named off `held`, not `reader?.data`: mid page-turn the sheet must still
-    // caption the surah on screen (2), not whatever the in-flight fetch is for.
+    // The caption comes off `held`, the same value `displayedSurahId` above
+    // is derived from, so it names the surah on screen (2). Kills
+    // `surahName={null}`.
     expect(screen.getByText('sheet-surah-name:Al-Baqarah')).toBeTruthy();
     fireEvent.click(screen.getByText('save note'));
 

@@ -1,9 +1,8 @@
 import { Pressable, Text } from 'react-native';
 import { BottomSheet } from '@/components/BottomSheet';
 import { Icon } from '@/components/icons/Icon';
-// Direct, not through the sheet barrel: this sheet draws no row and no
-// action buttons, and the barrel would pull react-native-svg and reanimated
-// in behind them. See the note in sheet/index.ts.
+// Direct, not through the sheet barrel: header-only sheet, and the barrel's
+// other exports pull the settings store into its tests. See sheet/index.ts.
 import { SheetHeader } from '@/components/sheet/SheetHeader';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';

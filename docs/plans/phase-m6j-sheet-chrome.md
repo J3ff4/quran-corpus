@@ -1063,7 +1063,7 @@ git commit -m "docs: log the M6j device run"
 
 1. No `<Text onPress>` acting as a button anywhere in `components/` — `grep -rn -B3 "onPress" --include=*.tsx components | grep "<Text"` returns nothing outside tests.
 2. No `●`, `○` or `ⓘ` in any non-test `.tsx`.
-3. All five sheets import their header and actions from `@/components/sheet`; no sheet defines its own padding wrapper.
+3. Every sheet draws its heading through `SheetHeader` where it has one (`WordSheet` deliberately has none -- it leads with the Arabic word), and its buttons through `SheetActions`; the two header-only sheets (`InfoSheet`, `LanguageSheet`) import `SheetHeader` from its module rather than the barrel -- see the note in `sheet/index.ts`. No sheet defines its own padding wrapper.
 4. Full suite green, `tsc` clean, `eslint` clean.
 5. Every new branch mutation-checked, with the killed mutant named in the commit body or this file.
 6. Checks 169-180 run on the release APK and logged here with dates.
