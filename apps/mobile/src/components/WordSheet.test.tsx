@@ -280,4 +280,22 @@ describe('WordSheet', () => {
 
     expect(screen.queryByTestId('gloss-lang-en')).toBeNull();
   });
+
+  it('gives the two ways deeper a row treatment, not a bare text run', () => {
+    // Most-tapped sheet in the app: every word in word-by-word opens it.
+    render(<WordSheet summary={summary({ root: 'rHm' })} {...handlers} />);
+
+    expect(screen.getByTestId('full-analysis').style.minHeight).toBe('48px');
+    expect(screen.getByTestId('root-link').style.minHeight).toBe('48px');
+  });
+
+  it('draws a chevron on both rows, not a bare label', () => {
+    // Closes the outstanding SheetRow finding: `trailingIcon` had no consumer
+    // passing a non-empty value anywhere in the suite, so a mutant that
+    // hardcoded SheetRow's `icon` to `undefined` (SheetRow.tsx:36) survived
+    // the whole run. WordSheet is the first caller to pass `trailingIcon`.
+    render(<WordSheet summary={summary({ root: 'rHm' })} {...handlers} />);
+
+    expect(screen.getAllByTestId('icon-chevronRight')).toHaveLength(2);
+  });
 });
