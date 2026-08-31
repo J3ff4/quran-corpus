@@ -388,6 +388,10 @@ export default function SurahRoute() {
         <NoteEditor
           surahId={displayedSurahId ?? 0}
           ayahNumber={editingNote}
+          // `held`, not `reader?.data`: during a page turn `reader` already
+          // names the incoming surah, and captioning the sheet with it would
+          // name the wrong one while the old surah is still what is on screen.
+          surahName={held?.surah.name_translit ?? null}
           note={bookmarks.get(editingNote) ?? null}
           uiLocale={uiLocale}
           error={noteError}
