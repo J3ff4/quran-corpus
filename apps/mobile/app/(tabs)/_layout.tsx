@@ -27,7 +27,15 @@ export default function TabsLayout() {
           two. The screens are still listed so the navigator's route order is
           declared here rather than inferred from the filesystem. */}
       <Tabs.Screen name="index" />
-      <Tabs.Screen name="surahs" />
+      {/* Mounted at launch instead of on first tap. Every other tab is cheap
+          enough to build on demand; this one opens with a SQLite read, so a
+          lazy mount put that read -- and the screen's own first render --
+          between the tap and anything to look at, which is the blank screen
+          with a spinner on it. Rendering it during startup moves the same work
+          behind the splash, where the corpus DB is already being opened, and
+          the browse prefetch in SurahsScreen then has the other three modes
+          warm before the tab is ever opened. */}
+      <Tabs.Screen name="surahs" options={{ lazy: false }} />
       <Tabs.Screen name="morphology" />
       <Tabs.Screen name="dictionary" />
       <Tabs.Screen name="menu" />
