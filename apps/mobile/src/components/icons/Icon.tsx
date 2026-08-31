@@ -22,7 +22,8 @@ export type IconName =
   | 'skipBack'
   | 'skipForward'
   | 'repeat'
-  | 'trash';
+  | 'trash'
+  | 'check';
 
 /**
  * Path data ported verbatim from web so the two products draw one glyph set:
@@ -112,6 +113,9 @@ const PATHS: Record<IconName, string[]> = {
     'M10.5 11v6',
     'M13.5 11v6',
   ],
+  // Stroked like every other glyph in this set (RN has no currentColor, so the
+  // stroke arrives from the theme). 24x24 box, same as the rest.
+  check: ['M20 6L9 17l-5-5'],
 };
 
 export function Icon({
