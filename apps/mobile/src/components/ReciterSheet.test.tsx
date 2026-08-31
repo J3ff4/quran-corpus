@@ -34,7 +34,6 @@ vi.mock('react-native', async () => {
       addEventListener: () => ({ remove: () => {} }),
     },
     Pressable: host('button'),
-    ScrollView: host('div'),
     Text: host('span'),
     View: host('div'),
   };

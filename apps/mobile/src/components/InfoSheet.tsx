@@ -7,7 +7,7 @@ import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
 export interface InfoButtonProps {
-  /** Accessible name for the ⓘ button, e.g. "About these translations". */
+  /** Accessible name for the info button, e.g. "About these translations". */
   label: string;
   expanded: boolean;
   onPress: () => void;
@@ -22,7 +22,7 @@ export interface InfoSheetProps {
   onClose: () => void;
 }
 
-/** The ⓘ that opens {@link InfoSheet}.
+/** The info button that opens {@link InfoSheet}.
  *
  *  Button and sheet are separate components, and the screen owns the open
  *  state, because BottomSheet positions itself with StyleSheet.absoluteFill
