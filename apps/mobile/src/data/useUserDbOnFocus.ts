@@ -7,6 +7,21 @@ import { openUserDb } from './userDb';
 
 export interface UserDbLoadState<T> {
   data: T | null;
+  /**
+   * True only while there is nothing to show yet -- NOT "a read is in flight".
+   *
+   * Every consumer renders this as a spinner, and this hook re-reads on every
+   * focus, every resume and after every write. A flag that tracked the read
+   * itself therefore put a spinner on screen beside data that was already
+   * correct, and took it away again a moment later. On Bookmarks that indicator
+   * sits in a gapped column above the list, so deleting a row pushed the whole
+   * list down and back -- the "jump" reported on 2026-08-31. On Home the same
+   * flag blanked the continue-reading card and both counters on every return to
+   * the tab.
+   *
+   * A refresh that fails still reports through `error`, so a re-read that is
+   * silent while it works is not silent when it breaks.
+   */
   loading: boolean;
   error: string | null;
   /** Re-read now, without waiting for the next focus or resume.
@@ -107,5 +122,9 @@ export function useUserDbOnFocus<T>(
 
   const reload = useCallback(() => runRef.current(), []);
 
-  return { data, loading, error, reload };
+  // `loading` is narrowed to "nothing to show yet" here rather than at each
+  // call site: two screens read it across four calls, all of them render it as
+  // a spinner, and the one that got it wrong got it wrong invisibly. See
+  // UserDbLoadState.
+  return { data, loading: loading && data === null, error, reload };
 }

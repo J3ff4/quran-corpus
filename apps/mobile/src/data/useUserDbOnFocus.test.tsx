@@ -96,6 +96,30 @@ describe('useUserDbOnFocus', () => {
     await waitFor(() => expect(screen.getByText('read-2')).toBeTruthy());
   });
 
+  it('keeps what is on screen while a re-read runs, instead of reporting a spinner', async () => {
+    const second = deferred<string>();
+    let reads = 0;
+    render(<Probe load={async () => (++reads === 1 ? 'first' : second.promise)} />);
+
+    await screen.findByText('first');
+
+    // Synchronous act: the refocus has started the read but nothing has
+    // resolved, which is the whole window the old flag reported as loading.
+    act(() => {
+      mocks.focusCallbacks.at(-1)?.();
+    });
+
+    // Every consumer renders `loading` as a spinner. One that appears in a
+    // gapped column above a list moves the list down and back for as long as
+    // the read takes -- and this hook re-reads on every focus, every resume and
+    // after every write, so that was most of what Bookmarks did.
+    expect(screen.getByText('idle')).toBeTruthy();
+    expect(screen.getByText('first')).toBeTruthy();
+
+    second.resolve('fresh');
+    await waitFor(() => expect(screen.getByText('fresh')).toBeTruthy());
+  });
+
   it('reloads when the app is resumed on a screen that never lost focus', async () => {
     let reads = 0;
     render(<Probe load={async () => `read-${++reads}`} />);
