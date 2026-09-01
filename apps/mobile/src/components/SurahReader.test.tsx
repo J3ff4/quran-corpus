@@ -12,6 +12,11 @@ const mocks = vi.hoisted(() => ({
   onScroll: null as ((event: { nativeEvent: { contentOffset: { y: number } } }) => void) | null,
   onContentSizeChange: null as ((width: number, height: number) => void) | null,
   headerLayout: null as ((height: number) => void) | null,
+  /** Hold the mode cross-fade's completion instead of running it, so a test
+   *  can look at the reader mid-switch -- the only moment both renderings are
+   *  mounted. Off by default. */
+  holdFade: false,
+  heldFades: [] as Array<(finished: boolean) => void>,
   scrollToIndex: vi.fn(),
   scrollToOffset: vi.fn(),
   focusEffect: null as (() => void) | null,
@@ -72,7 +77,17 @@ vi.mock('react-native-reanimated', async () => {
       }),
     ),
     Easing: { out: (fn: unknown) => fn, ease: undefined },
-    withTiming: (toValue: number) => toValue,
+    // The completion callback is run, not dropped. The mode cross-fade drops
+    // the outgoing layer from that callback, so a mock that ignores it leaves
+    // both renderings mounted for ever -- and every assertion about "which
+    // mode is on screen" would then be reading two of them.
+    withTiming: (toValue: number, _config?: unknown, callback?: (finished: boolean) => void) => {
+      if (!callback) return toValue;
+      if (mocks.holdFade) mocks.heldFades.push(callback);
+      else callback(true);
+      return toValue;
+    },
+    runOnJS: (fn: unknown) => fn,
     withSequence: (...steps: number[]) => steps[steps.length - 1],
     useSharedValue: (initial: number) => React.useRef({ value: initial }).current,
     useAnimatedStyle: (worklet: () => never) => {
@@ -263,6 +278,8 @@ describe('SurahReader', () => {
     mocks.onScroll = null;
     mocks.headerLayout = null;
     mocks.animatedStyles = [];
+    mocks.holdFade = false;
+    mocks.heldFades = [];
     mocks.reduceMotion = false;
     mocks.getReaderPosition.mockReset().mockReturnValue(null);
     mocks.setReaderPosition.mockReset();
@@ -896,6 +913,51 @@ describe('SurahReader', () => {
     // The Arabic is still there -- mushaf mode drops the translation, not the
     // ayah.
     expect(container.textContent).toContain(data.ayahs[0]!.ayah.text_uthmani.slice(-8));
+  });
+
+  it('never blanks the reader while a mode switch lands', async () => {
+    // The defect: switching modes changed the element type wrapping the list,
+    // React unmounted it, and the replacement re-ran the landing behind a
+    // spinner on an empty screen -- up to 2.5s deep in a long surah (owner
+    // report, 2026-09-01). The incoming rendering now lands underneath the one
+    // already on screen, so there is nothing to blank.
+    mocks.holdFade = true;
+    vi.useFakeTimers();
+    try {
+      const data = readerData(300);
+      const translation = data.ayahs[254]!.translation!.text;
+      const { container, rerender } = render(
+        <SurahReader {...baseProps(data)} readerMode="translation" initialAyahNumber={255} />,
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
+      expect(container.textContent).toContain(translation);
+
+      rerender(<SurahReader {...baseProps(data)} readerMode="mushaf" initialAyahNumber={255} />);
+
+      // Mid-landing, which is the whole window the defect lived in: the
+      // arriving rendering has mounted and has not settled, and there is still
+      // no spinner and no blank.
+      expect(screen.queryByTestId('reader-positioning')).toBeNull();
+      expect(container.textContent).toContain(translation);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000);
+      });
+
+      // Still nothing, once it has landed and before the fade is released.
+      expect(screen.queryByTestId('reader-positioning')).toBeNull();
+      expect(container.textContent).toContain(translation);
+
+      // The fade lands, and only then does the outgoing rendering go.
+      await act(async () => {
+        while (mocks.heldFades.length > 0) mocks.heldFades.shift()?.(true);
+      });
+      expect(container.textContent).not.toContain(translation);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('keeps the bookmark control reachable in either mode', () => {
