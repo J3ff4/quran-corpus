@@ -1,8 +1,24 @@
 import { Link, useRouter } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, SectionList, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  SectionList,
+  Text,
+  View,
+  useWindowDimensions,
+  type LayoutChangeEvent,
+} from 'react-native';
 import Swipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
-import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  type SharedValue,
+} from 'react-native-reanimated';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 
 import { ConfirmSheet } from '@/components/ConfirmSheet';
@@ -32,10 +48,30 @@ import {
   iconScale,
   panelWidth,
 } from '@/motion/swipePanel';
+import { useReducedMotion } from '@/motion/useReducedMotion';
 import { useAppSettings } from '@/settings/settingsStore';
 import { radii, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
+
+/** The space between two cards. Owned here because the exit animation has to
+ *  cancel it: a row that has collapsed to zero height still leaves the list's
+ *  own gap behind it, and that residue is what snapped shut when the reload
+ *  landed. */
+const ROW_GAP = 10;
+
+/** The slide, then the collapse. Deliberately sequential rather than one
+ *  motion: the card leaves first and the list closes afterwards, so the eye
+ *  follows one thing at a time. Together they are under a third of a second,
+ *  which is what keeps a delete feeling immediate rather than watched. */
+const SLIDE_MS = 180;
+const COLLAPSE_MS = 160;
+
+/** The ceiling a resting row is held under. A number, not `undefined`: an
+ *  animated style property that changes type between frames is the one thing
+ *  reanimated cannot interpolate. No card comes near it, so it constrains
+ *  nothing until the collapse takes over. */
+const RESTING_MAX_HEIGHT = 100000;
 
 /** Which ordering the list is in. Not "History": reading history is Home's
  *  continue-reading card and does not belong here. All three show the same
@@ -94,6 +130,10 @@ export function BookmarksScreen() {
    *  requestDelete. */
   const [confirming, setConfirming] = useState<Bookmark | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  /** Rows whose DELETE has committed and whose exit is still playing. A set,
+   *  not one key: a second delete during the first row's 340ms would otherwise
+   *  cut that row's exit short and put back the jump this removes. */
+  const [removing, setRemoving] = useState<ReadonlySet<string>>(() => new Set());
 
   const load = useCallback(loadBookmarksData, []);
   const { data, loading, error, reload } = useUserDbOnFocus(
@@ -171,10 +211,12 @@ export function BookmarksScreen() {
       const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
       await setBookmark(userClient, bookmark.surahId, bookmark.ayahNumber, false);
       setConfirming(null);
-      // Re-read rather than splice the row out of local state: the row is gone
-      // because the DELETE ran, and a list that drops it optimistically shows a
-      // bookmark as deleted that a failed write left in place.
-      reload();
+      // The write first, the motion second, the re-read last. Writing first is
+      // what keeps a failed DELETE honest: the row never moves and the error
+      // below is the only thing that changes. The re-read still replaces local
+      // state rather than splicing -- it just waits for the exit to finish, so
+      // the rows underneath glide into the gap instead of teleporting into it.
+      setRemoving((current) => new Set(current).add(keyOf(bookmark)));
     } catch (cause) {
       // Coordinate only, never the note -- same reason saveNote logs neither.
       console.error('[bookmarks] delete failed', {
@@ -214,12 +256,23 @@ export function BookmarksScreen() {
         uiLocale={uiLocale}
         onEditNote={() => setEditing(item)}
         onDelete={() => requestDelete(item)}
+        removing={removing.has(keyOf(item))}
+        onRemoved={() => {
+          setRemoving((current) => {
+            const next = new Set(current);
+            next.delete(keyOf(item));
+            return next;
+          });
+          reload();
+        }}
       />
     ),
     // requestDelete is redeclared every render and closes over nothing that
     // changes, so it stays out of the deps: listing it would rebuild the row
-    // callback on every render and defeat the memo.
-    [texts, surahNames, tab, uiLocale],
+    // callback on every render and defeat the memo. `removing` and `reload`
+    // are not in that category -- a row that cannot see its own removing flag
+    // never leaves.
+    [texts, surahNames, tab, uiLocale, removing, reload],
   );
 
   const visible = tab === 'notes' ? noted : recent;
@@ -448,6 +501,8 @@ function BookmarkRow({
   uiLocale,
   onEditNote,
   onDelete,
+  removing,
+  onRemoved,
 }: {
   bookmark: Bookmark;
   text: string | null;
@@ -456,10 +511,82 @@ function BookmarkRow({
   uiLocale: UiLocaleCode;
   onEditNote: () => void;
   onDelete: () => void;
+  /** The row's DELETE has committed; play it out and then say so. The list
+   *  still holds the item -- dropping it here is what made the rows below
+   *  teleport. */
+  removing: boolean;
+  /** Fired once the exit has finished, or immediately under reduced motion.
+   *  The caller re-reads the table then, not before. */
+  onRemoved: () => void;
 }) {
   const theme = useThemeColors();
   const router = useRouter();
   const swipe = useRef<SwipeableMethods>(null);
+  const reducedMotion = useReducedMotion();
+  const { width: screenWidth } = useWindowDimensions();
+
+  // 0 while the row is in the list, 1 once it has left. Two values, not one:
+  // the slide has to finish before the collapse starts, and a single
+  // interpolated progress would run both at once.
+  const slide = useSharedValue(0);
+  const collapse = useSharedValue(0);
+  // The row's own height, measured on an inner view so the animated outer one
+  // never measures the height it is itself setting.
+  const rowHeight = useSharedValue(0);
+  // Read through a ref, the same shape SurahReader uses: the caller rebuilds
+  // this callback on every render, and depending on it directly would restart
+  // the exit from the top each time.
+  const onRemovedRef = useRef(onRemoved);
+  useEffect(() => {
+    onRemovedRef.current = onRemoved;
+  }, [onRemoved]);
+
+  // Stable across renders, so the exit effect below has nothing to restart on.
+  const fireRemoved = useCallback(() => onRemovedRef.current(), []);
+
+  useEffect(() => {
+    if (!removing) return;
+    if (reducedMotion) {
+      // A standing instruction not to animate. The row goes at once and the
+      // list closes in the same frame, which is the trade this setting asks
+      // for.
+      onRemovedRef.current();
+      return;
+    }
+    slide.value = withTiming(1, { duration: SLIDE_MS, easing: Easing.in(Easing.cubic) }, (finished?: boolean) => {
+      // Only on a settled slide: an interrupted one (the screen unmounting
+      // under it) must not go on to fire a reload into a dead component.
+      if (!finished) return;
+      collapse.value = withTiming(
+        1,
+        { duration: COLLAPSE_MS, easing: Easing.out(Easing.cubic) },
+        (done?: boolean) => {
+          if (done) runOnJS(fireRemoved)();
+        },
+      );
+    });
+  }, [removing, reducedMotion, slide, collapse, fireRemoved]);
+
+  // Left, because that is the way the row travels under a swipe -- the delete
+  // panel is a right action, so the card moves off the left edge. The confirm
+  // sheet has no direction of its own, and giving it the same one keeps a
+  // delete looking like one gesture however it was asked for.
+  const slideStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: -slide.value * screenWidth }],
+  }));
+
+  // maxHeight, not height, and never undefined: a style property that changes
+  // type between frames is the one shape reanimated cannot interpolate. The
+  // resting value is a ceiling no card reaches, so it constrains nothing.
+  //
+  // The negative margin is the list's `gap` being paid back. Yoga puts the gap
+  // between children whatever their height, so without this a collapsed row
+  // still holds ROW_GAP of space and the reload closes it in one frame -- the
+  // jump, moved rather than fixed.
+  const collapseStyle = useAnimatedStyle(() => ({
+    maxHeight: collapse.value > 0 ? Math.max(0, rowHeight.value * (1 - collapse.value)) : RESTING_MAX_HEIGHT,
+    marginBottom: -ROW_GAP * collapse.value,
+  }));
   const coordinate = `${bookmark.surahId}:${bookmark.ayahNumber}`;
   // "Al-Baqara 2:255", not "2:255": the number alone identifies the ayah only
   // to someone who already knows the surah order.
@@ -481,6 +608,24 @@ function BookmarkRow({
   }
 
   return (
+    // Two wrappers, one job each: the outer collapses the space the row
+    // occupied, the inner carries it off screen. Splitting them is what lets
+    // the height be measured on a view whose height nothing is animating.
+    <Animated.View
+      testID={`bookmark-exit-${bookmark.surahId}-${bookmark.ayahNumber}`}
+      // Only while leaving: at rest the card's drop shadow has to escape its
+      // bounds, which is the same reason Swipeable's own container is opened
+      // up below.
+      style={[{ overflow: removing ? 'hidden' : 'visible' }, collapseStyle]}
+    >
+    <View
+      onLayout={(event: LayoutChangeEvent) => {
+        // Ignored once the exit is under way: the collapse shrinks this view,
+        // and re-reading it here would chase its own animation to zero.
+        if (!removing) rowHeight.value = event.nativeEvent.layout.height;
+      }}
+    >
+    <Animated.View style={slideStyle}>
     <Swipeable
       ref={swipe}
       friction={2}
@@ -614,5 +759,8 @@ function BookmarkRow({
         </Pressable>
       </GlassSurface>
     </Swipeable>
+    </Animated.View>
+    </View>
+    </Animated.View>
   );
 }
