@@ -159,6 +159,12 @@ const RECITATION_BAR_CLEARANCE = 56;
  *  a transition between places. */
 const MODE_FADE_MS = 160;
 
+/** The style a layer rests at once it is the only one left. `opacity: 1`
+ *  explicitly: the layer arrives wearing an animated opacity, and dropping
+ *  that style off the array does not by itself repaint the value it left
+ *  behind. */
+const RESTING_LAYER = { flex: 1, opacity: 1 } as const;
+
 /** The single plate mushaf mode's rows flow across. */
 function MushafPlate({ children }: { children: ReactNode }) {
   return (
@@ -962,17 +968,24 @@ export function SurahReader({
             barDocked={barDocked}
           />
         );
-        // The first layer is the page; anything above it is an arrival. It is
-        // absolutely positioned so the layer underneath keeps its own layout
-        // rather than being pushed out of the column, and untouchable until it
-        // has faded in -- a half-transparent list that swallows taps is worse
-        // than either mode.
-        if (index === 0) return list;
+        // The first layer is the page; anything above it is an arrival. An
+        // arrival is absolutely positioned so the layer underneath keeps its
+        // own layout rather than being pushed out of the column, and
+        // untouchable until it has faded in -- a half-transparent list that
+        // swallows taps is worse than either mode.
+        //
+        // Every layer gets the same wrapper, arriving or not. Returning `list`
+        // bare at index 0 was a remount waiting to happen: once the spent
+        // layer is dropped the survivor moves from index 1 to index 0, and a
+        // child whose element type changes at the same position is unmounted
+        // and rebuilt. The rebuilt list re-lands from scratch, which is
+        // exactly the blank-and-spinner this layering exists to remove
+        // (device, 2026-09-01, Al-Baqara 2:255).
         return (
           <Animated.View
             key={layer.id}
             pointerEvents={live ? 'auto' : 'none'}
-            style={[StyleSheet.absoluteFill, incomingStyle]}
+            style={index > 0 ? [StyleSheet.absoluteFill, incomingStyle] : RESTING_LAYER}
           >
             {list}
           </Animated.View>

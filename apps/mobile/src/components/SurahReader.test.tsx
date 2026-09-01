@@ -955,6 +955,16 @@ describe('SurahReader', () => {
         while (mocks.heldFades.length > 0) mocks.heldFades.shift()?.(true);
       });
       expect(container.textContent).not.toContain(translation);
+
+      // And dropping the spent layer must not blank the survivor. It moves
+      // from index 1 to index 0 as the array shrinks; while index 0 rendered
+      // its list bare and every other index wrapped it, that move changed the
+      // element type at that position, so React unmounted the landed list and
+      // rebuilt it -- which re-ran the landing behind the spinner on an empty
+      // screen. That was the blank the device still showed after the fade
+      // (Al-Baqara 2:255, 2026-09-01).
+      expect(screen.queryByTestId('reader-positioning')).toBeNull();
+      expect(container.textContent).toContain(data.ayahs[254]!.ayah.text_uthmani);
     } finally {
       vi.useRealTimers();
     }
