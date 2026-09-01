@@ -1,10 +1,9 @@
-import { Pressable, Text, View } from 'react-native';
+import { View } from 'react-native';
 import { RECITERS } from '@quran-corpus/data/mobile';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
-import { touchTargets, typography } from '@/theme/tokens';
-import { useThemeColors } from '@/theme/themeContext';
 import { BottomSheet } from './BottomSheet';
+import { SheetHeader, SheetRow } from './sheet';
 
 export interface ReciterSheetProps {
   /** The active `Reciter.id`. */
@@ -22,62 +21,36 @@ export interface ReciterSheetProps {
  * against -- so the sheet cannot offer an id the URL builder would reject, and
  * there is no second list in `apps/mobile` to drift from it (CLAUDE.md §2).
  *
- * ponytail: no ScrollView. Ten fixed rows fit a phone, and a scrollable body
- * inside BottomSheet would have to be made to cooperate with the sheet's own
- * drag-to-dismiss pan. If a large OS font scale ever pushes the last row off
- * the top, that is the fix: a scroll view plus `simultaneousWithExternalGesture`
- * on the sheet's gesture.
+ * ponytail: no ScrollView. `BottomSheet`'s pan gesture wraps its whole
+ * `children` tree (no `simultaneousWithExternalGesture` composition), so a
+ * ScrollView here would fight the sheet's own drag rather than cooperate with
+ * it -- ten rows at 48dp is already taller than a naive maxHeight would need
+ * to be, so this was speculative for a large-font-scale case nobody has
+ * observed, and device check 174 exists to catch it if it turns out real.
+ * Composing the gestures correctly needs a ref threaded into `BottomSheet`'s
+ * pan, which is surgery worth doing once that check shows it is needed.
  */
 export function ReciterSheet({ current, uiLocale, onSelect, onClose }: ReciterSheetProps) {
-  const theme = useThemeColors();
-
   return (
     <BottomSheet onClose={onClose} closeLabel={t(uiLocale, 'word.close')}>
-      <Text
-        accessibilityRole="header"
-        style={{ color: theme.text, fontSize: typography.body, fontWeight: '600' }}
-      >
-        {t(uiLocale, 'reader.chooseReciter')}
-      </Text>
+      <SheetHeader title={t(uiLocale, 'reader.chooseReciter')} />
       <View accessibilityRole="radiogroup">
-        {RECITERS.map((reciter) => {
-          const selected = reciter.id === current;
-          return (
-            <Pressable
-              key={reciter.id}
-              // radio, not button: an exclusive choice, and the role is what
-              // tells a screen reader "3 of 10" rather than leaving selection
-              // as an afterthought.
-              accessibilityRole="radio"
-              accessibilityState={{ selected, checked: selected }}
-              // The name alone. The bullet below is decorative and would
-              // otherwise be announced as a character.
-              accessibilityLabel={reciter.label}
-              onPress={() => {
-                // Guarded: re-selecting the active reciter would re-run the
-                // settings write path for a value that has not changed.
-                // Closing regardless -- tapping it is a "yes, that one"
-                // gesture, not a mistake.
-                if (!selected) onSelect(reciter.id);
-                onClose();
-              }}
-              style={{ minHeight: touchTargets.minimum, justifyContent: 'center' }}
-            >
-              {/* Filled/hollow bullet plus weight, the same convention the
-                  Settings screen uses: colour alone as the carrier of "this
-                  one is active" fails WCAG 1.4.1. */}
-              <Text
-                style={{
-                  color: selected ? theme.accent : theme.text,
-                  fontWeight: selected ? '700' : '400',
-                }}
-              >
-                {selected ? '● ' : '○ '}
-                {reciter.label}
-              </Text>
-            </Pressable>
-          );
-        })}
+        {RECITERS.map((reciter) => (
+          <SheetRow
+            key={reciter.id}
+            testID={`reciter-${reciter.id}`}
+            label={reciter.label}
+            role="radio"
+            selected={reciter.id === current}
+            onPress={() => {
+              // Guarded: re-selecting the active reciter re-runs the
+              // settings write for a value that has not changed. Closing
+              // either way -- tapping it is "yes, that one", not a mistake.
+              if (reciter.id !== current) onSelect(reciter.id);
+              onClose();
+            }}
+          />
+        ))}
       </View>
     </BottomSheet>
   );

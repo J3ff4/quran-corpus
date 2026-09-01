@@ -261,6 +261,27 @@ describe('BookmarksTab', () => {
     expect(headers.indexOf('Al-Fatiha')).toBeLessThan(headers.indexOf('Al-Baqara'));
   });
 
+  it('names the ayah in the note sheet, not just its coordinate', async () => {
+    const userClient = requireUserClient();
+    await setBookmark(userClient, 2, 255, true);
+    render(<BookmarksTab />);
+    fireEvent.click(await screen.findByTestId('bookmark-note-2-255'));
+    // "2:255" alone identifies the ayah only to someone who knows the order.
+    // { selector: 'span' } excludes the row's own "Open Al-Baqara 2:255" link
+    // text, which is still in the DOM underneath the (inline-rendered) sheet.
+    expect(await screen.findByText('Al-Baqara 2:255', { selector: 'span' })).toBeTruthy();
+  });
+
+  it('gives the note sheet buttons the 48dp floor', async () => {
+    const userClient = requireUserClient();
+    await setBookmark(userClient, 2, 255, true);
+    render(<BookmarksTab />);
+    fireEvent.click(await screen.findByTestId('bookmark-note-2-255'));
+    // The control that discarded a typed note was ~33dp.
+    expect(screen.getByTestId('note-save').style.minHeight).toBe('48px');
+    expect(screen.getByTestId('note-cancel').style.minHeight).toBe('48px');
+  });
+
   it('counts down the remaining characters while editing', async () => {
     const userClient = requireUserClient();
     await setBookmark(userClient, 2, 255, true);

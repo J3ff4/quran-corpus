@@ -93,12 +93,13 @@ vi.mock('@/components/NoteEditor', async () => {
     // parse under this transform; BookmarksTab.test.tsx covers its behaviour.
     // What matters here is that the route opens it for the right ayah and
     // hands what is typed to the write.
-    NoteEditor: ({ surahId, ayahNumber, note, error, onSave }: { surahId: number; ayahNumber: number; note: string | null; error?: string | null; onSave: (note: string) => void }) =>
+    NoteEditor: ({ surahId, ayahNumber, surahName, note, error, onSave }: { surahId: number; ayahNumber: number; surahName: string | null; note: string | null; error?: string | null; onSave: (note: string) => void }) =>
       React.createElement(
         'div',
         null,
         React.createElement('span', null, `editing:${ayahNumber}:${note ?? 'none'}`),
         React.createElement('span', null, `sheet-surah:${surahId}`),
+        React.createElement('span', null, `sheet-surah-name:${surahName ?? 'none'}`),
         React.createElement('span', null, `sheet-error:${error ?? 'none'}`),
         React.createElement('button', { onClick: () => onSave('  the throne verse  ') }, 'save note'),
       ),
@@ -420,6 +421,10 @@ describe('SurahRoute', () => {
     // `surahId` has already moved on.
     fireEvent.click(screen.getByText('edit note'));
     expect(screen.getByText('sheet-surah:2')).toBeTruthy();
+    // The caption comes off `held`, the same value `displayedSurahId` above
+    // is derived from, so it names the surah on screen (2). Kills
+    // `surahName={null}`.
+    expect(screen.getByText('sheet-surah-name:Al-Baqarah')).toBeTruthy();
     fireEvent.click(screen.getByText('save note'));
 
     await waitFor(() =>

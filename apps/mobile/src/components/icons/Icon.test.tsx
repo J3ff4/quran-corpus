@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { Icon } from './Icon';
 
@@ -39,5 +39,14 @@ describe('Icon', () => {
       expect(container.querySelectorAll('path').length).toBeGreaterThan(0);
       cleanup();
     }
+  });
+
+  it('draws a check', () => {
+    // Icon takes a testID, it does not invent one -- it spreads the prop only
+    // when given (exactOptionalPropertyTypes). Every caller below passes it.
+    render(<Icon name="check" color="#1f6f5b" size={20} testID="icon-check" />);
+    // Every glyph in the set is one or more <path d>; a name with no entry
+    // renders an empty <svg>, which is the regression this catches.
+    expect(screen.getByTestId('icon-check').querySelectorAll('path').length).toBeGreaterThan(0);
   });
 });

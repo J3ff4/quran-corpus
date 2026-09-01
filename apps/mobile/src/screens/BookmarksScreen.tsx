@@ -325,6 +325,7 @@ export function BookmarksScreen() {
         <NoteEditor
           surahId={editing.surahId}
           ayahNumber={editing.ayahNumber}
+          surahName={surahNames.get(editing.surahId) ?? null}
           note={editing.note}
           uiLocale={uiLocale}
           // Inside the sheet, not on the list behind it: the sheet is a <Modal>

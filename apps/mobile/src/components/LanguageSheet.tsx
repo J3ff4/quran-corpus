@@ -1,8 +1,8 @@
-import { Text } from 'react-native';
 import type { ContentLanguageCode, UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
-import { typography } from '@/theme/tokens';
-import { useThemeColors } from '@/theme/themeContext';
+// Direct, not through the sheet barrel: header-only sheet, and the barrel's
+// other exports pull the settings store into its tests. See sheet/index.ts.
+import { SheetHeader } from './sheet/SheetHeader';
 import { BottomSheet } from './BottomSheet';
 import { LanguageSelector } from './LanguageSelector';
 
@@ -19,16 +19,12 @@ export interface LanguageSheetProps {
  * for a setting most readers change once (owner ruling 2026-08-17).
  */
 export function LanguageSheet({ value, uiLocale, onChange, onClose }: LanguageSheetProps) {
-  const theme = useThemeColors();
-
   return (
     <BottomSheet onClose={onClose} closeLabel={t(uiLocale, 'word.close')}>
-      <Text
-        accessibilityRole="header"
-        style={{ color: theme.text, fontSize: typography.body, fontWeight: '600' }}
-      >
-        {t(uiLocale, 'reader.chooseLanguage')}
-      </Text>
+      {/* Was accessibilityRole="header", which lands as the banner landmark
+          rather than a heading. SheetHeader gets it right, and this sheet was
+          the last of the five still getting it wrong. */}
+      <SheetHeader title={t(uiLocale, 'reader.chooseLanguage')} />
       <LanguageSelector
         value={value}
         onChange={(code) => {

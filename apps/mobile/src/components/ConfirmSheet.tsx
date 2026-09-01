@@ -1,9 +1,9 @@
-import { Pressable, Text, View } from 'react-native';
+import { Text } from 'react-native';
 
 import { BottomSheet } from '@/components/BottomSheet';
+import { SheetActions, SheetHeader } from '@/components/sheet';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
-import { touchTargets } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
 /** A yes/no sheet for an action that cannot be undone.
@@ -33,13 +33,6 @@ export interface ConfirmSheetProps {
   onCancel: () => void;
 }
 
-const BUTTON = {
-  minHeight: touchTargets.minimum,
-  paddingHorizontal: 12,
-  alignItems: 'center',
-  justifyContent: 'center',
-} as const;
-
 export function ConfirmSheet({
   title,
   body,
@@ -53,45 +46,29 @@ export function ConfirmSheet({
 
   return (
     <BottomSheet onClose={onCancel} closeLabel={t(uiLocale, 'bookmarks.cancel')}>
-      <View style={{ padding: 16, gap: 12 }}>
-        <Text accessibilityRole="header" style={{ color: theme.text, fontWeight: '700' }}>
-          {title}
+      {/* No padding wrapper here: BottomSheet already applies 20/12/28 and a
+          14 gap between children. */}
+      <SheetHeader title={title} />
+      <Text style={{ color: theme.mutedText }}>{body}</Text>
+      {error ? (
+        <Text
+          testID="confirm-error"
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          style={{ color: theme.danger }}
+        >
+          {error}
         </Text>
-        <Text style={{ color: theme.mutedText }}>{body}</Text>
-        {error ? (
-          <Text
-            testID="confirm-error"
-            accessibilityRole="alert"
-            accessibilityLiveRegion="polite"
-            style={{ color: theme.danger }}
-          >
-            {error}
-          </Text>
-        ) : null}
-        {/* Pressables sized to the 48dp floor, not text runs with padding: a
-            padded <Text> here measured about 33dp tall, and the button that
-            misses is the one that destroys a note. */}
-        <View style={{ flexDirection: 'row', gap: 12, justifyContent: 'flex-end' }}>
-          <Pressable
-            testID="confirm-cancel"
-            accessibilityRole="button"
-            accessibilityLabel={t(uiLocale, 'bookmarks.cancel')}
-            onPress={onCancel}
-            style={BUTTON}
-          >
-            <Text style={{ color: theme.mutedText }}>{t(uiLocale, 'bookmarks.cancel')}</Text>
-          </Pressable>
-          <Pressable
-            testID="confirm-accept"
-            accessibilityRole="button"
-            accessibilityLabel={confirmLabel}
-            onPress={onConfirm}
-            style={BUTTON}
-          >
-            <Text style={{ color: theme.danger, fontWeight: '700' }}>{confirmLabel}</Text>
-          </Pressable>
-        </View>
-      </View>
+      ) : null}
+      <SheetActions
+        cancelLabel={t(uiLocale, 'bookmarks.cancel')}
+        onCancel={onCancel}
+        confirmLabel={confirmLabel}
+        onConfirm={onConfirm}
+        tone="danger"
+        cancelTestID="confirm-cancel"
+        confirmTestID="confirm-accept"
+      />
     </BottomSheet>
   );
 }

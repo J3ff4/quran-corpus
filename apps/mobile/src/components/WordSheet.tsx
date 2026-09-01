@@ -1,20 +1,16 @@
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import type { Word } from '@quran-corpus/data/mobile';
 import type { WordSummary } from '@/data/corpusRepository';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
-import { touchTargets, typography } from '@/theme/tokens';
+import { typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useArabicSizes } from '@/theme/useArabicSizes';
 import { BottomSheet } from './BottomSheet';
 import { SegmentedWord } from './SegmentedWord';
 import { GlossLangTag } from './GlossLangTag';
 import { SegmentPill } from './SegmentPill';
-
-const actionStyle = {
-  minHeight: touchTargets.minimum,
-  justifyContent: 'center',
-} as const;
+import { SheetRow } from './sheet';
 
 export interface WordSheetProps {
   /** null closes the sheet: BottomSheet unmounts, which IS the close. */
@@ -57,29 +53,21 @@ export function WordSheet({ summary, uiLocale, onClose, onOpenDetail, onOpenRoot
           <SegmentPill key={segment.id} segment={segment} />
         ))}
       </View>
-      <Pressable
+      <SheetRow
         testID="full-analysis"
-        accessibilityRole="button"
+        label={t(uiLocale, 'word.fullAnalysis')}
+        trailingIcon="chevronRight"
         onPress={() => onOpenDetail(word)}
-        style={actionStyle}
-      >
-        <Text style={{ color: theme.accent, fontSize: typography.body }}>
-          {t(uiLocale, 'word.fullAnalysis')}
-        </Text>
-      </Pressable>
+      />
       {rootBuckwalter ? (
-        <Pressable
+        <SheetRow
           testID="root-link"
-          accessibilityRole="button"
+          // Buckwalter is the routing key; the Arabic is only the label, and
+          // some rows carry no Arabic root at all.
+          label={`${t(uiLocale, 'word.root')} ${word.root ?? rootBuckwalter}`}
+          trailingIcon="chevronRight"
           onPress={() => onOpenRoot(rootBuckwalter)}
-          style={actionStyle}
-        >
-          <Text style={{ color: theme.accent, fontSize: typography.body }}>
-            {/* Buckwalter is the routing key; the Arabic is only the label,
-                and some rows carry no Arabic root at all. */}
-            {`${t(uiLocale, 'word.root')} ${word.root ?? rootBuckwalter}`}
-          </Text>
-        </Pressable>
+        />
       ) : null}
     </BottomSheet>
   );

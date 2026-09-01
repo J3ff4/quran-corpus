@@ -1,12 +1,16 @@
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, Text } from 'react-native';
 import { BottomSheet } from '@/components/BottomSheet';
+import { Icon } from '@/components/icons/Icon';
+// Direct, not through the sheet barrel: header-only sheet, and the barrel's
+// other exports pull the settings store into its tests. See sheet/index.ts.
+import { SheetHeader } from '@/components/sheet/SheetHeader';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
 import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
 export interface InfoButtonProps {
-  /** Accessible name for the ⓘ button, e.g. "About these translations". */
+  /** Accessible name for the info button, e.g. "About these translations". */
   label: string;
   expanded: boolean;
   onPress: () => void;
@@ -21,7 +25,7 @@ export interface InfoSheetProps {
   onClose: () => void;
 }
 
-/** The ⓘ that opens {@link InfoSheet}.
+/** The info button that opens {@link InfoSheet}.
  *
  *  Button and sheet are separate components, and the screen owns the open
  *  state, because BottomSheet positions itself with StyleSheet.absoluteFill
@@ -47,7 +51,7 @@ export function InfoButton({ label, expanded, onPress }: InfoButtonProps) {
         justifyContent: 'center',
       }}
     >
-      <Text style={{ color: theme.mutedText, fontSize: typography.body }}>ⓘ</Text>
+      <Icon testID="icon-info" name="info" color={theme.mutedText} size={20} />
     </Pressable>
   );
 }
@@ -65,18 +69,14 @@ export function InfoSheet({ label, body, uiLocale, onClose }: InfoSheetProps) {
 
   return (
     <BottomSheet onClose={onClose} closeLabel={t(uiLocale, 'lemma.close')}>
-      <View style={{ padding: 20, gap: 8 }}>
-        {/* 'heading' (ARIA-aligned), not accessibilityRole="header": the
-            latter lands as role="header" (the banner landmark) rather than
-            the heading role a screen reader needs -- see EntryHeader's
-            same note. */}
-        <Text role="heading" style={{ color: theme.text, fontSize: typography.body }}>
-          {label}
-        </Text>
-        <Text testID="info-body" style={{ color: theme.mutedText, fontSize: typography.body }}>
-          {body}
-        </Text>
-      </View>
+      {/* No padding wrapper: BottomSheet already applies 20/12/28 and a 14
+          gap, so the `padding: 20` this carried was a second helping of it.
+          SheetHeader also carries the role="heading" note this file used to
+          make on its own. */}
+      <SheetHeader title={label} />
+      <Text testID="info-body" style={{ color: theme.mutedText, fontSize: typography.body }}>
+        {body}
+      </Text>
     </BottomSheet>
   );
 }
