@@ -90,9 +90,14 @@ vi.mock('react-native-reanimated', async () => {
     runOnJS: (fn: unknown) => fn,
     withSequence: (...steps: number[]) => steps[steps.length - 1],
     useSharedValue: (initial: number) => React.useRef({ value: initial }).current,
+    // Evaluated, not stubbed to {}. The shared values these worklets read are
+    // real objects here (useSharedValue below returns one), and withTiming
+    // assigns its target value synchronously, so the result is the opacity the
+    // layer would actually wear. That is the only way a test can tell a
+    // cross-fade from two layers printed over each other.
     useAnimatedStyle: (worklet: () => never) => {
       mocks.animatedStyles.push(worklet as unknown as () => Record<string, unknown>);
-      return {};
+      return (worklet as unknown as () => Record<string, unknown>)();
     },
     // Linear between two stops with both ends clamped, which is all this
     // screen asks of the real one.
@@ -949,6 +954,20 @@ describe('SurahReader', () => {
       // Still nothing, once it has landed and before the fade is released.
       expect(screen.queryByTestId('reader-positioning')).toBeNull();
       expect(container.textContent).toContain(translation);
+
+      // A no-op re-render first: a shared value assignment does not re-render
+      // on its own, so the layers still carry the styles computed before the
+      // fade started. This is the next paint, which is what the phone shows.
+      rerender(<SurahReader {...baseProps(data)} readerMode="mushaf" initialAyahNumber={255} />);
+
+      // And the outgoing rendering is already invisible, before the drop that
+      // removes it. A layer's background is the bloom showing through, so an
+      // arriving layer at full opacity does not cover the one beneath: without
+      // its own fade the outgoing layer stays legible under the new one until
+      // the drop runs, which on device was 420ms of two readings of 2:255
+      // printed over each other.
+      expect(screen.getByTestId('reader-layer-0').style.opacity).toBe('0');
+      expect(screen.getByTestId('reader-layer-1').style.opacity).toBe('1');
 
       // The fade lands, and only then does the outgoing rendering go.
       await act(async () => {

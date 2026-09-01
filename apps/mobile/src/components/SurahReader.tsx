@@ -921,6 +921,15 @@ export function SurahReader({
   }, [reducedMotion, incoming, dropSpentLayers]);
 
   const incomingStyle = useAnimatedStyle(() => ({ opacity: incoming.value }));
+  // The other half of the cross-fade, and it is not optional. A layer's
+  // background is the bloom showing through, so an arriving layer at opacity 1
+  // does not hide the one beneath it -- both renderings sit on screen together
+  // until the spent one is dropped, and the drop is a JS-thread hop that the
+  // arriving list's own landing work can hold up. On device that was 420ms of
+  // two readings of 2:255 printed over each other (2026-09-01). Fading the
+  // outgoing layer out as the incoming comes in makes the drop invisible
+  // however late it runs.
+  const outgoingStyle = useAnimatedStyle(() => ({ opacity: 1 - incoming.value }));
 
   // Stable no-ops, so a layer that is not driving either one does not get a
   // fresh callback identity on every render of this component.
@@ -981,11 +990,18 @@ export function SurahReader({
         // and rebuilt. The rebuilt list re-lands from scratch, which is
         // exactly the blank-and-spinner this layering exists to remove
         // (device, 2026-09-01, Al-Baqara 2:255).
+        // Layer 0 stays in the column and every arrival is absolutely
+        // positioned over it, so the layer underneath keeps its own layout
+        // rather than being pushed out. While a switch is in flight the two
+        // cross-fade; alone, a layer rests at full opacity.
+        const base = index === 0 ? RESTING_LAYER : StyleSheet.absoluteFill;
+        const fade = layers.length === 1 ? null : live ? incomingStyle : outgoingStyle;
         return (
           <Animated.View
             key={layer.id}
+            testID={`reader-layer-${layer.id}`}
             pointerEvents={live ? 'auto' : 'none'}
-            style={index > 0 ? [StyleSheet.absoluteFill, incomingStyle] : RESTING_LAYER}
+            style={fade ? [base, fade] : base}
           >
             {list}
           </Animated.View>
