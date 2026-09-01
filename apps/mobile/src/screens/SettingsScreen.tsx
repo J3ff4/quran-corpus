@@ -334,7 +334,9 @@ export function SettingsScreen() {
         <ChoiceRow
           label={label('settings.wbwDensity')}
           hint={label('settings.wbwDensityHint')}
-          options={(['hybrid', 'dense'] as const).map((value) => ({
+          // Dense first, matching the Morphology screen's own control -- see
+          // the note on DENSITY_OPTIONS there.
+          options={(['dense', 'hybrid'] as const).map((value) => ({
             value,
             label: label(densityLabelKeys[value]),
           }))}
