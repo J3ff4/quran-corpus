@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { GlassSurface } from './GlassSurface';
 import { Icon, type IconName } from './icons/Icon';
@@ -59,14 +59,7 @@ export function GlassTabBar({ state, navigation, insets }: GlassTabBarProps) {
       pointerEvents="box-none"
       style={{ position: 'absolute', left: 16, right: 16, bottom: insets.bottom + 12 }}
     >
-      <GlassSurface radius="pill" style={{ flexDirection: 'row', paddingVertical: 6 }}>
-        {/* The same opaque backing the recitation bar carries, for the same
-            reason: this bar floats over a scrolling page, and the glass fill
-            alone (45% in dark, 85% in light) let the ayah underneath read
-            straight through the labels on every tab screen (device,
-            2026-08-29). RN has no backdrop-filter -- a docked bar stays
-            legible only by not being see-through. */}
-        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: theme.background, opacity: 0.94 }]} />
+      <GlassSurface docked radius="pill" style={{ flexDirection: 'row', paddingVertical: 6 }}>
         {state.routes.map((route, index) => {
           const tab = TABS[route.name];
           if (!tab) return null;

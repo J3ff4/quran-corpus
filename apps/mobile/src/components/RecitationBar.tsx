@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import { Pressable, Text, View, type LayoutChangeEvent } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -162,13 +162,7 @@ export function RecitationBar({
       pointerEvents="box-none"
       style={{ position: 'absolute', left: 16, right: 16, bottom: insets.bottom + 12 }}
     >
-      <GlassSurface radius="pill" style={{ paddingHorizontal: 14, paddingVertical: 10, gap: 6 }}>
-        {/* An opaque backing under the glass. Every other glass surface in the
-            app sits on the page; this one floats over scrolling text, and the
-            translucent fill alone let the ayah behind it read straight through
-            the bar (device, 2026-08-25). RN has no backdrop-filter, so the
-            only way a docked bar stays legible is to stop being see-through. */}
-        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: theme.background, opacity: 0.94 }]} />
+      <GlassSurface docked radius="pill" style={{ paddingHorizontal: 14, paddingVertical: 10, gap: 6 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <TransportButton
             icon="skipBack"

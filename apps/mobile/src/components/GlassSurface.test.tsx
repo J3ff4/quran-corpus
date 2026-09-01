@@ -7,7 +7,7 @@ vi.mock('react-native', async () => (await import('@/testing/rnHosts.js')).react
 import { GlassSurface } from './GlassSurface';
 import { ThemeContext, type ThemeColors } from '@/theme/themeContext';
 import { glass, radii, themeColors } from '@/theme/tokens';
-import { rgba } from '@/testing/rgb';
+import { rgb, rgba } from '@/testing/rgb';
 
 function renderIn(theme: ThemeColors, element: React.ReactElement) {
   return render(<ThemeContext.Provider value={theme}>{element}</ThemeContext.Provider>);
@@ -62,6 +62,33 @@ describe('GlassSurface', () => {
     renderIn(themeColors.dark, <GlassSurface testID="card"><span>inside</span></GlassSurface>);
 
     expect(screen.getByTestId('card').lastElementChild).toBe(screen.getByTestId('card-highlight'));
+  });
+
+  it('backs a docked surface with an opaque ground', () => {
+    // The fill is translucent and RN has no backdrop-filter, so a bar docked
+    // over scrolling text is see-through unless something opaque sits between.
+    // Both bars used to paint this themselves at opacity 0.94, and 6% of an
+    // ayah reading through a tab label is what that bought (device, 2026-08-29).
+    renderIn(themeColors.dark, <GlassSurface testID="bar" docked>{null}</GlassSurface>);
+
+    const backing = screen.getByTestId('bar-backing');
+    expect(backing.style.backgroundColor).toBe(rgb(themeColors.dark.background));
+    // No opacity: anything below 1 is bleed-through by another name.
+    expect(backing.style.opacity).toBe('');
+  });
+
+  it('leaves an undocked surface see-through', () => {
+    // The default has to stay glass -- every card in the app is one, and an
+    // opaque backing on all of them would flatten the whole design.
+    renderIn(themeColors.dark, <GlassSurface testID="card">{null}</GlassSurface>);
+
+    expect(screen.queryByTestId('card-backing')).toBeNull();
+  });
+
+  it('paints the docked backing under the children, not over them', () => {
+    renderIn(themeColors.dark, <GlassSurface testID="bar" docked><span>inside</span></GlassSurface>);
+
+    expect(screen.getByTestId('bar').firstElementChild).toBe(screen.getByTestId('bar-backing'));
   });
 
   it('renders its children', () => {
