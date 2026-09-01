@@ -1019,7 +1019,7 @@ adb install -r app/build/outputs/apk/release/app-release.apk
 
 `taskset` is not optional — the unconstrained build drove this machine to a load of 136 (2026-08-31).
 
-- [ ] **Step 6: Device checks — log every result in the table below**
+- [x] **Step 6: Device checks — log every result in the table below**
 
 | # | Check | Pass condition |
 | --- | --- | --- |
@@ -1036,7 +1036,7 @@ adb install -r app/build/outputs/apk/release/app-release.apk
 | 179 | TalkBack on the reciter sheet | Each row announces as a radio with its position and state |
 | 180 | Dark theme, every sheet | Accent-on-tint legible; nothing lost against the dark surface |
 
-- [ ] **Step 7: Record the run**
+- [x] **Step 7: Record the run**
 
 Append a `### Device run <date>` table to this file with build, date, result and notes per check — the format used in `phase-m6h-bookmarks-notes.md`. A milestone with "verification pending" is an unmet exit criterion (§10).
 
@@ -1077,3 +1077,39 @@ git commit -m "docs: log the M6j device run"
   1. `InfoButton` uses `info`, which already exists — Task 7 Step 7 does **not** depend on Task 1.
   2. `Icon` has no default testID; it spreads the prop only when given. Every assertion on `icon-check`/`icon-info` needs the caller to pass one, so Tasks 1, 4 and 7 do.
   3. The reader's note sheet is rendered by `app/surah/[surahId].tsx`, not `components/SurahReader.tsx` — the component only raises `onEditNote`. Task 6 edits the route.
+
+---
+
+### Device run 2026-08-31 (release APK, OnePlus 7 Pro, Android 12) — checks 169-180
+
+Build: local `assembleRelease` from `efceb59`, arm64-v8a, debug-signed, versionCode 1,
+82.7 MB. Installed over adb-over-wifi. Driven over adb: every geometry claim below is
+pixels from a `uiautomator` dump, every colour claim is a pixel histogram over the whole
+node rect from `screencap` — nothing eyeballed. Density override is 640, so **1 dp = 4 px**.
+
+**9 PASS, 2 FAIL, 1 PARTIAL.** Both failures were anticipated by this plan (171 by the
+risk table, 173 by the §5 finding on `accentWash`), and neither blocks the retrofit.
+
+| Check | Build | Date | Result | Notes |
+| --- | --- | --- | --- | --- |
+| 169 | release `efceb59` | 2026-08-31 | PASS | `Add note` over `An-Nisa 4:1`; after a save the same sheet reopens titled `Edit note` with the text preserved. Input is a bordered field with a `Write a note` placeholder and a live `Characters left · 500`. |
+| 170 | release `efceb59` | 2026-08-31 | PASS | Save is a filled accent block, Cancel is bare text. Cancel `[763,2816][1061,3008]` = 298×192 px = **74.5 × 48.0 dp**; Save `[1109,2816][1360,3008]` = 251×192 px = **62.8 × 48.0 dp**. Both clear the 48dp floor on the short axis exactly. |
+| 171 | release `efceb59` | 2026-08-31 | **FAIL** | The IME covers the **whole sheet body**, not just Save — title, subtitle, input and both buttons are all behind the keyboard, so the reader types blind. Typing still lands (`Characters left` ran 500 → 496 while nothing was visible). Predicted by the risk table; filed, not reverted — the fix is a keyboard-aware `BottomSheet`, out of this phase's scope. |
+| 172 | release `efceb59` | 2026-08-31 | PASS | Reader path gives byte-identical node bounds to 169 — same title, same `An-Nisa 4:1` caption, same button geometry. |
+| 173 | release `efceb59` | 2026-08-31 | **FAIL** | Check drawn, label accent + bold, no `●`/`○` anywhere — but **the tinted fill never paints**. Full-pixel histogram of the checked row's rect: 0 `accentWash` pixels in either theme (dark row is `#1d1b18`, identical to the sheet surface; light row is `#fffdf8`, identical to its surface). Not the "1.23:1, barely reads" the §5 review predicted — it is absent. The token itself is fine: the Settings pills sample `#e0e8e1` exactly, and `SheetActions`' filled confirm paints, so the defect is inside `SheetRow`, not in `tokens.ts` or the function-style pattern. |
+| 174 | release `efceb59` | 2026-08-31 | PASS | At the device maximum `font_scale 1.35`: all ten rows laid out, last row `Muhammad Ayyoub` at `[80,2816][1360,3008]`, clear of the 3056 usable edge. Nothing clipped, no scrolling needed. The deleted `ScrollView` was correctly deleted. |
+| 175 | release `efceb59` | 2026-08-31 | PASS | Tapping Abdul Basit switched Settings' summary row and closed the sheet. Reopening and re-tapping the active row closed it with the summary unchanged — the `if (id !== current)` guard holds on hardware. |
+| 176 | release `efceb59` | 2026-08-31 | PASS | `Full analysis` and `Root وقي` are both full-width rows spanning `[80,…][1360,…]` at 48dp with a right chevron. No heading, by design. |
+| 177 | release `efceb59` | 2026-08-31 | PASS | The lemma's `TRANSLATED AS` affordance is the drawn `info` glyph (stroked ring, stem, dot), not `ⓘ`; tapping it opens the `InfoSheet` with a `SheetHeader` title and body. Its hit rect is `[586,1180][746,1340]` = **40 × 40 dp**, under the 48dp floor — the §5 finding, confirmed on hardware. |
+| 178 | release `efceb59` | 2026-08-31 | PASS | Unchanged from 163. Glass sheet, `Delete this bookmark?` heading, danger **text** (not a fill). Cancel 298×192 px, Delete 289×192 px — both **48.0 dp** tall. Cancel kept the row; Delete removed it and the note. Note: an **un-noted** bookmark deletes with no sheet at all, which is `requestDelete`'s deliberate rule (`BookmarksScreen.tsx:196`), not a regression. |
+| 179 | release `efceb59` | 2026-08-31 | PARTIAL | From the accessibility tree each row is `android.widget.RadioButton` with `checked=true/false` and the reciter name as its label — role and state are right. **No collection position is exposed**: `accessibilityRole="radiogroup"` on a plain `View` sets no `CollectionInfo`, so TalkBack cannot say "3 of 10". Speech itself not exercised — same deferral as checks 143/144 (issue #34). |
+| 180 | release `efceb59` | 2026-08-31 | PASS | Note, reciter, word, info and confirm sheets all captured on the dark palette: surface `#1d1b18`, body text `#f1ede4`, accent `#5aa58d`, danger `#e88b8b`. Everything legible against the surface. The one dark-theme loss is 173's missing tint, counted there rather than twice. |
+
+**Environment restored after the run:** system font scale back to 1.0, app theme back to
+`System`, reciter back to Al-Husary (Murattal), and the plain An-Nisa 4:1 bookmark
+re-created (checks 178 and 175 consumed all three).
+
+**adb gotcha, recorded so the next run does not lose twenty minutes to it:** a bare
+`adb install` landed the APK in **user 10 (Guest)**, where `pm list packages` for user 0
+never shows it and `am start` answers `No activities found to run` while `dumpsys package`
+happily prints the manifest. Always `adb install -r --user 0`.
