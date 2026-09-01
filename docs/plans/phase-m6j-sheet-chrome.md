@@ -1087,8 +1087,10 @@ Build: local `assembleRelease` from `efceb59`, arm64-v8a, debug-signed, versionC
 pixels from a `uiautomator` dump, every colour claim is a pixel histogram over the whole
 node rect from `screencap` — nothing eyeballed. Density override is 640, so **1 dp = 4 px**.
 
-**9 PASS, 2 FAIL, 1 PARTIAL.** Both failures were anticipated by this plan (171 by the
-risk table, 173 by the §5 finding on `accentWash`), and neither blocks the retrofit.
+**10 PASS, 1 FAIL, 1 PARTIAL** after the 173 re-run below. As first run it was 9/2/1;
+173's failure turned out to be an artifact of the build, not of the code -- see
+*Check 173 was a bad build* under the table. 171 was anticipated by the risk table and
+does not block the retrofit.
 
 | Check | Build | Date | Result | Notes |
 | --- | --- | --- | --- | --- |
@@ -1096,18 +1098,54 @@ risk table, 173 by the §5 finding on `accentWash`), and neither blocks the retr
 | 170 | release `efceb59` | 2026-08-31 | PASS | Save is a filled accent block, Cancel is bare text. Cancel `[763,2816][1061,3008]` = 298×192 px = **74.5 × 48.0 dp**; Save `[1109,2816][1360,3008]` = 251×192 px = **62.8 × 48.0 dp**. Both clear the 48dp floor on the short axis exactly. |
 | 171 | release `efceb59` | 2026-08-31 | **FAIL** | The IME covers the **whole sheet body**, not just Save — title, subtitle, input and both buttons are all behind the keyboard, so the reader types blind. Typing still lands (`Characters left` ran 500 → 496 while nothing was visible). Predicted by the risk table; filed, not reverted — the fix is a keyboard-aware `BottomSheet`, out of this phase's scope. |
 | 172 | release `efceb59` | 2026-08-31 | PASS | Reader path gives byte-identical node bounds to 169 — same title, same `An-Nisa 4:1` caption, same button geometry. |
-| 173 | release `efceb59` | 2026-08-31 | **FAIL** | Check drawn, label accent + bold, no `●`/`○` anywhere — but **the tinted fill never paints**. Full-pixel histogram of the checked row's rect: 0 `accentWash` pixels in either theme (dark row is `#1d1b18`, identical to the sheet surface; light row is `#fffdf8`, identical to its surface). Not the "1.23:1, barely reads" the §5 review predicted — it is absent. The token itself is fine: the Settings pills sample `#e0e8e1` exactly, and `SheetActions`' filled confirm paints, so the defect is inside `SheetRow`, not in `tokens.ts` or the function-style pattern. |
+| 173 | release `efceb59` | 2026-08-31 | **FAIL** | Check drawn, label accent + bold, no `●`/`○` anywhere -- but the tinted fill never painted: 0 `accentWash` pixels in either theme. **Superseded by the re-run below -- the APK was built from a poisoned bundle, not from this branch's code.** |
+| 173 | release `c46697c` | 2026-09-01 | **PASS** | Re-run on an APK rebuilt from a clean tree. Full-pixel histogram of the checked row `[80,1088][1360,1280]`: dark = `#212e28` 218 821 px (the dark `accentWash`) + `#5aa58d` 19 041 px (accent label and check) + `#1d1b18` 1 848 px (the `radii.chip` corners); light = `#e0e8e1` 218 813 px + `#1f6f5b` 19 042 px + `#fffdf8` 1 848 px. The unchecked neighbour stays on the surface in both. D52 satisfied: check icon, accent bold label, tinted fill. |
 | 174 | release `efceb59` | 2026-08-31 | PASS | At the device maximum `font_scale 1.35`: all ten rows laid out, last row `Muhammad Ayyoub` at `[80,2816][1360,3008]`, clear of the 3056 usable edge. Nothing clipped, no scrolling needed. The deleted `ScrollView` was correctly deleted. |
 | 175 | release `efceb59` | 2026-08-31 | PASS | Tapping Abdul Basit switched Settings' summary row and closed the sheet. Reopening and re-tapping the active row closed it with the summary unchanged — the `if (id !== current)` guard holds on hardware. |
 | 176 | release `efceb59` | 2026-08-31 | PASS | `Full analysis` and `Root وقي` are both full-width rows spanning `[80,…][1360,…]` at 48dp with a right chevron. No heading, by design. |
 | 177 | release `efceb59` | 2026-08-31 | PASS | The lemma's `TRANSLATED AS` affordance is the drawn `info` glyph (stroked ring, stem, dot), not `ⓘ`; tapping it opens the `InfoSheet` with a `SheetHeader` title and body. Its hit rect is `[586,1180][746,1340]` = **40 × 40 dp**, under the 48dp floor — the §5 finding, confirmed on hardware. |
 | 178 | release `efceb59` | 2026-08-31 | PASS | Unchanged from 163. Glass sheet, `Delete this bookmark?` heading, danger **text** (not a fill). Cancel 298×192 px, Delete 289×192 px — both **48.0 dp** tall. Cancel kept the row; Delete removed it and the note. Note: an **un-noted** bookmark deletes with no sheet at all, which is `requestDelete`'s deliberate rule (`BookmarksScreen.tsx:196`), not a regression. |
 | 179 | release `efceb59` | 2026-08-31 | PARTIAL | From the accessibility tree each row is `android.widget.RadioButton` with `checked=true/false` and the reciter name as its label — role and state are right. **No collection position is exposed**: `accessibilityRole="radiogroup"` on a plain `View` sets no `CollectionInfo`, so TalkBack cannot say "3 of 10". Speech itself not exercised — same deferral as checks 143/144 (issue #34). |
-| 180 | release `efceb59` | 2026-08-31 | PASS | Note, reciter, word, info and confirm sheets all captured on the dark palette: surface `#1d1b18`, body text `#f1ede4`, accent `#5aa58d`, danger `#e88b8b`. Everything legible against the surface. The one dark-theme loss is 173's missing tint, counted there rather than twice. |
+| 180 | release `efceb59` | 2026-08-31 | PASS | Note, reciter, word, info and confirm sheets all captured on the dark palette: surface `#1d1b18`, body text `#f1ede4`, accent `#5aa58d`, danger `#e88b8b`. Everything legible against the surface. (The dark-theme loss noted here on 2026-08-31 was 173's missing tint; the 2026-09-01 re-run paints it.) |
+
+#### Check 173 was a bad build, not a bad row
+
+`SheetRow`'s tint was correct in git the whole time. The `efceb59` APK's JS bundle was
+compiled **while §4's mutation-check had the `backgroundColor` line deleted** from
+`SheetRow.tsx`: Gradle's `createBundleReleaseJsAndAssets` read the working tree at
+18:09:15 and the line was restored moments later, so the commit, the test suite and the
+source map all agreed while the shipped bytecode did not.
+
+Proof, by re-bundling with that one line removed and comparing bytecode length -- Gradle
+passes `--minify false` for the JS (it follows `android.enableMinifyInReleaseBuilds`), so
+`expo export:embed --dev false --minify false` piped through `hermesc -O` reproduces its
+output exactly:
+
+| bundle | bytes |
+| --- | --- |
+| shipped in the `efceb59` APK | 3 688 784 |
+| current source | 3 688 828 |
+| current source, tint line deleted | **3 688 784** |
+
+Confirmed on hardware from both directions: the shipped bundle repacked into a re-signed
+APK still fails, and a bundle built from current source paints -- minified or not.
+
+Two things this cost three hours, both worth keeping:
+
+- **Never start a bundle while a mutation is applied.** Mutate, assert, restore,
+  `git status --porcelain` clean, *then* build. §4 step 4 and any build command must not
+  overlap.
+- **`sourcesContent` in `index.android.bundle.packager.map` is not evidence of what was
+  compiled.** It showed `SheetRow.tsx:59` with the tint present. It agrees with the file
+  on disk when the map is written, not with the code Metro emitted. Bytecode length and
+  on-device pixels are the evidence.
 
 **Environment restored after the run:** system font scale back to 1.0, app theme back to
 `System`, reciter back to Al-Husary (Murattal), and the plain An-Nisa 4:1 bookmark
 re-created (checks 178 and 175 consumed all three).
+
+After the 2026-09-01 re-run the phone carries the rebuilt `c46697c` release APK (still
+versionCode 1, still debug-signed), theme back to `System`, reciter untouched.
 
 **adb gotcha, recorded so the next run does not lose twenty minutes to it:** a bare
 `adb install` landed the APK in **user 10 (Guest)**, where `pm list packages` for user 0
