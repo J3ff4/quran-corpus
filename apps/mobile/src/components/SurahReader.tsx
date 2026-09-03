@@ -917,13 +917,19 @@ export function SurahReader({
   // The arrival. Under reduced motion it is a cut, which is what the setting
   // asks for -- and a cut here still never shows a blank, because the layer
   // underneath is a finished rendering until the instant it is replaced.
+  //
+  // A zero-length timing rather than a bare `incoming.value = 1` followed by
+  // the drop. Both read as a cut, but only one of them survives the drop: a
+  // direct write is handed to the UI thread to apply, and dropping the spent
+  // layer in the same tick re-renders the survivor without an animated style
+  // at all, which unregisters the view before that write has landed. The
+  // opacity the node keeps is then the one reanimated last actually applied --
+  // 0, from the mount -- and the reader shows its header over an empty page
+  // (device, 2026-09-03: reduced motion only, into mushaf and translation
+  // alike). Routing through withTiming keeps the drop in the completion
+  // callback, which cannot run before the value has been committed.
   const revealIncoming = useCallback(() => {
-    if (reducedMotion) {
-      incoming.value = 1;
-      dropSpentLayers();
-      return;
-    }
-    incoming.value = withTiming(1, { duration: MODE_FADE_MS }, (finished?: boolean) => {
+    incoming.value = withTiming(1, { duration: reducedMotion ? 0 : MODE_FADE_MS }, (finished?: boolean) => {
       // Only on a settled fade: an interrupted one leaves the incoming layer
       // half-transparent, and dropping the layer under it would show the page
       // through the gap.

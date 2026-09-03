@@ -1005,6 +1005,50 @@ describe('SurahReader', () => {
     }
   });
 
+  it('lands a reduced-motion switch through the fade, not around it', async () => {
+    // Reduced motion still gets a cut -- but the cut has to be committed
+    // before the spent layer goes. Writing the shared value directly and
+    // dropping in the same tick re-rendered the survivor with no animated
+    // style, which unregistered the view before the write landed, and the
+    // node kept the opacity reanimated had last applied: 0. Header over an
+    // empty page, reduced motion only (device, 2026-09-03).
+    mocks.reduceMotion = true;
+    mocks.holdFade = true;
+    vi.useFakeTimers();
+    try {
+      const data = readerData(300);
+      const translation = data.ayahs[254]!.translation!.text;
+      const { container, rerender } = render(
+        <SurahReader {...baseProps(data)} readerMode="translation" initialAyahNumber={255} />,
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
+
+      rerender(<SurahReader {...baseProps(data)} readerMode="mushaf" initialAyahNumber={255} />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000);
+      });
+
+      // The landing is done and the spent layer is still here, because the
+      // drop is the fade's completion callback. Dropping it from the reveal
+      // itself is what the direct write did.
+      expect(mocks.heldFades.length).toBeGreaterThan(0);
+      expect(screen.queryByTestId('reader-layer-0')).not.toBeNull();
+      expect(container.textContent).toContain(translation);
+
+      await act(async () => {
+        while (mocks.heldFades.length > 0) mocks.heldFades.shift()?.(true);
+      });
+
+      expect(screen.queryByTestId('reader-layer-0')).toBeNull();
+      expect(screen.queryByTestId('reader-positioning')).toBeNull();
+      expect(container.textContent).toContain(data.ayahs[254]!.ayah.text_uthmani);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps the bookmark control reachable in either mode', () => {
     // Check 71 on the device list. Both renderers carry the same testID, so a
     // mode that quietly loses a control fails here rather than on the phone.
