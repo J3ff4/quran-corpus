@@ -583,7 +583,18 @@ function AyahList({
         // is a native toolbar outside this View and is still reachable.
         importantForAccessibility={sheetsOpen || !live ? 'no-hide-descendants' : 'auto'}
         initialNumToRender={initialIndex > 0 ? initialIndex + 1 : DEFAULT_INITIAL_RENDER}
-        style={{ flex: 1, opacity: positioned ? 1 : 0 }}
+        // `|| arriving` for the same reason the spinner below carries it, and
+        // it is the last blank on the device list. `reveal()` calls
+        // setPositioned(true) and onLanded() in one tick; onLanded starts the
+        // cross-fade, which is a shared-value write that takes effect on the
+        // UI thread at once, while setPositioned waits for React to commit. So
+        // for the frames in between the outgoing layer was already fading out
+        // and the incoming list was still hidden here -- both invisible, and
+        // the bloom showing through as one flash (device, Al-Baqara 2:255,
+        // 2026-09-02). An arriving layer needs no hiding of its own: its
+        // wrapper is at opacity 0 for the whole landing, and the fade is what
+        // reveals it.
+        style={{ flex: 1, opacity: positioned || arriving ? 1 : 0 }}
         contentContainerStyle={{
           paddingBottom: listBottomPadding + (barDocked ? RECITATION_BAR_CLEARANCE : 0),
         }}

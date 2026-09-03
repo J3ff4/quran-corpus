@@ -213,7 +213,7 @@ vi.mock('react-native', async () => {
     // Forwards the ref, so the imperative scroll calls the component makes on
     // mount are observable. A plain function component silently swallows it
     // and every scroll assertion would pass against a null ref.
-    FlatList: ({ data, ListHeaderComponent, renderItem, onViewableItemsChanged, onScrollToIndexFailed, onScroll, onContentSizeChange, contentContainerStyle, importantForAccessibility, initialNumToRender, ref }: {
+    FlatList: ({ data, ListHeaderComponent, renderItem, onViewableItemsChanged, onScrollToIndexFailed, onScroll, onContentSizeChange, contentContainerStyle, importantForAccessibility, initialNumToRender, style, ref }: {
       data: unknown[];
       ListHeaderComponent?: React.ReactNode;
       renderItem: (info: { item: unknown; index: number }) => React.ReactNode;
@@ -224,6 +224,7 @@ vi.mock('react-native', async () => {
       contentContainerStyle?: { paddingBottom?: number };
       importantForAccessibility?: string;
       initialNumToRender?: number;
+      style?: { opacity?: number };
       ref?: React.Ref<unknown>;
     }) => {
       mocks.onViewableItemsChanged = onViewableItemsChanged ?? null;
@@ -246,6 +247,10 @@ vi.mock('react-native', async () => {
           // The docked bar floats over the list, so this is the only thing
           // keeping the last ayah out from behind it.
           'data-padding-bottom': String(contentContainerStyle?.paddingBottom),
+          // The reader hides a list that has not landed by setting its
+          // opacity, and a mounted-but-invisible list is indistinguishable
+          // from a visible one through its rows alone.
+          'data-opacity': String(style?.opacity),
         },
         ListHeaderComponent,
         data.map((item, index) => React.createElement('div', { key: index }, renderItem({ item, index }))),
@@ -946,6 +951,17 @@ describe('SurahReader', () => {
       // no spinner and no blank.
       expect(screen.queryByTestId('reader-positioning')).toBeNull();
       expect(container.textContent).toContain(translation);
+
+      // Hiding the arriving rendering is the LAYER's job and only the layer's.
+      // The list used to hide itself as well, until `positioned` committed --
+      // and `reveal()` sets that in the same tick it starts the cross-fade,
+      // which is a shared-value write the UI thread applies before React
+      // commits anything. So the outgoing layer was already fading out while
+      // the incoming list was still at zero: both invisible, and the bloom
+      // through the gap is the one flash the device still showed after
+      // `8e183d4` (Al-Baqara 2:255, 2026-09-02).
+      expect(screen.getAllByTestId('reader-list')[1]?.getAttribute('data-opacity')).toBe('1');
+      expect(screen.getByTestId('reader-layer-1').style.opacity).toBe('0');
 
       await act(async () => {
         await vi.advanceTimersByTimeAsync(3000);
