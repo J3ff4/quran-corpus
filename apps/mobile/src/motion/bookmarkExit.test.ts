@@ -24,3 +24,13 @@ describe('rowExit', () => {
     expect(rowExit(1.2, 120).maxHeight).toBe(0);
   });
 });
+
+// Not a behaviour test -- a build-contract one. vitest runs this file without
+// reanimated's babel plugin, so nothing else here can tell a workletized
+// function from a plain one, and on device that difference is a crash rather
+// than a wrong number.
+it('is marked as a worklet, since a UI-thread caller cannot call a plain function', () => {
+  // First statement in the body, not merely present: that position is what the
+  // babel plugin matches on.
+  expect(rowExit.toString()).toMatch(/\)\s*\{\s*["']worklet["']/);
+});

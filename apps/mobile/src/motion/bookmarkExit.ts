@@ -25,8 +25,15 @@ export const RESTING_MAX_HEIGHT = 100000;
  * correctness claim -- a row on its way out has to reach *nothing*, height and
  * gap together -- and a shared value driving an inline worklet commits no
  * output a test can read.
+ *
+ * Workletized, and that is not decoration: useAnimatedStyle runs its body on
+ * the UI thread, where a plain imported function is not callable at all --
+ * reanimated throws rather than hopping threads, and the throw takes the screen
+ * down with it (device, 2026-09-03: opening Bookmarks crashed the app).
+ * swipePanel's three exports carry the directive for the same reason.
  */
 export function rowExit(collapse: number, rowHeight: number): { maxHeight: number; marginBottom: number } {
+  'worklet';
   return {
     maxHeight: collapse > 0 ? Math.max(0, rowHeight * (1 - collapse)) : RESTING_MAX_HEIGHT,
     marginBottom: ROW_GAP * (1 - collapse),
