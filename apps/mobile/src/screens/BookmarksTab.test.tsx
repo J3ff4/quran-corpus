@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMemoryUserClient } from '../data/userRepository.testHelpers';
 import { getBookmarks, setBookmark, setBookmarkNote } from '../data/userRepository';
 import BookmarksTab from '../../app/bookmarks';
+import { ROW_GAP } from '../motion/bookmarkExit';
 
 const mocks = vi.hoisted(() => ({
   userClient: null as ReturnType<typeof createMemoryUserClient> | null,
@@ -87,7 +88,11 @@ vi.mock('react-native-reanimated', async () => {
   return {
     default: { View: host('div'), createAnimatedComponent: (Component: unknown) => Component },
     runOnJS: (fn: unknown) => fn,
-    useAnimatedStyle: () => ({}),
+    // The worklet is run, not stubbed away. The exit's geometry -- the row's
+    // own bottom margin closing as it collapses -- lives entirely in one of
+    // these, and a mock returning {} makes a row that leaves a gap behind
+    // indistinguishable from one that does not.
+    useAnimatedStyle: (worklet: () => unknown) => worklet(),
     useSharedValue: (initial: unknown) => ({ value: initial }),
     withSpring: (to: unknown) => to,
     // The completion callback is run, not dropped. The bookmark exit chains
@@ -459,6 +464,28 @@ describe('BookmarksTab', () => {
     });
 
     await waitFor(() => expect(rowIds()).toEqual(['bookmark-row-1-1']));
+  });
+
+  it('lets the row carry the space the collapse has to close', async () => {
+    // The second jump (device, 2026-09-02): the card slid off, the neighbours
+    // rose -- and then jumped again when the re-read landed. The row collapsed
+    // its height but not the space beside it, because that space was the
+    // list's `gap`, which a row cannot reach: FlatList wraps every item in a
+    // cell, and Yoga clamps the cell at zero rather than letting a negative
+    // margin on the child pull it in.
+    //
+    // The wiring, not the arithmetic -- rowExit's own suite asserts the
+    // endpoints, and the exit itself is played out by the test above. What
+    // this pins is that the spacing reaches the screen from the ROW: a list
+    // `gap` would read 0 here, and the collapse would have nothing to close.
+    const userClient = requireUserClient();
+    await setBookmark(userClient, 2, 255, true);
+    await setBookmark(userClient, 1, 1, true);
+
+    render(<BookmarksTab />);
+    await screen.findByTestId('bookmark-row-2-255');
+
+    expect(screen.getByTestId('bookmark-exit-2-255').style.marginBottom).toBe(`${ROW_GAP}px`);
   });
 
   it('asks before deleting a bookmark whose note would go with it', async () => {

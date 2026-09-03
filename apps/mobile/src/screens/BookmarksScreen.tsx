@@ -48,17 +48,12 @@ import {
   iconScale,
   panelWidth,
 } from '@/motion/swipePanel';
+import { rowExit } from '@/motion/bookmarkExit';
 import { useReducedMotion } from '@/motion/useReducedMotion';
 import { useAppSettings } from '@/settings/settingsStore';
 import { radii, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
-
-/** The space between two cards. Owned here because the exit animation has to
- *  cancel it: a row that has collapsed to zero height still leaves the list's
- *  own gap behind it, and that residue is what snapped shut when the reload
- *  landed. */
-const ROW_GAP = 10;
 
 /** The slide, then the collapse. Deliberately sequential rather than one
  *  motion: the card leaves first and the list closes afterwards, so the eye
@@ -66,12 +61,6 @@ const ROW_GAP = 10;
  *  which is what keeps a delete feeling immediate rather than watched. */
 const SLIDE_MS = 180;
 const COLLAPSE_MS = 160;
-
-/** The ceiling a resting row is held under. A number, not `undefined`: an
- *  animated style property that changes type between frames is the one thing
- *  reanimated cannot interpolate. No card comes near it, so it constrains
- *  nothing until the collapse takes over. */
-const RESTING_MAX_HEIGHT = 100000;
 
 /** Which ordering the list is in. Not "History": reading history is Home's
  *  continue-reading card and does not belong here. All three show the same
@@ -350,7 +339,10 @@ export function BookmarksScreen() {
                 color: theme.mutedText,
                 paddingHorizontal: 16,
                 paddingTop: 14,
-                paddingBottom: 6,
+                // 16, not 6: the list's `gap` used to add the other 10 between
+                // a header and its first card, and the rows' own margin sits
+                // below them, not above.
+                paddingBottom: 16,
                 fontWeight: '700',
               }}
             >
@@ -359,7 +351,9 @@ export function BookmarksScreen() {
           )}
           style={{ flex: 1 }}
           // No paddingTop here: the first section header already carries 14.
-          contentContainerStyle={{ paddingBottom, paddingHorizontal: 16, gap: 10 }}
+          // No `gap` either -- see ROW_GAP: the rows carry their own spacing so
+          // the exit can close it.
+          contentContainerStyle={{ paddingBottom, paddingHorizontal: 16 }}
         />
       ) : (
         <FlatList
@@ -370,7 +364,7 @@ export function BookmarksScreen() {
           style={{ flex: 1 }}
           // paddingTop, unlike the SectionList above: nothing here heads the
           // list, so the first card sat flush against the segmented control.
-          contentContainerStyle={{ paddingTop: 10, paddingBottom, paddingHorizontal: 16, gap: 10 }}
+          contentContainerStyle={{ paddingTop: 10, paddingBottom, paddingHorizontal: 16 }}
         />
       )}
 
@@ -575,18 +569,9 @@ function BookmarkRow({
     transform: [{ translateX: -slide.value * screenWidth }],
   }));
 
-  // maxHeight, not height, and never undefined: a style property that changes
-  // type between frames is the one shape reanimated cannot interpolate. The
-  // resting value is a ceiling no card reaches, so it constrains nothing.
-  //
-  // The negative margin is the list's `gap` being paid back. Yoga puts the gap
-  // between children whatever their height, so without this a collapsed row
-  // still holds ROW_GAP of space and the reload closes it in one frame -- the
-  // jump, moved rather than fixed.
-  const collapseStyle = useAnimatedStyle(() => ({
-    maxHeight: collapse.value > 0 ? Math.max(0, rowHeight.value * (1 - collapse.value)) : RESTING_MAX_HEIGHT,
-    marginBottom: -ROW_GAP * collapse.value,
-  }));
+  // Height AND spacing, together -- see rowExit, which owns both and is where
+  // the endpoints are asserted.
+  const collapseStyle = useAnimatedStyle(() => rowExit(collapse.value, rowHeight.value));
   const coordinate = `${bookmark.surahId}:${bookmark.ayahNumber}`;
   // "Al-Baqara 2:255", not "2:255": the number alone identifies the ayah only
   // to someone who already knows the surah order.
