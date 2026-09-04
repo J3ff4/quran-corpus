@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { View, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { glass, radii, themeColors } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
@@ -10,6 +10,18 @@ export interface GlassSurfaceProps {
   radius?: keyof typeof radii;
   /** Extra layout style. Colour and border are the component's own. */
   style?: StyleProp<ViewStyle>;
+  /**
+   * True for a bar docked over scrolling content.
+   *
+   * RN has no backdrop-filter, so the translucent fill is simply see-through:
+   * on the recitation bar (device, 2026-08-25) and on every tab screen
+   * (device, 2026-08-29) the ayah behind the bar read straight through its
+   * labels. A docked surface therefore paints an opaque backing over the fill.
+   * Both bars used to carry that backing themselves, both at `opacity: 0.94`,
+   * which left 6% of the page still bleeding through -- the rule lives here so
+   * the next docked bar cannot be copy-pasted wrong again.
+   */
+  docked?: boolean;
   testID?: string;
 }
 
@@ -40,8 +52,9 @@ export function useGlassSkin() {
  * ponytail: no blur variant, no elevation prop, no "intensity". One surface,
  * two themes. Add a variant when a screen actually needs a second one.
  */
-export function GlassSurface({ children, radius = 'card', style, testID }: GlassSurfaceProps) {
+export function GlassSurface({ children, radius = 'card', style, testID, docked = false }: GlassSurfaceProps) {
   const skin = useGlassSkin();
+  const theme = useThemeColors();
 
   return (
     <View
@@ -58,6 +71,13 @@ export function GlassSurface({ children, radius = 'card', style, testID }: Glass
         style,
       ]}
     >
+      {docked ? (
+        <View
+          testID={testID ? `${testID}-backing` : undefined}
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { backgroundColor: theme.background }]}
+        />
+      ) : null}
       {children}
       {/* After the children, not before them. The recitation bar puts an opaque
           backing over the translucent fill (RN has no backdrop-filter), and as

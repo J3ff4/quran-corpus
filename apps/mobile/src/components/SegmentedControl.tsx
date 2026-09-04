@@ -106,12 +106,15 @@ export function SegmentedControl<T extends string>({
   const applied = useRef<number | null>(null);
   // The segment the user pressed, held until the caller's `value` catches up.
   //
-  // `onChange` is deferred (see the press handler), so for PILL_SETTLE_MS the
-  // prop still names the old segment. Without this the wash would arrive under
-  // a segment whose label was still grey and light while the segment it left
-  // stayed bold and accented -- the selection would read as being in two
-  // places. Cleared, not left standing, so the prop remains the authority: a
-  // caller that ignores `onChange` gets the pill and the label both put back.
+  // Two reasons, and the second is why it is set on every path rather than
+  // only the deferred one. First: `onChange` is held for PILL_SETTLE_MS (see
+  // the press handler), so the prop names the old segment throughout, and
+  // without this the wash would arrive under a segment whose label was still
+  // grey and light while the segment it left stayed bold -- the selection
+  // reading as being in two places for the length of the travel. Second: the
+  // effect below runs after every render and enforces `value`, so any render
+  // between the press and the caller applying the change would move the pill
+  // back to where it started before the new value moved it forward again.
   const [optimistic, setOptimistic] = useState<T | null>(null);
   const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -149,10 +152,17 @@ export function SegmentedControl<T extends string>({
   }
 
   // Deliberately without a dependency array. `value` is the authority on where
-  // the pill belongs, and this runs after every render to enforce that -- which
-  // covers the press below having already started the travel (target equals
-  // what was applied, so nothing restarts) and a caller that ignores `onChange`
-  // (the value never moved, so the pill is put back).
+  // the pill belongs, and this runs after every render to enforce that -- so
+  // the press below having already started the travel restarts nothing (target
+  // equals what was applied), and any render landing between the press and the
+  // caller applying it leaves the pill where the press put it.
+  //
+  // `value` is the authority only once `optimistic` clears, which happens when
+  // the caller applies the change. A caller that never applies it holds the
+  // pill on the pressed segment for good -- on both paths, since `optimistic`
+  // is now set before the reduced-motion branch. Every caller here applies it;
+  // one that may reject a selection has to drive this control as controlled
+  // and not use the optimistic hold at all.
   useEffect(() => {
     if (optimistic !== null && optimistic === value) setOptimistic(null);
     if (width === 0) return;
@@ -242,11 +252,21 @@ export function SegmentedControl<T extends string>({
               // travelling on, so doing both at once costs the travel a
               // 45-89ms hole. With no travel to protect there is nothing to
               // wait for, so reduced motion applies it straight away.
+              // Before the branch, not inside the animated arm. `optimistic`
+              // is what keeps the always-on effect below from reading a
+              // `value` the caller has not applied yet: without it the effect
+              // finds the prop still naming the old segment, decides the pill
+              // is in the wrong place and puts it back, and the real value
+              // then moves it a third time. Under reduced motion the travel is
+              // instant, so that bounce is three visible jumps rather than a
+              // spring being nudged -- B, A, B on the reader's mode pill
+              // (device, 2026-09-02). The hold below is what hid it everywhere
+              // else.
+              setOptimistic(option.value);
               if (!animate) {
                 onChange(option.value);
                 return;
               }
-              setOptimistic(option.value);
               pending.current = setTimeout(() => {
                 pending.current = null;
                 onChange(option.value);

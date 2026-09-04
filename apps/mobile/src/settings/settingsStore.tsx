@@ -64,7 +64,9 @@ const defaultSettings: AppSettings = {
   arabicScale: 'medium',
   reduceMotion: false,
   readerMode: 'translation',
-  wbwDensity: 'hybrid',
+  // Dense, not hybrid (owner ruling 2026-09-01). See DENSE_DEFAULT_KEY below
+  // for what happens to a phone that already stored the old default.
+  wbwDensity: 'dense',
   continuousPlay: false,
   reciterId: DEFAULT_RECITER_ID,
 };
@@ -116,6 +118,47 @@ function isReciterId(value: string | null): value is string {
   return value !== null && reciterById(value) !== null;
 }
 
+/** Marks the one-time move of the word-by-word default from hybrid to dense.
+ *
+ *  A phone that stored `hybrid` before 2026-09-01 stored it because it was the
+ *  *default*, not because anyone chose it -- the picker writes on every tap,
+ *  including a tap that re-selects what was already showing. So the move is
+ *  applied once to those rows and then never again: after this key is set,
+ *  `hybrid` means the reader asked for it and nothing here touches it.
+ *
+ *  Additive only, like every migration against this file -- it lives on the
+ *  owner's phone and survives app updates. It adds one settings row and, at
+ *  most, rewrites one existing value; it drops nothing and it is idempotent, so
+ *  a crash between the two writes replays harmlessly. */
+const DENSE_DEFAULT_KEY = 'migration.wbwDensityDense';
+
+/** Applies DENSE_DEFAULT_KEY's one-time move and returns the density to use.
+ *
+ *  Returns the *stored* string rather than a WbwDensity so the caller's own
+ *  `isWbwDensity` guard still runs over it -- a value this function passes
+ *  through untouched has been validated by nothing. */
+async function migrateWbwDensityDefault(
+  client: MobileDataClient,
+  stored: string | null,
+): Promise<string | null> {
+  if ((await getSetting(client, DENSE_DEFAULT_KEY)) === 'done') return stored;
+  // Absent already reads as dense through defaultSettings, so only a stored
+  // hybrid needs rewriting. Marked either way: the point of the key is that
+  // this runs once per device, not once per hybrid.
+  const migrated = stored === 'hybrid' ? 'dense' : stored;
+  try {
+    if (stored === 'hybrid') await saveSetting(client, 'wbwDensity', 'dense');
+    await saveSetting(client, DENSE_DEFAULT_KEY, 'done');
+  } catch (cause) {
+    // Swallowed, and deliberately not marked done: hydration must not fail over
+    // a preference nudge, and leaving the key unwritten means the next launch
+    // tries again. The in-memory value below is still the migrated one, so the
+    // reader sees dense on this run either way.
+    console.error('[settings] wbwDensity default migration failed', { cause });
+  }
+  return migrated;
+}
+
 export async function loadPersistedAppSettings(client: MobileDataClient): Promise<AppSettings> {
   // Keyed, not positional. This used to destructure the Promise.all result by
   // index, which is correct only as long as nobody reorders settingKeys or
@@ -134,7 +177,7 @@ export async function loadPersistedAppSettings(client: MobileDataClient): Promis
   const persistedArabicScale = persisted.arabicScale;
   const reduceMotion = persisted.reduceMotion;
   const persistedReaderMode = persisted.readerMode;
-  const persistedWbwDensity = persisted.wbwDensity;
+  const persistedWbwDensity = await migrateWbwDensityDefault(client, persisted.wbwDensity);
   const continuousPlay = persisted.continuousPlay;
   const persistedReciterId = persisted.reciterId;
 

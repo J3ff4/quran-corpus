@@ -524,7 +524,7 @@ describe('loadPersistedAppSettings', () => {
     expect(settings.wbwDensity).toBe('dense');
   });
 
-  it('falls back to hybrid for a wbwDensity it does not recognise', async () => {
+  it('falls back to the dense default for a wbwDensity it does not recognise', async () => {
     // '2c' and '2d' are in the list because they are the mockup names the
     // plan and every commit body use, and so the plausible thing for a later
     // writer to store. An unvalidated read hands the layout switch a value
@@ -535,8 +535,53 @@ describe('loadPersistedAppSettings', () => {
 
       const settings = await loadPersistedAppSettings(userClient);
 
-      expect(settings.wbwDensity).toBe('hybrid');
+      expect(settings.wbwDensity).toBe('dense');
     }
+  });
+
+  it('moves a phone off the old hybrid default exactly once', async () => {
+    // The owner ruling of 2026-09-01 made dense the default. A phone that
+    // stored `hybrid` stored the old default -- the picker writes on every
+    // tap, including one that re-selects what was already showing -- so it is
+    // moved, and the move is recorded so it never runs twice.
+    const userClient = requireSettingsClient();
+    await saveSetting(userClient, 'wbwDensity', 'hybrid');
+
+    const settings = await loadPersistedAppSettings(userClient);
+
+    expect(settings.wbwDensity).toBe('dense');
+    // Persisted, not only in memory: without the write the next launch reads
+    // hybrid again, and the marker below would stop it being moved a second
+    // time -- so the phone would be stuck on the value this was meant to move.
+    expect(await getSetting(userClient, 'wbwDensity')).toBe('dense');
+    expect(await getSetting(userClient, 'migration.wbwDensityDense')).toBe('done');
+  });
+
+  it('leaves hybrid alone once the move has run', async () => {
+    // The whole point of the marker: after the one-time move, hybrid means the
+    // reader chose it, and a preference the reader set must never be rewritten
+    // by a default.
+    const userClient = requireSettingsClient();
+    await saveSetting(userClient, 'migration.wbwDensityDense', 'done');
+    await saveSetting(userClient, 'wbwDensity', 'hybrid');
+
+    const settings = await loadPersistedAppSettings(userClient);
+
+    expect(settings.wbwDensity).toBe('hybrid');
+    expect(await getSetting(userClient, 'wbwDensity')).toBe('hybrid');
+  });
+
+  it('writes no density row for a phone that never stored one', async () => {
+    // Absent already reads as dense through defaultSettings, so the move has
+    // nothing to rewrite. Writing one anyway would turn a default into a
+    // stored choice, which is exactly what the marker exists to distinguish.
+    const userClient = requireSettingsClient();
+
+    const settings = await loadPersistedAppSettings(userClient);
+
+    expect(settings.wbwDensity).toBe('dense');
+    expect(await getSetting(userClient, 'wbwDensity')).toBeNull();
+    expect(await getSetting(userClient, 'migration.wbwDensityDense')).toBe('done');
   });
 
   it('rejects an arabicScale that only names a property of Object.prototype', async () => {

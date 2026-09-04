@@ -186,4 +186,26 @@ describe('SegmentedControl on a measured row', () => {
 
     expect(onChange).toHaveBeenCalledWith('page');
   });
+
+  it('holds the pressed segment under reduced motion too, until the value lands', () => {
+    // `renderControl` is a caller that never applies the change, which is also
+    // what a caller looks like for the render or two before its state lands.
+    // Without the optimistic value the effect reads the prop, finds it still
+    // naming the old segment, and puts the selection back -- then the real
+    // value moves it again. With no spring to smear it, that is three visible
+    // jumps: B, A, B on the reader's mode pill (device, 2026-09-02).
+    //
+    // Asserted through aria-selected rather than the pill's offset, which is a
+    // shared value with no committed output: the wash and the bold label are
+    // driven off the same index, so a selection that snapped back is a pill
+    // that snapped back.
+    settings.reduceMotion = true;
+    renderControl('surah');
+
+    fireEvent.click(screen.getAllByRole('tab')[2]!);
+
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs[2]?.getAttribute('aria-selected')).toBe('true');
+    expect(tabs[0]?.getAttribute('aria-selected')).toBe('false');
+  });
 });

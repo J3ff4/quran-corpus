@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMemoryUserClient } from '../data/userRepository.testHelpers';
 import { getBookmarks, setBookmark, setBookmarkNote } from '../data/userRepository';
 import BookmarksTab from '../../app/bookmarks';
+import { ROW_GAP } from '../motion/bookmarkExit';
 
 const mocks = vi.hoisted(() => ({
   userClient: null as ReturnType<typeof createMemoryUserClient> | null,
@@ -18,6 +19,11 @@ const mocks = vi.hoisted(() => ({
   /** Router pushes from a card press, so the whole-card target can be told
    *  apart from the coordinate Link inside it. */
   pushed: [] as unknown[][],
+  /** Hold every withTiming completion instead of running it, so a test can
+   *  look at the list mid-exit. Off by default: every other test wants the
+   *  delete to resolve within its own act(). */
+  holdTimings: false,
+  heldTimings: [] as Array<(finished: boolean) => void>,
 }));
 
 vi.mock('@quran-corpus/mobile-data', () => ({
@@ -82,10 +88,23 @@ vi.mock('react-native-reanimated', async () => {
   return {
     default: { View: host('div'), createAnimatedComponent: (Component: unknown) => Component },
     runOnJS: (fn: unknown) => fn,
-    useAnimatedStyle: () => ({}),
+    // The worklet is run, not stubbed away. The exit's geometry -- the row's
+    // own bottom margin closing as it collapses -- lives entirely in one of
+    // these, and a mock returning {} makes a row that leaves a gap behind
+    // indistinguishable from one that does not.
+    useAnimatedStyle: (worklet: () => unknown) => worklet(),
     useSharedValue: (initial: unknown) => ({ value: initial }),
     withSpring: (to: unknown) => to,
-    withTiming: (to: unknown) => to,
+    // The completion callback is run, not dropped. The bookmark exit chains
+    // slide -> collapse -> onRemoved through exactly these callbacks, so a
+    // mock that ignores them leaves every deleted row on screen -- and a test
+    // that then asserted the row was gone would be asserting the mock.
+    withTiming: (to: unknown, _config: unknown, callback?: (finished: boolean) => void) => {
+      if (!callback) return to;
+      if (mocks.holdTimings) mocks.heldTimings.push(callback);
+      else callback(true);
+      return to;
+    },
     Easing: { cubic: (v: number) => v, in: (fn: unknown) => fn, out: (fn: unknown) => fn },
   };
 });
@@ -165,6 +184,8 @@ describe('BookmarksTab', () => {
     mocks.ayahTexts = new Map();
     mocks.listsUsed = [];
     mocks.pushed = [];
+    mocks.holdTimings = false;
+    mocks.heldTimings = [];
   });
 
   afterEach(cleanup);
@@ -415,6 +436,121 @@ describe('BookmarksTab', () => {
     // against a row spliced out of local state by a write that never ran.
     await waitFor(() => expect(rowIds()).toEqual(['bookmark-row-1-1']));
     expect(await getBookmarks(userClient)).toHaveLength(1);
+  });
+
+  it('holds the deleted row on screen until its exit has played', async () => {
+    // The jump this replaces: the DELETE committed, the list re-read, and the
+    // rows below closed the gap in the same frame. The row now stays in the
+    // data until the slide and collapse have finished, so nothing underneath
+    // moves until there is a gap to move into.
+    mocks.holdTimings = true;
+    const userClient = requireUserClient();
+    await setBookmark(userClient, 2, 255, true);
+    await setBookmark(userClient, 1, 1, true);
+
+    render(<BookmarksTab />);
+    await screen.findByTestId('bookmark-row-2-255');
+
+    fireEvent.click(screen.getByTestId('bookmark-delete-2-255'));
+
+    // Written already -- the row is only still drawn because its exit is
+    // mid-flight, not because the delete has not happened.
+    await waitFor(async () => expect(await getBookmarks(userClient)).toHaveLength(1));
+    expect(rowIds()).toEqual(['bookmark-row-1-1', 'bookmark-row-2-255']);
+
+    // Slide, then collapse, then the re-read.
+    await act(async () => {
+      while (mocks.heldTimings.length > 0) mocks.heldTimings.shift()?.(true);
+    });
+
+    await waitFor(() => expect(rowIds()).toEqual(['bookmark-row-1-1']));
+  });
+
+  it('re-reads once the last exit has finished, not the first', async () => {
+    // Two deletes inside one 340ms exit. The first row's completion used to
+    // re-read unconditionally, and the fresh data no longer held the second
+    // row -- so it was unmounted mid-slide and its neighbours snapped shut in
+    // one frame, which is the jump this whole path removes.
+    mocks.holdTimings = true;
+    const userClient = requireUserClient();
+    await setBookmark(userClient, 2, 255, true);
+    await setBookmark(userClient, 1, 1, true);
+
+    render(<BookmarksTab />);
+    await screen.findByTestId('bookmark-row-2-255');
+
+    fireEvent.click(screen.getByTestId('bookmark-delete-2-255'));
+    await waitFor(async () => expect(await getBookmarks(userClient)).toHaveLength(1));
+    fireEvent.click(screen.getByTestId('bookmark-delete-1-1'));
+    await waitFor(async () => expect(await getBookmarks(userClient)).toHaveLength(0));
+
+    // The first row's slide, then its collapse: its exit is over and it has
+    // reported. The second row's is not.
+    await act(async () => {
+      mocks.heldTimings.shift()?.(true);
+    });
+    await act(async () => {
+      mocks.heldTimings.pop()?.(true);
+    });
+    expect(rowIds()).toContain('bookmark-row-1-1');
+
+    await act(async () => {
+      while (mocks.heldTimings.length > 0) mocks.heldTimings.shift()?.(true);
+    });
+    await waitFor(() => expect(rowIds()).toEqual([]));
+  });
+
+  it('re-reads on a backstop timer when the exit never reports', async () => {
+    // `onRemoved` fires from the collapse's completion callback, so anything
+    // that unmounts the row first -- switching tab mid-exit, another row's
+    // re-read landing under it -- swallowed the only thing that cleared the
+    // key and re-read the table. The deleted card then sat there until the
+    // next focus, and the key stayed set for the session: bookmarking that
+    // ayah again played the exit on the fresh row and vanished it.
+    mocks.holdTimings = true;
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const userClient = requireUserClient();
+      await setBookmark(userClient, 2, 255, true);
+      await setBookmark(userClient, 1, 1, true);
+
+      render(<BookmarksTab />);
+      await screen.findByTestId('bookmark-row-2-255');
+
+      fireEvent.click(screen.getByTestId('bookmark-delete-2-255'));
+      await waitFor(async () => expect(await getBookmarks(userClient)).toHaveLength(1));
+      expect(rowIds()).toContain('bookmark-row-2-255');
+
+      // Nothing ever completes the exit -- heldTimings is never drained.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      await waitFor(() => expect(rowIds()).toEqual(['bookmark-row-1-1']));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('lets the row carry the space the collapse has to close', async () => {
+    // The second jump (device, 2026-09-02): the card slid off, the neighbours
+    // rose -- and then jumped again when the re-read landed. The row collapsed
+    // its height but not the space beside it, because that space was the
+    // list's `gap`, which a row cannot reach: FlatList wraps every item in a
+    // cell, and Yoga clamps the cell at zero rather than letting a negative
+    // margin on the child pull it in.
+    //
+    // The wiring, not the arithmetic -- rowExit's own suite asserts the
+    // endpoints, and the exit itself is played out by the test above. What
+    // this pins is that the spacing reaches the screen from the ROW: a list
+    // `gap` would read 0 here, and the collapse would have nothing to close.
+    const userClient = requireUserClient();
+    await setBookmark(userClient, 2, 255, true);
+    await setBookmark(userClient, 1, 1, true);
+
+    render(<BookmarksTab />);
+    await screen.findByTestId('bookmark-row-2-255');
+
+    expect(screen.getByTestId('bookmark-exit-2-255').style.marginBottom).toBe(`${ROW_GAP}px`);
   });
 
   it('asks before deleting a bookmark whose note would go with it', async () => {

@@ -12,6 +12,11 @@ const mocks = vi.hoisted(() => ({
   onScroll: null as ((event: { nativeEvent: { contentOffset: { y: number } } }) => void) | null,
   onContentSizeChange: null as ((width: number, height: number) => void) | null,
   headerLayout: null as ((height: number) => void) | null,
+  /** Hold the mode cross-fade's completion instead of running it, so a test
+   *  can look at the reader mid-switch -- the only moment both renderings are
+   *  mounted. Off by default. */
+  holdFade: false,
+  heldFades: [] as Array<(finished: boolean) => void>,
   scrollToIndex: vi.fn(),
   scrollToOffset: vi.fn(),
   focusEffect: null as (() => void) | null,
@@ -72,12 +77,27 @@ vi.mock('react-native-reanimated', async () => {
       }),
     ),
     Easing: { out: (fn: unknown) => fn, ease: undefined },
-    withTiming: (toValue: number) => toValue,
+    // The completion callback is run, not dropped. The mode cross-fade drops
+    // the outgoing layer from that callback, so a mock that ignores it leaves
+    // both renderings mounted for ever -- and every assertion about "which
+    // mode is on screen" would then be reading two of them.
+    withTiming: (toValue: number, _config?: unknown, callback?: (finished: boolean) => void) => {
+      if (!callback) return toValue;
+      if (mocks.holdFade) mocks.heldFades.push(callback);
+      else callback(true);
+      return toValue;
+    },
+    runOnJS: (fn: unknown) => fn,
     withSequence: (...steps: number[]) => steps[steps.length - 1],
     useSharedValue: (initial: number) => React.useRef({ value: initial }).current,
+    // Evaluated, not stubbed to {}. The shared values these worklets read are
+    // real objects here (useSharedValue below returns one), and withTiming
+    // assigns its target value synchronously, so the result is the opacity the
+    // layer would actually wear. That is the only way a test can tell a
+    // cross-fade from two layers printed over each other.
     useAnimatedStyle: (worklet: () => never) => {
       mocks.animatedStyles.push(worklet as unknown as () => Record<string, unknown>);
-      return {};
+      return (worklet as unknown as () => Record<string, unknown>)();
     },
     // Linear between two stops with both ends clamped, which is all this
     // screen asks of the real one.
@@ -193,7 +213,7 @@ vi.mock('react-native', async () => {
     // Forwards the ref, so the imperative scroll calls the component makes on
     // mount are observable. A plain function component silently swallows it
     // and every scroll assertion would pass against a null ref.
-    FlatList: ({ data, ListHeaderComponent, renderItem, onViewableItemsChanged, onScrollToIndexFailed, onScroll, onContentSizeChange, contentContainerStyle, importantForAccessibility, initialNumToRender, ref }: {
+    FlatList: ({ data, ListHeaderComponent, renderItem, onViewableItemsChanged, onScrollToIndexFailed, onScroll, onContentSizeChange, contentContainerStyle, importantForAccessibility, initialNumToRender, style, ref }: {
       data: unknown[];
       ListHeaderComponent?: React.ReactNode;
       renderItem: (info: { item: unknown; index: number }) => React.ReactNode;
@@ -204,6 +224,7 @@ vi.mock('react-native', async () => {
       contentContainerStyle?: { paddingBottom?: number };
       importantForAccessibility?: string;
       initialNumToRender?: number;
+      style?: { opacity?: number };
       ref?: React.Ref<unknown>;
     }) => {
       mocks.onViewableItemsChanged = onViewableItemsChanged ?? null;
@@ -226,6 +247,10 @@ vi.mock('react-native', async () => {
           // The docked bar floats over the list, so this is the only thing
           // keeping the last ayah out from behind it.
           'data-padding-bottom': String(contentContainerStyle?.paddingBottom),
+          // The reader hides a list that has not landed by setting its
+          // opacity, and a mounted-but-invisible list is indistinguishable
+          // from a visible one through its rows alone.
+          'data-opacity': String(style?.opacity),
         },
         ListHeaderComponent,
         data.map((item, index) => React.createElement('div', { key: index }, renderItem({ item, index }))),
@@ -263,6 +288,8 @@ describe('SurahReader', () => {
     mocks.onScroll = null;
     mocks.headerLayout = null;
     mocks.animatedStyles = [];
+    mocks.holdFade = false;
+    mocks.heldFades = [];
     mocks.reduceMotion = false;
     mocks.getReaderPosition.mockReset().mockReturnValue(null);
     mocks.setReaderPosition.mockReset();
@@ -898,6 +925,130 @@ describe('SurahReader', () => {
     expect(container.textContent).toContain(data.ayahs[0]!.ayah.text_uthmani.slice(-8));
   });
 
+  it('never blanks the reader while a mode switch lands', async () => {
+    // The defect: switching modes changed the element type wrapping the list,
+    // React unmounted it, and the replacement re-ran the landing behind a
+    // spinner on an empty screen -- up to 2.5s deep in a long surah (owner
+    // report, 2026-09-01). The incoming rendering now lands underneath the one
+    // already on screen, so there is nothing to blank.
+    mocks.holdFade = true;
+    vi.useFakeTimers();
+    try {
+      const data = readerData(300);
+      const translation = data.ayahs[254]!.translation!.text;
+      const { container, rerender } = render(
+        <SurahReader {...baseProps(data)} readerMode="translation" initialAyahNumber={255} />,
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
+      expect(container.textContent).toContain(translation);
+
+      rerender(<SurahReader {...baseProps(data)} readerMode="mushaf" initialAyahNumber={255} />);
+
+      // Mid-landing, which is the whole window the defect lived in: the
+      // arriving rendering has mounted and has not settled, and there is still
+      // no spinner and no blank.
+      expect(screen.queryByTestId('reader-positioning')).toBeNull();
+      expect(container.textContent).toContain(translation);
+
+      // Hiding the arriving rendering is the LAYER's job and only the layer's.
+      // The list used to hide itself as well, until `positioned` committed --
+      // and `reveal()` sets that in the same tick it starts the cross-fade,
+      // which is a shared-value write the UI thread applies before React
+      // commits anything. So the outgoing layer was already fading out while
+      // the incoming list was still at zero: both invisible, and the bloom
+      // through the gap is the one flash the device still showed after
+      // `8e183d4` (Al-Baqara 2:255, 2026-09-02).
+      expect(screen.getAllByTestId('reader-list')[1]?.getAttribute('data-opacity')).toBe('1');
+      expect(screen.getByTestId('reader-layer-1').style.opacity).toBe('0');
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000);
+      });
+
+      // Still nothing, once it has landed and before the fade is released.
+      expect(screen.queryByTestId('reader-positioning')).toBeNull();
+      expect(container.textContent).toContain(translation);
+
+      // A no-op re-render first: a shared value assignment does not re-render
+      // on its own, so the layers still carry the styles computed before the
+      // fade started. This is the next paint, which is what the phone shows.
+      rerender(<SurahReader {...baseProps(data)} readerMode="mushaf" initialAyahNumber={255} />);
+
+      // And the outgoing rendering is already invisible, before the drop that
+      // removes it. A layer's background is the bloom showing through, so an
+      // arriving layer at full opacity does not cover the one beneath: without
+      // its own fade the outgoing layer stays legible under the new one until
+      // the drop runs, which on device was 420ms of two readings of 2:255
+      // printed over each other.
+      expect(screen.getByTestId('reader-layer-0').style.opacity).toBe('0');
+      expect(screen.getByTestId('reader-layer-1').style.opacity).toBe('1');
+
+      // The fade lands, and only then does the outgoing rendering go.
+      await act(async () => {
+        while (mocks.heldFades.length > 0) mocks.heldFades.shift()?.(true);
+      });
+      expect(container.textContent).not.toContain(translation);
+
+      // And dropping the spent layer must not blank the survivor. It moves
+      // from index 1 to index 0 as the array shrinks; while index 0 rendered
+      // its list bare and every other index wrapped it, that move changed the
+      // element type at that position, so React unmounted the landed list and
+      // rebuilt it -- which re-ran the landing behind the spinner on an empty
+      // screen. That was the blank the device still showed after the fade
+      // (Al-Baqara 2:255, 2026-09-01).
+      expect(screen.queryByTestId('reader-positioning')).toBeNull();
+      expect(container.textContent).toContain(data.ayahs[254]!.ayah.text_uthmani);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('lands a reduced-motion switch through the fade, not around it', async () => {
+    // Reduced motion still gets a cut -- but the cut has to be committed
+    // before the spent layer goes. Writing the shared value directly and
+    // dropping in the same tick re-rendered the survivor with no animated
+    // style, which unregistered the view before the write landed, and the
+    // node kept the opacity reanimated had last applied: 0. Header over an
+    // empty page, reduced motion only (device, 2026-09-03).
+    mocks.reduceMotion = true;
+    mocks.holdFade = true;
+    vi.useFakeTimers();
+    try {
+      const data = readerData(300);
+      const translation = data.ayahs[254]!.translation!.text;
+      const { container, rerender } = render(
+        <SurahReader {...baseProps(data)} readerMode="translation" initialAyahNumber={255} />,
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
+
+      rerender(<SurahReader {...baseProps(data)} readerMode="mushaf" initialAyahNumber={255} />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000);
+      });
+
+      // The landing is done and the spent layer is still here, because the
+      // drop is the fade's completion callback. Dropping it from the reveal
+      // itself is what the direct write did.
+      expect(mocks.heldFades.length).toBeGreaterThan(0);
+      expect(screen.queryByTestId('reader-layer-0')).not.toBeNull();
+      expect(container.textContent).toContain(translation);
+
+      await act(async () => {
+        while (mocks.heldFades.length > 0) mocks.heldFades.shift()?.(true);
+      });
+
+      expect(screen.queryByTestId('reader-layer-0')).toBeNull();
+      expect(screen.queryByTestId('reader-positioning')).toBeNull();
+      expect(container.textContent).toContain(data.ayahs[254]!.ayah.text_uthmani);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps the bookmark control reachable in either mode', () => {
     // Check 71 on the device list. Both renderers carry the same testID, so a
     // mode that quietly loses a control fails here rather than on the phone.
@@ -1227,20 +1378,78 @@ describe('SurahReader shared reading position', () => {
     expect(mocks.scrollToIndex).not.toHaveBeenCalled();
   });
 
-  it('re-lands on every switch, though the target ayah never changes', () => {
+  it('re-lands on every switch, though the target ayah never changes', async () => {
+    vi.useFakeTimers();
+    try {
+      const props = baseProps(readerData(10));
+      const { rerender } = render(<SurahReader {...props} readerMode="translation" />);
+
+      mocks.getReaderPosition.mockReturnValue(5);
+      rerender(<SurahReader {...props} readerMode="mushaf" />);
+      expect(mocks.scrollToIndex).toHaveBeenCalledTimes(1);
+
+      // The first switch has to finish before the second is a switch at all:
+      // one asked for while the arrival is still in flight cancels it rather
+      // than stacking a third rendering (see below).
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
+      const landed = mocks.scrollToIndex.mock.calls.length;
+      rerender(<SurahReader {...props} readerMode="translation" />);
+
+      // The whole point of the nonce: index 4 both times, so an effect keyed
+      // only on the index would not re-run and the second list would sit at
+      // offset 0. A count rather than an exact number -- a landing retries
+      // until the list reports content, and how many attempts that takes is
+      // not what this asserts.
+      expect(mocks.scrollToIndex.mock.calls.length).toBeGreaterThan(landed);
+      expect(mocks.scrollToIndex).toHaveBeenLastCalledWith({ index: 4, animated: false });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('cancels an arrival rather than stacking a third rendering on it', () => {
     const props = baseProps(readerData(10));
     const { rerender } = render(<SurahReader {...props} readerMode="translation" />);
+    expect(screen.getAllByTestId(/^reader-layer-/)).toHaveLength(1);
+    // A position to land on, so every arrival below stays mid-landing: one
+    // that has nothing to scroll to reveals and is dropped in the same tick,
+    // and there would be no in-flight switch to interrupt.
+    mocks.getReaderPosition.mockReturnValue(5);
 
+    // Mid-landing: the arrival has mounted and has not been revealed.
+    rerender(<SurahReader {...props} readerMode="mushaf" />);
+    expect(screen.getAllByTestId(/^reader-layer-/)).toHaveLength(2);
+
+    // Back to the rendering still on screen underneath. The arrival was at
+    // opacity 0 for its whole life, so dropping it shows nothing -- where
+    // appending would have mounted a third full list of the surah.
+    rerender(<SurahReader {...props} readerMode="translation" />);
+    expect(screen.getAllByTestId(/^reader-layer-/)).toHaveLength(1);
+    expect(screen.getByTestId('reader-layer-0')).toBeTruthy();
+
+    // And a third mode mid-flight replaces the arrival, still two.
+    rerender(<SurahReader {...props} readerMode="mushaf" />);
+    rerender(<SurahReader {...props} readerMode="words" />);
+    expect(screen.getAllByTestId(/^reader-layer-/)).toHaveLength(2);
+  });
+
+  it('keeps touch and TalkBack on the rendering that is actually on screen', () => {
+    const props = baseProps(readerData(10));
+    const { rerender } = render(<SurahReader {...props} readerMode="translation" />);
     mocks.getReaderPosition.mockReturnValue(5);
     rerender(<SurahReader {...props} readerMode="mushaf" />);
-    expect(mocks.scrollToIndex).toHaveBeenCalledTimes(1);
 
-    rerender(<SurahReader {...props} readerMode="translation" />);
+    // The arrival is at opacity 0 for the length of the landing -- up to 2.5s
+    // deep in a long surah. Handing it touches means a tap lands on a list
+    // nobody can see, scrolled somewhere else, and bookmarks the wrong ayah.
+    expect(screen.getByTestId('reader-layer-0').getAttribute('data-pointer-events')).toBe('auto');
+    expect(screen.getByTestId('reader-layer-1').getAttribute('data-pointer-events')).toBe('none');
 
-    // The whole point of the nonce: index 4 both times, so an effect keyed only
-    // on the index would not re-run and the second list would sit at offset 0.
-    expect(mocks.scrollToIndex).toHaveBeenCalledTimes(2);
-    expect(mocks.scrollToIndex).toHaveBeenLastCalledWith({ index: 4, animated: false });
+    const lists = screen.getAllByTestId('reader-list');
+    expect(lists[0]?.getAttribute('data-important-for-accessibility')).toBe('auto');
+    expect(lists[1]?.getAttribute('data-important-for-accessibility')).toBe('no-hide-descendants');
   });
 
   it('re-lands on the ayah the word-by-word screen was left at', () => {
