@@ -880,17 +880,27 @@ export function SurahReader({
     if (!current || current.mode === readerMode) return;
     incoming.value = 0;
     layerSeqRef.current += 1;
-    setLayers((existing) => [
-      ...existing,
-      {
+    setLayers((existing) => {
+      const arrival = {
         id: layerSeqRef.current,
         mode: readerMode,
         // Where the reader actually is, not where the route opened -- after
         // any scrolling those are different ayahs, and the route param is
         // absent entirely when the reader was opened from the surah list.
         seedAyah: getReaderPosition(data.surah.id) ?? initialAyahNumber ?? null,
-      },
-    ]);
+      };
+      // Never more than two. A switch asked for while one is still in flight
+      // replaces the arrival rather than stacking on it: the layer being
+      // replaced has never been seen -- it is at opacity 0 for its whole life
+      // -- so dropping it is invisible, where appending mounts another full
+      // list of the surah (2:255 renders ~255 rows before it can even try to
+      // scroll) for every tap of a mashed pill.
+      if (existing.length === 1) return [...existing, arrival];
+      // Back to what is already on screen underneath. Cancelling the arrival
+      // is the whole change: there is nothing to fade to.
+      if (existing[existing.length - 2]?.mode === readerMode) return existing.slice(0, -1);
+      return [...existing.slice(0, -1), arrival];
+    });
   }, [readerMode, layers, incoming, data.surah.id, initialAyahNumber]);
 
   // A change to the route's ayah param is an external deep link into the surah
@@ -966,16 +976,23 @@ export function SurahReader({
           reader is looking at, then fades in over it. Nothing blanks, and the
           landing still lands exactly -- see the note on AyahList. */}
       {layers.map((layer, index) => {
-        const live = index === layers.length - 1;
+        // Two questions, and answering both with "is this the newest layer"
+        // handed every touch to a list nobody could see. The arriving layer
+        // owns the cross-fade and fires the reveal; the layer the reader is
+        // *looking at* is the one underneath it until the arrival is dropped,
+        // and that is the one that takes touches, feeds the header's scroll
+        // offset, is exposed to TalkBack and records the reading position --
+        // which is what the note on AyahList's `live` has said all along.
+        const arriving = index > 0;
         const list = (
           <AyahList
             key={layer.id}
             data={data}
             mode={layer.mode}
             seedAyah={layer.seedAyah}
-            live={live}
-            onLanded={live && index > 0 ? revealIncoming : noopLanded}
-            arriving={index > 0}
+            live={!arriving}
+            onLanded={arriving ? revealIncoming : noopLanded}
+            arriving={arriving}
             bookmarkedAyahs={bookmarkedAyahs}
             {...(notesByAyah ? { notesByAyah } : {})}
             playingAyah={playingAyah}
@@ -988,7 +1005,7 @@ export function SurahReader({
             {...(onEditNote ? { onEditNote } : {})}
             onToggleAudio={onToggleAudio}
             onWordPress={onWordPress}
-            onScroll={live ? onScroll : noopScroll}
+            onScroll={arriving ? noopScroll : onScroll}
             headerHeight={headerHeight}
             sheetsOpen={Boolean(openWord) || languageOpen || reciterOpen}
             barDocked={barDocked}
@@ -1012,12 +1029,12 @@ export function SurahReader({
         // rather than being pushed out. While a switch is in flight the two
         // cross-fade; alone, a layer rests at full opacity.
         const base = index === 0 ? RESTING_LAYER : StyleSheet.absoluteFill;
-        const fade = layers.length === 1 ? null : live ? incomingStyle : outgoingStyle;
+        const fade = layers.length === 1 ? null : arriving ? incomingStyle : outgoingStyle;
         return (
           <Animated.View
             key={layer.id}
             testID={`reader-layer-${layer.id}`}
-            pointerEvents={live ? 'auto' : 'none'}
+            pointerEvents={arriving ? 'none' : 'auto'}
             style={fade ? [base, fade] : base}
           >
             {list}

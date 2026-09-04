@@ -1378,20 +1378,78 @@ describe('SurahReader shared reading position', () => {
     expect(mocks.scrollToIndex).not.toHaveBeenCalled();
   });
 
-  it('re-lands on every switch, though the target ayah never changes', () => {
+  it('re-lands on every switch, though the target ayah never changes', async () => {
+    vi.useFakeTimers();
+    try {
+      const props = baseProps(readerData(10));
+      const { rerender } = render(<SurahReader {...props} readerMode="translation" />);
+
+      mocks.getReaderPosition.mockReturnValue(5);
+      rerender(<SurahReader {...props} readerMode="mushaf" />);
+      expect(mocks.scrollToIndex).toHaveBeenCalledTimes(1);
+
+      // The first switch has to finish before the second is a switch at all:
+      // one asked for while the arrival is still in flight cancels it rather
+      // than stacking a third rendering (see below).
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
+      const landed = mocks.scrollToIndex.mock.calls.length;
+      rerender(<SurahReader {...props} readerMode="translation" />);
+
+      // The whole point of the nonce: index 4 both times, so an effect keyed
+      // only on the index would not re-run and the second list would sit at
+      // offset 0. A count rather than an exact number -- a landing retries
+      // until the list reports content, and how many attempts that takes is
+      // not what this asserts.
+      expect(mocks.scrollToIndex.mock.calls.length).toBeGreaterThan(landed);
+      expect(mocks.scrollToIndex).toHaveBeenLastCalledWith({ index: 4, animated: false });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('cancels an arrival rather than stacking a third rendering on it', () => {
     const props = baseProps(readerData(10));
     const { rerender } = render(<SurahReader {...props} readerMode="translation" />);
+    expect(screen.getAllByTestId(/^reader-layer-/)).toHaveLength(1);
+    // A position to land on, so every arrival below stays mid-landing: one
+    // that has nothing to scroll to reveals and is dropped in the same tick,
+    // and there would be no in-flight switch to interrupt.
+    mocks.getReaderPosition.mockReturnValue(5);
 
+    // Mid-landing: the arrival has mounted and has not been revealed.
+    rerender(<SurahReader {...props} readerMode="mushaf" />);
+    expect(screen.getAllByTestId(/^reader-layer-/)).toHaveLength(2);
+
+    // Back to the rendering still on screen underneath. The arrival was at
+    // opacity 0 for its whole life, so dropping it shows nothing -- where
+    // appending would have mounted a third full list of the surah.
+    rerender(<SurahReader {...props} readerMode="translation" />);
+    expect(screen.getAllByTestId(/^reader-layer-/)).toHaveLength(1);
+    expect(screen.getByTestId('reader-layer-0')).toBeTruthy();
+
+    // And a third mode mid-flight replaces the arrival, still two.
+    rerender(<SurahReader {...props} readerMode="mushaf" />);
+    rerender(<SurahReader {...props} readerMode="words" />);
+    expect(screen.getAllByTestId(/^reader-layer-/)).toHaveLength(2);
+  });
+
+  it('keeps touch and TalkBack on the rendering that is actually on screen', () => {
+    const props = baseProps(readerData(10));
+    const { rerender } = render(<SurahReader {...props} readerMode="translation" />);
     mocks.getReaderPosition.mockReturnValue(5);
     rerender(<SurahReader {...props} readerMode="mushaf" />);
-    expect(mocks.scrollToIndex).toHaveBeenCalledTimes(1);
 
-    rerender(<SurahReader {...props} readerMode="translation" />);
+    // The arrival is at opacity 0 for the length of the landing -- up to 2.5s
+    // deep in a long surah. Handing it touches means a tap lands on a list
+    // nobody can see, scrolled somewhere else, and bookmarks the wrong ayah.
+    expect(screen.getByTestId('reader-layer-0').getAttribute('data-pointer-events')).toBe('auto');
+    expect(screen.getByTestId('reader-layer-1').getAttribute('data-pointer-events')).toBe('none');
 
-    // The whole point of the nonce: index 4 both times, so an effect keyed only
-    // on the index would not re-run and the second list would sit at offset 0.
-    expect(mocks.scrollToIndex).toHaveBeenCalledTimes(2);
-    expect(mocks.scrollToIndex).toHaveBeenLastCalledWith({ index: 4, animated: false });
+    const lists = screen.getAllByTestId('reader-list');
+    expect(lists[0]?.getAttribute('data-important-for-accessibility')).toBe('auto');
+    expect(lists[1]?.getAttribute('data-important-for-accessibility')).toBe('no-hide-descendants');
   });
 
   it('re-lands on the ayah the word-by-word screen was left at', () => {
