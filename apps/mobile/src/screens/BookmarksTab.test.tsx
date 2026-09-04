@@ -466,6 +466,71 @@ describe('BookmarksTab', () => {
     await waitFor(() => expect(rowIds()).toEqual(['bookmark-row-1-1']));
   });
 
+  it('re-reads once the last exit has finished, not the first', async () => {
+    // Two deletes inside one 340ms exit. The first row's completion used to
+    // re-read unconditionally, and the fresh data no longer held the second
+    // row -- so it was unmounted mid-slide and its neighbours snapped shut in
+    // one frame, which is the jump this whole path removes.
+    mocks.holdTimings = true;
+    const userClient = requireUserClient();
+    await setBookmark(userClient, 2, 255, true);
+    await setBookmark(userClient, 1, 1, true);
+
+    render(<BookmarksTab />);
+    await screen.findByTestId('bookmark-row-2-255');
+
+    fireEvent.click(screen.getByTestId('bookmark-delete-2-255'));
+    await waitFor(async () => expect(await getBookmarks(userClient)).toHaveLength(1));
+    fireEvent.click(screen.getByTestId('bookmark-delete-1-1'));
+    await waitFor(async () => expect(await getBookmarks(userClient)).toHaveLength(0));
+
+    // The first row's slide, then its collapse: its exit is over and it has
+    // reported. The second row's is not.
+    await act(async () => {
+      mocks.heldTimings.shift()?.(true);
+    });
+    await act(async () => {
+      mocks.heldTimings.pop()?.(true);
+    });
+    expect(rowIds()).toContain('bookmark-row-1-1');
+
+    await act(async () => {
+      while (mocks.heldTimings.length > 0) mocks.heldTimings.shift()?.(true);
+    });
+    await waitFor(() => expect(rowIds()).toEqual([]));
+  });
+
+  it('re-reads on a backstop timer when the exit never reports', async () => {
+    // `onRemoved` fires from the collapse's completion callback, so anything
+    // that unmounts the row first -- switching tab mid-exit, another row's
+    // re-read landing under it -- swallowed the only thing that cleared the
+    // key and re-read the table. The deleted card then sat there until the
+    // next focus, and the key stayed set for the session: bookmarking that
+    // ayah again played the exit on the fresh row and vanished it.
+    mocks.holdTimings = true;
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const userClient = requireUserClient();
+      await setBookmark(userClient, 2, 255, true);
+      await setBookmark(userClient, 1, 1, true);
+
+      render(<BookmarksTab />);
+      await screen.findByTestId('bookmark-row-2-255');
+
+      fireEvent.click(screen.getByTestId('bookmark-delete-2-255'));
+      await waitFor(async () => expect(await getBookmarks(userClient)).toHaveLength(1));
+      expect(rowIds()).toContain('bookmark-row-2-255');
+
+      // Nothing ever completes the exit -- heldTimings is never drained.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      await waitFor(() => expect(rowIds()).toEqual(['bookmark-row-1-1']));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('lets the row carry the space the collapse has to close', async () => {
     // The second jump (device, 2026-09-02): the card slid off, the neighbours
     // rose -- and then jumped again when the re-read landed. The row collapsed

@@ -61,6 +61,9 @@ import { useListBottomPadding } from '@/theme/useListBottomPadding';
  *  which is what keeps a delete feeling immediate rather than watched. */
 const SLIDE_MS = 180;
 const COLLAPSE_MS = 160;
+/** Slack on the backstop timer, so it only ever fires for a row whose exit
+ *  never reported -- never as a race against one that is about to. */
+const EXIT_GRACE_MS = 120;
 
 /** Which ordering the list is in. Not "History": reading history is Home's
  *  continue-reading card and does not belong here. All three show the same
@@ -123,12 +126,52 @@ export function BookmarksScreen() {
    *  not one key: a second delete during the first row's 340ms would otherwise
    *  cut that row's exit short and put back the jump this removes. */
   const [removing, setRemoving] = useState<ReadonlySet<string>>(() => new Set());
+  /** Backstop timers, one per leaving row. `onRemoved` fires from the exit's
+   *  completion callback, so anything that unmounts the row first -- switching
+   *  tab mid-exit, or another row's re-read landing under it -- swallowed the
+   *  only thing that cleared the key and re-read the table, leaving a deleted
+   *  card on screen until the next focus. */
+  const removalTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  useEffect(() => {
+    const timers = removalTimers.current;
+    return () => {
+      timers.forEach(clearTimeout);
+      timers.clear();
+    };
+  }, []);
 
   const load = useCallback(loadBookmarksData, []);
   const { data, loading, error, reload } = useUserDbOnFocus(
     load,
     t(uiLocale, 'bookmarks.loadFailed'),
   );
+
+  const finishRemoval = useCallback((key: string) => {
+    const timer = removalTimers.current.get(key);
+    if (timer) clearTimeout(timer);
+    removalTimers.current.delete(key);
+    setRemoving((current) => {
+      if (!current.has(key)) return current;
+      const next = new Set(current);
+      next.delete(key);
+      return next;
+    });
+  }, []);
+
+  // The re-read waits for the *last* exit to finish, not the first. Reloading
+  // while another row is still sliding drops that row from the data mid-motion
+  // and snaps the list shut underneath it -- the jump this whole path exists
+  // to remove, reachable by deleting two cards in quick succession.
+  const pendingReload = useRef(false);
+  useEffect(() => {
+    if (removing.size > 0) {
+      pendingReload.current = true;
+      return;
+    }
+    if (!pendingReload.current) return;
+    pendingReload.current = false;
+    reload();
+  }, [removing, reload]);
 
   const bookmarks = useMemo(() => data?.bookmarks ?? [], [data]);
   const texts = data?.texts ?? new Map<string, string>();
@@ -205,7 +248,12 @@ export function BookmarksScreen() {
       // below is the only thing that changes. The re-read still replaces local
       // state rather than splicing -- it just waits for the exit to finish, so
       // the rows underneath glide into the gap instead of teleporting into it.
-      setRemoving((current) => new Set(current).add(keyOf(bookmark)));
+      const key = keyOf(bookmark);
+      setRemoving((current) => new Set(current).add(key));
+      removalTimers.current.set(
+        key,
+        setTimeout(() => finishRemoval(key), SLIDE_MS + COLLAPSE_MS + EXIT_GRACE_MS),
+      );
     } catch (cause) {
       // Coordinate only, never the note -- same reason saveNote logs neither.
       console.error('[bookmarks] delete failed', {
@@ -246,14 +294,7 @@ export function BookmarksScreen() {
         onEditNote={() => setEditing(item)}
         onDelete={() => requestDelete(item)}
         removing={removing.has(keyOf(item))}
-        onRemoved={() => {
-          setRemoving((current) => {
-            const next = new Set(current);
-            next.delete(keyOf(item));
-            return next;
-          });
-          reload();
-        }}
+        onRemoved={() => finishRemoval(keyOf(item))}
       />
     ),
     // requestDelete is redeclared every render and closes over nothing that
@@ -261,7 +302,7 @@ export function BookmarksScreen() {
     // callback on every render and defeat the memo. `removing` and `reload`
     // are not in that category -- a row that cannot see its own removing flag
     // never leaves.
-    [texts, surahNames, tab, uiLocale, removing, reload],
+    [texts, surahNames, tab, uiLocale, removing, finishRemoval],
   );
 
   const visible = tab === 'notes' ? noted : recent;
