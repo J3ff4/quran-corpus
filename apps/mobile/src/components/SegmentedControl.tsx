@@ -152,10 +152,17 @@ export function SegmentedControl<T extends string>({
   }
 
   // Deliberately without a dependency array. `value` is the authority on where
-  // the pill belongs, and this runs after every render to enforce that -- which
-  // covers the press below having already started the travel (target equals
-  // what was applied, so nothing restarts) and a caller that ignores `onChange`
-  // (the value never moved, so the pill is put back).
+  // the pill belongs, and this runs after every render to enforce that -- so
+  // the press below having already started the travel restarts nothing (target
+  // equals what was applied), and any render landing between the press and the
+  // caller applying it leaves the pill where the press put it.
+  //
+  // `value` is the authority only once `optimistic` clears, which happens when
+  // the caller applies the change. A caller that never applies it holds the
+  // pill on the pressed segment for good -- on both paths, since `optimistic`
+  // is now set before the reduced-motion branch. Every caller here applies it;
+  // one that may reject a selection has to drive this control as controlled
+  // and not use the optimistic hold at all.
   useEffect(() => {
     if (optimistic !== null && optimistic === value) setOptimistic(null);
     if (width === 0) return;
