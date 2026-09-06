@@ -11,6 +11,9 @@ const mocks = vi.hoisted(() => ({
     | null,
   onScroll: null as ((event: { nativeEvent: { contentOffset: { y: number } } }) => void) | null,
   onContentSizeChange: null as ((width: number, height: number) => void) | null,
+  getItemLayout: null as
+    | ((data: unknown, index: number) => { length: number; offset: number; index: number })
+    | null,
   headerLayout: null as ((height: number) => void) | null,
   /** Hold the mode cross-fade's completion instead of running it, so a test
    *  can look at the reader mid-switch -- the only moment both renderings are
@@ -213,7 +216,7 @@ vi.mock('react-native', async () => {
     // Forwards the ref, so the imperative scroll calls the component makes on
     // mount are observable. A plain function component silently swallows it
     // and every scroll assertion would pass against a null ref.
-    FlatList: ({ data, ListHeaderComponent, renderItem, onViewableItemsChanged, onScrollToIndexFailed, onScroll, onContentSizeChange, contentContainerStyle, importantForAccessibility, initialNumToRender, style, ref }: {
+    FlatList: ({ data, ListHeaderComponent, renderItem, onViewableItemsChanged, onScrollToIndexFailed, onScroll, onContentSizeChange, getItemLayout, contentContainerStyle, importantForAccessibility, initialNumToRender, style, ref }: {
       data: unknown[];
       ListHeaderComponent?: React.ReactNode;
       renderItem: (info: { item: unknown; index: number }) => React.ReactNode;
@@ -221,6 +224,7 @@ vi.mock('react-native', async () => {
       onScrollToIndexFailed?: (info: { index: number; averageItemLength: number }) => void;
       onScroll?: (event: { nativeEvent: { contentOffset: { y: number } } }) => void;
       onContentSizeChange?: (width: number, height: number) => void;
+      getItemLayout?: (data: unknown, index: number) => { length: number; offset: number; index: number };
       contentContainerStyle?: { paddingBottom?: number };
       importantForAccessibility?: string;
       initialNumToRender?: number;
@@ -231,6 +235,7 @@ vi.mock('react-native', async () => {
       mocks.onScrollToIndexFailed = onScrollToIndexFailed ?? null;
       mocks.onScroll = onScroll ?? null;
       mocks.onContentSizeChange = onContentSizeChange ?? null;
+      mocks.getItemLayout = getItemLayout ?? null;
       React.useImperativeHandle(ref, () => ({
         scrollToIndex: mocks.scrollToIndex,
         scrollToOffset: mocks.scrollToOffset,
@@ -328,14 +333,29 @@ describe('SurahReader', () => {
     expect(mocks.scrollToIndex).not.toHaveBeenCalled();
   });
 
-  it('renders far enough down the list for the deep-linked ayah to exist', () => {
-    // Not a performance knob here: FlatList cannot scroll to a row it has
-    // never rendered, and there is no getItemLayout to tell it where one
-    // would be. Rendering the target is what makes the landing exact rather
-    // than an estimate off the short cards near the top.
+  it('gives FlatList a getItemLayout so it can jump without measuring', () => {
+    const props = baseProps(readerData(10));
+    render(<SurahReader {...props} />);
+
+    const getItemLayout = mocks.getItemLayout;
+    expect(getItemLayout).toBeInstanceOf(Function);
+
+    const first = getItemLayout!(props.data.ayahs, 0);
+    const second = getItemLayout!(props.data.ayahs, 1);
+    expect(first.offset).toBe(0);
+    expect(first.length).toBeGreaterThan(0);
+    // Offsets are cumulative: an index's offset is every earlier row summed.
+    // FlatList sums nothing itself -- this table is the whole scroll geometry.
+    expect(second.offset).toBe(first.length);
+  });
+
+  it('stops widening initialNumToRender to cover a deep target', () => {
+    // The old landing needed the target rendered on the first commit to be
+    // measurable. getItemLayout removes that, and with it the cost of laying
+    // out every row above a deep link (282 of them for 2:282).
     render(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />);
 
-    expect(screen.getByTestId('reader-list').getAttribute('data-initial-num-to-render')).toBe('255');
+    expect(screen.getByTestId('reader-list').getAttribute('data-initial-num-to-render')).toBe('10');
   });
 
   it('opens a surah with no deep link on the default window', () => {

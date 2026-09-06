@@ -35,6 +35,7 @@ import { LanguageSheet } from './LanguageSheet';
 import { ReciterSheet } from './ReciterSheet';
 import { WordSheet } from './WordSheet';
 import { GlassSurface } from './GlassSurface';
+import { estimateRowHeight } from './rowHeightModel';
 import { useReducedMotion } from '@/motion/useReducedMotion';
 import { t } from '@/i18n/uiStrings';
 import { fonts, typography } from '@/theme/tokens';
@@ -112,18 +113,24 @@ interface SurahReaderProps {
 // onViewableItemsChanged, writing an ayah the reader never saw into the saved
 // reading position.
 //
-// "FlatList reported no failure" is not the same as "the row is at the top".
-// scrollToIndex computes its offset from the row heights measured so far, so a
-// card above the target that has rendered but not finished laying out measures
-// short, the jump lands short, and the target slides further down as those
-// cards settle. So every attempt re-scrolls, and only a scroll that both missed
-// nothing and left the content height unchanged counts as the landing. (Owner
-// device, 2026-08-23: 6:87 opened from a concordance row two cards below the
-// top, and the same from search and bookmarks.)
+// The landing is no longer blind. With getItemLayout below, scrollToIndex
+// computes its offset from the model rather than from whatever happens to have
+// been measured, so a jump can no longer land short because the cards above the
+// target had rendered but not settled -- the failure this loop was built for
+// (owner device, 2026-08-23: 6:87 opened two cards below the top from a
+// concordance row, and the same from search and bookmarks).
+//
+// What remains is model error: the estimate is close, not exact, so the row
+// arrives near the top rather than at it. That is a correction against one real
+// measurement, not a retry against a moving target -- Task 3 replaces this loop
+// with it. Until then the loop stands, and the offsets it scrolls to are now
+// stable between attempts.
 const MAX_SCROLL_ATTEMPTS = 25;
 const SCROLL_RETRY_DELAY_MS = 100;
-// React Native's own default. Restated because the deep-link case overrides it
-// and a bare 10 in the JSX reads as a number someone chose.
+// React Native's own default, restated so a bare 10 in the JSX does not read as
+// a number someone chose. Nothing overrides it any more: a deep link used to
+// widen the window to initialIndex + 1, because FlatList cannot scroll to a row
+// it has never rendered *unless* it has a getItemLayout. It has one now.
 const DEFAULT_INITIAL_RENDER = 10;
 
 // Ayahs fetched ahead of the one scrolling into view. The whole-surah fetch is
@@ -291,6 +298,49 @@ function AyahList({
   // Whether this mount has been focused before -- see the focus effect below.
   const focusedRef = useRef(false);
   const [positioned, setPositioned] = useState(false);
+  // 0 until the list has laid out. The row model is width-dependent, and a
+  // width guessed from the window would be wrong for mushaf mode, whose plate
+  // is inset.
+  const [listWidth, setListWidth] = useState(0);
+  const onListLayout = useCallback((event: LayoutChangeEvent) => {
+    setListWidth(event.nativeEvent.layout.width);
+  }, []);
+
+  // Cumulative, not per-row: scrollToIndex sums every preceding row, so the
+  // table is what FlatList actually reads. Rebuilt only when something it
+  // depends on changes -- a getItemLayout returning different offsets for the
+  // same index between calls would move content under the user's finger.
+  const layout = useMemo(() => {
+    const lengths = new Array<number>(data.ayahs.length);
+    const offsets = new Array<number>(data.ayahs.length);
+    let running = 0;
+    for (let index = 0; index < data.ayahs.length; index += 1) {
+      const item = data.ayahs[index];
+      // noUncheckedIndexedAccess is on: the index came from this loop, but the
+      // compiler cannot know that.
+      if (!item) continue;
+      const height = estimateRowHeight({
+        mode,
+        arabicSize: arabicSizes.reader,
+        listWidth,
+        arabicChars: item.ayah.text_uthmani?.length ?? 0,
+        translationChars: item.translation?.text.length ?? 0,
+      });
+      offsets[index] = running;
+      lengths[index] = height;
+      running += height;
+    }
+    return { lengths, offsets };
+  }, [data.ayahs, mode, arabicSizes.reader, listWidth]);
+
+  const getItemLayout = useCallback(
+    (_: unknown, index: number) => ({
+      length: layout.lengths[index] ?? 0,
+      offset: layout.offsets[index] ?? 0,
+      index,
+    }),
+    [layout],
+  );
 
   // The surah's opening, above ayah 1's card rather than inside it: in the card
   // it sat under the ayah number and bookmark row and still read as ayah 1's
@@ -573,6 +623,8 @@ function AyahList({
         onViewableItemsChanged={onViewableItemsChanged.current}
         onScrollToIndexFailed={onScrollToIndexFailed}
         onContentSizeChange={onContentSizeChange}
+        getItemLayout={getItemLayout}
+        onLayout={onListLayout}
         onScroll={onScroll}
         scrollEventThrottle={16}
         // BottomSheet -- the shell under both WordSheet and LanguageSheet --
@@ -582,7 +634,7 @@ function AyahList({
         // modal is only visually modal (CLAUDE.md §8, WCAG AA). The nav header
         // is a native toolbar outside this View and is still reachable.
         importantForAccessibility={sheetsOpen || !live ? 'no-hide-descendants' : 'auto'}
-        initialNumToRender={initialIndex > 0 ? initialIndex + 1 : DEFAULT_INITIAL_RENDER}
+        initialNumToRender={DEFAULT_INITIAL_RENDER}
         // `|| arriving` for the same reason the spinner below carries it, and
         // it is the last blank on the device list. `reveal()` calls
         // setPositioned(true) and onLanded() in one tick; onLanded starts the
