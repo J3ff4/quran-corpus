@@ -29,8 +29,9 @@ interface HostProps {
   testID?: string;
   // Native-only props with no DOM equivalent. Destructured so they never reach
   // createElement: React logs "Unknown event handler property" for onLayout and
-  // onTextLayout, and a non-boolean-attribute warning for `accessible` and
-  // pointerEvents, on every render.
+  // onTextLayout, and a non-boolean-attribute warning for `accessible`, on
+  // every render. `pointerEvents` is destructured too, but mapped rather than
+  // dropped -- see below.
   accessible?: unknown;
   contentContainerStyle?: unknown;
   // Reanimated's layout-animation builders, on an Animated.View. Nothing in
@@ -51,7 +52,7 @@ interface HostProps {
   onPressIn?: unknown;
   onPressOut?: unknown;
   onTextLayout?: unknown;
-  pointerEvents?: unknown;
+  pointerEvents?: 'auto' | 'none' | 'box-none' | 'box-only';
 }
 
 /** RN accepts `style={[a, b]}`; the DOM does not.
@@ -255,7 +256,7 @@ export function host(tag: string) {
     onPressIn: _onPressIn,
     onPressOut: _onPressOut,
     onTextLayout: _onTextLayout,
-    pointerEvents: _pointerEvents,
+    pointerEvents,
     ...props
   }: HostProps) {
     // Fires only when a suite has asked for a measured box; see setAutoLayout.
@@ -298,6 +299,11 @@ export function host(tag: string) {
         // away from TalkBack behind a sheet (accessibilityViewIsModal is
         // iOS-only), so a test has to be able to see it.
         'data-hidden-from-a11y': importantForAccessibility === 'no-hide-descendants' ? 'true' : undefined,
+        // Mapped for the same reason, and it was dropped until the reader's
+        // cross-fade handed every touch to a layer at opacity 0: which view
+        // takes a tap is behaviour, and there is no DOM equivalent to assert
+        // against. React warns about the camelCase prop on a DOM node.
+        'data-pointer-events': pointerEvents === undefined ? undefined : String(pointerEvents),
         onClick: onPress,
         style: flattenStyle(style),
       },

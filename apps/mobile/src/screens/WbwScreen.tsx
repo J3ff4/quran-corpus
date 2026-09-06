@@ -27,9 +27,12 @@ import { typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
+// Dense first, and it is the default (owner ruling 2026-09-01). The order is
+// the same here and in Settings: two controls for one setting that disagree on
+// which segment sits left read as two different settings.
 const DENSITY_OPTIONS: readonly { value: WbwDensity; labelKey: 'wbw.densityHybrid' | 'wbw.densityDense' }[] = [
-  { value: 'hybrid', labelKey: 'wbw.densityHybrid' },
   { value: 'dense', labelKey: 'wbw.densityDense' },
+  { value: 'hybrid', labelKey: 'wbw.densityHybrid' },
 ];
 
 interface OpenWord {

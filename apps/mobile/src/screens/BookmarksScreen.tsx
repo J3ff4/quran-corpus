@@ -1,8 +1,24 @@
 import { Link, useRouter } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, SectionList, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  SectionList,
+  Text,
+  View,
+  useWindowDimensions,
+  type LayoutChangeEvent,
+} from 'react-native';
 import Swipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
-import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  type SharedValue,
+} from 'react-native-reanimated';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 
 import { ConfirmSheet } from '@/components/ConfirmSheet';
@@ -32,10 +48,22 @@ import {
   iconScale,
   panelWidth,
 } from '@/motion/swipePanel';
+import { rowExit } from '@/motion/bookmarkExit';
+import { useReducedMotion } from '@/motion/useReducedMotion';
 import { useAppSettings } from '@/settings/settingsStore';
 import { radii, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
+
+/** The slide, then the collapse. Deliberately sequential rather than one
+ *  motion: the card leaves first and the list closes afterwards, so the eye
+ *  follows one thing at a time. Together they are under a third of a second,
+ *  which is what keeps a delete feeling immediate rather than watched. */
+const SLIDE_MS = 180;
+const COLLAPSE_MS = 160;
+/** Slack on the backstop timer, so it only ever fires for a row whose exit
+ *  never reported -- never as a race against one that is about to. */
+const EXIT_GRACE_MS = 120;
 
 /** Which ordering the list is in. Not "History": reading history is Home's
  *  continue-reading card and does not belong here. All three show the same
@@ -94,12 +122,56 @@ export function BookmarksScreen() {
    *  requestDelete. */
   const [confirming, setConfirming] = useState<Bookmark | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  /** Rows whose DELETE has committed and whose exit is still playing. A set,
+   *  not one key: a second delete during the first row's 340ms would otherwise
+   *  cut that row's exit short and put back the jump this removes. */
+  const [removing, setRemoving] = useState<ReadonlySet<string>>(() => new Set());
+  /** Backstop timers, one per leaving row. `onRemoved` fires from the exit's
+   *  completion callback, so anything that unmounts the row first -- switching
+   *  tab mid-exit, or another row's re-read landing under it -- swallowed the
+   *  only thing that cleared the key and re-read the table, leaving a deleted
+   *  card on screen until the next focus. */
+  const removalTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  useEffect(() => {
+    const timers = removalTimers.current;
+    return () => {
+      timers.forEach(clearTimeout);
+      timers.clear();
+    };
+  }, []);
 
   const load = useCallback(loadBookmarksData, []);
   const { data, loading, error, reload } = useUserDbOnFocus(
     load,
     t(uiLocale, 'bookmarks.loadFailed'),
   );
+
+  const finishRemoval = useCallback((key: string) => {
+    const timer = removalTimers.current.get(key);
+    if (timer) clearTimeout(timer);
+    removalTimers.current.delete(key);
+    setRemoving((current) => {
+      if (!current.has(key)) return current;
+      const next = new Set(current);
+      next.delete(key);
+      return next;
+    });
+  }, []);
+
+  // The re-read waits for the *last* exit to finish, not the first. Reloading
+  // while another row is still sliding drops that row from the data mid-motion
+  // and snaps the list shut underneath it -- the jump this whole path exists
+  // to remove, reachable by deleting two cards in quick succession.
+  const pendingReload = useRef(false);
+  useEffect(() => {
+    if (removing.size > 0) {
+      pendingReload.current = true;
+      return;
+    }
+    if (!pendingReload.current) return;
+    pendingReload.current = false;
+    reload();
+  }, [removing, reload]);
 
   const bookmarks = useMemo(() => data?.bookmarks ?? [], [data]);
   const texts = data?.texts ?? new Map<string, string>();
@@ -171,10 +243,17 @@ export function BookmarksScreen() {
       const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
       await setBookmark(userClient, bookmark.surahId, bookmark.ayahNumber, false);
       setConfirming(null);
-      // Re-read rather than splice the row out of local state: the row is gone
-      // because the DELETE ran, and a list that drops it optimistically shows a
-      // bookmark as deleted that a failed write left in place.
-      reload();
+      // The write first, the motion second, the re-read last. Writing first is
+      // what keeps a failed DELETE honest: the row never moves and the error
+      // below is the only thing that changes. The re-read still replaces local
+      // state rather than splicing -- it just waits for the exit to finish, so
+      // the rows underneath glide into the gap instead of teleporting into it.
+      const key = keyOf(bookmark);
+      setRemoving((current) => new Set(current).add(key));
+      removalTimers.current.set(
+        key,
+        setTimeout(() => finishRemoval(key), SLIDE_MS + COLLAPSE_MS + EXIT_GRACE_MS),
+      );
     } catch (cause) {
       // Coordinate only, never the note -- same reason saveNote logs neither.
       console.error('[bookmarks] delete failed', {
@@ -214,12 +293,16 @@ export function BookmarksScreen() {
         uiLocale={uiLocale}
         onEditNote={() => setEditing(item)}
         onDelete={() => requestDelete(item)}
+        removing={removing.has(keyOf(item))}
+        onRemoved={() => finishRemoval(keyOf(item))}
       />
     ),
     // requestDelete is redeclared every render and closes over nothing that
     // changes, so it stays out of the deps: listing it would rebuild the row
-    // callback on every render and defeat the memo.
-    [texts, surahNames, tab, uiLocale],
+    // callback on every render and defeat the memo. `removing` and `reload`
+    // are not in that category -- a row that cannot see its own removing flag
+    // never leaves.
+    [texts, surahNames, tab, uiLocale, removing, finishRemoval],
   );
 
   const visible = tab === 'notes' ? noted : recent;
@@ -297,7 +380,10 @@ export function BookmarksScreen() {
                 color: theme.mutedText,
                 paddingHorizontal: 16,
                 paddingTop: 14,
-                paddingBottom: 6,
+                // 16, not 6: the list's `gap` used to add the other 10 between
+                // a header and its first card, and the rows' own margin sits
+                // below them, not above.
+                paddingBottom: 16,
                 fontWeight: '700',
               }}
             >
@@ -306,7 +392,9 @@ export function BookmarksScreen() {
           )}
           style={{ flex: 1 }}
           // No paddingTop here: the first section header already carries 14.
-          contentContainerStyle={{ paddingBottom, paddingHorizontal: 16, gap: 10 }}
+          // No `gap` either -- see ROW_GAP: the rows carry their own spacing so
+          // the exit can close it.
+          contentContainerStyle={{ paddingBottom, paddingHorizontal: 16 }}
         />
       ) : (
         <FlatList
@@ -317,7 +405,7 @@ export function BookmarksScreen() {
           style={{ flex: 1 }}
           // paddingTop, unlike the SectionList above: nothing here heads the
           // list, so the first card sat flush against the segmented control.
-          contentContainerStyle={{ paddingTop: 10, paddingBottom, paddingHorizontal: 16, gap: 10 }}
+          contentContainerStyle={{ paddingTop: 10, paddingBottom, paddingHorizontal: 16 }}
         />
       )}
 
@@ -448,6 +536,8 @@ function BookmarkRow({
   uiLocale,
   onEditNote,
   onDelete,
+  removing,
+  onRemoved,
 }: {
   bookmark: Bookmark;
   text: string | null;
@@ -456,10 +546,73 @@ function BookmarkRow({
   uiLocale: UiLocaleCode;
   onEditNote: () => void;
   onDelete: () => void;
+  /** The row's DELETE has committed; play it out and then say so. The list
+   *  still holds the item -- dropping it here is what made the rows below
+   *  teleport. */
+  removing: boolean;
+  /** Fired once the exit has finished, or immediately under reduced motion.
+   *  The caller re-reads the table then, not before. */
+  onRemoved: () => void;
 }) {
   const theme = useThemeColors();
   const router = useRouter();
   const swipe = useRef<SwipeableMethods>(null);
+  const reducedMotion = useReducedMotion();
+  const { width: screenWidth } = useWindowDimensions();
+
+  // 0 while the row is in the list, 1 once it has left. Two values, not one:
+  // the slide has to finish before the collapse starts, and a single
+  // interpolated progress would run both at once.
+  const slide = useSharedValue(0);
+  const collapse = useSharedValue(0);
+  // The row's own height, measured on an inner view so the animated outer one
+  // never measures the height it is itself setting.
+  const rowHeight = useSharedValue(0);
+  // Read through a ref, the same shape SurahReader uses: the caller rebuilds
+  // this callback on every render, and depending on it directly would restart
+  // the exit from the top each time.
+  const onRemovedRef = useRef(onRemoved);
+  useEffect(() => {
+    onRemovedRef.current = onRemoved;
+  }, [onRemoved]);
+
+  // Stable across renders, so the exit effect below has nothing to restart on.
+  const fireRemoved = useCallback(() => onRemovedRef.current(), []);
+
+  useEffect(() => {
+    if (!removing) return;
+    if (reducedMotion) {
+      // A standing instruction not to animate. The row goes at once and the
+      // list closes in the same frame, which is the trade this setting asks
+      // for.
+      onRemovedRef.current();
+      return;
+    }
+    slide.value = withTiming(1, { duration: SLIDE_MS, easing: Easing.in(Easing.cubic) }, (finished?: boolean) => {
+      // Only on a settled slide: an interrupted one (the screen unmounting
+      // under it) must not go on to fire a reload into a dead component.
+      if (!finished) return;
+      collapse.value = withTiming(
+        1,
+        { duration: COLLAPSE_MS, easing: Easing.out(Easing.cubic) },
+        (done?: boolean) => {
+          if (done) runOnJS(fireRemoved)();
+        },
+      );
+    });
+  }, [removing, reducedMotion, slide, collapse, fireRemoved]);
+
+  // Left, because that is the way the row travels under a swipe -- the delete
+  // panel is a right action, so the card moves off the left edge. The confirm
+  // sheet has no direction of its own, and giving it the same one keeps a
+  // delete looking like one gesture however it was asked for.
+  const slideStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: -slide.value * screenWidth }],
+  }));
+
+  // Height AND spacing, together -- see rowExit, which owns both and is where
+  // the endpoints are asserted.
+  const collapseStyle = useAnimatedStyle(() => rowExit(collapse.value, rowHeight.value));
   const coordinate = `${bookmark.surahId}:${bookmark.ayahNumber}`;
   // "Al-Baqara 2:255", not "2:255": the number alone identifies the ayah only
   // to someone who already knows the surah order.
@@ -481,6 +634,24 @@ function BookmarkRow({
   }
 
   return (
+    // Two wrappers, one job each: the outer collapses the space the row
+    // occupied, the inner carries it off screen. Splitting them is what lets
+    // the height be measured on a view whose height nothing is animating.
+    <Animated.View
+      testID={`bookmark-exit-${bookmark.surahId}-${bookmark.ayahNumber}`}
+      // Only while leaving: at rest the card's drop shadow has to escape its
+      // bounds, which is the same reason Swipeable's own container is opened
+      // up below.
+      style={[{ overflow: removing ? 'hidden' : 'visible' }, collapseStyle]}
+    >
+    <View
+      onLayout={(event: LayoutChangeEvent) => {
+        // Ignored once the exit is under way: the collapse shrinks this view,
+        // and re-reading it here would chase its own animation to zero.
+        if (!removing) rowHeight.value = event.nativeEvent.layout.height;
+      }}
+    >
+    <Animated.View style={slideStyle}>
     <Swipeable
       ref={swipe}
       friction={2}
@@ -614,5 +785,8 @@ function BookmarkRow({
         </Pressable>
       </GlassSurface>
     </Swipeable>
+    </Animated.View>
+    </View>
+    </Animated.View>
   );
 }

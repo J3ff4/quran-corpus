@@ -10,11 +10,14 @@ import {
   type NativeSyntheticEvent,
   type ViewToken,
 } from 'react-native';
-import {
+import Animated, {
   Extrapolation,
   interpolate,
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withTiming,
+  type SharedValue,
 } from 'react-native-reanimated';
 import { router, useFocusEffect, useNavigation } from 'expo-router';
 import { reciterById, splitBasmala, type Word } from '@quran-corpus/data/mobile';
@@ -151,6 +154,17 @@ const TITLE_RISE = 10;
 // height up instead of growing the number.
 const RECITATION_BAR_CLEARANCE = 56;
 
+/** The cross-fade between two renderings of the same surah. Short: both layers
+ *  are the same words on the same ayah, so this is a change of treatment, not
+ *  a transition between places. */
+const MODE_FADE_MS = 160;
+
+/** The style a layer rests at once it is the only one left. `opacity: 1`
+ *  explicitly: the layer arrives wearing an animated opacity, and dropping
+ *  that style off the array does not by itself repaint the value it left
+ *  behind. */
+const RESTING_LAYER = { flex: 1, opacity: 1 } as const;
+
 /** The single plate mushaf mode's rows flow across. */
 function MushafPlate({ children }: { children: ReactNode }) {
   return (
@@ -171,6 +185,444 @@ function SurahPlate({ mushaf, children }: { mushaf: boolean; children: ReactNode
 // Shared instance: a fresh `[]` per render would change AyahText's memo key
 // for every not-yet-loaded ayah on every scroll frame.
 const EMPTY_WORDS: Word[] = [];
+
+interface AyahListProps {
+  data: SurahReaderData;
+  /** Which rendering this layer draws. A layer is one mode for its whole life:
+   *  switching modes mounts a second layer rather than re-rendering this one,
+   *  so nothing here ever has to survive a mode change. */
+  mode: ReaderMode;
+  /** The ayah to land on, captured when the layer mounts. */
+  seedAyah: number | null;
+  /** Whether this is the layer the reader is looking at. Only the live layer
+   *  records the reading position and asks for words -- one laying out under a
+   *  cross-fade must do neither, or a landing it has not finished overwrites
+   *  the position the visible layer is still sitting on. */
+  live: boolean;
+  /** The landing has settled, or given up. The caller cross-fades on this. */
+  onLanded: () => void;
+  /** This layer is arriving over one already on screen, so it must never draw
+   *  the positioning spinner: there is a finished rendering underneath it, and
+   *  painting the background over that is the blank this whole arrangement
+   *  exists to remove. */
+  arriving: boolean;
+  bookmarkedAyahs: Set<number>;
+  notesByAyah?: Map<number, string | null>;
+  playingAyah: number | null;
+  audioEnabled: boolean;
+  uiLocale: UiLocaleCode;
+  wordsByAyah: Map<number, Word[]>;
+  /** An ayah has come into view; the caller may want its words. Held in a ref
+   *  here, so the caller is free to rebuild it every render. */
+  onVisibleAyah: (ayahId: number) => void;
+  onReadingAyah?: (ayahNumber: number) => void;
+  onToggleBookmark: (ayahNumber: number) => void;
+  onEditNote?: (ayahNumber: number) => void;
+  onToggleAudio: (ayahNumber: number) => void;
+  onWordPress: (word: Word) => void;
+  onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  headerHeight: SharedValue<number>;
+  /** A sheet is over the reader, so this list must leave the TalkBack order. */
+  sheetsOpen: boolean;
+  barDocked: boolean;
+}
+
+/**
+ * One rendering of the surah: the list, and the landing sequence that puts it
+ * on the right ayah.
+ *
+ * Its own component so the reader can mount two of them. A mode switch used to
+ * change the element type at this position -- MushafPlate in one mode, Fragment
+ * in the other -- which unmounted the FlatList and re-ran the landing behind a
+ * spinner on a blank screen, for up to MAX_SCROLL_ATTEMPTS * SCROLL_RETRY_DELAY_MS.
+ * Deep in a long surah that is two and a half seconds of nothing (owner report,
+ * 2026-09-01). Keeping one list mounted would not have fixed it: a mushaf ayah
+ * and a translation card are nothing like the same height, so the preserved
+ * pixel offset points at a different ayah and the landing has to run anyway.
+ *
+ * So the landing still runs -- it just runs underneath the mode the reader is
+ * already looking at, and the layers cross-fade once it has landed. The cost is
+ * both renderings mounted for the length of one transition.
+ */
+function AyahList({
+  data,
+  mode,
+  seedAyah,
+  live,
+  onLanded,
+  arriving,
+  bookmarkedAyahs,
+  notesByAyah,
+  playingAyah,
+  audioEnabled,
+  uiLocale,
+  wordsByAyah,
+  onVisibleAyah,
+  onReadingAyah,
+  onToggleBookmark,
+  onEditNote,
+  onToggleAudio,
+  onWordPress,
+  onScroll,
+  headerHeight,
+  sheetsOpen,
+  barDocked,
+}: AyahListProps) {
+  const theme = useThemeColors();
+  const arabicSizes = useArabicSizes();
+  const listBottomPadding = useListBottomPadding();
+  const listRef = useRef<FlatList<SurahReaderData['ayahs'][number]>>(null);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const attemptsRef = useRef(0);
+  // Set by onScrollToIndexFailed, read by the attempt loop below. A ref, not
+  // state: FlatList reports the failure synchronously during a scroll and a
+  // re-render per attempt would remount nothing useful.
+  const failedRef = useRef(false);
+  // The list's content height, and the height the previous attempt scrolled
+  // over. Equal means nothing above the target grew in that window, which is
+  // the only evidence available here that the offset the scroll used is the
+  // offset the row actually sits at.
+  const contentHeightRef = useRef(0);
+  const settledHeightRef = useRef(-1);
+  // The same value as `positioned` below. onViewableItemsChanged is called by
+  // FlatList from outside the React tree off a ref that never re-reads props,
+  // so it cannot see the state.
+  const positionedRef = useRef(false);
+  // Whether this mount has been focused before -- see the focus effect below.
+  const focusedRef = useRef(false);
+  const [positioned, setPositioned] = useState(false);
+
+  // The surah's opening, above ayah 1's card rather than inside it: in the card
+  // it sat under the ayah number and bookmark row and still read as ayah 1's
+  // own first line (owner device report, 2026-08-17). Taken off ayah 1's text
+  // rather than held as a constant, so the banner carries that surah's own
+  // spelling -- 95 and 97 differ -- and AyahText strips exactly what shows here.
+  const basmala = useMemo(() => {
+    const first = data.ayahs.find((item) => item.ayah.ayah_number === 1);
+    if (!first) return null;
+    return splitBasmala(first.ayah.text_uthmani, { surahId: data.surah.id, ayahNumber: 1 }).basmala;
+  }, [data.ayahs, data.surah.id]);
+
+  // The ayah the list must land on, and how many landings have been demanded.
+  // `nonce` exists because the re-landing target is usually the ayah already
+  // being read, so an effect keyed on the index alone would never re-run.
+  //
+  // Reset during render rather than in an effect, the same shape WbwScreen uses
+  // for its page: an effect would set state *after* the landing effect had
+  // already run against the seed, so every mount landed twice -- the second
+  // scroll restarting a sequence the first had begun.
+  const anchorKey = `${data.surah.id}:${seedAyah ?? ''}`;
+  const [anchor, setAnchor] = useState(() => ({ key: anchorKey, ayah: seedAyah, nonce: 0 }));
+  if (anchor.key !== anchorKey) {
+    setAnchor({
+      key: anchorKey,
+      ayah: getReaderPosition(data.surah.id) ?? seedAyah,
+      nonce: anchor.nonce + 1,
+    });
+  }
+
+  const initialIndex = useMemo(() => {
+    if (!anchor.ayah) return -1;
+    return data.ayahs.findIndex((item) => item.ayah.ayah_number === anchor.ayah);
+  }, [data.ayahs, anchor.ayah]);
+
+  // Read through refs by the landing effect, so a caller that rebuilds either
+  // every render does not restart a scroll sequence already in flight.
+  const onLandedRef = useRef(onLanded);
+  const liveRef = useRef(live);
+  useEffect(() => {
+    onLandedRef.current = onLanded;
+    liveRef.current = live;
+  }, [onLanded, live]);
+
+  useEffect(() => {
+    // -1 means the ayah is not in this surah; 0 means the list already opens
+    // on it. Neither is a landing, and both must reveal the reader at once.
+    if (initialIndex <= 0) {
+      positionedRef.current = true;
+      setPositioned(true);
+      onLandedRef.current();
+      return;
+    }
+
+    // Reset, not left from the previous landing: an `ayah` param change on an
+    // already-mounted reader (an external deep link into the surah on screen)
+    // re-runs this effect without remounting, and a stale `true` reveals the
+    // list mid-scroll and lets onViewableItemsChanged write every ayah the
+    // jump passes over into the saved reading position.
+    positionedRef.current = false;
+    setPositioned(false);
+
+    let cancelled = false;
+    attemptsRef.current = 0;
+    // -1, not the live height: a re-run must scroll at least twice before it
+    // can call anything settled, or the first tick reveals on a comparison
+    // against a height nothing has scrolled over yet.
+    settledHeightRef.current = -1;
+
+    const reveal = () => {
+      if (cancelled) return;
+      positionedRef.current = true;
+      setPositioned(true);
+      // The landing *is* the reading position, and nothing else will record
+      // it. onViewableItemsChanged ignores every frame of the jump on purpose
+      // (positionedRef is false throughout, so the ayahs it flies over are not
+      // written), and no scroll follows the reveal to fire one afterwards. So
+      // without this the store still holds wherever this surah was last read,
+      // and the next mode switch re-anchors to that instead of the ayah the
+      // caller asked for -- opening /surah/2?ayah=50 from a bookmark and
+      // tapping Translation landed on 2:1.
+      if (anchor.ayah !== null) {
+        lastVisibleRef.current = anchor.ayah;
+        setReaderPosition(data.surah.id, anchor.ayah);
+      }
+      onLandedRef.current();
+    };
+
+    const attempt = () => {
+      if (cancelled) return;
+      failedRef.current = false;
+      attemptsRef.current += 1;
+      listRef.current?.scrollToIndex({ index: initialIndex, animated: false });
+      retryTimerRef.current = setTimeout(() => {
+        if (cancelled) return;
+        // Both halves: no miss, and no growth under the jump.
+        const landed = !failedRef.current && contentHeightRef.current === settledHeightRef.current;
+        settledHeightRef.current = contentHeightRef.current;
+        if (landed) return reveal();
+        // Capped: a row that never measures has to settle. Showing the reader
+        // in the wrong place is bad; leaving it behind a spinner for as long
+        // as the screen is open is worse.
+        if (attemptsRef.current >= MAX_SCROLL_ATTEMPTS) return reveal();
+        attempt();
+      }, SCROLL_RETRY_DELAY_MS);
+    };
+
+    attempt();
+    return () => {
+      cancelled = true;
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+    };
+    // The nonce, not just the index: a re-landing usually targets the ayah
+    // already on screen, so the index is unchanged and this would never re-run.
+  }, [initialIndex, anchor.nonce, anchor.ayah, data.surah.id]);
+
+  // Coming back from the word-by-word screen is a focus event: this screen
+  // stays mounted behind the pushed one, so no prop changes and the anchor's
+  // render-phase reset above never fires. Comparing against the ayah actually
+  // on screen is what keeps a focus from re-landing the list on itself.
+  useFocusEffect(
+    useCallback(() => {
+      // Re-focus only. useFocusEffect also fires on mount, and the shared
+      // position is a module singleton that outlives this screen -- so on the
+      // first pass it holds wherever this surah was last read, which is not
+      // where the caller asked to go. Reading 2:200, backing out and then
+      // tapping a bookmark for 2:5 opened 2:5 and immediately jumped to 2:200.
+      // The anchor above has already been seeded from the route by now, and
+      // that is the seed a fresh mount is supposed to honour.
+      if (!focusedRef.current) {
+        focusedRef.current = true;
+        return;
+      }
+      // Only the live layer. One still laying out under a cross-fade has an
+      // anchor of its own and re-seeding it mid-landing strands it.
+      if (!liveRef.current) return;
+      const position = getReaderPosition(data.surah.id);
+      if (position === null || position === lastVisibleRef.current) return;
+      setAnchor((current) => ({ ...current, ayah: position, nonce: current.nonce + 1 }));
+    }, [data.surah.id]),
+  );
+
+  // Records the miss and nothing else -- see the note above MAX_SCROLL_ATTEMPTS
+  // for what the offset estimate that used to live here cost.
+  const onScrollToIndexFailed = useCallback(() => {
+    failedRef.current = true;
+  }, []);
+  // Read by the landing loop above, one tick later -- not state: it changes on
+  // every layout pass while the surah settles and none of them is a render.
+  const onContentSizeChange = useCallback((_width: number, height: number) => {
+    contentHeightRef.current = height;
+  }, []);
+
+  const onReadingAyahRef = useRef(onReadingAyah);
+  const onVisibleAyahRef = useRef(onVisibleAyah);
+  // onViewableItemsChanged is a ref callback built once, outside the React
+  // tree, so it cannot close over a prop.
+  const surahIdRef = useRef(data.surah.id);
+  // The ayah actually on screen. Read when the reader is focused again, to tell
+  // "the word-by-word screen moved us" from "nothing changed".
+  const lastVisibleRef = useRef<number | null>(null);
+  // In an effect, not during render: a render React discards would otherwise
+  // leave the ref pointing at a callback that never committed, and FlatList
+  // calls onViewableItemsChanged outside the React tree, so it would happily
+  // invoke it. (Not useEffectEvent -- that is only callable from an Effect.)
+  useEffect(() => {
+    onReadingAyahRef.current = onReadingAyah;
+    onVisibleAyahRef.current = onVisibleAyah;
+    surahIdRef.current = data.surah.id;
+  }, [onReadingAyah, onVisibleAyah, data.surah.id]);
+
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    // Nothing at all from a layer nobody is looking at: its rows scroll past
+    // as it lands, and every one of them would be written to the reading
+    // position as if the reader had read it.
+    if (!liveRef.current) return;
+    const firstVisibleAyah = viewableItems[0]?.item as ReaderAyah | undefined;
+    // Not until the deep-link scroll has landed: the rows visible mid-landing
+    // are wherever the list happens to be, and recording one overwrites the
+    // saved reading position with an ayah nobody read.
+    if (positionedRef.current && firstVisibleAyah) {
+      const ayahNumber = firstVisibleAyah.ayah.ayah_number;
+      lastVisibleRef.current = ayahNumber;
+      // Synchronous and in memory, unlike onReadingAyah, which debounces a
+      // SQLite write. This is what the other two renderings read.
+      setReaderPosition(surahIdRef.current, ayahNumber);
+      onReadingAyahRef.current?.(ayahNumber);
+    }
+    for (const token of viewableItems) {
+      const item = token.item as ReaderAyah | undefined;
+      // Prefetching is not gated on the landing: it is a read, it is
+      // idempotent, and the rows around the target are exactly the ones about
+      // to be needed.
+      if (item) onVisibleAyahRef.current(item.ayah.id);
+    }
+  });
+
+  // Mushaf mode reads as one page, so the whole list sits on a single glass
+  // plate (mockup 1e). Translation mode's cards are each their own surface, so
+  // a plate under them would be glass on glass.
+  const Plate = mode === 'mushaf' ? MushafPlate : Fragment;
+
+  return (
+    <View style={{ flex: 1 }}>
+      <Plate>
+      <FlatList
+        ref={listRef}
+        data={data.ayahs}
+        keyExtractor={(item) => String(item.ayah.id)}
+        ListHeaderComponent={
+          <View
+            onLayout={(event: LayoutChangeEvent) => {
+              headerHeight.value = event.nativeEvent.layout.height;
+            }}
+            style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16 }}
+          >
+            {/* The surah opens on a plate (mockups 1e/1j): the Arabic name
+                leads, the Latin names sit under it in the display serif, and
+                the count and revelation type are a muted caption. */}
+            <SurahPlate mushaf={mode === 'mushaf'}>
+              <Text
+                style={{
+                  color: theme.text,
+                  fontFamily: fonts.arabic,
+                  fontSize: arabicSizes.banner,
+                  writingDirection: 'rtl',
+                }}
+              >
+                {data.surah.name_arabic}
+              </Text>
+              <Text
+                accessibilityRole="header"
+                style={{ color: theme.text, fontFamily: fonts.displaySemiBold, fontSize: typography.title }}
+              >
+                {data.surah.name_translit}
+              </Text>
+              <Text style={{ color: theme.mutedText, fontFamily: fonts.display, fontSize: typography.body }}>
+                {data.surah.name_translation}
+              </Text>
+              <Text style={{ color: theme.mutedText, fontSize: typography.caption }}>
+                {`${data.surah.ayah_count} ${t(uiLocale, 'surahList.ayahsSuffix')} · ${t(
+                  uiLocale,
+                  data.surah.revelation_type === 'meccan' ? 'browse.meccan' : 'browse.medinan',
+                )}`}
+              </Text>
+              {basmala ? <Bismillah text={basmala} uiLocale={uiLocale} /> : null}
+            </SurahPlate>
+          </View>
+        }
+        renderItem={({ item }) => {
+          // Two renderers, one list. Everything the list does around them --
+          // the landing sequence, viewability tracking, the sheets, the retry
+          // loop -- is mode-blind, and both renderers expose the same testIDs
+          // and the same word tap targets, so nothing below this line has to
+          // know which one is mounted.
+          const shared = {
+            surahId: data.surah.id,
+            ayahNumber: item.ayah.ayah_number,
+            arabicText: item.ayah.text_uthmani,
+            words: wordsByAyah.get(item.ayah.id) ?? EMPTY_WORDS,
+            bookmarked: bookmarkedAyahs.has(item.ayah.ayah_number),
+            note: notesByAyah?.get(item.ayah.ayah_number) ?? null,
+            playing: playingAyah === item.ayah.ayah_number,
+            uiLocale,
+            audioDisabled: !audioEnabled,
+            onToggleBookmark,
+            // Spread conditionally: exactOptionalPropertyTypes distinguishes
+            // "absent" from "present and undefined", and the renderers declare
+            // the prop optional rather than optional-or-undefined.
+            ...(onEditNote ? { onEditNote } : {}),
+            onToggleAudio,
+            onWordPress,
+          };
+          return mode === 'mushaf' ? (
+            <MushafAyah {...shared} />
+          ) : (
+            <AyahCard {...shared} translationText={item.translation?.text ?? null} />
+          );
+        }}
+        onViewableItemsChanged={onViewableItemsChanged.current}
+        onScrollToIndexFailed={onScrollToIndexFailed}
+        onContentSizeChange={onContentSizeChange}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        // BottomSheet -- the shell under both WordSheet and LanguageSheet --
+        // sets role="dialog"/aria-modal, but accessibilityViewIsModal is
+        // iOS-only, so on Android the ayah text and both card buttons stay
+        // reachable by TalkBack swipe while either sheet covers them and the
+        // modal is only visually modal (CLAUDE.md §8, WCAG AA). The nav header
+        // is a native toolbar outside this View and is still reachable.
+        importantForAccessibility={sheetsOpen || !live ? 'no-hide-descendants' : 'auto'}
+        initialNumToRender={initialIndex > 0 ? initialIndex + 1 : DEFAULT_INITIAL_RENDER}
+        // `|| arriving` for the same reason the spinner below carries it, and
+        // it is the last blank on the device list. `reveal()` calls
+        // setPositioned(true) and onLanded() in one tick; onLanded starts the
+        // cross-fade, which is a shared-value write that takes effect on the
+        // UI thread at once, while setPositioned waits for React to commit. So
+        // for the frames in between the outgoing layer was already fading out
+        // and the incoming list was still hidden here -- both invisible, and
+        // the bloom showing through as one flash (device, Al-Baqara 2:255,
+        // 2026-09-02). An arriving layer needs no hiding of its own: its
+        // wrapper is at opacity 0 for the whole landing, and the fade is what
+        // reveals it.
+        style={{ flex: 1, opacity: positioned || arriving ? 1 : 0 }}
+        contentContainerStyle={{
+          paddingBottom: listBottomPadding + (barDocked ? RECITATION_BAR_CLEARANCE : 0),
+        }}
+      />
+      </Plate>
+      {/* Over the list rather than instead of it: the list has to be mounted
+          and laid out for the scroll to have anything to land on. Opacity, not
+          a conditional render, for the same reason. */}
+      {positioned || arriving ? null : (
+        <View
+          testID="reader-positioning"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: theme.background,
+          }}
+        >
+          <ActivityIndicator />
+        </View>
+      )}
+    </View>
+  );
+}
 
 export function SurahReader({
   data,
@@ -198,30 +650,7 @@ export function SurahReader({
   nextSurahId = null,
   onPageSurah,
 }: SurahReaderProps) {
-  const theme = useThemeColors();
-  const arabicSizes = useArabicSizes();
-  const listBottomPadding = useListBottomPadding();
   const navigation = useNavigation();
-  const listRef = useRef<FlatList<SurahReaderData['ayahs'][number]>>(null);
-  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const attemptsRef = useRef(0);
-  // Set by onScrollToIndexFailed, read by the attempt loop below. A ref, not
-  // state: FlatList reports the failure synchronously during a scroll and a
-  // re-render per attempt would remount nothing useful.
-  const failedRef = useRef(false);
-  // The list's content height, and the height the previous attempt scrolled
-  // over. Equal means nothing above the target grew in that window, which is
-  // the only evidence available here that the offset the scroll used is the
-  // offset the row actually sits at.
-  const contentHeightRef = useRef(0);
-  const settledHeightRef = useRef(-1);
-  // The same value as `positioned` below. onViewableItemsChanged is called by
-  // FlatList from outside the React tree off a ref that never re-reads props,
-  // so it cannot see the state.
-  const positionedRef = useRef(false);
-  // Whether this mount has been focused before -- see the focus effect below.
-  const focusedRef = useRef(false);
-  const [positioned, setPositioned] = useState(false);
 
   const [languageOpen, setLanguageOpen] = useState(false);
   const [reciterOpen, setReciterOpen] = useState(false);
@@ -349,176 +778,15 @@ export function SurahReader({
     [scrollY],
   );
 
-  // The surah's opening, above ayah 1's card rather than inside it: in the card
-  // it sat under the ayah number and bookmark row and still read as ayah 1's
-  // own first line (owner device report, 2026-08-17). Taken off ayah 1's text
-  // rather than held as a constant, so the banner carries that surah's own
-  // spelling -- 95 and 97 differ -- and AyahText strips exactly what shows here.
-  const basmala = useMemo(() => {
-    const first = data.ayahs.find((item) => item.ayah.ayah_number === 1);
-    if (!first) return null;
-    return splitBasmala(first.ayah.text_uthmani, { surahId: data.surah.id, ayahNumber: 1 }).basmala;
-  }, [data.ayahs, data.surah.id]);
-
-  // The ayah the list must land on, and how many landings have been demanded.
-  //
-  // `Plate` below is MushafPlate in one mode and Fragment in the other, so the
-  // element type at that position changes on a mode switch and React unmounts
-  // the FlatList. The replacement starts at offset 0 with only the route param
-  // to land on -- absent whenever the reader was opened from the surah list --
-  // which is what sent a reader on 2:50 back to 2:1. Keeping the list mounted
-  // would not have fixed it either: a mushaf ayah and a translation card are
-  // nothing like the same height, so the preserved pixel offset points at a
-  // different ayah.
-  //
-  // `nonce` exists because the re-landing target is usually the ayah already
-  // being read, so an effect keyed on the index alone would never re-run.
-  //
-  // Reset during render rather than in an effect, the same shape WbwScreen uses
-  // for its page: an effect would set state *after* the landing effect had
-  // already run against the seed, so every mount landed twice -- the second
-  // scroll restarting a sequence the first had begun.
-  const anchorKey = `${data.surah.id}:${readerMode}:${initialAyahNumber ?? ''}`;
-  const [anchor, setAnchor] = useState(() => ({
-    key: anchorKey,
-    ayah: initialAyahNumber ?? null,
-    nonce: 0,
-  }));
-  if (anchor.key !== anchorKey) {
-    setAnchor({
-      key: anchorKey,
-      ayah: getReaderPosition(data.surah.id) ?? initialAyahNumber ?? null,
-      nonce: anchor.nonce + 1,
-    });
-  }
-
-  const initialIndex = useMemo(() => {
-    if (!anchor.ayah) return -1;
-    return data.ayahs.findIndex((item) => item.ayah.ayah_number === anchor.ayah);
-  }, [data.ayahs, anchor.ayah]);
-
-  useEffect(() => {
-    // -1 means the ayah is not in this surah; 0 means the list already opens
-    // on it. Neither is a landing, and both must reveal the reader at once.
-    if (initialIndex <= 0) {
-      positionedRef.current = true;
-      setPositioned(true);
-      return;
-    }
-
-    // Reset, not left from the previous landing: an `ayah` param change on an
-    // already-mounted reader (an external deep link into the surah on screen)
-    // re-runs this effect without remounting, and a stale `true` reveals the
-    // list mid-scroll and lets onViewableItemsChanged write every ayah the
-    // jump passes over into the saved reading position.
-    positionedRef.current = false;
-    setPositioned(false);
-
-    let cancelled = false;
-    attemptsRef.current = 0;
-    // -1, not the live height: a re-run must scroll at least twice before it
-    // can call anything settled, or the first tick reveals on a comparison
-    // against a height nothing has scrolled over yet.
-    settledHeightRef.current = -1;
-
-    const reveal = () => {
-      if (cancelled) return;
-      positionedRef.current = true;
-      setPositioned(true);
-      // The landing *is* the reading position, and nothing else will record
-      // it. onViewableItemsChanged ignores every frame of the jump on purpose
-      // (positionedRef is false throughout, so the ayahs it flies over are not
-      // written), and no scroll follows the reveal to fire one afterwards. So
-      // without this the store still holds wherever this surah was last read,
-      // and the next mode switch re-anchors to that instead of the ayah the
-      // caller asked for -- opening /surah/2?ayah=50 from a bookmark and
-      // tapping Translation landed on 2:1.
-      if (anchor.ayah !== null) {
-        lastVisibleRef.current = anchor.ayah;
-        setReaderPosition(data.surah.id, anchor.ayah);
-      }
-    };
-
-    const attempt = () => {
-      if (cancelled) return;
-      failedRef.current = false;
-      attemptsRef.current += 1;
-      listRef.current?.scrollToIndex({ index: initialIndex, animated: false });
-      retryTimerRef.current = setTimeout(() => {
-        if (cancelled) return;
-        // Both halves: no miss, and no growth under the jump.
-        const landed = !failedRef.current && contentHeightRef.current === settledHeightRef.current;
-        settledHeightRef.current = contentHeightRef.current;
-        if (landed) return reveal();
-        // Capped: a row that never measures has to settle. Showing the reader
-        // in the wrong place is bad; leaving it behind a spinner for as long
-        // as the screen is open is worse.
-        if (attemptsRef.current >= MAX_SCROLL_ATTEMPTS) return reveal();
-        attempt();
-      }, SCROLL_RETRY_DELAY_MS);
-    };
-
-    attempt();
-    return () => {
-      cancelled = true;
-      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
-    };
-    // The nonce, not just the index: a mode switch re-lands on the same ayah,
-    // so the index is unchanged and this effect would otherwise never re-run.
-  }, [initialIndex, anchor.nonce]);
-
-  // Coming back from the word-by-word screen is a focus event: this screen
-  // stays mounted behind the pushed one, so no prop changes and the anchor's
-  // render-phase reset above never fires. Comparing against the ayah actually
-  // on screen is what keeps a focus from re-landing the list on itself.
-  useFocusEffect(
-    useCallback(() => {
-      // Re-focus only. useFocusEffect also fires on mount, and the shared
-      // position is a module singleton that outlives this screen -- so on the
-      // first pass it holds wherever this surah was last read, which is not
-      // where the caller asked to go. Reading 2:200, backing out and then
-      // tapping a bookmark for 2:5 opened 2:5 and immediately jumped to 2:200.
-      // The anchor above has already been seeded from the route by now, and
-      // that is the seed a fresh mount is supposed to honour.
-      if (!focusedRef.current) {
-        focusedRef.current = true;
-        return;
-      }
-      const position = getReaderPosition(data.surah.id);
-      if (position === null || position === lastVisibleRef.current) return;
-      setAnchor((current) => ({ ...current, ayah: position, nonce: current.nonce + 1 }));
-    }, [data.surah.id]),
-  );
-
-  // Records the miss and nothing else -- see the note above MAX_SCROLL_ATTEMPTS
-  // for what the offset estimate that used to live here cost.
-  const onScrollToIndexFailed = useCallback(() => {
-    failedRef.current = true;
-  }, []);
-  // Read by the landing loop above, one tick later -- not state: it changes on
-  // every layout pass while the surah settles and none of them is a render.
-  const onContentSizeChange = useCallback((_width: number, height: number) => {
-    contentHeightRef.current = height;
-  }, []);
-  const onReadingAyahRef = useRef(onReadingAyah);
+  // Read by fetchWordsRef, which is built once and so cannot close over a
+  // prop. In an effect rather than during render: a render React discards
+  // would otherwise leave these pointing at values that never committed.
   const loadWordsRef = useRef(loadWords);
   const ayahsRef = useRef(data.ayahs);
-  // onViewableItemsChanged is a ref callback built once, outside the React
-  // tree, so it cannot close over a prop.
-  const surahIdRef = useRef(data.surah.id);
-  // The ayah actually on screen. Read when the reader is focused again, to tell
-  // "the word-by-word screen moved us" from "nothing changed".
-  const lastVisibleRef = useRef<number | null>(null);
-  // In an effect, not during render: a render React discards would otherwise
-  // leave the ref pointing at a callback that never committed, and FlatList
-  // calls onViewableItemsChanged outside the React tree, so it would happily
-  // invoke it. (Not useEffectEvent -- that is only callable from an Effect.)
   useEffect(() => {
-    onReadingAyahRef.current = onReadingAyah;
     loadWordsRef.current = loadWords;
     ayahsRef.current = data.ayahs;
-    surahIdRef.current = data.surah.id;
-  }, [onReadingAyah, loadWords, data.ayahs, data.surah.id]);
+  }, [loadWords, data.ayahs]);
 
   const [wordsByAyah, setWordsByAyah] = useState<Map<number, Word[]>>(new Map());
   // Separate from the state map, and written before the await:
@@ -554,26 +822,12 @@ export function SurahReader({
     );
   });
 
-  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
-    const firstVisibleAyah = viewableItems[0]?.item as ReaderAyah | undefined;
-    // Not until the deep-link scroll has landed: the rows visible mid-landing
-    // are wherever the list happens to be, and recording one overwrites the
-    // saved reading position with an ayah nobody read.
-    if (positionedRef.current && firstVisibleAyah) {
-      const ayahNumber = firstVisibleAyah.ayah.ayah_number;
-      lastVisibleRef.current = ayahNumber;
-      // Synchronous and in memory, unlike onReadingAyah, which debounces a
-      // SQLite write. This is what the other two renderings read.
-      setReaderPosition(surahIdRef.current, ayahNumber);
-      onReadingAyahRef.current?.(ayahNumber);
-    }
-    for (const token of viewableItems) {
-      const item = token.item as ReaderAyah | undefined;
-      // Prefetching is not gated: it is a read, it is idempotent, and the rows
-      // around the target are exactly the ones about to be needed.
-      if (item) void fetchWordsRef.current(item.ayah.id);
-    }
-  });
+  // The prefetch entry point every layer calls. Kept here rather than in the
+  // list so one word cache serves both renderings and survives the swap --
+  // per-layer caches would re-query the whole window on every mode switch.
+  const onVisibleAyah = useCallback((ayahId: number) => {
+    void fetchWordsRef.current(ayahId);
+  }, []);
 
   const [openWord, setOpenWord] = useState<WordSummary | null>(null);
 
@@ -607,132 +861,186 @@ export function SurahReader({
     setOpenWord(null);
   }, []);
 
+  // The renderings currently mounted, oldest first. One entry is the steady
+  // state; a second appears for the length of a mode switch and then replaces
+  // the first.
+  //
+  // Identified by a counter rather than by mode, deliberately. Keyed on mode,
+  // the surviving layer would take a new key the moment it became the only one
+  // left, remount, and re-land behind a spinner -- which is the whole defect,
+  // moved to the end of the transition.
+  const layerSeqRef = useRef(0);
+  const [layers, setLayers] = useState<{ id: number; mode: ReaderMode; seedAyah: number | null }[]>(
+    () => [{ id: 0, mode: readerMode, seedAyah: initialAyahNumber ?? null }],
+  );
+  const incoming = useSharedValue(0);
+
+  useEffect(() => {
+    const current = layers[layers.length - 1];
+    if (!current || current.mode === readerMode) return;
+    incoming.value = 0;
+    layerSeqRef.current += 1;
+    setLayers((existing) => {
+      const arrival = {
+        id: layerSeqRef.current,
+        mode: readerMode,
+        // Where the reader actually is, not where the route opened -- after
+        // any scrolling those are different ayahs, and the route param is
+        // absent entirely when the reader was opened from the surah list.
+        seedAyah: getReaderPosition(data.surah.id) ?? initialAyahNumber ?? null,
+      };
+      // Never more than two. A switch asked for while one is still in flight
+      // replaces the arrival rather than stacking on it: the layer being
+      // replaced has never been seen -- it is at opacity 0 for its whole life
+      // -- so dropping it is invisible, where appending mounts another full
+      // list of the surah (2:255 renders ~255 rows before it can even try to
+      // scroll) for every tap of a mashed pill.
+      if (existing.length === 1) return [...existing, arrival];
+      // Back to what is already on screen underneath. Cancelling the arrival
+      // is the whole change: there is nothing to fade to.
+      if (existing[existing.length - 2]?.mode === readerMode) return existing.slice(0, -1);
+      return [...existing.slice(0, -1), arrival];
+    });
+  }, [readerMode, layers, incoming, data.surah.id, initialAyahNumber]);
+
+  // A change to the route's ayah param is an external deep link into the surah
+  // already on screen, and it has to re-land the layer the reader is looking
+  // at. Only a *change*: a seed captured when the layer was created is the
+  // right answer for a mode switch (the reading position, not the param the
+  // reader was opened with), so the param may not simply win every render.
+  const lastParamRef = useRef(initialAyahNumber ?? null);
+  useEffect(() => {
+    const next = initialAyahNumber ?? null;
+    if (next === lastParamRef.current) return;
+    lastParamRef.current = next;
+    setLayers((existing) =>
+      existing.map((layer, index) =>
+        index === existing.length - 1 ? { ...layer, seedAyah: next } : layer,
+      ),
+    );
+  }, [initialAyahNumber]);
+
+  const dropSpentLayers = useCallback(() => {
+    setLayers((existing) => (existing.length > 1 ? existing.slice(-1) : existing));
+  }, []);
+
+  // The arrival. Under reduced motion it is a cut, which is what the setting
+  // asks for -- and a cut here still never shows a blank, because the layer
+  // underneath is a finished rendering until the instant it is replaced.
+  //
+  // A zero-length timing rather than a bare `incoming.value = 1` followed by
+  // the drop. Both read as a cut, but only one of them survives the drop: a
+  // direct write is handed to the UI thread to apply, and dropping the spent
+  // layer in the same tick re-renders the survivor without an animated style
+  // at all, which unregisters the view before that write has landed. The
+  // opacity the node keeps is then the one reanimated last actually applied --
+  // 0, from the mount -- and the reader shows its header over an empty page
+  // (device, 2026-09-03: reduced motion only, into mushaf and translation
+  // alike). Routing through withTiming keeps the drop in the completion
+  // callback, which cannot run before the value has been committed.
+  const revealIncoming = useCallback(() => {
+    incoming.value = withTiming(1, { duration: reducedMotion ? 0 : MODE_FADE_MS }, (finished?: boolean) => {
+      // Only on a settled fade: an interrupted one leaves the incoming layer
+      // half-transparent, and dropping the layer under it would show the page
+      // through the gap.
+      if (finished) runOnJS(dropSpentLayers)();
+    });
+  }, [reducedMotion, incoming, dropSpentLayers]);
+
+  const incomingStyle = useAnimatedStyle(() => ({ opacity: incoming.value }));
+  // The other half of the cross-fade, and it is not optional. A layer's
+  // background is the bloom showing through, so an arriving layer at opacity 1
+  // does not hide the one beneath it -- both renderings sit on screen together
+  // until the spent one is dropped, and the drop is a JS-thread hop that the
+  // arriving list's own landing work can hold up. On device that was 420ms of
+  // two readings of 2:255 printed over each other (2026-09-01). Fading the
+  // outgoing layer out as the incoming comes in makes the drop invisible
+  // however late it runs.
+  const outgoingStyle = useAnimatedStyle(() => ({ opacity: 1 - incoming.value }));
+
+  // Stable no-ops, so a layer that is not driving either one does not get a
+  // fresh callback identity on every render of this component.
+  const noopLanded = useCallback(() => {}, []);
+  const noopScroll = useCallback(() => {}, []);
+
   const ayahNumberOf = useCallback(
     (word: Word) => data.ayahs.find((item) => item.ayah.id === word.ayah_id)?.ayah.ayah_number,
     [data.ayahs],
   );
 
-  // Mushaf mode reads as one page, so the whole list sits on a single glass
-  // plate (mockup 1e). Translation mode's cards are each their own surface, so
-  // a plate under them would be glass on glass.
-  const Plate = readerMode === 'mushaf' ? MushafPlate : Fragment;
 
   return (
     <View style={{ flex: 1 }}>
-      <Plate>
-      <FlatList
-        ref={listRef}
-        data={data.ayahs}
-        keyExtractor={(item) => String(item.ayah.id)}
-        ListHeaderComponent={
-          <View
-            onLayout={(event: LayoutChangeEvent) => {
-              headerHeight.value = event.nativeEvent.layout.height;
-            }}
-            style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16 }}
+      {/* One layer per rendering, and two of them only while a switch is in
+          flight. The incoming layer lays out and lands underneath the one the
+          reader is looking at, then fades in over it. Nothing blanks, and the
+          landing still lands exactly -- see the note on AyahList. */}
+      {layers.map((layer, index) => {
+        // Two questions, and answering both with "is this the newest layer"
+        // handed every touch to a list nobody could see. The arriving layer
+        // owns the cross-fade and fires the reveal; the layer the reader is
+        // *looking at* is the one underneath it until the arrival is dropped,
+        // and that is the one that takes touches, feeds the header's scroll
+        // offset, is exposed to TalkBack and records the reading position --
+        // which is what the note on AyahList's `live` has said all along.
+        const arriving = index > 0;
+        const list = (
+          <AyahList
+            key={layer.id}
+            data={data}
+            mode={layer.mode}
+            seedAyah={layer.seedAyah}
+            live={!arriving}
+            onLanded={arriving ? revealIncoming : noopLanded}
+            arriving={arriving}
+            bookmarkedAyahs={bookmarkedAyahs}
+            {...(notesByAyah ? { notesByAyah } : {})}
+            playingAyah={playingAyah}
+            audioEnabled={audioEnabled}
+            uiLocale={uiLocale}
+            wordsByAyah={wordsByAyah}
+            onVisibleAyah={onVisibleAyah}
+            {...(onReadingAyah ? { onReadingAyah } : {})}
+            onToggleBookmark={onToggleBookmark}
+            {...(onEditNote ? { onEditNote } : {})}
+            onToggleAudio={onToggleAudio}
+            onWordPress={onWordPress}
+            onScroll={arriving ? noopScroll : onScroll}
+            headerHeight={headerHeight}
+            sheetsOpen={Boolean(openWord) || languageOpen || reciterOpen}
+            barDocked={barDocked}
+          />
+        );
+        // The first layer is the page; anything above it is an arrival. An
+        // arrival is absolutely positioned so the layer underneath keeps its
+        // own layout rather than being pushed out of the column, and
+        // untouchable until it has faded in -- a half-transparent list that
+        // swallows taps is worse than either mode.
+        //
+        // Every layer gets the same wrapper, arriving or not. Returning `list`
+        // bare at index 0 was a remount waiting to happen: once the spent
+        // layer is dropped the survivor moves from index 1 to index 0, and a
+        // child whose element type changes at the same position is unmounted
+        // and rebuilt. The rebuilt list re-lands from scratch, which is
+        // exactly the blank-and-spinner this layering exists to remove
+        // (device, 2026-09-01, Al-Baqara 2:255).
+        // Layer 0 stays in the column and every arrival is absolutely
+        // positioned over it, so the layer underneath keeps its own layout
+        // rather than being pushed out. While a switch is in flight the two
+        // cross-fade; alone, a layer rests at full opacity.
+        const base = index === 0 ? RESTING_LAYER : StyleSheet.absoluteFill;
+        const fade = layers.length === 1 ? null : arriving ? incomingStyle : outgoingStyle;
+        return (
+          <Animated.View
+            key={layer.id}
+            testID={`reader-layer-${layer.id}`}
+            pointerEvents={arriving ? 'none' : 'auto'}
+            style={fade ? [base, fade] : base}
           >
-            {/* The surah opens on a plate (mockups 1e/1j): the Arabic name
-                leads, the Latin names sit under it in the display serif, and
-                the count and revelation type are a muted caption. */}
-            <SurahPlate mushaf={readerMode === 'mushaf'}>
-              <Text
-                style={{
-                  color: theme.text,
-                  fontFamily: fonts.arabic,
-                  fontSize: arabicSizes.banner,
-                  writingDirection: 'rtl',
-                }}
-              >
-                {data.surah.name_arabic}
-              </Text>
-              <Text
-                accessibilityRole="header"
-                style={{ color: theme.text, fontFamily: fonts.displaySemiBold, fontSize: typography.title }}
-              >
-                {data.surah.name_translit}
-              </Text>
-              <Text style={{ color: theme.mutedText, fontFamily: fonts.display, fontSize: typography.body }}>
-                {data.surah.name_translation}
-              </Text>
-              <Text style={{ color: theme.mutedText, fontSize: typography.caption }}>
-                {`${data.surah.ayah_count} ${t(uiLocale, 'surahList.ayahsSuffix')} · ${t(
-                  uiLocale,
-                  data.surah.revelation_type === 'meccan' ? 'browse.meccan' : 'browse.medinan',
-                )}`}
-              </Text>
-              {basmala ? <Bismillah text={basmala} uiLocale={uiLocale} /> : null}
-            </SurahPlate>
-          </View>
-        }
-        renderItem={({ item }) => {
-          // Two renderers, one list. Everything the list does around them --
-          // the landing sequence, viewability tracking, the sheets, the retry
-          // loop -- is mode-blind, and both renderers expose the same testIDs
-          // and the same word tap targets, so nothing below this line has to
-          // know which one is mounted.
-          const shared = {
-            surahId: data.surah.id,
-            ayahNumber: item.ayah.ayah_number,
-            arabicText: item.ayah.text_uthmani,
-            words: wordsByAyah.get(item.ayah.id) ?? EMPTY_WORDS,
-            bookmarked: bookmarkedAyahs.has(item.ayah.ayah_number),
-            note: notesByAyah?.get(item.ayah.ayah_number) ?? null,
-            playing: playingAyah === item.ayah.ayah_number,
-            uiLocale,
-            audioDisabled: !audioEnabled,
-            onToggleBookmark,
-            // Spread conditionally: exactOptionalPropertyTypes distinguishes
-            // "absent" from "present and undefined", and the renderers declare
-            // the prop optional rather than optional-or-undefined.
-            ...(onEditNote ? { onEditNote } : {}),
-            onToggleAudio,
-            onWordPress,
-          };
-          return readerMode === 'mushaf' ? (
-            <MushafAyah {...shared} />
-          ) : (
-            <AyahCard {...shared} translationText={item.translation?.text ?? null} />
-          );
-        }}
-        onViewableItemsChanged={onViewableItemsChanged.current}
-        onScrollToIndexFailed={onScrollToIndexFailed}
-        onContentSizeChange={onContentSizeChange}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        // BottomSheet -- the shell under both WordSheet and LanguageSheet --
-        // sets role="dialog"/aria-modal, but accessibilityViewIsModal is
-        // iOS-only, so on Android the ayah text and both card buttons stay
-        // reachable by TalkBack swipe while either sheet covers them and the
-        // modal is only visually modal (CLAUDE.md §8, WCAG AA). The nav header
-        // is a native toolbar outside this View and is still reachable.
-        importantForAccessibility={openWord || languageOpen || reciterOpen ? 'no-hide-descendants' : 'auto'}
-        initialNumToRender={initialIndex > 0 ? initialIndex + 1 : DEFAULT_INITIAL_RENDER}
-        style={{ flex: 1, opacity: positioned ? 1 : 0 }}
-        contentContainerStyle={{
-          paddingBottom: listBottomPadding + (barDocked ? RECITATION_BAR_CLEARANCE : 0),
-        }}
-      />
-      </Plate>
-      {/* Over the list rather than instead of it: the list has to be mounted
-          and laid out for the scroll to have anything to land on. Opacity, not
-          a conditional render, for the same reason. */}
-      {positioned ? null : (
-        <View
-          testID="reader-positioning"
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: theme.background,
-          }}
-        >
-          <ActivityIndicator />
-        </View>
-      )}
+            {list}
+          </Animated.View>
+        );
+      })}
       {/* Hidden from TalkBack behind a sheet for the same reason the list is:
           accessibilityViewIsModal is iOS-only, so on Android a swipe would
           otherwise walk from the sheet straight onto this bar. */}
