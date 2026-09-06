@@ -124,12 +124,14 @@ print(len(sample), 'rows')
 PY
 ```
 
-Expected: `64 rows`.
+Expected: `63 rows`. (Eight per group, less one: mushaf/22 drew an
+endpoint index in the random sample and the `set` union deduped it.)
 
 - [ ] **Step 2: Write the failing tests**
 
 ```ts
 // apps/mobile/src/components/rowHeightModel.test.ts
+import { describe, expect, it } from 'vitest';
 import { measuredRows } from './rowHeightFixture';
 import { estimateRowHeight, type RowHeightInput } from './rowHeightModel';
 
@@ -220,7 +222,7 @@ describe('estimateRowHeight', () => {
 
 - [ ] **Step 3: Run and watch them fail**
 
-Run: `cd apps/mobile && npx jest src/components/rowHeightModel.test.ts`
+Run: `cd apps/mobile && npx vitest run src/components/rowHeightModel.test.ts`
 Expected: FAIL — `Cannot find module './rowHeightModel'`.
 
 - [ ] **Step 4: Write the model**
@@ -300,7 +302,7 @@ export function estimateRowHeight({
 
 - [ ] **Step 5: Run the tests**
 
-Run: `cd apps/mobile && npx jest src/components/rowHeightModel.test.ts`
+Run: `cd apps/mobile && npx vitest run src/components/rowHeightModel.test.ts`
 Expected: PASS, 7 tests.
 
 - [ ] **Step 6: Mutation-check the model (§4.4)**
@@ -365,7 +367,7 @@ it('stops widening initialNumToRender to cover a deep target', () => {
 
 - [ ] **Step 2: Run it and watch it fail**
 
-Run: `cd apps/mobile && npx jest src/components/SurahReader.test.tsx -t getItemLayout`
+Run: `cd apps/mobile && npx vitest run src/components/SurahReader.test.tsx -t getItemLayout`
 Expected: FAIL — `getItemLayout` is undefined.
 
 - [ ] **Step 3: Track the list's width**
@@ -429,7 +431,7 @@ be rendered to be scrollable to, and the retry loop is no longer blind.
 
 - [ ] **Step 6: Run the tests**
 
-Run: `cd apps/mobile && npx jest src/components/SurahReader.test.tsx`
+Run: `cd apps/mobile && npx vitest run src/components/SurahReader.test.tsx`
 Expected: PASS.
 
 - [ ] **Step 7: Commit**
@@ -516,7 +518,7 @@ it('does not record a reading position for ayahs the jump flies over', () => {
 
 - [ ] **Step 2: Run and watch them fail**
 
-Run: `cd apps/mobile && npx jest src/components/SurahReader.test.tsx -t 'corrects the model jump'`
+Run: `cd apps/mobile && npx vitest run src/components/SurahReader.test.tsx -t 'corrects the model jump'`
 Expected: FAIL — `scrollToOffset` never called.
 
 - [ ] **Step 3: Capture the target row's measured offset**
@@ -577,7 +579,7 @@ a pending jump.
 
 - [ ] **Step 5: Run the tests**
 
-Run: `cd apps/mobile && npx jest src/components/SurahReader.test.tsx`
+Run: `cd apps/mobile && npx vitest run src/components/SurahReader.test.tsx`
 Expected: PASS.
 
 - [ ] **Step 6: Mutation-check the landing (§4.4)**
@@ -605,15 +607,22 @@ git commit -m "fix(mobile/reader): land a deep link in two passes, not twenty-fi
 - [ ] **Step 1: Full suite, lint, types**
 
 ```bash
-cd apps/mobile && npx jest && npx tsc --noEmit && npx eslint .
+cd apps/mobile && npm test && npm run type-check && npm run lint
 ```
-Expected: all green. No `@ts-ignore`, no disabled rule without an inline
-justification (§4.3).
+Expected: tests and lint green. `type-check` carries two pre-existing errors
+on `main` (issue #54) and must carry exactly those two and no more:
+
+```
+src/components/SurahReader.test.tsx(1434,38): error TS2322: Type '"words"' is not assignable to type 'ReaderMode'.
+src/motion/useReducedMotion.test.ts(15,31): error TS2835: Relative import paths need explicit file extensions ...
+```
+
+No `@ts-ignore`, no disabled rule without an inline justification (§4.3).
 
 - [ ] **Step 2: Confirm the module graph is untouched**
 
 ```bash
-cd /home/claude/projects/quran-corpus-pwa/packages/data && npx jest tests/mobile-entry.test.ts
+cd /home/claude/projects/quran-corpus-pwa/packages/data && npx vitest run tests/mobile-entry.test.ts
 ```
 Expected: PASS. Nothing in this phase should reach `packages/data` at all; a
 failure here means an import went somewhere it should not (§2).
