@@ -100,3 +100,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# Raw device logcat captures (spike inputs) — never versioned, see CLAUDE.md 9
+apps/mobile/scripts/dump.txt

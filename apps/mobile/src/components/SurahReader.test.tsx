@@ -11,7 +11,14 @@ const mocks = vi.hoisted(() => ({
     | null,
   onScroll: null as ((event: { nativeEvent: { contentOffset: { y: number } } }) => void) | null,
   onContentSizeChange: null as ((width: number, height: number) => void) | null,
+  getItemLayout: null as
+    | ((data: unknown, index: number) => { length: number; offset: number; index: number })
+    | null,
   headerLayout: null as ((height: number) => void) | null,
+  /** The landing target's own onLayout. The list mock renders no real
+   *  geometry, so this is how a test says where the row actually came out. */
+  targetRowLayout: null as ((y: number) => void) | null,
+  autoLayoutY: null as number | null,
   /** Hold the mode cross-fade's completion instead of running it, so a test
    *  can look at the reader mid-switch -- the only moment both renderings are
    *  mounted. Off by default. */
@@ -213,14 +220,16 @@ vi.mock('react-native', async () => {
     // Forwards the ref, so the imperative scroll calls the component makes on
     // mount are observable. A plain function component silently swallows it
     // and every scroll assertion would pass against a null ref.
-    FlatList: ({ data, ListHeaderComponent, renderItem, onViewableItemsChanged, onScrollToIndexFailed, onScroll, onContentSizeChange, contentContainerStyle, importantForAccessibility, initialNumToRender, style, ref }: {
+    FlatList: ({ data, ListHeaderComponent, renderItem, CellRendererComponent, onViewableItemsChanged, onScrollToIndexFailed, onScroll, onContentSizeChange, getItemLayout, contentContainerStyle, importantForAccessibility, initialNumToRender, style, ref }: {
       data: unknown[];
       ListHeaderComponent?: React.ReactNode;
       renderItem: (info: { item: unknown; index: number }) => React.ReactNode;
+      CellRendererComponent?: React.ComponentType<{ index: number; children?: React.ReactNode }>;
       onViewableItemsChanged?: (info: { viewableItems: Array<{ item: unknown }> }) => void;
       onScrollToIndexFailed?: (info: { index: number; averageItemLength: number }) => void;
       onScroll?: (event: { nativeEvent: { contentOffset: { y: number } } }) => void;
       onContentSizeChange?: (width: number, height: number) => void;
+      getItemLayout?: (data: unknown, index: number) => { length: number; offset: number; index: number };
       contentContainerStyle?: { paddingBottom?: number };
       importantForAccessibility?: string;
       initialNumToRender?: number;
@@ -231,6 +240,7 @@ vi.mock('react-native', async () => {
       mocks.onScrollToIndexFailed = onScrollToIndexFailed ?? null;
       mocks.onScroll = onScroll ?? null;
       mocks.onContentSizeChange = onContentSizeChange ?? null;
+      mocks.getItemLayout = getItemLayout ?? null;
       React.useImperativeHandle(ref, () => ({
         scrollToIndex: mocks.scrollToIndex,
         scrollToOffset: mocks.scrollToOffset,
@@ -253,17 +263,47 @@ vi.mock('react-native', async () => {
           'data-opacity': String(style?.opacity),
         },
         ListHeaderComponent,
-        data.map((item, index) => React.createElement('div', { key: index }, renderItem({ item, index }))),
+        // Through the cell renderer when there is one, exactly as
+        // VirtualizedList does. The landing measures the *cell*, so a mock that
+        // renders rows bare leaves the target row unwired and every landing
+        // test asserts against a scroll sequence that never got a measurement.
+        data.map((item, index) =>
+          CellRendererComponent
+            ? React.createElement(
+                CellRendererComponent,
+                { key: index, index },
+                renderItem({ item, index }),
+              )
+            : React.createElement('div', { key: index }, renderItem({ item, index })),
+        ),
       );
     },
     ActivityIndicator: () => React.createElement('span', null, 'loading'),
     Pressable: host('button'),
     Text: host('span'),
-    View: (props: { onLayout?: (event: { nativeEvent: { layout: { height: number } } }) => void }) => {
-      // The list header is the only View in the reader that measures itself.
+    View: (props: {
+      testID?: string;
+      onLayout?: (event: { nativeEvent: { layout: { height: number; y: number } } }) => void;
+    }) => {
+      // Two Views in the reader measure themselves, and they want different
+      // halves of the layout: the list header its height, the landing target
+      // its y. Routed by testID rather than by "the first one wins", which is
+      // what this was before the target row existed.
       if (props.onLayout) {
         const { onLayout } = props;
-        mocks.headerLayout = (height: number) => onLayout({ nativeEvent: { layout: { height } } });
+        if (props.testID === 'reader-target-row') {
+          mocks.targetRowLayout = (y: number) => onLayout({ nativeEvent: { layout: { height: 0, y } } });
+          // A row inside the initial render window lays out on the first
+          // paint, before the landing effect runs -- which is the ordering a
+          // shallow target has on device and the one a manual call after
+          // render cannot produce.
+          if (mocks.autoLayoutY !== null) {
+            onLayout({ nativeEvent: { layout: { height: 0, y: mocks.autoLayoutY } } });
+          }
+        } else {
+          mocks.headerLayout = (height: number) =>
+            onLayout({ nativeEvent: { layout: { height, y: 0 } } });
+        }
       }
       return React.createElement(Div, props);
     },
@@ -287,6 +327,8 @@ describe('SurahReader', () => {
     mocks.setOptions.mockClear();
     mocks.onScroll = null;
     mocks.headerLayout = null;
+    mocks.targetRowLayout = null;
+    mocks.autoLayoutY = null;
     mocks.animatedStyles = [];
     mocks.holdFade = false;
     mocks.heldFades = [];
@@ -328,14 +370,48 @@ describe('SurahReader', () => {
     expect(mocks.scrollToIndex).not.toHaveBeenCalled();
   });
 
-  it('renders far enough down the list for the deep-linked ayah to exist', () => {
-    // Not a performance knob here: FlatList cannot scroll to a row it has
-    // never rendered, and there is no getItemLayout to tell it where one
-    // would be. Rendering the target is what makes the landing exact rather
-    // than an estimate off the short cards near the top.
+  it('gives FlatList a getItemLayout so it can jump without measuring', () => {
+    const props = baseProps(readerData(10));
+    render(<SurahReader {...props} />);
+
+    const getItemLayout = mocks.getItemLayout;
+    expect(getItemLayout).toBeInstanceOf(Function);
+
+    const first = getItemLayout!(props.data.ayahs, 0);
+    const second = getItemLayout!(props.data.ayahs, 1);
+    expect(first.offset).toBe(0);
+    expect(first.length).toBeGreaterThan(0);
+    // Offsets are cumulative: an index's offset is every earlier row summed.
+    // FlatList sums nothing itself -- this table is the whole scroll geometry.
+    expect(second.offset).toBe(first.length);
+  });
+
+  it('counts the list header in every offset it hands FlatList', () => {
+    // VirtualizedList reads a cell it has already laid out at its real y --
+    // measured in the content container, so counting the header -- and reads
+    // every other cell off this table. The two have to be the same coordinate
+    // space or the model jump lands a whole SurahPlate short.
+    const props = baseProps(readerData(10));
+    render(<SurahReader {...props} />);
+
+    const before = mocks.getItemLayout!(props.data.ayahs, 2).offset;
+    act(() => {
+      mocks.headerLayout!(356);
+    });
+    const after = mocks.getItemLayout!(props.data.ayahs, 2).offset;
+
+    expect(after).toBe(before + 356);
+    // Index 0 too: the first ayah sits below the header like every other one.
+    expect(mocks.getItemLayout!(props.data.ayahs, 0).offset).toBe(356);
+  });
+
+  it('stops widening initialNumToRender to cover a deep target', () => {
+    // The old landing needed the target rendered on the first commit to be
+    // measurable. getItemLayout removes that, and with it the cost of laying
+    // out every row above a deep link (282 of them for 2:282).
     render(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />);
 
-    expect(screen.getByTestId('reader-list').getAttribute('data-initial-num-to-render')).toBe('255');
+    expect(screen.getByTestId('reader-list').getAttribute('data-initial-num-to-render')).toBe('10');
   });
 
   it('opens a surah with no deep link on the default window', () => {
@@ -374,10 +450,14 @@ describe('SurahReader', () => {
       render(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />);
       expect(screen.queryByTestId('reader-positioning')).not.toBeNull();
 
-      // Two ticks: a scroll that missed nothing, over a content height the
-      // previous scroll already ran against.
+      // Past the deadline -- 8100 tracks LANDING_DEADLINE_MS, which is 8s so
+      // that it clears a cold start's first layout (t=3697ms measured on the
+      // owner's device) rather than cutting the landing short at 2s. Nothing
+      // measures here, so the pass cap never applies -- it counts corrections,
+      // and there is nothing to correct against. The deadline is the only
+      // thing that ends a landing whose target never reports.
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(250);
+        await vi.advanceTimersByTimeAsync(8100);
       });
 
       expect(screen.queryByTestId('reader-positioning')).toBeNull();
@@ -397,7 +477,7 @@ describe('SurahReader', () => {
         <SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />,
       );
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(250);
+        await vi.advanceTimersByTimeAsync(8100);
       });
       expect(screen.queryByTestId('reader-positioning')).toBeNull();
 
@@ -409,69 +489,200 @@ describe('SurahReader', () => {
     }
   });
 
-  it('re-scrolls while the cards above the target are still growing', async () => {
-    // The defect this covers: FlatList reports no failure as soon as the target
-    // row is measured, but the offset it jumped to was summed over cards above
-    // it that had not finished laying out. They grow, the target slides down,
-    // and the reader is revealed two cards short of it (owner device, 6:87 from
-    // a concordance row). A growing content height means the jump is stale.
+  it('keeps a measurement the target row reported before the landing began', async () => {
+    // A row inside the initial render window lays out on the first paint, in
+    // the same commit that runs the landing effect. Clearing the stored offset
+    // there threw that measurement away, and no second layout followed: the
+    // landing had nothing to correct against and ran out the deadline on the
+    // raw model offset. Searching 2:5 from a reader already open on 2:282 put
+    // 2:4 at the top on the owner's device (2026-09-07: 80 attempts, 8033ms,
+    // not one measurement).
     vi.useFakeTimers();
     try {
-      render(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />);
+      mocks.autoLayoutY = 1845;
+      render(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={5} />);
 
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(100);
-      });
-      act(() => {
-        mocks.onContentSizeChange?.(400, 90000);
-      });
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(100);
+        await vi.advanceTimersByTimeAsync(200);
       });
 
-      // Still hidden, and scrolled again -- against the taller content.
-      expect(screen.queryByTestId('reader-positioning')).not.toBeNull();
-      const attemptsWhileGrowing = mocks.scrollToIndex.mock.calls.length;
-      expect(attemptsWhileGrowing).toBeGreaterThanOrEqual(3);
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(100);
-      });
-
-      // Revealed on a tick that scrolled nothing: the last jump already ran
-      // against the settled height, so the row it landed on is the row it stays
-      // on.
-      expect(screen.queryByTestId('reader-positioning')).toBeNull();
-      expect(mocks.scrollToIndex).toHaveBeenCalledTimes(attemptsWhileGrowing);
+      expect(mocks.scrollToOffset).toHaveBeenCalledWith({ offset: 1845, animated: false });
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it('shows the reader anyway once the retries are spent', async () => {
+  it('ignores a measurement left by the target it has landed away from', async () => {
+    // The stamp is the whole reason the offset can be carried: a different
+    // target's y is not this one's, and correcting to it would land the reader
+    // wherever the last deep link went.
     vi.useFakeTimers();
     try {
-      // Driven off the scroll, not fired independently: FlatList reports the
-      // miss synchronously in response to scrollToIndex, so a row that never
-      // measures fails every attempt rather than every other one.
-      mocks.scrollToIndex.mockImplementation(() => {
-        mocks.onScrollToIndexFailed?.({ index: 254, averageItemLength: 120 });
+      const { rerender } = render(
+        <SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />,
+      );
+      act(() => {
+        mocks.targetRowLayout?.(40000);
       });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+      mocks.scrollToOffset.mockClear();
+
+      rerender(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={5} />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+
+      expect(mocks.scrollToOffset).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('reader-positioning')).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reveals a row that keeps re-laying out faster than the retry tick', async () => {
+    // Every measurement restarts the 100ms timer, so a row that reports more
+    // often than that pushes attempt() -- and with it the deadline check --
+    // permanently out of reach. Without a second check here the reader waits
+    // behind its spinner for as long as the row keeps moving.
+    vi.useFakeTimers();
+    try {
       render(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />);
 
-      // A row that never measures must settle: leaving the reader behind a
-      // spinner for as long as the screen is open is worse than showing it in
-      // the wrong place.
+      for (let tick = 0; tick < 200; tick += 1) {
+        act(() => {
+          mocks.targetRowLayout?.(40000 + tick);
+        });
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(50);
+        });
+      }
+
+      expect(screen.queryByTestId('reader-positioning')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('drops a measurement whose row has been unmounted since', async () => {
+    // The stamp says which row the number is about, not whether it is still
+    // true. Once the target's cell is recycled, the rows above it swap model
+    // estimates for measured heights and its old y stops pointing at it --
+    // so coming back to the same ayah must re-measure, not trust the number.
+    vi.useFakeTimers();
+    try {
+      const { rerender } = render(
+        <SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />,
+      );
+      act(() => {
+        mocks.targetRowLayout?.(40000);
+      });
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(100 * 30);
+        await vi.advanceTimersByTimeAsync(200);
+      });
+
+      // Landing elsewhere takes 255's cell down with it, and nothing measures
+      // the new target, so any offset still in hand is 255's.
+      rerender(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={5} />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+      mocks.scrollToOffset.mockClear();
+
+      rerender(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+
+      expect(mocks.scrollToOffset).not.toHaveBeenCalled();
+      expect(mocks.scrollToIndex).toHaveBeenCalledWith({ index: 254, animated: false });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('corrects the model jump against the target row real offset', async () => {
+    // getItemLayout's offsets are a model, and the model is not exact: worst
+    // measured drift is 512dp deep in Al-Baqara. So the jump is an
+    // approach, and the row's own laid-out y is what the landing corrects to.
+    vi.useFakeTimers();
+    try {
+      render(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />);
+
+      // The model put the row somewhere; it actually laid out at 40000.
+      act(() => {
+        mocks.targetRowLayout?.(40000);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
+
+      expect(mocks.scrollToOffset).toHaveBeenCalledWith({ offset: 40000, animated: false });
+      // Still hidden: one correction is not evidence the row stopped moving.
+      expect(screen.queryByTestId('reader-positioning')).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reveals the list only once the target row stops moving', async () => {
+    // A correction can move the rows above the target -- they lay out as they
+    // enter the window -- which moves the target again. The landing is the
+    // pass where it does not.
+    vi.useFakeTimers();
+    try {
+      render(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />);
+
+      act(() => {
+        mocks.targetRowLayout?.(40000);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
+      expect(screen.queryByTestId('reader-positioning')).not.toBeNull();
+
+      // Unchanged under the correction: settled.
+      act(() => {
+        mocks.targetRowLayout?.(40000);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
       });
 
       expect(screen.queryByTestId('reader-positioning')).toBeNull();
-      expect(mocks.scrollToIndex).toHaveBeenCalledTimes(25);
+      expect(mocks.scrollToOffset).toHaveBeenCalledTimes(1);
     } finally {
-      // mockClear in beforeEach would leave the implementation behind for
-      // every later test in the file.
-      mocks.scrollToIndex.mockReset();
+      vi.useRealTimers();
+    }
+  });
+
+  it('gives up after the cap rather than hiding the reader forever', async () => {
+    vi.useFakeTimers();
+    try {
+      render(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />);
+
+      // A row that never settles: a different y every pass. Showing the reader
+      // in the wrong place is bad; leaving it behind a spinner for as long as
+      // the screen is open is worse.
+      for (let pass = 0; pass < 10; pass += 1) {
+        act(() => {
+          mocks.targetRowLayout?.(40000 + pass * 40);
+        });
+        // Sequential on purpose: firing the passes together collapses them
+        // into one settle, which is the opposite of what this asserts.
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(100);
+        });
+      }
+
+      expect(screen.queryByTestId('reader-positioning')).toBeNull();
+      // The model jump, then the three corrections the cap allows. The jump
+      // itself is not a pass: spending the budget on it is what stopped the
+      // settle test from ever running on the device.
+      expect(mocks.scrollToIndex).toHaveBeenCalledTimes(1);
+      expect(mocks.scrollToOffset).toHaveBeenCalledTimes(3);
+    } finally {
       vi.useRealTimers();
     }
   });
@@ -495,7 +706,7 @@ describe('SurahReader', () => {
       expect(onReadingAyah).not.toHaveBeenCalled();
 
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(250);
+        await vi.advanceTimersByTimeAsync(8100);
       });
       act(() => {
         mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[254] }] });
@@ -521,7 +732,7 @@ describe('SurahReader', () => {
       expect(mocks.setReaderPosition).not.toHaveBeenCalled();
 
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(250);
+        await vi.advanceTimersByTimeAsync(8100);
       });
 
       expect(mocks.setReaderPosition).toHaveBeenCalledWith(1, 255);
@@ -940,7 +1151,7 @@ describe('SurahReader', () => {
         <SurahReader {...baseProps(data)} readerMode="translation" initialAyahNumber={255} />,
       );
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(250);
+        await vi.advanceTimersByTimeAsync(8100);
       });
       expect(container.textContent).toContain(translation);
 
@@ -964,7 +1175,7 @@ describe('SurahReader', () => {
       expect(screen.getByTestId('reader-layer-1').style.opacity).toBe('0');
 
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(3000);
+        await vi.advanceTimersByTimeAsync(8100);
       });
 
       // Still nothing, once it has landed and before the fade is released.
@@ -1022,12 +1233,12 @@ describe('SurahReader', () => {
         <SurahReader {...baseProps(data)} readerMode="translation" initialAyahNumber={255} />,
       );
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(250);
+        await vi.advanceTimersByTimeAsync(8100);
       });
 
       rerender(<SurahReader {...baseProps(data)} readerMode="mushaf" initialAyahNumber={255} />);
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(3000);
+        await vi.advanceTimersByTimeAsync(8100);
       });
 
       // The landing is done and the spent layer is still here, because the
@@ -1392,7 +1603,7 @@ describe('SurahReader shared reading position', () => {
       // one asked for while the arrival is still in flight cancels it rather
       // than stacking a third rendering (see below).
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(250);
+        await vi.advanceTimersByTimeAsync(8100);
       });
       const landed = mocks.scrollToIndex.mock.calls.length;
       rerender(<SurahReader {...props} readerMode="translation" />);

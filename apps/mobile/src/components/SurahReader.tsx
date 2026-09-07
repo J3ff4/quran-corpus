@@ -8,6 +8,7 @@ import {
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
+  type CellRendererProps,
   type ViewToken,
 } from 'react-native';
 import Animated, {
@@ -35,6 +36,7 @@ import { LanguageSheet } from './LanguageSheet';
 import { ReciterSheet } from './ReciterSheet';
 import { WordSheet } from './WordSheet';
 import { GlassSurface } from './GlassSurface';
+import { estimateRowHeight } from './rowHeightModel';
 import { useReducedMotion } from '@/motion/useReducedMotion';
 import { t } from '@/i18n/uiStrings';
 import { fonts, typography } from '@/theme/tokens';
@@ -98,10 +100,10 @@ interface SurahReaderProps {
 }
 
 // Ayah cards are variable height (Arabic runs wrap differently per ayah), so
-// there is no getItemLayout to give FlatList and scrollToIndex fails for any
-// row it has not measured yet. Two halves make a deep-link landing exact
-// instead of approximate: initialNumToRender is widened to cover the target,
-// so the row is rendered and therefore measurable on the first commit; and the
+// FlatList cannot scroll to a row it has not measured without being told where
+// the rows are. Two halves make a deep-link landing exact instead of
+// approximate: getItemLayout hands it a fitted model of every row's height, so
+// the target can be jumped to without laying out the ones above it; and the
 // list stays hidden until the scroll lands, so no attempt is ever seen as
 // motion.
 //
@@ -112,18 +114,38 @@ interface SurahReaderProps {
 // onViewableItemsChanged, writing an ayah the reader never saw into the saved
 // reading position.
 //
-// "FlatList reported no failure" is not the same as "the row is at the top".
-// scrollToIndex computes its offset from the row heights measured so far, so a
-// card above the target that has rendered but not finished laying out measures
-// short, the jump lands short, and the target slides further down as those
-// cards settle. So every attempt re-scrolls, and only a scroll that both missed
-// nothing and left the content height unchanged counts as the landing. (Owner
-// device, 2026-08-23: 6:87 opened from a concordance row two cards below the
-// top, and the same from search and bookmarks.)
-const MAX_SCROLL_ATTEMPTS = 25;
+// Three passes, not twenty-five. The old loop was blind: it re-scrolled and
+// asked whether the content height had stopped changing, because it had no way
+// to see where the target actually was, and every attempt jumped to an offset
+// summed over cards that were still laying out (owner device, 2026-08-23: 6:87
+// opened two cards below the top from a concordance row).
+//
+// Now getItemLayout puts the target in the render window on the first jump, and
+// the row's own laid-out y says where it really is. So a pass either moves the
+// row or proves it settled -- and the model's error, worst measured at 512dp,
+// is corrected against a real measurement rather than ground down by retries.
+const MAX_LANDING_PASSES = 3;
 const SCROLL_RETRY_DELAY_MS = 100;
-// React Native's own default. Restated because the deep-link case overrides it
-// and a bare 10 in the JSX reads as a number someone chose.
+// The budget for a row that never reports at all. Separate from the pass cap
+// because the two failures are different: the cap bounds how many times we
+// correct, this bounds how long we wait for the first measurement. Folding
+// them into one counter spent the whole budget waiting -- a row 281 deep does
+// not lay out within three 100ms ticks, so every landing corrected once and
+// revealed in the same tick, and the settle test never ran (owner device,
+// 2026-09-07: 16:90 landed with 200dp of ayah 89 still above it).
+//
+// Eight seconds because it has to clear a cold start, not a warm one. Measured
+// on the owner's device with the deadline off (2026-09-07, /surah/2?ayah=282):
+// the target row's first layout arrives at t=3697ms cold against t=421ms warm.
+// At 2000ms the deadline fired before any measurement existed, so the reader
+// revealed on the raw model estimate -- 2:282 came up 130dp high, with the tail
+// of 2:281 above it. Nothing waits this long in practice: both modes settle one
+// pass after the first measurement.
+const LANDING_DEADLINE_MS = 8000;
+// React Native's own default, restated so a bare 10 in the JSX does not read as
+// a number someone chose. Nothing overrides it any more: a deep link used to
+// widen the window to initialIndex + 1, because FlatList cannot scroll to a row
+// it has never rendered *unless* it has a getItemLayout. It has one now.
 const DEFAULT_INITIAL_RENDER = 10;
 
 // Ayahs fetched ahead of the one scrolling into view. The whole-surah fetch is
@@ -234,9 +256,9 @@ interface AyahListProps {
  * Its own component so the reader can mount two of them. A mode switch used to
  * change the element type at this position -- MushafPlate in one mode, Fragment
  * in the other -- which unmounted the FlatList and re-ran the landing behind a
- * spinner on a blank screen, for up to MAX_SCROLL_ATTEMPTS * SCROLL_RETRY_DELAY_MS.
- * Deep in a long surah that is two and a half seconds of nothing (owner report,
- * 2026-09-01). Keeping one list mounted would not have fixed it: a mushaf ayah
+ * spinner on a blank screen, for the whole length of the retry loop it then
+ * had. Deep in a long surah that is two and a half seconds of nothing (owner
+ * report, 2026-09-01). Keeping one list mounted would not have fixed it: a mushaf ayah
  * and a translation card are nothing like the same height, so the preserved
  * pixel offset points at a different ayah and the landing has to run anyway.
  *
@@ -273,17 +295,26 @@ function AyahList({
   const listBottomPadding = useListBottomPadding();
   const listRef = useRef<FlatList<SurahReaderData['ayahs'][number]>>(null);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const attemptsRef = useRef(0);
-  // Set by onScrollToIndexFailed, read by the attempt loop below. A ref, not
-  // state: FlatList reports the failure synchronously during a scroll and a
-  // re-render per attempt would remount nothing useful.
-  const failedRef = useRef(false);
-  // The list's content height, and the height the previous attempt scrolled
-  // over. Equal means nothing above the target grew in that window, which is
-  // the only evidence available here that the offset the scroll used is the
-  // offset the row actually sits at.
-  const contentHeightRef = useRef(0);
-  const settledHeightRef = useRef(-1);
+  const passesRef = useRef(0);
+  // Where the target row actually laid out, and the offset the previous pass
+  // corrected to. Refs, not state: they are written during layout, several
+  // times per settle, and none of those writes is a render.
+  // Stamped with the row it belongs to. A bare offset had to be cleared on
+  // every re-landing, and clearing it threw away the only measurement a
+  // shallow target ever reports: a row inside the initial render window lays
+  // out on the first paint, in the same commit that runs the landing effect,
+  // so the clear ran after its onLayout and no second layout followed. The
+  // landing then had nothing to correct against and ended on the deadline at
+  // the raw model offset -- searching 2:5 from a reader already open on 2:282
+  // put 2:4 at the top (owner device, 2026-09-07: 80 attempts, 8033ms, not one
+  // measurement). The index is what the clear was really for; carrying it
+  // keeps a measurement that is still about the right row.
+  const targetOffsetRef = useRef<{ index: number; y: number } | null>(null);
+  const lastMeasuredRef = useRef<number | null>(null);
+  // Called by the target row's onLayout. A ref because renderItem builds the
+  // handler fresh on every render, and the landing effect must not re-run for
+  // that -- see the effect's dependency note below.
+  const onTargetMeasuredRef = useRef<() => void>(() => {});
   // The same value as `positioned` below. onViewableItemsChanged is called by
   // FlatList from outside the React tree off a ref that never re-reads props,
   // so it cannot see the state.
@@ -291,6 +322,66 @@ function AyahList({
   // Whether this mount has been focused before -- see the focus effect below.
   const focusedRef = useRef(false);
   const [positioned, setPositioned] = useState(false);
+  // 0 until the list has laid out. The row model is width-dependent, and a
+  // width guessed from the window would be wrong for mushaf mode, whose plate
+  // is inset.
+  const [listWidth, setListWidth] = useState(0);
+  const onListLayout = useCallback((event: LayoutChangeEvent) => {
+    setListWidth(event.nativeEvent.layout.width);
+  }, []);
+
+  // The list header's height, in the same units the offset table is built in.
+  // Kept as state as well as the shared value the title fade reads, because the
+  // table is a useMemo and a shared value's write does not re-run one.
+  const [headerOffset, setHeaderOffset] = useState(0);
+
+  // Cumulative, not per-row: scrollToIndex sums every preceding row, so the
+  // table is what FlatList actually reads. Rebuilt only when something it
+  // depends on changes -- a getItemLayout returning different offsets for the
+  // same index between calls would move content under the user's finger.
+  const layout = useMemo(() => {
+    const lengths = new Array<number>(data.ayahs.length);
+    const offsets = new Array<number>(data.ayahs.length);
+    // Started at the header's height, not at zero. VirtualizedList mixes the
+    // two sources of cell geometry in one coordinate space: a cell it has
+    // already laid out is read back at its real y, which is measured inside the
+    // content container and so counts the header, and every other cell is read
+    // straight off this table (ListMetricsAggregator.getCellMetrics -- the
+    // measured frame wins, getItemLayout is the fallback). A table that starts
+    // at zero therefore disagrees with every measured frame by exactly the
+    // header, and the model jump lands that far short. The header here is the
+    // SurahPlate block, which is hundreds of dp -- measured at 356 on the
+    // owner's device -- so this is not a rounding error: it is the "2:282 came
+    // up 130dp high" class of miss, arriving before the correction pass can see
+    // it.
+    let running = headerOffset;
+    for (let index = 0; index < data.ayahs.length; index += 1) {
+      const item = data.ayahs[index];
+      // noUncheckedIndexedAccess is on: the index came from this loop, but the
+      // compiler cannot know that.
+      if (!item) continue;
+      const height = estimateRowHeight({
+        mode,
+        arabicSize: arabicSizes.reader,
+        listWidth,
+        arabicChars: item.ayah.text_uthmani?.length ?? 0,
+        translationChars: item.translation?.text.length ?? 0,
+      });
+      offsets[index] = running;
+      lengths[index] = height;
+      running += height;
+    }
+    return { lengths, offsets };
+  }, [data.ayahs, mode, arabicSizes.reader, listWidth, headerOffset]);
+
+  const getItemLayout = useCallback(
+    (_: unknown, index: number) => ({
+      length: layout.lengths[index] ?? 0,
+      offset: layout.offsets[index] ?? 0,
+      index,
+    }),
+    [layout],
+  );
 
   // The surah's opening, above ayah 1's card rather than inside it: in the card
   // it sat under the ayah number and bookmark row and still read as ayah 1's
@@ -326,6 +417,51 @@ function AyahList({
     return data.ayahs.findIndex((item) => item.ayah.ayah_number === anchor.ayah);
   }, [data.ayahs, anchor.ayah]);
 
+  // The landing measures the *cell*, not a View inside it. VirtualizedList
+  // positions cells directly in the content container, so a cell's `layout.y`
+  // is the coordinate scrollToOffset takes. A wrapper nested inside renderItem
+  // is laid out by that cell and always reports y=0, which the correction pass
+  // then dutifully scrolls to -- the whole surah jumped to the top (owner
+  // device, 2026-09-07: /surah/16?ayah=90 revealed on ayah 1).
+  const CellRenderer = useMemo(
+    () =>
+      function ReaderCell({ index, onLayout, ...rest }: CellRendererProps<ReaderAyah>) {
+        const isTarget = index === initialIndex;
+        // A measurement outlives the cell that made it unless something drops
+        // it. The stamp only says which row the number is about, not whether
+        // it is still true: virtualization recycles the target's cell once the
+        // reader scrolls away, and the rows above it then swap model estimates
+        // for real heights, so the y it last reported no longer points at it.
+        // Landing on 2:6, reading to 2:200 and coming back to 2:6 from a
+        // bookmark would take that number at face value -- scroll straight to
+        // it, find nothing there to re-measure, and reveal on it. Declared
+        // above the early return so the hook order does not depend on which
+        // row this is.
+        useEffect(() => {
+          if (!isTarget) return;
+          return () => {
+            if (targetOffsetRef.current?.index === index) targetOffsetRef.current = null;
+          };
+        }, [isTarget, index]);
+        if (!isTarget) return <View onLayout={onLayout} {...rest} />;
+        return (
+          <View
+            {...rest}
+            testID="reader-target-row"
+            onLayout={(event: LayoutChangeEvent) => {
+              // Forwarded, not replaced: VirtualizedList attaches its own cell
+              // onLayout in the modes that measure, and swallowing it there
+              // would break its bookkeeping.
+              onLayout?.(event);
+              targetOffsetRef.current = { index, y: event.nativeEvent.layout.y };
+              onTargetMeasuredRef.current();
+            }}
+          />
+        );
+      },
+    [initialIndex],
+  );
+
   // Read through refs by the landing effect, so a caller that rebuilds either
   // every render does not restart a scroll sequence already in flight.
   const onLandedRef = useRef(onLanded);
@@ -354,11 +490,14 @@ function AyahList({
     setPositioned(false);
 
     let cancelled = false;
-    attemptsRef.current = 0;
-    // -1, not the live height: a re-run must scroll at least twice before it
-    // can call anything settled, or the first tick reveals on a comparison
-    // against a height nothing has scrolled over yet.
-    settledHeightRef.current = -1;
+    const startedAt = Date.now();
+    passesRef.current = 0;
+    // Only the previous pass's offset is cleared. A measurement stamped with
+    // the target this landing is aiming at is still true, and the reason the
+    // clear existed -- comparing a new target's first measurement against the
+    // old target's last one and calling it settled on the spot -- is handled
+    // by the stamp instead.
+    lastMeasuredRef.current = null;
 
     const reveal = () => {
       if (cancelled) return;
@@ -377,30 +516,68 @@ function AyahList({
         setReaderPosition(data.surah.id, anchor.ayah);
       }
       onLandedRef.current();
+      // The landing is over: later layouts of the target row are the user
+      // scrolling, not the list settling, and a second reveal would fire
+      // onLanded again and re-start the caller's cross-fade.
+      cancelled = true;
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+    };
+
+    const schedule = () => {
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = setTimeout(attempt, SCROLL_RETRY_DELAY_MS);
     };
 
     const attempt = () => {
       if (cancelled) return;
-      failedRef.current = false;
-      attemptsRef.current += 1;
-      listRef.current?.scrollToIndex({ index: initialIndex, animated: false });
-      retryTimerRef.current = setTimeout(() => {
-        if (cancelled) return;
-        // Both halves: no miss, and no growth under the jump.
-        const landed = !failedRef.current && contentHeightRef.current === settledHeightRef.current;
-        settledHeightRef.current = contentHeightRef.current;
-        if (landed) return reveal();
-        // Capped: a row that never measures has to settle. Showing the reader
-        // in the wrong place is bad; leaving it behind a spinner for as long
-        // as the screen is open is worse.
-        if (attemptsRef.current >= MAX_SCROLL_ATTEMPTS) return reveal();
-        attempt();
-      }, SCROLL_RETRY_DELAY_MS);
+      const entry = targetOffsetRef.current;
+      const measured = entry !== null && entry.index === initialIndex ? entry.y : null;
+      if (measured === null) {
+        // Nothing measured yet. Jump on the model: it does not have to be
+        // right, only close enough to bring the target into the render window,
+        // where it lays out and reports where it really is. This costs no pass
+        // -- it is the same jump every time, and spending the correction
+        // budget on it is what stopped the settle test from ever running.
+        listRef.current?.scrollToIndex({ index: initialIndex, animated: false });
+      } else if (measured === lastMeasuredRef.current) {
+        // The row did not move under the last correction. That is the landing,
+        // and unlike the content-height check this replaces, it is evidence
+        // about the target itself rather than about the list around it.
+        return reveal();
+      } else {
+        passesRef.current += 1;
+        lastMeasuredRef.current = measured;
+        listRef.current?.scrollToOffset({ offset: measured, animated: false });
+        // Capped. A row that never settles has to be shown anyway: the reader
+        // in the wrong place is bad; behind a spinner for as long as the
+        // screen is open is worse.
+        if (passesRef.current >= MAX_LANDING_PASSES) return reveal();
+      }
+      // The other half of the cap: a target that never lays out reports
+      // nothing to correct against, so nothing above would ever end this.
+      if (Date.now() - startedAt >= LANDING_DEADLINE_MS) return reveal();
+      schedule();
+    };
+
+    // Restarted on every measurement rather than run on it: the row lays out
+    // repeatedly while the cards around it settle, and correcting to the first
+    // of those is correcting to a number that is about to change.
+    onTargetMeasuredRef.current = () => {
+      if (cancelled) return;
+      // The deadline is checked here as well as in attempt(), because this is
+      // what postpones attempt(): schedule() clears the pending timer and
+      // starts a fresh 100ms. A row that re-lays out more often than that --
+      // a long settle deep in al-Baqarah, a font swap, a cross-fade under
+      // load -- would push the only deadline check out of reach and hold the
+      // reader behind its spinner with no bound at all.
+      if (Date.now() - startedAt >= LANDING_DEADLINE_MS) return reveal();
+      schedule();
     };
 
     attempt();
     return () => {
       cancelled = true;
+      onTargetMeasuredRef.current = () => {};
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
     };
     // The nonce, not just the index: a re-landing usually targets the ayah
@@ -433,16 +610,11 @@ function AyahList({
     }, [data.surah.id]),
   );
 
-  // Records the miss and nothing else -- see the note above MAX_SCROLL_ATTEMPTS
-  // for what the offset estimate that used to live here cost.
-  const onScrollToIndexFailed = useCallback(() => {
-    failedRef.current = true;
-  }, []);
-  // Read by the landing loop above, one tick later -- not state: it changes on
-  // every layout pass while the surah settles and none of them is a render.
-  const onContentSizeChange = useCallback((_width: number, height: number) => {
-    contentHeightRef.current = height;
-  }, []);
+  // Deliberately empty, and deliberately still passed: with getItemLayout the
+  // jump has an offset for every index, so a miss is no longer a signal the
+  // landing reads -- but FlatList warns when it has no handler, and `data`
+  // changing under a pending jump can still produce one.
+  const onScrollToIndexFailed = useCallback(() => {}, []);
 
   const onReadingAyahRef = useRef(onReadingAyah);
   const onVisibleAyahRef = useRef(onVisibleAyah);
@@ -504,6 +676,7 @@ function AyahList({
           <View
             onLayout={(event: LayoutChangeEvent) => {
               headerHeight.value = event.nativeEvent.layout.height;
+              setHeaderOffset(event.nativeEvent.layout.height);
             }}
             style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16 }}
           >
@@ -570,9 +743,11 @@ function AyahList({
             <AyahCard {...shared} translationText={item.translation?.text ?? null} />
           );
         }}
+        CellRendererComponent={CellRenderer}
         onViewableItemsChanged={onViewableItemsChanged.current}
         onScrollToIndexFailed={onScrollToIndexFailed}
-        onContentSizeChange={onContentSizeChange}
+        getItemLayout={getItemLayout}
+        onLayout={onListLayout}
         onScroll={onScroll}
         scrollEventThrottle={16}
         // BottomSheet -- the shell under both WordSheet and LanguageSheet --
@@ -582,7 +757,7 @@ function AyahList({
         // modal is only visually modal (CLAUDE.md §8, WCAG AA). The nav header
         // is a native toolbar outside this View and is still reachable.
         importantForAccessibility={sheetsOpen || !live ? 'no-hide-descendants' : 'auto'}
-        initialNumToRender={initialIndex > 0 ? initialIndex + 1 : DEFAULT_INITIAL_RENDER}
+        initialNumToRender={DEFAULT_INITIAL_RENDER}
         // `|| arriving` for the same reason the spinner below carries it, and
         // it is the last blank on the device list. `reveal()` calls
         // setPositioned(true) and onLanded() in one tick; onLanded starts the
