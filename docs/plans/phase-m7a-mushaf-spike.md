@@ -243,7 +243,7 @@ not stretch, do not justify — the whole premise is that the font already fits 
 
 - [ ] **Step 2: Draw all three editions of each page**
 
-Nine renders. A picker at the top switches edition; the page fills the screen at the real
+Six renders -- V4 is ruled out in Findings 2. A picker at the top switches edition; the page fills the screen at the real
 reading size, not scaled down.
 
 - [ ] **Step 3: Confirm lines actually fill the width**
@@ -268,9 +268,9 @@ Local APK build per memory `local-apk-build-without-eas` — `taskset -c 0,1` is
 arm64 only. Or run through Expo Go if the fonts register there; note which, because Expo
 Go and a real build differ on native font paths.
 
-- [ ] **Step 2: Capture all nine renders**
+- [ ] **Step 2: Capture all six renders**
 
-Three pages × three editions, screenshots at native resolution, plus one photo of the
+Three pages × two editions, screenshots at native resolution, plus one photo of the
 phone in hand for true scale.
 
 - [ ] **Step 3: Send them to the owner and get the edition ruling**
@@ -372,8 +372,8 @@ M7a is done when all of these hold:
 - [ ] Findings §3 gives measured MB per edition per format, against the ~40MB budget.
 - [ ] Findings §4 answers yes/no, with a screenshot each: runtime registration, WOFF2,
       per-word tinting in glyph text, per-word tinting in fallback text.
-- [ ] Nine renders captured on the owner's GM1917 and sent; the owner has named an
-      edition.
+- [ ] Six renders captured on the owner's GM1917 and sent; the owner has named an
+      edition. (Nine before V4 was ruled out in Findings 2.)
 - [ ] PRD §10 renumbered.
 - [ ] No spike code, no font binary and no layout download is in git.
 - [ ] `lint`, `type-check` and `test` pass in `apps/mobile` (modulo issue #54).
