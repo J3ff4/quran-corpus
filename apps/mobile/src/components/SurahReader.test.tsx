@@ -541,6 +541,43 @@ describe('SurahReader', () => {
     }
   });
 
+  it('drops a measurement whose row has been unmounted since', async () => {
+    // The stamp says which row the number is about, not whether it is still
+    // true. Once the target's cell is recycled, the rows above it swap model
+    // estimates for measured heights and its old y stops pointing at it --
+    // so coming back to the same ayah must re-measure, not trust the number.
+    vi.useFakeTimers();
+    try {
+      const { rerender } = render(
+        <SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />,
+      );
+      act(() => {
+        mocks.targetRowLayout?.(40000);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+
+      // Landing elsewhere takes 255's cell down with it, and nothing measures
+      // the new target, so any offset still in hand is 255's.
+      rerender(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={5} />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+      mocks.scrollToOffset.mockClear();
+
+      rerender(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+
+      expect(mocks.scrollToOffset).not.toHaveBeenCalled();
+      expect(mocks.scrollToIndex).toHaveBeenCalledWith({ index: 254, animated: false });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('corrects the model jump against the target row real offset', async () => {
     // getItemLayout's offsets are a model, and the model is not exact: worst
     // measured drift is 512dp deep in Al-Baqara. So the jump is an

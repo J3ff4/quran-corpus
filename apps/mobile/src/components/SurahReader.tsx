@@ -426,7 +426,24 @@ function AyahList({
   const CellRenderer = useMemo(
     () =>
       function ReaderCell({ index, onLayout, ...rest }: CellRendererProps<ReaderAyah>) {
-        if (index !== initialIndex) return <View onLayout={onLayout} {...rest} />;
+        const isTarget = index === initialIndex;
+        // A measurement outlives the cell that made it unless something drops
+        // it. The stamp only says which row the number is about, not whether
+        // it is still true: virtualization recycles the target's cell once the
+        // reader scrolls away, and the rows above it then swap model estimates
+        // for real heights, so the y it last reported no longer points at it.
+        // Landing on 2:6, reading to 2:200 and coming back to 2:6 from a
+        // bookmark would take that number at face value -- scroll straight to
+        // it, find nothing there to re-measure, and reveal on it. Declared
+        // above the early return so the hook order does not depend on which
+        // row this is.
+        useEffect(() => {
+          if (!isTarget) return;
+          return () => {
+            if (targetOffsetRef.current?.index === index) targetOffsetRef.current = null;
+          };
+        }, [isTarget, index]);
+        if (!isTarget) return <View onLayout={onLayout} {...rest} />;
         return (
           <View
             {...rest}
