@@ -454,6 +454,99 @@ accepted.
 
 ### §2 Layout validation
 
+#### Ruling — the source changed, and why
+
+The plan assumed QUL's SQLite exports. **They are login-gated**: every
+`Download sqlite` button on `/resources/mushaf-layout/{10,15,19}` is an
+`ajax-modal` pointing at `/users/sign_in`, not a file. Rather than create an
+account to script against, the layout came from the **open quran.com v4 API**,
+which serves the same KFGQPC word data with no key:
+
+```
+https://api.quran.com/api/v4/verses/by_page/{1..604}
+  ?words=true&word_fields=code_v1,code_v2,line_number,page_number,
+   text_uthmani,text_qpc_hafs,char_type_name,position&per_page=300
+```
+
+604 JSON files, **32,375,809 bytes**, fetched 2026-09-07 at ~2 req/s into
+`~/quran-data/refdata/mushaf/pages/`. sha256 of the files concatenated in page
+order: `2ebbfb878ae47755f2801047c6ee2840d045098279d4f47d989efac6702c8cc7`.
+The request needs a `User-Agent`; urllib's default gets a flat 403.
+
+What this source does **not** carry is QUL's `line_type` / `is_centered`
+columns. It does not need to: line numbers already reserve the lines a surah
+band and a bismillah occupy, so those lines show up as gaps in the occupied
+set — page 2 occupies 6 lines, page 106 occupies 13. M7b infers band lines
+from the gaps rather than importing a column.
+
+**Ruling — V4 is out of the spike.** No open source publishes `code_v4` word
+codes: `/quran/verses/code_v4` silently falls back to `text_uthmani`, and the
+codes exist only behind the same QUL login. QUL's own V4 pages also say the V4
+tajweed fonts are "currently disabled, we're proofreading them". So the edition
+choice in Task 6 is **V1 vs V2**, six renders not nine. Cost if wrong: if the
+owner wants V4 later, it needs a QUL account and a re-run of Task 2 only.
+
+#### Two traps in the data, both load-bearing for M7b
+
+**1. The API emits duplicate JSON keys.** Every word carries `line_number`
+twice. The first is the **V1** line; the second, next to `page_number`, is the
+**V2** line. A plain `json.load` keeps only the last, so a naive reader
+positions V1 glyphs using V2 line numbers and never sees an error. Confirmed
+against the per-script endpoints: 5:77 has `v1_page` 121 and `v2_page` 120, and
+the word's two values are line 1 (V1) and page 120 / line 13 (V2). The
+validator parses with an `object_pairs_hook` that keeps both.
+
+**2. `by_page` paginates by V1, and returns whole verses.** A verse straddling
+a page boundary appears in both request files, so words must be assigned by
+their own page, not by the request. For V2 that means regrouping across request
+files entirely, because V2's page breaks differ from V1's.
+
+A third trap killed an early version of the checker: **word `id` is not
+reading order.** On page 106, 4:176 carries id 83385 while 5:2 on the same page
+carries 1544. Payload order is reading order; any sort or arithmetic on ids is
+wrong.
+
+#### Results — `check_mushaf_layout.py`, all 604 pages
+
+| Check | V1 | V2 |
+|---|---|---|
+| pages 1..604 present | 604 / 604 | 604 / 604 |
+| words | 83,665 | 83,665 |
+| line numbers inside 1..15 | clean | clean |
+| lines in reading order, unbroken | clean | **3 problems, page 589** |
+| words with no glyph code | none | none |
+| **agreement with our `ayahs.page`** | **0 disagreements** | **36 disagreements** |
+
+**V1 validates completely clean.** Our `ayahs.page` matches the V1 layout on
+every one of the 604 pages — the corpus is already paged to V1, so choosing V1
+costs no re-paging and no migration of existing page data.
+
+**V2 disagrees with our corpus on 18 ayahs**, always as a one-page shift at a
+boundary: 5:77, 5:83, 5:90, 6:131, 55:17-18, 55:41, 55:68-69, 68:16, 69:35,
+70:40, 74:18, 79:16, 80:41-42, 83:5-6, 83:34, 84:25 and neighbours. This is not
+an import bug on either side — it is the two KFGQPC prints genuinely breaking
+pages in different places. Choosing V2 means re-paging `ayahs.page`, which
+moves page-browse and every stored reading position.
+
+**V2 also carries one upstream defect.** On page 589, ayah 84:21's end-of-ayah
+marker (word id 23997) is on **line 13** while the five words of the same ayah
+before it are on **line 14**. Rendered literally, the verse number would jump a
+line backwards. V1 has no equivalent. (The sajdah mark on 84:21 is also merged
+into word 23995 rather than carrying its own id — id 23996 does not appear.)
+
+#### Mutation check
+
+Three corruptions of a copy of page 106, one at a time; each was caught by the
+check meant to catch it, and each run exited non-zero:
+
+| Corruption | Reported as |
+|---|---|
+| a `line_number` set to 99 | `page 106: line numbers outside 1..15: [99]` |
+| the page's verses reversed | `line 8 appears after line 15 in reading order`, `line 10 is broken into two runs` |
+| verse 5:1 deleted from the page | `page 106: layout-only -, corpus-only [(5, 1)]` |
+
+Script: `$CLAUDE_JOB_DIR/tmp/mutate_check.sh` (throwaway, not committed).
+
 ### §3 Byte cost
 
 ### §4 Font registration on RN Android
