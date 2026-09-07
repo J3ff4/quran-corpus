@@ -1,0 +1,399 @@
+# Phase M7a — Mushaf Spike Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: use superpowers:subagent-driven-development
+> or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax.
+
+**Goal:** answer the four questions that decide whether and how a glyph-based paged
+mushaf can ship, and let the owner pick the edition from renders on their own phone.
+
+**Architecture:** no production code. Downloads land outside git in
+`~/quran-data/refdata/mushaf/`. A throwaway dev-only route in `apps/mobile` proves font
+registration and renders the three editions; it is deleted before the PR merges. Only
+the findings section of this file and the PRD renumber merge.
+
+**Spec:** `docs/plans/phase-m7-paged-mushaf.md` — rulings 1, 5, 8, 9 and the M7a
+deliverable list.
+
+## Global Constraints
+
+- **No schema change, no migration, no importer** in M7a. Those are M7b.
+- **Nothing large enters git.** Fonts, layout DBs and raw downloads live in
+  `~/quran-data/refdata/mushaf/` (§9, and the temp/ purge precedent).
+- The throwaway route is deleted in Task 8. It must never be reachable from the tab bar
+  or any Link — dev-only, reached by typing the path.
+- Device work needs the owner present: the phone under `adb` is also this session's
+  display. Never drive it unattended.
+- Metro's file watcher is dead here — every source edit needs `expo start --clear`.
+- Never grep the Metro log for `"Android Bundled"` raw; ANSI codes split the words.
+  Strip first: `sed 's/\x1b\[[0-9;]*m//g'`.
+
+---
+
+### Task 1: Record the licence terms
+
+**Files:**
+- Modify: `docs/plans/phase-m7a-mushaf-spike.md` (Findings §1, at the bottom)
+
+Ruling 9 says we ship regardless. This task documents *what* is being accepted, so the
+About/Credits entry in M7c is accurate and the owner's acceptance is on the record.
+
+- [ ] **Step 1: Fetch the terms for each resource**
+
+Fetch and read, in full, each of:
+- `https://qul.tarteel.ai/faq` — QUL's general position on resource licensing
+- the mushaf-layout resource page for each of KFGQPC V1, V2, V4
+- `https://qul.tarteel.ai/resources/font/249` (QPC V2 font) and the V1/V4 equivalents
+- whatever "Terms of use" link each font resource page carries
+
+- [ ] **Step 2: Quote, do not summarise**
+
+For each resource write into Findings §1: resource name, URL, the licence string **as
+written** (or `NONE STATED` — that is a finding, not a gap), whether redistribution
+inside an app binary is addressed at all, and any attribution wording required.
+
+Do not paraphrase a licence into a verdict. A summary is what makes an accepted risk
+un-auditable later.
+
+- [ ] **Step 3: State the exposure in one paragraph**
+
+One paragraph, plain: what we are shipping, under what grant or absence of one, and what
+the realistic consequence is. This is what the owner accepted.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add docs/plans/phase-m7a-mushaf-spike.md
+git commit -m "docs(plans): M7a licence findings for QUL layout and QPC fonts"
+```
+
+---
+
+### Task 2: Download the layout data and validate it against our corpus
+
+**Files:**
+- Create: `~/quran-data/refdata/mushaf/` (outside git)
+- Create: `packages/scraper/tools/check_mushaf_layout.py`
+- Modify: `docs/plans/phase-m7a-mushaf-spike.md` (Findings §2)
+
+**Interfaces:**
+- Consumes: `apps/web/quran.db` — the live DB (`ayahs.surah_id`, `ayah_number`, `page`)
+- Produces: a validation verdict per edition that M7b's exit criterion reuses
+
+- [ ] **Step 1: Download all three layouts**
+
+```bash
+mkdir -p ~/quran-data/refdata/mushaf
+# one subdir per edition: v1/ v2/ v4/
+```
+
+Take the SQLite export where offered, JSON otherwise. Record each file's URL, size and
+sha256 in Findings §2.
+
+- [ ] **Step 2: Write the validator**
+
+`packages/scraper/tools/check_mushaf_layout.py`. Read-only against both DBs. It must
+report, per edition:
+
+- pages present, and any page in 1..604 missing
+- lines per page: the distribution, and every page whose count is not 15
+- `line_type` values seen, and counts of each
+- word-id ranges: any line where `first_word_id > last_word_id`, any gap or overlap
+  between consecutive lines
+- **cross-check against our corpus**: for every page, the set of `(surah, ayah)` the
+  layout's word ranges cover vs the set our `ayahs.page` says is on that page.
+  Report every disagreement with its page number.
+
+The cross-check is the point of the task. Memory
+`validate-data-by-alignment-not-count` applies: row counts matching proves nothing.
+
+- [ ] **Step 3: Run it and read the disagreements**
+
+```bash
+cd packages/scraper && python tools/check_mushaf_layout.py \
+  --layout ~/quran-data/refdata/mushaf/v2/layout.db \
+  --corpus ../../apps/web/quran.db
+```
+
+Expect *some* disagreement — the layouts differ in edition, and our `ayahs.page` came
+from a different source. A handful of boundary pages is normal; a systematic offset is a
+finding that changes M7b.
+
+- [ ] **Step 4: Mutation-check the validator**
+
+Flip one page's `last_word_id` in a copy of the layout DB and confirm the checker reports
+it. A validator that passes on corrupted input asserts nothing — this has slipped through
+twice already (PRs #71, #73).
+
+- [ ] **Step 5: Record and commit**
+
+Findings §2 gets the per-edition table and the disagreement list.
+
+```bash
+git add packages/scraper/tools/check_mushaf_layout.py docs/plans/phase-m7a-mushaf-spike.md
+git commit -m "feat(scraper): mushaf layout validator, cross-checked against ayahs.page"
+```
+
+---
+
+### Task 3: Download the fonts and measure the real byte cost
+
+**Files:**
+- Create: `~/quran-data/refdata/mushaf/{v1,v2,v4}/fonts/` (outside git)
+- Modify: `docs/plans/phase-m7a-mushaf-spike.md` (Findings §3)
+
+- [ ] **Step 1: Fetch all 604 pages, per edition, per format**
+
+```
+https://verses.quran.foundation/fonts/quran/hafs/{v1|v2}/woff2/p{1..604}.woff2
+```
+and the `.ttf` equivalents. Rate-limit politely (§11 discipline applies to any host, not
+just corpus.quran.com): ~1 req/s, resumable, skip what is already on disk.
+
+- [ ] **Step 2: Measure**
+
+Per edition, per format: total bytes, per-file min/median/max, and the count actually
+retrieved (a 404 on some page is a finding).
+
+- [ ] **Step 3: Record against the budget**
+
+Findings §3 gets a table: edition × format → total MB, and whether it fits the ~40MB
+budget from ruling 8. Add the layout DB's own contribution and the projected `quran.db`
+growth from Task 2's row counts.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add docs/plans/phase-m7a-mushaf-spike.md
+git commit -m "docs(plans): M7a measured font and layout byte cost per edition"
+```
+
+---
+
+### Task 4: Prove RN Android registers a page font at all
+
+**Files:**
+- Create: `apps/mobile/app/dev-mushaf-spike.tsx` (deleted in Task 8)
+- Modify: `docs/plans/phase-m7a-mushaf-spike.md` (Findings §4)
+
+The highest-risk question in the phase. If this fails, the glyph approach fails and the
+fallback in ruling 9's neighbourhood becomes the phase.
+
+- [ ] **Step 1: Copy a handful of fonts into the app's assets**
+
+Three pages per edition only — enough to prove registration, not the full 604. Put them
+under `apps/mobile/assets/fonts/spike/` and **add that directory to the root `.gitignore`** in the
+same step, so no font is ever staged.
+
+- [ ] **Step 2: Register one lazily and render its glyph string**
+
+In `dev-mushaf-spike.tsx`, use `expo-font`'s runtime `loadAsync` (not the static
+`useFonts` manifest) to register `p2` on demand, then render that page's `code_v2` string
+in `fontFamily: 'QCF2_002'` or whatever name registration returns.
+
+The two things to prove, separately:
+1. runtime `loadAsync` registers a font that was not in the static manifest, and
+2. the glyph string renders as words rather than as tofu boxes.
+
+- [ ] **Step 3: Try WOFF2 and TTF side by side**
+
+Same page, both formats, on screen at once. Ruling 8's budget is comfortable for TTF but
+WOFF2 is a third the size; the answer decides which we bundle. `hafs.18.woff2` already
+ships in this repo, which is weak evidence WOFF2 works — weak because it may be reaching
+RN through a different path. Prove it directly.
+
+- [ ] **Step 4: Test per-word tinting for shaping damage**
+
+Render one line twice: as a single `Text`, and as per-word `Text` children with
+alternating colours. Memory `rn-android-breaks-shaping-across-nested-text` says nesting
+breaks Unicode Arabic. A QCF word is one pre-shaped glyph with no joining to its
+neighbours, so it *should* be immune — confirm rather than assume, because ruling 20's
+three highlight states all depend on per-word tinting.
+
+Also render the Unicode Hafs fallback the same way. That text is live Arabic and is
+expected to break; knowing it breaks tells M7c the fallback must not be tinted.
+
+- [ ] **Step 5: Record**
+
+Findings §4: does runtime registration work, does WOFF2 work, does per-word tinting keep
+shaping in glyph text, does it in fallback text. Yes/no each, with a screenshot each.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add apps/mobile/app/dev-mushaf-spike.tsx .gitignore docs/plans/phase-m7a-mushaf-spike.md
+git commit -m "spike(mobile): prove runtime page-font registration and per-word tinting"
+```
+
+---
+
+### Task 5: Render one real page, three editions
+
+**Files:**
+- Modify: `apps/mobile/app/dev-mushaf-spike.tsx`
+
+- [ ] **Step 1: Render a page from layout rows**
+
+Pick three pages that exercise the range: **page 2** (al-Baqarah's opening, a surah band
+and a bismillah), **page 106** (two surahs on one sheet), and **page 604** (short surahs,
+three surah bands).
+
+Group words by `line_number`, join each line into one `Text`, centre the lines flagged
+`is_centered`, and let the page's own font do the fitting. Do not add letter-spacing, do
+not stretch, do not justify — the whole premise is that the font already fits the line.
+
+- [ ] **Step 2: Draw all three editions of each page**
+
+Nine renders. A picker at the top switches edition; the page fills the screen at the real
+reading size, not scaled down.
+
+- [ ] **Step 3: Confirm lines actually fill the width**
+
+The one thing the spike is really testing visually: do the 15 lines reach both margins
+without ragged ends? If they do not, the per-page font is not being applied and Task 4's
+answer was a false positive.
+
+---
+
+### Task 6: Device session with the owner
+
+**Files:**
+- Modify: `docs/plans/phase-m7a-mushaf-spike.md` (Findings §5)
+
+**Coordinate with the owner before starting.** The phone under `adb` is also this
+session's display.
+
+- [ ] **Step 1: Build and install**
+
+Local APK build per memory `local-apk-build-without-eas` — `taskset -c 0,1` is mandatory,
+arm64 only. Or run through Expo Go if the fonts register there; note which, because Expo
+Go and a real build differ on native font paths.
+
+- [ ] **Step 2: Capture all nine renders**
+
+Three pages × three editions, screenshots at native resolution, plus one photo of the
+phone in hand for true scale.
+
+- [ ] **Step 3: Send them to the owner and get the edition ruling**
+
+The owner picks V1, V2 or V4 from what they can see. Record the choice and, briefly, the
+reason — M7b's column names follow from it (`code_v1` vs `code_v2`).
+
+- [ ] **Step 4: Record the device facts**
+
+Findings §5: which build path was used, whether fonts registered on a real build, how
+long a cold page-font load took, and anything that looked wrong at true scale.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add docs/plans/phase-m7a-mushaf-spike.md
+git commit -m "docs(plans): M7a device renders and the owner's edition ruling"
+```
+
+---
+
+### Task 7: Write the finding
+
+**Files:**
+- Modify: `docs/plans/phase-m7a-mushaf-spike.md` (Findings §6)
+- Modify: `docs/PRD-android-first-mobile-app.md` (§10 renumbering)
+
+- [ ] **Step 1: Answer the four deliverables explicitly**
+
+One short section each: licence, edition, font registration, byte cost. Each ends in a
+decision, not a discussion.
+
+- [ ] **Step 2: State what M7b must build**
+
+Concrete: which edition, which format, which column names, which table shape, what the
+importer reads, what the exit criterion checks. M7b's plan is authored from this section,
+so anything vague here becomes a guess there.
+
+- [ ] **Step 3: State what M7c must build**
+
+Anything the device session changed about the UI assumptions — fallback tinting, load
+latency, band size at true scale.
+
+- [ ] **Step 4: Renumber the PRD**
+
+M7 release hardening → M8, treebank → M9, iOS → M10; new M7 = Paged Mushaf.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add docs/plans/phase-m7a-mushaf-spike.md docs/PRD-android-first-mobile-app.md
+git commit -m "docs: M7a finding, and renumber PRD phases for the mushaf phase"
+```
+
+---
+
+### Task 8: Remove the spike code
+
+**Files:**
+- Delete: `apps/mobile/app/dev-mushaf-spike.tsx`
+- Delete: `apps/mobile/assets/fonts/spike/`
+- Modify: `.gitignore` (repo root — `apps/mobile` has none)
+
+- [ ] **Step 1: Delete the route and the spike fonts**
+
+- [ ] **Step 2: Verify nothing references them**
+
+```bash
+grep -rn "dev-mushaf-spike\|fonts/spike" apps/mobile/src apps/mobile/app
+```
+Expect no matches.
+
+- [ ] **Step 3: Full quality gate**
+
+```bash
+cd apps/mobile && npm run lint && npm run type-check && npm test
+```
+Type-check is red on main with the two known errors from issue #54; anything beyond those
+two is ours.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add -A apps/mobile .gitignore
+git commit -m "chore(mobile): remove the M7a spike route and its fonts"
+```
+
+---
+
+## Acceptance criteria
+
+M7a is done when all of these hold:
+
+- [ ] Findings §1 quotes a licence string (or `NONE STATED`) for the layout and for all
+      three font editions, and states the accepted exposure in one paragraph.
+- [ ] `check_mushaf_layout.py` runs clean against the chosen edition, and its
+      disagreement list against `ayahs.page` is written down and explained.
+- [ ] The validator has been mutation-checked: a corrupted layout row makes it fail.
+- [ ] Findings §3 gives measured MB per edition per format, against the ~40MB budget.
+- [ ] Findings §4 answers yes/no, with a screenshot each: runtime registration, WOFF2,
+      per-word tinting in glyph text, per-word tinting in fallback text.
+- [ ] Nine renders captured on the owner's GM1917 and sent; the owner has named an
+      edition.
+- [ ] PRD §10 renumbered.
+- [ ] No spike code, no font binary and no layout download is in git.
+- [ ] `lint`, `type-check` and `test` pass in `apps/mobile` (modulo issue #54).
+
+Explicitly **not** in M7a: any schema change, any importer, any change to the reader.
+
+---
+
+## Findings
+
+_Filled in as the tasks run. Empty is not a pass._
+
+### §1 Licence
+
+### §2 Layout validation
+
+### §3 Byte cost
+
+### §4 Font registration on RN Android
+
+### §5 Device session
+
+### §6 Decision
