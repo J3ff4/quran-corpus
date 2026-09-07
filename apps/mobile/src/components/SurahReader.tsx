@@ -133,7 +133,15 @@ const SCROLL_RETRY_DELAY_MS = 100;
 // not lay out within three 100ms ticks, so every landing corrected once and
 // revealed in the same tick, and the settle test never ran (owner device,
 // 2026-09-07: 16:90 landed with 200dp of ayah 89 still above it).
-const LANDING_DEADLINE_MS = 2000;
+//
+// Eight seconds because it has to clear a cold start, not a warm one. Measured
+// on the owner's device with the deadline off (2026-09-07, /surah/2?ayah=282):
+// the target row's first layout arrives at t=3697ms cold against t=421ms warm.
+// At 2000ms the deadline fired before any measurement existed, so the reader
+// revealed on the raw model estimate -- 2:282 came up 130dp high, with the tail
+// of 2:281 above it. Nothing waits this long in practice: both modes settle one
+// pass after the first measurement.
+const LANDING_DEADLINE_MS = 8000;
 // React Native's own default, restated so a bare 10 in the JSX does not read as
 // a number someone chose. Nothing overrides it any more: a deep link used to
 // widen the window to initialIndex + 1, because FlatList cannot scroll to a row

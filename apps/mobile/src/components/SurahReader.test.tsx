@@ -422,12 +422,14 @@ describe('SurahReader', () => {
       render(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />);
       expect(screen.queryByTestId('reader-positioning')).not.toBeNull();
 
-      // Past the deadline. Nothing measures here, so the pass cap never
-      // applies -- it counts corrections, and there is nothing to correct
-      // against. The deadline is the only thing that ends a landing whose
-      // target never reports.
+      // Past the deadline -- 8100 tracks LANDING_DEADLINE_MS, which is 8s so
+      // that it clears a cold start's first layout (t=3697ms measured on the
+      // owner's device) rather than cutting the landing short at 2s. Nothing
+      // measures here, so the pass cap never applies -- it counts corrections,
+      // and there is nothing to correct against. The deadline is the only
+      // thing that ends a landing whose target never reports.
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(2100);
+        await vi.advanceTimersByTimeAsync(8100);
       });
 
       expect(screen.queryByTestId('reader-positioning')).toBeNull();
@@ -447,7 +449,7 @@ describe('SurahReader', () => {
         <SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />,
       );
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(2100);
+        await vi.advanceTimersByTimeAsync(8100);
       });
       expect(screen.queryByTestId('reader-positioning')).toBeNull();
 
@@ -563,7 +565,7 @@ describe('SurahReader', () => {
       expect(onReadingAyah).not.toHaveBeenCalled();
 
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(2100);
+        await vi.advanceTimersByTimeAsync(8100);
       });
       act(() => {
         mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[254] }] });
@@ -589,7 +591,7 @@ describe('SurahReader', () => {
       expect(mocks.setReaderPosition).not.toHaveBeenCalled();
 
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(2100);
+        await vi.advanceTimersByTimeAsync(8100);
       });
 
       expect(mocks.setReaderPosition).toHaveBeenCalledWith(1, 255);
@@ -1008,7 +1010,7 @@ describe('SurahReader', () => {
         <SurahReader {...baseProps(data)} readerMode="translation" initialAyahNumber={255} />,
       );
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(2100);
+        await vi.advanceTimersByTimeAsync(8100);
       });
       expect(container.textContent).toContain(translation);
 
@@ -1032,7 +1034,7 @@ describe('SurahReader', () => {
       expect(screen.getByTestId('reader-layer-1').style.opacity).toBe('0');
 
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(3000);
+        await vi.advanceTimersByTimeAsync(8100);
       });
 
       // Still nothing, once it has landed and before the fade is released.
@@ -1090,12 +1092,12 @@ describe('SurahReader', () => {
         <SurahReader {...baseProps(data)} readerMode="translation" initialAyahNumber={255} />,
       );
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(2100);
+        await vi.advanceTimersByTimeAsync(8100);
       });
 
       rerender(<SurahReader {...baseProps(data)} readerMode="mushaf" initialAyahNumber={255} />);
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(3000);
+        await vi.advanceTimersByTimeAsync(8100);
       });
 
       // The landing is done and the spent layer is still here, because the
@@ -1460,7 +1462,7 @@ describe('SurahReader shared reading position', () => {
       // one asked for while the arrival is still in flight cancels it rather
       // than stacking a third rendering (see below).
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(2100);
+        await vi.advanceTimersByTimeAsync(8100);
       });
       const landed = mocks.scrollToIndex.mock.calls.length;
       rerender(<SurahReader {...props} readerMode="translation" />);
