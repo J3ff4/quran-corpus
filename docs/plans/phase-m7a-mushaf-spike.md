@@ -388,6 +388,70 @@ _Filled in as the tasks run. Empty is not a pass._
 
 ### §1 Licence
 
+Fetched 2026-09-07. Every string below is quoted as written; `NONE STATED` is
+a finding, not a gap.
+
+**QUL FAQ — `https://qul.tarteel.ai/faq`** (the only page on the site that
+addresses licensing at all):
+
+> "The resources available on QUL vary in their copyright status. Some are in
+> the public domain, while others may be subject to specific licenses."
+
+> "We recommend reviewing the licensing information provided by each
+> resource's author before use."
+
+> "Yes, you can use QUL data in commercial projects. However, please review
+> the licensing terms for each resource. Some data may have restrictions or
+> require attribution, while others are freely available for commercial use."
+
+**Per-resource pages.** The FAQ defers to the resource author. No resource
+page carries an author licence:
+
+| Resource | URL | Licence string | Redistribution in a binary | Attribution asked |
+|---|---|---|---|---|
+| KFGQPC V1 layout (1405H print) | `/resources/mushaf-layout/15` | NONE STATED | not addressed | none stated |
+| KFGQPC V2 layout (1421H print) | `/resources/mushaf-layout/10` | NONE STATED | not addressed | none stated |
+| KFGQPC V4 layout (1441H print) | `/resources/mushaf-layout/19` | NONE STATED | not addressed | none stated |
+| QPC V1 Font | `/resources/font/238` | NONE STATED | not addressed | none stated |
+| QPC V2 Font | `/resources/font/249` | NONE STATED | not addressed | none stated |
+| QPC V4 Tajweed Font | `/resources/font/240` | NONE STATED | not addressed | none stated |
+
+The mushaf-layout index page lists twelve layouts and shows a licence string
+for none of them. The font index lists twenty-two fonts and shows a licence
+string for none of them.
+
+The V2 font page attributes the artwork without licensing it: the font is
+described as developed by the **King Fahd Complex for the Printing of the Holy
+Quran** from calligraphy by **Usman Taha**. That is the upstream rights
+holder; QUL is a redistributor, not the author.
+
+**"Terms of use"** — every QUL page footers to `https://www.tarteel.ai/terms`.
+That page is a JavaScript shell: it serves a `<title>` of "Terms of Service –
+Tarteel AI Quran Memorization" and **no readable body text** without executing
+scripts. Two independent fetches returned no clause text. So the terms QUL
+points at could not be read, and nothing in them can be quoted here.
+
+**QUL's own code** is separately licensed — `TarteelAI/quranic-universal-library`
+on GitHub — but that covers the Rails application, not the hosted data.
+
+#### Exposure, in one paragraph
+
+We intend to bundle, inside a distributed Android binary, two things we did not
+author: per-page QCF glyph fonts produced by the King Fahd Complex for the
+Printing of the Holy Quran, and page/line layout data describing a KFGQPC
+printed edition. Neither carries any grant of any kind — not a permissive
+licence, not a restrictive one, not a terms-of-use clause we could even read.
+We are shipping under the *absence* of a stated licence, which is not
+permission; the default position is that the rights holder retains everything.
+The realistic consequence is small and specific: KFGQPC has never, to our
+knowledge, pursued a Quran-reading app for using its fonts — dozens of them do,
+including quran.com, which serves these exact files from
+`verses.quran.foundation` — and the realistic worst case is a takedown request
+asking us to stop, which we would honour by falling back to the Unicode
+`text_qpc_hafs` rendering the app can already do. There is no user-data or
+security dimension. Ruling 9 accepted this; this paragraph is what was
+accepted.
+
 ### §2 Layout validation
 
 ### §3 Byte cost
