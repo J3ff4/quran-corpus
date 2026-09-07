@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   /** The landing target's own onLayout. The list mock renders no real
    *  geometry, so this is how a test says where the row actually came out. */
   targetRowLayout: null as ((y: number) => void) | null,
+  autoLayoutY: null as number | null,
   /** Hold the mode cross-fade's completion instead of running it, so a test
    *  can look at the reader mid-switch -- the only moment both renderings are
    *  mounted. Off by default. */
@@ -292,6 +293,13 @@ vi.mock('react-native', async () => {
         const { onLayout } = props;
         if (props.testID === 'reader-target-row') {
           mocks.targetRowLayout = (y: number) => onLayout({ nativeEvent: { layout: { height: 0, y } } });
+          // A row inside the initial render window lays out on the first
+          // paint, before the landing effect runs -- which is the ordering a
+          // shallow target has on device and the one a manual call after
+          // render cannot produce.
+          if (mocks.autoLayoutY !== null) {
+            onLayout({ nativeEvent: { layout: { height: 0, y: mocks.autoLayoutY } } });
+          }
         } else {
           mocks.headerLayout = (height: number) =>
             onLayout({ nativeEvent: { layout: { height, y: 0 } } });
@@ -320,6 +328,7 @@ describe('SurahReader', () => {
     mocks.onScroll = null;
     mocks.headerLayout = null;
     mocks.targetRowLayout = null;
+    mocks.autoLayoutY = null;
     mocks.animatedStyles = [];
     mocks.holdFade = false;
     mocks.heldFades = [];
@@ -455,6 +464,58 @@ describe('SurahReader', () => {
 
       rerender(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={286} />);
 
+      expect(screen.queryByTestId('reader-positioning')).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps a measurement the target row reported before the landing began', async () => {
+    // A row inside the initial render window lays out on the first paint, in
+    // the same commit that runs the landing effect. Clearing the stored offset
+    // there threw that measurement away, and no second layout followed: the
+    // landing had nothing to correct against and ran out the deadline on the
+    // raw model offset. Searching 2:5 from a reader already open on 2:282 put
+    // 2:4 at the top on the owner's device (2026-09-07: 80 attempts, 8033ms,
+    // not one measurement).
+    vi.useFakeTimers();
+    try {
+      mocks.autoLayoutY = 1845;
+      render(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={5} />);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+
+      expect(mocks.scrollToOffset).toHaveBeenCalledWith({ offset: 1845, animated: false });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('ignores a measurement left by the target it has landed away from', async () => {
+    // The stamp is the whole reason the offset can be carried: a different
+    // target's y is not this one's, and correcting to it would land the reader
+    // wherever the last deep link went.
+    vi.useFakeTimers();
+    try {
+      const { rerender } = render(
+        <SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />,
+      );
+      act(() => {
+        mocks.targetRowLayout?.(40000);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+      mocks.scrollToOffset.mockClear();
+
+      rerender(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={5} />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+
+      expect(mocks.scrollToOffset).not.toHaveBeenCalled();
       expect(screen.queryByTestId('reader-positioning')).not.toBeNull();
     } finally {
       vi.useRealTimers();

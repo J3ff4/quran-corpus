@@ -299,7 +299,17 @@ function AyahList({
   // Where the target row actually laid out, and the offset the previous pass
   // corrected to. Refs, not state: they are written during layout, several
   // times per settle, and none of those writes is a render.
-  const targetOffsetRef = useRef<number | null>(null);
+  // Stamped with the row it belongs to. A bare offset had to be cleared on
+  // every re-landing, and clearing it threw away the only measurement a
+  // shallow target ever reports: a row inside the initial render window lays
+  // out on the first paint, in the same commit that runs the landing effect,
+  // so the clear ran after its onLayout and no second layout followed. The
+  // landing then had nothing to correct against and ended on the deadline at
+  // the raw model offset -- searching 2:5 from a reader already open on 2:282
+  // put 2:4 at the top (owner device, 2026-09-07: 80 attempts, 8033ms, not one
+  // measurement). The index is what the clear was really for; carrying it
+  // keeps a measurement that is still about the right row.
+  const targetOffsetRef = useRef<{ index: number; y: number } | null>(null);
   const lastMeasuredRef = useRef<number | null>(null);
   // Called by the target row's onLayout. A ref because renderItem builds the
   // handler fresh on every render, and the landing effect must not re-run for
@@ -409,7 +419,7 @@ function AyahList({
               // onLayout in the modes that measure, and swallowing it there
               // would break its bookkeeping.
               onLayout?.(event);
-              targetOffsetRef.current = event.nativeEvent.layout.y;
+              targetOffsetRef.current = { index, y: event.nativeEvent.layout.y };
               onTargetMeasuredRef.current();
             }}
           />
@@ -448,10 +458,11 @@ function AyahList({
     let cancelled = false;
     const startedAt = Date.now();
     passesRef.current = 0;
-    // Cleared, not carried: a re-landing on an already-mounted reader would
-    // otherwise compare the new target's first measurement against the old
-    // target's last one and call it settled on the spot.
-    targetOffsetRef.current = null;
+    // Only the previous pass's offset is cleared. A measurement stamped with
+    // the target this landing is aiming at is still true, and the reason the
+    // clear existed -- comparing a new target's first measurement against the
+    // old target's last one and calling it settled on the spot -- is handled
+    // by the stamp instead.
     lastMeasuredRef.current = null;
 
     const reveal = () => {
@@ -485,7 +496,8 @@ function AyahList({
 
     const attempt = () => {
       if (cancelled) return;
-      const measured = targetOffsetRef.current;
+      const entry = targetOffsetRef.current;
+      const measured = entry !== null && entry.index === initialIndex ? entry.y : null;
       if (measured === null) {
         // Nothing measured yet. Jump on the model: it does not have to be
         // right, only close enough to bring the target into the render window,
