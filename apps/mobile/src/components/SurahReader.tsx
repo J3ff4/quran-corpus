@@ -563,7 +563,15 @@ function AyahList({
     // repeatedly while the cards around it settle, and correcting to the first
     // of those is correcting to a number that is about to change.
     onTargetMeasuredRef.current = () => {
-      if (!cancelled) schedule();
+      if (cancelled) return;
+      // The deadline is checked here as well as in attempt(), because this is
+      // what postpones attempt(): schedule() clears the pending timer and
+      // starts a fresh 100ms. A row that re-lays out more often than that --
+      // a long settle deep in al-Baqarah, a font swap, a cross-fade under
+      // load -- would push the only deadline check out of reach and hold the
+      // reader behind its spinner with no bound at all.
+      if (Date.now() - startedAt >= LANDING_DEADLINE_MS) return reveal();
+      schedule();
     };
 
     attempt();

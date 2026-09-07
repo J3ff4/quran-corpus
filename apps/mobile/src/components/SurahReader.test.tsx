@@ -541,6 +541,30 @@ describe('SurahReader', () => {
     }
   });
 
+  it('reveals a row that keeps re-laying out faster than the retry tick', async () => {
+    // Every measurement restarts the 100ms timer, so a row that reports more
+    // often than that pushes attempt() -- and with it the deadline check --
+    // permanently out of reach. Without a second check here the reader waits
+    // behind its spinner for as long as the row keeps moving.
+    vi.useFakeTimers();
+    try {
+      render(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />);
+
+      for (let tick = 0; tick < 200; tick += 1) {
+        act(() => {
+          mocks.targetRowLayout?.(40000 + tick);
+        });
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(50);
+        });
+      }
+
+      expect(screen.queryByTestId('reader-positioning')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('drops a measurement whose row has been unmounted since', async () => {
     // The stamp says which row the number is about, not whether it is still
     // true. Once the target's cell is recycled, the rows above it swap model
