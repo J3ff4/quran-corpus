@@ -549,6 +549,51 @@ Script: `$CLAUDE_JOB_DIR/tmp/mutate_check.sh` (throwaway, not committed).
 
 ### §3 Byte cost
 
+Fonts came from `https://verses.quran.foundation/fonts/quran/hafs/{ed}/{fmt}/p{N}.{fmt}`,
+604 pages per edition per format, into `~/quran-data/refdata/mushaf/fonts/`.
+`static-cdn.tarteel.ai/qul/fonts/quran_fonts/...` serves byte-identical files;
+a 15-page sample matched on every one, so the host is not a lever.
+
+**As shipped by the upstream CDN.** "in APK" is the raw size times the deflate
+ratio measured on a 40-file sample, because Android stores `assets/` deflated;
+WOFF2 is already Brotli-compressed, so deflate does nothing to it.
+
+| Edition | Format | Files | Raw | In APK | min / median / max per page |
+|---|---|---|---|---|---|
+| V1 | WOFF2 | 604 | 47.9 MB | **48.0 MB** | 15 / 79 / 93 KB |
+| V1 | TTF | 604 | 94.9 MB | **54.6 MB** | 27 / 155 / 173 KB |
+| V2 | WOFF2 | 604 | 97.7 MB | **97.8 MB** | 40 / 167 / 221 KB |
+| V2 | TTF | 279 of 604 | — | — | projected 206 MB raw from a 15-page sample |
+
+Every one of them busts ruling 8's ~40 MB budget. The V2 TTF download was
+abandoned at 279 files: at ~206 MB raw it is five times the budget, and V2 had
+already lost §2 on validation, so finishing it would have bought nothing.
+
+**Subsetting is the lever, and it is enough.** A page font ships **608 glyphs**
+but a page uses roughly a quarter of them — `glyf` alone is 136 KB of p300's
+159 KB. Subsetting each font to exactly the codepoints its own page's layout
+rows use (fontTools, `--layout-features=* --no-hinting --desubroutinize`),
+measured over the same 15-page sample and projected to 604:
+
+| Edition | Format | Raw after subsetting | In APK |
+|---|---|---|---|
+| V1 | WOFF2 | 33.7 MB | **33.7 MB** |
+| V1 | TTF | 54.4 MB | **37.2 MB** |
+
+**Both V1 options fit the budget after subsetting**, so the phase survives on
+size either way and the WOFF2-vs-TTF question in Task 4 is no longer a budget
+question — it is only about whether RN Android will load a WOFF2 at all.
+
+Note `fontTools` is not currently a dependency of `packages/scraper`. Adding it
+is a §12 question for M7b, not something M7a does.
+
+**Everything else the bundle grows by.** The layout itself is small: the 604
+API responses are 32 MB of JSON, but almost all of that is translation,
+transliteration and audio fields we discard. The rows we keep are one per word
+— 83,665 rows of (page, line, surah, ayah, position, glyph) — which is roughly
+the size of a single existing table in `quran.db` and negligible beside its
+current 140 MB.
+
 ### §4 Font registration on RN Android
 
 ### §5 Device session
