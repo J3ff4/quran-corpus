@@ -650,8 +650,41 @@ each result. "Implementation complete, verification pending" is a fail.
 | 189 | Deep-link into the surah already on screen | Re-lands without remounting |
 | 190 | Turn to the previous/next surah with the chevrons | Still lands at ayah 1 |
 
-**Verification log:** _(unfilled — fill on the device run, with the date and the
-device, or this phase is not done)_
+**Verification log**
+
+Run 2026-09-07, owner's OnePlus GM1917 (Android 12, 360x780dp), Expo Go dev
+bundle, branch `feat/m6l-row-estimation`. Arabic size was already **Extra
+large**, so every landing below is 182's config.
+
+| # | Result | Note |
+|---|--------|------|
+| 181 | PASS | Opened from the 2:282 bookmark; card top flush with the plate, first try |
+| 182 | PASS | Covered by every run — the device sat at Extra large throughout |
+| 183 | PASS | Mushaf -> Translation on 2:282 landed on 282, medallion flush at the top |
+| 184 | PASS | `/surah/18` cold: surah plate first, ayah 1 under it, no jump |
+| 185 | PASS | 16:90 from search |
+| 186 | **FAIL** | Not a landing defect — the durable position never advances. Issue #59 |
+| 187 | PARTIAL | Four swipes through 2:282: consistent line heights, nothing clipped or overlapping. Stutter is a motion judgement a screenshot cannot make — owed to the owner's eyes |
+| 188 | PASS | Same bookmark open with Reduce animations on; same landing |
+| 189 | PASS | After two fixes (below). Search 2:5 from a reader open on 2:282 |
+| 190 | PASS | Chevron to Aal-Imran lands at ayah 1. Header title blanks — issue #58, separate chrome |
+
+**Two defects the 864 green unit tests passed over, both found here, both in
+Task 3's own code, both fixed and mutation-checked:**
+
+1. `LANDING_DEADLINE_MS` at 2000 fired before the target's first layout ever
+   arrived on a cold start (measured t=3697ms cold against t=421ms warm), so
+   the reader revealed on the raw model estimate — 2:282 came up 130dp high.
+   Now 8000. `3a9e42b`.
+2. The landing cleared the stored offset on every run, which threw away the
+   only measurement a shallow target ever reports: a row inside the initial
+   render window lays out on the first paint, in the same commit as the effect,
+   and nothing moves it again. Searching 2:5 from a reader open on 2:282 put
+   2:4 at the top — 80 attempts over 8033ms, not one measurement. The offset
+   now carries the index it was measured for. `719de2e`.
+
+Both were invisible warm and invisible to jsdom, which is exactly what §10
+says this gate is for.
 
 ---
 
