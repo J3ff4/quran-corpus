@@ -59,7 +59,10 @@ instead.
 
 2451 measured rows. Every ayah of surah 73 and all 286 of Al-Baqara, in both
 modes, at all four Arabic sizes (22/28/35/42). Captured by driving the device
-over adb; `dump.txt` beside this file is the raw log.
+over adb. The raw log is not versioned (CLAUDE.md 9): it lives at
+`~/quran-data/refdata/m6l-row-height-dump.txt` on the build host, 1.08MB of
+RHSPIKE lines. `src/components/rowHeightFixture.ts` is the derived artifact
+and is what the tests read.
 
 ### 1. No closed-form model lands `scrollToIndex` exactly
 

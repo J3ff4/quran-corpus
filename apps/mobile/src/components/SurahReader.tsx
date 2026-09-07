@@ -100,10 +100,10 @@ interface SurahReaderProps {
 }
 
 // Ayah cards are variable height (Arabic runs wrap differently per ayah), so
-// there is no getItemLayout to give FlatList and scrollToIndex fails for any
-// row it has not measured yet. Two halves make a deep-link landing exact
-// instead of approximate: initialNumToRender is widened to cover the target,
-// so the row is rendered and therefore measurable on the first commit; and the
+// FlatList cannot scroll to a row it has not measured without being told where
+// the rows are. Two halves make a deep-link landing exact instead of
+// approximate: getItemLayout hands it a fitted model of every row's height, so
+// the target can be jumped to without laying out the ones above it; and the
 // list stays hidden until the scroll lands, so no attempt is ever seen as
 // motion.
 //
@@ -256,9 +256,9 @@ interface AyahListProps {
  * Its own component so the reader can mount two of them. A mode switch used to
  * change the element type at this position -- MushafPlate in one mode, Fragment
  * in the other -- which unmounted the FlatList and re-ran the landing behind a
- * spinner on a blank screen, for up to MAX_SCROLL_ATTEMPTS * SCROLL_RETRY_DELAY_MS.
- * Deep in a long surah that is two and a half seconds of nothing (owner report,
- * 2026-09-01). Keeping one list mounted would not have fixed it: a mushaf ayah
+ * spinner on a blank screen, for the whole length of the retry loop it then
+ * had. Deep in a long surah that is two and a half seconds of nothing (owner
+ * report, 2026-09-01). Keeping one list mounted would not have fixed it: a mushaf ayah
  * and a translation card are nothing like the same height, so the preserved
  * pixel offset points at a different ayah and the landing has to run anyway.
  *
