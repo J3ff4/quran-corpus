@@ -330,6 +330,11 @@ function AyahList({
     setListWidth(event.nativeEvent.layout.width);
   }, []);
 
+  // The list header's height, in the same units the offset table is built in.
+  // Kept as state as well as the shared value the title fade reads, because the
+  // table is a useMemo and a shared value's write does not re-run one.
+  const [headerOffset, setHeaderOffset] = useState(0);
+
   // Cumulative, not per-row: scrollToIndex sums every preceding row, so the
   // table is what FlatList actually reads. Rebuilt only when something it
   // depends on changes -- a getItemLayout returning different offsets for the
@@ -337,7 +342,19 @@ function AyahList({
   const layout = useMemo(() => {
     const lengths = new Array<number>(data.ayahs.length);
     const offsets = new Array<number>(data.ayahs.length);
-    let running = 0;
+    // Started at the header's height, not at zero. VirtualizedList mixes the
+    // two sources of cell geometry in one coordinate space: a cell it has
+    // already laid out is read back at its real y, which is measured inside the
+    // content container and so counts the header, and every other cell is read
+    // straight off this table (ListMetricsAggregator.getCellMetrics -- the
+    // measured frame wins, getItemLayout is the fallback). A table that starts
+    // at zero therefore disagrees with every measured frame by exactly the
+    // header, and the model jump lands that far short. The header here is the
+    // SurahPlate block, which is hundreds of dp -- measured at 356 on the
+    // owner's device -- so this is not a rounding error: it is the "2:282 came
+    // up 130dp high" class of miss, arriving before the correction pass can see
+    // it.
+    let running = headerOffset;
     for (let index = 0; index < data.ayahs.length; index += 1) {
       const item = data.ayahs[index];
       // noUncheckedIndexedAccess is on: the index came from this loop, but the
@@ -355,7 +372,7 @@ function AyahList({
       running += height;
     }
     return { lengths, offsets };
-  }, [data.ayahs, mode, arabicSizes.reader, listWidth]);
+  }, [data.ayahs, mode, arabicSizes.reader, listWidth, headerOffset]);
 
   const getItemLayout = useCallback(
     (_: unknown, index: number) => ({
@@ -634,6 +651,7 @@ function AyahList({
           <View
             onLayout={(event: LayoutChangeEvent) => {
               headerHeight.value = event.nativeEvent.layout.height;
+              setHeaderOffset(event.nativeEvent.layout.height);
             }}
             style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16 }}
           >

@@ -386,6 +386,25 @@ describe('SurahReader', () => {
     expect(second.offset).toBe(first.length);
   });
 
+  it('counts the list header in every offset it hands FlatList', () => {
+    // VirtualizedList reads a cell it has already laid out at its real y --
+    // measured in the content container, so counting the header -- and reads
+    // every other cell off this table. The two have to be the same coordinate
+    // space or the model jump lands a whole SurahPlate short.
+    const props = baseProps(readerData(10));
+    render(<SurahReader {...props} />);
+
+    const before = mocks.getItemLayout!(props.data.ayahs, 2).offset;
+    act(() => {
+      mocks.headerLayout!(356);
+    });
+    const after = mocks.getItemLayout!(props.data.ayahs, 2).offset;
+
+    expect(after).toBe(before + 356);
+    // Index 0 too: the first ayah sits below the header like every other one.
+    expect(mocks.getItemLayout!(props.data.ayahs, 0).offset).toBe(356);
+  });
+
   it('stops widening initialNumToRender to cover a deep target', () => {
     // The old landing needed the target rendered on the first commit to be
     // measurable. getItemLayout removes that, and with it the cost of laying
