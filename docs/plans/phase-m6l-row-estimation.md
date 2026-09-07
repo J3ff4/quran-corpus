@@ -686,6 +686,31 @@ Task 3's own code, both fixed and mutation-checked:**
 Both were invisible warm and invisible to jsdom, which is exactly what §10
 says this gate is for.
 
+**Re-run 2026-09-07 (second pass), after the `/code-review` fixes**
+
+`fadbafd` moves where every model jump lands, so the whole checklist was run
+again on the same device and bundle. Arabic size still **Extra large**.
+
+| # | Result | Note |
+|---|--------|------|
+| 181 | PASS | 2:282 bookmark: spinner at 1s, card flush under the pill by 5s. No visible scrolling — the list stays hidden until the reveal, so there is no motion to see |
+| 182 | PASS | Settings confirmed Extra large; every row below is that config |
+| 183 | PASS | Translation -> Mushaf on 2:282 stayed on 282. No blank, no flash |
+| 184 | PASS | Al-Maidah cold, no ayah param: plate, Bismillah, ayah 1. No jump |
+| 185 | PASS | 16:90 from the home search: An-Nahl 16:90 flush at the top |
+| 186 | **FAIL** | Reproduced and narrowed. Landing on 2:282, then force-stop + cold launch, still reads "Al-Isra 17:1" — the landing writes only the in-memory singleton, and the durable write rides the scroll handler, which no landing ever fires. Issue #59, still not a landing defect |
+| 187 | PASS | Upgraded from PARTIAL and now measured, not eyeballed: `dumpsys gfxinfo framestats`, 3 bursts of 5 swipes, 120 frames each. Gap p50 11.1ms (90Hz panel), p99 22.3ms, max 22.3ms, **zero gaps over 33ms**. One dropped frame twice in 360. No UI-thread stall |
+| 188 | PASS | Reduce animations on, same bookmark, same landing |
+| 189 | PASS | In-reader search 16:5 from a reader open on 16:90, then back to 16:90. Both re-landed exactly, header held, no remount |
+| 190 | PASS | Chevron from An-Nahl to Al-Isra lands at ayah 1. Header title still blanks — issue #58 |
+
+9 pass / 1 fail, the fail being #59 and outside this phase. The cold 2:282
+landing was exercised twice from a force-stopped app, which is the case
+`LANDING_DEADLINE_MS` exists for.
+
+Device left as found: Reduce animations off, Arabic size Extra large, all
+three bookmarks intact.
+
 ---
 
 ## Risks and rollback
