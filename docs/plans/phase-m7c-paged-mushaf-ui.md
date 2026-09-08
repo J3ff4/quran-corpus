@@ -150,7 +150,7 @@ Two inputs cannot be derived from one page's own rows, and both are closed sets 
 - **`PAGES_WITH_HEADER_ON_PREVIOUS_PAGE`** — this page's single gap is a bismillah, because the band is on the previous page.
 - **`TRAILING_BAND_SURAH`** — this page's line 15 carries the NEXT page's band, and names which surah. Without it a page ending early stops at its last word line and the band is never drawn at all.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -225,12 +225,12 @@ describe('composePage', () => {
 });
 ```
 
-- [ ] **Step 2: Run them and watch every one fail**
+- [x] **Step 2: Run them and watch every one fail**
 
 Run: `cd apps/mobile && npx vitest run src/mushaf/pageComposition.test.ts`
 Expected: FAIL, "Failed to resolve import ./pageComposition".
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```ts
 import type { MushafLine, MushafWord } from '@quran-corpus/data/mobile';
@@ -338,12 +338,12 @@ export function composePage(page: number, lines: MushafLine[]): PageSlot[] {
 }
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `npx vitest run src/mushaf/pageComposition.test.ts`
 Expected: PASS, 7 tests.
 
-- [ ] **Step 5: Assert the rule against the REAL layout, not just fixtures**
+- [x] **Step 5: Assert the rule against the REAL layout, not just fixtures**
 
 A fixture test proves the function does what the fixture says. It cannot prove the fixture matches 604 real pages. Write a script and run it once; paste its output into the plan's verification log.
 
@@ -384,11 +384,11 @@ Then run `composePage` itself over all 604 pages and check the three totals it m
 
 The first draft of this very function scored 114/**18**/18 — it measured the gap from the current line instead of from the start of the run, so the second line of every two-line gap looked like a one-line gap and drew a second band instead of the bismillah. The unit tests above all passed. **Run the totals.**
 
-- [ ] **Step 6: Mutation-check the header/bismillah swap**
+- [x] **Step 6: Mutation-check the header/bismillah swap**
 
 Flip `PAGES_WITH_HEADER_ON_PREVIOUS_PAGE.has(page)` to `false` and re-run. The "band is on the previous page" test MUST fail. Restore by re-editing — **never `git checkout` a mutation edit.**
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add apps/mobile/src/mushaf/pageComposition.ts apps/mobile/src/mushaf/pageComposition.test.ts
@@ -1574,3 +1574,12 @@ Explicitly **not** in M7c: shrinking the APK under Play's ceiling (M8), the fina
 ## Verification log
 
 _Written during Task 13. Empty until the device run happens — "implementation complete, verification pending" is an unmet exit criterion (§10)._
+
+### 2026-09-08 — Task 1: page composition
+
+- Unit tests: 7 passed (`src/mushaf/pageComposition.test.ts`).
+- Real-corpus gap rule (Step 5, script 1): `interior/leading gap slots with no following surah start: 0 []`.
+- `composePage` over all 604 real pages: **114 bands / 114 distinct surahs headed / 112 bismillahs / 18 line-15 trailing bands** — the three totals the plan requires.
+- Mutation-check: forcing `PAGES_WITH_HEADER_ON_PREVIOUS_PAGE.has(page)` false fails exactly the "band is on the previous page" test; restored by re-editing.
+- eslint clean; `npm run type-check` red only on issue #54's two pre-existing errors.
+- Commit `516552c`.
