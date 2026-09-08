@@ -6,7 +6,7 @@ import {
 import { deferred } from '../testing/deferred';
 
 /** A scrolled position, which carries no page. */
-const at = (ayahNumber: number): RecordedReadingPosition => ({ ayahNumber, page: null });
+const at = (ayahNumber: number): RecordedReadingPosition => ({ surahId: 1, ayahNumber, page: null });
 
 describe('createLatestReadingPositionRecorder', () => {
   it('serializes overlapping writes so the newest queued ayah is persisted last', async () => {
@@ -70,14 +70,34 @@ describe('createLatestReadingPositionRecorder', () => {
     const persist = vi.fn(async () => undefined);
     const recorder = createLatestReadingPositionRecorder(persist, vi.fn());
 
-    recorder.record({ ayahNumber: 1, page: 106 });
+    recorder.record({ surahId: 1, ayahNumber: 1, page: 106 });
     // Awaited: the skip compares against the last *persisted* position, so a
     // second record before the first write lands is queued regardless and
     // proves nothing about the comparison.
     await vi.waitFor(() => expect(persist).toHaveBeenCalledTimes(1));
 
-    recorder.record({ ayahNumber: 1, page: 107 });
+    recorder.record({ surahId: 1, ayahNumber: 1, page: 107 });
 
-    await vi.waitFor(() => expect(persist).toHaveBeenCalledWith({ ayahNumber: 1, page: 107 }));
+    await vi.waitFor(() =>
+      expect(persist).toHaveBeenCalledWith({ surahId: 1, ayahNumber: 1, page: 107 }),
+    );
+  });
+
+  it('records a page turn that crosses into the next surah at its ayah 1', async () => {
+    // 51 pages hold more than one surah. Page 108 opens 2:1 where page 107
+    // opened 1:5 -- same ayah number would not collide here, but a page whose
+    // first ayah is 1 following a surah that ended on ayah 1 does, and the
+    // stored surah would then stay a page behind.
+    const persist = vi.fn(async () => undefined);
+    const recorder = createLatestReadingPositionRecorder(persist, vi.fn());
+
+    recorder.record({ surahId: 1, ayahNumber: 1, page: 106 });
+    await vi.waitFor(() => expect(persist).toHaveBeenCalledTimes(1));
+
+    recorder.record({ surahId: 2, ayahNumber: 1, page: 106 });
+
+    await vi.waitFor(() =>
+      expect(persist).toHaveBeenCalledWith({ surahId: 2, ayahNumber: 1, page: 106 }),
+    );
   });
 });

@@ -13,7 +13,7 @@ vi.mock('@/mushaf/pageFont', () => ({
   mushafFontFamily: (page: number) => `QCF2${String(page).padStart(3, '0')}`,
 }));
 
-import { listPropsOf } from '@/testing/rnHosts';
+import { listPropsOf, listScrollsOf } from '@/testing/rnHosts';
 
 import { MushafPager } from './MushafPager';
 
@@ -113,6 +113,41 @@ describe('MushafPager', () => {
     expect(list.windowSize).toBe(3);
     expect(list.maxToRenderPerBatch).toBe(1);
     expect(list.removeClippedSubviews).toBe(true);
+  });
+
+  it('turns to the page the recitation has moved onto', () => {
+    // Ruling 19. Without this the audio tint moves onto a page the reader is
+    // not looking at, and the mushaf silently stops following the recitation.
+    const result = render(<MushafPager {...props} focusPage={null} />);
+    expect(listScrollsOf(result)).toEqual([]);
+
+    result.rerender(<MushafPager {...props} focusPage={108} />);
+    expect(listScrollsOf(result)).toEqual([{ index: 107, animated: true }]);
+  });
+
+  it('does not turn to the page it is already on', () => {
+    // The recitation crossing ayahs within one page reports the same page
+    // every time; scrolling on each would fight a reader mid-swipe.
+    const result = render(<MushafPager {...props} focusPage={106} />);
+    expect(listScrollsOf(result)).toEqual([]);
+  });
+
+  it('ignores a focus page outside the mushaf', () => {
+    // 605 reaches scrollToIndex as index 604, which throws inside the list
+    // rather than doing nothing.
+    const result = render(<MushafPager {...props} focusPage={605} />);
+    expect(listScrollsOf(result)).toEqual([]);
+  });
+
+  it('reports the page an auto-turn settles on', () => {
+    // The turn was not the reader's, but the page they are now on is still
+    // the page the reading position has to remember (ruling 15).
+    const onPageChange = vi.fn();
+    const result = render(
+      <MushafPager {...props} focusPage={108} onPageChange={onPageChange} />,
+    );
+    listPropsOf(result).onMomentumScrollEnd?.(settleAt(108));
+    expect(onPageChange).toHaveBeenCalledWith(108);
   });
 
   it('draws a page per item, keyed by its page number', () => {

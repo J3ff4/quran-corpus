@@ -51,8 +51,9 @@ export function AyahCard({
     <GlassSurface style={{ marginHorizontal: 16, marginBottom: 11, padding: 20, gap: 14 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <AyahMedallion n={ayahNumber} uiLocale={uiLocale} />
-        {/* Shared with MushafAyah, which is the point: the two renderers
-            differ in what you SEE, never in what you can DO. */}
+        {/* Shared with the scroll mushaf's row until M7c replaced it with a
+            pager; the printed page carries no controls at all (ruling 4), so
+            these are the only ayah actions in the reader now. */}
         <AyahControls
           surahId={surahId}
           ayahNumber={ayahNumber}

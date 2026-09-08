@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { FlatList } from 'react-native';
 import {
   MUSHAF_PAGE_MAX,
@@ -33,10 +33,17 @@ export interface MushafPagerProps {
   /** Fired once per settled page turn -- this is the write point for the
    *  durable reading position. */
   onPageChange: (page: number) => void;
+  /** A page the reader has to be shown without having swiped to it: the one
+   *  carrying the ayah being recited (ruling 19). Null leaves the pager alone.
+   *  The turn it causes still settles, so the page it lands on is reported
+   *  through onPageChange like any other. */
+  focusPage?: number | null;
   onWordPress: (word: MushafWord) => void;
 }
 
-type PageProps = Omit<MushafPagerProps, 'initialPage' | 'onPageChange'> & { page: number };
+type PageProps = Omit<MushafPagerProps, 'initialPage' | 'onPageChange' | 'focusPage'> & {
+  page: number;
+};
 
 /** One page in the pager, holding its own query.
  *
@@ -62,8 +69,14 @@ function PagerPage({ client, page, juzByPage, ...rest }: PageProps) {
  * swipe to land on a rendered page, and more is memory spent on pages nobody
  * is about to see.
  */
-export function MushafPager({ initialPage, onPageChange, ...page }: MushafPagerProps) {
+export function MushafPager({
+  initialPage,
+  onPageChange,
+  focusPage = null,
+  ...page
+}: MushafPagerProps) {
   const { width } = page;
+  const listRef = useRef<FlatList<number> | null>(null);
   // The page the reader is on, as far as the caller has been told. A settle
   // event fires at the end of every paging scroll, including one that ended
   // where it started (a short drag that snapped back), and the caller writes
@@ -80,8 +93,21 @@ export function MushafPager({ initialPage, onPageChange, ...page }: MushafPagerP
     [width, onPageChange],
   );
 
+  useEffect(() => {
+    // Nothing to do when the reciter is already on this page -- and a scroll
+    // to the page under the reader's finger would fight the swipe.
+    if (focusPage === null || focusPage === settled.current) return;
+    if (!Number.isInteger(focusPage) || focusPage < MUSHAF_PAGE_MIN || focusPage > MUSHAF_PAGE_MAX) return;
+    // settled is deliberately NOT written here: this scroll ends in a settle
+    // event like any other, and that is what reports the turn to the caller.
+    // Writing it would turn an auto-turn into a page the reading position
+    // never records.
+    listRef.current?.scrollToIndex({ index: focusPage - 1, animated: true });
+  }, [focusPage]);
+
   return (
     <FlatList
+      ref={listRef}
       testID="mushaf-pager"
       data={PAGES}
       keyExtractor={(item) => String(item)}

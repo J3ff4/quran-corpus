@@ -346,6 +346,15 @@ export function host(tag: string) {
  */
 const listProps = new WeakMap<object, ListHostProps>();
 
+/** One imperative scroll a component asked its list for. */
+export interface ScrollCall {
+  index?: number;
+  offset?: number;
+  animated?: boolean;
+}
+
+const listScrolls = new WeakMap<object, ScrollCall[]>();
+
 interface ListHostProps {
   data?: readonly unknown[];
   renderItem: (info: { item: unknown; index: number }) => React.ReactNode;
@@ -381,6 +390,18 @@ export function listPropsOf(result: {
   return props;
 }
 
+/** The imperative scrolls the component asked its list for, oldest first.
+ *  Same contract as listPropsOf: exactly one list in the render. */
+export function listScrollsOf(result: {
+  container: { querySelectorAll(selector: string): ArrayLike<object> };
+}): ScrollCall[] {
+  const nodes = result.container.querySelectorAll('[data-rn-list]');
+  if (nodes.length !== 1) {
+    throw new Error(`listScrollsOf: expected exactly one list in the render, found ${nodes.length}`);
+  }
+  return listScrolls.get(nodes[0]!) ?? [];
+}
+
 /** FlatList and SectionList, rendered eagerly and in full.
  *
  *  The real ones virtualize, which in jsdom means measuring a viewport that has
@@ -397,13 +418,27 @@ export function listPropsOf(result: {
  */
 export function FlatList(props: ListHostProps) {
   const { data, renderItem, keyExtractor, testID } = props;
+  // The imperative half of a list, kept for the same reason the prop bag is:
+  // a component that jumps the list -- the mushaf pager turning to the ayah
+  // being recited -- does it through the ref, and a mock that swallows the ref
+  // makes every assertion about that jump pass whether or not it happens.
+  const calls = React.useRef<ScrollCall[]>([]).current;
+  const handle = React.useRef({
+    scrollToIndex: (params: ScrollCall) => calls.push(params),
+    scrollToOffset: (params: ScrollCall) => calls.push(params),
+  }).current;
+  React.useImperativeHandle(props['ref'] as React.Ref<unknown>, () => handle);
+
   return React.createElement(
     'div',
     {
       'data-testid': testID,
       'data-rn-list': '',
       ref: (node: object | null) => {
-        if (node) listProps.set(node, props);
+        if (node) {
+          listProps.set(node, props);
+          listScrolls.set(node, calls);
+        }
       },
     },
     (data ?? []).map((item, index) =>

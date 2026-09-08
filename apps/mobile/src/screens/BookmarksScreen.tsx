@@ -727,7 +727,7 @@ function BookmarkRow({
                   justifyContent: 'center',
                 }}
               >
-                {/* Same pair the reader uses (AyahCard, MushafAyah): filled in the
+                {/* Same pair the reader's cards use (AyahCard): filled in the
                     accent for a note that exists, outline in muted for one still to
                     be written. */}
                 <Icon
