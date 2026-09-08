@@ -7,7 +7,20 @@ import type * as ExpoSQLite from 'expo-sqlite';
 // No constant for the asset name: Metro needs a string literal inside
 // require(), so the one below is the only place it can live and a second copy
 // here would only drift.
-export const corpusDbFileName = 'quran-corpus-m1.db';
+//
+// The version suffix is load-bearing. The extract below skips a file that
+// already exists, so before this was versioned a rebuilt corpus never reached
+// a device that had already run the app once: M7b's new `mushaf_layout` table
+// and re-paged `ayahs.page` were bundled correctly and the installed app still
+// answered `no such table: mushaf_layout` (measured on device, 2026-09-08).
+// **Bump this whenever the bundled DB's contents change.** Older extracts are
+// deleted on the next launch, so the phone never carries two 134 MB copies.
+export const corpusDbVersion = 'm7b';
+export const corpusDbFileName = `quran-corpus-${corpusDbVersion}.db`;
+
+/** Matches this app's own extracts, any version -- and nothing else in the
+ *  SQLite directory, which also holds the user DB that must never be touched. */
+const corpusDbPattern = /^quran-corpus-[a-z0-9]+\.db(\.partial)?$/;
 
 // The extraction below copies ~134 MB while the user stares at a fresh install,
 // so it is the slowest thing the app ever does. Callers hold the splash screen
@@ -22,6 +35,7 @@ export interface CorpusDbFileSystem {
   makeDirectoryAsync(uri: string, options: { intermediates: boolean }): Promise<void>;
   getInfoAsync(uri: string): Promise<{ exists: boolean }>;
   deleteAsync(uri: string, options: { idempotent: boolean }): Promise<void>;
+  readDirectoryAsync(uri: string): Promise<string[]>;
   copyAsync(options: { from: string; to: string }): Promise<void>;
   moveAsync(options: { from: string; to: string }): Promise<void>;
 }
@@ -41,6 +55,16 @@ export async function ensureCorpusDbFile(
   await fileSystem.makeDirectoryAsync(sqliteDir, { intermediates: true });
   const info = await fileSystem.getInfoAsync(targetPath);
   if (info.exists) return targetPath;
+
+  // A previous version's extract is dead weight the moment this one lands --
+  // 134 MB of it -- and deleting it before the copy also means a phone low on
+  // space is not asked to hold both at once. Only this app's own corpus files
+  // match; the user DB lives in the same directory and is never touched.
+  for (const entry of await fileSystem.readDirectoryAsync(sqliteDir)) {
+    if (corpusDbPattern.test(entry) && entry !== corpusDbFileName) {
+      await fileSystem.deleteAsync(`${sqliteDir}/${entry}`, { idempotent: true });
+    }
+  }
 
   // Copy to a scratch name and rename only once the copy has returned. A
   // half-written file is byte-for-byte indistinguishable from a complete one,

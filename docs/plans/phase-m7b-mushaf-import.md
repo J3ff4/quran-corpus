@@ -1630,10 +1630,10 @@ Machine run, owner not present. Everything below is measured, not asserted.
 | 4 | `getMushafPage` orders lines and rejects out-of-range pages | **PASS** — 8 tests |
 | 5 | Both traps mutation-checked | **PASS** for the file-index trap, the override and the backwards-marker check; the `ORDER BY` mutation does **not** bite (see Task 5's commit) |
 | 6 | `mushaf-fonts` reproduces 604 subset fonts, none in git | **PASS** — 198.2 MB raw -> 180.9 MB subset, 604 files, path gitignored |
-| 7 | Real APK: page renders in glyphs, pixels differ from not-loaded | **OWED** — needs the owner and the phone |
-| 8 | Page 589 renders 84:21's medallion on line 14 | **PASS in the data**, pixels owed — marker now line 14 seq 5, immediately after its last word at line 14 seq 4; **0** backwards markers remain corpus-wide |
-| 9 | Ordinary Arabic renders in KFGQPC, not the system face | **OWED** — Task 1 is the fix; only a pixel comparison can prove it |
-| 10 | Verification log | this section |
+| 7 | Real APK: page renders in glyphs, pixels differ from not-loaded | **PASS** — see the device run below |
+| 8 | Page 589 renders 84:21's medallion on line 14 | **PASS** — in the data and on screen |
+| 9 | Ordinary Arabic renders in KFGQPC, not the system face | **PASS** — compared against the previous WOFF2 build |
+| 10 | Verification log | this section, plus the device run below |
 | 11 | `/code-review` run and answered | **OWED** — user-triggered (§5) |
 
 **The 18-vs-56 correction.** The plan said 18 ayahs would move and to stop if any
@@ -1679,3 +1679,77 @@ errors.
 
 **Backup.** `/home/claude/quran-data/quran.db.bak-phase-m7b` (139,923,456 bytes,
 pre-import).
+
+### 2026-09-08 — device run, OnePlus GM1917, release APK
+
+Real APK, not Expo Go: `assembleRelease`, arm64-v8a only, debug-signed,
+`taskset -c 7,8` (the allowed CPU set moved from 0-3 to **7-10** since the
+`local-apk-build-without-eas` note was written; `-c 0,1` now fails outright with
+`taskset: failed to set affinity: Invalid argument` and the build dies in
+seconds). **APK 211.3 MB**, up from 82.7 MB — +128.6 MB of page fonts, close to
+M7a's 203 MB projection and **over the 200 MB Play base-module ceiling**. Full
+build 2m15s; incremental JS-only rebuilds 1m8s.
+
+Verification used a throwaway route, `app/dev-mushaf-check.tsx`, deleted again
+before this commit and confirmed gone from the installed build (`Unmatched
+Route`). M7b ships no mushaf UI, so without a harness nothing imports
+`pageFont.ts`, Metro bundles none of the 604 fonts, and none of these checks can
+run at all.
+
+| Check | Result |
+|---|---|
+| 1. A page renders in QCF glyphs from a real APK | **PASS** — page 46 in true Uthmani letterforms, 15 lines, the ۲۷۳ medallion in place |
+| 2. Its pixels differ from the same text unloaded | **PASS** — same page, same rows, no font: unrelated two-letter clusters in the system face |
+| 3. A subset page matches its unsubset original | **PASS** — p46 subset vs the upstream original at the same size: identical, glyph for glyph |
+| 4. Page 589 shows 84:21's medallion after its own words | **PASS** — `يَسْجُدُونَ۩ ۲۱` on line 14, nothing stray on line 13 |
+| 5. Ordinary Arabic renders in KFGQPC | **PASS** — against the previous WOFF2 build as control |
+
+**Check 2 is the one that matters.** With no font loaded the page still renders
+as *fluent-looking Arabic* — `لخ لم لى لي مج مح مخ مم` — because the QCF
+codepoints land in the system Arabic face. A screenshot of that is
+indistinguishable from success to anyone not reading it. This is M7a §4's
+finding reproduced from a release build.
+
+**Check 5 control.** The previous release APK (`app-m6k`, WOFF2) was installed,
+the same surah captured, then the new APK restored. The bismillah is plainly a
+different typeface in each, and the surah card is ~55 px shorter in the old one
+because the fallback face's metrics differ. The WOFF2 never applied, exactly as
+Task 1 said.
+
+#### A defect this run found, and its fix
+
+The first APK rendered nothing: `no such table: mushaf_layout`. The bundled DB
+was correct; `ensureCorpusDbFile` returned early on any existing file, so **a
+rebuilt corpus never reached a device that had already run the app** — not this
+table, not the re-paged `ayahs.page`, and not any future corpus change either.
+Fixed by versioning the extract filename (`corpusDbVersion`, now `m7b`) and
+deleting older extracts on the next launch so the phone never holds two 134 MB
+copies. Four tests cover it, and reverting the cleanup fails one; the user DB
+shares that directory and is explicitly never touched. **Bump `corpusDbVersion`
+whenever the bundled DB's contents change.**
+
+#### Two findings M7c owns
+
+**Rendering is size-dependent, and the harness's fixed 26 px is not a renderer.**
+Page 106 at 26 px looks thin and wrong and at 44 px is flawless; page 46 is the
+reverse — clean at 26 px, dropping glyph pieces at 44 px. Subsetting is not the
+variable: at 44 px the subset and the unsubset original drop *identically*.
+These are whole-word outlines, far larger than normal glyphs, and there is a
+per-page size band outside which Android drops them. M7a already requires a
+per-page scale factor; this says that scale also has an upper bound that must be
+checked on device per page, not derived from metrics alone.
+
+**The layout has no rows for surah headers or bismillah lines.** 54 of the 604
+pages have interior gaps in their line numbers, and every gap is exactly one
+pair of lines per surah that starts on that page: p106 lacks 6-7 (surah 5),
+p589 lacks 3-4 (surah 84), p604 lacks 1-2, 5-6 and 10-11 (surahs 112, 113, 114).
+`by_page` returns verse words, and a header band and a bismillah contain none.
+This is not a gap in the import — it is precisely the chrome M7a §6 assigns to
+M7c, and M7c must draw those lines rather than assume 1..15 are all present.
+
+#### Notes
+
+- The phone still carries a stale `quran-corpus-m1.db` (134 MB) from installing
+  the old APK as a control. The next `corpusDbVersion` bump deletes it.
+- fontTools also drops an `FFTM` table when subsetting (`don't know how to
+  subset`) — a FontForge timestamp, not a rendering table.
