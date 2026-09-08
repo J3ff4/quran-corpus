@@ -8,7 +8,14 @@ vi.mock('./fontManifest.generated', () => ({
   MUSHAF_FONT_ASSETS: { 1: 101, 2: 102, 604: 1604 },
 }));
 
-import { loadMushafPageFont, mushafFontFamily, resetLoadedFontsForTest } from './pageFont';
+import { renderHook, waitFor } from '@testing-library/react';
+
+import {
+  loadMushafPageFont,
+  mushafFontFamily,
+  resetLoadedFontsForTest,
+  useMushafPageFont,
+} from './pageFont';
 
 beforeEach(() => {
   loadAsync.mockClear();
@@ -51,5 +58,23 @@ describe('loadMushafPageFont', () => {
     await expect(loadMushafPageFont(1)).rejects.toThrow('nope');
     await expect(loadMushafPageFont(1)).resolves.toBe('QCF2001');
     expect(loadAsync).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('useMushafPageFont', () => {
+  it('reports an out-of-range page through error, not by throwing in render', () => {
+    // mushafFontFamily throws on 605. Called during render that is an
+    // unhandled exception the pager cannot catch, so the whole screen unmounts.
+    const { result } = renderHook(() => useMushafPageFont(605));
+    expect(result.current.error).toBeInstanceOf(RangeError);
+    expect(result.current.ready).toBe(false);
+    expect(result.current.family).toBe('');
+  });
+
+  it('loads a valid page', async () => {
+    const { result } = renderHook(() => useMushafPageFont(2));
+    await waitFor(() => expect(result.current.ready).toBe(true));
+    expect(result.current.family).toBe('QCF2002');
+    expect(result.current.error).toBeNull();
   });
 });

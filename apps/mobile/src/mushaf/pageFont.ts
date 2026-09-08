@@ -6,10 +6,14 @@ import { MUSHAF_FONT_ASSETS } from './fontManifest.generated';
 export const MUSHAF_PAGE_MIN = 1;
 export const MUSHAF_PAGE_MAX = 604;
 
+export function isMushafPage(page: number): boolean {
+  return Number.isInteger(page) && page >= MUSHAF_PAGE_MIN && page <= MUSHAF_PAGE_MAX;
+}
+
 /** Matches the font's own name table (`QCF2106`), so a family mismatch shows up
  *  in a font dump rather than as blank text. */
 export function mushafFontFamily(page: number): string {
-  if (!Number.isInteger(page) || page < MUSHAF_PAGE_MIN || page > MUSHAF_PAGE_MAX) {
+  if (!isMushafPage(page)) {
     throw new RangeError(
       `mushaf page must be an integer ${MUSHAF_PAGE_MIN}..${MUSHAF_PAGE_MAX}, got ${page}`,
     );
@@ -59,12 +63,26 @@ export function useMushafPageFont(page: number): {
   ready: boolean;
   error: Error | null;
 } {
-  const family = mushafFontFamily(page);
-  const [ready, setReady] = useState(() => loaded.has(family));
+  // A page number reaching this hook is a route param or a pager's page +- 1,
+  // so it can be out of range. mushafFontFamily throws on that, and thrown
+  // during render it takes the whole screen down instead of surfacing through
+  // this hook's own error channel.
+  const valid = isMushafPage(page);
+  const family = valid ? mushafFontFamily(page) : '';
+  const [ready, setReady] = useState(() => valid && loaded.has(family));
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    if (!valid) {
+      setReady(false);
+      setError(
+        new RangeError(
+          `mushaf page must be an integer ${MUSHAF_PAGE_MIN}..${MUSHAF_PAGE_MAX}, got ${page}`,
+        ),
+      );
+      return;
+    }
     setError(null);
     setReady(loaded.has(family));
     loadMushafPageFont(page)
@@ -77,7 +95,7 @@ export function useMushafPageFont(page: number): {
     return () => {
       cancelled = true;
     };
-  }, [family, page]);
+  }, [family, page, valid]);
 
   return { family, ready, error };
 }
