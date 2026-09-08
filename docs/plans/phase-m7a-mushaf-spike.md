@@ -596,6 +596,68 @@ current 140 MB.
 
 ### §4 Font registration on RN Android
 
+Run on the owner's GM1917 (OnePlus 7 Pro, Android 11), 2026-09-07, through
+**Expo Go** over LAN Metro — not a release build. Expo Go resolves an asset
+`require()` through the dev server rather than from `assets/` inside an APK, so
+the *registration* answers below are Expo Go's; the format answer is a decoder
+answer and does not depend on that path. Task 8 leaves nothing behind to
+re-check, so M7b's first device run must re-confirm registration from a real
+build before the importer is written.
+
+| Question | Answer | Evidence |
+| --- | --- | --- |
+| Does runtime `loadAsync` register a font that was never in the static manifest? | **Yes** | `spike_v2_ttf_p2` registered and rendered; six page fonts registered in one session, 37-101 ms each |
+| Does WOFF2 work? | **No** | `loadAsync` *resolves* on a WOFF2 in 37 ms with no error, and the text renders identically to the not-loaded state — system-font fallback |
+| Does per-word tinting keep shaping in glyph text? | **Yes** | alternating-colour words, line breaks and word positions pixel-identical to the untinted render |
+| Does it break the Unicode fallback? | **No, at word granularity** | one `Text` per *word* shapes the same as one `Text` for the line |
+
+**The WOFF2 result is the dangerous one, and it fails silently.** `Font.loadAsync`
+resolved successfully, the UI said `registered as spike_v2_woff2_p2`, and the
+glyphs on screen were the system font's interpretation of the QCF code points —
+readable-looking Arabic nonsense, not tofu, so a screenshot alone would not
+catch it. Nothing in the promise, the return value, or the console distinguishes
+this from success. **M7b bundles TTF.** Ruling: the only safe check for a
+registered font is a rendered-pixel comparison against the not-loaded state,
+because both the API and the eye pass a font that never loaded.
+
+That kills the WOFF2 half of §3's byte table, which is why subsetting stops
+being optional: subset **V1 TTF is 37.2 MB in-APK**, and unsubset TTF (54.6 MB)
+is over budget. §3's 33.7 MB WOFF2 figure is now dead.
+
+**Per-word tinting is safe; per-segment is still not.** Memory
+`rn-android-breaks-shaping-across-nested-text` holds, but its boundary is
+narrower than it reads: a nested `Text` breaks joining *inside* a word, and QCF
+glyph words never join to their neighbours anyway. The Unicode fallback survived
+per-word nesting too, for the same reason — the split lands on spaces, which
+join nothing. So ruling 20's three highlight states are buildable in both glyph
+and fallback text, and only sub-word (per-segment) colouring stays banned.
+
 ### §5 Device session
+
+Six renders captured (3 pages x V1/V2; V4 ruled out in §2), plus the
+comparison sheet `m7a-edition-comparison.png` sent to the owner.
+
+**What the renders prove.** The page font applies: correct KFGQPC letterforms,
+correct ayah medallions, and mushaf line breaks — page 2 ends its sixth line on
+`hum al-muflihun`, page 604 carries al-Ikhlas, al-Falaq and an-Nas as in print.
+
+**What they also expose — a real M7b requirement.** At a fixed `fontSize: 26`
+only page 2 fills the width edge to edge; pages 106 and 604 overflow and wrap
+each mushaf line onto a second row, which is visually wrong in a paged mushaf.
+The page font fits a line to *its own* nominal width, not to the device's. So
+M7b must scale font size per page from the widest line's measured advance
+against the available width, and clip rather than wrap (`numberOfLines={1}`) so
+an overflow is loud instead of silently re-flowing. This is the visual half of
+what M6l's row-estimation work did for the scroll reader.
+
+**The visible difference between the editions.** V1 sets the text wider and more
+openly, with ornate crowned ayah medallions; V2 sets tighter, fits more per line,
+and uses a plain oval medallion. Both are KFGQPC Hafs; neither is more correct.
+
+**Edition ruling: pending the owner.** The evidence outside taste all points one
+way and is recorded in §2 and §3: V1 agrees with our own `ayahs.page` on all 604
+pages (V2 disagrees on 18 ayahs and carries an upstream line-number defect on
+page 589), and V1 is roughly half V2's byte cost. Choosing V2 costs a re-paging
+migration of `ayahs.page` plus every stored reading position.
 
 ### §6 Decision
