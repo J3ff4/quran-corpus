@@ -1250,7 +1250,7 @@ Ruling 15: store the page, display it as the surah/ayah that page opens with. `s
 
 `page` is nullable precisely because every existing install has rows without one. A null page means "recorded before M7c" and the card falls back to the ayah, exactly as it does today.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 it('adds page as a nullable column without touching existing rows', async () => {
@@ -1276,27 +1276,27 @@ it('rejects a page outside 1..604 rather than storing it', async () => {
 });
 ```
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
 Run: `cd packages/data && node scripts/generate-schema.mjs && npx vitest run tests/userData.test.ts`
 
 **`generate-schema.mjs` is not optional.** A bare `npx vitest run` reads the previously generated `schema.generated.ts`, so a schema change never reaches the test and both the test AND its mutation-check pass vacuously.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Add the migration to the versioned list below `USER_DB_SCHEMA` — NOT to the baseline string, which every open re-applies and which cannot carry an `ALTER TABLE`.
 
-- [ ] **Step 4: Run the tests, with the schema regenerated first**
+- [x] **Step 4: Run the tests, with the schema regenerated first**
 
-- [ ] **Step 5: Mutation-check the range guard**
+- [x] **Step 5: Mutation-check the range guard**
 
 Delete the page bound check and re-run: the 605 test must fail. Regenerate the schema first, then restore by re-editing.
 
-- [ ] **Step 6: Wire the pager's settle to the recorder, and the Continue card to the page**
+- [x] **Step 6: Wire the pager's settle to the recorder, and the Continue card to the page**
 
 The write point is the page turn (ruling 15), not a scroll handler — that is issue #59's whole fix. `getPageIndex` (already in `@quran-corpus/data/mobile`) maps page → first surah/ayah for the display.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add packages/data apps/mobile/src/data
@@ -1666,3 +1666,55 @@ started, and without the guard that is a user-DB write per twitch.
 
 Gate: mobile 94 files / 948 tests, eslint clean on all three files, type-check
 red only on issue #54's two pre-existing errors.
+
+### 2026-09-08 — Task 9: reading position by page (issue #59)
+
+`e668c8d`. packages/data 32 files / 468 tests, mobile 94 / 949.
+
+**§5 trigger, review still owed.** This touches `packages/data` AND writes the
+on-device user DB. Per this task's own note the `/code-review` runs before the
+phase ends (Task 13), and nothing here is pushed until then.
+
+Migration 4: `ALTER TABLE reading_history ADD COLUMN page INTEGER`. Additive,
+nullable, no UPDATE, no rebuild-and-copy, no DROP.
+
+`recordReadingPosition(client, { surahId, ayahNumber, page })` — an object, not
+a fourth positional number. All three fields are numbers, so a positional page
+would sit beside `ayahNumber` with nothing but argument order telling them
+apart, and a swapped pair stores cleanly and then opens the wrong place. Five
+call sites updated.
+
+Mutation-checks, each restored by re-editing:
+
+1. Delete the page range guard -> all seven `rejects a page that is …` cases
+   fail (0, 605, -1, 106.5, NaN, Infinity, '106').
+2. `page = COALESCE(excluded.page, reading_history.page)` instead of
+   `page = excluded.page` -> "records no page at all when the reader is not
+   paging" fails. That coalesce is the plausible-looking version of this
+   statement, and it pairs a freshly scrolled ayah with a stale page.
+3. Point migration 4 at a different column name -> the nullable-column test and
+   both write tests fail.
+4. Recorder dedupe on `ayahNumber` alone -> "records a page turn that lands on
+   the ayah already stored" fails.
+
+**A vacuous test, caught by its own mutation-check.** #4 passed under the
+mutant on the first try: the skip compares against the last *persisted*
+position, and the test recorded twice before the first write resolved, so both
+records queued regardless of the comparison. Awaiting the first write is what
+makes the assertion mean anything. Same shape as the two vacuous assertions on
+PR #71 — a test that passes both ways asserts nothing.
+
+**Plan defect (harmless).** Step 2 requires `node scripts/generate-schema.mjs`
+before the tests. That script generates the *corpus* schema from `schema.sql`;
+the user DB's schema is a TS constant in `userData.ts`, so it plays no part
+here. The warning is right in general (see [[never-git-stash-for-a-baseline]])
+and simply does not apply to this task.
+
+**Not done, and deliberately:** the Continue card still displays the stored
+surah/ayah. Ruling 15 wants the ayah the page opens with, and Task 10's pager
+wiring records exactly that pair alongside the page, so the card needs no change
+— whereas `getPageIndex` would load all 604 rows to resolve one.
+
+**`page` is not written by anything yet.** The pager is not wired in until Task
+10; translation-mode scrolling records `page: null` explicitly, which is what
+clears a stale page.
