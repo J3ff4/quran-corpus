@@ -960,7 +960,7 @@ Ruling 20: all three can show at once, so this is a precedence function, not a s
 
 Pure and unit-tested precisely because "all three at once" is the case that is awkward to reproduce by hand on a device.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -1009,21 +1009,21 @@ describe('colorForAyah', () => {
 });
 ```
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Keys are `${surahId}:${ayahNumber}` strings, not objects — a page crosses surahs (51 of them do), so an ayah number alone is ambiguous and a `Set` of numbers would highlight the wrong verse on a shared page.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Expected: PASS, 5 tests.
 
-- [ ] **Step 5: Mutation-check the precedence**
+- [x] **Step 5: Mutation-check the precedence**
 
 Swap the audio and landing branches. The "audio wins" test must fail. Restore by re-editing.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/mobile/src/mushaf/highlights.ts apps/mobile/src/mushaf/highlights.test.ts
@@ -1619,3 +1619,11 @@ _Written during Task 13. Empty until the device run happens — "implementation 
 - Mutation-checks, each killing exactly one test: stretching the band off its 8.16:1 ratio; drawing the bismillah in the page's QCF font; hardcoding the footer's page label to English.
 - Gate: mobile **90 files / 916 tests**, web **81 files / 485 tests**, both eslint clean, web `tsc` clean, mobile type-check red only on issue #54's two pre-existing errors.
 - Commit `03db521`.
+
+### 2026-09-08 — Task 6: highlight states
+
+- `apps/mobile/src/mushaf/highlights.ts` + 7 tests (plan specified 5). Gate: mobile 91 files / 923 tests pass, eslint clean, type-check red only on issue #54's two pre-existing errors.
+- **Ruling — the pulse peaks short of the accent.** The plan's own mutation-check (swap the audio and landing branches) is vacuous if a landing pulse at progress 1 resolves *to* the accent: both branches then return the same string. Bookmark sits 45% toward the accent, the pulse 80% of the way from there, so the swap now fails exactly the "audio wins" test. Cost if wrong: a landing pulse is slightly quieter than it could be.
+- **Extra test — the spring overshoots.** `landingProgress` comes off a spring, so it exceeds 1; unclamped, the mix walks the channels past the accent and out of the byte range, rendering as an invalid colour instead of a loud one. Clamped, with a test; deleting the clamp fails only that test.
+- Contrast, both themes, against each page ground: bookmark 10.75 (light) / 10.73 (dark), pulse peak 6.42-7.15 / 7.06-7.66, accent 5.68 / 6.31. All clear AA.
+
