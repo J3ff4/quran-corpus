@@ -578,7 +578,7 @@ git commit -m "feat(scraper): extract each mushaf page's widest line for the rea
   export function mushafLineHeight(textHeight: number, lineCount: number): number;
   ```
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -622,12 +622,12 @@ describe('mushafLineHeight', () => {
 });
 ```
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
 Run: `npx vitest run src/mushaf/pageScale.test.ts`
 Expected: FAIL, unresolved import.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```ts
 import { MUSHAF_PAGE_MAX, MUSHAF_PAGE_MIN } from '@quran-corpus/data/mobile';
@@ -667,15 +667,15 @@ export function mushafLineHeight(textHeight: number, lineCount: number): number 
 }
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Expected: PASS, 6 tests. **The "every real page under the cap" test is the one that matters** — it reads the generated file, so a bad regeneration fails here rather than on a phone.
 
-- [ ] **Step 5: Mutation-check the cap**
+- [x] **Step 5: Mutation-check the cap**
 
 Replace `Math.min(...)` with `textWidth / em` and re-run: the cap test must fail. Restore by re-editing.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/mobile/src/mushaf/pageScale.ts apps/mobile/src/mushaf/pageScale.test.ts
@@ -1593,3 +1593,10 @@ _Written during Task 13. Empty until the device run happens — "implementation 
 - Mutation-check: changing the space guard to match `\u0000` fails exactly the separator test with `KeyError: 32`; restored by re-editing.
 - Gate: 825 pytest passed (822 + 3 new), mypy clean, ruff clean on every file this task touched. Six pre-existing `E501`/`E702` remain in `sources/corpus_parser.py`, `sources/qul.py`, `tests/test_db.py` and `tests/test_review_glosses.py` under ruff 0.15.17 — untouched here, not introduced by this task.
 - Commit `acaea85`.
+
+### 2026-09-08 — Task 3: per-page scale
+
+- 6 tests pass, including the one that walks all 604 pages: at 328dp of text width every page lands **18.1–27.5dp**, under the 40dp cap and well under the 44dp where M7b saw glyph dropout. Finding 3 asserted, not trusted — a bad regeneration of `pageMetrics.generated.ts` now fails here rather than on a phone.
+- Mutation-check: dropping `Math.min` to `textWidth / em` fails exactly the cap test; restored by re-editing.
+- Gate: 24 mushaf tests pass, eslint clean, `npm run type-check` red only on issue #54's two pre-existing errors.
+- Commit `2de4e8f`.
