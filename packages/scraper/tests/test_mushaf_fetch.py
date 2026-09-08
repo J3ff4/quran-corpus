@@ -19,9 +19,11 @@ def test_sends_a_user_agent_and_skips_existing_files(tmp_path):
     client = httpx.Client(transport=httpx.MockTransport(handler))
     written = fetch_layout(tmp_path, [1, 2, 3], client)
 
-    assert written == [1, 3]  # 2 already on disk
+    # 2 was already on disk, so a resumed run reports only what it fetched.
+    assert written == [1, 3]
     assert seen and all(ua == USER_AGENT for ua in seen)
-    assert json.loads((tmp_path / "001.json").read_text())["verses"][0]["verse_key"] == "1:1"
+    written_page = json.loads((tmp_path / "001.json").read_text())
+    assert written_page["verses"][0]["verse_key"] == "1:1"
 
 
 def test_refuses_a_page_outside_1_604(tmp_path):
