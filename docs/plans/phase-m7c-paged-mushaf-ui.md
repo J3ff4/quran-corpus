@@ -710,7 +710,7 @@ Three rules this component exists to hold:
 
 Per-word nested `<Text>` is safe here — a QCF word is ONE pre-shaped glyph, so there is no join for a nested element to break. This is exactly the case [[rn-android-breaks-shaping-across-nested-text]] does *not* cover, and M7a confirmed it on device.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```tsx
 import { render } from '@testing-library/react';
@@ -761,11 +761,11 @@ describe('MushafLineRow', () => {
 });
 ```
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
 Run: `npx vitest run src/components/mushaf/MushafLineRow.test.tsx`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```tsx
 import { Text } from 'react-native';
@@ -833,15 +833,15 @@ export function MushafLineRow({
 }
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Expected: PASS, 4 tests.
 
-- [ ] **Step 5: Mutation-check the join**
+- [x] **Step 5: Mutation-check the join**
 
 Change `{words.map(...)}` to `{words.map(...)}` interleaved with `' '` and re-run: the "joins with nothing at all" test must fail. Restore by re-editing.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/mobile/src/components/mushaf/MushafLineRow.tsx apps/mobile/src/components/mushaf/MushafLineRow.test.tsx
@@ -1600,3 +1600,12 @@ _Written during Task 13. Empty until the device run happens — "implementation 
 - Mutation-check: dropping `Math.min` to `textWidth / em` fails exactly the cap test; restored by re-editing.
 - Gate: 24 mushaf tests pass, eslint clean, `npm run type-check` red only on issue #54's two pre-existing errors.
 - Commit `2de4e8f`.
+
+### 2026-09-08 — Task 4: the line renderer
+
+- 8 tests pass (the plan's 4, plus the separator strip, the clip, the centring and the tap).
+- **Three plan defects corrected.** (a) The a11y test asserted `aria-hidden`, which `rnHosts` does not emit — it maps `importantForAccessibility` to `data-hidden-from-a11y`; asserted on that instead. (b) The colour test asserted `#ff0000` in the markup, but the DOM normalises hex to `rgb(255, 0, 0)`, so it could never pass however right the component was; reads `style.color` back per span now. (c) `pageFont` pulls `expo-font` → `expo-modules-core`, whose logger setup reads `__DEV__` and dies at import under jsdom; mocked, as `pageFont.test.ts` already does.
+- `rnHosts` widened with `accessibilityElementsHidden` (iOS's half of the hide pair) as a dropped prop — unmapped, React lowercases it into an unknown DOM attribute.
+- Mutation-checks, all three killing exactly one test and restored by re-editing: joining the words with a space; keeping the separator space; dropping `numberOfLines={1}`.
+- Gate: **89 test files / 907 tests pass**, eslint clean, `npm run type-check` red only on issue #54's two pre-existing errors.
+- Commit `273b823`.
