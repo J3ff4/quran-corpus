@@ -1428,7 +1428,7 @@ Ruling 9 and CLAUDE.md §11. The page fonts and the layout are KFGQPC via QUL, s
 
 Name both the layout source (quran.com v4 API / QUL) and the font source (KFGQPC), alongside the existing corpus.quran.com, Tanzil and QuranEnc entries.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```tsx
 it('credits KFGQPC and QUL for the mushaf pages and fonts', () => {
@@ -1439,9 +1439,9 @@ it('credits KFGQPC and QUL for the mushaf pages and fonts', () => {
 });
 ```
 
-- [ ] **Step 2: Run, implement, run**
+- [x] **Step 2: Run, implement, run**
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add apps/mobile/app/about.tsx apps/mobile/app/about.test.tsx
@@ -1816,3 +1816,33 @@ on #54's remaining TS2835.
 
 **Not verified here.** Device check 219.
 
+---
+
+## Verification log — Task 12 (2026-09-08)
+
+Commit `134743c`. Mobile suite 95 files / 985 tests pass, eslint clean on the
+three touched files, `type-check` red only on issue #54's remaining
+`useReducedMotion.test.ts(15,31)` TS2835.
+
+**Where the two credits went.** The layout row sits in *Text and translation*
+next to corpus.quran.com — it is a fact about the corpus, not about type. The
+font row sits in *Typefaces* beside Hafs. Not a new "Mushaf" group: one group
+per source-kind is the pattern the screen already sets, and a third group
+holding two rows would have split the type credits across two cards.
+
+**Both rows are `pending: true`.** Ruling 9 accepted the exposure; it did not
+clear a licence. The screen already distinguishes the two states with a pill,
+so naming these sources without it would have asserted a grant nobody has.
+
+**The plan's test was presence-only.** `textContent` containing `KFGQPC` and
+`QUL` passes on a screen that credits them as cleared, which is the exact
+failure the entry exists to prevent. The shipped test asserts the pill too.
+
+| Mutation | Result |
+| --- | --- |
+| Drop the `KFGQPC` credit | FAIL — `Unable to find an element with the text: KFGQPC` |
+| Drop `pending: true` from `QUL` | FAIL — `Unable to find an element by: [data-testid="pending-QUL"]` |
+
+Bodies are written in all three UI locales, as every other credit is; the
+proper nouns (`QUL`, `KFGQPC`) stay untranslated per the `Credit.name`
+contract.
