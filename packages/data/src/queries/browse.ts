@@ -37,6 +37,11 @@ export interface PageEntry {
   startSurahId: number;
   startAyahNumber: number;
   surahName: string;
+  /** The juz the page opens in, for the mushaf page's footer. Null when the
+   *  opening ayah carries no juz -- the same rows getJuzIndex skips. Taken
+   *  from the page's FIRST ayah rather than from a majority of its ayahs: a
+   *  page that straddles a juz boundary is printed under the juz it opens in. */
+  juz: number | null;
 }
 
 /**
@@ -131,12 +136,13 @@ export async function getJuzIndex(client: QueryClient): Promise<JuzEntry[]> {
  */
 export async function getPageIndex(client: QueryClient): Promise<PageEntry[]> {
   const result = await client.execute(`
-    SELECT page, start_surah_id, start_ayah_number, surah_name
+    SELECT page, start_surah_id, start_ayah_number, surah_name, juz
     FROM (
       SELECT a.page,
              a.surah_id      AS start_surah_id,
              a.ayah_number   AS start_ayah_number,
              s.name_translit AS surah_name,
+             a.juz           AS juz,
              ROW_NUMBER() OVER (PARTITION BY a.page ORDER BY a.surah_id, a.ayah_number) AS rn
       FROM ayahs  a
       JOIN surahs s ON s.id = a.surah_id
@@ -151,6 +157,9 @@ export async function getPageIndex(client: QueryClient): Promise<PageEntry[]> {
     startSurahId: Number(row['start_surah_id']),
     startAyahNumber: Number(row['start_ayah_number']),
     surahName: String(row['surah_name']),
+    // Not `Number(row['juz']) || null`: juz 0 does not exist, but that
+    // coercion would turn a genuine null into NaN before the fallback ran.
+    juz: row['juz'] === null || row['juz'] === undefined ? null : Number(row['juz']),
   }));
 }
 
