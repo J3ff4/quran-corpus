@@ -6,6 +6,7 @@ from scraper.mushaf_layout import (
     dedupe_pairs,
     load_rows,
     read_overrides,
+    validate_completeness,
     validate_rows,
 )
 
@@ -95,3 +96,42 @@ def test_read_overrides_ignores_comments(tmp_path: Path):
     p = tmp_path / "o.tsv"
     p.write_text("# comment\n84\t21\t7\t14\twhy\n", encoding="utf-8")
     assert read_overrides(p) == {(84, 21, 7): 14}
+
+
+def _full_rows():
+    """One word + one end marker on every page 1..604, all of ayah 1:1."""
+    rows = []
+    for page in range(1, 605):
+        rows.append(LayoutRow(page, 1, 1, 1, 1, 1, "word", "a"))
+        rows.append(LayoutRow(page, 1, 2, 1, 1, 2, "end", "b"))
+    return rows
+
+
+def test_completeness_rejects_an_empty_layout():
+    """The gate that matters: validate_rows passes [] clean, and import_layout
+    DELETEs the whole table before inserting. Without this, pointing
+    import-mushaf at a wrong --layout_dir wipes the layout and exits 0."""
+    assert validate_rows([], {(1, 1): 1}) == []
+    problems = validate_completeness([], {(1, 1): 1})
+    assert len(problems) == 2
+    assert "604 of 604 pages have no rows" in problems[0]
+    assert "1 of 1 corpus ayahs have no layout rows" in problems[1]
+
+
+def test_completeness_rejects_a_half_fetched_layout():
+    """An interrupted `mushaf-fetch` is the normal partial state. Importing it
+    re-pages only the covered ayahs, leaving ayahs.page a mix of V1 and V2."""
+    rows = [r for r in _full_rows() if r.page != 300]
+    problems = validate_completeness(rows, {(1, 1): 1})
+    assert len(problems) == 1
+    assert "1 of 604 pages have no rows: 300" in problems[0]
+
+
+def test_completeness_names_ayahs_the_layout_never_covers():
+    problems = validate_completeness(_full_rows(), {(1, 1): 1, (2, 5): 3})
+    assert len(problems) == 1
+    assert "1 of 2 corpus ayahs have no layout rows: 2:5" in problems[0]
+
+
+def test_completeness_passes_a_whole_layout():
+    assert validate_completeness(_full_rows(), {(1, 1): 1}) == []

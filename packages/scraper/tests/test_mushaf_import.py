@@ -112,9 +112,76 @@ def test_cli_creates_the_table_on_a_corpus_that_predates_it(tmp_path):
 
     result = CliRunner().invoke(
         main,
-        ["import-mushaf", str(layout), "--db", db_path, "--overrides", str(overrides)],
+        [
+            "import-mushaf",
+            str(layout),
+            "--db",
+            db_path,
+            "--overrides",
+            str(overrides),
+            # A two-ayah fixture is 2 of 604 pages; the completeness gate is
+            # what test_cli_refuses_a_partial_layout below covers.
+            "--allow-partial",
+        ],
     )
     assert result.exit_code == 0, result.output
     con = sqlite3.connect(db_path)
     assert con.execute("SELECT COUNT(*) FROM mushaf_layout").fetchone()[0] == 5
     assert con.execute("SELECT DISTINCT page FROM ayahs").fetchall() == [(1,)]
+
+
+def test_cli_refuses_a_partial_layout_and_writes_nothing(tmp_path):
+    """import_layout DELETEs the whole table before inserting, so a wrong or
+    half-fetched --layout_dir would otherwise wipe the layout and exit 0."""
+    from click.testing import CliRunner
+
+    from scraper.cli import main
+
+    db_path = _corpus(tmp_path)
+    con = sqlite3.connect(db_path)
+    con.execute(
+        """INSERT INTO mushaf_layout
+               (page, line, seq, surah_id, ayah_number, position, char_type, glyph)
+           VALUES (1, 1, 1, 1, 1, 1, 'word', 'A')"""
+    )
+    con.commit()
+    con.close()
+
+    empty = tmp_path / "empty-layout"
+    empty.mkdir()
+    overrides = tmp_path / "none.tsv"
+    overrides.write_text("# none\n", encoding="utf-8")
+
+    result = CliRunner().invoke(
+        main,
+        ["import-mushaf", str(empty), "--db", db_path, "--overrides", str(overrides)],
+    )
+    assert result.exit_code != 0
+    assert "604 of 604 pages have no rows" in result.output
+
+    con = sqlite3.connect(db_path)
+    surviving = con.execute("SELECT COUNT(*) FROM mushaf_layout").fetchone()[0]
+    con.close()
+    assert surviving == 1, "the pre-existing layout row was wiped"
+
+
+def test_cli_refuses_a_missing_overrides_file(tmp_path):
+    """--overrides defaults to a path relative to packages/scraper, so running
+    from anywhere else must say so rather than raise FileNotFoundError."""
+    from click.testing import CliRunner
+
+    from scraper.cli import main
+
+    result = CliRunner().invoke(
+        main,
+        [
+            "import-mushaf",
+            str(tmp_path),
+            "--db",
+            _corpus(tmp_path),
+            "--overrides",
+            str(tmp_path / "nope.tsv"),
+        ],
+    )
+    assert result.exit_code != 0
+    assert "overrides file not found" in result.output

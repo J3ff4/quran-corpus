@@ -545,6 +545,7 @@ def translate_glosses_cmd(db: str, batch_size: int) -> None:
 def glosses_export_cmd(db: str, top: int, out: str) -> None:
     """Export top-N Uzbek glosses for human review (JSON)."""
     import json
+
     from .review_glosses import export_top
 
     database = ScraperDatabase(db)
@@ -561,6 +562,7 @@ def glosses_export_cmd(db: str, top: int, out: str) -> None:
 def glosses_import_cmd(path: str, db: str) -> None:
     """Import reviewed Uzbek glosses; flips them to mt-reviewed (idempotent)."""
     import json
+
     from .review_glosses import import_reviewed
 
     with open(path, encoding="utf-8") as fh:
@@ -605,9 +607,6 @@ def fetch_salmone(dest: str, force: bool) -> None:
     click.echo(f"Salmone: {path.name}, {size} bytes -> {dest}")
 
 
-if __name__ == "__main__":
-    main()
-
 
 @main.command("mushaf-fetch")
 @click.option("--dest", required=True, help="Directory for the 604 layout JSON files")
@@ -634,26 +633,49 @@ def mushaf_fetch_cmd(dest: str) -> None:
     show_default=True,
     help="Derive ayahs.page from the imported layout",
 )
-def import_mushaf_cmd(layout_dir: str, db: str, overrides: str, repage: bool) -> None:
+@click.option(
+    "--allow-partial",
+    is_flag=True,
+    help="Import a layout that does not cover all 604 pages (testing only)",
+)
+def import_mushaf_cmd(
+    layout_dir: str, db: str, overrides: str, repage: bool, allow_partial: bool
+) -> None:
     """Import the KFGQPC V2 page layout. Refuses to write if validation fails."""
     import sqlite3
 
     from .mushaf_import import import_layout, word_counts
-    from .mushaf_layout import load_rows, read_overrides, validate_rows
+    from .mushaf_layout import (
+        load_rows,
+        read_overrides,
+        validate_completeness,
+        validate_rows,
+    )
+
+    overrides_path = Path(overrides)
+    if not overrides_path.exists():
+        # Defaults to a path relative to packages/scraper, so running from
+        # anywhere else would otherwise die with a raw FileNotFoundError.
+        raise click.ClickException(f"overrides file not found: {overrides_path}")
 
     # An existing corpus DB predates mushaf_layout; ScraperDatabase applies
     # schema.sql, which is CREATE IF NOT EXISTS throughout, so this is the same
     # idempotent schema-first step every other importer takes.
     ScraperDatabase(db)
 
-    rows = load_rows(Path(layout_dir), read_overrides(Path(overrides)))
+    rows = load_rows(Path(layout_dir), read_overrides(overrides_path))
     con = sqlite3.connect(db)
     try:
         counts = word_counts(con)
     finally:
         con.close()
 
+    # Completeness first: it is the check that catches a half-fetched
+    # layout_dir, which every per-ayah check below passes clean. Behind a flag
+    # because a fixture-sized import is legitimate; the default is the gate.
     problems = validate_rows(rows, counts)
+    if not allow_partial:
+        problems = validate_completeness(rows, counts) + problems
     if problems:
         for problem in problems[:50]:
             click.echo(f"  {problem}", err=True)
@@ -717,3 +739,7 @@ def mushaf_fonts_cmd(db: str, cache: str, dest: str) -> None:
         f"604 fonts: {total_raw / mb:.1f} MB raw -> {total_sub / mb:.1f} MB "
         f"subset in {dest}"
     )
+
+
+if __name__ == "__main__":
+    main()

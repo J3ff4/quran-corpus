@@ -85,6 +85,11 @@ def load_rows(
         for surah, ayah, word in by_page[page]:
             position = int(word["position"])
             # The V2 line is the SECOND line_number, then any pinned override.
+            # An override moves a word to another line but NOT to a chosen
+            # place within it: seq still comes from payload order, so the moved
+            # word lands last on its destination line. Correct for an end
+            # marker (which belongs last); wrong for a mid-line word, which
+            # would need the override file to carry a seq as well.
             line = overrides.get((surah, ayah, position), word.get("line_number__2"))
             if line is None:
                 continue
@@ -167,5 +172,42 @@ def validate_rows(
                 f"{surah}:{ayah}: end marker runs backwards, "
                 f"line {ends[0].line} before {words[-1].line}"
             )
+
+    return problems
+
+
+def validate_completeness(
+    rows: list[LayoutRow], word_counts: dict[tuple[int, int], int]
+) -> list[str]:
+    """Every problem with what is MISSING. Empty list means the layout is whole.
+
+    `validate_rows` is per-ayah: every one of its checks fires only for an ayah
+    that is *present*, so an empty or half-fetched layout passes it clean. That
+    is the shape-gate-blind-to-content-loss failure this repo has already paid
+    for once. `mushaf-fetch` is resumable and takes minutes, so a partial
+    layout_dir is the normal interrupted state, not an exotic one -- and
+    `import_layout` DELETEs the whole table before inserting, then re-derives
+    `ayahs.page` for covered ayahs only. Importing a partial layout therefore
+    leaves `ayahs.page` a silent mix of V1 and V2 page numbers.
+    """
+    problems: list[str] = []
+
+    pages = {row.page for row in rows}
+    missing_pages = [p for p in range(PAGE_MIN, PAGE_MAX + 1) if p not in pages]
+    if missing_pages:
+        shown = ", ".join(str(p) for p in missing_pages[:10])
+        problems.append(
+            f"{len(missing_pages)} of {PAGE_MAX} pages have no rows: {shown}"
+            + (", ..." if len(missing_pages) > 10 else "")
+        )
+
+    seen = {(row.surah, row.ayah) for row in rows}
+    missing_ayahs = sorted(key for key in word_counts if key not in seen)
+    if missing_ayahs:
+        shown = ", ".join(f"{s}:{a}" for s, a in missing_ayahs[:10])
+        problems.append(
+            f"{len(missing_ayahs)} of {len(word_counts)} corpus ayahs have no "
+            f"layout rows: {shown}" + (", ..." if len(missing_ayahs) > 10 else "")
+        )
 
     return problems
