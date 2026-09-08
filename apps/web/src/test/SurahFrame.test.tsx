@@ -1,8 +1,25 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { SURAH_BAND_PATH } from '@quran-corpus/config/ornaments/surahBand';
 import { SurahFrame } from '../components/reader/ornaments/SurahFrame';
 
 describe('SurahFrame', () => {
+  it('draws the shared arabesque in its own authoring box', () => {
+    // The geometry moved to packages/config in M7c so the mobile mushaf page
+    // could draw the same band (§3). Nothing here asserted the path or the
+    // viewBox before that move, so the extraction was checked by comparing
+    // bytes against git -- this is that check, kept where it runs on every
+    // change instead.
+    const { container } = render(
+      <SurahFrame surahNumber={2}>
+        <span>x</span>
+      </SurahFrame>,
+    );
+    const svg = container.querySelector('svg');
+    expect(svg?.getAttribute('viewBox')).toBe('0 -500 16320 2000');
+    expect(svg?.querySelector('path')?.getAttribute('d')).toBe(SURAH_BAND_PATH);
+  });
+
   it('frames the surah name and hides decoration from a11y', () => {
     render(
       <SurahFrame surahNumber={2}>

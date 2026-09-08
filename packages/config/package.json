@@ -9,7 +9,8 @@
     "./tailwind/preset": "./tailwind/preset.ts",
     "./theme/palette": "./theme/palette.ts",
     "./ornaments/medallion": "./ornaments/medallion.ts",
-    "./prettier": "./prettier/index.js"
+    "./prettier": "./prettier/index.js",
+    "./ornaments/surahBand": "./ornaments/surahBand.ts"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.0.0",
