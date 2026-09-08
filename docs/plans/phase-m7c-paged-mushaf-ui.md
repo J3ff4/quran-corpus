@@ -1323,7 +1323,7 @@ The mushaf branch no longer renders the ayah `FlatList` at all. It renders `Mush
 
 **Issue #58 while here.** The header's surah name goes blank after a chevron turn. In a pager the name is a function of the current page, not of the screen's mount-time surah — deriving it from the settled page is the fix, and the pager makes the old failure unreachable. Assert it: a test that pages and then reads the header title.
 
-- [ ] **Step 1: Write the failing tests in `SurahReader.test.tsx`**
+- [x] **Step 1: Write the failing tests in `SurahReader.test.tsx`**
 
 ```tsx
 it('renders the pager in mushaf mode, not a list of ayah rows', () => {});
@@ -1341,19 +1341,19 @@ it('still renders translation mode as a list of cards', () => {
 });
 ```
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
-- [ ] **Step 3: Implement, then delete `MushafAyah`**
+- [x] **Step 3: Implement, then delete `MushafAyah`**
 
 Delete only after the tests above pass — a red suite plus a deletion is two failures wearing one coat.
 
-- [ ] **Step 4: Run the whole mobile suite**
+- [x] **Step 4: Run the whole mobile suite**
 
 Run: `npx vitest run && npx eslint . --ext .ts,.tsx && npm run type-check`
 
 Expected: all green. Type-check still shows issue #54's two pre-existing errors (`SurahReader.test.tsx` TS2322, `useReducedMotion.test.ts` TS2835) and no others. **`SurahReader.test.tsx` is edited in this task — if its TS2322 is now trivial to fix, fix it and note that #54 is half closed.**
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/mobile
@@ -1718,3 +1718,66 @@ wiring records exactly that pair alongside the page, so the card needs no change
 **`page` is not written by anything yet.** The pager is not wired in until Task
 10; translation-mode scrolling records `page: null` explicitly, which is what
 clears a stale page.
+
+### 2026-09-08 — Task 10: the pager wired in, the scroll mushaf gone
+
+Commits `0d1adef` (data), `edb0efc` (mobile). Mobile 95 files / 974 tests;
+packages/data 32 / 469; eslint clean on every touched file. Type-check red on
+**one** error now, not two.
+
+- **#54 half closed.** `SurahReader.test.tsx` passed `readerMode="words"`, and
+  `ReaderMode` is `'mushaf' | 'translation'` — there is no third mode to
+  interrupt an arrival with, so the line asserted a scenario that cannot
+  happen. Removed; the TS2322 is gone. `useReducedMotion.test.ts`'s TS2835 is
+  all that is left of #54.
+- **Plan gap, ruled.** The plan never says where `ayahTexts`, `surahNames`,
+  `juzByPage` or the settled page's surah/ayah come from — Task 7 and Task 8
+  both take them as props. They cannot come from `SurahReaderData`: that is one
+  surah, and 51 pages hold more than one. Ruling: one additive field on
+  `getPageIndex` (`juz`) plus `getSurahList`, cached process-wide, and each
+  surah's ayah rows fetched on demand. **Cost if wrong:** a second query shape
+  to maintain; the alternative was a new per-page query, which is a bigger §5
+  surface for the same answer.
+- **Ruling 19 was unimplementable as specced.** Device check 210 wants the page
+  to follow the recitation, and Task 8's pager has no way to be told to turn.
+  Added `focusPage`, which scrolls through the list ref and then settles like
+  any other turn — so an auto-turn still records its page. `settled` is
+  deliberately *not* written by the effect: writing it would make the auto-turn
+  the one page the reading position never remembers.
+- **The mock ate the ref.** Same finding as Task 8's, one layer down:
+  `rnHosts`'s `FlatList` is a plain function component, so `ref` landed in the
+  prop bag and `listRef.current` was always null. Every assertion about an
+  imperative scroll would have passed against a pager that never scrolled.
+  `listScrollsOf` reads the calls back.
+- **The reading position needed its own surah.** `RecordedReadingPosition` gains
+  `surahId`; the screen no longer pairs a page with `displayedSurahId`. Page 108
+  opens al-Baqarah while the reader was opened on al-Fatihah, and the old shape
+  had no way to say so.
+
+**Mutation-checks (8, all caught):**
+
+| Mutant | Test that failed |
+|---|---|
+| `a.juz AS juz` deleted from `getPageIndex` | 4 of browse.test.ts |
+| `focusPage` range guard deleted | ignores a focus page outside the mushaf |
+| `scrollToIndex` call deleted | turns to the page the recitation has moved onto |
+| `indexPromise ??=` → `=` | reads the index once however many readers ask |
+| per-surah ayah cache bypassed | fetches a surah once however many pages visited |
+| `if (ready \|\| error)` → `if (ready)` | lands anyway when the font fails |
+| `juz !== null` skip → `?? 0` | skips the pages that have none |
+| missing-ayah guard on a word tap deleted | opens nothing for a word whose rows have not arrived |
+| `landing: pulse > 0 ? key : null` → always the key | lets the pulse fade |
+| recorder dedupe without `surahId` | records a turn that crosses into the next surah |
+
+**Rewritten, not deleted.** Six existing tests asserted that a mode switch mounts
+two ayah lists, or that mushaf mode draws ayah rows. Those are now false by
+design, so each was re-pointed at what the switch actually is since M7c —
+mushaf ↔ translation, one list and one pager — rather than dropped. The
+bookmark-control check lost its mushaf half outright: a printed page carries no
+controls (ruling 4).
+
+**Not verified here.** Everything above is unit-level. The pager, its fonts and
+the auto-turn are device checks 200-220 (Task 13), and the §5 review is still
+owed on two counts — `packages/data` (this task added a second trigger) and the
+Task 9 user-DB write.
+
