@@ -866,14 +866,14 @@ The geometry is currently inline in web's `SurahFrame.tsx`. Ruling 21 puts the s
 
 Keep web's rationale comments with the geometry: the nonzero fill rule producing the cartouche cutouts, and the 8.16:1 ratio budgeting only ~26px of vertical space, are properties of the art, not of either consumer.
 
-- [ ] **Step 1: Extract the path, repoint web, run web's suite**
+- [x] **Step 1: Extract the path, repoint web, run web's suite**
 
 Move the `d` string and viewBox into `packages/config/ornaments/surahBand.ts` beside `medallion.ts`. Import them in `SurahFrame.tsx`. Geometry only — fill and stroke stay with each consumer, since web paints via Tailwind and RN has no `currentColor` (the same split `medallion.ts` already documents).
 
 Run: `cd apps/web && npx vitest run src/test/SurahFrame.test.tsx`
 Expected: PASS, unchanged. A diff in the rendered path means the extraction dropped something.
 
-- [ ] **Step 2: Write the failing mobile chrome tests**
+- [x] **Step 2: Write the failing mobile chrome tests**
 
 ```tsx
 import { render, screen } from '@testing-library/react';
@@ -912,7 +912,7 @@ describe('PageFooter', () => {
 });
 ```
 
-- [ ] **Step 3: Implement the three components**
+- [x] **Step 3: Implement the three components**
 
 `SurahBand` — the extracted path in an `<Svg>` at 8.16:1, stroked/filled with `theme.mutedText`, the transliterated surah name centred over it via absolute inset (NOT padding: the same percentage-resolves-against-width trap web documents). Its own `accessibilityLabel` is the surah name, because the art carries no readable text.
 
@@ -920,12 +920,12 @@ describe('PageFooter', () => {
 
 `PageFooter` — `medallion-1` geometry from `packages/config/ornaments/medallion.ts` around the page number, juz beside it. **Marked as a stand-in** (ruling 23) with a comment naming the ruling, so a reviewer and the PR body agree.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `npx vitest run src/components/mushaf/`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/config/ornaments/surahBand.ts apps/web/src/components/reader/ornaments/SurahFrame.tsx \
@@ -1609,3 +1609,13 @@ _Written during Task 13. Empty until the device run happens — "implementation 
 - Mutation-checks, all three killing exactly one test and restored by re-editing: joining the words with a space; keeping the separator space; dropping `numberOfLines={1}`.
 - Gate: **89 test files / 907 tests pass**, eslint clean, `npm run type-check` red only on issue #54's two pre-existing errors.
 - Commit `273b823`.
+
+### 2026-09-08 — Task 5: page chrome
+
+- Geometry extracted to `packages/config/ornaments/surahBand.ts`, web repointed at it. The path is **byte-identical** to the one it replaced — 17,177 chars, compared against `git show HEAD:...` — which is the real proof of a lossless extraction.
+- **The plan's Step 1 check was vacuous.** "Run web's suite, a diff in the rendered path means the extraction dropped something" — web's `SurahFrame.test.tsx` asserted neither the path nor the viewBox, so a corrupted `SURAH_BAND_VIEW_BOX` passed **both** suites green. Both now assert path and viewBox, and a re-mutation fails both. That is the gap that would have let a silent geometry loss ship.
+- **Ruling — `BismillahLine` takes its text as a prop.** The plan said "reuse `Bismillah.tsx`'s string", but that component deliberately holds no string: 95:1 and 97:1 spell the basmala with a shadda on the ba and the other 110 do not, so a constant is wrong on two surahs. Task 7's `MushafPage` sources it from `ayahTexts` via `splitBasmala`, which it already has.
+- **Ruling — `SurahBand` drops `surahId`.** Unused, and eslint refuses it. Web's frame puts numerals in the two medallion cutouts because it heads a scrolling surah; on a mushaf page the number is already in the footer and the cutouts are ~5dp wide at this band's height.
+- Mutation-checks, each killing exactly one test: stretching the band off its 8.16:1 ratio; drawing the bismillah in the page's QCF font; hardcoding the footer's page label to English.
+- Gate: mobile **90 files / 916 tests**, web **81 files / 485 tests**, both eslint clean, web `tsc` clean, mobile type-check red only on issue #54's two pre-existing errors.
+- Commit `03db521`.
