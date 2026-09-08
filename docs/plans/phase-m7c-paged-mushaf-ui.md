@@ -1130,7 +1130,7 @@ A horizontal `FlatList` over `[1..604]`, `pagingEnabled`, `inverted` for RTL (ru
 
 Windowing matters here — 604 pages each holding a registered font. `windowSize={3}`, `maxToRenderPerBatch={1}`, `removeClippedSubviews`. Prefetch exactly one page either side so a swipe lands on a rendered page rather than a blank one, and no further: each page pulls a ~200 KB font that `expo-font` never unloads.
 
-- [ ] **Step 1: Widen the `FlatList` test mock, then write the failing tests**
+- [x] **Step 1: Widen the `FlatList` test mock, then write the failing tests**
 
 ```tsx
 import { render } from '@testing-library/react';
@@ -1215,17 +1215,17 @@ That is the same shape as [[rn-accessible-view-collapses-children]]: a prop the 
 
 So this task's **first** step is to widen the mock — keep the full prop bag on the host node and export `listPropsOf(result)` to read it back — and then mutation-check the widening itself: delete `inverted` from `MushafPager` and confirm the inverted test fails. If it still passes, the mock is still dropping the prop and every assertion here is decorative.
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
-- [ ] **Step 5: Mutation-check the settle handler**
+- [x] **Step 5: Mutation-check the settle handler**
 
 Make `onPageChange` fire on every scroll event rather than on settle. The "exactly once per settle" test must fail.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/mobile/src/components/mushaf/MushafPager.tsx apps/mobile/src/components/mushaf/MushafPager.test.tsx
@@ -1635,3 +1635,34 @@ _Written during Task 13. Empty until the device run happens — "implementation 
 - **Finding — the a11y overlay would have eaten every tap.** One focusable band per ayah laid over the text block is what publishes ruling 12's labels, and without `pointerEvents="none"` no word on any page is tappable while the page looks perfectly correct. Now asserted.
 - **Gotcha — `beforeEach(() => mock.mockReset())` breaks a rejection test.** An arrow returning the mock hands vitest the mock as the hook's result; a rejection the test deliberately provokes then surfaces as the test's own failure, on the line that constructed the error, while the assertion above it passes. A block body fixes it. Cost two debugging rounds; recorded in the suite.
 
+### 2026-09-08 — Task 8: the pager
+
+`fe65c21`. 10 tests, plan asked for 7.
+
+**The mock was the task.** `src/testing/rnHosts.ts`'s `FlatList` destructured
+`data`, `renderItem`, `keyExtractor`, `testID` and dropped everything else, and
+everything else is what a pager IS. It now keeps the whole prop bag on the host
+node (`data-rn-list`, a WeakMap keyed by the node) and exports `listPropsOf`,
+which throws rather than guessing when a render holds no list or more than one.
+`listPropsOf` is typed structurally, not against `Element`: rnHosts compiles
+without the DOM lib.
+
+Mutation-checks, each killing exactly one named test, each restored by
+re-editing:
+
+1. Delete `inverted` from the pager -> "is inverted" fails. Against the mock as
+   it stood before this task, it passed. That is the whole justification for
+   widening it.
+2. Delete the settle guard (`if (page === settled.current) return`) -> "exactly
+   once per settle" and "says nothing when a drag snaps back" both fail.
+3. Drop the `initialScrollIndex` clamp -> "opens on a real page when handed one
+   outside the mushaf" fails.
+
+**Added beyond the plan:** the clamp. `initialScrollIndex` is not bounds-checked
+by FlatList -- an index past the data crashes the scroll rather than showing an
+empty page -- and this number arrives from a route param and from the user DB.
+Also the snap-back test: a settle fires at the end of a drag that ended where it
+started, and without the guard that is a user-DB write per twitch.
+
+Gate: mobile 94 files / 948 tests, eslint clean on all three files, type-check
+red only on issue #54's two pre-existing errors.
