@@ -76,6 +76,32 @@ describe('runMigrations', () => {
     d.close();
   });
 
+  it('creates mushaf_layout with its range checks enforced', async () => {
+    const d = createDatabase('file::memory:');
+    await runMigrations(d);
+    await d.execute(`INSERT INTO surahs (id, name_arabic, name_translit, name_translation,
+                                         revelation_type, ayah_count, order_number)
+                     VALUES (1, 'x', 'Al-Fatihah', 'The Opening', 'meccan', 7, 1)`);
+
+    // A page or line outside the mushaf must be refused by the table itself:
+    // the importer validates too, but the corpus DB is written by Python, by
+    // TypeScript and occasionally by hand, and only the CHECK binds all three.
+    await expect(
+      d.execute(`INSERT INTO mushaf_layout VALUES (605, 1, 1, 1, 1, 1, 'word', 'A')`),
+    ).rejects.toThrow();
+    await expect(
+      d.execute(`INSERT INTO mushaf_layout VALUES (1, 16, 1, 1, 1, 1, 'word', 'A')`),
+    ).rejects.toThrow();
+    await expect(
+      d.execute(`INSERT INTO mushaf_layout VALUES (1, 1, 1, 1, 1, 1, 'medallion', 'A')`),
+    ).rejects.toThrow();
+
+    await d.execute(`INSERT INTO mushaf_layout VALUES (604, 15, 1, 1, 1, 1, 'end', 'A')`);
+    const rows = await d.execute('SELECT COUNT(*) AS n FROM mushaf_layout');
+    expect(Number(rows.rows[0]['n'])).toBe(1);
+    d.close();
+  });
+
   it('adds verbatim + reserved columns to words', async () => {
     const d = createDatabase('file::memory:');
     await runMigrations(d);

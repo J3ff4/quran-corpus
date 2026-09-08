@@ -164,6 +164,23 @@ CREATE TABLE IF NOT EXISTS word_concept_tags (
   UNIQUE(word_id, tag_label)
 );
 
+-- The KFGQPC V2 page layout: one row per rendered glyph-word, in reading order.
+-- Source-agnostic per CLAUDE.md §3 -- no upstream ids anywhere. It joins the
+-- rest of the corpus on surah:ayah:position, which is exactly how `words` is
+-- keyed, and `char_type='end'` rows are the ayah medallions, which have no
+-- `words` row at all (they are position n+1 of an n-word ayah).
+CREATE TABLE IF NOT EXISTS mushaf_layout (
+  page        INTEGER NOT NULL CHECK(page BETWEEN 1 AND 604),
+  line        INTEGER NOT NULL CHECK(line BETWEEN 1 AND 15),
+  seq         INTEGER NOT NULL,
+  surah_id    INTEGER NOT NULL REFERENCES surahs(id) ON DELETE CASCADE,
+  ayah_number INTEGER NOT NULL,
+  position    INTEGER NOT NULL,
+  char_type   TEXT    NOT NULL CHECK(char_type IN ('word','end')),
+  glyph       TEXT    NOT NULL,
+  PRIMARY KEY (page, line, seq)
+);
+
 CREATE INDEX IF NOT EXISTS idx_ayahs_surah         ON ayahs(surah_id);
 CREATE INDEX IF NOT EXISTS idx_words_ayah          ON words(ayah_id);
 CREATE INDEX IF NOT EXISTS idx_translations_ayah   ON translations(ayah_id, language_code);
@@ -176,6 +193,7 @@ CREATE INDEX IF NOT EXISTS idx_roots_sort_order     ON roots(sort_order);
 CREATE INDEX IF NOT EXISTS idx_word_segments_word  ON word_segments(word_id, segment_index);
 CREATE INDEX IF NOT EXISTS idx_word_segments_root  ON word_segments(root);
 CREATE INDEX IF NOT EXISTS idx_word_concept_word   ON word_concept_tags(word_id);
+CREATE INDEX IF NOT EXISTS idx_mushaf_layout_ayah  ON mushaf_layout(surah_id, ayah_number, position);
 
 -- Global search (Phase 07b). Unified FTS5 over normalized Arabic + translation
 -- text. Arabic body is normalized in app code before insert (backfill) --

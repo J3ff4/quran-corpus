@@ -620,3 +620,44 @@ def mushaf_fetch_cmd(dest: str) -> None:
     with httpx.Client() as client:
         written = fetch_layout(Path(dest), range(PAGE_MIN, PAGE_MAX + 1), client)
     click.echo(f"fetched {len(written)} pages into {dest}")
+
+
+@main.command("import-mushaf")
+@click.argument("layout_dir")
+@click.option("--db", default="quran.db", show_default=True)
+@click.option(
+    "--overrides", default="tools/mushaf_line_overrides.tsv", show_default=True
+)
+@click.option(
+    "--repage/--no-repage",
+    default=True,
+    show_default=True,
+    help="Derive ayahs.page from the imported layout",
+)
+def import_mushaf_cmd(layout_dir: str, db: str, overrides: str, repage: bool) -> None:
+    """Import the KFGQPC V2 page layout. Refuses to write if validation fails."""
+    import sqlite3
+
+    from .mushaf_import import import_layout, word_counts
+    from .mushaf_layout import load_rows, read_overrides, validate_rows
+
+    rows = load_rows(Path(layout_dir), read_overrides(Path(overrides)))
+    con = sqlite3.connect(db)
+    try:
+        counts = word_counts(con)
+    finally:
+        con.close()
+
+    problems = validate_rows(rows, counts)
+    if problems:
+        for problem in problems[:50]:
+            click.echo(f"  {problem}", err=True)
+        raise click.ClickException(
+            f"{len(problems)} layout problems; nothing was written"
+        )
+
+    summary = import_layout(db, rows, repage=repage)
+    click.echo(
+        f"imported {summary.rows} rows across {summary.pages} pages; "
+        f"repaged {summary.repaged} ayahs"
+    )
