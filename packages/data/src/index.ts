@@ -41,6 +41,8 @@ export {
   backfillRootSortOrderIfStale,
 } from './queries/roots.js';
 export type { ConcordancePageOpts } from './queries/roots.js';
+export { getMushafPage, MUSHAF_PAGE_MIN, MUSHAF_PAGE_MAX } from './queries/mushaf.js';
+export type { MushafLine, MushafWord } from './queries/mushaf.js';
 export { getLemmaEntry, getLemmaConcordancePage, countLemmaConcordance } from './queries/lemma.js';
 // LEMMA_GLOSS_LIMIT, cleanGloss and cleanGlossList are deliberately NOT
 // exported: getLemmaEntry already applies them, so nothing outside this package

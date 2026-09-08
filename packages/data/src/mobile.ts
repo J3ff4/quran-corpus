@@ -22,6 +22,8 @@ export {
 export { getAllSurahs, getSurahById } from './queries/surahs.js';
 export { getAyahPreviews, getAyahsBySurah, getAyahWithWords } from './queries/ayahs.js';
 export type { AyahPreview } from './queries/ayahs.js';
+export { getMushafPage, MUSHAF_PAGE_MIN, MUSHAF_PAGE_MAX } from './queries/mushaf.js';
+export type { MushafLine, MushafWord } from './queries/mushaf.js';
 export { getJuzIndex, getPageIndex, getRevealedIndex } from './queries/browse.js';
 export type { JuzEntry, JuzSurahRange, PageEntry, RevealedEntry } from './queries/browse.js';
 export {
