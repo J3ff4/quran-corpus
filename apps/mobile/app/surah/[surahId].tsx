@@ -116,11 +116,11 @@ export default function SurahRoute() {
   const [readingError, setReadingError] = useState<string | null>(null);
   const readingRecorder = useMemo(() => {
     if (!displayedSurahId) return null;
-    return createLatestReadingPositionRecorder(async (ayahNumber) => {
+    return createLatestReadingPositionRecorder(async ({ ayahNumber, page }) => {
       setReadingError(null);
       const userDb = await openUserDb();
       const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
-      await recordReadingPosition(userClient, displayedSurahId, ayahNumber);
+      await recordReadingPosition(userClient, { surahId: displayedSurahId, ayahNumber, page });
       // Decision 22: any reading counts, and this write already fires on the
       // reader's scroll, so it is the one place that sees every read without a
       // second listener to keep in step.
@@ -371,7 +371,9 @@ export default function SurahRoute() {
         onEditNote={(ayahNumber) => setEditingNote(ayahNumber)}
         onToggleAudio={audio.toggleAyah}
         onReadingAyah={(ayahNumber) => {
-          readingRecorder?.record(ayahNumber);
+          // No page: this fires from the translation list's scroll. The pager
+          // records its own page on each settle (Task 10).
+          readingRecorder?.record({ ayahNumber, page: null });
         }}
         // 1 and 114 are facts about the mushaf, and parseSurahId enforces the
         // same bound on the route. D47: no wrapping, so an end is a dead arrow
