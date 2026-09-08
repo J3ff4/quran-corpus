@@ -364,19 +364,27 @@ git commit -m "chore(mobile): remove the M7a spike route and its fonts"
 
 M7a is done when all of these hold:
 
-- [ ] Findings §1 quotes a licence string (or `NONE STATED`) for the layout and for all
+- [x] Findings §1 quotes a licence string (or `NONE STATED`) for the layout and for all
       three font editions, and states the accepted exposure in one paragraph.
-- [ ] `check_mushaf_layout.py` runs clean against the chosen edition, and its
+- [x] `check_mushaf_layout.py` runs clean against the chosen edition, and its
       disagreement list against `ayahs.page` is written down and explained.
-- [ ] The validator has been mutation-checked: a corrupted layout row makes it fail.
-- [ ] Findings §3 gives measured MB per edition per format, against the ~40MB budget.
-- [ ] Findings §4 answers yes/no, with a screenshot each: runtime registration, WOFF2,
+      **Met with one exception, deliberately.** The chosen edition is V2, and V2
+      does *not* run clean: three problems on page 589, all one upstream defect
+      (§2). It is written down, explained and handed to M7b as a pinned
+      correction row rather than papered over. V1 is the edition that runs
+      clean, and the owner chose V2 knowing that.
+- [x] The validator has been mutation-checked: a corrupted layout row makes it fail.
+- [x] Findings §3 gives measured MB per edition per format, against the ~40MB budget.
+      The chosen edition **exceeds it** — 120.0 MB against ~40 MB — and the owner
+      accepted the overrun explicitly (§6, deliverable 4).
+- [x] Findings §4 answers yes/no, with a screenshot each: runtime registration, WOFF2,
       per-word tinting in glyph text, per-word tinting in fallback text.
-- [ ] Six renders captured on the owner's GM1917 and sent; the owner has named an
+- [x] Six renders captured on the owner's GM1917 and sent; the owner has named an
       edition. (Nine before V4 was ruled out in Findings 2.)
-- [ ] PRD §10 renumbered.
-- [ ] No spike code, no font binary and no layout download is in git.
-- [ ] `lint`, `type-check` and `test` pass in `apps/mobile` (modulo issue #54).
+- [x] PRD §10 renumbered.
+- [x] No spike code, no font binary and no layout download is in git.
+- [x] `lint`, `type-check` and `test` pass in `apps/mobile` (modulo issue #54).
+      2026-09-07: lint clean, 869 tests pass, type-check red only on #54's two.
 
 Explicitly **not** in M7a: any schema change, any importer, any change to the reader.
 
