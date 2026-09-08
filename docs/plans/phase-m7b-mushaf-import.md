@@ -1634,7 +1634,7 @@ Machine run, owner not present. Everything below is measured, not asserted.
 | 8 | Page 589 renders 84:21's medallion on line 14 | **PASS** — in the data and on screen |
 | 9 | Ordinary Arabic renders in KFGQPC, not the system face | **PASS** — compared against the previous WOFF2 build |
 | 10 | Verification log | this section, plus the device run below |
-| 11 | `/code-review` run and answered | **OWED** — user-triggered (§5) |
+| 11 | `/code-review` run and answered | **PASS** — 8 findings, 5 fixed (`14e008b`, `86dea11`), 3 declined |
 
 **The 18-vs-56 correction.** The plan said 18 ayahs would move and to stop if any
 other number came back. 56 came back, so this stopped and measured, three ways:
@@ -1753,3 +1753,55 @@ M7c, and M7c must draw those lines rather than assume 1..15 are all present.
   the old APK as a control. The next `corpusDbVersion` bump deletes it.
 - fontTools also drops an `FFTM` table when subsetting (`don't know how to
   subset`) — a FontForge timestamp, not a rendering table.
+
+### 2026-09-08 — `/code-review` (§5)
+
+Two triggers: `packages/data` schema+queries, and parsing untrusted upstream
+JSON. Eight findings, one pass, no re-run — no fix was large enough to
+plausibly introduce a new defect.
+
+Fixed (`14e008b`, `packages/scraper`):
+
+1. **Three commands were unreachable.** `mushaf-fetch`, `import-mushaf` and
+   `mushaf-fonts` were registered *after* `if __name__ == "__main__"`, so
+   `python -m scraper.cli mushaf-fetch` answered `Error: No such command`.
+   Verified live before and after.
+2. **A wrong `--layout_dir` wiped the layout and exited 0.** `validate_rows`
+   is per-ayah, so it passes `[]` clean; `import_layout` DELETEs the whole
+   table before inserting. Added `validate_completeness` (all 604 pages, every
+   corpus ayah), with `--allow-partial` for fixture-sized imports.
+3. **Same gate covers a half-fetched layout.** `mushaf-fetch` is resumable and
+   takes minutes, so a partial dir is the normal interrupted state; importing
+   one re-pages only covered ayahs, leaving `ayahs.page` a mix of V1 and V2.
+   This is the phase-23 shape-gate-blind-to-content-loss failure again.
+4. **`--overrides` died with a raw `FileNotFoundError`** when run from outside
+   `packages/scraper`, its default being a relative path. Now a `ClickException`.
+
+Fixed (`86dea11`, `apps/mobile`):
+
+5. **`useMushafPageFont` threw out of render** for a page outside 1..604 —
+   reachable from a route param or a pager's `page ± 1` — taking the screen
+   down instead of surfacing through the hook's own `error` channel.
+
+Declined, with reasons:
+
+6. **Override `seq` ignores position within the destination line.** True, and
+   correct for the one shipped override (84:21's end marker, which belongs
+   last). Fixing it needs the override file to carry a `seq`, which no case
+   yet requires. Documented at the call site instead — YAGNI, not oversight.
+7. **`openCorpusDb` deletes the old extract before the copy.** A deliberate
+   trade-off, and the reviewer's own note says "worth stating explicitly if
+   kept" — the comment already states it: a phone low on space is not asked to
+   hold 268 MB at once. Reversing the order trades a rare no-corpus state for a
+   common out-of-space one.
+8. **Two same-tick mounts can both call `loadAsync` for one page.** Registration
+   is idempotent, so the only cost is parsing a font twice in a race that needs
+   two components mounting the same page in one tick. Caching the in-flight
+   promise would make the docstring literally true and change nothing else.
+
+Mutation-checked: both `validate_completeness` branches, the CLI's completeness
+wiring, and the hook guard each fail a test when removed.
+
+Gate after the fixes: scraper 822 passed, ruff + mypy clean; `packages/data`
+456 passed, tsc clean; `apps/mobile` 86 files / 886 tests passed, eslint clean,
+type-check red only on issue #54's two pre-existing errors.
