@@ -15,6 +15,11 @@ export interface AyahCardProps {
   /** Empty until the reader has fetched this ayah's words; see AyahText. */
   words: Word[];
   translationText: string | null;
+  /** Whether to draw it. Separate from `translationText` being null, which
+   *  means the ayah has no translation in the chosen language at all: this one
+   *  is the reader's own switch, and the card must not have to guess which of
+   *  the two it is looking at. */
+  showTranslation?: boolean;
   bookmarked: boolean;
   /** This ayah's note, or null for none. Only ever non-null on a bookmarked
    *  ayah -- a note is an attribute of a bookmark. */
@@ -34,6 +39,7 @@ export function AyahCard({
   arabicText,
   words,
   translationText,
+  showTranslation = true,
   bookmarked,
   note = null,
   playing,
@@ -76,7 +82,7 @@ export function AyahCard({
         ayahNumber={ayahNumber}
         onWordPress={onWordPress}
       />
-      {translationText ? (
+      {showTranslation && translationText ? (
         <Text
           style={{
             color: theme.text,

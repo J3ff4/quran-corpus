@@ -86,6 +86,10 @@ interface SurahReaderProps {
    *  renders a reader. */
   readerMode: ReaderMode;
   onChangeReaderMode: (mode: ReaderMode) => void;
+  /** Whether the cards draw their translation. Owned by the screen above for
+   *  the same reason readerMode is: it is a persisted setting. */
+  showTranslation?: boolean;
+  onChangeShowTranslation?: (show: boolean) => void;
   /** Ayah to open at, from a bookmark or the saved reading position. */
   initialAyahNumber?: number | null;
   /** Omitted leaves the reader as a plain mushaf: every ayah renders its full
@@ -231,6 +235,7 @@ interface AyahListProps {
   notesByAyah?: Map<number, string | null>;
   playingAyah: number | null;
   audioEnabled: boolean;
+  showTranslation: boolean;
   uiLocale: UiLocaleCode;
   wordsByAyah: Map<number, Word[]>;
   /** An ayah has come into view; the caller may want its words. Held in a ref
@@ -275,6 +280,7 @@ function AyahList({
   notesByAyah,
   playingAyah,
   audioEnabled,
+  showTranslation,
   uiLocale,
   wordsByAyah,
   onVisibleAyah,
@@ -726,7 +732,13 @@ function AyahList({
             onToggleAudio,
             onWordPress,
           };
-          return <AyahCard {...shared} translationText={item.translation?.text ?? null} />;
+          return (
+            <AyahCard
+              {...shared}
+              translationText={item.translation?.text ?? null}
+              showTranslation={showTranslation}
+            />
+          );
         }}
         CellRendererComponent={CellRenderer}
         onViewableItemsChanged={onViewableItemsChanged.current}
@@ -795,6 +807,8 @@ export function SurahReader({
   onChangeContentLanguage,
   readerMode,
   onChangeReaderMode,
+  showTranslation = true,
+  onChangeShowTranslation,
   initialAyahNumber,
   loadWords,
   loadWordSummary,
@@ -949,6 +963,8 @@ export function SurahReader({
           {...(readerMode === 'mushaf' ? {} : { titleStyle })}
           mode={readerMode}
           onChangeMode={onChangeReaderMode}
+          showTranslation={showTranslation}
+          {...(onChangeShowTranslation ? { onChangeShowTranslation } : {})}
           uiLocale={uiLocale}
           prevSurahId={prevSurahId}
           nextSurahId={nextSurahId}
@@ -991,6 +1007,8 @@ export function SurahReader({
     uiLocale,
     readerMode,
     onChangeReaderMode,
+    showTranslation,
+    onChangeShowTranslation,
     data.surah.id,
     headerSurahName,
     prevSurahId,
@@ -1271,6 +1289,7 @@ export function SurahReader({
             {...(notesByAyah ? { notesByAyah } : {})}
             playingAyah={playingAyah}
             audioEnabled={audioEnabled}
+            showTranslation={showTranslation}
             uiLocale={uiLocale}
             wordsByAyah={wordsByAyah}
             onVisibleAyah={onVisibleAyah}

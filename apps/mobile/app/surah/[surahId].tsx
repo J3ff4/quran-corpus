@@ -51,6 +51,8 @@ export default function SurahRoute() {
     uiLocale,
     readerMode,
     setReaderMode,
+    showTranslation,
+    setShowTranslation,
     reciterId,
     setReciterId,
     continuousPlay,
@@ -364,6 +366,8 @@ export default function SurahRoute() {
         onChangeContentLanguage={setContentLanguage}
         readerMode={readerMode}
         onChangeReaderMode={setReaderMode}
+        showTranslation={showTranslation}
+        onChangeShowTranslation={setShowTranslation}
         initialAyahNumber={initialAyahNumber}
         loadWords={loadWords}
         loadWordSummary={loadWordSummary}

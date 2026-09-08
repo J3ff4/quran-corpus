@@ -89,6 +89,7 @@ export type UiStringKey =
   | 'reader.chooseReciter'
   | 'reader.ayahLabel'
   | 'reader.chooseLanguage'
+  | 'reader.showTranslationLabel'
   | 'reader.bismillah'
   | 'reader.back'
   | 'reader.mode'
@@ -334,6 +335,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.chooseReciter': 'Choose reciter',
     'reader.ayahLabel': 'Ayah',
     'reader.chooseLanguage': 'Choose translation language',
+    'reader.showTranslationLabel': 'Translation',
     'reader.bismillah': 'In the name of Allah, the Entirely Merciful, the Especially Merciful',
     'reader.back': 'Back',
     'reader.mode': 'Reading mode',
@@ -536,6 +538,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.chooseReciter': 'Qorini tanlang',
     'reader.ayahLabel': 'Oyat',
     'reader.chooseLanguage': 'Tarjima tilini tanlang',
+    'reader.showTranslationLabel': 'Tarjima',
     'reader.bismillah': 'Mehribon va rahmli Alloh nomi bilan',
     'reader.back': 'Orqaga',
     'reader.mode': 'O‘qish rejimi',
@@ -733,6 +736,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.chooseReciter': 'Выберите чтеца',
     'reader.ayahLabel': 'Аят',
     'reader.chooseLanguage': 'Выберите язык перевода',
+    'reader.showTranslationLabel': 'Перевод',
     'reader.bismillah': 'Именем Аллаха, Милостивого, Милосердного',
     'reader.back': 'Назад',
     'reader.mode': 'Режим чтения',

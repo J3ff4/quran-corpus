@@ -30,6 +30,10 @@ export interface AppSettings {
   arabicScale: ArabicScale;
   reduceMotion: boolean;
   readerMode: ReaderMode;
+  /** Whether translation mode draws the translation under the Arabic. Off
+   *  leaves the cards Arabic-only -- and takes the language control with it,
+   *  since a picker that changes nothing visible is a dead control. */
+  showTranslation: boolean;
   wbwDensity: WbwDensity;
   /** Whether recitation runs on into the next ayah. Saved rather than held in
    *  useRecitation, because Settings offers it: a second copy inside the reader
@@ -48,6 +52,7 @@ export interface AppSettingsContextValue extends AppSettings {
   setArabicScale: (scale: ArabicScale) => void;
   setReduceMotion: (reduce: boolean) => void;
   setReaderMode: (mode: ReaderMode) => void;
+  setShowTranslation: (show: boolean) => void;
   setWbwDensity: (density: WbwDensity) => void;
   setContinuousPlay: (enabled: boolean) => void;
   setReciterId: (id: string) => void;
@@ -64,6 +69,7 @@ const defaultSettings: AppSettings = {
   arabicScale: 'medium',
   reduceMotion: false,
   readerMode: 'translation',
+  showTranslation: true,
   // Dense, not hybrid (owner ruling 2026-09-01). See DENSE_DEFAULT_KEY below
   // for what happens to a phone that already stored the old default.
   wbwDensity: 'dense',
@@ -85,7 +91,18 @@ const AppSettingsContext = createContext<AppSettingsContextValue | null>(null);
 // change -- the owner's report was that the Arabic dominated the card at any
 // system size. System scaling still composes on top; nothing here sets
 // allowFontScaling.
-const settingKeys = ['uiLocale', 'contentLanguage', 'theme', 'analyticsEnabled', 'arabicScale', 'reduceMotion', 'readerMode', 'wbwDensity', 'continuousPlay', 'reciterId'] as const;
+const settingKeys = ['uiLocale', 'contentLanguage', 'theme', 'analyticsEnabled', 'arabicScale', 'reduceMotion', 'readerMode', 'showTranslation', 'wbwDensity', 'continuousPlay', 'reciterId'] as const;
+
+/** A stored boolean, or the default for anything that is not one.
+ *
+ *  `value === 'true'` is enough only while the default is false: on a setting
+ *  that defaults to ON it reads an absent row, and every unrecognised string,
+ *  as OFF -- which is the translation disappearing rather than a fallback. */
+function storedBoolean(value: string | null, fallback: boolean): boolean {
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return fallback;
+}
 
 function isUiLocale(value: string | null): value is UiLocaleCode {
   return uiLocales.some((locale) => locale.code === value);
@@ -177,6 +194,7 @@ export async function loadPersistedAppSettings(client: MobileDataClient): Promis
   const persistedArabicScale = persisted.arabicScale;
   const reduceMotion = persisted.reduceMotion;
   const persistedReaderMode = persisted.readerMode;
+  const showTranslation = persisted.showTranslation;
   const persistedWbwDensity = await migrateWbwDensityDefault(client, persisted.wbwDensity);
   const continuousPlay = persisted.continuousPlay;
   const persistedReciterId = persisted.reciterId;
@@ -189,6 +207,7 @@ export async function loadPersistedAppSettings(client: MobileDataClient): Promis
     arabicScale: isArabicScale(persistedArabicScale) ? persistedArabicScale : defaultSettings.arabicScale,
     reduceMotion: reduceMotion === 'true',
     readerMode: isReaderMode(persistedReaderMode) ? persistedReaderMode : defaultSettings.readerMode,
+    showTranslation: storedBoolean(showTranslation, defaultSettings.showTranslation),
     wbwDensity: isWbwDensity(persistedWbwDensity) ? persistedWbwDensity : defaultSettings.wbwDensity,
     // Same 'true' comparison the other two booleans take, and for the same
     // reason: settingValue stores String(value), so anything that is not
@@ -397,6 +416,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       setArabicScale: (arabicScale) => updateSetting('arabicScale', arabicScale),
       setReduceMotion: (reduceMotion) => updateSetting('reduceMotion', reduceMotion),
       setReaderMode: (readerMode) => updateSetting('readerMode', readerMode),
+      setShowTranslation: (showTranslation) => updateSetting('showTranslation', showTranslation),
       setWbwDensity: (wbwDensity) => updateSetting('wbwDensity', wbwDensity),
       setContinuousPlay: (continuousPlay) => updateSetting('continuousPlay', continuousPlay),
       // Guarded on the way in as well as on the way out. The sheet only ever

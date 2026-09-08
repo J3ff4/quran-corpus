@@ -9,6 +9,7 @@ export type IconName =
   | 'settings'
   | 'words'
   | 'translate'
+  | 'translationText'
   | 'dictionary'
   | 'menu'
   | 'info'
@@ -35,6 +36,10 @@ export type IconName =
  * RN has no currentColor, so the stroke arrives as a prop from the theme.
  */
 const PATHS: Record<IconName, string[]> = {
+  // Lines of prose, for the switch that draws or hides the translation under
+  // the Arabic. Deliberately not a second globe: the globe beside it picks the
+  // language, and two glyphs of the same thing name neither.
+  translationText: ['M4 7.5h16', 'M4 12h16', 'M4 16.5h10'],
   home: ['M3 10.5 12 3l9 7.5', 'M5 9.5V21h14V9.5'],
   book: [
     'M4 5a2 2 0 0 1 2-2h5v18H6a2 2 0 0 1-2-2z',

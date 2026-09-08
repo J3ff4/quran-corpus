@@ -1185,6 +1185,24 @@ describe('SurahReader', () => {
     expect(screen.queryByTestId('mushaf-reader')).toBeNull();
   });
 
+  it('hides the translation on every card when the setting is off', () => {
+    // The setting is the screen's, the cards are the list's, and the reader is
+    // the only thing between them -- a wiring test, because AyahCard's own
+    // suite passes whether or not anything hands it the flag.
+    const data = readerData(3);
+    const translation = data.ayahs[0]!.translation!.text;
+
+    const { container, rerender } = render(
+      <SurahReader {...baseProps(data)} readerMode="translation" showTranslation />,
+    );
+    expect(container.textContent).toContain(translation);
+
+    rerender(<SurahReader {...baseProps(data)} readerMode="translation" showTranslation={false} />);
+
+    expect(container.textContent).not.toContain(translation);
+    expect(container.textContent).toContain(data.ayahs[0]!.ayah.text_uthmani);
+  });
+
   it('opens on the page holding the requested ayah', () => {
     // /surah/1?ayah=5 has to open the page 1:5 is printed on, not the surah's
     // first page: a page is not a surah (ruling 10), and the ayah column is

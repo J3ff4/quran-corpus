@@ -19,6 +19,7 @@ function renderHeader(props: Partial<ReaderHeaderProps> = {}) {
     onOpenLanguage: vi.fn(),
     onOpenSearch: vi.fn(),
     onBack: vi.fn(),
+    onChangeShowTranslation: vi.fn(),
   };
   render(
     <ThemeContext.Provider value={themeColors.dark}>
@@ -83,6 +84,39 @@ describe('ReaderHeader', () => {
 
     fireEvent.click(screen.getByLabelText('Search'));
     expect(onOpenSearch).toHaveBeenCalledTimes(1);
+  });
+
+  it('switches the translation off and back on', () => {
+    const { onChangeShowTranslation } = renderHeader({ showTranslation: true });
+
+    fireEvent.click(screen.getByTestId('toggle-translation'));
+
+    expect(onChangeShowTranslation).toHaveBeenCalledWith(false);
+  });
+
+  it('says whether the translation is on, not just that a control exists', () => {
+    // A switch whose only difference is which handler argument it sends tells
+    // a screen reader nothing about the state it is in.
+    renderHeader({ showTranslation: false });
+
+    expect(screen.getByTestId('toggle-translation').getAttribute('aria-checked')).toBe('false');
+  });
+
+  it('hides the language control when the translation is off', () => {
+    // A picker that changes nothing visible is a dead control.
+    renderHeader({ showTranslation: false });
+
+    expect(screen.queryByTestId('open-language')).toBeNull();
+    expect(screen.getByTestId('toggle-translation')).toBeTruthy();
+  });
+
+  it('draws neither translation control in mushaf mode', () => {
+    // The printed page has no translation to switch and no language to pick
+    // (ruling 4: no control chrome on the page).
+    renderHeader({ mode: 'mushaf' });
+
+    expect(screen.queryByTestId('toggle-translation')).toBeNull();
+    expect(screen.queryByTestId('open-language')).toBeNull();
   });
 
   it('names the surah in the bar for a screen reader even while it is faded out', () => {
