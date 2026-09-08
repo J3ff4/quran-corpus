@@ -707,10 +707,70 @@ after the ruling, puts subset V2 at 120.0 MB in-APK against V1's 43.1 MB, and
 V2 cannot be subset further. Re-put to the owner with that number attached; §6
 records whatever they decide second.
 
-**Edition ruling: pending the owner.** The evidence outside taste all points one
-way and is recorded in §2 and §3: V1 agrees with our own `ayahs.page` on all 604
-pages (V2 disagrees on 18 ayahs and carries an upstream line-number defect on
-page 589), and V1 is roughly half V2's byte cost. Choosing V2 costs a re-paging
-migration of `ayahs.page` plus every stored reading position.
+**Edition ruling: V2, confirmed against the byte cost.** Re-put to the owner
+with the 120.0 MB figure attached and the two cheaper alternatives (V1, or V2
+with fonts downloaded after install); the owner chose **"V2 anyway — eat the
+size"**. Every non-taste signal favoured V1 and the owner overrode all of them
+knowingly. That is the decision; §6 carries what it costs.
 
 ### §6 Decision
+
+The spike set out to answer four questions. All four are answered.
+
+**1. Licence — proceed, with the exposure recorded.** Every QUL resource page
+for the three layouts and three fonts states no licence, and the "Terms of use"
+they footer to is a JavaScript shell with no readable body (§1). Upstream rights
+belong to KFGQPC; QUL is a redistributor. The owner accepted the exposure under
+ruling 9, and §1's one-paragraph statement is the record. **Decision: ship,
+attribute KFGQPC and QUL in About/Credits per §11 of CLAUDE.md, and re-check if
+KFGQPC ever publishes terms.**
+
+**2. Edition — V2.** Owner's ruling, twice: on looks first, then again with the
+byte cost in hand. **Decision: V2 layout, V2 fonts, and M7b pays the two bills
+that come with it** — a re-paging migration of `ayahs.page` (V2 disagrees with
+our current V1 paging on 18 ayahs) that also moves every stored reading position,
+and the page-589 upstream defect (84:21's end-marker on line 13, its words on
+line 14) which needs a pinned correction row, not a silent fix.
+
+**3. Font registration — runtime `loadAsync`, TTF only.** Proven on device (§4).
+**Decision: bundle TTF, never WOFF2** — a WOFF2 `loadAsync` resolves without
+error and renders the system font's reading of the QCF code points, which looks
+like Arabic rather than tofu, so neither the API nor a screenshot catches it.
+The only valid check for a registered font is a rendered-pixel comparison
+against the not-loaded state, and M7b's first device run must re-confirm
+registration from a real APK, since this spike ran through Expo Go.
+
+**4. Byte cost — 120.0 MB, accepted.** Subset V2 TTF over all 604 pages (§3
+correction). Subsetting cannot improve it: a V2 page font is 178 whole-word
+outlines and uses all of them. **Decision: accept it in the APK.** The APK goes
+to roughly 203 MB, past the 200 MB base-module ceiling, so a future Play upload
+needs Play Asset Delivery — a distribution problem for M8's release hardening,
+not a blocker for the side-loaded builds we ship today. M7b still subsets (9% is
+free), and must verify a subset page against its unsubset original on device
+because fontTools reports a malformed class table on 15 V2 fonts.
+
+#### What M7b must build
+
+- Import the V2 page layout into `packages/data` — 83,665 word rows of (page,
+  line, surah, ayah, position, glyph). Source is the quran.com v4 API, with §2's
+  three traps handled explicitly: read the **second** `line_number` for V2, assign
+  each word to its own `page_number`, and never sort or do arithmetic on word ids.
+- Re-page `ayahs.page` to V2 and migrate stored reading positions. This touches
+  `packages/data` schema and the on-device user DB, so it takes both §5 triggers
+  for an independent review, and the user-DB migration is additive only.
+- Subset and bundle the 604 V2 TTFs, verified page-by-page against the unsubset
+  originals on device.
+- Register a page font at runtime, re-confirmed from a real APK first.
+- `fontTools` becomes a `packages/scraper` dependency — a §12 question to ask
+  before writing the importer, not while writing it.
+
+#### What M7c must build
+
+- The pager itself (model A), replacing the scroll reader per the M7 rulings.
+- Per-page scale: `fontSize = textWidth / widestLineEm`, one factor per page,
+  with `numberOfLines={1}` so an overflow is loud instead of silently wrapping.
+- The chrome that makes it a mushaf rather than lines of glyphs: page frame and
+  margins, surah bands, centred bismillah, page border, page number.
+- Per-word highlight states — safe in both glyph and Unicode text (§4); only
+  sub-word colouring stays banned.
+- Ayah-by-ayah translation, toggleable.
