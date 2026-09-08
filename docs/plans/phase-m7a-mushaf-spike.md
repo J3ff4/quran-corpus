@@ -587,6 +587,39 @@ question — it is only about whether RN Android will load a WOFF2 at all.
 Note `fontTools` is not currently a dependency of `packages/scraper`. Adding it
 is a §12 question for M7b, not something M7a does.
 
+**Correction, 2026-09-07 — measured on all 604 fonts, not a 15-page sample.**
+Both subset figures above were projections and both were wrong; the V2 TTF row
+was never measured at all. §4 also killed WOFF2 outright, so only TTF matters.
+All 604 V2 TTFs were downloaded and every font of both editions was subset to
+its own page's codepoints (fontTools, `layout_features="*"`) and deflated:
+
+| Edition | Fonts | Raw | In APK | Subset raw | **Subset in APK** |
+|---|---|---|---|---|---|
+| V1 TTF | 604 | 90.5 MB | 51.7 MB | 62.6 MB | **43.1 MB** |
+| V2 TTF | 604 | 198.2 MB | 129.5 MB | 180.9 MB | **120.0 MB** |
+
+**Subsetting works on V1 and barely touches V2** — 31% off V1, 9% off V2 — and
+the reason is structural, not a tuning problem. Page 106's fonts, compared:
+
+| | Glyphs | `glyf` | File |
+|---|---|---|---|
+| V1 p106 | 608 | 122 KB | 147 KB |
+| V2 p106 | 178 | 301 KB | 313 KB |
+
+V1 ships a large glyph inventory of which a page uses about a quarter, so there
+is a great deal to throw away. V2 ships one heavily-detailed outline per word on
+the page and nothing else — every glyph is used, so there is nothing to remove.
+**V2 cannot be made to fit by subsetting.** No amount of tooling changes this;
+it is what the edition is.
+
+Against the current 82.7 MB release APK: V1 lands it near 126 MB, V2 near
+203 MB — past the 200 MB base-module ceiling a Play upload would have to clear,
+before any of ruling 8's budget is considered.
+
+fontTools emits `Unknown ClassDef format: 0` on 15 of the V2 fonts and is silent
+on all 604 V1 fonts. A malformed class table means M7b must verify a subset page
+by rendering it against its unsubset original on device, not by size alone.
+
 **Everything else the bundle grows by.** The layout itself is small: the 604
 API responses are 32 MB of JSON, but almost all of that is translation,
 transliteration and audio fields we discard. The rows we keep are one per word
@@ -653,6 +686,26 @@ what M6l's row-estimation work did for the scroll reader.
 **The visible difference between the editions.** V1 sets the text wider and more
 openly, with ornate crowned ayah medallions; V2 sets tighter, fits more per line,
 and uses a plain oval medallion. Both are KFGQPC Hafs; neither is more correct.
+
+**Line advances say a page is one scale factor.** Measured from each page
+font's `hmtx`: a page's full lines all carry essentially the same advance — V1
+p106 runs 14.14-14.28 em across 13 lines, V2 p106 15.43-15.75 em. Short lines
+are genuinely short in print (a surah's last line, centred). So M7b sizes a page
+with `fontSize = textWidth / widestLineEm`, one number per page. On the owner's
+GM1917 that is about 24 dp for V2; the spike's hardcoded 26 is why pages 106 and
+604 wrapped. V2 packs ~15.6 em per line against V1's ~14.2, so at equal page
+width V2's text renders about 9% smaller.
+
+**Owner's ruling, 2026-09-07: V2 on looks** — "v2 looks much better. but both of
+them does not resemble mushaf yet." The second half is the spike's missing
+chrome, not the font: no page frame or margins, no surah bands, no centred
+bismillah, no page border or number, and lines wrapping instead of clipping.
+M7c builds all of it.
+
+**The ruling was made before V2's byte cost existed.** §3's correction, measured
+after the ruling, puts subset V2 at 120.0 MB in-APK against V1's 43.1 MB, and
+V2 cannot be subset further. Re-put to the owner with that number attached; §6
+records whatever they decide second.
 
 **Edition ruling: pending the owner.** The evidence outside taste all points one
 way and is recorded in §2 and §3: V1 agrees with our own `ayahs.page` on all 604
