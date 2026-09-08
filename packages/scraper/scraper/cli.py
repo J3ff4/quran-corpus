@@ -607,3 +607,16 @@ def fetch_salmone(dest: str, force: bool) -> None:
 
 if __name__ == "__main__":
     main()
+
+
+@main.command("mushaf-fetch")
+@click.option("--dest", required=True, help="Directory for the 604 layout JSON files")
+def mushaf_fetch_cmd(dest: str) -> None:
+    """Download the KFGQPC page layout from api.quran.com. Resumable."""
+    import httpx
+
+    from .mushaf_fetch import PAGE_MAX, PAGE_MIN, fetch_layout
+
+    with httpx.Client() as client:
+        written = fetch_layout(Path(dest), range(PAGE_MIN, PAGE_MAX + 1), client)
+    click.echo(f"fetched {len(written)} pages into {dest}")
