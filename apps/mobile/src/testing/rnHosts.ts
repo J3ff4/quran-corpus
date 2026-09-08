@@ -33,6 +33,11 @@ interface HostProps {
   // every render. `pointerEvents` is destructured too, but mapped rather than
   // dropped -- see below.
   accessible?: unknown;
+  // iOS's half of the hide-from-screen-readers pair, alongside Android's
+  // importantForAccessibility. Dropped rather than mapped: React lowercases it
+  // into an unknown DOM attribute, and the Android prop below is the one a
+  // test can assert on.
+  accessibilityElementsHidden?: unknown;
   contentContainerStyle?: unknown;
   // Reanimated's layout-animation builders, on an Animated.View. Nothing in
   // jsdom can run one, and spread onto a DOM node React warns about all three
@@ -240,6 +245,7 @@ export function host(tag: string) {
     style,
     testID,
     accessible: _accessible,
+    accessibilityElementsHidden: _accessibilityElementsHidden,
     contentContainerStyle: _contentContainerStyle,
     entering: _entering,
     exiting: _exiting,
