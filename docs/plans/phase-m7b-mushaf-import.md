@@ -1515,7 +1515,13 @@ for k in sorted(moved)[:20]:
     print(f'  {k[0]}:{k[1]} {moved[k][0]} -> {moved[k][1]}')
 PY
 ```
-Expected: **18 ayahs move**, all by one page, and they are the boundary list in M7a §2 (5:77, 5:83, 5:90, 6:131, 55:17-18, 55:41, 55:68-69, 68:16, 69:35, 70:40, 74:18, 79:16, 80:41-42, 83:5-6, 83:34, 84:25 and neighbours). Anything else moving means the derivation is wrong — stop and investigate, do not ship it.
+Expected: **56 ayahs move**, all by exactly one page. (This plan and M7a §5 both
+said 18; the live run measured 56 and the smaller figure was wrong. Confirmed
+independently: V1-vs-V2 read straight from the layout JSON gives the same 56
+without touching a database, and our pre-import `ayahs.page` matches the V1
+pages from that JSON on all 6,236 ayahs — our stored paging *was* V1.) Any ayah
+moving by more than one page, or any ayah left with a NULL page, means the
+derivation is wrong — stop and investigate, do not ship it.
 
 - [ ] **Step 3: Build the fonts**
 
@@ -1587,7 +1593,7 @@ M7b is done when all of these hold:
 
 - [ ] `mushaf_layout` holds 83,665 rows across 604 pages: 77,429 `word` + 6,236 `end`.
 - [ ] The importer refuses to write when validation fails, proven by a run that exits non-zero and leaves 0 rows.
-- [ ] Exactly 18 ayahs changed page, and they are M7a §2's boundary list.
+- [ ] Exactly 56 ayahs changed page, each by one page, and no ayah is left without one.
 - [ ] `getMushafPage` returns lines in order and rejects a page outside 1..604.
 - [ ] Both traps are mutation-checked: assigning by the file index fails a test, and dropping `ORDER BY line, seq` fails a test.
 - [ ] `uv run scraper mushaf-fonts` reproduces 604 subset fonts from an empty dest; none of them is in git.
@@ -1607,3 +1613,69 @@ Explicitly **not** in M7b: the pager UI, per-page scale, page chrome, translatio
 | A subset font renders wrong on device (the 15 ClassDef warnings) | Ship the unsubset fonts: 198.2 MB raw / 129.5 MB in-APK. Costs ~10 MB in the APK, changes no code — `mushaf-fonts` writes the cache file straight through. |
 | Fonts missing on a fresh checkout | Metro fails to resolve at bundle time, loudly, and README Step 5 names the command. No silent fallback — which is the point. |
 | Upstream API disappears mid-import | `mushaf-fetch` is resumable and the JSON is kept outside git at `~/quran-data/refdata/mushaf/pages`; re-parsing never needs a re-fetch (§11). |
+
+---
+
+## Verification log
+
+### 2026-09-08 — Tasks 1-8, code and live import (no device run yet)
+
+Machine run, owner not present. Everything below is measured, not asserted.
+
+| # | Criterion | Result |
+|---|---|---|
+| 1 | `mushaf_layout` holds 83,665 rows / 604 pages | **PASS** — 77,429 `word` + 6,236 `end`, exactly as M7a measured |
+| 2 | Importer refuses to write when validation fails | **PASS** — a corpus disagreeing with the layout exits 1, leaves 0 rows and `ayahs.page` untouched |
+| 3 | Ayahs re-paged | **PASS with a corrected number** — **56**, not the 18 this plan predicted. See below |
+| 4 | `getMushafPage` orders lines and rejects out-of-range pages | **PASS** — 8 tests |
+| 5 | Both traps mutation-checked | **PASS** for the file-index trap, the override and the backwards-marker check; the `ORDER BY` mutation does **not** bite (see Task 5's commit) |
+| 6 | `mushaf-fonts` reproduces 604 subset fonts, none in git | **PASS** — 198.2 MB raw -> 180.9 MB subset, 604 files, path gitignored |
+| 7 | Real APK: page renders in glyphs, pixels differ from not-loaded | **OWED** — needs the owner and the phone |
+| 8 | Page 589 renders 84:21's medallion on line 14 | **PASS in the data**, pixels owed — marker now line 14 seq 5, immediately after its last word at line 14 seq 4; **0** backwards markers remain corpus-wide |
+| 9 | Ordinary Arabic renders in KFGQPC, not the system face | **OWED** — Task 1 is the fix; only a pixel comparison can prove it |
+| 10 | Verification log | this section |
+| 11 | `/code-review` run and answered | **OWED** — user-triggered (§5) |
+
+**The 18-vs-56 correction.** The plan said 18 ayahs would move and to stop if any
+other number came back. 56 came back, so this stopped and measured, three ways:
+
+1. DB diff before/after the import: 56 ayahs, every one by exactly one page, no
+   ayah left without a page, pages still 1..604.
+2. V1 (request-file index) against V2 (`page_number`), read straight from the
+   layout JSON with no database involved: **the same 56**.
+3. Our *pre-import* `ayahs.page` against the V1 pages from that same JSON: they
+   agree on **all 6,236 ayahs**. Our stored paging was exactly V1.
+
+(3) is what settles it: if the derivation were broken, it could not reproduce V1
+perfectly from one axis and differ from it on 56 ayahs along another. The 18 was
+wrong — M7a's own prose names 20 ayahs and then says "and neighbours", and the
+disagreement continues through juz 30 (87:11-15, 88:23-26, 89:23, 90:19-20,
+92:10-14, 94:3-8, 96:13-19, 98:6-7, 100:6-9), which that list stops short of.
+M7a §5 and this plan's criterion are corrected to 56.
+
+**Deviations from the plan, and why.**
+
+- `import-mushaf` instantiates `ScraperDatabase(db)` before connecting. Every
+  existing corpus DB predates `mushaf_layout`, so a plain `sqlite3.connect`
+  fails with "no such table". Covered by a test that drops the table and drives
+  the CLI.
+- The font cache uses the upstream's unpadded `p{N}.ttf`, not `p{N:03d}.ttf`, so
+  the 604 TTFs M7a already downloaded are reused instead of re-fetched. The
+  bundled output stays padded — the Metro manifest needs fixed-width names.
+- `fontTools.*` added to the mypy overrides: it ships no `py.typed`.
+- Task 8 step 9's `git add apps/mobile/assets/db/quran.db` is a no-op — that
+  file is gitignored (`.gitignore:34`, `*.db`). The fixture is regenerated by
+  `pnpm --filter @quran-corpus/mobile-data generate:m1-db`, and it does carry
+  `mushaf_layout` (83,665 rows) and the new paging (5:77 -> page 120).
+
+**New upstream warning, benign.** Alongside the 15 `Unknown ClassDef format: 0`
+fonts, subsetting drops an `FFTM` table ("NOT subset; don't know how to subset")
+— a FontForge timestamp, not a rendering table. Check 7 still governs.
+
+**Gate.** scraper 816 passed, ruff clean on new files (15 pre-existing errors
+unchanged), mypy clean. packages/data 32 files / 456 tests, tsc clean.
+apps/mobile 86 files, eslint clean, type-check red only on issue #54's two known
+errors.
+
+**Backup.** `/home/claude/quran-data/quran.db.bak-phase-m7b` (139,923,456 bytes,
+pre-import).

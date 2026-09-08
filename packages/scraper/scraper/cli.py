@@ -641,6 +641,11 @@ def import_mushaf_cmd(layout_dir: str, db: str, overrides: str, repage: bool) ->
     from .mushaf_import import import_layout, word_counts
     from .mushaf_layout import load_rows, read_overrides, validate_rows
 
+    # An existing corpus DB predates mushaf_layout; ScraperDatabase applies
+    # schema.sql, which is CREATE IF NOT EXISTS throughout, so this is the same
+    # idempotent schema-first step every other importer takes.
+    ScraperDatabase(db)
+
     rows = load_rows(Path(layout_dir), read_overrides(Path(overrides)))
     con = sqlite3.connect(db)
     try:
@@ -691,7 +696,11 @@ def mushaf_fonts_cmd(db: str, cache: str, dest: str) -> None:
     try:
         with httpx.Client(headers={"User-Agent": USER_AGENT}, timeout=60) as client:
             for page in range(PAGE_MIN, PAGE_MAX + 1):
-                src = cache_dir / f"p{page:03d}.ttf"
+                # Unpadded, mirroring the upstream URL, so the cache is a
+                # plain mirror of what was downloaded. The bundled output below
+                # is padded instead -- the generated Metro manifest needs a
+                # fixed-width literal name per page.
+                src = cache_dir / f"p{page}.ttf"
                 if not src.exists() or src.stat().st_size == 0:
                     response = client.get(FONT_URL.format(page=page))
                     response.raise_for_status()

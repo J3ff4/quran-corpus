@@ -74,3 +74,47 @@ def test_ayah_spanning_two_pages_takes_the_first(tmp_path):
     assert con.execute(
         "SELECT page FROM ayahs WHERE surah_id=1 AND ayah_number=1"
     ).fetchone() == (1,)
+
+
+def test_cli_creates_the_table_on_a_corpus_that_predates_it(tmp_path):
+    """Every existing corpus DB was built before mushaf_layout existed, so the
+    command has to apply the schema itself rather than assume the table."""
+    from click.testing import CliRunner
+
+    from scraper.cli import main
+
+    db_path = _corpus(tmp_path)
+    con = sqlite3.connect(db_path)
+    con.execute("DROP TABLE mushaf_layout")
+    con.commit()
+    con.close()
+
+    layout = tmp_path / "layout"
+    layout.mkdir()
+    # 1:1 has two corpus words, 1:2 has one -- the payload must agree exactly.
+    (layout / "001.json").write_text(
+        '{"verses":[{"verse_key":"1:1","words":['
+        '{"position":1,"char_type_name":"word","line_number":1,"code_v2":"A",'
+        '"line_number":1,"page_number":1},'
+        '{"position":2,"char_type_name":"word","line_number":1,"code_v2":"B",'
+        '"line_number":1,"page_number":1},'
+        '{"position":3,"char_type_name":"end","line_number":1,"code_v2":"M",'
+        '"line_number":1,"page_number":1}]},'
+        '{"verse_key":"1:2","words":['
+        '{"position":1,"char_type_name":"word","line_number":1,"code_v2":"C",'
+        '"line_number":2,"page_number":1},'
+        '{"position":2,"char_type_name":"end","line_number":1,"code_v2":"N",'
+        '"line_number":2,"page_number":1}]}]}',
+        encoding="utf-8",
+    )
+    overrides = tmp_path / "none.tsv"
+    overrides.write_text("# none\n", encoding="utf-8")
+
+    result = CliRunner().invoke(
+        main,
+        ["import-mushaf", str(layout), "--db", db_path, "--overrides", str(overrides)],
+    )
+    assert result.exit_code == 0, result.output
+    con = sqlite3.connect(db_path)
+    assert con.execute("SELECT COUNT(*) FROM mushaf_layout").fetchone()[0] == 5
+    assert con.execute("SELECT DISTINCT page FROM ayahs").fetchall() == [(1,)]

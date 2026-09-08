@@ -537,12 +537,23 @@ wrong.
 every one of the 604 pages — the corpus is already paged to V1, so choosing V1
 costs no re-paging and no migration of existing page data.
 
-**V2 disagrees with our corpus on 18 ayahs**, always as a one-page shift at a
+**V2 disagrees with our corpus on 56 ayahs**, always as a one-page shift at a
 boundary: 5:77, 5:83, 5:90, 6:131, 55:17-18, 55:41, 55:68-69, 68:16, 69:35,
 70:40, 74:18, 79:16, 80:41-42, 83:5-6, 83:34, 84:25 and neighbours. This is not
 an import bug on either side — it is the two KFGQPC prints genuinely breaking
 pages in different places. Choosing V2 means re-paging `ayahs.page`, which moves
 page-browse.
+
+> **Corrected in M7b (2026-09-08).** The count was 18 here; the live import
+> measured **56 ayahs across 25 pages**. The figure is confirmed three ways,
+> each independent of the others: the DB diff before and after the import; V1
+> (request-file index) against V2 (`page_number`) read straight from the layout
+> JSON, touching no database; and our pre-import `ayahs.page` against the V1
+> pages from that same JSON, which agree on **all 6,236 ayahs** — so our stored
+> paging was exactly V1 and the derivation has nothing wrong with it. The named
+> list below stops at 84:25 and is also short: the disagreement continues
+> through juz 30 (87:11-15, 88:23-26, 89:23, 90:19-20, 92:10-14, 94:3-8,
+> 96:13-19, 98:6-7, 100:6-9).
 
 > **Corrected in M7b (2026-09-08).** This said re-paging also "moves every
 > stored reading position". It does not: `reading_history` is
@@ -750,7 +761,7 @@ KFGQPC ever publishes terms.**
 **2. Edition — V2.** Owner's ruling, twice: on looks first, then again with the
 byte cost in hand. **Decision: V2 layout, V2 fonts, and M7b pays the two bills
 that come with it** — a re-paging of `ayahs.page` (V2 disagrees with our current
-V1 paging on 18 ayahs), which is corpus-side only and needs no device migration
+V1 paging on 56 ayahs), which is corpus-side only and needs no device migration
 (see §2's correction), and the page-589 upstream defect (84:21's end-marker on line 13, its words on
 line 14) which needs a pinned correction row, not a silent fix.
 
