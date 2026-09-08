@@ -504,10 +504,18 @@ against the per-script endpoints: 5:77 has `v1_page` 121 and `v2_page` 120, and
 the word's two values are line 1 (V1) and page 120 / line 13 (V2). The
 validator parses with an `object_pairs_hook` that keeps both.
 
-**2. `by_page` paginates by V1, and returns whole verses.** A verse straddling
-a page boundary appears in both request files, so words must be assigned by
-their own page, not by the request. For V2 that means regrouping across request
-files entirely, because V2's page breaks differ from V1's.
+**2. `page_number` is the V2 page; the request file index is the V1 page.**
+Words must be assigned by their own `page_number`, never by the file they
+arrived in. For V2 that means regrouping across request files entirely, because
+V2's page breaks differ from V1's — 361 words sit on a V2 page whose request
+file does not exist under that number.
+
+> **Corrected in M7b (2026-09-08).** This trap was first written as "`by_page`
+> returns whole verses, so a page-straddling ayah leaks the neighbouring page's
+> words". Measured across all 604 files: no verse and no word appears in more
+> than one request file — the API *splits* a straddling verse rather than
+> repeating it. The corrective action above was always right; the mechanism
+> given for it was not.
 
 A third trap killed an early version of the checker: **word `id` is not
 reading order.** On page 106, 4:176 carries id 83385 while 5:2 on the same page
@@ -533,8 +541,14 @@ costs no re-paging and no migration of existing page data.
 boundary: 5:77, 5:83, 5:90, 6:131, 55:17-18, 55:41, 55:68-69, 68:16, 69:35,
 70:40, 74:18, 79:16, 80:41-42, 83:5-6, 83:34, 84:25 and neighbours. This is not
 an import bug on either side — it is the two KFGQPC prints genuinely breaking
-pages in different places. Choosing V2 means re-paging `ayahs.page`, which
-moves page-browse and every stored reading position.
+pages in different places. Choosing V2 means re-paging `ayahs.page`, which moves
+page-browse.
+
+> **Corrected in M7b (2026-09-08).** This said re-paging also "moves every
+> stored reading position". It does not: `reading_history` is
+> `(surah_id, ayah_number)` and no setting stores a page (verified across
+> `apps/mobile/src` and `packages/data/src/userData.ts`). Re-paging is a
+> corpus-side change with **no on-device migration**.
 
 **V2 also carries one upstream defect.** On page 589, ayah 84:21's end-of-ayah
 marker (word id 23997) is on **line 13** while the five words of the same ayah
@@ -735,9 +749,9 @@ KFGQPC ever publishes terms.**
 
 **2. Edition — V2.** Owner's ruling, twice: on looks first, then again with the
 byte cost in hand. **Decision: V2 layout, V2 fonts, and M7b pays the two bills
-that come with it** — a re-paging migration of `ayahs.page` (V2 disagrees with
-our current V1 paging on 18 ayahs) that also moves every stored reading position,
-and the page-589 upstream defect (84:21's end-marker on line 13, its words on
+that come with it** — a re-paging of `ayahs.page` (V2 disagrees with our current
+V1 paging on 18 ayahs), which is corpus-side only and needs no device migration
+(see §2's correction), and the page-589 upstream defect (84:21's end-marker on line 13, its words on
 line 14) which needs a pinned correction row, not a silent fix.
 
 **3. Font registration — runtime `loadAsync`, TTF only.** Proven on device (§4).
@@ -763,9 +777,10 @@ because fontTools reports a malformed class table on 15 V2 fonts.
   line, surah, ayah, position, glyph). Source is the quran.com v4 API, with §2's
   three traps handled explicitly: read the **second** `line_number` for V2, assign
   each word to its own `page_number`, and never sort or do arithmetic on word ids.
-- Re-page `ayahs.page` to V2 and migrate stored reading positions. This touches
-  `packages/data` schema and the on-device user DB, so it takes both §5 triggers
-  for an independent review, and the user-DB migration is additive only.
+- Re-page `ayahs.page` to V2, derived from the imported layout rather than
+  imported twice. Nothing on the device stores a page, so there is no user-DB
+  migration: M7b takes two of §5's three triggers (`packages/data` schema and
+  queries, and parsing untrusted upstream JSON), not three.
 - Subset and bundle the 604 V2 TTFs, verified page-by-page against the unsubset
   originals on device.
 - Register a page font at runtime, re-confirmed from a real APK first.
