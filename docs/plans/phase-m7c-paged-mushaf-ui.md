@@ -1050,7 +1050,7 @@ Two things this component owns and nothing else does:
 
 **Not rendering until the font is registered.** A page drawn before `useMushafPageFont` resolves shows the QCF codepoints in the system face — plausible-looking Arabic that is not the Qur'an. That is the single worst failure this phase can ship, and it looks fine in a screenshot. Render nothing (the page's paper ground alone) until `ready`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```tsx
 describe('MushafPage', () => {
@@ -1090,23 +1090,23 @@ describe('MushafPage', () => {
 });
 ```
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
-- [ ] **Step 3: Implement `useMushafPage`, then `MushafPage`**
+- [x] **Step 3: Implement `useMushafPage`, then `MushafPage`**
 
 `useMushafPage(client, page)` returns `{ lines, loading, error }` and calls `getMushafPage`. It must tolerate the page changing under it (the pager prefetches neighbours) — the same cancelled-flag shape `useMushafPageFont` already uses.
 
 `MushafPage` computes `fontSize = mushafFontSize(page, width - 2 * margin)` and `lineHeight = mushafLineHeight(height - footerHeight, MUSHAF_LINES_PER_PAGE)` once per layout, then maps `composePage(...)` to a row per slot. Every slot gets a box of exactly `lineHeight` — including `blank` — so the grid holds.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Expected: PASS, 5 tests.
 
-- [ ] **Step 5: Mutation-check the not-ready guard**
+- [x] **Step 5: Mutation-check the not-ready guard**
 
 Make the component render its lines regardless of `ready`. The first test must fail. Restore by re-editing. **This is the most important mutation-check in the phase** — the guard's whole job is to prevent a failure that looks like success.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/mobile/src/mushaf/useMushafPage.ts apps/mobile/src/components/mushaf/MushafPage.tsx \
@@ -1626,4 +1626,12 @@ _Written during Task 13. Empty until the device run happens — "implementation 
 - **Ruling — the pulse peaks short of the accent.** The plan's own mutation-check (swap the audio and landing branches) is vacuous if a landing pulse at progress 1 resolves *to* the accent: both branches then return the same string. Bookmark sits 45% toward the accent, the pulse 80% of the way from there, so the swap now fails exactly the "audio wins" test. Cost if wrong: a landing pulse is slightly quieter than it could be.
 - **Extra test — the spring overshoots.** `landingProgress` comes off a spring, so it exceeds 1; unclamped, the mix walks the channels past the accent and out of the byte range, rendering as an invalid colour instead of a loud one. Clamped, with a test; deleting the clamp fails only that test.
 - Contrast, both themes, against each page ground: bookmark 10.75 (light) / 10.73 (dark), pulse peak 6.42-7.15 / 7.06-7.66, accent 5.68 / 6.31. All clear AA.
+
+### 2026-09-08 — Task 7: the page
+
+- `apps/mobile/src/mushaf/useMushafPage.ts` (4 tests) + `apps/mobile/src/components/mushaf/MushafPage.tsx` (11 tests; plan specified 5). Gate: mobile 93 files / 938 tests pass, eslint clean, type-check red only on issue #54's two pre-existing errors.
+- **Mutation-checks, three, each killing exactly one test:** drawing the lines regardless of `ready` fails the not-ready test (the phase's most important guard); dropping the 1..15 padding fails the grid test; dropping `pointerEvents="none"` on the a11y overlay fails the touch-through test.
+- **Finding — composePage stops at the last occupied line.** It returns slots up to the page's last word line, so mapping its output directly gives a short page fewer than 15 boxes and its lines stretch. `MushafPage` keys the slots by line and draws 1..15.
+- **Finding — the a11y overlay would have eaten every tap.** One focusable band per ayah laid over the text block is what publishes ruling 12's labels, and without `pointerEvents="none"` no word on any page is tappable while the page looks perfectly correct. Now asserted.
+- **Gotcha — `beforeEach(() => mock.mockReset())` breaks a rejection test.** An arrow returning the mock hands vitest the mock as the hook's result; a rejection the test deliberately provokes then surfaces as the test's own failure, on the line that constructed the error, while the assertion above it passes. A block body fixes it. Cost two debugging rounds; recorded in the suite.
 
