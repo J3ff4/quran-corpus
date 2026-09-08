@@ -133,8 +133,12 @@ async function createCorpusDb(): Promise<SQLite.SQLiteDatabase> {
 export function useCorpusFonts(): [boolean, Error | null] {
   const { useFonts } = require('expo-font') as typeof ExpoFont;
 
+  // TTF, not WOFF2. Android's Typeface cannot read WOFF2 and expo-font reports
+  // no error when it fails -- it falls back to the system face, which renders
+  // Arabic perfectly plausibly. `hafs.18.woff2` shipped as family `Hafs` from
+  // M0 until 2026-09-08 and never once applied. See M7a Findings §4.
   return useFonts({
-    Hafs: require('../../assets/fonts/hafs.18.woff2'),
+    Hafs: require('../../assets/fonts/hafs.ttf'),
     Newsreader: require('../../assets/fonts/Newsreader-Regular.ttf'),
     'Newsreader-SemiBold': require('../../assets/fonts/Newsreader-SemiBold.ttf'),
   });

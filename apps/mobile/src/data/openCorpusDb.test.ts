@@ -1,3 +1,4 @@
+import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import type { CorpusDbFileSystem } from './openCorpusDb';
 import { corpusDbFileName, ensureCorpusDbFile, stagingSuffix } from './openCorpusDb';
@@ -107,5 +108,20 @@ describe('ensureCorpusDbFile', () => {
       'Bundled corpus DB asset did not resolve to a local URI',
     );
     expect(fileSystem.moveAsync).not.toHaveBeenCalled();
+  });
+});
+
+describe('font assets', () => {
+  // A WOFF2 handed to expo-font resolves and then silently does nothing on
+  // Android (M7a §4). This is a repo-level invariant, not a rendering test:
+  // no test can observe the fallback, which is the whole problem.
+  it('ships no .woff2 font', () => {
+    expect(readdirSync('assets/fonts').filter((f) => f.endsWith('.woff2'))).toEqual([]);
+  });
+
+  it('loads Hafs from a .ttf', () => {
+    const src = readFileSync('src/data/openCorpusDb.ts', 'utf8');
+    expect(src).toMatch(/Hafs: require\('\.\.\/\.\.\/assets\/fonts\/hafs\.ttf'\)/);
+    expect(src).not.toMatch(/\.woff2'\)/);
   });
 });
