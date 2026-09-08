@@ -104,5 +104,3 @@ pnpm-debug.log*
 # Raw device logcat captures (spike inputs) — never versioned, see CLAUDE.md 9
 apps/mobile/scripts/dump.txt
 
-# M7a mushaf spike: per-page QCF fonts and extracted layout, never versioned
-apps/mobile/assets/fonts/spike/
