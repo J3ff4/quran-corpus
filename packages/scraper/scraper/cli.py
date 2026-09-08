@@ -661,3 +661,50 @@ def import_mushaf_cmd(layout_dir: str, db: str, overrides: str, repage: bool) ->
         f"imported {summary.rows} rows across {summary.pages} pages; "
         f"repaged {summary.repaged} ayahs"
     )
+
+
+@main.command("mushaf-fonts")
+@click.option("--db", default="quran.db", show_default=True)
+@click.option("--cache", required=True, help="Directory for the raw upstream TTFs")
+@click.option(
+    "--dest", default="../../apps/mobile/assets/fonts/mushaf", show_default=True
+)
+def mushaf_fonts_cmd(db: str, cache: str, dest: str) -> None:
+    """Fetch and subset the 604 V2 page fonts. Gitignored output."""
+    import sqlite3
+
+    import httpx
+
+    from .mushaf_fetch import USER_AGENT
+    from .mushaf_fonts import (
+        FONT_URL,
+        PAGE_MAX,
+        PAGE_MIN,
+        page_glyphs,
+        subset_page_font,
+    )
+
+    cache_dir, dest_dir = Path(cache), Path(dest)
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    con = sqlite3.connect(db)
+    total_raw = total_sub = 0
+    try:
+        with httpx.Client(headers={"User-Agent": USER_AGENT}, timeout=60) as client:
+            for page in range(PAGE_MIN, PAGE_MAX + 1):
+                src = cache_dir / f"p{page:03d}.ttf"
+                if not src.exists() or src.stat().st_size == 0:
+                    response = client.get(FONT_URL.format(page=page))
+                    response.raise_for_status()
+                    src.write_bytes(response.content)
+                raw, sub = subset_page_font(
+                    src, dest_dir / f"p{page:03d}.ttf", page_glyphs(con, page)
+                )
+                total_raw += raw
+                total_sub += sub
+    finally:
+        con.close()
+    mb = 1024 * 1024
+    click.echo(
+        f"604 fonts: {total_raw / mb:.1f} MB raw -> {total_sub / mb:.1f} MB "
+        f"subset in {dest}"
+    )

@@ -104,3 +104,7 @@ pnpm-debug.log*
 # Raw device logcat captures (spike inputs) — never versioned, see CLAUDE.md 9
 apps/mobile/scripts/dump.txt
 
+
+# M7b: 604 subset KFGQPC V2 page fonts, ~120MB. Regenerate with
+# `uv run scraper mushaf-fonts` -- never commit them (CLAUDE.md §9).
+apps/mobile/assets/fonts/mushaf/
