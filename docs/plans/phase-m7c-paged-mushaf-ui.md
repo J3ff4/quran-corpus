@@ -1377,7 +1377,7 @@ Owner ruling 2026-09-08, overriding ruling 3's "translation mode untouched": tra
 
 `showTranslation: boolean`, default `true`, persisted through the existing `settings` table by the same path `readerMode` uses. When off, `AyahCard` renders Arabic only, and the header's language control is hidden — a language picker that changes nothing visible is a dead control.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```tsx
 it('defaults showTranslation to true', () => {});
@@ -1398,19 +1398,19 @@ it('hides the language control when the translation is off', () => {
 });
 ```
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Follow `readerMode` exactly: an `isShowTranslation`-style validator on read (the persisted value is a string from SQLite and is untrusted input), a default in `defaultSettings`, a setter through `updateSetting`.
 
-- [ ] **Step 4: Run the tests and the mobile gate**
+- [x] **Step 4: Run the tests and the mobile gate**
 
-- [ ] **Step 5: Mutation-check the persistence validator**
+- [x] **Step 5: Mutation-check the persistence validator**
 
 Feed the store a persisted `showTranslation` of `"maybe"`. It must fall back to the default, not render `undefined`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add apps/mobile/src/settings apps/mobile/src/components
@@ -1780,4 +1780,39 @@ controls (ruling 4).
 the auto-turn are device checks 200-220 (Task 13), and the §5 review is still
 owed on two counts — `packages/data` (this task added a second trigger) and the
 Task 9 user-DB write.
+
+### 2026-09-08 — Task 11: the translation switch
+
+Commit `b991988`. Mobile 95 files / 984 tests; eslint clean; type-check red only
+on #54's remaining TS2835.
+
+- **The plan's own boolean shape was wrong.** Step 3 says "follow `readerMode`
+  exactly", but the two booleans already in the store read back as
+  `value === 'true'`, and both default to **false**. On a setting that defaults
+  to ON that comparison reads an absent row — every install that exists today —
+  as OFF: the translation would have vanished on upgrade with nothing changed.
+  `storedBoolean(value, fallback)` is the fix, and Step 5's own mutation-check
+  is exactly what catches it.
+- **Ruled: the switch is translation mode's, and so is the language picker.**
+  The plan hides the picker when the translation is off; mushaf mode has
+  neither, since ruling 4 puts no control chrome on the page. Cost if wrong: a
+  reader who wants the picker in mushaf mode has to switch modes to reach it —
+  which is where the translation it picks for lives anyway.
+- **One new icon path, no asset.** `translationText` is three prose rules.
+  Deliberately not a second globe: the globe beside it picks the language, and
+  two glyphs of the same thing name neither. State is announced through
+  `accessibilityRole="switch"` + `accessibilityState`, because colour alone is
+  not an announcement.
+- **Not added: a Settings-screen copy.** The plan scopes this to the reader's
+  header, and a second view of the same value is a second thing to keep in step.
+
+**Mutation-checks (3, all caught):**
+
+| Mutant | Test that failed |
+|---|---|
+| `storedBoolean(...)` → `=== 'true'` | defaults to ON; falls back to ON for an unrecognised value |
+| `showTranslation &&` dropped from AyahCard | renders no translation block when switched off (+ the reader's wiring test) |
+| language control no longer gated on the switch | hides the language control when the translation is off |
+
+**Not verified here.** Device check 219.
 
