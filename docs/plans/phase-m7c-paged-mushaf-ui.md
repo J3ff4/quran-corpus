@@ -411,7 +411,7 @@ git commit -m "feat(mobile/mushaf): derive a page's header and bismillah lines f
 
 Why generated and committed, not computed at runtime: RN cannot measure text without rendering it, and the value is a property of files we ship. 604 floats is ~7 KB.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 from scraper.mushaf_metrics import widest_line_em
@@ -435,12 +435,12 @@ def test_a_glyph_missing_from_the_cmap_is_not_silently_zero():
         widest_line_em({1: [""]}, {}, {}, upm=2500)
 ```
 
-- [ ] **Step 2: Run and watch it fail**
+- [x] **Step 2: Run and watch it fail**
 
 Run: `cd packages/scraper && uv run pytest tests/test_mushaf_metrics.py -q`
 Expected: FAIL, `ModuleNotFoundError: No module named 'scraper.mushaf_metrics'`.
 
-- [ ] **Step 3: Implement the pure part**
+- [x] **Step 3: Implement the pure part**
 
 ```python
 """Per-page type metrics, read off the fonts we actually ship."""
@@ -471,12 +471,12 @@ def widest_line_em(
     return round(widest / upm, 4)
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `uv run pytest tests/test_mushaf_metrics.py -q`
 Expected: PASS, 2 tests.
 
-- [ ] **Step 5: Add the CLI command**
+- [x] **Step 5: Add the CLI command**
 
 Append to `packages/scraper/scraper/cli.py` — **before** the `if __name__ == "__main__":` guard at the end of the file. (Three commands were once registered after it and were unreachable via `python -m`; see M7b's review log.)
 
@@ -540,7 +540,7 @@ def mushaf_metrics_cmd(db: str, fonts: str, out: str) -> None:
     )
 ```
 
-- [ ] **Step 6: Generate and sanity-check the output**
+- [x] **Step 6: Generate and sanity-check the output**
 
 ```bash
 cd packages/scraper
@@ -549,12 +549,12 @@ uv run scraper mushaf-metrics --db ../../apps/web/quran.db
 
 Expected: `604 pages: 11.91..18.17 em -> ...pageMetrics.generated.ts`. A min under 8 or a max over 20 means a glyph went missing — stop and find out which, do not ship it.
 
-- [ ] **Step 7: Run the full scraper gate**
+- [x] **Step 7: Run the full scraper gate**
 
 Run: `uv run pytest -q && uv run ruff check scraper tests && uv run mypy scraper`
 Expected: all pass.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add packages/scraper/scraper/mushaf_metrics.py packages/scraper/tests/test_mushaf_metrics.py \
@@ -703,6 +703,7 @@ git commit -m "feat(mobile/mushaf): size each page from its own widest line"
 
 Three rules this component exists to hold:
 
+0. **Strip U+0020 from a glyph string before rendering it.** Task 2 found 198 layout rows, on 197 pages, whose word holds two glyph codes separated by a space; both codes are always in that page's own font, and the fonts have no space glyph. It is a separator in the source data, not something print draws — Task 2's metrics give it zero width, so drawing it would make those pages wider than they were measured.
 1. **Join glyphs with `''`, never a space.** These fonts lack U+0020, so a space splits the line into a fallback run per word and the line renders in the system font — as plausible Arabic, not tofu (M7a §4).
 2. **Centre the line.** Finding 2: lines are pre-justified to within 2%, so centring is visually identical and needs no width heuristic.
 3. **`numberOfLines={1}`.** An overflow must clip loudly rather than wrap into the line below and push the page off its 15-line grid.
@@ -1583,3 +1584,12 @@ _Written during Task 13. Empty until the device run happens — "implementation 
 - Mutation-check: forcing `PAGES_WITH_HEADER_ON_PREVIOUS_PAGE.has(page)` false fails exactly the "band is on the previous page" test; restored by re-editing.
 - eslint clean; `npm run type-check` red only on issue #54's two pre-existing errors.
 - Commit `516552c`.
+
+### 2026-09-08 — Task 2: per-page font metrics
+
+- `uv run scraper mushaf-metrics --db ../../apps/web/quran.db` → `604 pages: 11.9068..18.1664 em`, median 15.7288 — the plan's 11.91 / 18.17 / 15.73 reproduced from the shipped fonts.
+- **Plan defect corrected:** the plan's two test literals held private-use glyph chars that do not survive as text; written as `"\ue000"` escapes instead, with a comment, or both assertions would have run against empty strings and asserted nothing.
+- **Ruling — the separator space.** 198 rows on 197 pages split a word's two glyph codes with U+0020, which no QCF font carries; every non-space code in them was verified present in its own page's font. Treated as a zero-width separator rather than a `KeyError`, with a test; the alternative was refusing to measure 197 of 604 pages. Task 4 gained rule 0 so the renderer strips it too — measuring a page narrower than it draws would overflow it.
+- Mutation-check: changing the space guard to match `\u0000` fails exactly the separator test with `KeyError: 32`; restored by re-editing.
+- Gate: 825 pytest passed (822 + 3 new), mypy clean, ruff clean on every file this task touched. Six pre-existing `E501`/`E702` remain in `sources/corpus_parser.py`, `sources/qul.py`, `tests/test_db.py` and `tests/test_review_glosses.py` under ruff 0.15.17 — untouched here, not introduced by this task.
+- Commit `acaea85`.
