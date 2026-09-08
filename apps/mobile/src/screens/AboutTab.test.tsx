@@ -69,6 +69,20 @@ describe('AboutTab', () => {
     }
   });
 
+  it('credits KFGQPC and QUL for the mushaf pages and their fonts', () => {
+    render(<AboutTab />);
+
+    // Ruling 9: the page layout and the page fonts ship under an accepted
+    // exposure with no redistribution grant stated. The credit is only half of
+    // what makes that auditable -- the pill is the half that says the licence
+    // was never cleared, so both are asserted. A screen that named them and
+    // dropped the pill would read as cleared.
+    expect(screen.getByText('QUL')).toBeTruthy();
+    expect(screen.getByText('KFGQPC')).toBeTruthy();
+    expect(screen.getByTestId('pending-QUL').textContent).toBe('Source approval incomplete');
+    expect(screen.getByTestId('pending-KFGQPC').textContent).toBe('Source approval incomplete');
+  });
+
   it('marks an uncleared licence as uncleared, and leaves a cleared one unmarked', () => {
     render(<AboutTab />);
 
