@@ -16,14 +16,20 @@ import { useThemeColors } from '@/theme/themeContext';
 
 import { BismillahLine } from './BismillahLine';
 import { MushafLineRow } from './MushafLineRow';
-import { PageFooter } from './PageFooter';
+import { PageCorners } from './PageCorners';
 import { SurahBand } from './SurahBand';
 
-/** Side margin the text block sits inside, and the strip the footer owns.
- *  Both are subtracted before the page is scaled, so the type never runs into
- *  either. */
+/** Side margin the text block sits inside, and the strips its furniture owns
+ *  at the top and bottom. All three are subtracted before the page is scaled,
+ *  so the type never runs into any of them.
+ *
+ *  The furniture moved into the page's corners in M7d (rulings 8 and 9), but
+ *  the space it needs did not change: the same 44dp that was one centred
+ *  footer is now a page number in one bottom corner, and the top strip is the
+ *  juz and the surah name. */
 const PAGE_MARGIN = 16;
 const FOOTER_HEIGHT = 44;
+const HEADER_HEIGHT = 22;
 
 export interface MushafPageProps {
   page: number;
@@ -93,7 +99,7 @@ export function MushafPage({
   if (!ready) return <View style={{ width, height, backgroundColor: theme.background }} />;
 
   const fontSize = mushafFontSize(page, width - 2 * PAGE_MARGIN);
-  const lineHeight = mushafLineHeight(height - FOOTER_HEIGHT, MUSHAF_LINES_PER_PAGE);
+  const lineHeight = mushafLineHeight(height - FOOTER_HEIGHT - HEADER_HEIGHT, MUSHAF_LINES_PER_PAGE);
   const color = colorForWord(highlights, theme);
   const background = backgroundForWord(highlights, theme);
   // Keyed by line, then drawn 1..15 rather than iterated: composePage stops at
@@ -115,7 +121,10 @@ export function MushafPage({
         onPress={onTap}
         style={StyleSheet.absoluteFill}
       />
-      <View style={{ flex: 1, paddingHorizontal: PAGE_MARGIN }} pointerEvents="box-none">
+      <View
+        style={{ flex: 1, paddingHorizontal: PAGE_MARGIN, paddingTop: HEADER_HEIGHT }}
+        pointerEvents="box-none"
+      >
         {pageLines.map((line) => {
           const slot = slots.get(line);
           return (
@@ -182,9 +191,13 @@ export function MushafPage({
         ))}
       </View>
 
-      <View style={{ height: FOOTER_HEIGHT, justifyContent: 'center' }}>
-        <PageFooter page={page} juz={juz} uiLocale={uiLocale} />
-      </View>
+      <View style={{ height: FOOTER_HEIGHT }} />
+      <PageCorners
+        page={page}
+        juz={juz}
+        surahName={surahNames.get(openingSurahId(lines)) ?? ''}
+        uiLocale={uiLocale}
+      />
     </View>
   );
 }
@@ -215,4 +228,10 @@ function surahOfBismillah(slots: Map<number, PageSlot>, line: number): number {
     if (below?.kind === 'words') return below.words[0]?.surahId ?? 0;
   }
   return 0;
+}
+
+/** The surah a page opens with -- the one print names in its corner, even on a
+ *  page that goes on to head another. */
+function openingSurahId(lines: MushafLine[]): number {
+  return lines[0]?.words[0]?.surahId ?? 0;
 }

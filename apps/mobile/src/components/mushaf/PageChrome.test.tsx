@@ -10,7 +10,7 @@ vi.mock('react-native', async () => {
 import { SURAH_BAND_PATH } from '@quran-corpus/config/ornaments/surahBand';
 
 import { BismillahLine } from './BismillahLine';
-import { PageFooter } from './PageFooter';
+import { PageCorners } from './PageCorners';
 import { SurahBand } from './SurahBand';
 
 afterEach(cleanup);
@@ -77,16 +77,43 @@ describe('BismillahLine', () => {
   });
 });
 
-describe('PageFooter', () => {
-  it('shows the page number and its juz', () => {
-    const { container } = render(<PageFooter page={106} juz={6} uiLocale="en" />);
+describe('PageCorners', () => {
+  const props = { juz: 6, surahName: 'Al-Maidah', uiLocale: 'en' as const };
+
+  it('shows the page number, its juz and the surah the page opens with', () => {
+    const { container } = render(<PageCorners {...props} page={106} />);
     const text = container.textContent ?? '';
     expect(text).toContain('106');
-    expect(text).toContain('6');
+    expect(text).toContain('Juz 6');
+    expect(text).toContain('Al-Maidah');
+  });
+
+  it('puts an odd page-s number on the right and an even one on the left', () => {
+    // Ruling 8: the outer edge of the leaf. Odd pages are rectos, and with one
+    // page on screen at a time the alternation is all that is left of the
+    // spread -- and it is what a reader's thumb learns.
+    const numberBox = () =>
+      screen.getByTestId('page-number') as HTMLElement;
+
+    render(<PageCorners {...props} page={47} />);
+    expect(numberBox().style.right).toBe('16px');
+    expect(numberBox().style.left).toBe('');
+    cleanup();
+
+    render(<PageCorners {...props} page={48} />);
+    expect(numberBox().style.left).toBe('16px');
+    expect(numberBox().style.right).toBe('');
+  });
+
+  it('never takes a touch, since it sits over the words', () => {
+    // The corners are absolutely positioned over the text block. One that
+    // swallowed a press would make the words under it impossible to open.
+    const { container } = render(<PageCorners {...props} page={106} />);
+    expect(container.firstElementChild?.getAttribute('data-pointer-events')).toBe('none');
   });
 
   it('speaks the numbers with their labels, in the ui locale', () => {
-    render(<PageFooter page={106} juz={6} uiLocale="ru" />);
+    render(<PageCorners {...props} page={106} uiLocale="ru" />);
     expect(screen.getByLabelText(/Страница 106/)).toBeTruthy();
   });
 });
