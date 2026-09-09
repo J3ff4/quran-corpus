@@ -395,3 +395,41 @@ it('bookmarks the ayah-s own surah, not the page-s first', async () => {
 1. **Ruling 11 reads as already-satisfied** — see §0. If "Arabic numerals everywhere in the mushaf" was meant instead (page number, juz, and the band in Arabic-Indic, matching print), say so: it is a small change, but it is the opposite of what the ruling says and I am not guessing.
 2. **Tab icon and label.** `book` belongs to Surahs. Proposing "Mushaf" with a page-spread glyph; the icon set may need one drawn.
 3. **The mushaf tab keeps its own page** while Surahs keeps its own scroll position — two places the app remembers where you are, one row in the database. Intended, per ruling 13, but worth one look.
+
+---
+
+## Implementation log (2026-09-09)
+
+Tasks 1-5 and 7-9 are implemented and committed on `feat/m7d-mushaf-tab`.
+Task 6 is deferred into the device run (see its ruling above); Task 10 is the
+device run itself, which needs the owner and the phone.
+
+| Task | Commit | Note |
+|---|---|---|
+| 1 Tab swap | `613d91e` | Mushaf tab in, Morphology to Menu. `tabs.morphology` deleted -- the i18n suite fails an unused key |
+| 2 Chrome visibility | `d3c7c3f` | Module state, not a context: the tab bar is a sibling of the screen |
+| 3 MushafScreen | `96b6456` | Own client, index, page, position, bookmarks, word sheet |
+| 4 Mode ripped out | `a55b0a4` | **-824 lines.** `ReaderMode` gone from the codebase; 20 tests deleted and named in the commit body |
+| 5 Gestures | `8e3c1ea` | Tap toggles chrome, long-press opens the sheet, pressed word washes |
+| 7 Furniture | `65f0e36`, `bdd783f` | Corners + band cutouts; the band's medallion geometry moved into `packages/config` so both apps read one measurement |
+| 8 Chrome | `cf2d5ff` | Jump (page/surah/juz) + search; `pageForJump` extracted so it is not buried behind a mocked sheet |
+| 9 Ayah actions | `d072b56` | Keyed to the pressed word's surah. #61 closed, both halves |
+
+**Gate:** mobile 99 files / all tests, `packages/data` 32, web 81, scraper 825
+-- all pass. Type-check and lint clean in all three TS packages.
+
+Two mutation-checks earned their keep:
+
+- Deleting `Math.min` in the band's width fit failed the new column test.
+- Deleting the whole pressed-word branch in `colorForWord` left the first
+  version of its test GREEN -- it asserted the pressed colour on a *playing*
+  ayah, where the accent is what `playing` returns anyway. Rewritten against a
+  bookmark, where the two differ.
+
+### Owed
+
+1. **Task 10, the device run** -- checks 219-240, plus Task 6's measurement as
+   224/224a. Needs the owner and the phone.
+2. **`/code-review`** -- §5 triggers: on-device user-DB writes in Tasks 3 and 9.
+   User-triggered; the agent cannot launch it.
+3. **No PR.** The owner's call.
