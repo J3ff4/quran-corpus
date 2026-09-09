@@ -37,6 +37,7 @@ import { ReaderHeader } from './ReaderHeader';
 import { Bismillah } from './Bismillah';
 import { LanguageSheet } from './LanguageSheet';
 import { ReciterSheet } from './ReciterSheet';
+import { AyahControls } from './AyahControls';
 import { WordSheet } from './WordSheet';
 import { GlassSurface } from './GlassSurface';
 import { estimateRowHeight } from './rowHeightModel';
@@ -1237,6 +1238,14 @@ export function SurahReader({
     [data.ayahs],
   );
 
+  // The open word's ayah, when it is one this reader can act on. A mushaf page
+  // holds ayahs from surahs the route never named (page 106 opens in An-Nisa
+  // and heads Al-Ma'idah), and every control here -- bookmarks, notes, audio
+  // -- is keyed to the displayed surah alone. Undefined for those words, so
+  // the sheet shows morphology and no actions rather than actions that would
+  // land on the wrong surah's ayah.
+  const openWordAyah = openWord ? ayahNumberOf(openWord.word) : undefined;
+
 
   return (
     <View style={{ flex: 1 }}>
@@ -1364,6 +1373,28 @@ export function SurahReader({
       <WordSheet
         summary={openWord}
         uiLocale={uiLocale}
+        {...(openWordAyah === undefined
+          ? {}
+          : {
+              ayahLabel: `${t(uiLocale, 'reader.ayahLabel')} ${openWordAyah}`,
+              // Built here, not described to the sheet: the sheet has no
+              // business knowing what a bookmark is, and every piece of this
+              // is already in hand.
+              ayahActions: (
+                <AyahControls
+                  surahId={data.surah.id}
+                  ayahNumber={openWordAyah}
+                  bookmarked={bookmarkedAyahs.has(openWordAyah)}
+                  note={notesByAyah?.get(openWordAyah) ?? null}
+                  playing={playingAyah === openWordAyah}
+                  uiLocale={uiLocale}
+                  audioDisabled={!audioEnabled}
+                  onToggleBookmark={onToggleBookmark}
+                  {...(onEditNote ? { onEditNote } : {})}
+                  onToggleAudio={onToggleAudio}
+                />
+              ),
+            })}
         onClose={closeSheet}
         onOpenDetail={(word) => {
           const ayahNumber = ayahNumberOf(word);

@@ -220,17 +220,24 @@ vi.mock('./ReciterSheet', async () => {
 vi.mock('./WordSheet', async () => {
   const React = await import('react');
   return {
-    WordSheet: ({ summary, onClose, onOpenDetail, onOpenRoot }: {
+    // ayahActions and ayahLabel are rendered, not dropped: a mock that
+    // destructures only what it knew about passes every assertion about a prop
+    // it silently throws away (the lesson rnHosts taught twice).
+    WordSheet: ({ summary, onClose, onOpenDetail, onOpenRoot, ayahActions, ayahLabel }: {
       summary: { word: { id: number } } | null;
       onClose: () => void;
       onOpenDetail: (word: unknown) => void;
       onOpenRoot: (rootBuckwalter: string) => void;
+      ayahActions?: React.ReactNode;
+      ayahLabel?: string;
     }) =>
       summary
         ? React.createElement(
             'div',
             { 'data-testid': 'word-sheet' },
             React.createElement('span', null, String(summary.word.id)),
+            ayahLabel ? React.createElement('span', { 'data-testid': 'sheet-ayah-label' }, ayahLabel) : null,
+            ayahActions,
             React.createElement('button', { 'data-testid': 'close-sheet', onClick: onClose }),
             React.createElement('button', {
               'data-testid': 'open-detail',
@@ -897,6 +904,63 @@ describe('SurahReader', () => {
     // exactly what passing the token list instead of the pressed word gives.
     expect(loadWordSummary).toHaveBeenCalledWith(expect.objectContaining({ position: 2 }));
     expect(screen.getByTestId('word-sheet').textContent).toContain('1002');
+  });
+
+  it('carries the ayah-s own controls into the word sheet', async () => {
+    // Ruling 4: the mushaf page has no chrome, so this row is the only way to
+    // bookmark, note or play the ayah being read as print. The sheet is where
+    // it lives in both modes -- the tap that opens it is the same tap.
+    const data = readerData(1);
+    const onToggleBookmark = vi.fn();
+    render(
+      <SurahReader
+        {...baseProps(data)}
+        onToggleBookmark={onToggleBookmark}
+        loadWords={async (ayahId) => surahWords(ayahId)}
+        loadWordSummary={(async (word: { id: number }) => ({ word, segments: [], gloss: null })) as never}
+      />,
+    );
+
+    await act(async () => {
+      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getAllByTestId('word-token')[0]!);
+    });
+
+    expect(screen.getByTestId('sheet-ayah-label').textContent).toBe('Ayah 1');
+    // Scoped to the sheet: the ayah card carries a bookmark with the same
+    // handle, and a document-wide query would pass on the card's alone.
+    const sheet = screen.getByTestId('word-sheet');
+    const bookmark = sheet.querySelector('[data-testid="ayah-1-1-bookmark"]');
+    expect(bookmark).toBeTruthy();
+    fireEvent.click(bookmark!);
+    expect(onToggleBookmark).toHaveBeenCalledWith(1);
+  });
+
+  it('shows no ayah controls for a word from a surah the reader is not on', async () => {
+    // A mushaf page carries ayahs from surahs the route never named -- page
+    // 106 opens in An-Nisa and heads Al-Ma-idah. Every control here is keyed
+    // to the displayed surah, so acting on one of those words would bookmark
+    // the wrong ayah. Morphology, no actions.
+    const data = readerData(1);
+    render(
+      <SurahReader
+        {...baseProps(data)}
+        loadWords={async () => surahWords(999)}
+        loadWordSummary={(async (word: { id: number }) => ({ word, segments: [], gloss: null })) as never}
+      />,
+    );
+
+    await act(async () => {
+      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getAllByTestId('word-token')[0]!);
+    });
+
+    expect(screen.getByTestId('word-sheet')).toBeTruthy();
+    expect(screen.queryByTestId('sheet-ayah-label')).toBeNull();
   });
 
   it('shows the word tapped last, not the query that finished last', async () => {

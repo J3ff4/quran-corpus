@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
 import type { Word } from '@quran-corpus/data/mobile';
 import type { WordSummary } from '@/data/corpusRepository';
@@ -19,6 +20,19 @@ export interface WordSheetProps {
   onClose: () => void;
   onOpenDetail: (word: Word) => void;
   onOpenRoot: (rootBuckwalter: string) => void;
+  /** The reader's own controls for the ayah this word sits in, already built.
+   *  A node rather than the ayah's state and three callbacks: the sheet has no
+   *  business knowing what a bookmark is, and the reader already holds every
+   *  piece.
+   *
+   *  This row is why the mushaf page can carry no chrome (ruling 4) -- it is
+   *  the only way to bookmark, note or play an ayah while reading print.
+   *  Absent where the reader cannot act: the Words screen, and an ayah outside
+   *  the reader's own surah. */
+  ayahActions?: ReactNode;
+  /** Names the ayah the actions act on -- on a mushaf page the tapped word can
+   *  be several ayahs away from where the eye is. */
+  ayahLabel?: string;
 }
 
 /**
@@ -26,7 +40,15 @@ export interface WordSheetProps {
  * morphological segment, and the two ways deeper into the corpus. The shell
  * around it -- backdrop, motion, drag, back -- is BottomSheet's.
  */
-export function WordSheet({ summary, uiLocale, onClose, onOpenDetail, onOpenRoot }: WordSheetProps) {
+export function WordSheet({
+  summary,
+  uiLocale,
+  onClose,
+  onOpenDetail,
+  onOpenRoot,
+  ayahActions,
+  ayahLabel,
+}: WordSheetProps) {
   const theme = useThemeColors();
   const sizes = useArabicSizes();
 
@@ -53,6 +75,15 @@ export function WordSheet({ summary, uiLocale, onClose, onOpenDetail, onOpenRoot
           <SegmentPill key={segment.id} segment={segment} />
         ))}
       </View>
+      {ayahActions ? (
+        <View
+          testID="word-ayah-actions"
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+        >
+          <Text style={{ color: theme.mutedText, fontSize: typography.body }}>{ayahLabel ?? ''}</Text>
+          {ayahActions}
+        </View>
+      ) : null}
       <SheetRow
         testID="full-analysis"
         label={t(uiLocale, 'word.fullAnalysis')}
