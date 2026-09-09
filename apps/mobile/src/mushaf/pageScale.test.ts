@@ -3,9 +3,23 @@ import { MUSHAF_MAX_FONT_SIZE, mushafFontSize, mushafLineHeight } from './pageSc
 import { MUSHAF_PAGE_WIDEST_EM } from './pageMetrics.generated';
 
 describe('mushafFontSize', () => {
-  it('fills the width with the page-s widest line', () => {
+  it('fills the width with the page-s widest line, less the rounding slack', () => {
     const em = MUSHAF_PAGE_WIDEST_EM[45]!; // page 46
-    expect(mushafFontSize(46, 328)).toBeCloseTo(328 / em, 5);
+    expect(mushafFontSize(46, 328)).toBeCloseTo((328 * 0.985) / em, 5);
+  });
+
+  it('leaves every page room to round into', () => {
+    // The device run: at an exact fit Android rounds each glyph advance up and
+    // the widest line ellipsises. Every page must draw its widest line inside
+    // the column with a pixel or two to spare, not exactly at its edge.
+    for (let page = 1; page <= 604; page += 1) {
+      const em = MUSHAF_PAGE_WIDEST_EM[page - 1]!;
+      const drawn = mushafFontSize(page, 328) * em;
+      expect(drawn).toBeLessThan(328);
+      // ...and the slack stays slack: a page shrunk to fit would read as a
+      // narrower mushaf, which is the other way to fail this.
+      expect(drawn).toBeGreaterThan(328 * 0.97);
+    }
   });
 
   it('caps at the size where Android drops whole-word glyphs', () => {

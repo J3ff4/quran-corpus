@@ -14,6 +14,19 @@ export const MUSHAF_MAX_FONT_SIZE = 40;
 /** A floor, so a mid-layout zero height cannot make a line invisible. */
 const MIN_LINE_HEIGHT = 1;
 
+/**
+ * The slack a page keeps between its widest line and the column it sits in.
+ *
+ * `textWidth / em` is an exact fit by construction, and an exact fit is what
+ * the device run found ellipsised: Android lays each glyph out at an integer
+ * advance, so forty rounded-up glyphs put the widest line a few pixels past
+ * the column and `numberOfLines={1}` answers with a '...'. Measured on page 46
+ * at 640dpi the ink filled 1309 of 1312px -- there was nothing left to round
+ * into. 1.5% is more than the worst rounding (~0.5px per glyph) and is half a
+ * point of type at this size.
+ */
+const WIDTH_SLACK = 0.985;
+
 export function mushafFontSize(page: number, textWidth: number): number {
   if (!Number.isInteger(page) || page < MUSHAF_PAGE_MIN || page > MUSHAF_PAGE_MAX) {
     throw new RangeError(
@@ -26,7 +39,7 @@ export function mushafFontSize(page: number, textWidth: number): number {
     // or truncated generation -- say which page, not "NaN".
     throw new Error(`no metrics for mushaf page ${page}; run \`scraper mushaf-metrics\``);
   }
-  return Math.min(textWidth / em, MUSHAF_MAX_FONT_SIZE);
+  return Math.min((textWidth * WIDTH_SLACK) / em, MUSHAF_MAX_FONT_SIZE);
 }
 
 export function mushafLineHeight(textHeight: number, lineCount: number): number {
