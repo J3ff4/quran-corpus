@@ -1,5 +1,5 @@
 import { View } from 'react-native';
-import type { MushafLine, MushafWord } from '@quran-corpus/data/mobile';
+import { splitBasmala, type MushafLine, type MushafWord } from '@quran-corpus/data/mobile';
 
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
@@ -119,7 +119,7 @@ export function MushafPage({
               )}
               {slot?.kind === 'bismillah' && (
                 <BismillahLine
-                  text={ayahTexts.get(ayahKey(surahOfBismillah(slots, line), 1)) ?? ''}
+                  text={bismillahText(ayahTexts, surahOfBismillah(slots, line))}
                   fontSize={fontSize}
                   lineHeight={lineHeight}
                   uiLocale={uiLocale}
@@ -151,6 +151,19 @@ export function MushafPage({
       </View>
     </View>
   );
+}
+
+/** The basmala a surah's own ayah 1 spells, and nothing else of that ayah.
+ *
+ *  `ayahs.text_uthmani` for an ayah 1 carries the basmala AND the ayah that
+ *  follows it, so handing the row straight to the line drew the opening words
+ *  of the surah on the bismillah line -- ellipsised, since it does not fit.
+ *  The split is the corpus's own (95:1 and 97:1 spell it with a shadda), and a
+ *  row that does not start with one draws nothing rather than a wrong line. */
+function bismillahText(ayahTexts: Map<string, string>, surahId: number): string {
+  const ayahOne = ayahTexts.get(ayahKey(surahId, 1));
+  if (ayahOne === undefined) return '';
+  return splitBasmala(ayahOne, { surahId, ayahNumber: 1 }).basmala ?? '';
 }
 
 /** The surah a bismillah line belongs to: the band above it names it, and on

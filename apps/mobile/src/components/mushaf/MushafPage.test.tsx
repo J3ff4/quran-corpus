@@ -19,6 +19,10 @@ import { ayahKey } from '@/mushaf/highlights';
 
 import { MushafPage } from './MushafPage';
 
+// Four tokens, as the corpus spells it. splitBasmala counts tokens, so a
+// stand-in string would leave the prefix unrecognised and assert nothing.
+const BASMALA = '\u0628\u0650\u0633\u0652\u0645\u0650 \u0671\u0644\u0644\u0651\u064e\u0647\u0650 \u0671\u0644\u0631\u0651\u064e\u062d\u0652\u0645\u064e\u0670\u0646\u0650 \u0671\u0644\u0631\u0651\u064e\u062d\u0650\u064a\u0645\u0650';
+
 const word = (surahId: number, ayahNumber: number, position: number, glyph: string) => ({
   surahId,
   ayahNumber,
@@ -48,7 +52,8 @@ const props = {
   highlights: { bookmarked: new Set<string>(), landing: null, playing: null, landingProgress: 0 },
   ayahTexts: new Map([
     [ayahKey(2, 1), 'ALIF LAM MIM'],
-    [ayahKey(5, 1), 'BISMILLAH AR-RAHMAN'],
+    // The real row shape: an ayah 1 carries the basmala AND the ayah after it.
+    [ayahKey(5, 1), `${BASMALA} \u064a\u0640\u0670\u0623\u064e\u064a\u0651\u064f\u0647\u064e\u0627 \u0627\u0644\u0651\u064e\u0630\u0650\u064a\u0646\u064e`],
   ]),
   surahNames: new Map([[5, 'Al-Ma-idah']]),
   juz: 6,
@@ -113,7 +118,15 @@ describe('MushafPage', () => {
   it('draws the bismillah from the surah-s own ayah 1, not a constant', () => {
     // 95:1 and 97:1 spell it with a shadda and the other 110 do not.
     const { container } = render(<MushafPage {...props} lines={openingLines} />);
-    expect(container.textContent).toContain('BISMILLAH AR-RAHMAN');
+    expect(container.textContent).toContain(BASMALA);
+  });
+
+  it('draws the basmala alone, not the whole of ayah 1 behind it', () => {
+    // The device run: the row is basmala + the surah's first words, and the
+    // line drew all of it, ellipsised. The line holds the basmala only.
+    render(<MushafPage {...props} lines={openingLines} />);
+    const bismillah = screen.getByLabelText('In the name of Allah, the Entirely Merciful, the Especially Merciful');
+    expect(bismillah.textContent).toBe(BASMALA);
   });
 
   it('keeps 15 line slots on a page whose words occupy fewer', () => {
