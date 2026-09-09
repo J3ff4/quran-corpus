@@ -29,6 +29,7 @@ import type { ContentLanguageCode, UiLocaleCode } from '@/i18n/languages';
 import type { ReaderMode } from '@/settings/settingsStore';
 
 import { AyahCard } from './AyahCard';
+import type { MushafWord } from '@quran-corpus/data/mobile';
 import { MushafReader } from './mushaf/MushafReader';
 import { useMushafIndex } from '@/mushaf/mushafReaderData';
 import { ayahKey } from '@/mushaf/highlights';
@@ -1217,17 +1218,17 @@ export function SurahReader({
   // prefetch through, so a page the reader has already looked at answers from
   // its cache.
   const onMushafWordPress = useCallback(
-    (ayahId: number, position: number) => {
+    (pressed: MushafWord, ayahId: number) => {
       if (!loadWords) return;
       void loadWords(ayahId)
         .then((words) => {
-          const word = words.find((candidate) => candidate.position === position);
+          const word = words.find((candidate) => candidate.position === pressed.position);
           // No word at that position is the ayah-end medallion, which has a
           // layout row and no word row behind it. Nothing opens.
           if (word) onWordPress(word);
         })
         .catch((cause: unknown) => {
-          console.error('[reader] mushaf word load failed', { ayahId, position, cause });
+          console.error('[reader] mushaf word load failed', { ayahId, position: pressed.position, cause });
         });
     },
     [loadWords, onWordPress],

@@ -12,15 +12,18 @@ import { getSurahGlosses, getWordSummary, type Gloss, type WordSummary } from '.
  * query costs the same whether one word is tapped or fifty -- 6,116 rows for
  * al-Baqarah. Caching it per surah+language is what keeps the second tap free.
  *
- * Shared because the reader and the word-by-word screen both open the same
- * sheet from the same database: a second copy of this cache is a second place
+ * Shared because the reader, the word-by-word screen and the mushaf tab all
+ * open the same sheet from the same database: a second copy of this cache is a second place
  * for the invalidation key to drift.
  */
 export function useWordSummaryLoader(
   client: MobileDataClient | null,
   surahId: number | null,
   contentLanguage: ContentLanguageCode,
-): (word: Word) => Promise<WordSummary> {
+  // The mushaf tab has no surah of its own: a page carries whatever surahs
+  // print put on it, so its caller passes the tapped word's surah per call and
+  // leaves this null.
+): (word: Word, wordSurahId?: number) => Promise<WordSummary> {
   // The in-flight promise, not the map it resolves to. Storing the resolved
   // value left the cache empty for as long as the query took, so a second tap
   // landing while the first was still running missed, and issued its own
@@ -29,15 +32,16 @@ export function useWordSummaryLoader(
   const glossesRef = useRef<{ key: string; glosses: Promise<Map<number, Gloss>> } | null>(null);
 
   return useCallback(
-    async (word: Word) => {
-      if (!client || !surahId) throw new Error('the corpus database is not open');
+    async (word: Word, wordSurahId?: number) => {
+      const surah = wordSurahId ?? surahId;
+      if (!client || !surah) throw new Error('the corpus database is not open');
       // Language is part of the key, not just the surah: switching content
       // language while a surah is open otherwise keeps serving the glosses
       // fetched for the previous one.
-      const key = `${surahId}:${contentLanguage}`;
+      const key = `${surah}:${contentLanguage}`;
       let entry = glossesRef.current;
       if (entry?.key !== key) {
-        entry = { key, glosses: getSurahGlosses(client, surahId, contentLanguage) };
+        entry = { key, glosses: getSurahGlosses(client, surah, contentLanguage) };
         glossesRef.current = entry;
       }
 

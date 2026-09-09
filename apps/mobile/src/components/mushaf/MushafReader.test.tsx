@@ -144,7 +144,13 @@ describe('MushafReader', () => {
     const tap = mocks.pagerProps.at(-1)?.['onWordPress'] as (word: unknown) => void;
     act(() => tap({ surahId: 5, ayahNumber: 82, position: 3, charType: 'word', glyph: '' }));
 
-    expect(onWordPress).toHaveBeenCalledWith(682, 3);
+    // The word AND its ayah row: the row id answers "which words", the word
+    // answers "which surah", and on a page holding two surahs the second is
+    // not derivable from the screen.
+    expect(onWordPress).toHaveBeenCalledWith(
+      expect.objectContaining({ surahId: 5, ayahNumber: 82, position: 3 }),
+      682,
+    );
   });
 
   it('opens nothing for a word whose ayah rows have not arrived', () => {
