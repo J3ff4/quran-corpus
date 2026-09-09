@@ -154,6 +154,7 @@ export function MushafPage({
               {slot?.kind === 'header' && (
                 <SurahBand
                   surahName={surahNames.get(slot.surahId) ?? ''}
+                  surahId={slot.surahId}
                   height={lineHeight}
                   width={width - 2 * PAGE_MARGIN}
                 />
