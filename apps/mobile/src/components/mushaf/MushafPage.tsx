@@ -29,7 +29,10 @@ import { SurahBand } from './SurahBand';
  *  juz and the surah name. */
 const PAGE_MARGIN = 16;
 const FOOTER_HEIGHT = 44;
-const HEADER_HEIGHT = 22;
+// 26, not 22: PageCorners puts its row at top 6 with a 13pt caption, whose
+// line box on Android is ~18dp -- 24 in all, which the old figure did not
+// reserve, so the juz and the surah name could graze the first glyph line.
+const HEADER_HEIGHT = 26;
 
 export interface MushafPageProps {
   page: number;
