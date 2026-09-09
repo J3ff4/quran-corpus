@@ -13,9 +13,15 @@ vi.mock('react-native', async () => {
 
 const mocks = vi.hoisted(() => ({
   readerProps: [] as Array<Record<string, unknown>>,
+  sheetProps: [] as Array<Record<string, unknown>>,
   position: null as { surahId: number; ayahNumber: number; page: number | null } | null,
   bookmarks: [] as { surahId: number; ayahNumber: number; note: string | null }[],
   recordReadingPosition: vi.fn(),
+  setBookmark: vi.fn(),
+  setBookmarkNote: vi.fn(),
+  useRecitation: vi.fn(),
+  toggleAyah: vi.fn(),
+  loadWordSummary: vi.fn(),
   loadFails: false,
 }));
 
@@ -31,7 +37,15 @@ vi.mock('@/components/mushaf/MushafReader', async () => {
   };
 });
 
-vi.mock('@/components/WordSheet', () => ({ WordSheet: () => null }));
+// Captured rather than rendered: WordSheet has its own suite, and what this
+// screen decides is which coordinate the actions it builds are keyed to.
+vi.mock('@/components/WordSheet', () => ({
+  WordSheet: (props: Record<string, unknown>) => {
+    mocks.sheetProps.push(props);
+    return null;
+  },
+}));
+
 vi.mock('expo-router', () => ({ router: { push: vi.fn() } }));
 vi.mock('@/components/mushaf/MushafChrome', () => ({ MushafChrome: () => null }));
 vi.mock('@/components/mushaf/PageJumpSheet', () => ({ PageJumpSheet: () => null }));
@@ -48,11 +62,39 @@ vi.mock('@/data/userRepository', () => ({
     mocks.recordReadingPosition(...args);
     return Promise.resolve();
   },
+  setBookmark: (...args: unknown[]) => {
+    mocks.setBookmark(...args);
+    return Promise.resolve();
+  },
+  setBookmarkNote: (...args: unknown[]) => {
+    mocks.setBookmarkNote(...args);
+    return Promise.resolve();
+  },
 }));
-vi.mock('@/data/corpusRepository', () => ({ getWordsForAyah: () => Promise.resolve([]) }));
-vi.mock('@/data/useWordSummaryLoader', () => ({ useWordSummaryLoader: () => vi.fn() }));
+vi.mock('@/audio/ayahAudio', () => ({
+  useRecitation: (...args: unknown[]) => {
+    mocks.useRecitation(...args);
+    return { ayah: null, playing: false, toggleAyah: mocks.toggleAyah };
+  },
+}));
+vi.mock('@/components/AyahControls', () => ({ AyahControls: () => null }));
+vi.mock('@/components/NoteEditor', () => ({ NoteEditor: () => null }));
+vi.mock('@/data/corpusRepository', () => ({
+  getWordsForAyah: () => Promise.resolve([{ id: 91, ayah_id: 9, position: 1 }]),
+}));
+vi.mock('@/data/useWordSummaryLoader', () => ({
+  useWordSummaryLoader: () => (word: unknown, surahId: number) => {
+    mocks.loadWordSummary(word, surahId);
+    return Promise.resolve({ word, segments: [], gloss: null });
+  },
+}));
 vi.mock('@/settings/settingsStore', () => ({
-  useAppSettings: () => ({ uiLocale: 'en', contentLanguage: 'en' }),
+  useAppSettings: () => ({
+    uiLocale: 'en',
+    contentLanguage: 'en',
+    reciterId: 'husary',
+    continuousPlay: false,
+  }),
 }));
 
 const indexPages = new Map([
@@ -61,13 +103,19 @@ const indexPages = new Map([
   [107, { page: 107, startSurahId: 5, startAyahNumber: 90, surahName: 'Al-Maidah', juz: 7 }],
 ]);
 vi.mock('@/mushaf/mushafReaderData', () => ({
-  useMushafIndex: () => ({ pages: indexPages, surahNames: new Map(), ready: true }),
+  useMushafIndex: () => ({
+    pages: indexPages,
+    surahNames: new Map([[4, 'An-Nisa'], [5, 'Al-Maidah']]),
+    ayahCounts: new Map([[4, 176], [5, 120]]),
+    ready: true,
+  }),
 }));
 
 import { MushafScreen } from './MushafScreen';
 
 beforeEach(() => {
   mocks.readerProps = [];
+  mocks.sheetProps = [];
   mocks.position = null;
   mocks.bookmarks = [];
   mocks.loadFails = false;
@@ -121,6 +169,33 @@ describe('MushafScreen', () => {
         page: 107,
       }),
     );
+  });
+
+  it('acts on the word-s own surah, not the page-s first (#61)', async () => {
+    // Page 106 opens in An-Nisa and heads Al-Ma'idah. Long-press a word of the
+    // SECOND surah and every control in the sheet has to be keyed to it: a tab
+    // has no route surah to fall back on, which is the whole of #61.
+    mocks.position = { surahId: 4, ayahNumber: 176, page: 106 };
+    const props = await renderScreen();
+
+    const longPress = props()['onWordPress'] as (word: unknown, ayahId: number) => void;
+    await act(async () => {
+      longPress({ surahId: 5, ayahNumber: 2, position: 1, charType: 'word', glyph: '' }, 9);
+    });
+
+    expect(mocks.loadWordSummary).toHaveBeenCalledWith(expect.anything(), 5);
+    await waitFor(() =>
+      expect(mocks.sheetProps.at(-1)?.['ayahLabel']).toContain('5:2'),
+    );
+    expect(mocks.sheetProps.at(-1)?.['ayahActions']).toBeTruthy();
+  });
+
+  it('starts the recitation with no surah, since a tab has none to assume', async () => {
+    // The hook reads `surah` when it starts an ayah rather than at mount,
+    // which is what lets the screen hand it whichever surah was pressed.
+    await renderScreen();
+
+    expect(mocks.useRecitation).toHaveBeenCalledWith(null, 0, 'husary', expect.anything());
   });
 
   it('carries every bookmark, not one surah-s worth', async () => {

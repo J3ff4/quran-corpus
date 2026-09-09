@@ -13,10 +13,19 @@ export interface MushafIndex {
   /** Transliterated surah names, by surah id. Every surah, not the pages'
    *  opening ones: a band can name a surah that starts halfway down a page. */
   surahNames: Map<number, string>;
+  /** Ayah count per surah. The mushaf tab's recitation needs it and cannot ask
+   *  the route for it: what is playing is whatever surah the tapped word
+   *  belonged to. Same query as the names, so it costs nothing. */
+  ayahCounts: Map<number, number>;
   ready: boolean;
 }
 
-const EMPTY_INDEX: MushafIndex = { pages: new Map(), surahNames: new Map(), ready: false };
+const EMPTY_INDEX: MushafIndex = {
+  pages: new Map(),
+  surahNames: new Map(),
+  ayahCounts: new Map(),
+  ready: false,
+};
 
 // Process-wide, and deliberately not per reader: the index is 604 + 114 rows of
 // data that cannot change while the app runs, and the reader mounts a fresh
@@ -36,6 +45,7 @@ async function loadIndex(client: MobileDataClient): Promise<Omit<MushafIndex, 'r
   return {
     pages: new Map(pages.map((entry) => [entry.page, entry])),
     surahNames: new Map(surahs.map((surah) => [surah.id, surah.nameTranslit])),
+    ayahCounts: new Map(surahs.map((surah) => [surah.id, surah.ayahCount])),
   };
 }
 
