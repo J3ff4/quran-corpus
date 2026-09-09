@@ -1941,3 +1941,42 @@ whole of it is one prop.
   printed mushaf does.
 - **The recitation bar reads 0:00 / --:-- until playback actually starts**, so
   a stalled first tap looks identical to a paused player.
+
+### `/code-review` (2026-09-09)
+
+Owner-run, §5 triggers: `packages/data` queries (Tasks 9/10) and the on-device
+user-DB write (Task 9). One pass, eight findings, no blocking correctness
+defect. The reviewer also replayed `composePage` over the real 604-page
+`mushaf_layout` data — 114 bands, 112 bismillah lines, every one resolvable —
+and confirmed `SURAH_BAND_PATH` is byte-identical to web's old inline path and
+that `recordReadingPosition`'s signature change has no unmigrated callers.
+
+Fixed in `d041c44`:
+
+- **`SurahBand` width was uncapped.** `height * 8.16` inside a line box of
+  `(pageHeight - 44) / 15`: ~50dp box, 408dp band, 328dp column. Both ends of
+  the arabesque were cut on every surah opening. Now fits the narrower axis.
+  Mutation-checked.
+- **TalkBack labels named no surah**, so "Ayah 1" was announced twice on the
+  51 two-surah pages.
+- **A duplicated KFGQPC comment** in `AboutScreen`.
+
+Folded into #61 (cross-surah actions): `prevSurahId`/`nextSurahId` and
+`bookmarkedKeys` are keyed to the route's surah while the header title follows
+the page's — same root, and blocking once the mushaf becomes its own tab.
+
+Declined, with reasons:
+
+- **`fontSize` from width, `lineHeight` from height, unrelated.** Only bites in
+  Android multi-window, which portrait-lock does not cover but which nothing
+  else in the app is built for either. M7d rebuilds this page's chrome.
+- **The TalkBack overlay's focus rectangles are equal slices** of the page
+  rather than where each ayah is printed. Real, but a fix needs per-ayah
+  geometry from the line rows — M7d work, and check 217 has not run yet.
+- **`PagerPage` drops `loading`/`error`**, so a failed `getMushafPage` renders
+  as a blank grid indistinguishable from a page whose font has not landed.
+  Blank is already the deliberate safe state here; a retry affordance belongs
+  with M7d's chrome.
+- **`indexPromise`/`ayahCache` are module-global and never evict.** One client
+  for the process's life, and the corpus DB is never reopened. Revisit if a DB
+  swap or recovery path is ever added.
