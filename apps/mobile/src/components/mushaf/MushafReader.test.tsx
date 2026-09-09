@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   fontReady: true,
   fontError: null as Error | null,
   ayahs: new Map<string, unknown>(),
+  ayahSurahIds: [] as readonly number[],
   reduceMotion: false,
 }));
 
@@ -32,7 +33,10 @@ vi.mock('@/mushaf/pageFont', () => ({
 }));
 
 vi.mock('@/mushaf/mushafReaderData', () => ({
-  useMushafAyahs: () => mocks.ayahs,
+  useMushafAyahs: (_client: unknown, surahIds: readonly number[]) => {
+    mocks.ayahSurahIds = surahIds;
+    return mocks.ayahs;
+  },
 }));
 
 vi.mock('@/motion/useReducedMotion', () => ({ useReducedMotion: () => mocks.reduceMotion }));
@@ -73,6 +77,7 @@ beforeEach(() => {
   mocks.fontError = null;
   mocks.reduceMotion = false;
   mocks.ayahs = new Map();
+  mocks.ayahSurahIds = [];
   // jsdom lays nothing out, and this component draws nothing until it has a
   // measured box -- the page is sized to the space under the reader's header,
   // not to the window.
@@ -98,6 +103,27 @@ describe('MushafReader', () => {
     render(<MushafReader {...props} />);
 
     expect(mocks.pagerProps.at(-1)).toMatchObject({ width: 360, height: 720, initialPage: 106 });
+  });
+
+  it('asks for every surah the pages on screen can hold, not just the ones they open with', () => {
+    // Page 604 opens with al-Ikhlas and then heads al-Falaq and an-Nas. Asking
+    // only for each page's opening surah left both of their bismillah lines
+    // blank on the device -- the text for a surah nobody opened a page with
+    // was never fetched.
+    const lastPages = new Map([
+      [603, { page: 603, startSurahId: 106, startAyahNumber: 1, surahName: 'Quraysh', juz: 30 }],
+      [604, { page: 604, startSurahId: 112, startAyahNumber: 1, surahName: 'Al-Ikhlas', juz: 30 }],
+    ]);
+    render(
+      <MushafReader
+        {...props}
+        initialPage={604}
+        index={{ ...index, pages: lastPages, surahNames: new Map([[114, 'An-Nas']]) }}
+      />,
+    );
+
+    expect(mocks.ayahSurahIds).toContain(113);
+    expect(mocks.ayahSurahIds).toContain(114);
   });
 
   it('gives the footer a juz per page, and skips the pages that have none', () => {

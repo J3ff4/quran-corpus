@@ -24,6 +24,12 @@ const PULSE_HOLD_MS = 400;
 const PULSE_STEP_MS = 150;
 const PULSE_STEPS = [0.8, 0.6, 0.4, 0.2, 0];
 
+/** The last surah, so the final pages know where their range ends. A fact
+ *  about the mushaf, like MUSHAF_PAGE_MAX beside it, and not something the
+ *  loaded index can answer: page 604 opens with al-Ikhlas and the index has no
+ *  page after it to name an-Nas. */
+const LAST_SURAH_ID = 114;
+
 export interface MushafReaderProps {
   client: MobileDataClient | null;
   index: MushafIndex;
@@ -81,12 +87,21 @@ export function MushafReader({
   // one: a surah that starts halfway down page N is the *opening* surah of
   // page N + 1, so a window that stops at the page being read has no text for
   // the bismillah it is about to draw.
+  //
+  // A *range*, not each page's opening surah: a page can hold surahs its own
+  // row never names. Page 604 opens with al-Ikhlas and then heads al-Falaq and
+  // an-Nas, and the device run drew both of their bismillah lines empty. The
+  // surahs on a page run from the surah it opens with to the one the page
+  // after it opens with, so the window's range covers every band and bismillah
+  // inside it.
   const surahIds = useMemo(() => {
+    const first = index.pages.get(page - 1)?.startSurahId ?? index.pages.get(page)?.startSurahId;
+    if (first === undefined) return [];
+    // One past the window: the last window page runs up to whatever the next
+    // page opens with, and past the end of the mushaf that is the last surah.
+    const last = index.pages.get(page + 3)?.startSurahId ?? LAST_SURAH_ID;
     const ids: number[] = [];
-    for (let p = page - 1; p <= page + 2; p += 1) {
-      const entry = index.pages.get(p);
-      if (entry) ids.push(entry.startSurahId);
-    }
+    for (let surahId = first; surahId <= Math.max(first, last); surahId += 1) ids.push(surahId);
     return ids;
   }, [index.pages, page]);
   const ayahs = useMushafAyahs(client, surahIds);
