@@ -16,13 +16,15 @@ import { useListBottomPadding } from '@/theme/useListBottomPadding';
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const ROWS: { href: string; icon: IconName; label: UiStringKey; sub: UiStringKey }[] = [
+  { href: '/morphology', icon: 'words', label: 'menu.morphology', sub: 'menu.morphologySub' },
   { href: '/bookmarks', icon: 'bookmark', label: 'menu.bookmarks', sub: 'menu.bookmarksSub' },
   { href: '/settings', icon: 'settings', label: 'menu.settings', sub: 'menu.settingsSub' },
   { href: '/about', icon: 'info', label: 'menu.about', sub: 'menu.aboutSub' },
 ];
 
 /** The fifth tab. Bookmarks and Settings gave up their own slots so Dictionary
- *  could have one; this is where they went. No logic of its own -- deliberately
+ *  could have one, and Morphology gave up its own so the mushaf could (M7d);
+ *  this is where all four went. No logic of its own -- deliberately
  *  so: the mockup's "24 ayahs saved" subtitle would make the one screen with
  *  nothing to load open the user database on every focus, and the count is
  *  already on the Bookmarks header one tap away. */

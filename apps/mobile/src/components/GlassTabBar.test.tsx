@@ -10,7 +10,7 @@ import { ThemeContext } from '@/theme/themeContext';
 import { themeColors } from '@/theme/tokens';
 import { rgb } from '@/testing/rgb';
 
-const ROUTES = ['index', 'surahs', 'morphology', 'dictionary', 'menu'];
+const ROUTES = ['index', 'surahs', 'mushaf', 'dictionary', 'menu'];
 
 function props(index: number, navigate = vi.fn(), defaultPrevented = false): GlassTabBarProps {
   return {
@@ -42,8 +42,19 @@ describe('GlassTabBar', () => {
     const tabs = screen.getAllByRole('tab');
     expect(tabs[2]?.getAttribute('aria-selected')).toBe('true');
     expect(tabs[0]?.getAttribute('aria-selected')).toBe('false');
-    expect(screen.getByTestId('tab-morphology-label').style.color).toBe(rgb(themeColors.dark.accent));
+    expect(screen.getByTestId('tab-mushaf-label').style.color).toBe(rgb(themeColors.dark.accent));
     expect(screen.getByTestId('tab-index-label').style.color).toBe(rgb(themeColors.dark.mutedText));
+  });
+
+  it('carries the mushaf tab, and no longer the morphology one', () => {
+    // The map is keyed by route name, so a renamed tab does not fail loudly --
+    // it renders nothing at all and the bar comes up four wide.
+    renderBar({
+      ...props(0),
+      state: { index: 0, routes: [...ROUTES, 'morphology'].map((name) => ({ key: name, name })) },
+    });
+    expect(screen.getByTestId('tab-mushaf-label')).toBeTruthy();
+    expect(screen.queryByTestId('tab-morphology-label')).toBeNull();
   });
 
   it('navigates to the route that was pressed', () => {

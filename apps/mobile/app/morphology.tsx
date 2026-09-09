@@ -9,11 +9,14 @@ import { typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
 /**
- * The morphology tab opens on the word-by-word view of wherever the reader
- * left off. The empty state below is the only thing it shows on a fresh
- * install, where there is no position to open.
+ * Word-by-word, opening on wherever the reader left off. The empty state below
+ * is the only thing it shows on a fresh install, where there is no position to
+ * open.
+ *
+ * A Menu row rather than a tab since M7d: the mushaf took the fifth slot, and
+ * of the two this is the one already reachable from the reader's own chips.
  */
-export default function MorphologyTab() {
+export default function MorphologyRoute() {
   const { uiLocale } = useAppSettings();
   const theme = useThemeColors();
   const { data: position, loading, error } = useUserDbOnFocus(

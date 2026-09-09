@@ -33,7 +33,7 @@ export interface GlassTabBarProps {
 const TABS: Record<string, { icon: IconName; label: UiStringKey }> = {
   index: { icon: 'home', label: 'tabs.home' },
   surahs: { icon: 'book', label: 'tabs.surahs' },
-  morphology: { icon: 'words', label: 'tabs.morphology' },
+  mushaf: { icon: 'pages', label: 'tabs.mushaf' },
   dictionary: { icon: 'dictionary', label: 'tabs.dictionary' },
   menu: { icon: 'menu', label: 'tabs.menu' },
 };

@@ -212,13 +212,13 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
         importantForAccessibility={open ? 'no-hide-descendants' : 'auto'}
       >
         {/* Drawn in the screen rather than pushed to the nav header with
-            setOptions. The morphology tab has no header to push to -- tabs run
+            setOptions. Morphology was a tab until M7d and tabs run
             headerShown: false since M6a, because a native header strip cuts
             across the bloom -- so on that entry point the surah name and the
             pager were both silently absent, leaving no way to change the ayah
-            range at all (issue #25, found on the M6e device run). Here they
-            reach both entry points, and it is what every other screen already
-            does: app/_layout.tsx sets `title: ''` on the Stack so the nav
+            range at all (issue #25, found on the M6e device run). Drawing them
+            here reaches every entry point, and it is what every other screen
+            already does: app/_layout.tsx sets `title: ''` on the Stack so the nav
             header carries the back affordance and nothing else.
 
             Name and pager share one row on purpose. Stacked as separate rows

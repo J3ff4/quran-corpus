@@ -4,7 +4,7 @@ export type UiStringKey =
   | 'tabs.home'
   | 'tabs.surahs'
   | 'tabs.bookmarks'
-  | 'tabs.morphology'
+  | 'tabs.mushaf'
   | 'tabs.settings'
   | 'tabs.dictionary'
   | 'tabs.menu'
@@ -15,6 +15,8 @@ export type UiStringKey =
   | 'menu.bookmarksSub'
   | 'menu.settingsSub'
   | 'menu.aboutSub'
+  | 'menu.morphology'
+  | 'menu.morphologySub'
   | 'menu.deviceHeading'
   | 'menu.deviceNote'
   | 'wbw.title'
@@ -268,7 +270,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'tabs.home': 'Home',
     'tabs.surahs': 'Surahs',
     'tabs.bookmarks': 'Bookmarks',
-    'tabs.morphology': 'Morphology',
+    'tabs.mushaf': 'Mushaf',
     'tabs.settings': 'Settings',
     'tabs.dictionary': 'Dictionary',
     'tabs.menu': 'Menu',
@@ -279,6 +281,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'menu.bookmarksSub': 'Saved ayahs and the notes on them',
     'menu.settingsSub': 'Reading, recitation, appearance, language',
     'menu.aboutSub': 'Sources, licences and version',
+    'menu.morphology': 'Morphology',
+    'menu.morphologySub': 'Word by word, from where you left off',
     'menu.deviceHeading': 'On this device',
     'menu.deviceNote': 'Nothing you save leaves the phone. Bookmarks, notes and settings live in one file here, and they survive app updates.',
     'wbw.title': 'Word by word',
@@ -473,7 +477,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'tabs.home': 'Bosh sahifa',
     'tabs.surahs': 'Suralar',
     'tabs.bookmarks': 'Xatcho‘plar',
-    'tabs.morphology': 'Morfologiya',
+    'tabs.mushaf': 'Mushaf',
     'tabs.settings': 'Sozlamalar',
     'tabs.dictionary': 'Lug‘at',
     'tabs.menu': 'Menyu',
@@ -484,6 +488,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'menu.bookmarksSub': 'Saqlangan oyatlar va ulardagi izohlar',
     'menu.settingsSub': 'O‘qish, qiroat, ko‘rinish, til',
     'menu.aboutSub': 'Manbalar, litsenziyalar va versiya',
+    'menu.morphology': 'Morfologiya',
+    'menu.morphologySub': 'Soʻzma-soʻz, toʻxtagan joyingizdan',
     'menu.deviceHeading': 'Shu qurilmada',
     'menu.deviceNote': 'Saqlanganlar telefondan chiqmaydi. Xatcho‘plar, izohlar va sozlamalar shu yerdagi bitta faylda saqlanadi va ilova yangilanganda ham qoladi.',
     'wbw.title': 'So‘zma-so‘z',
@@ -673,7 +679,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'tabs.home': 'Главная',
     'tabs.surahs': 'Суры',
     'tabs.bookmarks': 'Закладки',
-    'tabs.morphology': 'Морфология',
+    'tabs.mushaf': 'Мусхаф',
     'tabs.settings': 'Настройки',
     'tabs.dictionary': 'Словарь',
     'tabs.menu': 'Меню',
@@ -684,6 +690,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'menu.bookmarksSub': 'Сохранённые аяты и заметки к ним',
     'menu.settingsSub': 'Чтение, чтец, оформление, язык',
     'menu.aboutSub': 'Источники, лицензии и версия',
+    'menu.morphology': 'Морфология',
+    'menu.morphologySub': 'Пословно, с того места, где вы остановились',
     'menu.deviceHeading': 'На этом устройстве',
     'menu.deviceNote': 'Ничего из сохранённого не покидает телефон. Закладки, заметки и настройки хранятся в одном файле здесь и сохраняются при обновлении приложения.',
     'wbw.title': 'Пословно',

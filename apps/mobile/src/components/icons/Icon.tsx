@@ -4,6 +4,7 @@ import Svg, { Path } from 'react-native-svg';
 export type IconName =
   | 'home'
   | 'book'
+  | 'pages'
   | 'bookmark'
   | 'note'
   | 'settings'
@@ -44,6 +45,17 @@ const PATHS: Record<IconName, string[]> = {
   book: [
     'M4 5a2 2 0 0 1 2-2h5v18H6a2 2 0 0 1-2-2z',
     'M20 5a2 2 0 0 0-2-2h-5v18h5a2 2 0 0 0 2-2z',
+  ],
+  // A page spread with its text block, for the mushaf. `book` is the Surahs
+  // tab's and a second closed book beside it would name neither: this one is
+  // open, which is what the mushaf tab shows.
+  pages: [
+    'M3 5.5c3-1.2 6-1.2 9 0v14c-3-1.2-6-1.2-9 0z',
+    'M21 5.5c-3-1.2-6-1.2-9 0v14c3-1.2 6-1.2 9 0z',
+    'M5.5 9.5h4',
+    'M14.5 9.5h4',
+    'M5.5 13h4',
+    'M14.5 13h4',
   ],
   bookmark: ['M6 3.5h12a1 1 0 0 1 1 1V21l-7-4.2L5 21V4.5a1 1 0 0 1 1-1z'],
   // No web counterpart -- notes are a mobile feature. Drawn to the same 24-box

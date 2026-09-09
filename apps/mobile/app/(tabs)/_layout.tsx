@@ -36,7 +36,10 @@ export default function TabsLayout() {
           the browse prefetch in SurahsScreen then has the other three modes
           warm before the tab is ever opened. */}
       <Tabs.Screen name="surahs" options={{ lazy: false }} />
-      <Tabs.Screen name="morphology" />
+      {/* Not `lazy: false`, unlike Surahs above. This tab opens with a SQLite
+          read AND a page-font registration, and moving both into startup costs
+          more than the landing cross-fade it would save. */}
+      <Tabs.Screen name="mushaf" />
       <Tabs.Screen name="dictionary" />
       <Tabs.Screen name="menu" />
     </Tabs>

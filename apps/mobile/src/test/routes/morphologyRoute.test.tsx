@@ -3,7 +3,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Not colocated with the route -- see word.test.tsx for why app/ cannot hold a
 // test file.
-import MorphologyTab from '../../../app/(tabs)/morphology';
+import MorphologyRoute from '../../../app/morphology';
 
 interface Position {
   surahId: number;
@@ -86,7 +86,7 @@ describe('morphology tab', () => {
     // back exited the app -- owner device report, 2026-08-16.
     mocks.position = { surahId: 2, ayahNumber: 21 };
 
-    render(<MorphologyTab />);
+    render(<MorphologyRoute />);
 
     expect(await screen.findByTestId('wbw-screen')).toBeTruthy();
     expect(mocks.redirect).not.toHaveBeenCalled();
@@ -95,7 +95,7 @@ describe('morphology tab', () => {
   it('opens at the last-read ayah', async () => {
     mocks.position = { surahId: 2, ayahNumber: 21 };
 
-    render(<MorphologyTab />);
+    render(<MorphologyRoute />);
 
     await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenCalledWith(expect.anything(), 2, 21));
   });
@@ -103,7 +103,7 @@ describe('morphology tab', () => {
   it('still shows the empty state with no reading history', async () => {
     mocks.position = null;
 
-    render(<MorphologyTab />);
+    render(<MorphologyRoute />);
 
     expect(await screen.findByText('No reading history yet')).toBeTruthy();
     expect(mocks.getWbwScreen).not.toHaveBeenCalled();
@@ -119,7 +119,7 @@ describe('morphology tab', () => {
     mocks.position = null;
     mocks.loading = true;
 
-    render(<MorphologyTab />);
+    render(<MorphologyRoute />);
 
     expect(screen.getByTestId('loading')).toBeTruthy();
     expect(screen.queryByText(/no reading history/i)).toBeNull();
@@ -130,7 +130,7 @@ describe('morphology tab', () => {
     mocks.position = null;
     mocks.error = 'Unable to load reading history';
 
-    render(<MorphologyTab />);
+    render(<MorphologyRoute />);
 
     expect(screen.getByRole('alert').textContent).toBe('Unable to load reading history');
     expect(screen.queryByText(/no reading history/i)).toBeNull();
