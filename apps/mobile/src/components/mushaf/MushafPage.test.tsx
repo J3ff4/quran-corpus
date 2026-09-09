@@ -49,7 +49,13 @@ const props = {
   lines: plainLines,
   width: 360,
   height: 640,
-  highlights: { bookmarked: new Set<string>(), landing: null, playing: null, landingProgress: 0 },
+  highlights: {
+    bookmarked: new Set<string>(),
+    landing: null,
+    playing: null,
+    landingProgress: 0,
+    pressed: null,
+  },
   ayahTexts: new Map([
     [ayahKey(2, 1), 'ALIF LAM MIM'],
     // The real row shape: an ayah 1 carries the basmala AND the ayah after it.
@@ -58,7 +64,10 @@ const props = {
   surahNames: new Map([[5, 'Al-Ma-idah']]),
   juz: 6,
   uiLocale: 'en' as const,
-  onWordPress: () => {},
+  onWordLongPress: () => {},
+  onWordPressIn: () => {},
+  onWordPressOut: () => {},
+  onTap: () => {},
 };
 
 const lineBoxesOf = (container: HTMLElement) =>

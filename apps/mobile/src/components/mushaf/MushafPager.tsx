@@ -38,7 +38,11 @@ export interface MushafPagerProps {
    *  The turn it causes still settles, so the page it lands on is reported
    *  through onPageChange like any other. */
   focusPage?: number | null;
-  onWordPress: (word: MushafWord) => void;
+  onWordLongPress: (word: MushafWord) => void;
+  onWordPressIn: (word: MushafWord) => void;
+  onWordPressOut: () => void;
+  /** A tap on any page. Toggles the chrome (ruling 3). */
+  onTap: () => void;
 }
 
 type PageProps = Omit<MushafPagerProps, 'initialPage' | 'onPageChange' | 'focusPage'> & {

@@ -68,6 +68,7 @@ const props = {
   uiLocale: 'en' as const,
   onPageChange: vi.fn(),
   onWordPress: vi.fn(),
+  onTap: vi.fn(),
   onLanded: vi.fn(),
 };
 
@@ -134,14 +135,14 @@ describe('MushafReader', () => {
     expect(juzByPage.has(107)).toBe(false);
   });
 
-  it('turns a tapped glyph into the ayah row the word sheet needs', () => {
+  it('turns a long-pressed glyph into the ayah row the word sheet needs', () => {
     // The layout rows carry a coordinate, not a word id. Without the lookup
     // the sheet has nothing to open on.
     mocks.ayahs = new Map([[ayahKey(5, 82), { id: 682, text_uthmani: 'الآية' }]]);
     const onWordPress = vi.fn();
     render(<MushafReader {...props} onWordPress={onWordPress} />);
 
-    const tap = mocks.pagerProps.at(-1)?.['onWordPress'] as (word: unknown) => void;
+    const tap = mocks.pagerProps.at(-1)?.['onWordLongPress'] as (word: unknown) => void;
     act(() => tap({ surahId: 5, ayahNumber: 82, position: 3, charType: 'word', glyph: '' }));
 
     // The word AND its ayah row: the row id answers "which words", the word
@@ -157,7 +158,7 @@ describe('MushafReader', () => {
     const onWordPress = vi.fn();
     render(<MushafReader {...props} onWordPress={onWordPress} />);
 
-    const tap = mocks.pagerProps.at(-1)?.['onWordPress'] as (word: unknown) => void;
+    const tap = mocks.pagerProps.at(-1)?.['onWordLongPress'] as (word: unknown) => void;
     act(() => tap({ surahId: 5, ayahNumber: 82, position: 3, charType: 'word', glyph: '' }));
 
     expect(onWordPress).not.toHaveBeenCalled();
@@ -232,5 +233,23 @@ describe('MushafReader', () => {
 
     expect(mocks.pagerProps.at(-1)?.['highlights']).toMatchObject({ playing: '5:90' });
     expect(mocks.pagerProps.at(-1)?.['focusPage']).toBe(107);
+  });
+
+  it('marks the word under the finger, and lets a page turn clear it', () => {
+    // The wash is the only thing saying which word the sheet is about to be
+    // about, and a wash left behind on a page the reader has swiped away from
+    // is a mark nobody can see and nothing will remove.
+    render(<MushafReader {...props} />);
+    const word = { surahId: 5, ayahNumber: 82, position: 3, charType: 'word', glyph: '' };
+
+    const pressIn = mocks.pagerProps.at(-1)?.['onWordPressIn'] as (word: unknown) => void;
+    act(() => pressIn(word));
+    expect(
+      (mocks.pagerProps.at(-1)?.['highlights'] as { pressed: unknown }).pressed,
+    ).toMatchObject({ surahId: 5, ayahNumber: 82, position: 3 });
+
+    const turn = mocks.pagerProps.at(-1)?.['onPageChange'] as (page: number) => void;
+    act(() => turn(107));
+    expect((mocks.pagerProps.at(-1)?.['highlights'] as { pressed: unknown }).pressed).toBeNull();
   });
 });

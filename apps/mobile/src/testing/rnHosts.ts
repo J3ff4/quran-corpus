@@ -24,6 +24,9 @@ interface HostProps {
   accessibilityState?: { disabled?: boolean; selected?: boolean; checked?: boolean; expanded?: boolean };
   children?: React.ReactNode;
   onPress?: () => void;
+  onLongPress?: () => void;
+  onPressIn?: () => void;
+  onPressOut?: () => void;
   role?: string;
   style?: unknown;
   testID?: string;
@@ -54,8 +57,6 @@ interface HostProps {
   // that assertion vacuous -- it would pass against a two-line gloss too.
   numberOfLines?: number;
   onLayout?: unknown;
-  onPressIn?: unknown;
-  onPressOut?: unknown;
   onTextLayout?: unknown;
   pointerEvents?: 'auto' | 'none' | 'box-none' | 'box-only';
 }
@@ -241,6 +242,7 @@ export function host(tag: string) {
     accessibilityState,
     children,
     onPress,
+    onLongPress,
     role,
     style,
     testID,
@@ -256,11 +258,8 @@ export function host(tag: string) {
     showsHorizontalScrollIndicator: _showsHorizontalScrollIndicator,
     numberOfLines,
     onLayout,
-    // usePressScale's handlers. Dropped rather than mapped: there is no DOM
-    // event for a press phase, and React logs "does not recognize the
-    // onPressIn prop" for every card on every render if they are spread.
-    onPressIn: _onPressIn,
-    onPressOut: _onPressOut,
+    onPressIn,
+    onPressOut,
     onTextLayout: _onTextLayout,
     pointerEvents,
     ...props
@@ -311,6 +310,17 @@ export function host(tag: string) {
         // against. React warns about the camelCase prop on a DOM node.
         'data-pointer-events': pointerEvents === undefined ? undefined : String(pointerEvents),
         onClick: onPress,
+        // RN's press phases, mapped onto the nearest DOM events rather than
+        // spread (React logs "does not recognize the onPressIn prop" for every
+        // card on every render) and rather than dropped, which is what they
+        // were until M7d. Dropping a prop makes every assertion about it
+        // decorative -- the rnHosts lesson, learned on `accessible` and again
+        // on a sheet's own props -- and the mushaf's long press is now the only
+        // way to open the word sheet, so it is exactly the prop a suite must be
+        // able to fire. onContextMenu is the DOM's long press.
+        onContextMenu: onLongPress,
+        onMouseDown: onPressIn,
+        onMouseUp: onPressOut,
         style: flattenStyle(style),
       },
       children,

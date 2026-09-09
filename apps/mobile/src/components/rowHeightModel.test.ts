@@ -77,7 +77,7 @@ describe('estimateRowHeight', () => {
   it('is finite and positive for degenerate input', () => {
     // listWidth is 0 on the first commit, before the list has laid out.
     const h = estimateRowHeight({
-      mode: 'translation', arabicSize: 28, listWidth: 0,
+      arabicSize: 28, listWidth: 0,
       arabicChars: 1213, translationChars: 1334,
     });
     expect(Number.isFinite(h)).toBe(true);

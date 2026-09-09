@@ -1,9 +1,14 @@
-import { View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { splitBasmala, type MushafLine, type MushafWord } from '@quran-corpus/data/mobile';
 
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
-import { ayahKey, colorForAyah, type HighlightInput } from '@/mushaf/highlights';
+import {
+  ayahKey,
+  backgroundForWord,
+  colorForWord,
+  type HighlightInput,
+} from '@/mushaf/highlights';
 import { composePage, MUSHAF_LINES_PER_PAGE, type PageSlot } from '@/mushaf/pageComposition';
 import { useMushafPageFont } from '@/mushaf/pageFont';
 import { mushafFontSize, mushafLineHeight } from '@/mushaf/pageScale';
@@ -37,7 +42,11 @@ export interface MushafPageProps {
   surahNames: Map<number, string>;
   juz: number;
   uiLocale: UiLocaleCode;
-  onWordPress: (word: MushafWord) => void;
+  onWordLongPress: (word: MushafWord) => void;
+  onWordPressIn: (word: MushafWord) => void;
+  onWordPressOut: () => void;
+  /** A tap anywhere on the page. Toggles the chrome (ruling 3). */
+  onTap: () => void;
 }
 
 /** The ayahs this page touches, in mushaf order, deduplicated. */
@@ -73,7 +82,10 @@ export function MushafPage({
   surahNames,
   juz,
   uiLocale,
-  onWordPress,
+  onWordLongPress,
+  onWordPressIn,
+  onWordPressOut,
+  onTap,
 }: MushafPageProps) {
   const theme = useThemeColors();
   const { ready } = useMushafPageFont(page);
@@ -82,7 +94,8 @@ export function MushafPage({
 
   const fontSize = mushafFontSize(page, width - 2 * PAGE_MARGIN);
   const lineHeight = mushafLineHeight(height - FOOTER_HEIGHT, MUSHAF_LINES_PER_PAGE);
-  const color = colorForAyah(highlights, theme);
+  const color = colorForWord(highlights, theme);
+  const background = backgroundForWord(highlights, theme);
   // Keyed by line, then drawn 1..15 rather than iterated: composePage stops at
   // the page's last occupied line, and a short page (the last page of the
   // mushaf, or a page that ends a surah) must still hold the full grid.
@@ -91,7 +104,18 @@ export function MushafPage({
 
   return (
     <View style={{ width, height, backgroundColor: theme.background }}>
-      <View style={{ flex: 1, paddingHorizontal: PAGE_MARGIN }}>
+      {/* BEHIND the lines, not over them: an overlay would take the long press
+          the words need. The words carry their own tap handler for the same
+          reason in reverse -- most of a page is covered in glyphs, and a page
+          whose text was deaf to a tap would leave the chrome unreachable
+          exactly where the reader is looking. */}
+      <Pressable
+        testID="mushaf-page-tap"
+        accessible={false}
+        onPress={onTap}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={{ flex: 1, paddingHorizontal: PAGE_MARGIN }} pointerEvents="box-none">
         {pageLines.map((line) => {
           const slot = slots.get(line);
           return (
@@ -110,8 +134,12 @@ export function MushafPage({
                   words={slot.words}
                   fontSize={fontSize}
                   lineHeight={lineHeight}
-                  colorForAyah={color}
-                  onWordPress={onWordPress}
+                  colorForWord={color}
+                  backgroundForWord={background}
+                  onWordLongPress={onWordLongPress}
+                  onWordPressIn={onWordPressIn}
+                  onWordPressOut={onWordPressOut}
+                  onTap={onTap}
                 />
               )}
               {slot?.kind === 'header' && (

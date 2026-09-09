@@ -1519,7 +1519,7 @@ describe('SurahReader shared reading position', () => {
 
   it('does not re-anchor when the store has nothing for this surah', () => {
     const props = baseProps(readerData(10));
-    const { rerender } = render(<SurahReader {...props} readerMode="mushaf" />);
+    const { rerender } = render(<SurahReader {...props} />);
 
     rerender(<SurahReader {...props} />);
 
@@ -1598,8 +1598,6 @@ function baseProps(data: ReturnType<typeof readerData>) {
     onToggleAudio: vi.fn(),
     contentLanguage: 'en' as const,
     onChangeContentLanguage: vi.fn(),
-    readerMode: 'translation' as const,
-    onChangeReaderMode: vi.fn(),
   };
 }
 

@@ -14,7 +14,7 @@ import { getBookmarks, getLastReadingPosition, recordReadingPosition } from '@/d
 import { useWordSummaryLoader } from '@/data/useWordSummaryLoader';
 import { ayahKey } from '@/mushaf/highlights';
 import { useMushafIndex } from '@/mushaf/mushafReaderData';
-import { releaseChrome, showChrome } from '@/mushaf/chromeVisibility';
+import { releaseChrome, showChrome, toggleChrome } from '@/mushaf/chromeVisibility';
 import { useAppSettings } from '@/settings/settingsStore';
 import { useThemeColors } from '@/theme/themeContext';
 
@@ -166,6 +166,7 @@ export function MushafScreen() {
         uiLocale={uiLocale}
         onPageChange={onPageChange}
         onWordPress={onWordPress}
+        onTap={toggleChrome}
         onLanded={noop}
       />
       <WordSheet

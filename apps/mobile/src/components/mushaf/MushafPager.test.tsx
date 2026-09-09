@@ -24,13 +24,22 @@ const props = {
   initialPage: 106,
   width: 360,
   height: 720,
-  highlights: { bookmarked: new Set<string>(), landing: null, playing: null, landingProgress: 0 },
+  highlights: {
+    bookmarked: new Set<string>(),
+    landing: null,
+    playing: null,
+    landingProgress: 0,
+    pressed: null,
+  },
   ayahTexts: new Map<string, string>(),
   surahNames: new Map<number, string>(),
   juzByPage: new Map<number, number>(),
   uiLocale: 'en' as const,
   onPageChange: vi.fn(),
-  onWordPress: vi.fn(),
+  onWordLongPress: vi.fn(),
+  onWordPressIn: vi.fn(),
+  onWordPressOut: vi.fn(),
+  onTap: vi.fn(),
 };
 
 /** The settle event RN emits at the end of a paging scroll. */
