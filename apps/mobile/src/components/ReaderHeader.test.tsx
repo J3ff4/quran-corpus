@@ -25,7 +25,6 @@ function renderHeader(props: Partial<ReaderHeaderProps> = {}) {
     <ThemeContext.Provider value={themeColors.dark}>
       <ReaderHeader
         surahName="Al-Baqarah"
-        mode="translation"
         uiLocale="en"
         {...handlers}
         {...props}
@@ -38,32 +37,25 @@ function renderHeader(props: Partial<ReaderHeaderProps> = {}) {
 describe('ReaderHeader', () => {
   afterEach(cleanup);
 
-  it('reports the chosen mode', () => {
-    const { onChangeMode } = renderHeader();
-
-    fireEvent.click(screen.getByText('Mushaf'));
-
-    expect(onChangeMode).toHaveBeenCalledWith('mushaf');
-  });
-
-  it('navigates rather than switching mode for word-by-word', () => {
-    // Decision 17: both WBW doors reach one screen. Rendering a third mode
-    // inline would be a second word-by-word implementation to keep in step,
-    // and a persisted 'wbw' would reopen the app onto a screen the user left
-    // by pressing back.
-    const { onChangeMode, onOpenWbw } = renderHeader();
+  it('navigates rather than switching rendering for word-by-word', () => {
+    // Decision 17: both WBW doors reach one screen. Rendering it inline would
+    // be a second word-by-word implementation to keep in step, and persisting
+    // it would reopen the app onto a screen the user left by pressing back.
+    const { onOpenWbw } = renderHeader();
 
     fireEvent.click(screen.getByText('Words'));
 
     expect(onOpenWbw).toHaveBeenCalledTimes(1);
-    expect(onChangeMode).not.toHaveBeenCalled();
   });
 
-  it('marks the mode it was given, not the first segment', () => {
-    renderHeader({ mode: 'mushaf' });
+  it('offers the translation and the door beside it, and no mushaf chip', () => {
+    // M7d ruling 2: the mushaf is a tab now. A chip that switched a rendering
+    // this reader no longer has would be a control leading nowhere.
+    renderHeader();
 
-    expect(screen.getByTestId('segment-mushaf').getAttribute('aria-selected')).toBe('true');
-    expect(screen.getByTestId('segment-translation').getAttribute('aria-selected')).toBe('false');
+    expect(screen.getByTestId('segment-translation').getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByTestId('segment-wbw')).toBeTruthy();
+    expect(screen.queryByTestId('segment-mushaf')).toBeNull();
   });
 
   it('carries the back affordance the native toolbar used to provide', () => {
@@ -108,15 +100,6 @@ describe('ReaderHeader', () => {
 
     expect(screen.queryByTestId('open-language')).toBeNull();
     expect(screen.getByTestId('toggle-translation')).toBeTruthy();
-  });
-
-  it('draws neither translation control in mushaf mode', () => {
-    // The printed page has no translation to switch and no language to pick
-    // (ruling 4: no control chrome on the page).
-    renderHeader({ mode: 'mushaf' });
-
-    expect(screen.queryByTestId('toggle-translation')).toBeNull();
-    expect(screen.queryByTestId('open-language')).toBeNull();
   });
 
   it('names the surah in the bar for a screen reader even while it is faded out', () => {

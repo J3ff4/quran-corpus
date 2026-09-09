@@ -49,8 +49,6 @@ export default function SurahRoute() {
     contentLanguage,
     setContentLanguage,
     uiLocale,
-    readerMode,
-    setReaderMode,
     showTranslation,
     setShowTranslation,
     reciterId,
@@ -364,8 +362,6 @@ export default function SurahRoute() {
         uiLocale={uiLocale}
         contentLanguage={contentLanguage}
         onChangeContentLanguage={setContentLanguage}
-        readerMode={readerMode}
-        onChangeReaderMode={setReaderMode}
         showTranslation={showTranslation}
         onChangeShowTranslation={setShowTranslation}
         initialAyahNumber={initialAyahNumber}
@@ -374,16 +370,11 @@ export default function SurahRoute() {
         onToggleBookmark={toggleBookmark}
         onEditNote={(ayahNumber) => setEditingNote(ayahNumber)}
         onToggleAudio={audio.toggleAyah}
-        corpusClient={corpusClient}
         onReadingAyah={(ayahNumber) => {
-          // No page: this fires from the translation list's scroll, and a null
-          // page clears whatever page a mushaf session left in the row.
+          // No page: this reader scrolls by ayah, and a null page clears
+          // whatever page a mushaf session left in the shared row (ruling 13).
           if (displayedSurahId) readingRecorder?.record({ surahId: displayedSurahId, ayahNumber, page: null });
         }}
-        // The page's own surah and ayah, not the screen's: 51 pages hold more
-        // than one surah (ruling 10), so the reader can be paged into a surah
-        // the route never named.
-        onReadingPage={(position) => readingRecorder?.record(position)}
         // 1 and 114 are facts about the mushaf, and parseSurahId enforces the
         // same bound on the route. D47: no wrapping, so an end is a dead arrow
         // rather than a jump to the other end of the book.

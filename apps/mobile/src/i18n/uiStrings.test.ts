@@ -13,7 +13,6 @@ const ALLOWED_COLLISIONS: Partial<Record<UiStringKey, readonly ('uz' | 'ru')[]>>
   'browse.juz': ['uz'],
   'browse.juzLabel': ['uz'],
   // Same again: "Mushaf" is the Arabic muṣḥaf, spelled the same in Uzbek.
-  'reader.modeMushaf': ['uz'],
   'tabs.mushaf': ['uz'],
   // The OFL requires its notice to be reproduced, and reproducing it means the
   // English wording -- a translated licence notice is not the notice. The

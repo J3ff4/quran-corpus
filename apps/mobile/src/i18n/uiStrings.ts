@@ -95,7 +95,6 @@ export type UiStringKey =
   | 'reader.bismillah'
   | 'reader.back'
   | 'reader.mode'
-  | 'reader.modeMushaf'
   | 'reader.modeTranslation'
   | 'reader.modeWbw'
   | 'word.fullAnalysis'
@@ -345,7 +344,6 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.bismillah': 'In the name of Allah, the Entirely Merciful, the Especially Merciful',
     'reader.back': 'Back',
     'reader.mode': 'Reading mode',
-    'reader.modeMushaf': 'Mushaf',
     'reader.modeTranslation': 'Translation',
     'reader.modeWbw': 'Words',
     'word.fullAnalysis': 'Full analysis',
@@ -552,7 +550,6 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.bismillah': 'Mehribon va rahmli Alloh nomi bilan',
     'reader.back': 'Orqaga',
     'reader.mode': 'O‘qish rejimi',
-    'reader.modeMushaf': 'Mushaf',
     'reader.modeTranslation': 'Tarjima',
     'reader.modeWbw': 'So‘zlar',
     'word.fullAnalysis': 'To‘liq tahlil',
@@ -754,7 +751,6 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.bismillah': 'Именем Аллаха, Милостивого, Милосердного',
     'reader.back': 'Назад',
     'reader.mode': 'Режим чтения',
-    'reader.modeMushaf': 'Мусхаф',
     'reader.modeTranslation': 'Перевод',
     'reader.modeWbw': 'Слова',
     'word.fullAnalysis': 'Полный разбор',

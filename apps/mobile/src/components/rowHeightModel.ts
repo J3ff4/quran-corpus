@@ -1,13 +1,10 @@
-import type { ReaderMode } from '@/settings/settingsStore';
-
 export interface RowHeightInput {
-  mode: ReaderMode;
   /** The reader's Arabic font size in dp -- useArabicSizes().reader. */
   arabicSize: number;
   /** The FlatList's own width. 0 before it has laid out. */
   listWidth: number;
   arabicChars: number;
-  /** 0 in mushaf mode, where no translation is drawn. */
+  /** 0 when the reader is drawing no translation. */
   translationChars: number;
 }
 
@@ -19,9 +16,11 @@ export interface RowHeightInput {
 // next for indistinguishable error.
 //
 // The card's fixed furniture. Barely moves with Arabic size in the
-// measurements (92..101dp mushaf, 169..174dp translation), so it is a constant
-// and the residual rides in the text term.
-const CHROME_DP: Record<ReaderMode, number> = { mushaf: 94, translation: 170 };
+// measurements (169..174dp), so it is a constant and the residual rides in the
+// text term. The fit had a second value for the mushaf's plate rows, dropped
+// in M7d along with the mode itself: the mushaf is a pager of fixed-height
+// pages now and nothing estimates its rows.
+const CHROME_DP = 170;
 
 // dp per Arabic character, at REFERENCE_WIDTH. Scales with size^2: line height
 // grows with the size while characters per line fall as 1/size, so the
@@ -33,9 +32,8 @@ const ARABIC_DP_PER_CHAR_PER_SQ_DP = 0.00108;
 // 0.70..0.78 across all four), because the English block never scales with it.
 const TRANSLATION_DP_PER_CHAR = 0.72;
 
-// The widths the coefficients were fitted at: the mushaf plate is inset, the
-// translation card is not.
-const REFERENCE_WIDTH: Record<ReaderMode, number> = { mushaf: 334, translation: 360 };
+// The width the coefficients were fitted at.
+const REFERENCE_WIDTH = 360;
 
 /**
  * An estimate of one ayah row's height, for `getItemLayout`.
@@ -47,23 +45,20 @@ const REFERENCE_WIDTH: Record<ReaderMode, number> = { mushaf: 334, translation: 
  * it, which is what the old `initialNumToRender = initialIndex + 1` was for.
  */
 export function estimateRowHeight({
-  mode,
   arabicSize,
   listWidth,
   arabicChars,
   translationChars,
 }: RowHeightInput): number {
-  const reference = REFERENCE_WIDTH[mode];
   // Characters per line scale with the width, so dp per character scales with
-  // its inverse. Only two widths were measured and they are confounded with
-  // mode, so this half of the law is unverified -- the correction pass is what
-  // makes that safe. Guarded because listWidth is 0 on the first commit.
-  const widthFactor = listWidth > 0 ? reference / listWidth : 1;
+  // its inverse. Only two widths were measured, so this half of the law is
+  // unverified -- the correction pass is what makes that safe. Guarded because
+  // listWidth is 0 on the first commit.
+  const widthFactor = listWidth > 0 ? REFERENCE_WIDTH / listWidth : 1;
 
   const arabic =
     ARABIC_DP_PER_CHAR_PER_SQ_DP * arabicSize * arabicSize * arabicChars * widthFactor;
-  const translation =
-    mode === 'translation' ? TRANSLATION_DP_PER_CHAR * translationChars * widthFactor : 0;
+  const translation = TRANSLATION_DP_PER_CHAR * translationChars * widthFactor;
 
-  return CHROME_DP[mode] + arabic + translation;
+  return CHROME_DP + arabic + translation;
 }

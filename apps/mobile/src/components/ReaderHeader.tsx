@@ -9,16 +9,13 @@ import { SegmentedControl } from './SegmentedControl';
 import { Icon } from './icons/Icon';
 import { t } from '@/i18n/uiStrings';
 import type { UiLocaleCode } from '@/i18n/languages';
-import type { ReaderMode } from '@/settings/settingsStore';
 import { fonts, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
-/** The chip's values: the two real modes plus the door to word-by-word.
- *
- *  'wbw' is deliberately NOT a ReaderMode. It is a navigation, and the type
- *  keeps that distinction where the compiler can see it -- `onChangeMode`
- *  cannot be handed 'wbw' by accident. */
-type ModeChipValue = ReaderMode | 'wbw';
+/** The chip's values. Neither is a mode any more: since M7d the mushaf is its
+ *  own tab (ruling 2) and this reader has one rendering, so the chip is the
+ *  rendering it is showing and the door to word-by-word beside it. */
+type ModeChipValue = 'translation' | 'wbw';
 
 export interface ReaderHeaderProps {
   /** Transliterated surah name, shown once the list's own heading scrolls off. */
@@ -27,13 +24,10 @@ export interface ReaderHeaderProps {
    *  Passed in rather than computed here so this component stays a pure
    *  renderer and the reader keeps one source of truth for the scroll. */
   titleStyle?: StyleProp<TextStyle>;
-  mode: ReaderMode;
-  onChangeMode: (mode: ReaderMode) => void;
   onOpenWbw: () => void;
   onOpenLanguage: () => void;
-  /** Whether the cards draw their translation. Its control, and the language
-   *  picker beside it, are translation mode's alone: the printed page has no
-   *  translation to switch (ruling 4). */
+  /** Whether the cards draw their translation, and the language picker beside
+   *  its switch. */
   showTranslation?: boolean;
   onChangeShowTranslation?: (show: boolean) => void;
   onOpenSearch: () => void;
@@ -59,16 +53,14 @@ export interface ReaderHeaderProps {
  * used to provide is therefore this component's job now -- the back
  * affordance, and the surah name that fades in as the list's heading leaves.
  *
- * Two rows, where the mockup draws one. The mockup's chip has two segments and
- * no search or globe beside it; ours has three plus both actions, and five
- * controls in a 390pt row leaves the name about 34pt. The bar stays a single
+ * Two rows, where the mockup draws one. The mockup's chip has no search or
+ * globe beside it; ours has both, and five controls in a 390pt row leaves the
+ * name about 34pt. The bar stays a single
  * surface, so it still reads as one piece of chrome.
  */
 export function ReaderHeader({
   surahName,
   titleStyle,
-  mode,
-  onChangeMode,
   onOpenWbw,
   onOpenLanguage,
   showTranslation = true,
@@ -84,7 +76,6 @@ export function ReaderHeader({
   const insets = useSafeAreaInsets();
 
   const options = [
-    { value: 'mushaf', label: t(uiLocale, 'reader.modeMushaf') },
     { value: 'translation', label: t(uiLocale, 'reader.modeTranslation') },
     { value: 'wbw', label: t(uiLocale, 'reader.modeWbw') },
   ] as const satisfies readonly { value: ModeChipValue; label: string }[];
@@ -155,9 +146,7 @@ export function ReaderHeader({
               backdrop, so leaving it mounted holds the ayah list at
               no-hide-descendants behind whatever opens next. */}
           <SearchHeaderButton uiLocale={uiLocale} onPress={onOpenSearch} />
-          {/* Both are translation mode's. In mushaf mode neither has anything
-              to act on, and a control that does nothing is worse than none. */}
-          {mode === 'translation' && onChangeShowTranslation ? (
+          {onChangeShowTranslation ? (
             <Pressable
               testID="toggle-translation"
               accessibilityRole="switch"
@@ -176,7 +165,7 @@ export function ReaderHeader({
               <Icon name="translationText" color={showTranslation ? theme.accent : theme.mutedText} />
             </Pressable>
           ) : null}
-          {mode === 'translation' && showTranslation ? (
+          {showTranslation ? (
             <Pressable
               testID="open-language"
               accessibilityRole="button"
@@ -195,18 +184,16 @@ export function ReaderHeader({
         </View>
         <SegmentedControl
           options={options}
-          value={mode}
+          // Always the rendering on screen: the other chip is a door, not a
+          // state, so nothing here can move it.
+          value="translation"
           accessibilityLabel={t(uiLocale, 'reader.mode')}
           onChange={(next) => {
             // Decision 17: both word-by-word doors reach one screen. Rendering
-            // a third mode inline would be a second WBW implementation to keep
-            // in step with /surah/[id]/words, and persisting 'wbw' would
-            // reopen the app onto a screen the user left by pressing back.
-            if (next === 'wbw') {
-              onOpenWbw();
-              return;
-            }
-            onChangeMode(next);
+            // it inline would be a second WBW implementation to keep in step
+            // with /surah/[id]/words, and persisting it would reopen the app
+            // onto a screen the user left by pressing back.
+            if (next === 'wbw') onOpenWbw();
           }}
         />
       </GlassSurface>
