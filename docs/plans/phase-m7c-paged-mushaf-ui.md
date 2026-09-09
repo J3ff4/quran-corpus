@@ -1846,3 +1846,98 @@ failure the entry exists to prevent. The shipped test asserts the pill too.
 Bodies are written in all three UI locales, as every other credit is; the
 proper nouns (`QUL`, `KFGQPC`) stay untranslated per the `Credit.name`
 contract.
+
+---
+
+## Verification log — Task 13: device run (2026-09-09)
+
+**Device:** OnePlus 7 Pro (GM1917), Android 13, 1440x3120 @ 640dpi, adb over
+wifi (`192.168.0.136:41897`).
+**Build:** release APK, arm64-v8a, versionCode 2, debug-signed, installed as an
+upgrade over the 2026-08-31 build (`adb install -r --user 0`).
+**Two builds were run.** The first (branch tip `134743c`, md5
+`ea0689c05fe...`) surfaced four defects; the second (tip `e15e6da`) carries the
+fixes and is what the re-run below records.
+
+### Step 1: full gate
+
+- `apps/mobile`: **95 test files / 990 tests pass**; eslint clean on every
+  touched file; `npm run type-check` red only on issue #54's remaining
+  `useReducedMotion.test.ts(15,31)` TS2835.
+- `packages/data` and `packages/scraper` were gated at their own tasks (Task 9:
+  32 files / 468 tests; Task 2: 825 pytest, mypy and ruff clean) and neither is
+  touched by this task's fixes.
+
+### Step 4: the checks
+
+| # | Result |
+|---|---|
+| 200 | **PASS** (build 2). Page 1 in QCF glyphs, band, 15 slots, footer. Build 1 ellipsised line 5. |
+| 201 | **PASS with a question** — see "Ruling 7 reads backwards" below. The pager turns; the gesture is the opposite of the check's wording. |
+| 202 | **PASS** (build 2). Al-Ma'idah's band on line 6, its bismillah on line 7, one band only. Build 1 drew the whole of 5:1 on the bismillah line. |
+| 203 | **PASS** (build 2). Page 77 opens with the bismillah on line 1; page 76 carries the band on line 15. |
+| 204 | **PASS**. Page 187: band, no bismillah. |
+| 205 | **PASS** (build 2). Three surahs, three bands, three bismillahs, short final lines centred. Build 1 drew al-Falaq's and an-Nas's bismillah lines **empty**. |
+| 206 | **PASS**. Pages 46 and 106: every glyph whole, no dropped pieces, at the production size. |
+| 207 | **PASS**. Page 443 (18.17 em) fits with no clipping. |
+| 208 | **PASS**. `/surah/5?ayah=1` opens page 106; 5:1 pulses and the pulse fades within ~1.5s. |
+| 209 | **PASS**. Bookmark wash on 5:10 survives a turn to 110 and back. |
+| 210 | **PASS**. Tint follows the recitation 5:10 -> 5:11 -> 5:13, and the pager auto-turned 109 -> 110 when playback reached 5:14. Continuous playback is off by default -- the bar's loop control turns it on, and check 210 needs it on. |
+| 211 | **PARTIAL**. Audio over bookmark verified on device: 5:10 bookmarked and playing drew the accent, not the wash, and stayed legible. All three at once (bookmark + landing pulse + audio on one ayah) was not reproducible by hand -- the pulse fires on arrival and the deep link re-enters in whatever mode the reader was left in. Precedence itself is unit-tested and mutation-checked (Task 6). |
+| 212 | **PASS** (build 2). The sheet carries `Ayah N` + bookmark/note/play; bookmarking from it washed the ayah on the page behind. Build 1 had **no ayah actions anywhere in mushaf mode**. |
+| 213 | **PASS**. Next chevron: Al-Ma'idah p106 -> Al-An'am **p128**; previous: back to **p106**. Both are the surah's first page. |
+| 214 | **PASS**. The header named Al-An'am across the turn and Al-Ma'idah back. |
+| 215 | **PASS**. Paged 106 -> 109, backgrounded, force-stopped, cold started: Continue reading showed **Al-Ma'idah 5:10**, which is page 109's first ayah, and tapping it reopened page 109. |
+| 216 | **PASS**. Two bookmarks and the reading position written by build 1 read back intact after build 2 was installed over it. (The release APK is not debuggable, so the user DB cannot be read directly -- the app's own read-back is the evidence.) |
+| 217 | **NOT RUN** — needs TalkBack. `adb shell settings put` is blocked on this device and TalkBack takes over the screen the terminal session shares. Owner action. |
+| 218 | **NOT RUN** — needs "Remove animations". Same blocker. Owner action. |
+| 219 | **PASS**. The switch hides the translation and the language globe; the cards stay. |
+| 220 | **PASS**. 40 pages (110 -> 150): TOTAL PSS 663 MB -> 645 -> 660 MB. Flat, no growth. Worth noting the absolute figure: ~660 MB resident with the fonts registered. |
+
+### Defects found, and what was done
+
+1. **Every page's widest line ellipsised** (`c24a3e1`). `textWidth / em` is an
+   exact fit and Android rounds each glyph advance up, so the widest line
+   overflowed by a few pixels and `numberOfLines={1}` drew a `...`. Page 46's
+   ink measured 1309 of 1312px -- there was nothing to round into. Fixed with
+   1.5% of slack; measured again on device at 1292-1307px across pages 1, 46,
+   106, 443 and 604.
+2. **The bismillah line drew the whole of ayah 1** (`6aaded5`). The row carries
+   the basmala *and* the ayah after it; `splitBasmala` is the corpus's own
+   split and is what the line takes now.
+3. **A page's non-opening surahs had no text** (`a6f9db3`). The reader fetched
+   each window page's *opening* surah, so page 604's al-Falaq and an-Nas
+   bismillah lines drew empty. It now fetches the surah range the window spans.
+4. **Ruling 4's promise was unimplemented** (`e15e6da`). Task 10 took the ayah
+   controls off the page; the sheet never gained them, so mushaf mode could not
+   bookmark, note or play anything. The reader now builds the controls and
+   hands them to `WordSheet` as a node.
+
+Each fix is mutation-checked: dropping the slack, the split, the range, and the
+actions each fails exactly its own test.
+
+### Ruling 7 reads backwards
+
+Check 201 says "swipe right-to-left advances 1 -> 2". On device the opposite
+gesture advances: dragging **left-to-right** goes 1 -> 2, and right-to-left
+goes back. That is what `inverted` does, and it is what a printed mushaf does
+-- page 2 sits to the *left* of page 1, so turning to it moves the paper
+rightwards. The unit test asserted the `inverted` prop, which is true either
+way, so nothing caught the wording.
+
+**Not changed.** The behaviour matches the book and every mushaf app; the
+check's wording is what looks wrong. Owner's call, and cheap either way -- the
+whole of it is one prop.
+
+### Known gaps, filed rather than fixed here
+
+- **Ayah actions are per-surah.** The sheet shows them only for ayahs of the
+  displayed surah: bookmarks, notes and the player are all keyed to it, and a
+  page carries ayahs from surahs the route never named. Words from those show
+  morphology and no actions rather than actions that would land on the wrong
+  ayah. Re-keying all three by surah is its own change.
+- **Page 1 and 2 are top-aligned**, not centred in a frame the way print sets
+  them. Both are short pages; the grid is right, the placement is not what a
+  printed mushaf does.
+- **The recitation bar reads 0:00 / --:-- until playback actually starts**, so
+  a stalled first tap looks identical to a paused player.
