@@ -33,6 +33,8 @@ vi.mock('@/components/mushaf/MushafReader', async () => {
 
 vi.mock('@/components/WordSheet', () => ({ WordSheet: () => null }));
 vi.mock('expo-router', () => ({ router: { push: vi.fn() } }));
+vi.mock('@/components/mushaf/MushafChrome', () => ({ MushafChrome: () => null }));
+vi.mock('@/components/mushaf/PageJumpSheet', () => ({ PageJumpSheet: () => null }));
 
 vi.mock('@/data/openCorpusDb', () => ({
   openCorpusDb: () => (mocks.loadFails ? Promise.reject(new Error('no db')) : Promise.resolve({})),

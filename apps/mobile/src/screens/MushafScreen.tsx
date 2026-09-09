@@ -4,7 +4,9 @@ import { ActivityIndicator, View } from 'react-native';
 import type { MushafWord, Word } from '@quran-corpus/data/mobile';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 
+import { MushafChrome } from '@/components/mushaf/MushafChrome';
 import { MushafReader } from '@/components/mushaf/MushafReader';
+import { PageJumpSheet, type JumpKind } from '@/components/mushaf/PageJumpSheet';
 import { WordSheet } from '@/components/WordSheet';
 import { getWordsForAyah, type WordSummary } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
@@ -14,7 +16,13 @@ import { getBookmarks, getLastReadingPosition, recordReadingPosition } from '@/d
 import { useWordSummaryLoader } from '@/data/useWordSummaryLoader';
 import { ayahKey } from '@/mushaf/highlights';
 import { useMushafIndex } from '@/mushaf/mushafReaderData';
-import { releaseChrome, showChrome, toggleChrome } from '@/mushaf/chromeVisibility';
+import { pageForJump } from '@/mushaf/pageJump';
+import {
+  releaseChrome,
+  showChrome,
+  toggleChrome,
+  useChromeVisible,
+} from '@/mushaf/chromeVisibility';
 import { useAppSettings } from '@/settings/settingsStore';
 import { useThemeColors } from '@/theme/themeContext';
 
@@ -45,6 +53,10 @@ export function MushafScreen() {
   // inferred from where the user is.
   const [openMushafWord, setOpenMushafWord] = useState<MushafWord | null>(null);
   const index = useMushafIndex(client);
+  const chromeVisible = useChromeVisible();
+  const [jumpOpen, setJumpOpen] = useState(false);
+  /** A page the reader has to be taken to without swiping there. */
+  const [focusPage, setFocusPage] = useState<number | null>(null);
   const loadWordSummary = useWordSummaryLoader(client, null, contentLanguage);
 
   useEffect(() => {
@@ -139,6 +151,17 @@ export function MushafScreen() {
     [client, loadWordSummary],
   );
 
+  const onJump = useCallback(
+    (kind: JumpKind, value: number) => {
+      setJumpOpen(false);
+      const page = pageForJump(index.pages, kind, value);
+      // Null only if the index cannot name the target -- the sheet has already
+      // refused anything outside the mushaf's own ranges. Nothing moves.
+      if (page !== null) setFocusPage(page);
+    },
+    [index.pages],
+  );
+
   const closeSheet = useCallback(() => {
     requestRef.current += 1;
     setOpenWord(null);
@@ -162,13 +185,27 @@ export function MushafScreen() {
         landingAyah={null}
         bookmarkedKeys={bookmarkedKeys}
         playingAyah={null}
-        focusPage={null}
+        focusPage={focusPage}
         uiLocale={uiLocale}
-        onPageChange={onPageChange}
+        onPageChange={(page) => {
+          // Cleared once the pager has arrived, or the next jump to the same
+          // page would be a prop that never changes and so never moves it.
+          setFocusPage(null);
+          onPageChange(page);
+        }}
         onWordPress={onWordPress}
         onTap={toggleChrome}
         onLanded={noop}
       />
+      <MushafChrome
+        visible={chromeVisible}
+        uiLocale={uiLocale}
+        onOpenJump={() => setJumpOpen(true)}
+        onOpenSearch={() => router.push('/search')}
+      />
+      {jumpOpen ? (
+        <PageJumpSheet uiLocale={uiLocale} onClose={() => setJumpOpen(false)} onJump={onJump} />
+      ) : null}
       <WordSheet
         summary={openWord}
         uiLocale={uiLocale}
