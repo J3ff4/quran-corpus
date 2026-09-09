@@ -19,6 +19,12 @@ export interface SurahBandProps {
   surahName: string;
   /** The line box this band sits in. */
   height: number;
+  /** The column the line box sits in. The band is 8.16:1, and a line box tall
+   *  enough makes that wider than the page: at a 15-line grid on a 360dp
+   *  screen the box is ~50dp, which asks for a 411dp band inside a 328dp
+   *  column and cuts both ends of the arabesque off. The band fits the
+   *  narrower of the two and keeps its shape. */
+  width: number;
 }
 
 /**
@@ -30,9 +36,13 @@ export interface SurahBandProps {
  * publishes the name as its own accessibility label. Without that a screen
  * reader meets decorative art and a bare word.
  */
-export function SurahBand({ surahName, height }: SurahBandProps) {
+export function SurahBand({ surahName, height, width }: SurahBandProps) {
   const theme = useThemeColors();
-  const width = height * BAND_ASPECT;
+  // Whichever axis runs out first. `meet` would letterbox the art for us, but
+  // the name is drawn over the band and has to follow the height the band
+  // actually got, not the box it was offered.
+  const bandHeight = Math.min(height, width / BAND_ASPECT);
+  const bandWidth = bandHeight * BAND_ASPECT;
 
   return (
     <View
@@ -42,8 +52,8 @@ export function SurahBand({ surahName, height }: SurahBandProps) {
       style={{ height, alignItems: 'center', justifyContent: 'center' }}
     >
       <Svg
-        width={width}
-        height={height}
+        width={bandWidth}
+        height={bandHeight}
         viewBox={SURAH_BAND_VIEW_BOX}
         preserveAspectRatio="xMidYMid meet"
         style={{ position: 'absolute' }}
@@ -58,7 +68,7 @@ export function SurahBand({ surahName, height }: SurahBandProps) {
         numberOfLines={1}
         style={{
           color: theme.text,
-          fontSize: height * 0.42,
+          fontSize: bandHeight * 0.42,
           textAlign: 'center',
         }}
       >

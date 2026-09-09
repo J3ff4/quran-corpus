@@ -115,7 +115,11 @@ export function MushafPage({
                 />
               )}
               {slot?.kind === 'header' && (
-                <SurahBand surahName={surahNames.get(slot.surahId) ?? ''} height={lineHeight} />
+                <SurahBand
+                  surahName={surahNames.get(slot.surahId) ?? ''}
+                  height={lineHeight}
+                  width={width - 2 * PAGE_MARGIN}
+                />
               )}
               {slot?.kind === 'bismillah' && (
                 <BismillahLine
@@ -138,9 +142,13 @@ export function MushafPage({
           <View
             key={ayahKey(surahId, ayahNumber)}
             accessible
-            accessibilityLabel={`${t(uiLocale, 'reader.ayahLabel')} ${ayahNumber}. ${
-              ayahTexts.get(ayahKey(surahId, ayahNumber)) ?? ''
-            }`}
+            // The surah too, and not only on the 51 pages that hold two: a
+            // page is not a surah, so "Ayah 1" alone names nothing a listener
+            // can place, and on a shared page it is announced twice.
+            accessibilityLabel={`${surahNames.get(surahId) ?? ''} ${t(
+              uiLocale,
+              'reader.ayahLabel',
+            )} ${ayahNumber}. ${ayahTexts.get(ayahKey(surahId, ayahNumber)) ?? ''}`.trim()}
             style={{ flex: 1 }}
           />
         ))}

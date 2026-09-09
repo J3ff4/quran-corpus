@@ -72,9 +72,6 @@ const TYPEFACES: Credit[] = [
   // the layout above; they are credited separately because they are a
   // separate source's work travelling under the same permission gap.
   { name: 'KFGQPC', body: 'about.sourceMushafFont', pending: true },
-  // 604 of them, one per mushaf page. Same override and same missing grant as
-  // the layout above; they are credited separately because they are a
-  // separate source's work travelling under the same permission gap.
 ];
 
 export function AboutScreen() {
