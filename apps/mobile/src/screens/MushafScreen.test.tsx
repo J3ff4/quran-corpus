@@ -8,6 +8,15 @@ vi.mock('react-native', async () => {
   return {
     ...reactNativeTextMock(),
     ActivityIndicator: () => React.createElement('span', { 'data-testid': 'spinner' }),
+    // Controllable, unlike the inert one rnHosts ships: a resume is the one
+    // way this suite can make the screen re-read the user DB without
+    // unmounting it, and re-reading is the whole point of doing it on focus.
+    AppState: {
+      addEventListener: (_event: string, listener: (state: string) => void) => {
+        mocks.appStateListeners.push(listener);
+        return { remove: () => {} };
+      },
+    },
   };
 });
 
@@ -23,6 +32,10 @@ const mocks = vi.hoisted(() => ({
   toggleAyah: vi.fn(),
   loadWordSummary: vi.fn(),
   loadFails: false,
+  focusTeardowns: [] as Array<() => void>,
+  showChrome: vi.fn(),
+  releaseChrome: vi.fn(),
+  appStateListeners: [] as Array<(state: string) => void>,
 }));
 
 // The reader half has its own suite; what this screen does is decide what it
@@ -46,8 +59,32 @@ vi.mock('@/components/WordSheet', () => ({
   },
 }));
 
-vi.mock('expo-router', () => ({ router: { push: vi.fn() } }));
+// useFocusEffect for real, not a stub: what this screen does on focus -- arm
+// the chrome, release it on blur, re-read the bookmarks -- is exactly what a
+// stubbed-out focus would stop testing.
+vi.mock('expo-router', async () => {
+  const React = await import('react');
+  return {
+    router: { push: vi.fn() },
+    useFocusEffect: (callback: () => void | (() => void)) => {
+      React.useEffect(() => {
+        const teardown = callback();
+        // Kept so a test can run the BLUR half without unmounting: a tab screen
+        // is not unmounted when the user leaves it, which is the whole reason
+        // this is useFocusEffect and not useEffect.
+        if (teardown) mocks.focusTeardowns.push(teardown);
+        return teardown;
+      }, [callback]);
+    },
+  };
+});
 vi.mock('@/components/mushaf/MushafChrome', () => ({ MushafChrome: () => null }));
+vi.mock('@/mushaf/chromeVisibility', () => ({
+  showChrome: (...args: unknown[]) => mocks.showChrome(...args),
+  releaseChrome: (...args: unknown[]) => mocks.releaseChrome(...args),
+  toggleChrome: vi.fn(),
+  useChromeVisible: () => true,
+}));
 vi.mock('@/components/mushaf/PageJumpSheet', () => ({ PageJumpSheet: () => null }));
 
 vi.mock('@/data/openCorpusDb', () => ({
@@ -119,7 +156,12 @@ beforeEach(() => {
   mocks.position = null;
   mocks.bookmarks = [];
   mocks.loadFails = false;
+  mocks.focusTeardowns = [];
+  mocks.appStateListeners = [];
   mocks.recordReadingPosition.mockClear();
+  mocks.showChrome.mockClear();
+  mocks.releaseChrome.mockClear();
+  mocks.toggleAyah.mockClear();
 });
 
 afterEach(cleanup);
@@ -191,11 +233,76 @@ describe('MushafScreen', () => {
   });
 
   it('starts the recitation with no surah, since a tab has none to assume', async () => {
-    // The hook reads `surah` when it starts an ayah rather than at mount,
-    // which is what lets the screen hand it whichever surah was pressed.
+    // Nothing is playing, so there is no surah to give the hook. The surah
+    // travels with the toggle call instead -- see the test below.
     await renderScreen();
 
     expect(mocks.useRecitation).toHaveBeenCalledWith(null, 0, 'husary', expect.anything());
+  });
+
+  it('re-reads the bookmarks after the app comes back, rather than trusting the ones it started with', async () => {
+    // A tab screen is never unmounted, so bookmarks read once at mount were
+    // the ones that were true when the app launched. Bookmark a verse in the
+    // Surahs tab, come back, and the sheet offered "add" for a verse that was
+    // already saved -- and the toggle then wrote the opposite of the row.
+    const props = await renderScreen();
+    expect((props()['bookmarkedKeys'] as ReadonlySet<string>).size).toBe(0);
+
+    mocks.bookmarks = [{ surahId: 5, ayahNumber: 3, note: 'later' }];
+    await act(async () => {
+      mocks.appStateListeners.forEach((listener) => listener('active'));
+    });
+
+    await waitFor(() =>
+      expect((props()['bookmarkedKeys'] as ReadonlySet<string>).has('5:3')).toBe(true),
+    );
+  });
+
+  it('gives the chrome back on BLUR, not only on unmount', async () => {
+    // A tab screen stays mounted after the user leaves it, so a mount-scoped
+    // release never ran: the 3.5s idle timer armed here went on to hide the
+    // app's TAB BAR on whichever tab they had switched to -- a screen with no
+    // control left to bring it back.
+    await renderScreen();
+    expect(mocks.showChrome).toHaveBeenCalled();
+    expect(mocks.releaseChrome).not.toHaveBeenCalled();
+
+    // Every focus teardown on the screen, the bookmark re-read's included --
+    // blur runs all of them, and only one of them is the chrome's.
+    expect(mocks.focusTeardowns.length).toBeGreaterThan(0);
+    act(() => mocks.focusTeardowns.forEach((teardown) => teardown()));
+
+    expect(mocks.releaseChrome).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens where the SURAH reader left off, which stores no page', async () => {
+    // The reader writes `page: null` deliberately (ruling 13). Reading that as
+    // "no position" opened the mushaf on the Fatiha for anyone whose last
+    // session was in the reader -- the common path.
+    mocks.position = { surahId: 5, ayahNumber: 85, page: null };
+    const props = await renderScreen();
+
+    expect(props()['initialPage']).toBe(106);
+  });
+
+  it('sounds the pressed word-s own surah, which the hook has not been told yet', async () => {
+    // useRecitation was rendered with the PREVIOUS `playing`: null on the
+    // first press, and the OTHER surah on a page carrying two. Nothing played
+    // at all in the first case.
+    mocks.position = { surahId: 4, ayahNumber: 176, page: 106 };
+    const props = await renderScreen();
+
+    const longPress = props()['onWordPress'] as (word: unknown, ayahId: number) => void;
+    await act(async () => {
+      longPress({ surahId: 5, ayahNumber: 2, position: 1, charType: 'word', glyph: '' }, 9);
+    });
+
+    const actions = mocks.sheetProps.at(-1)?.['ayahActions'] as {
+      props: { onToggleAudio: () => void };
+    };
+    act(() => actions.props.onToggleAudio());
+
+    expect(mocks.toggleAyah).toHaveBeenCalledWith(2, 5);
   });
 
   it('carries every bookmark, not one surah-s worth', async () => {

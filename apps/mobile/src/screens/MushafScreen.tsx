@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 import type { MushafWord, Word } from '@quran-corpus/data/mobile';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
@@ -21,12 +21,13 @@ import {
   setBookmark,
   setBookmarkNote,
 } from '@/data/userRepository';
+import { useUserDbOnFocus } from '@/data/useUserDbOnFocus';
 import { useWordSummaryLoader } from '@/data/useWordSummaryLoader';
 import { useRecitation } from '@/audio/ayahAudio';
 import { t } from '@/i18n/uiStrings';
 import { ayahKey, type PressedWord } from '@/mushaf/highlights';
 import { useMushafIndex } from '@/mushaf/mushafReaderData';
-import { pageForJump } from '@/mushaf/pageJump';
+import { pageForAyah, pageForJump } from '@/mushaf/pageJump';
 import {
   releaseChrome,
   showChrome,
@@ -51,10 +52,19 @@ export function MushafScreen() {
   const { uiLocale, contentLanguage, reciterId, continuousPlay } = useAppSettings();
   const theme = useThemeColors();
   const [client, setClient] = useState<MobileDataClient | null>(null);
-  // Null until the saved position has been read. The pager takes its opening
-  // page at mount and owns it afterwards, so opening on 1 and correcting to
-  // 106 a moment later would be a page turn the reader did not ask for.
+  // Null until the saved position has been read AND resolved to a page. The
+  // pager takes its opening page at mount and owns it afterwards, so opening
+  // on 1 and correcting to 106 a moment later would be a page turn the reader
+  // did not ask for.
   const [initialPage, setInitialPage] = useState<number | null>(null);
+  // The saved row itself, held until there is an index to resolve it against.
+  // `page` is null on every row the SURAH reader wrote -- deliberately, since
+  // it scrolls by ayah and a stale page would be worse than none (ruling 13) --
+  // so taking `position.page ?? 1` opened the mushaf on the Fatiha for anyone
+  // whose last session was in the reader, which is the common path.
+  const [savedPosition, setSavedPosition] = useState<
+    { surahId: number; ayahNumber: number; page: number | null } | null | undefined
+  >(undefined);
   // `surah:ayah` -> its note. One map, not a Set plus a second map: both would
   // be written from the same rows and could disagree. Keyed by coordinate and
   // not by ayah number, because a page holds whatever surahs print put on it --
@@ -77,6 +87,14 @@ export function MushafScreen() {
   /** A page the reader has to be taken to without swiping there. */
   const [focusPage, setFocusPage] = useState<number | null>(null);
   const loadWordSummary = useWordSummaryLoader(client, null, contentLanguage);
+  // Every bookmark, keyed by coordinate, re-read on every focus and resume.
+  // The reader narrows its own to one surah because it only ever shows one; a
+  // page can hold two, and the second surah's bookmarks are exactly what a
+  // narrowed set drops. On focus and not at mount because a tab screen is
+  // never unmounted: bookmarking a verse in the Surahs tab and coming back
+  // otherwise left this screen showing -- and writing against -- what was true
+  // when the app started.
+  const savedBookmarks = useUserDbOnFocus(getBookmarks, t(uiLocale, 'bookmarks.loadFailed'));
 
   useEffect(() => {
     let cancelled = false;
@@ -86,24 +104,15 @@ export function MushafScreen() {
         const [corpusDb, userDb] = await Promise.all([openCorpusDb(), openUserDb()]);
         const corpus = createExpoSqliteClient(corpusDb as ExpoSqliteLike);
         const user = createExpoSqliteClient(userDb as ExpoSqliteLike);
-        const [position, saved] = await Promise.all([
-          getLastReadingPosition(user),
-          getBookmarks(user),
-        ]);
+        const position = await getLastReadingPosition(user);
         if (cancelled) return;
         setClient(corpus);
-        // Every bookmark, keyed by coordinate. The reader narrows its own to
-        // one surah because it only ever shows one; a page can hold two, and
-        // the second surah's bookmarks are exactly what a narrowed set drops.
-        setBookmarks(
-          new Map(saved.map((bookmark) => [ayahKey(bookmark.surahId, bookmark.ayahNumber), bookmark.note])),
-        );
-        setInitialPage(position?.page ?? FIRST_PAGE);
+        setSavedPosition(position ?? null);
       } catch (cause) {
         // Logged for logcat, never shown: the pager still renders, and a page
         // that cannot load its rows draws its own paper ground.
         console.error('[mushaf] load failed', { cause });
-        if (!cancelled) setInitialPage(FIRST_PAGE);
+        if (!cancelled) setSavedPosition(null);
       }
     }
 
@@ -113,13 +122,48 @@ export function MushafScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    const rows = savedBookmarks.data;
+    if (!rows) return;
+    // Straight over the local map, not merged: this read is what the database
+    // says, and an optimistic toggle it does not contain is one that failed or
+    // one this screen has already rolled back.
+    setBookmarks(new Map(rows.map((bookmark) => [ayahKey(bookmark.surahId, bookmark.ayahNumber), bookmark.note])));
+  }, [savedBookmarks.data]);
+
+  // The opening page, resolved once and then never again: `initialPage` is
+  // what the pager mounts on, and it owns the page after that.
+  useEffect(() => {
+    if (savedPosition === undefined || initialPage !== null) return;
+    if (savedPosition === null) {
+      setInitialPage(FIRST_PAGE);
+      return;
+    }
+    if (savedPosition.page !== null) {
+      setInitialPage(savedPosition.page);
+      return;
+    }
+    // No page on the row, so it came from the surah reader: resolve the
+    // coordinate it did leave. Waits for the index rather than falling back to
+    // page 1, because page 1 is exactly the wrong answer here.
+    if (!index.ready) return;
+    setInitialPage(pageForAyah(index.pages, savedPosition.surahId, savedPosition.ayahNumber) ?? FIRST_PAGE);
+  }, [savedPosition, initialPage, index.ready, index.pages]);
+
   // The chrome is the tab bar too. Shown on arrival so the tab the user just
   // pressed is still under their thumb, and released on the way out so no
   // other screen inherits a hidden bar or a pending countdown.
-  useEffect(() => {
-    showChrome();
-    return releaseChrome;
-  }, []);
+  //
+  // On FOCUS, not on mount. A tab screen is not unmounted when the user leaves
+  // it, so a mount-scoped release never ran: the 3.5s idle timer armed here
+  // kept ticking after a switch to another tab and hid the app's tab bar
+  // there, on a screen with no way to bring it back.
+  useFocusEffect(
+    useCallback(() => {
+      showChrome();
+      return releaseChrome;
+    }, []),
+  );
 
   const recorder = useMemo(
     () =>
@@ -134,7 +178,10 @@ export function MushafScreen() {
         // reader nothing they can see or act on until the next launch.
         (cause: unknown) => console.error('[mushaf] position write failed', { cause }),
       ),
-    [uiLocale],
+    // Nothing in here reads a render value. It used to depend on `uiLocale`,
+    // which rebuilt the recorder -- discarding whatever it had queued -- every
+    // time the UI language changed.
+    [],
   );
 
   const onPageChange = useCallback(
@@ -366,7 +413,11 @@ export function MushafScreen() {
                       surahId: openMushafWord.surahId,
                       ayahNumber: openMushafWord.ayahNumber,
                     });
-                    audio.toggleAyah(openMushafWord.ayahNumber);
+                    // The surah goes with the call. `useRecitation` was
+                    // rendered with the PREVIOUS `playing`, so on the first
+                    // press it holds null and nothing sounds at all, and on a
+                    // page carrying two surahs it holds the other one.
+                    audio.toggleAyah(openMushafWord.ayahNumber, openMushafWord.surahId);
                   }}
                 />
               ),
