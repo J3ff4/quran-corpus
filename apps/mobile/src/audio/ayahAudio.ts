@@ -204,6 +204,11 @@ export function useRecitation(
   // What the driver is actually loaded with, which the *setting* stops
   // describing the moment the reciter changes under a paused ayah.
   const loadedReciterRef = useRef(reciterId);
+  // The surah the loaded file belongs to. An ayah NUMBER does not identify a
+  // recording: 51 pages carry two surahs, so 5:3 and 6:3 both arrive here as
+  // `3` and resuming on the number alone would sound the wrong surah's file
+  // under the right surah's highlight.
+  const loadedSurahRef = useRef<number | null>(null);
   // The URL the driver is on. Kept only so the one before it can be dropped
   // from the preload cache.
   const loadedUrlRef = useRef<string | null>(null);
@@ -215,16 +220,23 @@ export function useRecitation(
   // once -- see handleStatus.
   const soundedRef = useRef(false);
 
-  function startAyah(ayah: number) {
-    if (surah === null) return;
+  // `surah` is a prop, so it is whatever the render this closure came from was
+  // handed. The mushaf tab has no surah of its own -- it learns one from the
+  // word that was pressed and sets state with it -- so at the moment it calls
+  // toggleAyah the hook has still been rendered with the PREVIOUS surah, or
+  // with null. Hence the override: the caller that knows the surah says so in
+  // the same call, rather than hoping a re-render lands first.
+  function startAyah(ayah: number, surahOverride?: number) {
+    const surahId = surahOverride ?? surah;
+    if (surahId === null) return;
 
     let url: string;
     try {
       // Validated in packages/data: an unknown reciter or an out-of-range
       // coordinate throws there rather than being interpolated into a path.
-      url = ayahAudioUrl(surah, ayah, reciterId);
+      url = ayahAudioUrl(surahId, ayah, reciterId);
     } catch (cause) {
-      console.error('[audio] refused to build a url', { surah, ayah, reciterId, cause });
+      console.error('[audio] refused to build a url', { surah: surahId, ayah, reciterId, cause });
       setState((current) => ({ ...current, playing: false, error: 'reader.audioFailed' }));
       return;
     }
@@ -242,6 +254,7 @@ export function useRecitation(
     const stale = loadedUrlRef.current;
     ayahRef.current = ayah;
     loadedReciterRef.current = reciterId;
+    loadedSurahRef.current = surahId;
     loadedUrlRef.current = url;
     finishedRef.current = false;
     soundedRef.current = false;
@@ -251,7 +264,7 @@ export function useRecitation(
     // Re-asserted on every ayah rather than once on the first: the reciter can
     // change mid-surah (device check 87) and the artist line has to change with
     // it.
-    driver.setLockScreen(options.surahName ?? `Surah ${surah}`, reciterById(reciterId)?.label ?? '');
+    driver.setLockScreen(options.surahName ?? `Surah ${surahId}`, reciterById(reciterId)?.label ?? '');
     driver.play();
 
     // One behind, not all: the file sounding right now was itself warmed by the
@@ -265,7 +278,7 @@ export function useRecitation(
     // with, and warming a file continuous play will never play is someone's
     // mobile data.
     const next = ayah + 1;
-    if (continuous && next <= ayahCount) driver.preload(ayahAudioUrl(surah, next, reciterId));
+    if (continuous && next <= ayahCount) driver.preload(ayahAudioUrl(surahId, next, reciterId));
   }
 
   function handleStatus(status: RecitationStatus) {
@@ -333,7 +346,7 @@ export function useRecitation(
   const statusRef = useRef(handleStatus);
   statusRef.current = handleStatus;
 
-  function toggleAyah(ayah: number) {
+  function toggleAyah(ayah: number, surahOverride?: number) {
     const driver = driverRef.current;
     // `state.error === null` is what makes the second tap after a failure a
     // retry rather than a resume: the source that failed is still loaded, so
@@ -347,6 +360,7 @@ export function useRecitation(
     if (
       driver &&
       ayahRef.current === ayah &&
+      (surahOverride === undefined || loadedSurahRef.current === surahOverride) &&
       state.error === null &&
       !finishedRef.current &&
       loadedReciterRef.current === reciterId
@@ -371,7 +385,7 @@ export function useRecitation(
       }
       return;
     }
-    startAyah(ayah);
+    startAyah(ayah, surahOverride);
   }
 
   function seekTo(seconds: number) {
