@@ -29,7 +29,12 @@ export function useWordSummaryLoader(
   // landing while the first was still running missed, and issued its own
   // full-surah gloss query -- 6,116 rows for al-Baqarah, twice, to answer two
   // taps a moment apart (#12).
-  const glossesRef = useRef<{ key: string; glosses: Promise<Map<number, Gloss>> } | null>(null);
+  //
+  // TWO entries, not one. The mushaf presses words on a page, and 51 pages
+  // carry two surahs: with a single slot, alternating taps across the boundary
+  // evicted on every press and re-ran the full-surah query each time -- the
+  // exact cost this cache exists to remove.
+  const glossesRef = useRef<{ key: string; glosses: Promise<Map<number, Gloss>> }[]>([]);
 
   return useCallback(
     async (word: Word, wordSurahId?: number) => {
@@ -39,10 +44,12 @@ export function useWordSummaryLoader(
       // language while a surah is open otherwise keeps serving the glosses
       // fetched for the previous one.
       const key = `${surah}:${contentLanguage}`;
-      let entry = glossesRef.current;
-      if (entry?.key !== key) {
+      let entry = glossesRef.current.find((cached) => cached.key === key);
+      if (!entry) {
         entry = { key, glosses: getSurahGlosses(client, surah, contentLanguage) };
-        glossesRef.current = entry;
+        // Newest first, and never more than two: a third would be a surah no
+        // page can reach from where the reader is.
+        glossesRef.current = [entry, ...glossesRef.current].slice(0, 2);
       }
 
       // Awaited off the entry this call captured, so a call still in flight is
@@ -55,8 +62,9 @@ export function useWordSummaryLoader(
       } catch (cause) {
         // A rejected promise is a permanent cache entry: without this every
         // later tap on the surah would replay the same failure and never
-        // retry. Cleared only if nothing newer has taken its place.
-        if (glossesRef.current === entry) glossesRef.current = null;
+        // retry. Only this entry is dropped -- the other slot holds a
+        // different surah and has nothing to do with this failure.
+        glossesRef.current = glossesRef.current.filter((cached) => cached !== entry);
         throw cause;
       }
 
