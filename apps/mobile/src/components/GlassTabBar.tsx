@@ -1,9 +1,12 @@
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, Text } from 'react-native';
+import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
 
 import { GlassSurface } from './GlassSurface';
 import { Icon, type IconName } from './icons/Icon';
 import { t, type UiStringKey } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
+import { useChromeVisible } from '@/mushaf/chromeVisibility';
+import { useReducedMotion } from '@/motion/useReducedMotion';
 import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
@@ -27,6 +30,11 @@ export interface GlassTabBarProps {
   };
   insets: { bottom: number };
 }
+
+/** How far the bar drops on its way out, and how long it takes. Far enough to
+ *  clear its own height plus the inset it floats above. */
+const BAR_TRAVEL = 120;
+const CHROME_FADE_MS = 220;
 
 /** Route name -> glyph and label. Keyed by route so a reordered <Tabs> cannot
  *  silently pair the wrong icon with the wrong screen. */
@@ -53,11 +61,31 @@ const TABS: Record<string, { icon: IconName; label: UiStringKey }> = {
 export function GlassTabBar({ state, navigation, insets }: GlassTabBarProps) {
   const theme = useThemeColors();
   const { uiLocale } = useAppSettings();
+  // The mushaf hides the bar along with its own chrome (M7d ruling 7). Every
+  // other screen leaves the value alone, where it is permanently true.
+  const visible = useChromeVisible();
+  const reducedMotion = useReducedMotion();
+  const duration = reducedMotion ? 0 : CHROME_FADE_MS;
+  const style = useAnimatedStyle(() => ({
+    opacity: withTiming(visible ? 1 : 0, { duration }),
+    transform: [{ translateY: withTiming(visible ? 0 : BAR_TRAVEL, { duration }) }],
+  }));
 
   return (
-    <View
-      pointerEvents="box-none"
-      style={{ position: 'absolute', left: 16, right: 16, bottom: insets.bottom + 12 }}
+    <Animated.View
+      testID="tab-bar"
+      // `none` and not `box-none` while hidden: a bar faded to nothing still
+      // occupies the bottom of the screen, and the tap that is supposed to
+      // bring it back would land on it instead of on the page.
+      pointerEvents={visible ? 'box-none' : 'none'}
+      // Off the screen and out of the reading order together. A bar TalkBack
+      // can still reach is a bar the user cannot see to know they reached.
+      accessibilityElementsHidden={!visible}
+      importantForAccessibility={visible ? 'auto' : 'no-hide-descendants'}
+      style={[
+        { position: 'absolute', left: 16, right: 16, bottom: insets.bottom + 12 },
+        style,
+      ]}
     >
       <GlassSurface docked radius="pill" style={{ flexDirection: 'row', paddingVertical: 6 }}>
         {state.routes.map((route, index) => {
@@ -101,6 +129,6 @@ export function GlassTabBar({ state, navigation, insets }: GlassTabBarProps) {
           );
         })}
       </GlassSurface>
-    </View>
+    </Animated.View>
   );
 }
