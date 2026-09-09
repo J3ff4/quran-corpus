@@ -433,3 +433,21 @@ Two mutation-checks earned their keep:
 2. **`/code-review`** -- §5 triggers: on-device user-DB writes in Tasks 3 and 9.
    User-triggered; the agent cannot launch it.
 3. **No PR.** The owner's call.
+
+## Review pass (2026-09-09)
+
+`/code-review` on the branch. Eight findings, all real, all fixed:
+`912802b` (surah jump dead for 17 surahs), `88ca21d` (audio: first press
+silent, cross-surah press wrong file), `d68791c` (tab bar hidden on other
+tabs; stale bookmarks; opens on the Fatiha after a reader session; recorder
+dep), `84a0e5b` (gloss cache thrash on two-surah pages), `234bd0b` (corner
+row height).
+
+One half declined: the reading position stays a mount-time read. Re-reading
+it on focus would move the pager under a reader who turned pages here and
+stepped away.
+
+Eight mutation-checks run, one per fix, each confirmed red. Gate: 99 files /
+1022 tests, type-check and lint clean.
+
+Still owed: the device run (219-240, plus 224/224a), and the PR.
