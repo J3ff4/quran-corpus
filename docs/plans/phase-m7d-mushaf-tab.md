@@ -223,7 +223,21 @@ it('tints the pressed word alone, over every other state', () => {
 
 ---
 
-## Task 6: The word hit test is off
+## Task 6: The word hit test is off — DEFERRED to the device run
+
+**Ruling (2026-09-09):** step 1 of this task is a measurement on real hardware,
+and the phone under adb is the session's own display. Guessing at branch A
+without the log would be a style change to a component that renders every glyph
+of the Qur'an, made on a hunch. So Task 6 runs inside Task 10, as checks 224 and
+224a, with the owner present. Everything below stands as written.
+
+Two candidates worth checking first, both free: the parent `<Text>` carries
+`lineHeight` and `textAlign: 'center'` on a `numberOfLines={1}` run, and it
+sets no `writingDirection` -- QCF glyphs are Private Use Area codepoints, whose
+Bidi class is L, so Android resolves the paragraph direction from them rather
+than from the Arabic they draw.
+
+## Task 6 (as planned)
 
 **Files:** modify `src/components/mushaf/MushafLineRow.tsx` and, only on branch B, add a generated table under `src/mushaf/`.
 
