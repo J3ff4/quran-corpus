@@ -15,6 +15,11 @@ export interface AyahCardProps {
   /** Empty until the reader has fetched this ayah's words; see AyahText. */
   words: Word[];
   translationText: string | null;
+  /** Whether to draw it. Separate from `translationText` being null, which
+   *  means the ayah has no translation in the chosen language at all: this one
+   *  is the reader's own switch, and the card must not have to guess which of
+   *  the two it is looking at. */
+  showTranslation?: boolean;
   bookmarked: boolean;
   /** This ayah's note, or null for none. Only ever non-null on a bookmarked
    *  ayah -- a note is an attribute of a bookmark. */
@@ -34,6 +39,7 @@ export function AyahCard({
   arabicText,
   words,
   translationText,
+  showTranslation = true,
   bookmarked,
   note = null,
   playing,
@@ -51,8 +57,9 @@ export function AyahCard({
     <GlassSurface style={{ marginHorizontal: 16, marginBottom: 11, padding: 20, gap: 14 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <AyahMedallion n={ayahNumber} uiLocale={uiLocale} />
-        {/* Shared with MushafAyah, which is the point: the two renderers
-            differ in what you SEE, never in what you can DO. */}
+        {/* Shared with the scroll mushaf's row until M7c replaced it with a
+            pager; the printed page carries no controls at all (ruling 4), so
+            these are the only ayah actions in the reader now. */}
         <AyahControls
           surahId={surahId}
           ayahNumber={ayahNumber}
@@ -75,7 +82,7 @@ export function AyahCard({
         ayahNumber={ayahNumber}
         onWordPress={onWordPress}
       />
-      {translationText ? (
+      {showTranslation && translationText ? (
         <Text
           style={{
             color: theme.text,

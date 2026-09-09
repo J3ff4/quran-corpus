@@ -51,6 +51,8 @@ export default function SurahRoute() {
     uiLocale,
     readerMode,
     setReaderMode,
+    showTranslation,
+    setShowTranslation,
     reciterId,
     setReciterId,
     continuousPlay,
@@ -116,11 +118,11 @@ export default function SurahRoute() {
   const [readingError, setReadingError] = useState<string | null>(null);
   const readingRecorder = useMemo(() => {
     if (!displayedSurahId) return null;
-    return createLatestReadingPositionRecorder(async (ayahNumber) => {
+    return createLatestReadingPositionRecorder(async ({ surahId: positionSurahId, ayahNumber, page }) => {
       setReadingError(null);
       const userDb = await openUserDb();
       const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
-      await recordReadingPosition(userClient, displayedSurahId, ayahNumber);
+      await recordReadingPosition(userClient, { surahId: positionSurahId, ayahNumber, page });
       // Decision 22: any reading counts, and this write already fires on the
       // reader's scroll, so it is the one place that sees every read without a
       // second listener to keep in step.
@@ -364,15 +366,24 @@ export default function SurahRoute() {
         onChangeContentLanguage={setContentLanguage}
         readerMode={readerMode}
         onChangeReaderMode={setReaderMode}
+        showTranslation={showTranslation}
+        onChangeShowTranslation={setShowTranslation}
         initialAyahNumber={initialAyahNumber}
         loadWords={loadWords}
         loadWordSummary={loadWordSummary}
         onToggleBookmark={toggleBookmark}
         onEditNote={(ayahNumber) => setEditingNote(ayahNumber)}
         onToggleAudio={audio.toggleAyah}
+        corpusClient={corpusClient}
         onReadingAyah={(ayahNumber) => {
-          readingRecorder?.record(ayahNumber);
+          // No page: this fires from the translation list's scroll, and a null
+          // page clears whatever page a mushaf session left in the row.
+          if (displayedSurahId) readingRecorder?.record({ surahId: displayedSurahId, ayahNumber, page: null });
         }}
+        // The page's own surah and ayah, not the screen's: 51 pages hold more
+        // than one surah (ruling 10), so the reader can be paged into a surah
+        // the route never named.
+        onReadingPage={(position) => readingRecorder?.record(position)}
         // 1 and 114 are facts about the mushaf, and parseSurahId enforces the
         // same bound on the route. D47: no wrapping, so an end is a dead arrow
         // rather than a jump to the other end of the book.

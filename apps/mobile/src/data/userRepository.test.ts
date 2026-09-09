@@ -36,10 +36,10 @@ describe('userRepository', () => {
 
   it('stores the latest reading position', async () => {
     const client = createMemoryUserClient();
-    await recordReadingPosition(client, 1, 7);
-    await recordReadingPosition(client, 2, 10);
+    await recordReadingPosition(client, { surahId: 1, ayahNumber: 7 });
+    await recordReadingPosition(client, { surahId: 2, ayahNumber: 10, page: 3 });
 
-    expect(await getLastReadingPosition(client)).toEqual({ surahId: 2, ayahNumber: 10 });
+    expect(await getLastReadingPosition(client)).toEqual({ surahId: 2, ayahNumber: 10, page: 3 });
   });
 
   it('stores string settings by key', async () => {

@@ -481,7 +481,21 @@ it assumes. Nine sub-phases, one PR and one preview APK each. Spec and plans:
 A true paged mushaf is explicitly **not** in scope; page browse scrolls to the
 page's first ayah.
 
-### Phase M7: Android Release Hardening
+### Phase M7: Paged Mushaf
+
+The mushaf becomes a real paged mushaf built from **imported** KFGQPC page
+layout data — never layout we compute ourselves. Owner rulings:
+`docs/plans/phase-m7-paged-mushaf.md`. Spike and its findings (licence,
+edition, font registration, byte cost): `docs/plans/phase-m7a-mushaf-spike.md`.
+
+- M7a — spike. Done: layout source validated against `ayahs.page`, edition
+  chosen, TTF-only registration proven on device, byte cost measured.
+- M7b — import the page layout into `packages/data`, subset and bundle the 604
+  per-page fonts, and register them at runtime per page.
+- M7c — the pager itself: model A, paged replaces the scroll reader, ayah-by-ayah
+  translation toggle, per-word highlight states.
+
+### Phase M8: Android Release Hardening
 
 - Accessibility pass.
 - Performance pass on target devices.
@@ -490,13 +504,13 @@ page's first ayah.
 - Legal/source attribution review.
 - Release candidate QA.
 
-### Phase M8: Post-V1 Treebank Readiness
+### Phase M9: Post-V1 Treebank Readiness
 
 - Track web/data treebank implementation.
 - Add native treebank viewer after treebank exists in the shared data layer.
 - Validate touch pan/zoom rendering and performance.
 
-### Phase M9: iOS Readiness
+### Phase M10: iOS Readiness
 
 - Audit platform-specific code.
 - Enable iOS build.

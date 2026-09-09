@@ -37,6 +37,41 @@ const mocks = vi.hoisted(() => ({
   // worklet for a press scale.
   animatedStyles: [] as Array<() => Record<string, unknown>>,
   reduceMotion: false,
+  /** Every set of props the mushaf half was rendered with, newest last. */
+  mushafProps: [] as Array<Record<string, unknown>>,
+  /** The arriving mushaf layer's onLanded, held rather than called. A real
+   *  page lands when its font registers, which is not the same tick it mounts,
+   *  and a mock that lands instantly would leave no window in which a switch
+   *  is in flight -- the window every layering assertion here is about. */
+  mushafLanded: null as (() => void) | null,
+}));
+
+// Mocked rather than rendered: MushafReader pulls expo-font, which throws on
+// __DEV__ under jsdom, and it has its own suite. What this one asserts is the
+// wiring -- which component each mode mounts, and the page it is opened at.
+vi.mock('./mushaf/MushafReader', async () => {
+  const React = await import('react');
+  return {
+    MushafReader: (props: Record<string, unknown>) => {
+      mocks.mushafProps.push(props);
+      mocks.mushafLanded = props['onLanded'] as () => void;
+      return React.createElement('div', { 'data-testid': 'mushaf-reader' });
+    },
+  };
+});
+
+// The page index is a database read. Two pages of one surah and a third that
+// opens the next one, which is what issue #58 is about.
+vi.mock('@/mushaf/mushafReaderData', () => ({
+  useMushafIndex: () => ({
+    pages: new Map([
+      [106, { page: 106, startSurahId: 1, startAyahNumber: 1, surahName: 'Al-Fatihah', juz: 6 }],
+      [107, { page: 107, startSurahId: 1, startAyahNumber: 5, surahName: 'Al-Fatihah', juz: 6 }],
+      [108, { page: 108, startSurahId: 2, startAyahNumber: 1, surahName: 'Al-Baqarah', juz: 6 }],
+    ]),
+    surahNames: new Map([[1, 'Al-Fatihah'], [2, 'Al-Baqarah']]),
+    ready: true,
+  }),
 }));
 
 // Not importOriginal: the real package doesn't parse under vitest (Metro-only
@@ -185,17 +220,24 @@ vi.mock('./ReciterSheet', async () => {
 vi.mock('./WordSheet', async () => {
   const React = await import('react');
   return {
-    WordSheet: ({ summary, onClose, onOpenDetail, onOpenRoot }: {
+    // ayahActions and ayahLabel are rendered, not dropped: a mock that
+    // destructures only what it knew about passes every assertion about a prop
+    // it silently throws away (the lesson rnHosts taught twice).
+    WordSheet: ({ summary, onClose, onOpenDetail, onOpenRoot, ayahActions, ayahLabel }: {
       summary: { word: { id: number } } | null;
       onClose: () => void;
       onOpenDetail: (word: unknown) => void;
       onOpenRoot: (rootBuckwalter: string) => void;
+      ayahActions?: React.ReactNode;
+      ayahLabel?: string;
     }) =>
       summary
         ? React.createElement(
             'div',
             { 'data-testid': 'word-sheet' },
             React.createElement('span', null, String(summary.word.id)),
+            ayahLabel ? React.createElement('span', { 'data-testid': 'sheet-ayah-label' }, ayahLabel) : null,
+            ayahActions,
             React.createElement('button', { 'data-testid': 'close-sheet', onClick: onClose }),
             React.createElement('button', {
               'data-testid': 'open-detail',
@@ -335,6 +377,8 @@ describe('SurahReader', () => {
     mocks.reduceMotion = false;
     mocks.getReaderPosition.mockReset().mockReturnValue(null);
     mocks.setReaderPosition.mockReset();
+    mocks.mushafProps = [];
+    mocks.mushafLanded = null;
   });
 
   afterEach(cleanup);
@@ -862,6 +906,63 @@ describe('SurahReader', () => {
     expect(screen.getByTestId('word-sheet').textContent).toContain('1002');
   });
 
+  it('carries the ayah-s own controls into the word sheet', async () => {
+    // Ruling 4: the mushaf page has no chrome, so this row is the only way to
+    // bookmark, note or play the ayah being read as print. The sheet is where
+    // it lives in both modes -- the tap that opens it is the same tap.
+    const data = readerData(1);
+    const onToggleBookmark = vi.fn();
+    render(
+      <SurahReader
+        {...baseProps(data)}
+        onToggleBookmark={onToggleBookmark}
+        loadWords={async (ayahId) => surahWords(ayahId)}
+        loadWordSummary={(async (word: { id: number }) => ({ word, segments: [], gloss: null })) as never}
+      />,
+    );
+
+    await act(async () => {
+      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getAllByTestId('word-token')[0]!);
+    });
+
+    expect(screen.getByTestId('sheet-ayah-label').textContent).toBe('Ayah 1');
+    // Scoped to the sheet: the ayah card carries a bookmark with the same
+    // handle, and a document-wide query would pass on the card's alone.
+    const sheet = screen.getByTestId('word-sheet');
+    const bookmark = sheet.querySelector('[data-testid="ayah-1-1-bookmark"]');
+    expect(bookmark).toBeTruthy();
+    fireEvent.click(bookmark!);
+    expect(onToggleBookmark).toHaveBeenCalledWith(1);
+  });
+
+  it('shows no ayah controls for a word from a surah the reader is not on', async () => {
+    // A mushaf page carries ayahs from surahs the route never named -- page
+    // 106 opens in An-Nisa and heads Al-Ma-idah. Every control here is keyed
+    // to the displayed surah, so acting on one of those words would bookmark
+    // the wrong ayah. Morphology, no actions.
+    const data = readerData(1);
+    render(
+      <SurahReader
+        {...baseProps(data)}
+        loadWords={async () => surahWords(999)}
+        loadWordSummary={(async (word: { id: number }) => ({ word, segments: [], gloss: null })) as never}
+      />,
+    );
+
+    await act(async () => {
+      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getAllByTestId('word-token')[0]!);
+    });
+
+    expect(screen.getByTestId('word-sheet')).toBeTruthy();
+    expect(screen.queryByTestId('sheet-ayah-label')).toBeNull();
+  });
+
   it('shows the word tapped last, not the query that finished last', async () => {
     // The first tap of a surah is the slow one -- it warms the gloss cache --
     // so a second tap really can resolve first. Without the sequence guard the
@@ -1118,22 +1219,123 @@ describe('SurahReader', () => {
     expect(barLayer()?.getAttribute('data-hidden-from-a11y')).toBe('true');
   });
 
-  it('renders mushaf mode without the translation the cards show', () => {
-    // The switch in renderItem is the logic. Asserting on MushafAyah directly
-    // would pass just as well with the reader hardcoded to AyahCard, which is
-    // exactly the mistake this catches.
-    const data = readerData(1);
+  it('renders the pager in mushaf mode, not a list of ayah rows', () => {
+    // Ruling 6: the paged mushaf replaces the scroll mushaf outright. A reader
+    // that still listed ayahs in mushaf mode would look almost right -- the
+    // Arabic is the same text -- so this asserts on which component mounted.
+    const data = readerData(8);
 
-    const { container, rerender } = render(<SurahReader {...baseProps(data)} readerMode="translation" />);
-    const translation = data.ayahs[0]!.translation!.text;
-    expect(container.textContent).toContain(translation);
+    const { rerender } = render(<SurahReader {...baseProps(data)} readerMode="translation" />);
+    expect(screen.queryByTestId('mushaf-reader')).toBeNull();
+    expect(screen.getAllByTestId('reader-list')).toHaveLength(1);
 
     rerender(<SurahReader {...baseProps(data)} readerMode="mushaf" />);
+    act(() => mocks.mushafLanded?.());
+    rerender(<SurahReader {...baseProps(data)} readerMode="mushaf" />);
+
+    expect(screen.getByTestId('mushaf-reader')).toBeTruthy();
+    expect(screen.queryAllByTestId('reader-list')).toHaveLength(0);
+  });
+
+  it('still renders translation mode as a list of cards', () => {
+    // The guard on ruling 6: paged replaces the mushaf, not the reader.
+    const data = readerData(3);
+
+    render(<SurahReader {...baseProps(data)} readerMode="translation" />);
+
+    expect(screen.getByTestId('reader-list')).toBeTruthy();
+    // getAllByText: the fixture gives every ayah the same translation.
+    expect(screen.getAllByText(data.ayahs[0]!.translation!.text)).toHaveLength(3);
+    expect(screen.queryByTestId('mushaf-reader')).toBeNull();
+  });
+
+  it('hides the translation on every card when the setting is off', () => {
+    // The setting is the screen's, the cards are the list's, and the reader is
+    // the only thing between them -- a wiring test, because AyahCard's own
+    // suite passes whether or not anything hands it the flag.
+    const data = readerData(3);
+    const translation = data.ayahs[0]!.translation!.text;
+
+    const { container, rerender } = render(
+      <SurahReader {...baseProps(data)} readerMode="translation" showTranslation />,
+    );
+    expect(container.textContent).toContain(translation);
+
+    rerender(<SurahReader {...baseProps(data)} readerMode="translation" showTranslation={false} />);
 
     expect(container.textContent).not.toContain(translation);
-    // The Arabic is still there -- mushaf mode drops the translation, not the
-    // ayah.
-    expect(container.textContent).toContain(data.ayahs[0]!.ayah.text_uthmani.slice(-8));
+    expect(container.textContent).toContain(data.ayahs[0]!.ayah.text_uthmani);
+  });
+
+  it('opens on the page holding the requested ayah', () => {
+    // /surah/1?ayah=5 has to open the page 1:5 is printed on, not the surah's
+    // first page: a page is not a surah (ruling 10), and the ayah column is
+    // the only thing that knows which page it is.
+    const data = readerData(8);
+
+    render(<SurahReader {...baseProps(data)} readerMode="mushaf" initialAyahNumber={5} />);
+
+    expect(mocks.mushafProps.at(-1)?.['initialPage']).toBe(107);
+    expect(mocks.mushafProps.at(-1)?.['landingAyah']).toEqual({ surahId: 1, ayahNumber: 5 });
+  });
+
+  it('opens on the surah-s own first page when no ayah was asked for', () => {
+    // Page 1 of the mushaf would be al-Fatihah -- a plausible-looking wrong
+    // book for every surah but the first.
+    const data = readerData(8);
+
+    render(<SurahReader {...baseProps(data)} readerMode="mushaf" />);
+
+    expect(mocks.mushafProps.at(-1)?.['initialPage']).toBe(106);
+  });
+
+  it('keeps the surah name after a page turn crosses into the next surah', () => {
+    // Issue #58: the name went blank after a chevron turn and stayed blank.
+    // In a pager the name is a function of the page, and the screen's
+    // mount-time surah is exactly what it must not be.
+    const data = readerData(8);
+    render(<SurahReader {...baseProps(data)} readerMode="mushaf" />);
+    const nameOf = () => {
+      const options = mocks.setOptions.mock.calls.at(-1)?.[0] as {
+        header: () => React.ReactElement<{ surahName: string }>;
+      };
+      return options.header().props.surahName;
+    };
+    expect(nameOf()).toBe('Al-Fatihah');
+
+    const onPageChange = mocks.mushafProps.at(-1)?.['onPageChange'] as (page: number) => void;
+    act(() => onPageChange(108));
+
+    expect(nameOf()).toBe('Al-Baqarah');
+  });
+
+  it('reports a page turn with the surah and ayah that page opens on', () => {
+    // Ruling 15. The pair is the page-s own, not the screen-s: page 108 opens
+    // al-Baqarah while the reader was opened on al-Fatihah, and pairing the
+    // new page with the old surah stores a coordinate nobody read.
+    const onReadingPage = vi.fn();
+    render(
+      <SurahReader {...baseProps(readerData(8))} readerMode="mushaf" onReadingPage={onReadingPage} />,
+    );
+
+    const onPageChange = mocks.mushafProps.at(-1)?.['onPageChange'] as (page: number) => void;
+    act(() => onPageChange(108));
+
+    expect(onReadingPage).toHaveBeenCalledWith({ surahId: 2, ayahNumber: 1, page: 108 });
+  });
+
+  it('follows the recitation onto the page the ayah being played is printed on', () => {
+    // Ruling 19. Without this the audio tint moves onto a page the reader is
+    // not looking at.
+    const data = readerData(8);
+    const { rerender } = render(
+      <SurahReader {...baseProps(data)} readerMode="mushaf" playingAyah={null} />,
+    );
+    expect(mocks.mushafProps.at(-1)?.['focusPage']).toBeNull();
+
+    rerender(<SurahReader {...baseProps(data)} readerMode="mushaf" playingAyah={5} />);
+
+    expect(mocks.mushafProps.at(-1)?.['focusPage']).toBe(107);
   });
 
   it('never blanks the reader while a mode switch lands', async () => {
@@ -1162,19 +1364,13 @@ describe('SurahReader', () => {
       // no spinner and no blank.
       expect(screen.queryByTestId('reader-positioning')).toBeNull();
       expect(container.textContent).toContain(translation);
-
-      // Hiding the arriving rendering is the LAYER's job and only the layer's.
-      // The list used to hide itself as well, until `positioned` committed --
-      // and `reveal()` sets that in the same tick it starts the cross-fade,
-      // which is a shared-value write the UI thread applies before React
-      // commits anything. So the outgoing layer was already fading out while
-      // the incoming list was still at zero: both invisible, and the bloom
-      // through the gap is the one flash the device still showed after
-      // `8e183d4` (Al-Baqara 2:255, 2026-09-02).
-      expect(screen.getAllByTestId('reader-list')[1]?.getAttribute('data-opacity')).toBe('1');
+      expect(screen.getByTestId('mushaf-reader')).toBeTruthy();
       expect(screen.getByTestId('reader-layer-1').style.opacity).toBe('0');
 
+      // The mushaf lands when its first page's font is registered, which is
+      // not the tick it mounted -- exactly the window a blank would show in.
       await act(async () => {
+        mocks.mushafLanded?.();
         await vi.advanceTimersByTimeAsync(8100);
       });
 
@@ -1210,7 +1406,7 @@ describe('SurahReader', () => {
       // screen. That was the blank the device still showed after the fade
       // (Al-Baqara 2:255, 2026-09-01).
       expect(screen.queryByTestId('reader-positioning')).toBeNull();
-      expect(container.textContent).toContain(data.ayahs[254]!.ayah.text_uthmani);
+      expect(screen.getByTestId('mushaf-reader')).toBeTruthy();
     } finally {
       vi.useRealTimers();
     }
@@ -1238,6 +1434,7 @@ describe('SurahReader', () => {
 
       rerender(<SurahReader {...baseProps(data)} readerMode="mushaf" initialAyahNumber={255} />);
       await act(async () => {
+        mocks.mushafLanded?.();
         await vi.advanceTimersByTimeAsync(8100);
       });
 
@@ -1254,22 +1451,21 @@ describe('SurahReader', () => {
 
       expect(screen.queryByTestId('reader-layer-0')).toBeNull();
       expect(screen.queryByTestId('reader-positioning')).toBeNull();
-      expect(container.textContent).toContain(data.ayahs[254]!.ayah.text_uthmani);
+      expect(screen.getByTestId('mushaf-reader')).toBeTruthy();
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it('keeps the bookmark control reachable in either mode', () => {
-    // Check 71 on the device list. Both renderers carry the same testID, so a
-    // mode that quietly loses a control fails here rather than on the phone.
+  it('keeps the bookmark control on the cards translation mode draws', () => {
+    // Check 71 on the device list. It no longer has a mushaf half: a printed
+    // page carries no controls (ruling 4), and the ayah actions moved into the
+    // word sheet with M7c.
     const data = readerData(1);
     const ayahNumber = data.ayahs[0]!.ayah.ayah_number;
 
-    const { rerender } = render(<SurahReader {...baseProps(data)} readerMode="translation" />);
-    expect(screen.getByTestId(`ayah-1-${ayahNumber}-bookmark`)).toBeTruthy();
+    render(<SurahReader {...baseProps(data)} readerMode="translation" />);
 
-    rerender(<SurahReader {...baseProps(data)} readerMode="mushaf" />);
     expect(screen.getByTestId(`ayah-1-${ayahNumber}-bookmark`)).toBeTruthy();
   });
 
@@ -1540,6 +1736,8 @@ describe('SurahReader shared reading position', () => {
     mocks.scrollToIndex.mockClear();
     mocks.getReaderPosition.mockReset().mockReturnValue(null);
     mocks.setReaderPosition.mockReset();
+    mocks.mushafProps = [];
+    mocks.mushafLanded = null;
   });
 
   afterEach(cleanup);
@@ -1567,24 +1765,24 @@ describe('SurahReader shared reading position', () => {
   });
 
   it('lands on the shared position when the reader mode changes', () => {
+    // Mushaf -> translation, which since M7c is the direction that mounts a
+    // list: the arriving list starts at offset 0, and without the re-anchor
+    // the reader lands on ayah 1 rather than where the mushaf was left.
     const props = baseProps(readerData(10));
-    const { rerender } = render(<SurahReader {...props} readerMode="translation" />);
+    const { rerender } = render(<SurahReader {...props} readerMode="mushaf" />);
     expect(mocks.scrollToIndex).not.toHaveBeenCalled();
 
     mocks.getReaderPosition.mockReturnValue(5);
-    rerender(<SurahReader {...props} readerMode="mushaf" />);
+    rerender(<SurahReader {...props} readerMode="translation" />);
 
-    // The plate wrapping the list is MushafPlate in one mode and Fragment in
-    // the other, so React unmounts the FlatList and the replacement starts at
-    // offset 0. Without the re-anchor the reader lands on ayah 1.
     expect(mocks.scrollToIndex).toHaveBeenCalledWith({ index: 4, animated: false });
   });
 
   it('does not re-anchor when the store has nothing for this surah', () => {
     const props = baseProps(readerData(10));
-    const { rerender } = render(<SurahReader {...props} readerMode="translation" />);
+    const { rerender } = render(<SurahReader {...props} readerMode="mushaf" />);
 
-    rerender(<SurahReader {...props} readerMode="mushaf" />);
+    rerender(<SurahReader {...props} readerMode="translation" />);
 
     expect(mocks.scrollToIndex).not.toHaveBeenCalled();
   });
@@ -1593,10 +1791,10 @@ describe('SurahReader shared reading position', () => {
     vi.useFakeTimers();
     try {
       const props = baseProps(readerData(10));
-      const { rerender } = render(<SurahReader {...props} readerMode="translation" />);
+      const { rerender } = render(<SurahReader {...props} readerMode="mushaf" />);
 
       mocks.getReaderPosition.mockReturnValue(5);
-      rerender(<SurahReader {...props} readerMode="mushaf" />);
+      rerender(<SurahReader {...props} readerMode="translation" />);
       expect(mocks.scrollToIndex).toHaveBeenCalledTimes(1);
 
       // The first switch has to finish before the second is a switch at all:
@@ -1606,6 +1804,8 @@ describe('SurahReader shared reading position', () => {
         await vi.advanceTimersByTimeAsync(8100);
       });
       const landed = mocks.scrollToIndex.mock.calls.length;
+      rerender(<SurahReader {...props} readerMode="mushaf" />);
+      act(() => mocks.mushafLanded?.());
       rerender(<SurahReader {...props} readerMode="translation" />);
 
       // The whole point of the nonce: index 4 both times, so an effect keyed
@@ -1640,17 +1840,19 @@ describe('SurahReader shared reading position', () => {
     expect(screen.getAllByTestId(/^reader-layer-/)).toHaveLength(1);
     expect(screen.getByTestId('reader-layer-0')).toBeTruthy();
 
-    // And a third mode mid-flight replaces the arrival, still two.
+    // And a switch back mid-flight is still two, not three: the arrival is
+    // replaced rather than stacked on. There is no third mode to reach for --
+    // ReaderMode is 'mushaf' | 'translation', and the 'words' this line used
+    // to pass was not one of them (issue #54).
     rerender(<SurahReader {...props} readerMode="mushaf" />);
-    rerender(<SurahReader {...props} readerMode="words" />);
     expect(screen.getAllByTestId(/^reader-layer-/)).toHaveLength(2);
   });
 
   it('keeps touch and TalkBack on the rendering that is actually on screen', () => {
     const props = baseProps(readerData(10));
-    const { rerender } = render(<SurahReader {...props} readerMode="translation" />);
+    const { rerender } = render(<SurahReader {...props} readerMode="mushaf" />);
     mocks.getReaderPosition.mockReturnValue(5);
-    rerender(<SurahReader {...props} readerMode="mushaf" />);
+    rerender(<SurahReader {...props} readerMode="translation" />);
 
     // The arrival is at opacity 0 for the length of the landing -- up to 2.5s
     // deep in a long surah. Handing it touches means a tap lands on a list
@@ -1658,9 +1860,10 @@ describe('SurahReader shared reading position', () => {
     expect(screen.getByTestId('reader-layer-0').getAttribute('data-pointer-events')).toBe('auto');
     expect(screen.getByTestId('reader-layer-1').getAttribute('data-pointer-events')).toBe('none');
 
-    const lists = screen.getAllByTestId('reader-list');
-    expect(lists[0]?.getAttribute('data-important-for-accessibility')).toBe('auto');
-    expect(lists[1]?.getAttribute('data-important-for-accessibility')).toBe('no-hide-descendants');
+    // The arriving list is the only one here, and it is the one that must stay
+    // out of TalkBack's swipe order until it is what the reader is looking at.
+    const list = screen.getByTestId('reader-list');
+    expect(list.getAttribute('data-important-for-accessibility')).toBe('no-hide-descendants');
   });
 
   it('re-lands on the ayah the word-by-word screen was left at', () => {
@@ -1796,7 +1999,10 @@ function readerData(ayahCount = 1) {
         text_uthmani: 'بسم الله',
         text_simple: 'بسم الله',
         juz: 1,
-        page: 1,
+        // Four ayahs to a page, so a test can ask for an ayah that is NOT on
+        // the surah's first page. With every ayah on page 1 the mushaf would
+        // open at the right page whether or not it read this column.
+        page: 106 + Math.floor(index / 4),
         audio_url: null,
       },
       translation: {

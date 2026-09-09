@@ -16,6 +16,7 @@ dependencies = [
   "click>=8.1.0",
   "lxml>=5.3.0",
   "defusedxml>=0.0.1",
+  "fonttools>=4.60.0",
 ]
 
 [project.optional-dependencies]
@@ -51,6 +52,11 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "transformers.*"
+ignore_missing_imports = true
+
+# fontTools ships no py.typed marker, so every import of it is untyped to mypy.
+[[tool.mypy.overrides]]
+module = "fontTools.*"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

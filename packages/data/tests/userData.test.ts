@@ -5,8 +5,11 @@ import {
   USER_DB_MIGRATIONS,
   USER_DB_SCHEMA,
   USER_DB_VERSION,
+  USER_PAGE_MAX,
+  USER_PAGE_MIN,
   countDistinctRootsViewed,
   getBookmarks,
+  getLastReadingPosition,
   getReadingDays,
   getRootViewsByDay,
   NOTE_MAX_LENGTH,
@@ -66,7 +69,7 @@ describe('user-data write validation', () => {
   it.each(badCoordinates)('rejects a reading position with %s', async (_label, surahId, ayahNumber) => {
     const { client, statements } = recordingClient();
 
-    await expect(recordReadingPosition(client, surahId, ayahNumber)).rejects.toThrow(RangeError);
+    await expect(recordReadingPosition(client, { surahId, ayahNumber })).rejects.toThrow(RangeError);
     expect(statements).toEqual([]);
   });
 
@@ -86,7 +89,7 @@ describe('user-data write validation', () => {
     // per-surah bound may still accept.
     await setBookmark(client, 1, 7, true);
     await setBookmark(client, 114, 6, false);
-    await recordReadingPosition(client, 2, 286);
+    await recordReadingPosition(client, { surahId: 2, ayahNumber: 286 });
 
     expect(statements).toHaveLength(3);
     expect(statements[0]).toContain('INSERT INTO bookmarks');
@@ -105,7 +108,7 @@ describe('user-data write validation', () => {
       let lastValid = 0;
       for (let ayahNumber = 1; ayahNumber <= 287; ayahNumber += 1) {
         try {
-          await recordReadingPosition(client, surahId, ayahNumber);
+          await recordReadingPosition(client, { surahId, ayahNumber });
           lastValid = ayahNumber;
         } catch {
           break;
@@ -549,5 +552,87 @@ describe('migration 3 — the note column', () => {
     expect(old.rows).toHaveLength(1);
 
     db.close();
+  });
+});
+
+describe('reading position by page', () => {
+  it('adds page as a nullable column without touching existing rows', async () => {
+    const db = memoryUserDb();
+    await db.executeMultiple(USER_DB_SCHEMA);
+    // A row exactly as a build from before M7c wrote it. The file is on the
+    // owner's phone and survives the update that adds the column.
+    await db.execute('INSERT INTO reading_history (id, surah_id, ayah_number) VALUES (1, 2, 5)');
+
+    await migrateUserDb(db);
+
+    expect(await getLastReadingPosition(db)).toEqual({ surahId: 2, ayahNumber: 5, page: null });
+
+    db.close();
+  });
+
+  it('records the page a turn landed on', async () => {
+    const db = memoryUserDb();
+    await db.executeMultiple(USER_DB_SCHEMA);
+    await migrateUserDb(db);
+
+    await recordReadingPosition(db, { surahId: 5, ayahNumber: 1, page: 106 });
+
+    expect(await getLastReadingPosition(db)).toEqual({ surahId: 5, ayahNumber: 1, page: 106 });
+
+    db.close();
+  });
+
+  it('records no page at all when the reader is not paging', async () => {
+    // Translation mode still scrolls by ayah. A null page is a real value --
+    // "recorded without one" -- not a missing write, and it must overwrite a
+    // page an earlier mushaf session left behind rather than leave it standing.
+    const db = memoryUserDb();
+    await db.executeMultiple(USER_DB_SCHEMA);
+    await migrateUserDb(db);
+    await recordReadingPosition(db, { surahId: 5, ayahNumber: 1, page: 106 });
+
+    await recordReadingPosition(db, { surahId: 2, ayahNumber: 30 });
+
+    expect(await getLastReadingPosition(db)).toEqual({ surahId: 2, ayahNumber: 30, page: null });
+
+    db.close();
+  });
+
+  it.each([
+    ['zero', 0],
+    ['past the last page', 605],
+    ['negative', -1],
+    ['fractional', 106.5],
+    ['NaN', Number.NaN],
+    ['Infinity', Number.POSITIVE_INFINITY],
+    ['a numeric string', '106'],
+  ])('rejects a page that is %s rather than storing it', async (_label, page) => {
+    // assertAyahCoordinate already guards the other two. A page arrives from a
+    // pager index, so it is derived rather than typed -- and this is the last
+    // boundary before a durable file on someone's phone.
+    const { client, statements } = recordingClient();
+
+    await expect(
+      recordReadingPosition(client, { surahId: 5, ayahNumber: 1, page: page as number }),
+    ).rejects.toThrow(RangeError);
+    expect(statements).toEqual([]);
+  });
+
+  it('accepts the first and last pages of the mushaf', async () => {
+    const { client, statements } = recordingClient();
+
+    await recordReadingPosition(client, { surahId: 1, ayahNumber: 1, page: USER_PAGE_MIN });
+    await recordReadingPosition(client, { surahId: 114, ayahNumber: 6, page: USER_PAGE_MAX });
+
+    expect(statements).toHaveLength(2);
+  });
+
+  it('bounds pages by the same range the corpus does', async () => {
+    // The bounds are restated here rather than imported: userData.ts is a leaf
+    // with no runtime imports (mobile-entry.test.ts enforces it), and the
+    // mushaf query lives behind one. This is the assertion that keeps the two
+    // copies honest.
+    const { MUSHAF_PAGE_MIN, MUSHAF_PAGE_MAX } = await import('../src/queries/mushaf.js');
+    expect([USER_PAGE_MIN, USER_PAGE_MAX]).toEqual([MUSHAF_PAGE_MIN, MUSHAF_PAGE_MAX]);
   });
 });

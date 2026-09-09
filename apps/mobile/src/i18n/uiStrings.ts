@@ -89,6 +89,7 @@ export type UiStringKey =
   | 'reader.chooseReciter'
   | 'reader.ayahLabel'
   | 'reader.chooseLanguage'
+  | 'reader.showTranslationLabel'
   | 'reader.bismillah'
   | 'reader.back'
   | 'reader.mode'
@@ -201,6 +202,8 @@ export type UiStringKey =
   | 'about.sourceUzbek'
   | 'about.sourceRussian'
   | 'about.sourceHafs'
+  | 'about.sourceMushafLayout'
+  | 'about.sourceMushafFont'
   | 'about.sourceAudio'
   | 'about.sourceCorpus'
   | 'about.sourceLane'
@@ -334,6 +337,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.chooseReciter': 'Choose reciter',
     'reader.ayahLabel': 'Ayah',
     'reader.chooseLanguage': 'Choose translation language',
+    'reader.showTranslationLabel': 'Translation',
     'reader.bismillah': 'In the name of Allah, the Entirely Merciful, the Especially Merciful',
     'reader.back': 'Back',
     'reader.mode': 'Reading mode',
@@ -413,6 +417,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceUzbek': 'The Uzbek translation the reader shows.',
     'about.sourceRussian': 'The Russian translation the reader shows.',
     'about.sourceHafs': 'The Arabic face the Quran text itself is set in.',
+    'about.sourceMushafLayout': 'Mushaf page and line layout, from the Quran.com v4 API (Quranic Universal Library). King Fahd Glorious Quran Printing Complex edition.',
+    'about.sourceMushafFont': 'The page fonts the mushaf pages are printed with, one per page. King Fahd Glorious Quran Printing Complex, via the Quranic Universal Library.',
     // Names the host, not a reciter: ten of them are selectable now, so a
     // single hard-coded name would be wrong for nine of the choices.
     'about.sourceAudio': 'Streamed per-ayah audio. The voice is chosen in Settings; every reciter the app can play is listed below.',
@@ -536,6 +542,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.chooseReciter': 'Qorini tanlang',
     'reader.ayahLabel': 'Oyat',
     'reader.chooseLanguage': 'Tarjima tilini tanlang',
+    'reader.showTranslationLabel': 'Tarjima',
     'reader.bismillah': 'Mehribon va rahmli Alloh nomi bilan',
     'reader.back': 'Orqaga',
     'reader.mode': 'O‘qish rejimi',
@@ -615,6 +622,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceUzbek': 'O‘quvchi ko‘rsatadigan o‘zbekcha tarjima.',
     'about.sourceRussian': 'O‘quvchi ko‘rsatadigan ruscha tarjima.',
     'about.sourceHafs': 'Qur’on matni shu arabcha shriftda teriladi.',
+    'about.sourceMushafLayout': 'Mushaf sahifa va satr joylashuvi, Quran.com v4 API (Quranic Universal Library) dan. Shoh Fahd Qur’on bosmaxonasi nashri.',
+    'about.sourceMushafFont': 'Mushaf sahifalari teriladigan shriftlar, har sahifaga bittadan. Shoh Fahd Qur’on bosmaxonasi, Quranic Universal Library orqali.',
     'about.sourceAudio': 'Har bir oyat uchun oqim orqali audio. Qori Sozlamalarda tanlanadi; ilova ijro eta oladigan barcha qorilar quyida.',
     'about.sourceCorpus': 'So‘zma-so‘z morfologiya va grammatika. GNU General Public License.',
     'about.sourceLane': 'O‘zak ta’riflari, qurandev/roots orqali. Jamoat mulki.',
@@ -733,6 +742,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.chooseReciter': 'Выберите чтеца',
     'reader.ayahLabel': 'Аят',
     'reader.chooseLanguage': 'Выберите язык перевода',
+    'reader.showTranslationLabel': 'Перевод',
     'reader.bismillah': 'Именем Аллаха, Милостивого, Милосердного',
     'reader.back': 'Назад',
     'reader.mode': 'Режим чтения',
@@ -813,6 +823,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceUzbek': 'Узбекский перевод, который показывает читалка.',
     'about.sourceRussian': 'Русский перевод, который показывает читалка.',
     'about.sourceHafs': 'Арабский шрифт, которым набран сам текст Корана.',
+    'about.sourceMushafLayout': 'Разметка страниц и строк мусхафа, из Quran.com v4 API (Quranic Universal Library). Издание Комплекса имени короля Фахда.',
+    'about.sourceMushafFont': 'Постраничные шрифты, которыми набраны страницы мусхафа, по одному на страницу. Комплекс имени короля Фахда, через Quranic Universal Library.',
     'about.sourceAudio': 'Потоковое аудио по аятам. Чтец выбирается в настройках; ниже перечислены все, кого приложение может воспроизвести.',
     'about.sourceCorpus': 'Пословная морфология и грамматика. GNU General Public License.',
     'about.sourceLane': 'Определения корней, через qurandev/roots. Общественное достояние.',

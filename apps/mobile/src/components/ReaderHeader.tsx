@@ -31,6 +31,11 @@ export interface ReaderHeaderProps {
   onChangeMode: (mode: ReaderMode) => void;
   onOpenWbw: () => void;
   onOpenLanguage: () => void;
+  /** Whether the cards draw their translation. Its control, and the language
+   *  picker beside it, are translation mode's alone: the printed page has no
+   *  translation to switch (ruling 4). */
+  showTranslation?: boolean;
+  onChangeShowTranslation?: (show: boolean) => void;
   onOpenSearch: () => void;
   onBack: () => void;
   uiLocale: UiLocaleCode;
@@ -66,6 +71,8 @@ export function ReaderHeader({
   onChangeMode,
   onOpenWbw,
   onOpenLanguage,
+  showTranslation = true,
+  onChangeShowTranslation,
   onOpenSearch,
   onBack,
   uiLocale,
@@ -148,20 +155,43 @@ export function ReaderHeader({
               backdrop, so leaving it mounted holds the ayah list at
               no-hide-descendants behind whatever opens next. */}
           <SearchHeaderButton uiLocale={uiLocale} onPress={onOpenSearch} />
-          <Pressable
-            testID="open-language"
-            accessibilityRole="button"
-            accessibilityLabel={t(uiLocale, 'reader.chooseLanguage')}
-            onPress={onOpenLanguage}
-            style={{
-              minHeight: touchTargets.minimum,
-              minWidth: touchTargets.minimum,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Icon name="translate" color={theme.accent} />
-          </Pressable>
+          {/* Both are translation mode's. In mushaf mode neither has anything
+              to act on, and a control that does nothing is worse than none. */}
+          {mode === 'translation' && onChangeShowTranslation ? (
+            <Pressable
+              testID="toggle-translation"
+              accessibilityRole="switch"
+              // The state, not just the label: the glyph's colour is the only
+              // other difference, and colour alone is not an announcement.
+              accessibilityState={{ checked: showTranslation }}
+              accessibilityLabel={t(uiLocale, 'reader.showTranslationLabel')}
+              onPress={() => onChangeShowTranslation(!showTranslation)}
+              style={{
+                minHeight: touchTargets.minimum,
+                minWidth: touchTargets.minimum,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Icon name="translationText" color={showTranslation ? theme.accent : theme.mutedText} />
+            </Pressable>
+          ) : null}
+          {mode === 'translation' && showTranslation ? (
+            <Pressable
+              testID="open-language"
+              accessibilityRole="button"
+              accessibilityLabel={t(uiLocale, 'reader.chooseLanguage')}
+              onPress={onOpenLanguage}
+              style={{
+                minHeight: touchTargets.minimum,
+                minWidth: touchTargets.minimum,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Icon name="translate" color={theme.accent} />
+            </Pressable>
+          ) : null}
         </View>
         <SegmentedControl
           options={options}

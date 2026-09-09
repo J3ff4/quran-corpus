@@ -33,6 +33,11 @@ interface HostProps {
   // every render. `pointerEvents` is destructured too, but mapped rather than
   // dropped -- see below.
   accessible?: unknown;
+  // iOS's half of the hide-from-screen-readers pair, alongside Android's
+  // importantForAccessibility. Dropped rather than mapped: React lowercases it
+  // into an unknown DOM attribute, and the Android prop below is the one a
+  // test can assert on.
+  accessibilityElementsHidden?: unknown;
   contentContainerStyle?: unknown;
   // Reanimated's layout-animation builders, on an Animated.View. Nothing in
   // jsdom can run one, and spread onto a DOM node React warns about all three
@@ -240,6 +245,7 @@ export function host(tag: string) {
     style,
     testID,
     accessible: _accessible,
+    accessibilityElementsHidden: _accessibilityElementsHidden,
     contentContainerStyle: _contentContainerStyle,
     entering: _entering,
     exiting: _exiting,
@@ -326,12 +332,30 @@ export function host(tag: string) {
  *  contiguous blocks yields alternating Meccan/Medinan ones), and keying by it
  *  would swallow that as a duplicate-key warning instead of rendering it.
  */
-export function FlatList({
-  data,
-  renderItem,
-  keyExtractor,
-  testID,
-}: {
+/** The prop bag of every rendered mock list, by its host node.
+ *
+ *  A `FlatList` carries a dozen props that render nothing -- `inverted`,
+ *  `pagingEnabled`, `getItemLayout`, `onMomentumScrollEnd`, `windowSize` --
+ *  and every one of them is load-bearing on device. Destructuring only the
+ *  props the mock draws with silently drops the rest, and an assertion on a
+ *  dropped prop passes whether or not the component sets it. Same shape as
+ *  `accessible` collapsing its children: a prop the mock eats is a prop no
+ *  unit test can defend.
+ *
+ *  So the whole bag is kept, and `listPropsOf` reads it back.
+ */
+const listProps = new WeakMap<object, ListHostProps>();
+
+/** One imperative scroll a component asked its list for. */
+export interface ScrollCall {
+  index?: number;
+  offset?: number;
+  animated?: boolean;
+}
+
+const listScrolls = new WeakMap<object, ScrollCall[]>();
+
+interface ListHostProps {
   data?: readonly unknown[];
   renderItem: (info: { item: unknown; index: number }) => React.ReactNode;
   keyExtractor?: (item: unknown, index: number) => string;
@@ -340,10 +364,83 @@ export function FlatList({
   // how rows past the first screenful became unreachable on device -- and it
   // is not observable from the rows themselves.
   testID?: string;
-}) {
+  // Typed rather than left to the index signature: these are the props the
+  // mushaf pager is entirely made of, and `unknown` is not callable, so a
+  // suite could not assert on them at all.
+  getItemLayout?: (data: unknown, index: number) => { length: number; offset: number; index: number };
+  onMomentumScrollEnd?: (event: { nativeEvent: { contentOffset: { x: number; y: number } } }) => void;
+  [prop: string]: unknown;
+}
+
+/** Every prop the component handed its list, including the ones that draw
+ *  nothing. Throws rather than guessing when a render holds no list or more
+ *  than one -- both mean the assertion about to run is not the one intended. */
+export function listPropsOf(result: {
+  // Structural, not `Element`: this file is compiled without the DOM lib (the
+  // app it mocks has no DOM), and the only thing needed off the container is
+  // the query.
+  container: { querySelectorAll(selector: string): ArrayLike<object> };
+}): ListHostProps {
+  const nodes = result.container.querySelectorAll('[data-rn-list]');
+  if (nodes.length !== 1) {
+    throw new Error(`listPropsOf: expected exactly one list in the render, found ${nodes.length}`);
+  }
+  const props = listProps.get(nodes[0]!);
+  if (!props) throw new Error('listPropsOf: the list node carries no recorded props');
+  return props;
+}
+
+/** The imperative scrolls the component asked its list for, oldest first.
+ *  Same contract as listPropsOf: exactly one list in the render. */
+export function listScrollsOf(result: {
+  container: { querySelectorAll(selector: string): ArrayLike<object> };
+}): ScrollCall[] {
+  const nodes = result.container.querySelectorAll('[data-rn-list]');
+  if (nodes.length !== 1) {
+    throw new Error(`listScrollsOf: expected exactly one list in the render, found ${nodes.length}`);
+  }
+  return listScrolls.get(nodes[0]!) ?? [];
+}
+
+/** FlatList and SectionList, rendered eagerly and in full.
+ *
+ *  The real ones virtualize, which in jsdom means measuring a viewport that has
+ *  no height and rendering nothing -- every assertion then fails on an empty
+ *  list rather than on the component. Rendering everything is the point: a
+ *  suite asserting on the 604th row wants the 604th row.
+ *
+ *  `keyExtractor` is honoured rather than ignored so a duplicate-key bug still
+ *  surfaces as a React warning, and section headers render through the same
+ *  path the device uses. Sections themselves key by index, not by title: two
+ *  sections may legitimately share a title (a chronology that stops being two
+ *  contiguous blocks yields alternating Meccan/Medinan ones), and keying by it
+ *  would swallow that as a duplicate-key warning instead of rendering it.
+ */
+export function FlatList(props: ListHostProps) {
+  const { data, renderItem, keyExtractor, testID } = props;
+  // The imperative half of a list, kept for the same reason the prop bag is:
+  // a component that jumps the list -- the mushaf pager turning to the ayah
+  // being recited -- does it through the ref, and a mock that swallows the ref
+  // makes every assertion about that jump pass whether or not it happens.
+  const calls = React.useRef<ScrollCall[]>([]).current;
+  const handle = React.useRef({
+    scrollToIndex: (params: ScrollCall) => calls.push(params),
+    scrollToOffset: (params: ScrollCall) => calls.push(params),
+  }).current;
+  React.useImperativeHandle(props['ref'] as React.Ref<unknown>, () => handle);
+
   return React.createElement(
     'div',
-    { 'data-testid': testID },
+    {
+      'data-testid': testID,
+      'data-rn-list': '',
+      ref: (node: object | null) => {
+        if (node) {
+          listProps.set(node, props);
+          listScrolls.set(node, calls);
+        }
+      },
+    },
     (data ?? []).map((item, index) =>
       React.createElement('div', { key: keyExtractor?.(item, index) ?? index }, renderItem({ item, index })),
     ),

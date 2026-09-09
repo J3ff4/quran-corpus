@@ -1,6 +1,12 @@
+import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import type { CorpusDbFileSystem } from './openCorpusDb';
-import { corpusDbFileName, ensureCorpusDbFile, stagingSuffix } from './openCorpusDb';
+import {
+  corpusDbFileName,
+  corpusDbVersion,
+  ensureCorpusDbFile,
+  stagingSuffix,
+} from './openCorpusDb';
 
 const sqliteDir = 'file:///docs/SQLite';
 const targetPath = `${sqliteDir}/${corpusDbFileName}`;
@@ -41,14 +47,21 @@ function createFileSystem(initialFiles: Record<string, string>) {
       files.set(to, files.get(from) ?? 'missing');
       files.delete(from);
     }),
+    readDirectoryAsync: vi.fn(async (uri: string) => {
+      calls.push('readDirectory');
+      const prefix = `${uri}/`;
+      return [...files.keys()]
+        .filter((path) => path.startsWith(prefix))
+        .map((path) => path.slice(prefix.length));
+    }),
   };
 
   return { fileSystem, calls, files };
 }
 
 describe('openCorpusDb constants', () => {
-  it('uses a stable local filename', () => {
-    expect(corpusDbFileName).toBe('quran-corpus-m1.db');
+  it('carries the corpus version in the local filename', () => {
+    expect(corpusDbFileName).toBe(`quran-corpus-${corpusDbVersion}.db`);
   });
 });
 
@@ -63,7 +76,14 @@ describe('ensureCorpusDbFile', () => {
     // Order is the whole point: the copy must land on a scratch name and only
     // become targetPath via the rename, so a kill mid-copy cannot leave a
     // truncated file that later launches mistake for a complete database.
-    expect(calls).toEqual(['makeDirectory', 'getInfo', 'delete', 'copy', 'move']);
+    expect(calls).toEqual([
+      'makeDirectory',
+      'getInfo',
+      'readDirectory',
+      'delete',
+      'copy',
+      'move',
+    ]);
     expect(fileSystem.copyAsync).toHaveBeenCalledWith({ from: assetUri, to: stagingPath });
     expect(fileSystem.moveAsync).toHaveBeenCalledWith({ from: stagingPath, to: targetPath });
     expect(files.get(targetPath)).toBe('fresh');
@@ -107,5 +127,67 @@ describe('ensureCorpusDbFile', () => {
       'Bundled corpus DB asset did not resolve to a local URI',
     );
     expect(fileSystem.moveAsync).not.toHaveBeenCalled();
+  });
+});
+
+describe('font assets', () => {
+  // A WOFF2 handed to expo-font resolves and then silently does nothing on
+  // Android (M7a §4). This is a repo-level invariant, not a rendering test:
+  // no test can observe the fallback, which is the whole problem.
+  it('ships no .woff2 font', () => {
+    expect(readdirSync('assets/fonts').filter((f) => f.endsWith('.woff2'))).toEqual([]);
+  });
+
+  it('loads Hafs from a .ttf', () => {
+    const src = readFileSync('src/data/openCorpusDb.ts', 'utf8');
+    expect(src).toMatch(/Hafs: require\('\.\.\/\.\.\/assets\/fonts\/hafs\.ttf'\)/);
+    expect(src).not.toMatch(/\.woff2'\)/);
+  });
+});
+
+describe('a rebuilt corpus reaching a device that already ran the app', () => {
+  // Measured on device 2026-09-08: M7b bundled `mushaf_layout` correctly and
+  // the installed app still answered `no such table: mushaf_layout`, because
+  // the extract returns early on any existing file. The version in the name is
+  // what makes a new corpus a different file rather than the same one.
+  it('extracts the new version even though an older extract is present', async () => {
+    const stale = `${sqliteDir}/quran-corpus-m1.db`;
+    const { fileSystem, files } = createFileSystem({ [stale]: 'old corpus' });
+
+    const result = await ensureCorpusDbFile(fileSystem, sqliteDir, async () => assetUri);
+
+    expect(result).toBe(targetPath);
+    expect(files.get(targetPath)).toBe('fresh');
+  });
+
+  it('deletes the older extract rather than leaving 134MB behind', async () => {
+    const stale = `${sqliteDir}/quran-corpus-m1.db`;
+    const { fileSystem, files } = createFileSystem({ [stale]: 'old corpus' });
+
+    await ensureCorpusDbFile(fileSystem, sqliteDir, async () => assetUri);
+
+    expect(files.has(stale)).toBe(false);
+  });
+
+  it('never touches the user DB in the same directory', async () => {
+    const userDb = `${sqliteDir}/quran-user.db`;
+    const { fileSystem, files } = createFileSystem({
+      [userDb]: 'bookmarks and notes',
+      [`${sqliteDir}/quran-corpus-m1.db`]: 'old corpus',
+    });
+
+    await ensureCorpusDbFile(fileSystem, sqliteDir, async () => assetUri);
+
+    expect(files.get(userDb)).toBe('bookmarks and notes');
+  });
+
+  it('still skips the copy when the current version is already extracted', async () => {
+    const { fileSystem } = createFileSystem({ [targetPath]: 'current' });
+    const resolveAssetUri = vi.fn(async () => assetUri);
+
+    await ensureCorpusDbFile(fileSystem, sqliteDir, resolveAssetUri);
+
+    expect(resolveAssetUri).not.toHaveBeenCalled();
+    expect(fileSystem.copyAsync).not.toHaveBeenCalled();
   });
 });

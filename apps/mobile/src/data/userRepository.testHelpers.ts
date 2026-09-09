@@ -15,6 +15,7 @@ type BookmarkRow = {
 type HistoryRow = {
   surah_id: number;
   ayah_number: number;
+  page: number | null;
 };
 
 export function createMemoryUserClient(): MobileDataClient {
@@ -67,8 +68,15 @@ export function createMemoryUserClient(): MobileDataClient {
       }
 
       if (sql.startsWith('INSERT INTO reading_history')) {
-        const [surahId, ayahNumber] = args as SqlValue[];
-        history = { surah_id: Number(surahId), ayah_number: Number(ayahNumber) };
+        const [surahId, ayahNumber, page] = args as SqlValue[];
+        history = {
+          surah_id: Number(surahId),
+          ayah_number: Number(ayahNumber),
+          // Overwritten every time, null included: the real statement writes
+          // `page = excluded.page` rather than coalescing, so a scrolled
+          // position clears the page a mushaf session left behind.
+          page: page == null ? null : Number(page),
+        };
         return { rows: [] };
       }
 

@@ -23,6 +23,25 @@ pnpm build
 pnpm android
 ```
 
+### Mushaf page fonts
+
+The 604 KFGQPC V2 page fonts are ~180MB and are **not in git**. A mobile build
+needs them present or Metro fails to resolve `assets/fonts/mushaf/p001.ttf`:
+
+```bash
+cd packages/scraper && uv run scraper mushaf-fonts \
+  --db ../../apps/web/quran.db \
+  --cache ~/quran-data/refdata/mushaf/fonts/v2/ttf
+```
+
+The first run downloads them (~200MB); later runs re-subset from the cache. The
+subset is driven by `mushaf_layout`, so import the page layout first:
+
+```bash
+cd packages/scraper && uv run scraper mushaf-fetch --dest ~/quran-data/refdata/mushaf/pages
+uv run scraper import-mushaf ~/quran-data/refdata/mushaf/pages --db ../../apps/web/quran.db
+```
+
 ## M1 Android Smoke Test
 
 1. Run `pnpm install`.

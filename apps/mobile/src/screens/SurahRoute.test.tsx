@@ -605,7 +605,13 @@ describe('SurahRoute', () => {
     fireEvent.click(screen.getByText('read ayah'));
 
     await waitFor(() => expect(mocks.recordReadingDay).toHaveBeenCalled());
-    expect(mocks.recordReadingPosition).toHaveBeenCalledWith({}, 2, 256);
+    expect(mocks.recordReadingPosition).toHaveBeenCalledWith({}, {
+      surahId: 2,
+      ayahNumber: 256,
+      // Null, not absent: the translation list scrolls by ayah, and a null page
+      // clears whatever page a mushaf session left in the row.
+      page: null,
+    });
     expect(screen.queryByText('Unable to save reading position')).toBeNull();
   });
 

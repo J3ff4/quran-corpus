@@ -244,4 +244,45 @@ describe('AyahCard', () => {
 
     expect(screen.getByText('Arabic text')).toBeTruthy();
   });
+
+  it('renders no translation block when the reader has switched it off', () => {
+    const { container } = render(
+      <AyahCard
+        {...baseProps}
+        ayahNumber={1}
+        arabicText="Arabic text"
+        translationText="In the name of God"
+        showTranslation={false}
+        bookmarked={false}
+        playing={false}
+        uiLocale="en"
+        onToggleBookmark={vi.fn()}
+        onToggleAudio={vi.fn()}
+      />,
+    );
+
+    expect(container.textContent).not.toContain('In the name of God');
+    // The Arabic is the point of the card; only the translation goes.
+    expect(screen.getByText('Arabic text')).toBeTruthy();
+  });
+
+  it('draws the translation by default, so a caller that knows nothing of the switch still shows it', () => {
+    // Optional prop: every existing call site predates the setting, and a
+    // default of false would have emptied the reader with no code changing.
+    render(
+      <AyahCard
+        {...baseProps}
+        ayahNumber={1}
+        arabicText="Arabic text"
+        translationText="In the name of God"
+        bookmarked={false}
+        playing={false}
+        uiLocale="en"
+        onToggleBookmark={vi.fn()}
+        onToggleAudio={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('In the name of God')).toBeTruthy();
+  });
 });

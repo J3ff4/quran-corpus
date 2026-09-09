@@ -92,7 +92,26 @@ export const USER_DB_MIGRATIONS: readonly { version: number; statements: readonl
     // migrateUserDb must never be made to swallow an error.
     statements: ['ALTER TABLE bookmarks ADD COLUMN note TEXT'],
   },
+  {
+    version: 4,
+    // The page the reader last turned to. Nullable because every install that
+    // exists today has a row without one: a null page means "recorded before
+    // the paged mushaf", and the Continue card falls back to the ayah exactly
+    // as it does now. surah_id and ayah_number stay and stay written -- the
+    // Continue card, bookmarks and the WBW screen all read them.
+    statements: ['ALTER TABLE reading_history ADD COLUMN page INTEGER'],
+  },
 ];
+
+/** The mushaf's page range, restated.
+ *
+ *  Not imported from `queries/mushaf.ts`: this module is a leaf with no runtime
+ *  imports at all (mobile-entry.test.ts enforces that, so that the user-DB
+ *  entry adds nothing to the Metro graph), and that query file is behind one.
+ *  `tests/userData.test.ts` asserts the two copies agree, which is the part
+ *  that would otherwise drift. */
+export const USER_PAGE_MIN = 1;
+export const USER_PAGE_MAX = 604;
 
 /** The version a file is at once every migration above has been applied. */
 export const USER_DB_VERSION = USER_DB_MIGRATIONS.length + 1;
@@ -208,6 +227,10 @@ export interface Bookmark {
 export interface ReadingPosition {
   surahId: number;
   ayahNumber: number;
+  /** The mushaf page, or null when the position was recorded without one --
+   *  either by a build older than the paged mushaf, or from translation mode,
+   *  which still scrolls by ayah. */
+  page: number | null;
 }
 
 export async function setBookmark(
@@ -322,36 +345,66 @@ export async function getBookmarks(client: QueryClient): Promise<Bookmark[]> {
   }));
 }
 
+/**
+ * Where the reader was, as one record rather than three positional numbers.
+ *
+ * An object because all three fields are numbers: a positional `page` would sit
+ * next to `ayahNumber` with nothing but argument order telling them apart, and
+ * a swapped pair stores cleanly and opens the wrong place.
+ */
+export interface ReadingPositionInput {
+  surahId: number;
+  ayahNumber: number;
+  /** Omitted or null when the reader is not paging. */
+  page?: number | null;
+}
+
 export async function recordReadingPosition(
   client: QueryClient,
-  surahId: number,
-  ayahNumber: number,
+  { surahId, ayahNumber, page = null }: ReadingPositionInput,
 ): Promise<void> {
   assertAyahCoordinate(surahId, ayahNumber);
+  // A page is derived from a pager index rather than typed by anyone, so
+  // nothing upstream has range-checked it -- and INTEGER accepts every wrong
+  // value there is. This is the last boundary before a file that survives app
+  // updates.
+  if (page !== null && (!Number.isInteger(page) || page < USER_PAGE_MIN || page > USER_PAGE_MAX)) {
+    throw new RangeError(
+      `page must be an integer in ${USER_PAGE_MIN}..${USER_PAGE_MAX} or null, got ${String(page)}`,
+    );
+  }
 
   await client.execute({
-    sql: `INSERT INTO reading_history (id, surah_id, ayah_number, updated_at)
-          VALUES (1, ?, ?, CURRENT_TIMESTAMP)
+    sql: `INSERT INTO reading_history (id, surah_id, ayah_number, page, updated_at)
+          VALUES (1, ?, ?, ?, CURRENT_TIMESTAMP)
           ON CONFLICT(id) DO UPDATE SET
             surah_id = excluded.surah_id,
             ayah_number = excluded.ayah_number,
+            -- Written unconditionally, including as null: leaving the old page
+            -- standing would pair a fresh ayah with the page of whatever the
+            -- reader was on before, which is a plausible-looking wrong place.
+            page = excluded.page,
             updated_at = CURRENT_TIMESTAMP`,
-    args: [surahId, ayahNumber],
+    args: [surahId, ayahNumber, page],
   });
 }
 
 export async function getLastReadingPosition(client: QueryClient): Promise<ReadingPosition | null> {
   const result = await client.execute(`
-    SELECT surah_id, ayah_number
+    SELECT surah_id, ayah_number, page
     FROM reading_history
     WHERE id = 1
   `);
   const row = result.rows[0];
   if (!row) return null;
 
+  const page = row.page;
   return {
     surahId: Number(row.surah_id),
     ayahNumber: Number(row.ayah_number),
+    // Not `Number(page) || null`: page 0 does not exist, but the coercion would
+    // also turn a genuine null into NaN before the fallback ever ran.
+    page: page === null || page === undefined ? null : Number(page),
   };
 }
 

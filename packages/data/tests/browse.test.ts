@@ -15,6 +15,8 @@ let db: Client;
 //   juz 2 : 2:6 2:7 2:8               (page 3)
 //   juz 3 : 2:9 | 3:1 3:2             (page 4)  <- crosses a surah boundary
 //   (3:3 has no juz and no page at all)
+//   3:4 has a page (5) but no juz -- a page whose opening ayah carries none,
+//   which is the only way PageEntry.juz can come back null.
 //
 // Surah 1's ayahs carry ids 20-22, above every other row: that is what a
 // delete-and-re-import of one surah leaves behind, since ayahs.id is
@@ -38,7 +40,7 @@ beforeAll(async () => {
     sql: `INSERT INTO surahs (id, name_arabic, name_translit, name_translation, revelation_type, ayah_count, order_number)
           VALUES (1, 'الفاتحة', 'Al-Fatihah', 'The Opening', 'meccan', 3, 2),
                  (2, 'البقرة', 'Al-Baqarah', 'The Cow', 'medinan', 9, 3),
-                 (3, 'آل عمران', 'Aal-Imran', 'Family of Imran', 'medinan', 3, 1)`,
+                 (3, 'آل عمران', 'Aal-Imran', 'Family of Imran', 'medinan', 4, 1)`,
     args: [],
   });
   // Explicit ids, deliberately NOT ascending in mushaf order -- see the header.
@@ -55,6 +57,7 @@ beforeAll(async () => {
     [10, 3, 1, 3, 4],
     [11, 3, 2, 3, 4],
     [12, 3, 3, null, null],
+    [13, 3, 4, null, 5],
   ];
   for (const [id, surahId, ayahNumber, juz, page] of ayahs) {
     await db.execute({
@@ -140,7 +143,7 @@ describe('getPageIndex', () => {
   it('returns every page in order, each with the ayah it opens on', async () => {
     const rows = await getPageIndex(db);
 
-    expect(rows.map((r) => r.page)).toEqual([1, 2, 3, 4]);
+    expect(rows.map((r) => r.page)).toEqual([1, 2, 3, 4, 5]);
     expect(rows[0]).toMatchObject({ page: 1, startSurahId: 1, startAyahNumber: 1 });
     // 1:3, not 2:1: surah 1 holds the higher ids here, so a MIN(id) start would
     // skip past the three ayahs the page actually opens with.
@@ -153,11 +156,20 @@ describe('getPageIndex', () => {
     expect(rows[3]).toMatchObject({ page: 4, startSurahId: 2, startAyahNumber: 9, surahName: 'Al-Baqarah' });
   });
 
+  it('carries the juz the page opens in, for the mushaf page footer', async () => {
+    const rows = await getPageIndex(db);
+
+    // Page 4 straddles the 2:9 / 3:1 boundary but sits wholly in juz 3; page 2
+    // opens in juz 1 and runs into juz 1's own pages, so a query reading the
+    // juz off any ayah but the first would answer differently for it.
+    expect(rows.map((r) => r.juz)).toEqual([1, 1, 2, 3, null]);
+  });
+
   it('ignores ayahs with no page rather than reporting a null one', async () => {
     const rows = await getPageIndex(db);
 
     expect(rows.every((r) => Number.isInteger(r.page))).toBe(true);
-    expect(rows).toHaveLength(4);
+    expect(rows).toHaveLength(5);
   });
 });
 

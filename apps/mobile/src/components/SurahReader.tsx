@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -22,18 +22,22 @@ import Animated, {
 } from 'react-native-reanimated';
 import { router, useFocusEffect, useNavigation } from 'expo-router';
 import { reciterById, splitBasmala, type Word } from '@quran-corpus/data/mobile';
+import type { MobileDataClient } from '@quran-corpus/mobile-data';
 import type { ReaderAyah, SurahReaderData, WordSummary } from '@/data/corpusRepository';
 import { getReaderPosition, setReaderPosition } from '@/data/readerPosition';
 import type { ContentLanguageCode, UiLocaleCode } from '@/i18n/languages';
 import type { ReaderMode } from '@/settings/settingsStore';
 
 import { AyahCard } from './AyahCard';
-import { MushafAyah } from './MushafAyah';
+import { MushafReader } from './mushaf/MushafReader';
+import { useMushafIndex } from '@/mushaf/mushafReaderData';
+import { ayahKey } from '@/mushaf/highlights';
 import { RecitationBar, type RecitationBarProps } from './RecitationBar';
 import { ReaderHeader } from './ReaderHeader';
 import { Bismillah } from './Bismillah';
 import { LanguageSheet } from './LanguageSheet';
 import { ReciterSheet } from './ReciterSheet';
+import { AyahControls } from './AyahControls';
 import { WordSheet } from './WordSheet';
 import { GlassSurface } from './GlassSurface';
 import { estimateRowHeight } from './rowHeightModel';
@@ -83,6 +87,10 @@ interface SurahReaderProps {
    *  renders a reader. */
   readerMode: ReaderMode;
   onChangeReaderMode: (mode: ReaderMode) => void;
+  /** Whether the cards draw their translation. Owned by the screen above for
+   *  the same reason readerMode is: it is a persisted setting. */
+  showTranslation?: boolean;
+  onChangeShowTranslation?: (show: boolean) => void;
   /** Ayah to open at, from a bookmark or the saved reading position. */
   initialAyahNumber?: number | null;
   /** Omitted leaves the reader as a plain mushaf: every ayah renders its full
@@ -93,6 +101,14 @@ interface SurahReaderProps {
   onEditNote?: (ayahNumber: number) => void;
   onToggleAudio: (ayahNumber: number) => void;
   onReadingAyah?: (ayahNumber: number) => void;
+  /** A mushaf page turn. Carries its own surah and ayah -- the page the reader
+   *  turned to need not belong to the surah the route named (ruling 10), so
+   *  the caller must not pair this page with the screen's surah. */
+  onReadingPage?: (position: { surahId: number; ayahNumber: number; page: number }) => void;
+  /** The open corpus database, for the mushaf's page index and the ayah rows
+   *  of surahs the reader was not opened on. Null renders the reader with no
+   *  mushaf pages, which is what a test that never opens a database wants. */
+  corpusClient?: MobileDataClient | null;
   /** Forwarded to the header's surah chevrons. Omitted draws none. */
   prevSurahId?: number | null;
   nextSurahId?: number | null;
@@ -187,21 +203,13 @@ const MODE_FADE_MS = 160;
  *  behind. */
 const RESTING_LAYER = { flex: 1, opacity: 1 } as const;
 
-/** The single plate mushaf mode's rows flow across. */
-function MushafPlate({ children }: { children: ReactNode }) {
+/** The surah's opening block. Its own glass, like the cards below it: since
+ *  M7c the mushaf is a pager rather than a list, so nothing here is ever the
+ *  single-plate rendering the mushaf used to be. */
+function SurahPlate({ children }: { children: ReactNode }) {
   return (
-    <GlassSurface style={{ flex: 1, marginHorizontal: 12, marginBottom: 8, paddingTop: 4 }}>
-      {children}
-    </GlassSurface>
+    <GlassSurface style={{ padding: 20, gap: 6, alignItems: 'center' }}>{children}</GlassSurface>
   );
-}
-
-/** The surah's opening block: its own glass in translation mode, bare in
- *  mushaf mode, where the whole list is already one plate. */
-function SurahPlate({ mushaf, children }: { mushaf: boolean; children: ReactNode }) {
-  const style = { padding: 20, gap: 6, alignItems: 'center' as const };
-  if (mushaf) return <View style={style}>{children}</View>;
-  return <GlassSurface style={style}>{children}</GlassSurface>;
 }
 
 // Shared instance: a fresh `[]` per render would change AyahText's memo key
@@ -210,10 +218,6 @@ const EMPTY_WORDS: Word[] = [];
 
 interface AyahListProps {
   data: SurahReaderData;
-  /** Which rendering this layer draws. A layer is one mode for its whole life:
-   *  switching modes mounts a second layer rather than re-rendering this one,
-   *  so nothing here ever has to survive a mode change. */
-  mode: ReaderMode;
   /** The ayah to land on, captured when the layer mounts. */
   seedAyah: number | null;
   /** Whether this is the layer the reader is looking at. Only the live layer
@@ -232,6 +236,7 @@ interface AyahListProps {
   notesByAyah?: Map<number, string | null>;
   playingAyah: number | null;
   audioEnabled: boolean;
+  showTranslation: boolean;
   uiLocale: UiLocaleCode;
   wordsByAyah: Map<number, Word[]>;
   /** An ayah has come into view; the caller may want its words. Held in a ref
@@ -268,7 +273,6 @@ interface AyahListProps {
  */
 function AyahList({
   data,
-  mode,
   seedAyah,
   live,
   onLanded,
@@ -277,6 +281,7 @@ function AyahList({
   notesByAyah,
   playingAyah,
   audioEnabled,
+  showTranslation,
   uiLocale,
   wordsByAyah,
   onVisibleAyah,
@@ -361,7 +366,9 @@ function AyahList({
       // compiler cannot know that.
       if (!item) continue;
       const height = estimateRowHeight({
-        mode,
+        // A layer of this component is always translation mode now: the mushaf
+        // is a pager, and its pages are a fixed height that no model estimates.
+        mode: 'translation',
         arabicSize: arabicSizes.reader,
         listWidth,
         arabicChars: item.ayah.text_uthmani?.length ?? 0,
@@ -372,7 +379,7 @@ function AyahList({
       running += height;
     }
     return { lengths, offsets };
-  }, [data.ayahs, mode, arabicSizes.reader, listWidth, headerOffset]);
+  }, [data.ayahs, arabicSizes.reader, listWidth, headerOffset]);
 
   const getItemLayout = useCallback(
     (_: unknown, index: number) => ({
@@ -660,14 +667,8 @@ function AyahList({
     }
   });
 
-  // Mushaf mode reads as one page, so the whole list sits on a single glass
-  // plate (mockup 1e). Translation mode's cards are each their own surface, so
-  // a plate under them would be glass on glass.
-  const Plate = mode === 'mushaf' ? MushafPlate : Fragment;
-
   return (
     <View style={{ flex: 1 }}>
-      <Plate>
       <FlatList
         ref={listRef}
         data={data.ayahs}
@@ -683,7 +684,7 @@ function AyahList({
             {/* The surah opens on a plate (mockups 1e/1j): the Arabic name
                 leads, the Latin names sit under it in the display serif, and
                 the count and revelation type are a muted caption. */}
-            <SurahPlate mushaf={mode === 'mushaf'}>
+            <SurahPlate>
               <Text
                 style={{
                   color: theme.text,
@@ -714,11 +715,6 @@ function AyahList({
           </View>
         }
         renderItem={({ item }) => {
-          // Two renderers, one list. Everything the list does around them --
-          // the landing sequence, viewability tracking, the sheets, the retry
-          // loop -- is mode-blind, and both renderers expose the same testIDs
-          // and the same word tap targets, so nothing below this line has to
-          // know which one is mounted.
           const shared = {
             surahId: data.surah.id,
             ayahNumber: item.ayah.ayah_number,
@@ -737,10 +733,12 @@ function AyahList({
             onToggleAudio,
             onWordPress,
           };
-          return mode === 'mushaf' ? (
-            <MushafAyah {...shared} />
-          ) : (
-            <AyahCard {...shared} translationText={item.translation?.text ?? null} />
+          return (
+            <AyahCard
+              {...shared}
+              translationText={item.translation?.text ?? null}
+              showTranslation={showTranslation}
+            />
           );
         }}
         CellRendererComponent={CellRenderer}
@@ -774,7 +772,6 @@ function AyahList({
           paddingBottom: listBottomPadding + (barDocked ? RECITATION_BAR_CLEARANCE : 0),
         }}
       />
-      </Plate>
       {/* Over the list rather than instead of it: the list has to be mounted
           and laid out for the scroll to have anything to land on. Opacity, not
           a conditional render, for the same reason. */}
@@ -811,6 +808,8 @@ export function SurahReader({
   onChangeContentLanguage,
   readerMode,
   onChangeReaderMode,
+  showTranslation = true,
+  onChangeShowTranslation,
   initialAyahNumber,
   loadWords,
   loadWordSummary,
@@ -818,6 +817,8 @@ export function SurahReader({
   onEditNote,
   onToggleAudio,
   onReadingAyah,
+  onReadingPage,
+  corpusClient = null,
   // Defaulted rather than forwarded as undefined: exactOptionalPropertyTypes
   // rejects an explicit undefined for an optional prop, and null is what the
   // header already reads as "no surah that way".
@@ -841,6 +842,71 @@ export function SurahReader({
   // The one condition the bar renders under, named once: the list has to
   // reserve room for exactly the frames the bar is on screen for.
   const barDocked = audioEnabled && dockedAyah !== null;
+
+  // The page index, for the header's title and the pager's footers. Loaded
+  // once per process, so a mode switch and a surah page-turn both read a map
+  // that is already there.
+  const mushafIndex = useMushafIndex(corpusClient);
+  // Which page each of this surah's ayahs is printed on. From the corpus rows
+  // the reader already holds -- ayahs.page is what M7b re-paged, and is the
+  // only thing that can turn `?ayah=` into an opening page (ruling 10).
+  const pageByAyah = useMemo(() => {
+    const byAyah = new Map<number, number>();
+    for (const item of data.ayahs) {
+      if (item.ayah.page !== null) byAyah.set(item.ayah.ayah_number, item.ayah.page);
+    }
+    return byAyah;
+  }, [data.ayahs]);
+  const pageOfAyah = useCallback(
+    (ayahNumber: number | null) => {
+      // The surah's own first page when the ayah is unknown or unpaged: a
+      // reader opened from the surah list has no ayah, and page 1 of the
+      // mushaf would be the wrong book entirely.
+      const first = data.ayahs[0]?.ayah.page ?? 1;
+      if (ayahNumber === null) return first;
+      return pageByAyah.get(ayahNumber) ?? first;
+    },
+    [data.ayahs, pageByAyah],
+  );
+  // The page the pager has settled on, once it has moved. Null until then, so
+  // the header falls back to the surah the reader was opened on rather than
+  // guessing a page before one exists.
+  const [mushafPage, setMushafPage] = useState<number | null>(null);
+  // Issue #58: the name is a function of the page, not of the screen's
+  // mount-time surah. A pager crosses into the next surah without the screen
+  // changing, and the old header could only ever name the one it was mounted
+  // with -- which after a chevron turn was a surah the reader had left.
+  const headerSurahName =
+    (readerMode === 'mushaf' && mushafPage !== null
+      ? mushafIndex.pages.get(mushafPage)?.surahName
+      : null) ?? data.surah.name_translit;
+  const bookmarkedKeys = useMemo(
+    () => new Set([...bookmarkedAyahs].map((ayahNumber) => ayahKey(data.surah.id, ayahNumber))),
+    [bookmarkedAyahs, data.surah.id],
+  );
+  // Ruling 19: the page follows the recitation. Null while nothing is playing,
+  // which leaves the pager exactly where the reader put it.
+  const focusPage = playingAyah === null ? null : (pageByAyah.get(playingAyah) ?? null);
+
+  const onMushafPageChange = useCallback(
+    (page: number) => {
+      setMushafPage(page);
+      const entry = mushafIndex.pages.get(page);
+      if (!entry) return;
+      // The in-memory position too, and only when the page opens in the surah
+      // on screen: it is keyed by surah, and it is what a switch to
+      // translation mode lands on.
+      if (entry.startSurahId === data.surah.id) {
+        setReaderPosition(data.surah.id, entry.startAyahNumber);
+      }
+      onReadingPage?.({
+        surahId: entry.startSurahId,
+        ayahNumber: entry.startAyahNumber,
+        page,
+      });
+    },
+    [mushafIndex.pages, data.surah.id, onReadingPage],
+  );
 
   // The nav header carries the surah name once the list header's 24pt heading
   // has scrolled off -- Android's own app-bar behaviour, and it keeps the name
@@ -891,10 +957,15 @@ export function SurahReader({
       // renders underneath the back arrow (see app/_layout.tsx).
       header: () => (
         <ReaderHeader
-          surahName={data.surah.name_translit}
-          titleStyle={titleStyle}
+          surahName={headerSurahName}
+          // No fade in mushaf mode: the fade is driven by the ayah list's
+          // scroll offset, and a pager never scrolls vertically -- the title
+          // would sit at opacity 0 for the whole session (issue #58).
+          {...(readerMode === 'mushaf' ? {} : { titleStyle })}
           mode={readerMode}
           onChangeMode={onChangeReaderMode}
+          showTranslation={showTranslation}
+          {...(onChangeShowTranslation ? { onChangeShowTranslation } : {})}
           uiLocale={uiLocale}
           prevSurahId={prevSurahId}
           nextSurahId={nextSurahId}
@@ -937,8 +1008,10 @@ export function SurahReader({
     uiLocale,
     readerMode,
     onChangeReaderMode,
+    showTranslation,
+    onChangeShowTranslation,
     data.surah.id,
-    data.surah.name_translit,
+    headerSurahName,
     prevSurahId,
     nextSurahId,
     onPageSurah,
@@ -1137,11 +1210,41 @@ export function SurahReader({
   // fresh callback identity on every render of this component.
   const noopLanded = useCallback(() => {}, []);
   const noopScroll = useCallback(() => {}, []);
+  const noopPageChange = useCallback(() => {}, []);
+
+  // A tapped glyph carries a coordinate, not a word row. The reader's own word
+  // loader is what turns the ayah into words -- the same query the ayah cards
+  // prefetch through, so a page the reader has already looked at answers from
+  // its cache.
+  const onMushafWordPress = useCallback(
+    (ayahId: number, position: number) => {
+      if (!loadWords) return;
+      void loadWords(ayahId)
+        .then((words) => {
+          const word = words.find((candidate) => candidate.position === position);
+          // No word at that position is the ayah-end medallion, which has a
+          // layout row and no word row behind it. Nothing opens.
+          if (word) onWordPress(word);
+        })
+        .catch((cause: unknown) => {
+          console.error('[reader] mushaf word load failed', { ayahId, position, cause });
+        });
+    },
+    [loadWords, onWordPress],
+  );
 
   const ayahNumberOf = useCallback(
     (word: Word) => data.ayahs.find((item) => item.ayah.id === word.ayah_id)?.ayah.ayah_number,
     [data.ayahs],
   );
+
+  // The open word's ayah, when it is one this reader can act on. A mushaf page
+  // holds ayahs from surahs the route never named (page 106 opens in An-Nisa
+  // and heads Al-Ma'idah), and every control here -- bookmarks, notes, audio
+  // -- is keyed to the displayed surah alone. Undefined for those words, so
+  // the sheet shows morphology and no actions rather than actions that would
+  // land on the wrong surah's ayah.
+  const openWordAyah = openWord ? ayahNumberOf(openWord.word) : undefined;
 
 
   return (
@@ -1159,11 +1262,34 @@ export function SurahReader({
         // offset, is exposed to TalkBack and records the reading position --
         // which is what the note on AyahList's `live` has said all along.
         const arriving = index > 0;
-        const list = (
+        const list = layer.mode === 'mushaf' ? (
+          <MushafReader
+            key={layer.id}
+            client={corpusClient}
+            index={mushafIndex}
+            initialPage={pageOfAyah(layer.seedAyah)}
+            landingAyah={
+              layer.seedAyah === null
+                ? null
+                : { surahId: data.surah.id, ayahNumber: layer.seedAyah }
+            }
+            bookmarkedKeys={bookmarkedKeys}
+            playingAyah={
+              playingAyah === null ? null : { surahId: data.surah.id, ayahNumber: playingAyah }
+            }
+            // Only the live layer follows the recitation: a layer still laying
+            // out under a cross-fade would scroll itself to a page nobody has
+            // seen and arrive there instead of where the reader was.
+            focusPage={arriving ? null : focusPage}
+            uiLocale={uiLocale}
+            onPageChange={arriving ? noopPageChange : onMushafPageChange}
+            onWordPress={onMushafWordPress}
+            onLanded={arriving ? revealIncoming : noopLanded}
+          />
+        ) : (
           <AyahList
             key={layer.id}
             data={data}
-            mode={layer.mode}
             seedAyah={layer.seedAyah}
             live={!arriving}
             onLanded={arriving ? revealIncoming : noopLanded}
@@ -1172,6 +1298,7 @@ export function SurahReader({
             {...(notesByAyah ? { notesByAyah } : {})}
             playingAyah={playingAyah}
             audioEnabled={audioEnabled}
+            showTranslation={showTranslation}
             uiLocale={uiLocale}
             wordsByAyah={wordsByAyah}
             onVisibleAyah={onVisibleAyah}
@@ -1246,6 +1373,28 @@ export function SurahReader({
       <WordSheet
         summary={openWord}
         uiLocale={uiLocale}
+        {...(openWordAyah === undefined
+          ? {}
+          : {
+              ayahLabel: `${t(uiLocale, 'reader.ayahLabel')} ${openWordAyah}`,
+              // Built here, not described to the sheet: the sheet has no
+              // business knowing what a bookmark is, and every piece of this
+              // is already in hand.
+              ayahActions: (
+                <AyahControls
+                  surahId={data.surah.id}
+                  ayahNumber={openWordAyah}
+                  bookmarked={bookmarkedAyahs.has(openWordAyah)}
+                  note={notesByAyah?.get(openWordAyah) ?? null}
+                  playing={playingAyah === openWordAyah}
+                  uiLocale={uiLocale}
+                  audioDisabled={!audioEnabled}
+                  onToggleBookmark={onToggleBookmark}
+                  {...(onEditNote ? { onEditNote } : {})}
+                  onToggleAudio={onToggleAudio}
+                />
+              ),
+            })}
         onClose={closeSheet}
         onOpenDetail={(word) => {
           const ayahNumber = ayahNumberOf(word);

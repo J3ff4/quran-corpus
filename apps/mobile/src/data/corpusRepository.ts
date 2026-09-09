@@ -110,6 +110,16 @@ export async function getSurahList(client: MobileDataClient): Promise<SurahListI
   }));
 }
 
+/** One surah's ayah rows, unjoined.
+ *
+ *  The mushaf needs `text_uthmani` for TalkBack and `id` to turn a tapped
+ *  glyph into a `Word`, for surahs the reader was not opened on -- 51 pages
+ *  hold more than one. getSurahReader would answer with translations nobody
+ *  reads on a mushaf page. */
+export async function getAyahsOfSurah(client: MobileDataClient, surahId: number): Promise<Ayah[]> {
+  return getAyahsBySurah(client, surahId);
+}
+
 export async function getSurahReader(
   client: MobileDataClient,
   surahId: number,

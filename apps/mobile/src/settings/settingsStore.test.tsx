@@ -489,6 +489,39 @@ describe('loadPersistedAppSettings', () => {
     await expect(loadPersistedAppSettings(userClient)).resolves.toMatchObject({ continuousPlay: true });
   });
 
+  it('shows the translation until the reader says otherwise', async () => {
+    // Default true: translation mode with no translation is an empty card.
+    const userClient = requireSettingsClient();
+
+    await expect(loadPersistedAppSettings(userClient)).resolves.toMatchObject({
+      showTranslation: true,
+    });
+  });
+
+  it('restores a switched-off translation across a reload', async () => {
+    const userClient = requireSettingsClient();
+    await saveSetting(userClient, 'showTranslation', 'false');
+
+    await expect(loadPersistedAppSettings(userClient)).resolves.toMatchObject({
+      showTranslation: false,
+    });
+  });
+
+  it('falls back to ON for a showTranslation it does not recognise', async () => {
+    // NOT the `=== 'true'` the false-defaulted booleans take: on a setting
+    // that defaults to ON, that comparison reads every unrecognised string --
+    // and an absent row -- as OFF, which is a reader whose translation
+    // silently disappeared rather than a fallback to the default.
+    const userClient = requireSettingsClient();
+    for (const bad of ['maybe', 'TRUE', '1', '']) {
+      await saveSetting(userClient, 'showTranslation', bad);
+
+      const settings = await loadPersistedAppSettings(userClient);
+
+      expect(settings.showTranslation).toBe(true);
+    }
+  });
+
   it('restores a persisted reader mode', async () => {
     const userClient = requireSettingsClient();
     await saveSetting(userClient, 'readerMode', 'mushaf');

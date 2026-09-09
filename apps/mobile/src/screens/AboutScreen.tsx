@@ -47,6 +47,11 @@ const GROUPS: { title: UiStringKey; credits: Credit[] }[] = [
     credits: [
       { name: 'Tanzil', body: 'about.sourceArabic', pending: true },
       { name: 'corpus.quran.com', body: 'about.sourceCorpus' },
+      // The layout, not the text: which words fall on which line of which
+      // page. Shipped under an accepted-exposure override with no
+      // redistribution grant stated (ruling 9), so it is pending like the
+      // rest of the uncleared set -- this row is what makes that auditable.
+      { name: 'QUL', body: 'about.sourceMushafLayout', pending: true },
       ...TRANSLATION_CREDITS,
     ],
   },
@@ -63,6 +68,10 @@ const GROUPS: { title: UiStringKey; credits: Credit[] }[] = [
 const TYPEFACES: Credit[] = [
   { name: 'Newsreader', body: 'about.sourceNewsreader' },
   { name: 'Hafs', body: 'about.sourceHafs', pending: true },
+  // 604 of them, one per mushaf page. Same override and same missing grant as
+  // the layout above; they are credited separately because they are a
+  // separate source's work travelling under the same permission gap.
+  { name: 'KFGQPC', body: 'about.sourceMushafFont', pending: true },
 ];
 
 export function AboutScreen() {
