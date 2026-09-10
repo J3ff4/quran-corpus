@@ -4,6 +4,7 @@ import type { LayoutChangeEvent } from 'react-native';
 import Animated, {
   Easing,
   runOnJS,
+  useAnimatedKeyboard,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -65,6 +66,27 @@ export function BottomSheet({ onClose, closeLabel, children }: BottomSheetProps)
   const translateY = useSharedValue(screenHeight);
   const fade = useSharedValue(0);
   const sheetHeight = useSharedValue(0);
+  // The keyboard's height, live, on the UI thread. Without it the sheet does
+  // not move when a field inside it takes focus, and on the note editor that
+  // put the input, the counter, Cancel AND Save underneath the keyboard: the
+  // owner could neither see what they were typing nor reach the button that
+  // saved it (device, 2026-09-10). It is not the note editor's bug to fix --
+  // the sheet is what owns the sheet's position, and the next sheet with a
+  // field in it would have shipped the same defect.
+  //
+  // Both translucency flags: the sheet renders inside a Modal with
+  // `statusBarTranslucent`, in an edge-to-edge app, so without them the height
+  // reported is short by the system bars and the sheet stops under the
+  // keyboard's top edge rather than on it.
+  //
+  // `useAnimatedKeyboard` carries a deprecation notice pointing at
+  // react-native-keyboard-controller. That is a new dependency and a §12
+  // question for the owner, not something to slip in with a layout fix; this
+  // hook is present, supported in 4.5.1 and does the whole job.
+  const keyboard = useAnimatedKeyboard({
+    isStatusBarTranslucentAndroid: true,
+    isNavigationBarTranslucentAndroid: true,
+  });
 
   // Read through a ref so the entrance effect below does not depend on it.
   // With screenHeight in those deps, an Android split-screen resize while the
@@ -129,7 +151,11 @@ export function BottomSheet({ onClose, closeLabel, children }: BottomSheetProps)
     // Under reduced motion the sheet fades with the backdrop and never moves;
     // otherwise it is opaque throughout and only translates.
     opacity: reduced ? fade.value : 1,
-    transform: [{ translateY: translateY.value }],
+    // Minus the keyboard, so the sheet sits ON its top edge rather than under
+    // it. Subtracted from the same value the entrance and the drag write, so
+    // a sheet dragged down with the keyboard up still lands where it should
+    // and a keyboard opening mid-entrance does not fight the slide.
+    transform: [{ translateY: translateY.value - keyboard.height.value }],
   }));
 
   return (

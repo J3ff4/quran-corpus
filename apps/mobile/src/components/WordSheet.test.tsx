@@ -53,6 +53,8 @@ vi.mock('react-native-reanimated', async () => {
       createAnimatedComponent: (Component: unknown) => Component,
     },
     runOnJS: (fn: unknown) => fn,
+    // A closed keyboard: BottomSheet subtracts this from its own translate.
+    useAnimatedKeyboard: () => ({ height: { value: 0 }, state: { value: 1 } }),
     useAnimatedStyle: () => ({}),
     useSharedValue: (initial: unknown) => {
       const shared = { value: initial };

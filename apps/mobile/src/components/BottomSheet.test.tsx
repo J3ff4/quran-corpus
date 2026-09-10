@@ -17,6 +17,11 @@ const mocks = vi.hoisted(() => ({
   // otherwise unreachable from a test -- GestureDetector is stubbed out -- and
   // the drag-to-dismiss branch is the one place the two values move apart.
   sharedValues: [] as Array<{ value: unknown }>,
+  /** The keyboard's height in dp, as the sheet's animated style sees it.
+   *  jsdom has no keyboard, so this is the only way to drive the lift. */
+  keyboardHeight: 0,
+  /** Every useAnimatedStyle worklet, in declaration order: backdrop, sheet. */
+  styleFactories: [] as Array<() => Record<string, unknown>>,
   gestures: new Map<string, (event: never) => void>(),
   // Which animation primitive each move went through. The frames are not
   // observable from jsdom, but the choice of primitive is, and that is the
@@ -67,7 +72,14 @@ vi.mock('react-native-reanimated', async () => {
       createAnimatedComponent: (Component: unknown) => Component,
     },
     runOnJS: (fn: unknown) => fn,
-    useAnimatedStyle: () => ({}),
+    useAnimatedKeyboard: () => ({ height: { value: mocks.keyboardHeight }, state: { value: 1 } }),
+    // Captured rather than run: letting the worklet's output reach the DOM
+    // would change what every other test here renders. The keyboard test below
+    // calls the sheet's own factory directly instead.
+    useAnimatedStyle: (factory: () => Record<string, unknown>) => {
+      mocks.styleFactories.push(factory);
+      return {};
+    },
     useSharedValue: (initial: unknown) => {
       const shared = { value: initial };
       mocks.sharedValues.push(shared);
@@ -104,6 +116,8 @@ describe('BottomSheet', () => {
     mocks.gestures.clear();
     mocks.animations = [];
     mocks.modalProps = null;
+    mocks.keyboardHeight = 0;
+    mocks.styleFactories = [];
   });
 
   afterEach(cleanup);
@@ -219,6 +233,32 @@ describe('BottomSheet', () => {
 
     // Left subscribed, a gone sheet swallows every back press in the app.
     expect(mocks.backRemove).toHaveBeenCalled();
+  });
+
+  it('rides the keyboard so a field inside it is never underneath one', () => {
+    // The note editor put its input, its counter, Cancel AND Save under the
+    // keyboard: the owner could not see what they typed and could not reach
+    // the button that saved it (device, 2026-09-10). It is fixed here rather
+    // than there -- the sheet owns where the sheet sits, and the next sheet
+    // with a field in it would have shipped the same defect.
+    mocks.keyboardHeight = 300;
+    render(<BottomSheet onClose={() => {}} closeLabel="Close">{null}</BottomSheet>);
+
+    // The second worklet is the sheet's; the first is the backdrop's.
+    const sheetStyle = mocks.styleFactories[1]!();
+    const transform = sheetStyle.transform as Array<{ translateY: number }>;
+    expect(transform[0]!.translateY).toBe(-300);
+  });
+
+  it('sits where it always did when no keyboard is up', () => {
+    // The other half of the branch. Without it a sheet hardcoded to -300 --
+    // or one subtracting a constant -- passes the test above and floats above
+    // the bottom edge of every screen in the app.
+    render(<BottomSheet onClose={() => {}} closeLabel="Close">{null}</BottomSheet>);
+
+    const sheetStyle = mocks.styleFactories[1]!();
+    const transform = sheetStyle.transform as Array<{ translateY: number }>;
+    expect(transform[0]!.translateY).toBe(0);
   });
 
   it('renders its children inside the dialog', () => {

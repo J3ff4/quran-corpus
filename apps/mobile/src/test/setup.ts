@@ -93,6 +93,11 @@ vi.mock('react-native-reanimated', async () => {
       }),
     ),
     useSharedValue: (initial: number) => ({ value: initial }),
+    // A closed keyboard. The sheet subtracts this height from its own
+    // translate, so 0 leaves every existing assertion about where a sheet
+    // sits exactly as it was; whether the lift itself happens is a device
+    // check, since jsdom has no keyboard to raise.
+    useAnimatedKeyboard: () => ({ height: { value: 0 }, state: { value: 1 } }),
     useAnimatedStyle: (factory: () => unknown) => factory(),
     withTiming: (toValue: number) => toValue,
     withSpring: (toValue: number) => toValue,
