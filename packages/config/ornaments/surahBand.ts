@@ -83,7 +83,7 @@ export const SURAH_BAND_CARTOUCHE = {
   /** The name's cap height, as a fraction of the band's height. The glyph is a
    *  whole calligraphic name rather than a line of type, so this is fitted to
    *  the cartouche's clear height, not derived from a type scale. */
-  nameSize: 0.62,
+  nameSize: 0.78,
 } as const;
 
 const EASTERN_ARABIC_DIGITS = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
