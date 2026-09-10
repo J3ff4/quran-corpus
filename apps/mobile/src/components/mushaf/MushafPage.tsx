@@ -1,3 +1,4 @@
+import { useCallback, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { splitBasmala, type MushafLine, type MushafWord } from '@quran-corpus/data/mobile';
 
@@ -8,6 +9,7 @@ import {
   backgroundForWord,
   colorForWord,
   type HighlightInput,
+  type PressedWord,
 } from '@/mushaf/highlights';
 import { composePage, MUSHAF_LINES_PER_PAGE, type PageSlot } from '@/mushaf/pageComposition';
 import { useMushafPageFont } from '@/mushaf/pageFont';
@@ -52,8 +54,6 @@ export interface MushafPageProps {
   juz: number;
   uiLocale: UiLocaleCode;
   onWordLongPress: (word: MushafWord) => void;
-  onWordPressIn: (word: MushafWord) => void;
-  onWordPressOut: () => void;
   /** A tap anywhere on the page. Toggles the chrome (ruling 3). */
   onTap: () => void;
 }
@@ -92,19 +92,32 @@ export function MushafPage({
   juz,
   uiLocale,
   onWordLongPress,
-  onWordPressIn,
-  onWordPressOut,
   onTap,
 }: MushafPageProps) {
   const theme = useThemeColors();
   const { ready } = useMushafPageFont(page);
+  // The word under a finger on THIS page, held here rather than by the reader.
+  // Up there it was one piece of state above the pager, so a finger touching
+  // down re-rendered the reader, the pager and all three mounted pages -- and
+  // a swipe begins with a finger touching down on a word. Three page renders
+  // and three more on the press-out, both inside the first frames of the
+  // gesture, are what made the turn feel heavy (owner, 2026-09-10). A page can
+  // only ever hold a press on one of its own words, so it is the page's state.
+  // The scroll steals the responder as soon as the swipe moves, which fires
+  // the press-out and clears the wash.
+  const [pressed, setPressed] = useState<PressedWord | null>(null);
+  const onWordPressIn = useCallback((word: MushafWord) => {
+    setPressed({ surahId: word.surahId, ayahNumber: word.ayahNumber, position: word.position });
+  }, []);
+  const onWordPressOut = useCallback(() => setPressed(null), []);
 
   if (!ready) return <View style={{ width, height, backgroundColor: theme.background }} />;
 
   const fontSize = mushafFontSize(page, width - 2 * PAGE_MARGIN);
   const lineHeight = mushafLineHeight(height - FOOTER_HEIGHT - HEADER_HEIGHT, MUSHAF_LINES_PER_PAGE);
-  const color = colorForWord(highlights, theme);
-  const background = backgroundForWord(highlights, theme);
+  const marks: HighlightInput = pressed === null ? highlights : { ...highlights, pressed };
+  const color = colorForWord(marks, theme);
+  const background = backgroundForWord(marks, theme);
   // Keyed by line, then drawn 1..15 rather than iterated: composePage stops at
   // the page's last occupied line, and a short page (the last page of the
   // mushaf, or a page that ends a surah) must still hold the full grid.

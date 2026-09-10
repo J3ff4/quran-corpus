@@ -39,8 +39,6 @@ export interface MushafPagerProps {
    *  through onPageChange like any other. */
   focusPage?: number | null;
   onWordLongPress: (word: MushafWord) => void;
-  onWordPressIn: (word: MushafWord) => void;
-  onWordPressOut: () => void;
   /** A tap on any page. Toggles the chrome (ruling 3). */
   onTap: () => void;
 }
@@ -126,7 +124,14 @@ export function MushafPager({
       windowSize={3}
       maxToRenderPerBatch={1}
       initialNumToRender={1}
-      removeClippedSubviews
+      // Android's default paging deceleration drifts for a beat after the
+      // finger leaves, which reads as the page arriving late. `fast` is what a
+      // native pager does.
+      decelerationRate="fast"
+      // NOT removeClippedSubviews. With a window of three there is nothing to
+      // save -- one page either side is already all that is mounted -- and on
+      // Android it is a known source of blank and half-drawn cells on a
+      // horizontal list, which is the one artefact this pager cannot afford.
       onMomentumScrollEnd={onMomentumScrollEnd}
       renderItem={({ item }) => <PagerPage page={item} {...page} />}
     />

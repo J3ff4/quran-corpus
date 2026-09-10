@@ -236,21 +236,13 @@ describe('MushafReader', () => {
     expect(mocks.pagerProps.at(-1)?.['focusPage']).toBe(107);
   });
 
-  it('marks the word under the finger, and lets a page turn clear it', () => {
-    // The wash is the only thing saying which word the sheet is about to be
-    // about, and a wash left behind on a page the reader has swiped away from
-    // is a mark nobody can see and nothing will remove.
+  it('leaves the press wash to the page, so a touch cannot re-render its siblings', () => {
+    // A swipe begins with a finger on a word. While this state lived here, that
+    // first touch re-rendered the reader and all three mounted pages before the
+    // page had moved at all. Nothing above the pager knows about it now.
     render(<MushafReader {...props} />);
-    const word = { surahId: 5, ayahNumber: 82, position: 3, charType: 'word', glyph: '' };
 
-    const pressIn = mocks.pagerProps.at(-1)?.['onWordPressIn'] as (word: unknown) => void;
-    act(() => pressIn(word));
-    expect(
-      (mocks.pagerProps.at(-1)?.['highlights'] as { pressed: unknown }).pressed,
-    ).toMatchObject({ surahId: 5, ayahNumber: 82, position: 3 });
-
-    const turn = mocks.pagerProps.at(-1)?.['onPageChange'] as (page: number) => void;
-    act(() => turn(107));
+    expect(mocks.pagerProps.at(-1)?.['onWordPressIn']).toBeUndefined();
     expect((mocks.pagerProps.at(-1)?.['highlights'] as { pressed: unknown }).pressed).toBeNull();
   });
 });

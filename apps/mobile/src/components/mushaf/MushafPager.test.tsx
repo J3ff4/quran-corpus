@@ -37,8 +37,6 @@ const props = {
   uiLocale: 'en' as const,
   onPageChange: vi.fn(),
   onWordLongPress: vi.fn(),
-  onWordPressIn: vi.fn(),
-  onWordPressOut: vi.fn(),
   onTap: vi.fn(),
 };
 
@@ -121,7 +119,12 @@ describe('MushafPager', () => {
     const list = listPropsOf(render(<MushafPager {...props} />));
     expect(list.windowSize).toBe(3);
     expect(list.maxToRenderPerBatch).toBe(1);
-    expect(list.removeClippedSubviews).toBe(true);
+    // NOT clipped. With a window of three there is nothing left to clip, and
+    // on Android it is a known source of blank and half-drawn cells on a
+    // horizontal list. `fast` deceleration is what stops the turn drifting
+    // after the finger leaves (owner, 2026-09-10).
+    expect(list.removeClippedSubviews).toBeUndefined();
+    expect(list.decelerationRate).toBe('fast');
   });
 
   it('turns to the page the recitation has moved onto', () => {

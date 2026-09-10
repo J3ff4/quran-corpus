@@ -65,8 +65,6 @@ const props = {
   juz: 6,
   uiLocale: 'en' as const,
   onWordLongPress: () => {},
-  onWordPressIn: () => {},
-  onWordPressOut: () => {},
   onTap: () => {},
 };
 
@@ -117,6 +115,23 @@ describe('MushafPage', () => {
     fireEvent.click(blank);
 
     expect(onTap).toHaveBeenCalledTimes(1);
+  });
+
+  it('washes the pressed word itself, without the reader holding that state', () => {
+    // The press wash lives here, not above the pager. Up there one finger
+    // touching down re-rendered the reader and all three mounted pages -- and
+    // a swipe begins with a finger touching down on a word, so every page turn
+    // paid for three page renders before it had moved at all.
+    render(<MushafPage {...props} />);
+
+    const glyph = screen.getByText('A');
+    expect(glyph.style.backgroundColor).toBe('');
+
+    fireEvent.mouseDown(glyph);
+    expect(screen.getByText('A').style.backgroundColor).not.toBe('');
+
+    fireEvent.mouseUp(screen.getByText('A'));
+    expect(screen.getByText('A').style.backgroundColor).toBe('');
   });
 
   it('draws nothing but the page ground until the font is registered', () => {

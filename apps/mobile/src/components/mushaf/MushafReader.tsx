@@ -5,7 +5,7 @@ import type { MobileDataClient } from '@quran-corpus/mobile-data';
 
 import type { UiLocaleCode } from '@/i18n/languages';
 import { useReducedMotion } from '@/motion/useReducedMotion';
-import { ayahKey, type HighlightInput, type PressedWord } from '@/mushaf/highlights';
+import { ayahKey, type HighlightInput } from '@/mushaf/highlights';
 import { useMushafAyahs, type MushafIndex } from '@/mushaf/mushafReaderData';
 import { useMushafPageFont } from '@/mushaf/pageFont';
 import { useThemeColors } from '@/theme/themeContext';
@@ -146,21 +146,18 @@ export function MushafReader({
     return () => timers.forEach(clearTimeout);
   }, [landingKey, reducedMotion]);
 
-  // The word under a finger right now. Held here rather than in the page so it
-  // survives the page's own re-render, and cleared on a page turn below: a
-  // wash left on a page the reader has swiped away from is a mark nobody can
-  // see and nothing will remove.
-  const [pressed, setPressed] = useState<PressedWord | null>(null);
-
   const highlights: HighlightInput = useMemo(
     () => ({
       bookmarked: bookmarkedKeys,
       landing: pulse > 0 ? landingKey : null,
       playing: playingAyah ? ayahKey(playingAyah.surahId, playingAyah.ayahNumber) : null,
       landingProgress: pulse,
-      pressed,
+      // The page owns the press wash; see MushafPage. Nothing above the pager
+      // knows about it, which is the point -- a touch must not re-render the
+      // two pages the reader is not touching.
+      pressed: null,
     }),
-    [bookmarkedKeys, landingKey, playingAyah, pulse, pressed],
+    [bookmarkedKeys, landingKey, playingAyah, pulse],
   );
 
   // The reader is cross-fading onto this, and a page whose font has not landed
@@ -176,16 +173,10 @@ export function MushafReader({
   const onListPageChange = useCallback(
     (next: number) => {
       setPage(next);
-      setPressed(null);
       onPageChange(next);
     },
     [onPageChange],
   );
-
-  const onWordPressIn = useCallback((word: MushafWord) => {
-    setPressed({ surahId: word.surahId, ayahNumber: word.ayahNumber, position: word.position });
-  }, []);
-  const onWordPressOut = useCallback(() => setPressed(null), []);
 
   const onPagerWordLongPress = useCallback(
     (word: MushafWord) => {
@@ -223,8 +214,6 @@ export function MushafReader({
           focusPage={focusPage}
           onPageChange={onListPageChange}
           onWordLongPress={onPagerWordLongPress}
-          onWordPressIn={onWordPressIn}
-          onWordPressOut={onWordPressOut}
           onTap={onTap}
         />
       ) : null}
