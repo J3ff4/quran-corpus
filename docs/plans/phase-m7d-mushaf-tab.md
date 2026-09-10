@@ -586,3 +586,61 @@ device, that is the first thing to test -- move the shadow to a wrapper.
 - [ ] 269. Mushaf top bar: the shadow is plainly visible against the paper.
 - [ ] 270. Bottom tab bar: same, on every tab.
 - [ ] 271. Both in dark mode.
+
+## Device run on the m7d-3 APK (2026-09-10)
+
+Owner's second pass: shadow good, gap good, surah names still to be solved by a
+different face (owner is choosing one), top bar left with the agent to inspect,
+**page sliding unchanged**. Run over adb on the OnePlus 7 Pro, release APK.
+
+### What the measurement found
+
+`decelerationRate`, `removeClippedSubviews` and the press-wash move were all
+real, and all beside the point. `dumpsys gfxinfo` on five swipes:
+
+| | before | after |
+| --- | --- | --- |
+| Janky frames | 120 / 130 (92%) | 15 / 182 (8%) |
+| 50th percentile | 34ms | 9ms |
+| 90th percentile | 44ms | 12ms |
+| Frames for the same five swipes | 130 | 182 |
+
+Frame-stage breakdown put 14ms in `DrawStart -> SyncStart` (recording display
+lists, UI thread) and 17ms in `IssueDrawCommandsStart -> SwapBuffers`, with the
+**GPU idle at 2ms**. `atrace gfx view` then named it: **6,425 `Texture upload`
+slices across 44 frames -- ~146 per frame, one per word on the page**, sizes
+~90x100px. A page's whole-word QCF glyphs do not fit in Skia's glyph atlas, so
+every frame evicted and re-uploaded the lot. The mushaf drew at ~25fps whatever
+the pager did; `react-native-pager-view` would not have moved this number.
+
+Fix: `renderToHardwareTextureAndroid` on the page cell (`14c7ceb`), so a page is
+rasterised once and a turn is a blit, plus `memo` on `PagerPage` so the chrome's
+visibility boolean stops re-rendering three pages and invalidating three layers.
+Control: `com.android.settings` scrolls at 0% janky / 5ms on the same device, so
+the measurement itself is sound.
+
+The top bar's "flip" is downstream of the same number. A 220ms slide had 6-7
+frames to run in at 34ms each -- a ~15% jump per frame. The toggle now measures
+16ms median, 1 janky frame in 43. The animation code is unchanged since
+`53e2b38`; if it still reads wrong on this build the cause is elsewhere.
+
+### Checks run
+
+| # | Result |
+| --- | --- |
+| 253 | PASS (page 282, Al-Isra) |
+| 254 | PASS -- three bands on 602, three names, no tofu |
+| 255 / 268 | PASS -- surah 102 draws التكاثر from V4 |
+| 256 | PASS -- page 1 block centred |
+| 262 | PASS (owner) |
+| 263 | PASS -- 8% janky, 9ms median, no drift after release |
+| 264 | PASS -- swipe from a finger on a word, no hitch |
+| 265 | PASS -- wash under the finger, captured mid-press |
+| 266 | PASS -- fifteen fast turns each way, no blank or half-drawn page |
+| 267 | PASS -- al-Munafiqun (63, page 554) inside its frame |
+| 269 / 270 | PASS (owner: "shadow is good") |
+| 271 | NOT RUN -- the app's theme preference is Light on this phone, so `cmd uimode night yes` does not reach it |
+| 260 / 261 | Owner's call on this build |
+
+Still owed: 271, the M7c carry-forward 217/218, 219-248, 224/224a, 249-259, and
+the PR.
