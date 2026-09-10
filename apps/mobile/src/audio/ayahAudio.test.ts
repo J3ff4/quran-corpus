@@ -444,6 +444,24 @@ describe('paging to another surah', () => {
     expect(r.state().ayah).toBeNull();
   });
 
+  it('keeps playing when the surah arrives in the same tick as the ayah', () => {
+    // The mushaf tab has no surah of its own: pressing Play calls setPlaying
+    // and toggleAyah together, so the hook re-renders with the surah one commit
+    // AFTER the ayah has already started. Keyed on the prop, the stop above
+    // fired on that commit and paused the ayah it had just started -- a Pause
+    // icon that flipped back to Play with nothing sounding, on the very first
+    // press of every session.
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: null, ayahCount: 0, player, continuous: false });
+
+    r.toggleAyah(5, 5);
+    r.changeSurah(5);
+
+    expect(player.pauses).toBe(0);
+    expect(r.state().playing).toBe(true);
+    expect(r.state().ayah).toBe(5);
+  });
+
   it('leaves the driver alive so the next tap does not rebuild a player', () => {
     const player = fakePlayer();
     const r = renderRecitation({ surah: 2, ayahCount: 286, player, continuous: false });

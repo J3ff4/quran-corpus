@@ -421,14 +421,24 @@ export function useRecitation(
   // The driver is paused, not destroyed: destroying belongs to unmount below,
   // and rebuilding a player for the next tap costs a visible delay before the
   // first syllable.
+  //
+  // It compares the surah against the one the DRIVER is loaded with, in the
+  // effect body, rather than tearing down in a cleanup keyed on the prop. A
+  // cleanup closes over the OLD surah and cannot see the new one, so it fires
+  // on every change of the prop -- including the mushaf's own. There the surah
+  // arrives in the same tick as the ayah (`setPlaying` beside `toggleAyah`), so
+  // the very first press started the ayah and then had this cleanup pause it
+  // one commit later: a Pause icon that flipped straight back to Play with
+  // nothing sounding.
   useEffect(() => {
-    return () => {
-      driverRef.current?.pause();
-      ayahRef.current = null;
-      finishedRef.current = false;
-      soundedRef.current = false;
-      setState(IDLE);
-    };
+    const loaded = loadedSurahRef.current;
+    if (loaded === null || surah === null || loaded === surah) return;
+    driverRef.current?.pause();
+    ayahRef.current = null;
+    loadedSurahRef.current = null;
+    finishedRef.current = false;
+    soundedRef.current = false;
+    setState(IDLE);
   }, [surah]);
 
   useEffect(() => {
