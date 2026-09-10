@@ -29,8 +29,8 @@ import { ayahKey, type PressedWord } from '@/mushaf/highlights';
 import { useMushafIndex } from '@/mushaf/mushafReaderData';
 import { pageForAyah, pageForJump } from '@/mushaf/pageJump';
 import {
+  hideChrome,
   releaseChrome,
-  showChrome,
   toggleChrome,
   useChromeVisible,
 } from '@/mushaf/chromeVisibility';
@@ -150,9 +150,11 @@ export function MushafScreen() {
     setInitialPage(pageForAyah(index.pages, savedPosition.surahId, savedPosition.ayahNumber) ?? FIRST_PAGE);
   }, [savedPosition, initialPage, index.ready, index.pages]);
 
-  // The chrome is the tab bar too. Shown on arrival so the tab the user just
-  // pressed is still under their thumb, and released on the way out so no
-  // other screen inherits a hidden bar or a pending countdown.
+  // The chrome is the tab bar too. HIDDEN on arrival (owner ruling
+  // 2026-09-10): the mushaf is a page of a book, and the first frame of it
+  // should be the page and nothing else. A tap anywhere brings both bars back
+  // for the 3.5s the idle timer allows. Released on the way out so no other
+  // screen inherits a hidden bar or a pending countdown.
   //
   // On FOCUS, not on mount. A tab screen is not unmounted when the user leaves
   // it, so a mount-scoped release never ran: the 3.5s idle timer armed here
@@ -160,7 +162,7 @@ export function MushafScreen() {
   // there, on a screen with no way to bring it back.
   useFocusEffect(
     useCallback(() => {
-      showChrome();
+      hideChrome();
       return releaseChrome;
     }, []),
   );

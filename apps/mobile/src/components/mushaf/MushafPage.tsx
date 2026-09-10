@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { splitBasmala, type MushafLine, type MushafWord } from '@quran-corpus/data/mobile';
 
 import type { UiLocaleCode } from '@/i18n/languages';
@@ -112,18 +112,19 @@ export function MushafPage({
   const pageLines = Array.from({ length: MUSHAF_LINES_PER_PAGE }, (_, i) => i + 1);
 
   return (
-    <View style={{ width, height, backgroundColor: theme.background }}>
-      {/* BEHIND the lines, not over them: an overlay would take the long press
-          the words need. The words carry their own tap handler for the same
-          reason in reverse -- most of a page is covered in glyphs, and a page
-          whose text was deaf to a tap would leave the chrome unreachable
-          exactly where the reader is looking. */}
-      <Pressable
-        testID="mushaf-page-tap"
-        accessible={false}
-        onPress={onTap}
-        style={StyleSheet.absoluteFill}
-      />
+    // AROUND the lines, not behind them and not over them. Over them it would
+    // take the long press the words need. Behind them -- which is where it was
+    // -- it received almost nothing: a touch that lands on a line slot is
+    // claimed by that slot's own View and bubbles up its React ANCESTORS, and a
+    // sibling painted underneath is not one of those. Only the glyphs, which
+    // carry their own handler, brought the chrome back. As the ancestor it gets
+    // every touch no child claimed, which is the whole page minus the words.
+    <Pressable
+      testID="mushaf-page-tap"
+      accessible={false}
+      onPress={onTap}
+      style={{ width, height, backgroundColor: theme.background }}
+    >
       <View
         style={{ flex: 1, paddingHorizontal: PAGE_MARGIN, paddingTop: HEADER_HEIGHT }}
         pointerEvents="box-none"
@@ -202,7 +203,7 @@ export function MushafPage({
         surahName={surahNames.get(openingSurahId(lines)) ?? ''}
         uiLocale={uiLocale}
       />
-    </View>
+    </Pressable>
   );
 }
 

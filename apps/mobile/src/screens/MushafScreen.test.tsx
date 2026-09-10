@@ -33,7 +33,7 @@ const mocks = vi.hoisted(() => ({
   loadWordSummary: vi.fn(),
   loadFails: false,
   focusTeardowns: [] as Array<() => void>,
-  showChrome: vi.fn(),
+  hideChrome: vi.fn(),
   releaseChrome: vi.fn(),
   appStateListeners: [] as Array<(state: string) => void>,
 }));
@@ -80,7 +80,8 @@ vi.mock('expo-router', async () => {
 });
 vi.mock('@/components/mushaf/MushafChrome', () => ({ MushafChrome: () => null }));
 vi.mock('@/mushaf/chromeVisibility', () => ({
-  showChrome: (...args: unknown[]) => mocks.showChrome(...args),
+  hideChrome: (...args: unknown[]) => mocks.hideChrome(...args),
+  showChrome: vi.fn(),
   releaseChrome: (...args: unknown[]) => mocks.releaseChrome(...args),
   toggleChrome: vi.fn(),
   useChromeVisible: () => true,
@@ -159,7 +160,7 @@ beforeEach(() => {
   mocks.focusTeardowns = [];
   mocks.appStateListeners = [];
   mocks.recordReadingPosition.mockClear();
-  mocks.showChrome.mockClear();
+  mocks.hideChrome.mockClear();
   mocks.releaseChrome.mockClear();
   mocks.toggleAyah.mockClear();
 });
@@ -258,13 +259,21 @@ describe('MushafScreen', () => {
     );
   });
 
+  it('arrives with the chrome hidden, page first', async () => {
+    // Owner ruling 2026-09-10. The chrome is the app's tab bar as well, so an
+    // arrival that showed it put a bar over the top and bottom of a page the
+    // reader had just asked to see.
+    await renderScreen();
+
+    expect(mocks.hideChrome).toHaveBeenCalled();
+  });
+
   it('gives the chrome back on BLUR, not only on unmount', async () => {
     // A tab screen stays mounted after the user leaves it, so a mount-scoped
     // release never ran: the 3.5s idle timer armed here went on to hide the
     // app's TAB BAR on whichever tab they had switched to -- a screen with no
     // control left to bring it back.
     await renderScreen();
-    expect(mocks.showChrome).toHaveBeenCalled();
     expect(mocks.releaseChrome).not.toHaveBeenCalled();
 
     // Every focus teardown on the screen, the bookmark re-read's included --

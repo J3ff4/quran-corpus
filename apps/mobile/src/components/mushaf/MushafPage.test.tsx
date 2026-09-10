@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('react-native', async () => {
@@ -79,6 +79,23 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('MushafPage', () => {
+  it('brings the chrome back from a tap on blank paper, not only from a glyph', () => {
+    // The tap target used to be a sibling painted behind the text column. A
+    // touch landing on an empty line slot is claimed by that slot and bubbles
+    // up its own ancestors, and a sibling underneath is not one of them -- so
+    // only the words, which carry their own handler, could bring the chrome
+    // back. On a page whose chrome has hidden itself that is most of the page
+    // deaf to the only gesture that restores it.
+    const onTap = vi.fn();
+    const { container } = render(<MushafPage {...props} onTap={onTap} />);
+
+    // Line 15: past the last occupied line, so it holds nothing at all.
+    const blank = lineBoxesOf(container)[14] as HTMLElement;
+    fireEvent.click(blank);
+
+    expect(onTap).toHaveBeenCalledTimes(1);
+  });
+
   it('draws nothing but the page ground until the font is registered', () => {
     // A page drawn early renders QCF codepoints in the system face, which
     // looks like Arabic and is not the Qur'an. Blank is the safe state.
