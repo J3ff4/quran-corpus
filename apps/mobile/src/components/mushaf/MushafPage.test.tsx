@@ -79,6 +79,29 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('MushafPage', () => {
+  it('draws pages 1 and 2 as their occupied block, not on the full grid', () => {
+    // The only two pages the layout does not fill. On a 15-line grid al-Fatiha
+    // sat in the top half of the screen over half a page of blank paper; the
+    // printed mushaf centres it. Fewer boxes is what lets the column centre
+    // them -- 15 boxes of a fixed line height fill the page whatever the
+    // justification says.
+    const fatiha = [
+      { line: 3, words: [word(1, 1, 1, 'A')] },
+      { line: 4, words: [word(1, 2, 1, 'B')] },
+    ];
+    const { container } = render(<MushafPage {...props} page={1} lines={fatiha} />);
+
+    expect(lineBoxesOf(container)).toHaveLength(4);
+  });
+
+  it('keeps every other page on the full 15-line grid', () => {
+    // The grid is what makes a page a page: a short page in the middle of the
+    // mushaf (one that ends a surah) still holds its blank lines.
+    const { container } = render(<MushafPage {...props} />);
+
+    expect(lineBoxesOf(container)).toHaveLength(15);
+  });
+
   it('brings the chrome back from a tap on blank paper, not only from a glyph', () => {
     // The tap target used to be a sibling painted behind the text column. A
     // touch landing on an empty line slot is claimed by that slot and bubbles

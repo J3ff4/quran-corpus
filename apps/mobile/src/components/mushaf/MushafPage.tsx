@@ -109,7 +109,16 @@ export function MushafPage({
   // the page's last occupied line, and a short page (the last page of the
   // mushaf, or a page that ends a surah) must still hold the full grid.
   const slots = new Map(composePage(page, lines).map((slot) => [slot.line, slot]));
-  const pageLines = Array.from({ length: MUSHAF_LINES_PER_PAGE }, (_, i) => i + 1);
+  // Pages 1 and 2 are the only two the layout does not fill: al-Fatiha occupies
+  // lines 2-8 and al-Baqarah's opening 3-8. Drawn on the full 15-line grid they
+  // sat in the top half of the screen with half a page of blank paper beneath.
+  // The printed mushaf centres both inside their frame, so here the grid is the
+  // occupied block and the page centres that -- the line rhythm stays every
+  // other page's, which is what makes the whole thing read as one book.
+  const centred = page <= 2 && slots.size > 0;
+  const firstLine = centred ? Math.min(...slots.keys()) : 1;
+  const lastLine = centred ? Math.max(...slots.keys()) : MUSHAF_LINES_PER_PAGE;
+  const pageLines = Array.from({ length: lastLine - firstLine + 1 }, (_, i) => firstLine + i);
 
   return (
     // AROUND the lines, not behind them and not over them. Over them it would
@@ -126,7 +135,12 @@ export function MushafPage({
       style={{ width, height, backgroundColor: theme.background }}
     >
       <View
-        style={{ flex: 1, paddingHorizontal: PAGE_MARGIN, paddingTop: HEADER_HEIGHT }}
+        style={{
+          flex: 1,
+          paddingHorizontal: PAGE_MARGIN,
+          paddingTop: HEADER_HEIGHT,
+          justifyContent: centred ? 'center' : 'flex-start',
+        }}
         pointerEvents="box-none"
       >
         {pageLines.map((line) => {
