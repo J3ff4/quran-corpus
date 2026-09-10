@@ -1,5 +1,10 @@
 import { Pressable, Text } from 'react-native';
-import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import { useEffect } from 'react';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GlassSurface } from '@/components/GlassSurface';
@@ -11,9 +16,19 @@ import { useReducedMotion } from '@/motion/useReducedMotion';
 import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
-/** Matches the tab bar's own travel, so the two leave together. */
+/** Matches the tab bar's own travel time, so the two leave together. */
 const CHROME_FADE_MS = 220;
-const BAR_TRAVEL = -80;
+/** Tall enough to clear the top edge from wherever the bar is docked.
+ *
+ *  The bar used to travel a flat -80, which from `insets.top + 4` leaves a
+ *  48dp bar still overlapping the screen when its opacity reaches 0. It
+ *  therefore faded roughly in place while the tab bar slid its whole height
+ *  out of frame, and the owner read the difference as the top bar "flipping"
+ *  rather than sliding (2026-09-10). Derived from the inset instead, so the
+ *  bar is genuinely gone by the time it is invisible. */
+const BAR_HEIGHT = 56;
+/** Was 8. The bar sits just under the status bar now (owner, 2026-09-10). */
+const TOP_GAP = 2;
 
 export interface MushafChromeProps {
   visible: boolean;
@@ -40,9 +55,22 @@ export function MushafChrome({ visible, uiLocale, onOpenJump, onOpenSearch }: Mu
   const reducedMotion = useReducedMotion();
   const duration = reducedMotion ? 0 : CHROME_FADE_MS;
 
+  const travel = -(insets.top + TOP_GAP + BAR_HEIGHT);
+  // A shared value driven from an effect, NOT `withTiming` called inside the
+  // style worklet. Inside the worklet the animation is re-issued every time
+  // the worklet re-evaluates -- which is every render of this component, and
+  // the mushaf screen re-renders on every page turn, every press and every
+  // recitation tick. Each re-issue restarts the timing curve from wherever the
+  // bar had got to, with a fresh full duration, so a bar caught mid-move
+  // visibly stutters. Issued from an effect it runs once per change.
+  const progress = useSharedValue(visible ? 1 : 0);
+  useEffect(() => {
+    progress.value = withTiming(visible ? 1 : 0, { duration });
+  }, [visible, duration, progress]);
+
   const style = useAnimatedStyle(() => ({
-    opacity: withTiming(visible ? 1 : 0, { duration }),
-    transform: [{ translateY: withTiming(visible ? 0 : BAR_TRAVEL, { duration }) }],
+    opacity: progress.value,
+    transform: [{ translateY: (1 - progress.value) * travel }],
   }));
 
   return (
@@ -55,7 +83,7 @@ export function MushafChrome({ visible, uiLocale, onOpenJump, onOpenSearch }: Mu
       accessibilityElementsHidden={!visible}
       importantForAccessibility={visible ? 'auto' : 'no-hide-descendants'}
       style={[
-        { position: 'absolute', top: insets.top + 8, left: 16, right: 16 },
+        { position: 'absolute', top: insets.top + TOP_GAP, left: 16, right: 16 },
         style,
       ]}
     >
