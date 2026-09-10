@@ -289,6 +289,44 @@ describe('WordSheet', () => {
     expect(screen.getByTestId('root-link').style.minHeight).toBe('48px');
   });
 
+  it('tints each segment pill with its own POS colour, not the sheet-s surface', () => {
+    // The pill used to fill with theme.surface, which IS the sheet's own
+    // colour: a chip at 1:1 against its container, held together by a
+    // hairline. Owner, 2026-09-10: "stuff inside is also very poorly placed."
+    render(<WordSheet summary={summary({ segments: [seg(0, 'V'), seg(1, 'N')] })} {...handlers} />);
+
+    const fills = screen.getAllByTestId('segment-pill').map((pill) => pill.style.backgroundColor);
+    for (const fill of fills) expect(fill).not.toBe('');
+    // And two different buckets are two different tints -- a single hardcoded
+    // fill would satisfy the loop above.
+    expect(new Set(fills).size).toBe(2);
+  });
+
+  it('leaves a bucket the corpus does not surface untinted, with its hairline', () => {
+    // posBucket returns null for DET. A tint there would assert a category the
+    // corpus itself declines to give, so the pill keeps the border instead --
+    // and without one it would have no edge at all against the group.
+    render(<WordSheet summary={summary({ segments: [seg(0, 'DET')] })} {...handlers} />);
+
+    const pill = screen.getAllByTestId('segment-pill')[0]!;
+    expect(pill.style.backgroundColor).toBe('');
+    expect(pill.style.borderWidth).toBe('1px');
+  });
+
+  it('puts the ayah-s own actions after the two links, not between the blocks', () => {
+    // They act on the verse, not on the word the sheet is about, so they end
+    // the sheet. Stranded mid-column they read as part of the morphology.
+    const { container } = render(
+      <WordSheet summary={summary({ root: 'rHm' })} {...handlers} ayahActions={<span>acts</span>} ayahLabel="Al-Fatiha 1:2" />,
+    );
+
+    const order = Array.from(container.querySelectorAll('[data-testid]')).map((node) =>
+      node.getAttribute('data-testid'),
+    );
+    expect(order.indexOf('word-ayah-actions')).toBeGreaterThan(order.indexOf('root-link'));
+    expect(order.indexOf('word-hero')).toBeLessThan(order.indexOf('segment-pill'));
+  });
+
   it('draws a chevron on both rows, not a bare label', () => {
     // Closes the outstanding SheetRow finding: `trailingIcon` had no consumer
     // passing a non-empty value anywhere in the suite, so a mutant that
