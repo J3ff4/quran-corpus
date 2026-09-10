@@ -26,10 +26,13 @@ export function ayahKey(surahId: number, ayahNumber: number): string {
   return `${surahId}:${ayahNumber}`;
 }
 
-/** How far each state pulls the text toward the accent. A bookmark is a quiet
- *  standing mark; a landing pulse is louder but still short of the accent, so
- *  a playing ayah stays the strongest thing on the page (ruling 20). */
-const BOOKMARK_TINT = 0.45;
+/** How far a landing pulse pulls the text toward the accent. Louder than the
+ *  page but still short of the accent, so a playing ayah stays the strongest
+ *  thing there (ruling 20).
+ *
+ *  A bookmark used to have a figure here too -- 0.45 toward the accent -- and
+ *  it does not any more: it is a band under the words now, not a colour on
+ *  them. See `backgroundForWord`. */
 const LANDING_PEAK = 0.8;
 
 const channels = (hex: string): [number, number, number] => [
@@ -54,9 +57,13 @@ function mix(from: string, to: string, t: number): string {
 }
 
 /**
- * One colour per word, resolved from the four highlight states that can all be
- * true at once (ruling 20, and M7d ruling 4). Precedence, strongest first:
- * **pressed -> audio -> landing -> bookmark -> plain text.**
+ * One colour per word. Precedence, strongest first:
+ * **pressed -> audio -> landing -> plain text.**
+ *
+ * A bookmark is absent from this list on purpose. It is the one state that
+ * stands for weeks rather than for a gesture or a playhead, and as a fourth
+ * shade of green it was indistinguishable from the other two -- so it moved
+ * out of the ink and under it (owner, 2026-09-10). See `backgroundForWord`.
  *
  * Pressed wins over audio, which wins over everything else: it is the only
  * state the reader is causing at this instant, and its whole job is to say
@@ -72,15 +79,16 @@ export function colorForWord(
   input: HighlightInput,
   theme: typeof themeColors.light,
 ): (surahId: number, ayahNumber: number, position: number) => string {
-  const bookmarkColor = mix(theme.text, theme.accent, BOOKMARK_TINT);
   const pressed = input.pressed;
   return (surahId, ayahNumber, position) => {
     if (isPressed(pressed, surahId, ayahNumber, position)) return theme.accent;
     const key = ayahKey(surahId, ayahNumber);
     if (input.playing === key) return theme.accent;
-    const base = input.bookmarked.has(key) ? bookmarkColor : theme.text;
-    if (input.landing === key) return mix(base, theme.accent, LANDING_PEAK * input.landingProgress);
-    return base;
+    // A bookmark no longer appears here at all: it is the band underneath.
+    if (input.landing === key) {
+      return mix(theme.text, theme.accent, LANDING_PEAK * input.landingProgress);
+    }
+    return theme.text;
   };
 }
 
@@ -99,21 +107,30 @@ function isPressed(
 }
 
 /**
- * The ground a word sits on: a wash under the pressed word, nothing anywhere
- * else.
+ * The ground a word sits on: the amber band of a bookmarked ayah, and the
+ * accent wash under the one word being pressed.
  *
- * Colour alone cannot carry this state. A pressed word takes the accent, and
- * so does a playing one -- press a word inside the ayah being recited and the
- * two would be indistinguishable, which is exactly the moment the mark has to
- * be readable. The wash is what separates them, and it is also the only one of
- * the four states that says "this word", not "this verse".
+ * Both live here because both are grounds, and one sits on the other: press a
+ * word inside a bookmarked ayah and the green wash has to win over the amber
+ * band for that word only. Colour alone cannot carry either state -- a pressed
+ * word takes the accent and so does a playing one, and a bookmark competing in
+ * ink with those two is the "very vague" mark this replaces.
+ *
+ * The words of a line are adjacent runs of one <Text> joined with no space
+ * (see MushafLineRow), so a per-word background paints as one unbroken band
+ * across the ayah rather than as a row of separate rectangles.
  */
 export function backgroundForWord(
   input: HighlightInput,
   theme: typeof themeColors.light,
 ): (surahId: number, ayahNumber: number, position: number) => string | undefined {
   const pressed = input.pressed;
-  if (pressed === null) return () => undefined;
-  return (surahId, ayahNumber, position) =>
-    isPressed(pressed, surahId, ayahNumber, position) ? theme.accentWash : undefined;
+  const { bookmarked } = input;
+  // Nothing to draw at all: hand back one closure rather than run two lookups
+  // per word on every page that has neither.
+  if (pressed === null && bookmarked.size === 0) return () => undefined;
+  return (surahId, ayahNumber, position) => {
+    if (isPressed(pressed, surahId, ayahNumber, position)) return theme.accentWash;
+    return bookmarked.has(ayahKey(surahId, ayahNumber)) ? theme.bookmarkWash : undefined;
+  };
 }
