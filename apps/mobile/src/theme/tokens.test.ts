@@ -51,6 +51,8 @@ describe('fonts', () => {
       arabic: 'Hafs',
       display: 'Newsreader',
       displaySemiBold: 'Newsreader-SemiBold',
+      surahName: 'SurahNameV2',
+      surahNameAlt: 'SurahNameV4',
     });
   });
 });

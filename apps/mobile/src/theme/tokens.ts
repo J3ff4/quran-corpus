@@ -187,6 +187,11 @@ export const fonts = {
   arabic: 'Hafs',
   display: 'Newsreader',
   displaySemiBold: 'Newsreader-SemiBold',
+  /** The surah's calligraphic name, one PUA glyph per surah. `surahNameAlt` is
+   *  not a weight or a style -- v2 simply has no glyph for surah 102, so that
+   *  one surah is drawn in v4. See `@quran-corpus/config/ornaments/surahName`. */
+  surahName: 'SurahNameV2',
+  surahNameAlt: 'SurahNameV4',
 } as const;
 
 /** Reader-Arabic size steps. Multipliers, not absolute sizes, so Android's own

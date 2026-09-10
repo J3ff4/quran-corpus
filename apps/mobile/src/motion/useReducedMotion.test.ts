@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  */
 async function freshHook() {
   vi.resetModules();
-  const module = await import('./useReducedMotion');
+  const module = await import('./useReducedMotion.js');
   return module.useReducedMotion;
 }
 

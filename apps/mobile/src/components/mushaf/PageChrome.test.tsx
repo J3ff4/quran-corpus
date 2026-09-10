@@ -16,9 +16,24 @@ import { SurahBand } from './SurahBand';
 afterEach(cleanup);
 
 describe('SurahBand', () => {
-  it('names the surah inside the band', () => {
-    const { container } = render(<SurahBand surahName="Al-Ma-idah" surahId={5} height={40} width={400} />);
-    expect(container.textContent).toContain('Al-Ma-idah');
+  it('writes the calligraphic name inside the cartouche, not a Latin caption under it', () => {
+    // Owner, 2026-09-10: the band used to draw an empty frame with the
+    // transliteration printed beneath it. The name belongs in the panel the
+    // arabesque is shaped around, in the same surah-name face web's reader
+    // header uses -- one PUA glyph per surah, at 0xE000 + id.
+    render(<SurahBand surahName="Al-Ma-idah" surahId={5} height={40} width={400} />);
+
+    expect(screen.getByTestId('band-name').textContent).toBe(String.fromCodePoint(0xe005));
+    expect(screen.getByTestId('band-name').textContent).not.toContain('Al-Ma-idah');
+  });
+
+  it('draws surah 102 in the fallback face, which is the only one that has it', () => {
+    // surah-name-v2 has no glyph for At-Takathur at all. Left in v2 it renders
+    // as a missing-glyph box in the middle of the band.
+    render(<SurahBand surahName="At-Takathur" surahId={102} height={40} width={400} />);
+
+    const style = screen.getByTestId('band-name').querySelector('span')?.getAttribute('style') ?? '';
+    expect(style).toContain('SurahNameV4');
   });
 
   it('labels itself for TalkBack, since the art carries no text', () => {

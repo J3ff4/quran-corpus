@@ -54,6 +54,7 @@ const index = {
     [107, { page: 107, startSurahId: 5, startAyahNumber: 90, surahName: 'Al-Maidah', juz: null }],
   ]),
   surahNames: new Map([[5, 'Al-Maidah']]),
+  ayahCounts: new Map([[5, 120]]),
   ready: true,
 };
 

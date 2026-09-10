@@ -1,9 +1,6 @@
 /**
- * Both surah-name-v2 and surah-name-v4 (quranfonts.com) map each surah to
- * a PUA glyph at 0xE000 + surah.id (verified against each font's own
- * cmap: codepoints 0xE001-0xE072, one per surah). v2 is missing the
- * glyph for surah 102 -- callers fall back to font-surah-name-v4 for it.
+ * Re-exported from `@quran-corpus/config`: the mobile mushaf's surah band draws
+ * the same glyph, and the mapping may not live in one app (CLAUDE.md §3).
+ * Kept as a module here so the two call sites' imports do not have to move.
  */
-export function surahNameGlyph(surahId: number): string {
-  return String.fromCodePoint(0xe000 + surahId);
-}
+export { needsSurahNameFallback, surahNameGlyph } from '@quran-corpus/config/ornaments/surahName';

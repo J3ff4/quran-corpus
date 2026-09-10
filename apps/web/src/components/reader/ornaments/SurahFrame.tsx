@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 
 import {
   SURAH_BAND_MEDALLIONS,
-  SURAH_BAND_NUMERAL_SIZE,
   SURAH_BAND_PATH,
   SURAH_BAND_VIEW_BOX,
   toEasternArabicNumeral,

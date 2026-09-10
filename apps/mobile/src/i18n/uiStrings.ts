@@ -218,6 +218,7 @@ export type UiStringKey =
   | 'about.sourceHansWehr'
   | 'about.sourceEditorial'
   | 'about.sourceNewsreader'
+  | 'about.sourceSurahName'
   | 'about.groupText'
   | 'about.groupDictionary'
   | 'about.groupRecitation'
@@ -443,6 +444,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceHansWehr': 'Concise modern glosses, shown first on a root entry.',
     'about.sourceEditorial': 'Roots written for this app, where no source covered them.',
     'about.sourceNewsreader': 'SIL Open Font License 1.1. Copyright 2020 The Newsreader Project Authors.',
+    'about.sourceSurahName': 'The calligraphic surah name inside the mushaf band. Free/open, no attribution required; credited for transparency. One glyph per surah at PUA codepoint 0xE000 + surah number.',
     'about.groupText': 'Text and translation',
     'about.groupDictionary': 'Dictionary',
     'about.groupRecitation': 'Recitation',
@@ -654,6 +656,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceHansWehr': 'Qisqa zamonaviy ma’nolar, o‘zak sahifasida birinchi ko‘rsatiladi.',
     'about.sourceEditorial': 'Hech bir manba qamrab olmagan o‘zaklar shu ilova uchun yozilgan.',
     'about.sourceNewsreader': 'SIL Open Font License 1.1. Copyright 2020 The Newsreader Project Authors.',
+    'about.sourceSurahName': 'Mushaf lentasidagi xattotlik uslubidagi sura nomi. Erkin/ochiq, atribut talab qilinmaydi; shaffoflik uchun keltirilgan. Har bir suraga PUA kod nuqtasi 0xE000 + sura raqami bo‘yicha bitta glif.',
     'about.groupText': 'Matn va tarjima',
     'about.groupDictionary': 'Lug‘at',
     'about.groupRecitation': 'Qiroat',
@@ -863,6 +866,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceHansWehr': 'Краткие современные значения, показываются первыми на странице корня.',
     'about.sourceEditorial': 'Корни, написанные для этого приложения там, где их не покрыл ни один источник.',
     'about.sourceNewsreader': 'SIL Open Font License 1.1. Copyright 2020 The Newsreader Project Authors.',
+    'about.sourceSurahName': 'Каллиграфическое название суры внутри орнаментальной рамки мусхафа. Свободная лицензия, указание авторства не требуется; приведено для прозрачности. По одному глифу на суру в кодовой точке PUA 0xE000 + номер суры.',
     'about.groupText': 'Текст и перевод',
     'about.groupDictionary': 'Словарь',
     'about.groupRecitation': 'Чтение',
