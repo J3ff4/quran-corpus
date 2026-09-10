@@ -72,8 +72,45 @@ interface HostProps {
  *  jsdom is holding a finger down. */
 function flattenStyle(style: unknown): Record<string, unknown> | undefined {
   const resolved = typeof style === 'function' ? (style as (state: { pressed: boolean }) => unknown)({ pressed: false }) : style;
-  if (!Array.isArray(resolved)) return resolved as Record<string, unknown> | undefined;
-  return Object.assign({}, ...resolved.flat(Infinity).filter(Boolean));
+  const flat = (
+    Array.isArray(resolved)
+      ? Object.assign({}, ...resolved.flat(Infinity).filter(Boolean))
+      : resolved
+  ) as Record<string, unknown> | undefined;
+  return withBoxShadow(flat);
+}
+
+/**
+ * RN's shadow props expressed as a `boxShadow` the DOM can hold.
+ *
+ * React puts the style object straight onto `node.style`, where
+ * `shadowOpacity` and `elevation` are simply not properties -- they vanish
+ * without a warning. So no test could see a shadow at all, in either
+ * direction: a surface given the wrong depth and a surface given none looked
+ * identical to the suite. This is the same shape of blindness as `accessible`
+ * on a View, and the reason the tab bar shipped four sub-phases flat.
+ *
+ * The value is not a faithful CSS rendering of RN's shadow model -- it does not
+ * need to be. It only has to differ when the inputs differ.
+ */
+function withBoxShadow(flat: Record<string, unknown> | undefined) {
+  if (!flat) return flat;
+  const { shadowOpacity, shadowRadius, shadowOffset, elevation } = flat;
+  if (shadowOpacity === undefined && shadowRadius === undefined && elevation === undefined) {
+    return flat;
+  }
+  const offset = (shadowOffset ?? { width: 0, height: 0 }) as { width: number; height: number };
+  // Valid CSS, because jsdom parses the value and drops anything it cannot
+  // read -- which would put us back where we started. Elevation rides in the
+  // blur radius, since Android's shadow is drawn from elevation alone and CSS
+  // has nowhere else to put it.
+  const blur = Number(shadowRadius ?? 0) + Number(elevation ?? 0);
+  return {
+    ...flat,
+    boxShadow: `${offset.width}px ${offset.height}px ${blur}px rgba(0, 0, 0, ${Number(
+      shadowOpacity ?? 0,
+    )})`,
+  };
 }
 
 /**

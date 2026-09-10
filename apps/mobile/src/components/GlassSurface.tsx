@@ -50,7 +50,8 @@ export function useGlassSkin() {
  * from the bloom.
  *
  * ponytail: no blur variant, no elevation prop, no "intensity". One surface,
- * two themes. Add a variant when a screen actually needs a second one.
+ * two themes, and one variant -- `docked` -- which is a fact about where the
+ * surface sits rather than a knob. Add another when a screen actually needs it.
  */
 export function GlassSurface({ children, radius = 'card', style, testID, docked = false }: GlassSurfaceProps) {
   const skin = useGlassSkin();
@@ -66,7 +67,7 @@ export function GlassSurface({ children, radius = 'card', style, testID, docked 
           borderWidth: 1,
           borderRadius: radii[radius],
           overflow: 'hidden',
-          ...skin.shadow,
+          ...(docked ? skin.dockedShadow : skin.shadow),
         },
         style,
       ]}

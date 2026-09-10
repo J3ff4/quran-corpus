@@ -141,6 +141,21 @@ export const glass = {
       shadowOffset: { width: 0, height: 10 },
       elevation: 6,
     },
+    /** A docked bar's shadow, deeper than a card's.
+     *
+     *  A card sits ON the page and needs only to be lifted off it. A docked bar
+     *  floats OVER a page that scrolls underneath, and the card shadow was not
+     *  enough to say so -- on the device the tab pill read as painted onto the
+     *  paper (owner, 2026-09-10). The bar is also the one surface whose
+     *  backdrop is arbitrary text, so the shadow is what gives its edge
+     *  somewhere to land. */
+    dockedShadow: {
+      shadowColor: '#3a3227',
+      shadowOpacity: 0.22,
+      shadowRadius: 26,
+      shadowOffset: { width: 0, height: 12 },
+      elevation: 16,
+    },
   },
   dark: {
     // colors.night at 45%. Not a literal -- if the page colour moves, the card
@@ -157,6 +172,13 @@ export const glass = {
       shadowRadius: 19,
       shadowOffset: { width: 0, height: 16 },
       elevation: 10,
+    },
+    dockedShadow: {
+      shadowColor: '#000000',
+      shadowOpacity: 0.55,
+      shadowRadius: 28,
+      shadowOffset: { width: 0, height: 18 },
+      elevation: 20,
     },
   },
 } as const;

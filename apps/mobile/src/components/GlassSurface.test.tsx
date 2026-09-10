@@ -42,6 +42,20 @@ describe('GlassSurface', () => {
     expect(screen.getByTestId('card-highlight').style.backgroundColor).toBe(rgba(glass.dark.highlight));
   });
 
+  it('digs a deeper shadow under a docked bar than under a card', () => {
+    // A card sits ON the page; a docked bar floats over one that scrolls
+    // underneath, and at the card's elevation the tab pill read as painted
+    // onto the paper (owner, 2026-09-10). Asserted against the card as well,
+    // so a token edited to the same value in both places fails here.
+    renderIn(themeColors.light, <GlassSurface testID="bar" docked>{null}</GlassSurface>);
+    renderIn(themeColors.light, <GlassSurface testID="card">{null}</GlassSurface>);
+
+    expect(glass.light.dockedShadow.elevation).toBeGreaterThan(glass.light.shadow.elevation);
+    expect(screen.getByTestId('bar').getAttribute('style')).not.toBe(
+      screen.getByTestId('card').getAttribute('style'),
+    );
+  });
+
   it('takes its radius from the named token', () => {
     renderIn(themeColors.light, <GlassSurface testID="bar" radius="pill">{null}</GlassSurface>);
 
