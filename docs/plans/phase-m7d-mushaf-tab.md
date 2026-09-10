@@ -451,3 +451,86 @@ Eight mutation-checks run, one per fix, each confirmed red. Gate: 99 files /
 1022 tests, type-check and lint clean.
 
 Still owed: the device run (219-240, plus 224/224a), and the PR.
+
+## Owner screenshot pass (2026-09-10)
+
+Six screenshots, six complaints, all against the m7d APK. Five fixed here,
+one deferred with a ruling.
+
+**Rulings taken before any code was written** (the owner was asked; nothing
+below was assumed):
+
+| Question | Ruling |
+| --- | --- |
+| What does the ornament band carry? | The Arabic calligraphic name INSIDE the cartouche, both number cutouts kept and properly centred. Use the surah-name face the web app already uses. |
+| Chrome on arrival | Hidden — the tab bar with it. Tap toggles; the 3.5s idle timer stays. |
+| Which pages are centred | 1 and 2 only, as a block, line spacing unchanged. |
+| Drop shadow | Mushaf chrome and the tab bar. |
+| `root_buckwalter` vs `root_arabic` | **Deferred.** Issue #65. |
+
+### The five fixes
+
+1. **`68b4acb` — mushaf Play did nothing.** `useRecitation` stopped the driver
+   in a cleanup keyed on the `surah` prop; a cleanup closes over the OLD surah
+   and fires on every change. The reader never changes it. The mushaf sets it
+   in the same tick it starts the ayah, so the commit that carried the surah
+   paused the ayah it had just started — Pause icon, straight back to Play,
+   silence. Now compared against the surah the driver is actually loaded with,
+   in the effect body where both values are visible.
+2. **`c7de7c7` — only glyphs brought the chrome back, and it was up on
+   arrival.** The tap target was a `Pressable` painted *behind* the text column
+   as a sibling. A touch on a line slot is claimed by that slot's View and
+   bubbles up its React ancestors; a sibling underneath is not one. It is the
+   page's ancestor now. Chrome hides on focus rather than showing.
+3. **`9338627` — pages 1-2 hung from the top.** They are the only two pages the
+   layout does not fill (lines 2-8 and 3-8). The grid on those two is the
+   occupied block, and the column centres it. Closes #62.
+4. **`d3512e8` — empty cartouche over a Latin caption.** The name goes inside,
+   in surah-name-v2 (v4 for surah 102, the one glyph v2 lacks). Mapping shared
+   at `@quran-corpus/config/ornaments/surahName`; web re-exports it. TTF, not
+   WOFF2. Both numerals moved into a View each — `alignItems`/`justifyContent`
+   are flex *container* properties and a `<Text>` is not one, which is why they
+   sat high and left inside their cutouts. Credited in About (§11).
+5. **`0993451` — docked bars read as painted on.** `docked` now picks a deeper
+   shadow as well as the opaque backing.
+
+**The shim was blind to shadows.** React puts the style object onto
+`node.style`, where `shadowOpacity` and `elevation` are not properties and
+vanish silently — no test could tell a wrong shadow from no shadow, in either
+direction. `rnHosts` now folds RN's shadow props into a `boxShadow` the DOM
+holds. Same shape as `accessible` on a View, and part of why the tab bar
+shipped four sub-phases flat.
+
+Also cleared two pre-existing gate failures on this branch (issue #54): a test
+fixture missing `ayahCounts`, an extensionless relative import under node16,
+and an unused import left in `SurahFrame` by `bdd783f`.
+
+Six mutation-checks run, one per behavioural fix, each confirmed red. Gate: 99
+files / 1029 tests, type-check and lint clean across the workspace.
+
+§5: no independent review. Nothing here touches `packages/data` schema or
+queries, a trust boundary, or the on-device user DB.
+
+### Build
+
+`assembleRelease` from `0993451`, arm64-v8a, debug-signed, versionCode 1,
+211,941,075 bytes. 613 TTFs in the APK against the previous build's 611 — the
+two surah-name faces are really in there. Served at
+`http://100.70.26.76:3938/quran-corpus-m7d-2.apk`.
+
+Still owed: the device run (219-240, 241-248, 224/224a, and M7c's 217/218),
+plus the new checks below, and the PR.
+
+| # | Check | Expect |
+| --- | --- | --- |
+| 249 | Open the Mushaf tab | No bars at all on the first frame — page only |
+| 250 | Tap blank paper below the last line | Both bars return, then leave after 3.5s |
+| 251 | Tap the ornament band, then a page margin | Same — neither is deaf |
+| 252 | Long-press a word | Sheet opens; the chrome does not toggle |
+| 253 | Any surah-opening page | Arabic name inside the cartouche, both numerals centred in their circles |
+| 254 | Page 602 (Quraysh / Al-Maun / Al-Kawthar) | Three bands, three names, no missing-glyph boxes |
+| 255 | Surah 102, At-Takathur | A name, not a tofu box (v2 has no glyph; v4 is the fallback) |
+| 256 | Pages 1 and 2 | Text block centred, not hanging from the top |
+| 257 | Page 3 | Still a full 15-line grid — the centring is those two pages only |
+| 258 | Long-press → Play, fresh launch | Sound on the first press, Pause icon stays |
+| 259 | Tab bar on any tab, and the mushaf chrome | Reads as floating; a visible shadow under the edge |
