@@ -143,6 +143,15 @@ export const glass = {
     },
     /** A docked bar's shadow, deeper than a card's.
      *
+     *  `boxShadow`, not the shadow* props. On Android those four are ignored
+     *  outright -- only `elevation` draws, and what it draws is Material's own
+     *  ambient shadow, whose colour, blur and offset are not ours to set. The
+     *  bar's shadow was therefore never the one written here; the owner
+     *  reported it as "very vague" (2026-09-10) and that is exactly what
+     *  elevation 16 looks like on cream paper. RN 0.86 on the new architecture
+     *  renders `boxShadow` on both platforms, so the values below are the ones
+     *  that actually reach the screen.
+     *
      *  A card sits ON the page and needs only to be lifted off it. A docked bar
      *  floats OVER a page that scrolls underneath, and the card shadow was not
      *  enough to say so -- on the device the tab pill read as painted onto the
@@ -150,11 +159,7 @@ export const glass = {
      *  backdrop is arbitrary text, so the shadow is what gives its edge
      *  somewhere to land. */
     dockedShadow: {
-      shadowColor: '#3a3227',
-      shadowOpacity: 0.22,
-      shadowRadius: 26,
-      shadowOffset: { width: 0, height: 12 },
-      elevation: 16,
+      boxShadow: '0px 12px 26px rgba(58, 50, 39, 0.22)',
     },
   },
   dark: {
@@ -174,11 +179,7 @@ export const glass = {
       elevation: 10,
     },
     dockedShadow: {
-      shadowColor: '#000000',
-      shadowOpacity: 0.55,
-      shadowRadius: 28,
-      shadowOffset: { width: 0, height: 18 },
-      elevation: 20,
+      boxShadow: '0px 18px 28px rgba(0, 0, 0, 0.55)',
     },
   },
 } as const;
