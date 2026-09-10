@@ -45,12 +45,21 @@ export interface WordSheetProps {
  * the flat column this replaces read as one undifferentiated list, with the
  * ayah's own controls stranded in the middle of it):
  *
- * 1. the word itself and what it means, centred, as the sheet's subject;
- * 2. its morphology, in a labelled group;
- * 3. the two ways deeper, in a second group, so a tap that leaves the sheet is
- *    visibly a different kind of thing from a chip that does not;
- * 4. the ayah's own actions, last, because they act on the verse rather than
- *    on the word the sheet is about.
+ * 1. the ayah's own actions, named, as the sheet's header;
+ * 2. the word itself and what it means, centred, as the sheet's subject;
+ * 3. its morphology, in a labelled group;
+ * 4. the two ways deeper, in a second group, so a tap that leaves the sheet is
+ *    visibly a different kind of thing from a chip that does not.
+ *
+ * Play and bookmark sit at the TOP, not under the two links (owner ruling
+ * 2026-09-10, on the device). The first draft put them last on the argument
+ * that they act on the verse rather than on the word -- true, and beside the
+ * point: they are the sheet's most-tapped controls, the sheet is tall, and on
+ * a mushaf page they are the ONLY way to bookmark or play anything (M7d ruling
+ * 4). Buried at the bottom of a sheet that can run past the fold, the one
+ * gesture the page cannot otherwise perform was the hardest thing in it to
+ * reach. The ayah label beside them is what stops the header reading as
+ * controls for the word.
  *
  * The groups are <GlassSurface>, which is the card in every other screen. In
  * light mode its fill resolves to the sheet's own surface, so the grouping is
@@ -76,6 +85,18 @@ export function WordSheet({
 
   return (
     <BottomSheet onClose={onClose} closeLabel={t(uiLocale, 'word.close')}>
+      {ayahActions ? (
+        <View
+          testID="word-ayah-actions"
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
+        >
+          <Text style={{ color: theme.mutedText, fontSize: typography.body, flexShrink: 1 }}>
+            {ayahLabel ?? ''}
+          </Text>
+          {ayahActions}
+        </View>
+      ) : null}
+
       <View testID="word-hero" style={{ alignItems: 'center', gap: 8 }}>
         <SegmentedWord word={word} segments={segments} fontSize={sizes.title} />
         {/* The tag is nested inside the gloss rather than set beside it so the
@@ -140,17 +161,6 @@ export function WordSheet({
         ) : null}
       </GlassSurface>
 
-      {ayahActions ? (
-        <View
-          testID="word-ayah-actions"
-          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
-        >
-          <Text style={{ color: theme.mutedText, fontSize: typography.body, flexShrink: 1 }}>
-            {ayahLabel ?? ''}
-          </Text>
-          {ayahActions}
-        </View>
-      ) : null}
     </BottomSheet>
   );
 }

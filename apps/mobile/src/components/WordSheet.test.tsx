@@ -313,9 +313,11 @@ describe('WordSheet', () => {
     expect(pill.style.borderWidth).toBe('1px');
   });
 
-  it('puts the ayah-s own actions after the two links, not between the blocks', () => {
-    // They act on the verse, not on the word the sheet is about, so they end
-    // the sheet. Stranded mid-column they read as part of the morphology.
+  it('heads the sheet with the ayah-s own actions, above the word itself', () => {
+    // Owner ruling on the device, 2026-09-10. They are the most-tapped
+    // controls in the sheet and, on a mushaf page, the only way to bookmark or
+    // play anything at all (M7d ruling 4) -- at the bottom of a sheet that can
+    // run past the fold they were the hardest thing in it to reach.
     const { container } = render(
       <WordSheet summary={summary({ root: 'rHm' })} {...handlers} ayahActions={<span>acts</span>} ayahLabel="Al-Fatiha 1:2" />,
     );
@@ -323,8 +325,11 @@ describe('WordSheet', () => {
     const order = Array.from(container.querySelectorAll('[data-testid]')).map((node) =>
       node.getAttribute('data-testid'),
     );
-    expect(order.indexOf('word-ayah-actions')).toBeGreaterThan(order.indexOf('root-link'));
-    expect(order.indexOf('word-hero')).toBeLessThan(order.indexOf('segment-pill'));
+    expect(order.indexOf('word-ayah-actions')).toBeLessThan(order.indexOf('word-hero'));
+    expect(order.indexOf('word-ayah-actions')).toBeLessThan(order.indexOf('root-link'));
+    // The label travels with them: a bare row of icons at the top of the sheet
+    // reads as controls for the WORD, which is the one thing they are not.
+    expect(screen.getByTestId('word-ayah-actions').textContent).toContain('Al-Fatiha 1:2');
   });
 
   it('draws a chevron on both rows, not a bare label', () => {
