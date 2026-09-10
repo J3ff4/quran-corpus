@@ -1,15 +1,15 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { BackHandler, Modal, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { BackHandler, Keyboard, Modal, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import Animated, {
   Easing,
   runOnJS,
-  useAnimatedKeyboard,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReducedMotion } from '@/motion/useReducedMotion';
 import { useThemeColors } from '@/theme/themeContext';
 
@@ -66,27 +66,39 @@ export function BottomSheet({ onClose, closeLabel, children }: BottomSheetProps)
   const translateY = useSharedValue(screenHeight);
   const fade = useSharedValue(0);
   const sheetHeight = useSharedValue(0);
-  // The keyboard's height, live, on the UI thread. Without it the sheet does
-  // not move when a field inside it takes focus, and on the note editor that
-  // put the input, the counter, Cancel AND Save underneath the keyboard: the
-  // owner could neither see what they were typing nor reach the button that
-  // saved it (device, 2026-09-10). It is not the note editor's bug to fix --
-  // the sheet is what owns the sheet's position, and the next sheet with a
-  // field in it would have shipped the same defect.
+  // How far the sheet has to rise to clear the keyboard.
   //
-  // Both translucency flags: the sheet renders inside a Modal with
-  // `statusBarTranslucent`, in an edge-to-edge app, so without them the height
-  // reported is short by the system bars and the sheet stops under the
-  // keyboard's top edge rather than on it.
+  // Read from RN's own Keyboard events, NOT from reanimated's
+  // `useAnimatedKeyboard`, which was the first attempt and did nothing on the
+  // device (owner, 2026-09-10: "text area is still behind the keyboard").
+  // Reanimated attaches its listener to `currentActivity.window.decorView` and
+  // only updates the height once a WindowInsetsAnimation callback on THAT view
+  // has moved its state to OPEN. This sheet lives in a <Modal>, which is a
+  // separate native window: the IME animation is dispatched to the dialog's
+  // window, the activity's decor view never sees it, and the height stays 0
+  // for as long as the sheet is open. RN's own events read the static ime
+  // inset off the root window instead, with no animation callback to miss.
   //
-  // `useAnimatedKeyboard` carries a deprecation notice pointing at
-  // react-native-keyboard-controller. That is a new dependency and a §12
-  // question for the owner, not something to slip in with a layout fix; this
-  // hook is present, supported in 4.5.1 and does the whole job.
-  const keyboard = useAnimatedKeyboard({
-    isStatusBarTranslucentAndroid: true,
-    isNavigationBarTranslucentAndroid: true,
-  });
+  // Plus the bottom inset: `keyboardDidShow` reports the ime inset MINUS the
+  // system bars (ReactRootView.checkForKeyboardEvents), and this sheet is
+  // anchored at bottom: 0 of an edge-to-edge window -- i.e. behind the
+  // navigation bar, which the keyboard also covers. Without the inset the
+  // sheet stops a navigation bar short and its last row stays buried.
+  const keyboardLift = useSharedValue(0);
+  const bottomInset = useSafeAreaInsets().bottom;
+
+  useEffect(() => {
+    const shown = Keyboard.addListener('keyboardDidShow', (event) => {
+      keyboardLift.value = withTiming(event.endCoordinates.height + bottomInset, ENTER);
+    });
+    const hidden = Keyboard.addListener('keyboardDidHide', () => {
+      keyboardLift.value = withTiming(0, EXIT);
+    });
+    return () => {
+      shown.remove();
+      hidden.remove();
+    };
+  }, [bottomInset, keyboardLift]);
 
   // Read through a ref so the entrance effect below does not depend on it.
   // With screenHeight in those deps, an Android split-screen resize while the
@@ -155,7 +167,7 @@ export function BottomSheet({ onClose, closeLabel, children }: BottomSheetProps)
     // it. Subtracted from the same value the entrance and the drag write, so
     // a sheet dragged down with the keyboard up still lands where it should
     // and a keyboard opening mid-entrance does not fight the slide.
-    transform: [{ translateY: translateY.value - keyboard.height.value }],
+    transform: [{ translateY: translateY.value - keyboardLift.value }],
   }));
 
   return (

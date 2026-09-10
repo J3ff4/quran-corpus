@@ -13,7 +13,6 @@ vi.mock('react-native-reanimated', async () => {
     // driver, so what this suite asserts is the props that carry it --
     // pointerEvents and the accessibility flags -- not the transform.
     // A closed keyboard: BottomSheet subtracts this from its own translate.
-    useAnimatedKeyboard: () => ({ height: { value: 0 }, state: { value: 1 } }),
     useAnimatedStyle: () => ({}),
     withTiming: (to: unknown) => to,
   };

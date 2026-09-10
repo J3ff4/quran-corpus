@@ -34,6 +34,10 @@ vi.mock('react-native', async () => {
     },
     // The sheet lives in a Modal so it can cover the navigator's tab pill.
     Modal,
+    // A keyboard that never opens. Whether the sheet lifts is a device check
+    // -- jsdom has no keyboard -- and BottomSheet.test.tsx drives these
+    // listeners by hand.
+    Keyboard: { addListener: () => ({ remove: () => {} }) },
     Pressable: host('button'),
     StyleSheet: { absoluteFill: {} },
     Text: host('span'),
@@ -54,7 +58,6 @@ vi.mock('react-native-reanimated', async () => {
     },
     runOnJS: (fn: unknown) => fn,
     // A closed keyboard: BottomSheet subtracts this from its own translate.
-    useAnimatedKeyboard: () => ({ height: { value: 0 }, state: { value: 1 } }),
     useAnimatedStyle: () => ({}),
     useSharedValue: (initial: unknown) => {
       const shared = { value: initial };

@@ -17,9 +17,9 @@ const mocks = vi.hoisted(() => ({
   // otherwise unreachable from a test -- GestureDetector is stubbed out -- and
   // the drag-to-dismiss branch is the one place the two values move apart.
   sharedValues: [] as Array<{ value: unknown }>,
-  /** The keyboard's height in dp, as the sheet's animated style sees it.
-   *  jsdom has no keyboard, so this is the only way to drive the lift. */
-  keyboardHeight: 0,
+  /** The sheet's own Keyboard subscriptions, by event name. jsdom has no
+   *  keyboard, so calling one of these IS the keyboard opening. */
+  keyboardListeners: new Map<string, (event: unknown) => void>(),
   /** Every useAnimatedStyle worklet, in declaration order: backdrop, sheet. */
   styleFactories: [] as Array<() => Record<string, unknown>>,
   gestures: new Map<string, (event: never) => void>(),
@@ -56,6 +56,12 @@ vi.mock('react-native', async () => {
       mocks.modalProps = props as Record<string, unknown>;
       return React.createElement(React.Fragment, null, children);
     },
+    Keyboard: {
+      addListener: (event: string, handler: (payload: unknown) => void) => {
+        mocks.keyboardListeners.set(event, handler);
+        return { remove: () => mocks.keyboardListeners.delete(event) };
+      },
+    },
     Pressable: host('button'),
     StyleSheet: { absoluteFill: {} },
     Text: host('span'),
@@ -72,7 +78,6 @@ vi.mock('react-native-reanimated', async () => {
       createAnimatedComponent: (Component: unknown) => Component,
     },
     runOnJS: (fn: unknown) => fn,
-    useAnimatedKeyboard: () => ({ height: { value: mocks.keyboardHeight }, state: { value: 1 } }),
     // Captured rather than run: letting the worklet's output reach the DOM
     // would change what every other test here renders. The keyboard test below
     // calls the sheet's own factory directly instead.
@@ -101,6 +106,12 @@ vi.mock('react-native-reanimated', async () => {
   };
 });
 
+// A device with gesture navigation: the sheet is anchored behind that bar and
+// the keyboard covers it too, so the lift has to include it.
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 24, bottom: 24, left: 0, right: 0 }),
+}));
+
 vi.mock('react-native-gesture-handler', async () => {
   const { reactNativeGestureHandlerMock } = await import('@/testing/rnHosts.js');
   const gestureHandler = reactNativeGestureHandlerMock();
@@ -116,7 +127,7 @@ describe('BottomSheet', () => {
     mocks.gestures.clear();
     mocks.animations = [];
     mocks.modalProps = null;
-    mocks.keyboardHeight = 0;
+    mocks.keyboardListeners.clear();
     mocks.styleFactories = [];
   });
 
@@ -125,7 +136,7 @@ describe('BottomSheet', () => {
   it('restores the backdrop dim when a drag stops short of dismissing', () => {
     render(<BottomSheet onClose={() => {}} closeLabel="Close"><span>body</span></BottomSheet>);
     const [translateY, fade] = mocks.sharedValues;
-    expect(mocks.sharedValues).toHaveLength(3);
+    expect(mocks.sharedValues).toHaveLength(4);
 
     // The real sequence: a dismissing drag starts the fade out, its animation
     // is interrupted by a second drag, and that one stops short. Starting from
@@ -241,13 +252,35 @@ describe('BottomSheet', () => {
     // the button that saved it (device, 2026-09-10). It is fixed here rather
     // than there -- the sheet owns where the sheet sits, and the next sheet
     // with a field in it would have shipped the same defect.
-    mocks.keyboardHeight = 300;
     render(<BottomSheet onClose={() => {}} closeLabel="Close">{null}</BottomSheet>);
+    mocks.keyboardListeners.get('keyboardDidShow')?.({ endCoordinates: { height: 300 } });
 
+    // 300 of keyboard plus the 24dp navigation bar it also covers: RN reports
+    // the ime inset minus the system bars, and the sheet is anchored behind
+    // them. Lift only the reported height and the last row stays buried.
     // The second worklet is the sheet's; the first is the backdrop's.
     const sheetStyle = mocks.styleFactories[1]!();
     const transform = sheetStyle.transform as Array<{ translateY: number }>;
-    expect(transform[0]!.translateY).toBe(-300);
+    expect(transform[0]!.translateY).toBe(-324);
+  });
+
+  it('drops back down when the keyboard closes', () => {
+    render(<BottomSheet onClose={() => {}} closeLabel="Close">{null}</BottomSheet>);
+    mocks.keyboardListeners.get('keyboardDidShow')?.({ endCoordinates: { height: 300 } });
+    mocks.keyboardListeners.get('keyboardDidHide')?.({});
+
+    const transform = mocks.styleFactories[1]!().transform as Array<{ translateY: number }>;
+    expect(transform[0]!.translateY).toBe(0);
+  });
+
+  it('unsubscribes from the keyboard when it closes', () => {
+    const { unmount } = render(
+      <BottomSheet onClose={() => {}} closeLabel="Close">{null}</BottomSheet>,
+    );
+    expect(mocks.keyboardListeners.size).toBe(2);
+    unmount();
+    // Left subscribed, every sheet ever opened keeps animating a dead value.
+    expect(mocks.keyboardListeners.size).toBe(0);
   });
 
   it('sits where it always did when no keyboard is up', () => {

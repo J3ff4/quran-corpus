@@ -93,7 +93,6 @@ vi.mock('react-native-reanimated', async () => {
     // these, and a mock returning {} makes a row that leaves a gap behind
     // indistinguishable from one that does not.
     // A closed keyboard: BottomSheet subtracts this from its own translate.
-    useAnimatedKeyboard: () => ({ height: { value: 0 }, state: { value: 1 } }),
     useAnimatedStyle: (worklet: () => unknown) => worklet(),
     useSharedValue: (initial: unknown) => ({ value: initial }),
     withSpring: (to: unknown) => to,
@@ -171,6 +170,10 @@ vi.mock('react-native', async () => {
     Text: host('span'),
     TextInput: Input,
     View: host('div'),
+    // A keyboard that never opens. Whether the sheet lifts is a device check
+    // -- jsdom has no keyboard -- and BottomSheet.test.tsx drives these
+    // listeners by hand.
+    Keyboard: { addListener: () => ({ remove: () => {} }) },
     Pressable: host('button'),
     Animated: { View: host('div'), createAnimatedComponent: () => host('button') },
   };
