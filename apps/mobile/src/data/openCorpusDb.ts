@@ -165,5 +165,10 @@ export function useCorpusFonts(): [boolean, Error | null] {
     Hafs: require('../../assets/fonts/hafs.ttf'),
     Newsreader: require('../../assets/fonts/Newsreader-Regular.ttf'),
     'Newsreader-SemiBold': require('../../assets/fonts/Newsreader-SemiBold.ttf'),
+    // The calligraphic surah name the mushaf's band carries, the same pair web
+    // uses: one PUA glyph per surah, and v4 only because v2 has no glyph for
+    // surah 102 at all.
+    SurahNameV2: require('../../assets/fonts/SurahNameV2.ttf'),
+    SurahNameV4: require('../../assets/fonts/SurahNameV4.ttf'),
   });
 }

@@ -8,10 +8,11 @@ import { arabicScales, type ArabicScale } from '../theme/tokens';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 
-// Two values, not three. 'wbw' is a navigation, not a rendering -- the chip's
-// third segment pushes /surah/[id]/words -- so persisting it would reopen the
-// app onto a screen the user left by pressing back.
-export type ReaderMode = 'mushaf' | 'translation';
+// `ReaderMode` and its `readerMode` setting were deleted in M7d: the mushaf
+// became its own tab (ruling 1) and the reader has one rendering again, so
+// there is no longer a mode to choose or to persist. The stored row on a
+// device that used to hold 'mushaf' is simply never read again -- deleting it
+// would be a destructive migration to no purpose (decision 34: additive only).
 
 // Global, not per-screen (decision 26): the density is a reading preference,
 // and a reader who wants dense wants it in every surah.
@@ -29,7 +30,6 @@ export interface AppSettings {
   analyticsEnabled: boolean;
   arabicScale: ArabicScale;
   reduceMotion: boolean;
-  readerMode: ReaderMode;
   /** Whether translation mode draws the translation under the Arabic. Off
    *  leaves the cards Arabic-only -- and takes the language control with it,
    *  since a picker that changes nothing visible is a dead control. */
@@ -51,7 +51,6 @@ export interface AppSettingsContextValue extends AppSettings {
   setAnalyticsEnabled: (enabled: boolean) => void;
   setArabicScale: (scale: ArabicScale) => void;
   setReduceMotion: (reduce: boolean) => void;
-  setReaderMode: (mode: ReaderMode) => void;
   setShowTranslation: (show: boolean) => void;
   setWbwDensity: (density: WbwDensity) => void;
   setContinuousPlay: (enabled: boolean) => void;
@@ -68,7 +67,6 @@ const defaultSettings: AppSettings = {
   analyticsEnabled: false,
   arabicScale: 'medium',
   reduceMotion: false,
-  readerMode: 'translation',
   showTranslation: true,
   // Dense, not hybrid (owner ruling 2026-09-01). See DENSE_DEFAULT_KEY below
   // for what happens to a phone that already stored the old default.
@@ -91,7 +89,7 @@ const AppSettingsContext = createContext<AppSettingsContextValue | null>(null);
 // change -- the owner's report was that the Arabic dominated the card at any
 // system size. System scaling still composes on top; nothing here sets
 // allowFontScaling.
-const settingKeys = ['uiLocale', 'contentLanguage', 'theme', 'analyticsEnabled', 'arabicScale', 'reduceMotion', 'readerMode', 'showTranslation', 'wbwDensity', 'continuousPlay', 'reciterId'] as const;
+const settingKeys = ['uiLocale', 'contentLanguage', 'theme', 'analyticsEnabled', 'arabicScale', 'reduceMotion', 'showTranslation', 'wbwDensity', 'continuousPlay', 'reciterId'] as const;
 
 /** A stored boolean, or the default for anything that is not one.
  *
@@ -118,10 +116,6 @@ function isTheme(value: string | null): value is ThemePreference {
 
 function isArabicScale(value: string | null): value is ArabicScale {
   return value !== null && Object.hasOwn(arabicScales, value);
-}
-
-function isReaderMode(value: string | null): value is ReaderMode {
-  return value === 'mushaf' || value === 'translation';
 }
 
 function isWbwDensity(value: string | null): value is WbwDensity {
@@ -193,7 +187,6 @@ export async function loadPersistedAppSettings(client: MobileDataClient): Promis
   const analyticsEnabled = persisted.analyticsEnabled;
   const persistedArabicScale = persisted.arabicScale;
   const reduceMotion = persisted.reduceMotion;
-  const persistedReaderMode = persisted.readerMode;
   const showTranslation = persisted.showTranslation;
   const persistedWbwDensity = await migrateWbwDensityDefault(client, persisted.wbwDensity);
   const continuousPlay = persisted.continuousPlay;
@@ -206,7 +199,6 @@ export async function loadPersistedAppSettings(client: MobileDataClient): Promis
     analyticsEnabled: analyticsEnabled === 'true',
     arabicScale: isArabicScale(persistedArabicScale) ? persistedArabicScale : defaultSettings.arabicScale,
     reduceMotion: reduceMotion === 'true',
-    readerMode: isReaderMode(persistedReaderMode) ? persistedReaderMode : defaultSettings.readerMode,
     showTranslation: storedBoolean(showTranslation, defaultSettings.showTranslation),
     wbwDensity: isWbwDensity(persistedWbwDensity) ? persistedWbwDensity : defaultSettings.wbwDensity,
     // Same 'true' comparison the other two booleans take, and for the same
@@ -415,7 +407,6 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       setAnalyticsEnabled: (analyticsEnabled) => updateSetting('analyticsEnabled', analyticsEnabled),
       setArabicScale: (arabicScale) => updateSetting('arabicScale', arabicScale),
       setReduceMotion: (reduceMotion) => updateSetting('reduceMotion', reduceMotion),
-      setReaderMode: (readerMode) => updateSetting('readerMode', readerMode),
       setShowTranslation: (showTranslation) => updateSetting('showTranslation', showTranslation),
       setWbwDensity: (wbwDensity) => updateSetting('wbwDensity', wbwDensity),
       setContinuousPlay: (continuousPlay) => updateSetting('continuousPlay', continuousPlay),

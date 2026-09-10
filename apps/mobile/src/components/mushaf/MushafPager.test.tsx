@@ -24,13 +24,20 @@ const props = {
   initialPage: 106,
   width: 360,
   height: 720,
-  highlights: { bookmarked: new Set<string>(), landing: null, playing: null, landingProgress: 0 },
+  highlights: {
+    bookmarked: new Set<string>(),
+    landing: null,
+    playing: null,
+    landingProgress: 0,
+    pressed: null,
+  },
   ayahTexts: new Map<string, string>(),
   surahNames: new Map<number, string>(),
   juzByPage: new Map<number, number>(),
   uiLocale: 'en' as const,
   onPageChange: vi.fn(),
-  onWordPress: vi.fn(),
+  onWordLongPress: vi.fn(),
+  onTap: vi.fn(),
 };
 
 /** The settle event RN emits at the end of a paging scroll. */
@@ -39,6 +46,17 @@ const settleAt = (page: number) => ({
 });
 
 describe('MushafPager', () => {
+  it('memoises a page, so a chrome toggle two levels up does not redraw three', () => {
+    // Every prop a page takes is a stable reference from the reader. Without
+    // the memo one boolean -- the chrome's visibility -- re-rendered all three
+    // mounted pages, and a page render invalidates the hardware layer it is
+    // held in, so a 220ms slide competed with three full rasterisations.
+    const list = listPropsOf(render(<MushafPager {...props} />));
+    const cell = list.renderItem?.({ item: 106 } as never) as { type: { $$typeof?: symbol } };
+
+    expect(cell.type.$$typeof).toBe(Symbol.for('react.memo'));
+  });
+
   it('spans exactly the 604 pages of the mushaf', () => {
     const list = listPropsOf(render(<MushafPager {...props} />));
     expect(list.data).toHaveLength(604);
@@ -112,7 +130,12 @@ describe('MushafPager', () => {
     const list = listPropsOf(render(<MushafPager {...props} />));
     expect(list.windowSize).toBe(3);
     expect(list.maxToRenderPerBatch).toBe(1);
-    expect(list.removeClippedSubviews).toBe(true);
+    // NOT clipped. With a window of three there is nothing left to clip, and
+    // on Android it is a known source of blank and half-drawn cells on a
+    // horizontal list. `fast` deceleration is what stops the turn drifting
+    // after the finger leaves (owner, 2026-09-10).
+    expect(list.removeClippedSubviews).toBeUndefined();
+    expect(list.decelerationRate).toBe('fast');
   });
 
   it('turns to the page the recitation has moved onto', () => {

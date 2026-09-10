@@ -54,6 +54,7 @@ const index = {
     [107, { page: 107, startSurahId: 5, startAyahNumber: 90, surahName: 'Al-Maidah', juz: null }],
   ]),
   surahNames: new Map([[5, 'Al-Maidah']]),
+  ayahCounts: new Map([[5, 120]]),
   ready: true,
 };
 
@@ -68,6 +69,7 @@ const props = {
   uiLocale: 'en' as const,
   onPageChange: vi.fn(),
   onWordPress: vi.fn(),
+  onTap: vi.fn(),
   onLanded: vi.fn(),
 };
 
@@ -134,24 +136,30 @@ describe('MushafReader', () => {
     expect(juzByPage.has(107)).toBe(false);
   });
 
-  it('turns a tapped glyph into the ayah row the word sheet needs', () => {
+  it('turns a long-pressed glyph into the ayah row the word sheet needs', () => {
     // The layout rows carry a coordinate, not a word id. Without the lookup
     // the sheet has nothing to open on.
     mocks.ayahs = new Map([[ayahKey(5, 82), { id: 682, text_uthmani: 'الآية' }]]);
     const onWordPress = vi.fn();
     render(<MushafReader {...props} onWordPress={onWordPress} />);
 
-    const tap = mocks.pagerProps.at(-1)?.['onWordPress'] as (word: unknown) => void;
+    const tap = mocks.pagerProps.at(-1)?.['onWordLongPress'] as (word: unknown) => void;
     act(() => tap({ surahId: 5, ayahNumber: 82, position: 3, charType: 'word', glyph: '' }));
 
-    expect(onWordPress).toHaveBeenCalledWith(682, 3);
+    // The word AND its ayah row: the row id answers "which words", the word
+    // answers "which surah", and on a page holding two surahs the second is
+    // not derivable from the screen.
+    expect(onWordPress).toHaveBeenCalledWith(
+      expect.objectContaining({ surahId: 5, ayahNumber: 82, position: 3 }),
+      682,
+    );
   });
 
   it('opens nothing for a word whose ayah rows have not arrived', () => {
     const onWordPress = vi.fn();
     render(<MushafReader {...props} onWordPress={onWordPress} />);
 
-    const tap = mocks.pagerProps.at(-1)?.['onWordPress'] as (word: unknown) => void;
+    const tap = mocks.pagerProps.at(-1)?.['onWordLongPress'] as (word: unknown) => void;
     act(() => tap({ surahId: 5, ayahNumber: 82, position: 3, charType: 'word', glyph: '' }));
 
     expect(onWordPress).not.toHaveBeenCalled();
@@ -226,5 +234,15 @@ describe('MushafReader', () => {
 
     expect(mocks.pagerProps.at(-1)?.['highlights']).toMatchObject({ playing: '5:90' });
     expect(mocks.pagerProps.at(-1)?.['focusPage']).toBe(107);
+  });
+
+  it('leaves the press wash to the page, so a touch cannot re-render its siblings', () => {
+    // A swipe begins with a finger on a word. While this state lived here, that
+    // first touch re-rendered the reader and all three mounted pages before the
+    // page had moved at all. Nothing above the pager knows about it now.
+    render(<MushafReader {...props} />);
+
+    expect(mocks.pagerProps.at(-1)?.['onWordPressIn']).toBeUndefined();
+    expect((mocks.pagerProps.at(-1)?.['highlights'] as { pressed: unknown }).pressed).toBeNull();
   });
 });

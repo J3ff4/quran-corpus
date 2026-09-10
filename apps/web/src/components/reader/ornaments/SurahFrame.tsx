@@ -1,20 +1,16 @@
 import type { ReactNode } from 'react';
 
-import { SURAH_BAND_PATH, SURAH_BAND_VIEW_BOX } from '@quran-corpus/config/ornaments/surahBand';
+import {
+  SURAH_BAND_MEDALLIONS,
+  SURAH_BAND_PATH,
+  SURAH_BAND_VIEW_BOX,
+  toEasternArabicNumeral,
+} from '@quran-corpus/config/ornaments/surahBand';
 
 interface SurahFrameProps {
   children: ReactNode;
   surahNumber: number;
   className?: string;
-}
-
-const EASTERN_ARABIC_DIGITS = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-
-function toEasternArabicNumeral(n: number): string {
-  return String(n)
-    .split('')
-    .map((d) => EASTERN_ARABIC_DIGITS[Number(d)])
-    .join('');
 }
 
 /**
@@ -43,13 +39,24 @@ function toEasternArabicNumeral(n: number): string {
  * Arabic-Indic numeral sits in the right medallion and the Western numeral in
  * the left one.
  */
-const medallionBase = { top: '20.5%', height: '57.7%', width: '7.19%' } as const;
+// Percentages off the shared fractions, so the mushaf page and this frame
+// cannot drift apart on geometry neither of them measured.
+const pct = (fraction: number) => `${(fraction * 100).toFixed(2)}%`;
+const medallionBase = {
+  top: pct(SURAH_BAND_MEDALLIONS.top),
+  height: pct(SURAH_BAND_MEDALLIONS.height),
+  width: pct(SURAH_BAND_MEDALLIONS.width),
+} as const;
 // kfgqpc (font-arabic's primary face) substitutes its own decorative
 // ayah-end roundel for plain digit glyphs, which reads as a second medallion
 // nested in the frame's medallion. Amiri has plain Eastern Arabic-Indic digit
 // forms, so it's referenced directly here instead of the font-arabic class.
-const rightMedallionStyle = { ...medallionBase, left: '75.8%', fontFamily: "'Amiri', 'Amiri Fallback'" };
-const leftMedallionStyle = { ...medallionBase, left: '17.16%' };
+const rightMedallionStyle = {
+  ...medallionBase,
+  left: pct(SURAH_BAND_MEDALLIONS.easternLeft),
+  fontFamily: "'Amiri', 'Amiri Fallback'",
+};
+const leftMedallionStyle = { ...medallionBase, left: pct(SURAH_BAND_MEDALLIONS.westernLeft) };
 
 export function SurahFrame({ children, surahNumber, className }: SurahFrameProps) {
   // 1-2 digit surah numbers (1-99) read as visually smaller than the

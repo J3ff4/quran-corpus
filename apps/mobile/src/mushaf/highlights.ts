@@ -7,6 +7,16 @@ export interface HighlightInput {
   playing: string | null;
   /** 1 at the pulse's peak, 0 once faded. */
   landingProgress: number;
+  /** The word under a long press, or null. The only per-WORD state there is:
+   *  the other three mark an ayah, and this one has to say which of its words
+   *  the sheet about to open is about (M7d ruling 4). */
+  pressed: PressedWord | null;
+}
+
+export interface PressedWord {
+  surahId: number;
+  ayahNumber: number;
+  position: number;
 }
 
 /** Keys are strings, not ayah numbers: 51 pages cross a surah boundary, so an
@@ -44,21 +54,66 @@ function mix(from: string, to: string, t: number): string {
 }
 
 /**
- * One colour per ayah, resolved from the three highlight states that can all
- * be true at once (ruling 20). Precedence, strongest first:
- * **audio -> landing -> bookmark -> plain text.** Audio wins because it is the
- * one that moves, and a landing pulse under a playing ayah would fight it.
+ * One colour per word, resolved from the four highlight states that can all be
+ * true at once (ruling 20, and M7d ruling 4). Precedence, strongest first:
+ * **pressed -> audio -> landing -> bookmark -> plain text.**
+ *
+ * Pressed wins over audio, which wins over everything else: it is the only
+ * state the reader is causing at this instant, and its whole job is to say
+ * which word the sheet that is opening belongs to. Audio comes next because it
+ * is the one that moves on its own, and a landing pulse under a playing ayah
+ * would fight it.
+ *
+ * A word, not an ayah: three of the four states mark a whole ayah and the
+ * fourth marks one word inside it, so the ayah-shaped signature could not
+ * express the new one at all.
  */
-export function colorForAyah(
+export function colorForWord(
   input: HighlightInput,
   theme: typeof themeColors.light,
-): (surahId: number, ayahNumber: number) => string {
+): (surahId: number, ayahNumber: number, position: number) => string {
   const bookmarkColor = mix(theme.text, theme.accent, BOOKMARK_TINT);
-  return (surahId, ayahNumber) => {
+  const pressed = input.pressed;
+  return (surahId, ayahNumber, position) => {
+    if (isPressed(pressed, surahId, ayahNumber, position)) return theme.accent;
     const key = ayahKey(surahId, ayahNumber);
     if (input.playing === key) return theme.accent;
     const base = input.bookmarked.has(key) ? bookmarkColor : theme.text;
     if (input.landing === key) return mix(base, theme.accent, LANDING_PEAK * input.landingProgress);
     return base;
   };
+}
+
+function isPressed(
+  pressed: PressedWord | null,
+  surahId: number,
+  ayahNumber: number,
+  position: number,
+): boolean {
+  return (
+    pressed !== null &&
+    pressed.surahId === surahId &&
+    pressed.ayahNumber === ayahNumber &&
+    pressed.position === position
+  );
+}
+
+/**
+ * The ground a word sits on: a wash under the pressed word, nothing anywhere
+ * else.
+ *
+ * Colour alone cannot carry this state. A pressed word takes the accent, and
+ * so does a playing one -- press a word inside the ayah being recited and the
+ * two would be indistinguishable, which is exactly the moment the mark has to
+ * be readable. The wash is what separates them, and it is also the only one of
+ * the four states that says "this word", not "this verse".
+ */
+export function backgroundForWord(
+  input: HighlightInput,
+  theme: typeof themeColors.light,
+): (surahId: number, ayahNumber: number, position: number) => string | undefined {
+  const pressed = input.pressed;
+  if (pressed === null) return () => undefined;
+  return (surahId, ayahNumber, position) =>
+    isPressed(pressed, surahId, ayahNumber, position) ? theme.accentWash : undefined;
 }

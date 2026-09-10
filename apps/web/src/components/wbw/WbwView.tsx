@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { Surah } from '@quran-corpus/data';
 import { Bismillah } from '../reader/ornaments/Bismillah';
 import { SurahFrame } from '../reader/ornaments/SurahFrame';
-import { surahNameGlyph } from '../reader/ornaments/surahNameGlyph';
+import { needsSurahNameFallback, surahNameGlyph } from '../reader/ornaments/surahNameGlyph';
 import { WbwAyahs } from './WbwAyahs';
 import { Pager } from './Pager';
 import { ScrollToAyah } from '../shared/ScrollToAyah';
@@ -39,7 +39,7 @@ export function WbwView({
         <SurahFrame surahNumber={surah.id} className="mb-3">
           <p
             className={`text-[1.9rem] leading-none text-paper-900 dark:text-paper-100 ${
-              surah.id === 102 ? 'font-surah-name-v4' : 'font-surah-name'
+              needsSurahNameFallback(surah.id) ? 'font-surah-name-v4' : 'font-surah-name'
             }`}
             aria-hidden="true"
           >

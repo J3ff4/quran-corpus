@@ -4,7 +4,14 @@ export type UiStringKey =
   | 'tabs.home'
   | 'tabs.surahs'
   | 'tabs.bookmarks'
-  | 'tabs.morphology'
+  | 'tabs.mushaf'
+  | 'mushaf.jump'
+  | 'mushaf.jumpTitle'
+  | 'mushaf.jumpPage'
+  | 'mushaf.jumpSurah'
+  | 'mushaf.jumpJuz'
+  | 'mushaf.jumpGo'
+  | 'mushaf.jumpOutOfRange'
   | 'tabs.settings'
   | 'tabs.dictionary'
   | 'tabs.menu'
@@ -15,6 +22,8 @@ export type UiStringKey =
   | 'menu.bookmarksSub'
   | 'menu.settingsSub'
   | 'menu.aboutSub'
+  | 'menu.morphology'
+  | 'menu.morphologySub'
   | 'menu.deviceHeading'
   | 'menu.deviceNote'
   | 'wbw.title'
@@ -93,7 +102,6 @@ export type UiStringKey =
   | 'reader.bismillah'
   | 'reader.back'
   | 'reader.mode'
-  | 'reader.modeMushaf'
   | 'reader.modeTranslation'
   | 'reader.modeWbw'
   | 'word.fullAnalysis'
@@ -210,6 +218,7 @@ export type UiStringKey =
   | 'about.sourceHansWehr'
   | 'about.sourceEditorial'
   | 'about.sourceNewsreader'
+  | 'about.sourceSurahName'
   | 'about.groupText'
   | 'about.groupDictionary'
   | 'about.groupRecitation'
@@ -266,9 +275,16 @@ export type UiStringKey =
 export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
   en: {
     'tabs.home': 'Home',
+    'mushaf.jump': 'Go to page, surah or juz',
+    'mushaf.jumpTitle': 'Go to',
+    'mushaf.jumpPage': 'Page',
+    'mushaf.jumpSurah': 'Surah',
+    'mushaf.jumpJuz': 'Juz',
+    'mushaf.jumpGo': 'Go',
+    'mushaf.jumpOutOfRange': 'Nothing there. Page 1-604, surah 1-114, juz 1-30.',
     'tabs.surahs': 'Surahs',
     'tabs.bookmarks': 'Bookmarks',
-    'tabs.morphology': 'Morphology',
+    'tabs.mushaf': 'Mushaf',
     'tabs.settings': 'Settings',
     'tabs.dictionary': 'Dictionary',
     'tabs.menu': 'Menu',
@@ -279,6 +295,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'menu.bookmarksSub': 'Saved ayahs and the notes on them',
     'menu.settingsSub': 'Reading, recitation, appearance, language',
     'menu.aboutSub': 'Sources, licences and version',
+    'menu.morphology': 'Morphology',
+    'menu.morphologySub': 'Word by word, from where you left off',
     'menu.deviceHeading': 'On this device',
     'menu.deviceNote': 'Nothing you save leaves the phone. Bookmarks, notes and settings live in one file here, and they survive app updates.',
     'wbw.title': 'Word by word',
@@ -341,7 +359,6 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.bismillah': 'In the name of Allah, the Entirely Merciful, the Especially Merciful',
     'reader.back': 'Back',
     'reader.mode': 'Reading mode',
-    'reader.modeMushaf': 'Mushaf',
     'reader.modeTranslation': 'Translation',
     'reader.modeWbw': 'Words',
     'word.fullAnalysis': 'Full analysis',
@@ -427,6 +444,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceHansWehr': 'Concise modern glosses, shown first on a root entry.',
     'about.sourceEditorial': 'Roots written for this app, where no source covered them.',
     'about.sourceNewsreader': 'SIL Open Font License 1.1. Copyright 2020 The Newsreader Project Authors.',
+    'about.sourceSurahName': 'The calligraphic surah name inside the mushaf band. Free/open, no attribution required; credited for transparency. One glyph per surah at PUA codepoint 0xE000 + surah number.',
     'about.groupText': 'Text and translation',
     'about.groupDictionary': 'Dictionary',
     'about.groupRecitation': 'Recitation',
@@ -471,9 +489,16 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
   },
   uz: {
     'tabs.home': 'Bosh sahifa',
+    'mushaf.jump': 'Sahifa, sura yoki juzga oʻtish',
+    'mushaf.jumpTitle': 'Oʻtish',
+    'mushaf.jumpPage': 'Sahifa',
+    'mushaf.jumpSurah': 'Sura',
+    'mushaf.jumpJuz': 'Juz',
+    'mushaf.jumpGo': 'Oʻtish',
+    'mushaf.jumpOutOfRange': 'Bunday joy yoʻq. Sahifa 1-604, sura 1-114, juz 1-30.',
     'tabs.surahs': 'Suralar',
     'tabs.bookmarks': 'Xatcho‘plar',
-    'tabs.morphology': 'Morfologiya',
+    'tabs.mushaf': 'Mushaf',
     'tabs.settings': 'Sozlamalar',
     'tabs.dictionary': 'Lug‘at',
     'tabs.menu': 'Menyu',
@@ -484,6 +509,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'menu.bookmarksSub': 'Saqlangan oyatlar va ulardagi izohlar',
     'menu.settingsSub': 'O‘qish, qiroat, ko‘rinish, til',
     'menu.aboutSub': 'Manbalar, litsenziyalar va versiya',
+    'menu.morphology': 'Morfologiya',
+    'menu.morphologySub': 'Soʻzma-soʻz, toʻxtagan joyingizdan',
     'menu.deviceHeading': 'Shu qurilmada',
     'menu.deviceNote': 'Saqlanganlar telefondan chiqmaydi. Xatcho‘plar, izohlar va sozlamalar shu yerdagi bitta faylda saqlanadi va ilova yangilanganda ham qoladi.',
     'wbw.title': 'So‘zma-so‘z',
@@ -546,7 +573,6 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.bismillah': 'Mehribon va rahmli Alloh nomi bilan',
     'reader.back': 'Orqaga',
     'reader.mode': 'O‘qish rejimi',
-    'reader.modeMushaf': 'Mushaf',
     'reader.modeTranslation': 'Tarjima',
     'reader.modeWbw': 'So‘zlar',
     'word.fullAnalysis': 'To‘liq tahlil',
@@ -630,6 +656,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceHansWehr': 'Qisqa zamonaviy ma’nolar, o‘zak sahifasida birinchi ko‘rsatiladi.',
     'about.sourceEditorial': 'Hech bir manba qamrab olmagan o‘zaklar shu ilova uchun yozilgan.',
     'about.sourceNewsreader': 'SIL Open Font License 1.1. Copyright 2020 The Newsreader Project Authors.',
+    'about.sourceSurahName': 'Mushaf lentasidagi xattotlik uslubidagi sura nomi. Erkin/ochiq, atribut talab qilinmaydi; shaffoflik uchun keltirilgan. Har bir suraga PUA kod nuqtasi 0xE000 + sura raqami bo‘yicha bitta glif.',
     'about.groupText': 'Matn va tarjima',
     'about.groupDictionary': 'Lug‘at',
     'about.groupRecitation': 'Qiroat',
@@ -671,9 +698,16 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
   },
   ru: {
     'tabs.home': 'Главная',
+    'mushaf.jump': 'Перейти к странице, суре или джузу',
+    'mushaf.jumpTitle': 'Перейти',
+    'mushaf.jumpPage': 'Страница',
+    'mushaf.jumpSurah': 'Сура',
+    'mushaf.jumpJuz': 'Джуз',
+    'mushaf.jumpGo': 'Перейти',
+    'mushaf.jumpOutOfRange': 'Такого нет. Страница 1-604, сура 1-114, джуз 1-30.',
     'tabs.surahs': 'Суры',
     'tabs.bookmarks': 'Закладки',
-    'tabs.morphology': 'Морфология',
+    'tabs.mushaf': 'Мусхаф',
     'tabs.settings': 'Настройки',
     'tabs.dictionary': 'Словарь',
     'tabs.menu': 'Меню',
@@ -684,6 +718,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'menu.bookmarksSub': 'Сохранённые аяты и заметки к ним',
     'menu.settingsSub': 'Чтение, чтец, оформление, язык',
     'menu.aboutSub': 'Источники, лицензии и версия',
+    'menu.morphology': 'Морфология',
+    'menu.morphologySub': 'Пословно, с того места, где вы остановились',
     'menu.deviceHeading': 'На этом устройстве',
     'menu.deviceNote': 'Ничего из сохранённого не покидает телефон. Закладки, заметки и настройки хранятся в одном файле здесь и сохраняются при обновлении приложения.',
     'wbw.title': 'Пословно',
@@ -746,7 +782,6 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.bismillah': 'Именем Аллаха, Милостивого, Милосердного',
     'reader.back': 'Назад',
     'reader.mode': 'Режим чтения',
-    'reader.modeMushaf': 'Мусхаф',
     'reader.modeTranslation': 'Перевод',
     'reader.modeWbw': 'Слова',
     'word.fullAnalysis': 'Полный разбор',
@@ -831,6 +866,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceHansWehr': 'Краткие современные значения, показываются первыми на странице корня.',
     'about.sourceEditorial': 'Корни, написанные для этого приложения там, где их не покрыл ни один источник.',
     'about.sourceNewsreader': 'SIL Open Font License 1.1. Copyright 2020 The Newsreader Project Authors.',
+    'about.sourceSurahName': 'Каллиграфическое название суры внутри орнаментальной рамки мусхафа. Свободная лицензия, указание авторства не требуется; приведено для прозрачности. По одному глифу на суру в кодовой точке PUA 0xE000 + номер суры.',
     'about.groupText': 'Текст и перевод',
     'about.groupDictionary': 'Словарь',
     'about.groupRecitation': 'Чтение',

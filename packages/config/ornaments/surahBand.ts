@@ -30,3 +30,69 @@ export const SURAH_BAND_PATH =
 
 /** Native authoring box; consumers scale it. 16320 x 2000 = 8.16:1. */
 export const SURAH_BAND_VIEW_BOX = '0 -500 16320 2000';
+
+/**
+ * The two round medallions flanking the cartouche, as fractions of the band's
+ * own box: `left` and `width` of its width, `top` and `height` of its height.
+ *
+ * Recovered from the path's subpath bounding boxes offline, not guessed (see
+ * the note above). Shared because both products fill them with the surah's
+ * number and neither may re-derive geometry the other already measured.
+ *
+ * RTL reading starts on the right, so the Eastern Arabic-Indic numeral goes in
+ * the right medallion and the Western one in the left.
+ */
+export const SURAH_BAND_MEDALLIONS = {
+  top: 0.205,
+  height: 0.577,
+  width: 0.0719,
+  /** Left edge of each medallion, as a fraction of the band's width. */
+  easternLeft: 0.758,
+  westernLeft: 0.1716,
+} as const;
+
+/**
+ * Numeral size inside a medallion, as a fraction of the band's height.
+ *
+ * Two values per script because digit count changes the apparent size at a
+ * fixed one: a two-digit Western numeral reads smaller than a three-digit one,
+ * and a three-digit Eastern numeral reads larger. Both are the web frame's
+ * fitted rem values divided by the band height they were fitted at.
+ */
+export const SURAH_BAND_NUMERAL_SIZE = {
+  westernShort: 0.1636,
+  westernLong: 0.1487,
+  easternShort: 0.2478,
+  easternLong: 0.228,
+} as const;
+
+/**
+ * The cartouche between the two medallions -- the panel the surah's name is
+ * written in -- as fractions of the band's own box.
+ *
+ * Derived from the medallion geometry rather than measured again: the panel is
+ * exactly the span between the inner edge of the left medallion and the left
+ * edge of the right one, and two numbers that must agree may not be written
+ * down twice.
+ */
+export const SURAH_BAND_CARTOUCHE = {
+  left: SURAH_BAND_MEDALLIONS.westernLeft + SURAH_BAND_MEDALLIONS.width,
+  width:
+    SURAH_BAND_MEDALLIONS.easternLeft -
+    (SURAH_BAND_MEDALLIONS.westernLeft + SURAH_BAND_MEDALLIONS.width),
+  /** The name's cap height, as a fraction of the band's height. The glyph is a
+   *  whole calligraphic name rather than a line of type, so this is fitted to
+   *  the cartouche's clear height, not derived from a type scale. */
+  nameSize: 0.78,
+} as const;
+
+const EASTERN_ARABIC_DIGITS = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+
+/** Western digits to Eastern Arabic-Indic. Here rather than in either app
+ *  because the band's right medallion is the only place either draws them. */
+export function toEasternArabicNumeral(n: number): string {
+  return String(n)
+    .split('')
+    .map((digit) => EASTERN_ARABIC_DIGITS[Number(digit)])
+    .join('');
+}

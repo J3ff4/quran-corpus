@@ -72,6 +72,7 @@ const TYPEFACES: Credit[] = [
   // the layout above; they are credited separately because they are a
   // separate source's work travelling under the same permission gap.
   { name: 'KFGQPC', body: 'about.sourceMushafFont', pending: true },
+  { name: 'surah-name-v2 / v4 (quranfonts.com)', body: 'about.sourceSurahName' },
 ];
 
 export function AboutScreen() {

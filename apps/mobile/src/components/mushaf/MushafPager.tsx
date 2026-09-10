@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { memo, useCallback, useEffect, useRef } from 'react';
 import { FlatList } from 'react-native';
 import {
   MUSHAF_PAGE_MAX,
@@ -38,7 +38,9 @@ export interface MushafPagerProps {
    *  The turn it causes still settles, so the page it lands on is reported
    *  through onPageChange like any other. */
   focusPage?: number | null;
-  onWordPress: (word: MushafWord) => void;
+  onWordLongPress: (word: MushafWord) => void;
+  /** A tap on any page. Toggles the chrome (ruling 3). */
+  onTap: () => void;
 }
 
 type PageProps = Omit<MushafPagerProps, 'initialPage' | 'onPageChange' | 'focusPage'> & {
@@ -47,15 +49,22 @@ type PageProps = Omit<MushafPagerProps, 'initialPage' | 'onPageChange' | 'focusP
 
 /** One page in the pager, holding its own query.
  *
+ *  Memoised, and every prop it takes is a stable reference from the reader.
+ *  Without it a chrome toggle -- one boolean, two levels up -- re-rendered all
+ *  three mounted pages, and a page render invalidates the hardware layer the
+ *  page is now held in, so the bar's own 220ms slide was competing with three
+ *  full page rasterisations. Measured on device (2026-09-10): the toggle's
+ *  frames ran at a 17ms median against an 11ms budget until this landed.
+ *
  *  Per page rather than per pager: the list keeps three pages mounted, so
  *  three queries are live at a time and a swipe lands on rows that are already
  *  there. A single query in the pager would refetch on every turn and blank
  *  the page it is turning to.
  */
-function PagerPage({ client, page, juzByPage, ...rest }: PageProps) {
+const PagerPage = memo(function PagerPage({ client, page, juzByPage, ...rest }: PageProps) {
   const { lines } = useMushafPage(client, page);
   return <MushafPage page={page} lines={lines} juz={juzByPage.get(page) ?? 0} {...rest} />;
-}
+});
 
 /**
  * The mushaf, all 604 pages of it, turning right to left.
@@ -122,7 +131,14 @@ export function MushafPager({
       windowSize={3}
       maxToRenderPerBatch={1}
       initialNumToRender={1}
-      removeClippedSubviews
+      // Android's default paging deceleration drifts for a beat after the
+      // finger leaves, which reads as the page arriving late. `fast` is what a
+      // native pager does.
+      decelerationRate="fast"
+      // NOT removeClippedSubviews. With a window of three there is nothing to
+      // save -- one page either side is already all that is mounted -- and on
+      // Android it is a known source of blank and half-drawn cells on a
+      // horizontal list, which is the one artefact this pager cannot afford.
       onMomentumScrollEnd={onMomentumScrollEnd}
       renderItem={({ item }) => <PagerPage page={item} {...page} />}
     />

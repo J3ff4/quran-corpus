@@ -12,8 +12,9 @@ const ALLOWED_COLLISIONS: Partial<Record<UiStringKey, readonly ('uz' | 'ru')[]>>
   // way in both. Not an untranslated copy.
   'browse.juz': ['uz'],
   'browse.juzLabel': ['uz'],
+  'mushaf.jumpJuz': ['uz'],
   // Same again: "Mushaf" is the Arabic muṣḥaf, spelled the same in Uzbek.
-  'reader.modeMushaf': ['uz'],
+  'tabs.mushaf': ['uz'],
   // The OFL requires its notice to be reproduced, and reproducing it means the
   // English wording -- a translated licence notice is not the notice. The
   // sentence around it is the credit; this string IS the legal text.

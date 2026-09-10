@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('react-native', async () => {
@@ -49,7 +49,13 @@ const props = {
   lines: plainLines,
   width: 360,
   height: 640,
-  highlights: { bookmarked: new Set<string>(), landing: null, playing: null, landingProgress: 0 },
+  highlights: {
+    bookmarked: new Set<string>(),
+    landing: null,
+    playing: null,
+    landingProgress: 0,
+    pressed: null,
+  },
   ayahTexts: new Map([
     [ayahKey(2, 1), 'ALIF LAM MIM'],
     // The real row shape: an ayah 1 carries the basmala AND the ayah after it.
@@ -58,7 +64,8 @@ const props = {
   surahNames: new Map([[5, 'Al-Ma-idah']]),
   juz: 6,
   uiLocale: 'en' as const,
-  onWordPress: () => {},
+  onWordLongPress: () => {},
+  onTap: () => {},
 };
 
 const lineBoxesOf = (container: HTMLElement) =>
@@ -70,6 +77,75 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('MushafPage', () => {
+  it('draws pages 1 and 2 as their occupied block, not on the full grid', () => {
+    // The only two pages the layout does not fill. On a 15-line grid al-Fatiha
+    // sat in the top half of the screen over half a page of blank paper; the
+    // printed mushaf centres it. Fewer boxes is what lets the column centre
+    // them -- 15 boxes of a fixed line height fill the page whatever the
+    // justification says.
+    const fatiha = [
+      { line: 3, words: [word(1, 1, 1, 'A')] },
+      { line: 4, words: [word(1, 2, 1, 'B')] },
+    ];
+    const { container } = render(<MushafPage {...props} page={1} lines={fatiha} />);
+
+    expect(lineBoxesOf(container)).toHaveLength(4);
+  });
+
+  it('keeps every other page on the full 15-line grid', () => {
+    // The grid is what makes a page a page: a short page in the middle of the
+    // mushaf (one that ends a surah) still holds its blank lines.
+    const { container } = render(<MushafPage {...props} />);
+
+    expect(lineBoxesOf(container)).toHaveLength(15);
+  });
+
+  it('brings the chrome back from a tap on blank paper, not only from a glyph', () => {
+    // The tap target used to be a sibling painted behind the text column. A
+    // touch landing on an empty line slot is claimed by that slot and bubbles
+    // up its own ancestors, and a sibling underneath is not one of them -- so
+    // only the words, which carry their own handler, could bring the chrome
+    // back. On a page whose chrome has hidden itself that is most of the page
+    // deaf to the only gesture that restores it.
+    const onTap = vi.fn();
+    const { container } = render(<MushafPage {...props} onTap={onTap} />);
+
+    // Line 15: past the last occupied line, so it holds nothing at all.
+    const blank = lineBoxesOf(container)[14] as HTMLElement;
+    fireEvent.click(blank);
+
+    expect(onTap).toHaveBeenCalledTimes(1);
+  });
+
+  it('washes the pressed word itself, without the reader holding that state', () => {
+    // The press wash lives here, not above the pager. Up there one finger
+    // touching down re-rendered the reader and all three mounted pages -- and
+    // a swipe begins with a finger touching down on a word, so every page turn
+    // paid for three page renders before it had moved at all.
+    render(<MushafPage {...props} />);
+
+    const glyph = screen.getByText('A');
+    expect(glyph.style.backgroundColor).toBe('');
+
+    fireEvent.mouseDown(glyph);
+    expect(screen.getByText('A').style.backgroundColor).not.toBe('');
+
+    fireEvent.mouseUp(screen.getByText('A'));
+    expect(screen.getByText('A').style.backgroundColor).toBe('');
+  });
+
+  it('holds the page as GPU pixels rather than re-drawing it every frame', () => {
+    // A page carries ~150 whole-word QCF glyphs at ~90x100 device pixels, far
+    // more than fits in Skia's glyph atlas, so every frame evicted and
+    // re-uploaded the lot: 146 `Texture upload` slices per frame while
+    // swiping, a 32ms median frame against 11ms at 90Hz, 100% janky, GPU idle
+    // at 2ms (device, 2026-09-10). Rasterised once into a hardware layer the
+    // same swipe measured 8ms and 9% janky.
+    const { container } = render(<MushafPage {...props} />);
+
+    expect(container.querySelector('[data-testid="mushaf-page-tap"]')?.getAttribute('data-hardware-layer')).toBe('true');
+  });
+
   it('draws nothing but the page ground until the font is registered', () => {
     // A page drawn early renders QCF codepoints in the system face, which
     // looks like Arabic and is not the Qur'an. Blank is the safe state.

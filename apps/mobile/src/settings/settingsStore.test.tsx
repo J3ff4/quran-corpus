@@ -522,30 +522,17 @@ describe('loadPersistedAppSettings', () => {
     }
   });
 
-  it('restores a persisted reader mode', async () => {
+  it('ignores a readerMode row left behind by an older build', async () => {
+    // M7d deleted the setting when the mushaf became its own tab. The row is
+    // NOT deleted from the device -- migrations are additive only (decision
+    // 34) -- so what matters is that a stored 'mushaf' cannot reach anything:
+    // it is simply not among the keys that are read.
     const userClient = requireSettingsClient();
     await saveSetting(userClient, 'readerMode', 'mushaf');
 
     const settings = await loadPersistedAppSettings(userClient);
 
-    expect(settings.readerMode).toBe('mushaf');
-  });
-
-  it('falls back to translation for a readerMode it does not recognise', async () => {
-    // Same keyed-not-positional hazard this file already documents: an
-    // unvalidated read puts an arbitrary stored string into the reader's mode
-    // switch, which renders neither branch. 'wbw' is in the list because it is
-    // the plausible one -- it is a real mode chip segment, and it is precisely
-    // the value that must not be stored, since reopening onto the screen the
-    // user left by pressing back is not a restore.
-    const userClient = requireSettingsClient();
-    for (const bad of ['wbw', 'MUSHAF', '', 'null']) {
-      await saveSetting(userClient, 'readerMode', bad);
-
-      const settings = await loadPersistedAppSettings(userClient);
-
-      expect(settings.readerMode).toBe('translation');
-    }
+    expect(settings).not.toHaveProperty('readerMode');
   });
 
   it('restores a persisted word-by-word density', async () => {

@@ -45,9 +45,13 @@ export interface MushafReaderProps {
   focusPage: number | null;
   uiLocale: UiLocaleCode;
   onPageChange: (page: number) => void;
-  /** A word was tapped. The ayah is handed over by row id, which is what the
-   *  reader's own word loader takes. */
-  onWordPress: (ayahId: number, position: number) => void;
+  /** A word was long-pressed, which is what opens the sheet since M7d (ruling
+   *  4). Both the layout word and its ayah's row id: the row id is what a word
+   *  loader takes, and the word carries the surah and ayah number that a page
+   *  -- unlike a surah reader -- cannot assume. */
+  onWordPress: (word: MushafWord, ayahId: number) => void;
+  /** A tap on the page. Toggles the chrome, and nothing else (ruling 3). */
+  onTap: () => void;
   /** The first page's font is registered, so there is something to show. The
    *  reader cross-fades on this exactly as it does for the ayah list. */
   onLanded: () => void;
@@ -73,6 +77,7 @@ export function MushafReader({
   uiLocale,
   onPageChange,
   onWordPress,
+  onTap,
   onLanded,
 }: MushafReaderProps) {
   const theme = useThemeColors();
@@ -147,6 +152,10 @@ export function MushafReader({
       landing: pulse > 0 ? landingKey : null,
       playing: playingAyah ? ayahKey(playingAyah.surahId, playingAyah.ayahNumber) : null,
       landingProgress: pulse,
+      // The page owns the press wash; see MushafPage. Nothing above the pager
+      // knows about it, which is the point -- a touch must not re-render the
+      // two pages the reader is not touching.
+      pressed: null,
     }),
     [bookmarkedKeys, landingKey, playingAyah, pulse],
   );
@@ -169,13 +178,13 @@ export function MushafReader({
     [onPageChange],
   );
 
-  const onPagerWordPress = useCallback(
+  const onPagerWordLongPress = useCallback(
     (word: MushafWord) => {
       const ayah = ayahs.get(ayahKey(word.surahId, word.ayahNumber));
       // No row means the surah's ayahs have not arrived yet. Nothing opens,
       // rather than a sheet that names the wrong word.
       if (!ayah) return;
-      onWordPress(ayah.id, word.position);
+      onWordPress(word, ayah.id);
     },
     [ayahs, onWordPress],
   );
@@ -204,7 +213,8 @@ export function MushafReader({
           uiLocale={uiLocale}
           focusPage={focusPage}
           onPageChange={onListPageChange}
-          onWordPress={onPagerWordPress}
+          onWordLongPress={onPagerWordLongPress}
+          onTap={onTap}
         />
       ) : null}
     </View>

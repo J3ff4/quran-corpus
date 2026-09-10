@@ -1,9 +1,16 @@
-import { View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { Pressable, View } from 'react-native';
 import { splitBasmala, type MushafLine, type MushafWord } from '@quran-corpus/data/mobile';
 
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
-import { ayahKey, colorForAyah, type HighlightInput } from '@/mushaf/highlights';
+import {
+  ayahKey,
+  backgroundForWord,
+  colorForWord,
+  type HighlightInput,
+  type PressedWord,
+} from '@/mushaf/highlights';
 import { composePage, MUSHAF_LINES_PER_PAGE, type PageSlot } from '@/mushaf/pageComposition';
 import { useMushafPageFont } from '@/mushaf/pageFont';
 import { mushafFontSize, mushafLineHeight } from '@/mushaf/pageScale';
@@ -11,14 +18,23 @@ import { useThemeColors } from '@/theme/themeContext';
 
 import { BismillahLine } from './BismillahLine';
 import { MushafLineRow } from './MushafLineRow';
-import { PageFooter } from './PageFooter';
+import { PageCorners } from './PageCorners';
 import { SurahBand } from './SurahBand';
 
-/** Side margin the text block sits inside, and the strip the footer owns.
- *  Both are subtracted before the page is scaled, so the type never runs into
- *  either. */
+/** Side margin the text block sits inside, and the strips its furniture owns
+ *  at the top and bottom. All three are subtracted before the page is scaled,
+ *  so the type never runs into any of them.
+ *
+ *  The furniture moved into the page's corners in M7d (rulings 8 and 9), but
+ *  the space it needs did not change: the same 44dp that was one centred
+ *  footer is now a page number in one bottom corner, and the top strip is the
+ *  juz and the surah name. */
 const PAGE_MARGIN = 16;
 const FOOTER_HEIGHT = 44;
+// 26, not 22: PageCorners puts its row at top 6 with a 13pt caption, whose
+// line box on Android is ~18dp -- 24 in all, which the old figure did not
+// reserve, so the juz and the surah name could graze the first glyph line.
+const HEADER_HEIGHT = 26;
 
 export interface MushafPageProps {
   page: number;
@@ -37,7 +53,9 @@ export interface MushafPageProps {
   surahNames: Map<number, string>;
   juz: number;
   uiLocale: UiLocaleCode;
-  onWordPress: (word: MushafWord) => void;
+  onWordLongPress: (word: MushafWord) => void;
+  /** A tap anywhere on the page. Toggles the chrome (ruling 3). */
+  onTap: () => void;
 }
 
 /** The ayahs this page touches, in mushaf order, deduplicated. */
@@ -73,25 +91,82 @@ export function MushafPage({
   surahNames,
   juz,
   uiLocale,
-  onWordPress,
+  onWordLongPress,
+  onTap,
 }: MushafPageProps) {
   const theme = useThemeColors();
   const { ready } = useMushafPageFont(page);
+  // The word under a finger on THIS page, held here rather than by the reader.
+  // Up there it was one piece of state above the pager, so a finger touching
+  // down re-rendered the reader, the pager and all three mounted pages -- and
+  // a swipe begins with a finger touching down on a word. Three page renders
+  // and three more on the press-out, both inside the first frames of the
+  // gesture, are what made the turn feel heavy (owner, 2026-09-10). A page can
+  // only ever hold a press on one of its own words, so it is the page's state.
+  // The scroll steals the responder as soon as the swipe moves, which fires
+  // the press-out and clears the wash.
+  const [pressed, setPressed] = useState<PressedWord | null>(null);
+  const onWordPressIn = useCallback((word: MushafWord) => {
+    setPressed({ surahId: word.surahId, ayahNumber: word.ayahNumber, position: word.position });
+  }, []);
+  const onWordPressOut = useCallback(() => setPressed(null), []);
 
   if (!ready) return <View style={{ width, height, backgroundColor: theme.background }} />;
 
   const fontSize = mushafFontSize(page, width - 2 * PAGE_MARGIN);
-  const lineHeight = mushafLineHeight(height - FOOTER_HEIGHT, MUSHAF_LINES_PER_PAGE);
-  const color = colorForAyah(highlights, theme);
+  const lineHeight = mushafLineHeight(height - FOOTER_HEIGHT - HEADER_HEIGHT, MUSHAF_LINES_PER_PAGE);
+  const marks: HighlightInput = pressed === null ? highlights : { ...highlights, pressed };
+  const color = colorForWord(marks, theme);
+  const background = backgroundForWord(marks, theme);
   // Keyed by line, then drawn 1..15 rather than iterated: composePage stops at
   // the page's last occupied line, and a short page (the last page of the
   // mushaf, or a page that ends a surah) must still hold the full grid.
   const slots = new Map(composePage(page, lines).map((slot) => [slot.line, slot]));
-  const pageLines = Array.from({ length: MUSHAF_LINES_PER_PAGE }, (_, i) => i + 1);
+  // Pages 1 and 2 are the only two the layout does not fill: al-Fatiha occupies
+  // lines 2-8 and al-Baqarah's opening 3-8. Drawn on the full 15-line grid they
+  // sat in the top half of the screen with half a page of blank paper beneath.
+  // The printed mushaf centres both inside their frame, so here the grid is the
+  // occupied block and the page centres that -- the line rhythm stays every
+  // other page's, which is what makes the whole thing read as one book.
+  const centred = page <= 2 && slots.size > 0;
+  const firstLine = centred ? Math.min(...slots.keys()) : 1;
+  const lastLine = centred ? Math.max(...slots.keys()) : MUSHAF_LINES_PER_PAGE;
+  const pageLines = Array.from({ length: lastLine - firstLine + 1 }, (_, i) => firstLine + i);
 
   return (
-    <View style={{ width, height, backgroundColor: theme.background }}>
-      <View style={{ flex: 1, paddingHorizontal: PAGE_MARGIN }}>
+    // AROUND the lines, not behind them and not over them. Over them it would
+    // take the long press the words need. Behind them -- which is where it was
+    // -- it received almost nothing: a touch that lands on a line slot is
+    // claimed by that slot's own View and bubbles up its React ANCESTORS, and a
+    // sibling painted underneath is not one of those. Only the glyphs, which
+    // carry their own handler, brought the chrome back. As the ancestor it gets
+    // every touch no child claimed, which is the whole page minus the words.
+    <Pressable
+      testID="mushaf-page-tap"
+      accessible={false}
+      onPress={onTap}
+      // The page is held as GPU pixels rather than re-drawn every frame.
+      //
+      // A page carries ~150 whole-word QCF glyphs at ~90x100 device pixels
+      // each -- far more than fits in Skia's glyph atlas, so the atlas evicted
+      // and re-uploaded every glyph on every frame. Measured on device
+      // (2026-09-10): 146 `Texture upload` slices per frame while swiping, a
+      // 32ms median frame against an 11ms budget at 90Hz, 100% janky frames,
+      // with the GPU itself idle at 2ms. A page turn was therefore drawing at
+      // ~25fps whatever the pager did, which is what the owner compared
+      // against Ayah. Rasterised once into a hardware layer, a turn is a blit.
+      renderToHardwareTextureAndroid
+      style={{ width, height, backgroundColor: theme.background }}
+    >
+      <View
+        style={{
+          flex: 1,
+          paddingHorizontal: PAGE_MARGIN,
+          paddingTop: HEADER_HEIGHT,
+          justifyContent: centred ? 'center' : 'flex-start',
+        }}
+        pointerEvents="box-none"
+      >
         {pageLines.map((line) => {
           const slot = slots.get(line);
           return (
@@ -110,13 +185,18 @@ export function MushafPage({
                   words={slot.words}
                   fontSize={fontSize}
                   lineHeight={lineHeight}
-                  colorForAyah={color}
-                  onWordPress={onWordPress}
+                  colorForWord={color}
+                  backgroundForWord={background}
+                  onWordLongPress={onWordLongPress}
+                  onWordPressIn={onWordPressIn}
+                  onWordPressOut={onWordPressOut}
+                  onTap={onTap}
                 />
               )}
               {slot?.kind === 'header' && (
                 <SurahBand
                   surahName={surahNames.get(slot.surahId) ?? ''}
+                  surahId={slot.surahId}
                   height={lineHeight}
                   width={width - 2 * PAGE_MARGIN}
                 />
@@ -154,10 +234,14 @@ export function MushafPage({
         ))}
       </View>
 
-      <View style={{ height: FOOTER_HEIGHT, justifyContent: 'center' }}>
-        <PageFooter page={page} juz={juz} uiLocale={uiLocale} />
-      </View>
-    </View>
+      <View style={{ height: FOOTER_HEIGHT }} />
+      <PageCorners
+        page={page}
+        juz={juz}
+        surahName={surahNames.get(openingSurahId(lines)) ?? ''}
+        uiLocale={uiLocale}
+      />
+    </Pressable>
   );
 }
 
@@ -187,4 +271,10 @@ function surahOfBismillah(slots: Map<number, PageSlot>, line: number): number {
     if (below?.kind === 'words') return below.words[0]?.surahId ?? 0;
   }
   return 0;
+}
+
+/** The surah a page opens with -- the one print names in its corner, even on a
+ *  page that goes on to head another. */
+function openingSurahId(lines: MushafLine[]): number {
+  return lines[0]?.words[0]?.surahId ?? 0;
 }

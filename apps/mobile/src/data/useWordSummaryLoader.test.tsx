@@ -42,6 +42,10 @@ function Probe({
             .catch((cause: Error) => setGloss(`error: ${cause.message}`));
         }}
       />
+      {/* The mushaf's shape: no surah of its own, a surah per call. Two of
+          them, because 51 pages carry two surahs and the presses alternate. */}
+      <button data-testid="tap-a" onClick={() => void load(word, 5).catch(() => {})} />
+      <button data-testid="tap-b" onClick={() => void load(word, 6).catch(() => {})} />
       <span data-testid="gloss">{gloss}</span>
     </>
   );
@@ -84,6 +88,38 @@ describe('useWordSummaryLoader', () => {
     await waitFor(() => expect(mocks.getWordSummary).toHaveBeenCalledTimes(2));
 
     expect(mocks.getSurahGlosses).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps both surahs of a page warm, not just the last one pressed', async () => {
+    // A single cache slot evicts on every press that crosses the boundary, so
+    // alternating taps on one of the 51 two-surah pages re-ran the full-surah
+    // query each time -- the exact cost this cache exists to remove.
+    render(<Probe surahId={null} contentLanguage="en" />);
+    fireEvent.click(screen.getByTestId('tap-a'));
+    fireEvent.click(screen.getByTestId('tap-b'));
+    await waitFor(() => expect(mocks.getWordSummary).toHaveBeenCalledTimes(2));
+    expect(mocks.getSurahGlosses).toHaveBeenCalledTimes(2);
+
+    fireEvent.click(screen.getByTestId('tap-a'));
+    fireEvent.click(screen.getByTestId('tap-b'));
+    await waitFor(() => expect(mocks.getWordSummary).toHaveBeenCalledTimes(4));
+
+    expect(mocks.getSurahGlosses).toHaveBeenCalledTimes(2);
+  });
+
+  it('holds two surahs and no more', async () => {
+    render(<Probe surahId={2} contentLanguage="en" />);
+    fireEvent.click(screen.getByTestId('tap-a'));
+    fireEvent.click(screen.getByTestId('tap-b'));
+    tap();
+    await waitFor(() => expect(mocks.getWordSummary).toHaveBeenCalledTimes(3));
+    expect(mocks.getSurahGlosses).toHaveBeenCalledTimes(3);
+
+    // Surah 5 was pushed out by the two after it. An unbounded cache would
+    // hold every surah the session ever touched.
+    fireEvent.click(screen.getByTestId('tap-a'));
+    await waitFor(() => expect(mocks.getWordSummary).toHaveBeenCalledTimes(4));
+    expect(mocks.getSurahGlosses).toHaveBeenCalledTimes(4);
   });
 
   it('refetches when the content language changes', async () => {

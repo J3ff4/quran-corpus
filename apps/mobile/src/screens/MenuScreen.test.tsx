@@ -36,12 +36,14 @@ describe('MenuScreen', () => {
   beforeEach(() => mocks.push.mockReset());
   afterEach(cleanup);
 
-  it('opens bookmarks, settings and about', () => {
+  it('opens morphology, bookmarks, settings and about', () => {
     render(<MenuScreen />);
 
-    // The three destinations the tab bar gave up a slot for. A missing row
-    // here is a screen the user can no longer reach at all.
+    // The four destinations the tab bar gave up a slot for. A missing row
+    // here is a screen the user can no longer reach at all -- morphology
+    // especially, which lost its own tab to the mushaf in M7d.
     for (const [icon, href] of [
+      ['words', '/morphology'],
       ['bookmark', '/bookmarks'],
       ['settings', '/settings'],
       ['info', '/about'],

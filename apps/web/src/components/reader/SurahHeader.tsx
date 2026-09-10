@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { Surah } from '@quran-corpus/data';
 import { SurahFrame } from './ornaments/SurahFrame';
-import { surahNameGlyph } from './ornaments/surahNameGlyph';
+import { needsSurahNameFallback, surahNameGlyph } from './ornaments/surahNameGlyph';
 
 interface SurahHeaderProps {
   surah: Surah;
@@ -22,7 +22,7 @@ export function SurahHeader({ surah }: SurahHeaderProps) {
         <SurahFrame surahNumber={surah.id} className="mb-1">
           <p
             className={`text-[1.9rem] leading-none text-paper-900 dark:text-paper-100 ${
-              surah.id === 102 ? 'font-surah-name-v4' : 'font-surah-name'
+              needsSurahNameFallback(surah.id) ? 'font-surah-name-v4' : 'font-surah-name'
             }`}
             aria-hidden="true"
           >

@@ -42,6 +42,24 @@ describe('GlassSurface', () => {
     expect(screen.getByTestId('card-highlight').style.backgroundColor).toBe(rgba(glass.dark.highlight));
   });
 
+  it('gives a docked bar a boxShadow, which is the only kind Android draws as written', () => {
+    // A card sits ON the page; a docked bar floats over one that scrolls
+    // underneath, and the bar's shadow read as barely there (owner,
+    // 2026-09-10). The cause was the shadow* props: Android ignores all four
+    // and draws Material's own ambient shadow off `elevation` instead, so the
+    // colour, blur and offset written in the token never reached the screen.
+    // Asserted against the card too, so a token edited to the same value in
+    // both places fails here.
+    renderIn(themeColors.light, <GlassSurface testID="bar" docked>{null}</GlassSurface>);
+    renderIn(themeColors.light, <GlassSurface testID="card">{null}</GlassSurface>);
+
+    expect(glass.light.dockedShadow.boxShadow).toBeTypeOf('string');
+    expect(screen.getByTestId('bar').style.boxShadow).not.toBe('');
+    expect(screen.getByTestId('bar').style.boxShadow).not.toBe(
+      screen.getByTestId('card').style.boxShadow,
+    );
+  });
+
   it('takes its radius from the named token', () => {
     renderIn(themeColors.light, <GlassSurface testID="bar" radius="pill">{null}</GlassSurface>);
 

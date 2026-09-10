@@ -11,27 +11,20 @@ import {
   type CellRendererProps,
   type ViewToken,
 } from 'react-native';
-import Animated, {
+import {
   Extrapolation,
   interpolate,
-  runOnJS,
   useAnimatedStyle,
   useSharedValue,
-  withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
 import { router, useFocusEffect, useNavigation } from 'expo-router';
 import { reciterById, splitBasmala, type Word } from '@quran-corpus/data/mobile';
-import type { MobileDataClient } from '@quran-corpus/mobile-data';
 import type { ReaderAyah, SurahReaderData, WordSummary } from '@/data/corpusRepository';
 import { getReaderPosition, setReaderPosition } from '@/data/readerPosition';
 import type { ContentLanguageCode, UiLocaleCode } from '@/i18n/languages';
-import type { ReaderMode } from '@/settings/settingsStore';
 
 import { AyahCard } from './AyahCard';
-import { MushafReader } from './mushaf/MushafReader';
-import { useMushafIndex } from '@/mushaf/mushafReaderData';
-import { ayahKey } from '@/mushaf/highlights';
 import { RecitationBar, type RecitationBarProps } from './RecitationBar';
 import { ReaderHeader } from './ReaderHeader';
 import { Bismillah } from './Bismillah';
@@ -81,14 +74,10 @@ interface SurahReaderProps {
    *  test without the store's expo-sqlite import. */
   contentLanguage: ContentLanguageCode;
   onChangeContentLanguage: (code: ContentLanguageCode) => void;
-  /** Which rendering the ayahs get. Owned by the screen above for the same
-   *  reason contentLanguage is: it is a persisted setting, and reading it here
-   *  would drag the settings store's expo-sqlite import into every test that
-   *  renders a reader. */
-  readerMode: ReaderMode;
-  onChangeReaderMode: (mode: ReaderMode) => void;
-  /** Whether the cards draw their translation. Owned by the screen above for
-   *  the same reason readerMode is: it is a persisted setting. */
+  /** Whether the cards draw their translation. Owned by the screen above
+   *  because it is a persisted setting, and reading it here would drag the
+   *  settings store's expo-sqlite import into every test that renders a
+   *  reader. */
   showTranslation?: boolean;
   onChangeShowTranslation?: (show: boolean) => void;
   /** Ayah to open at, from a bookmark or the saved reading position. */
@@ -104,11 +93,6 @@ interface SurahReaderProps {
   /** A mushaf page turn. Carries its own surah and ayah -- the page the reader
    *  turned to need not belong to the surah the route named (ruling 10), so
    *  the caller must not pair this page with the screen's surah. */
-  onReadingPage?: (position: { surahId: number; ayahNumber: number; page: number }) => void;
-  /** The open corpus database, for the mushaf's page index and the ayah rows
-   *  of surahs the reader was not opened on. Null renders the reader with no
-   *  mushaf pages, which is what a test that never opens a database wants. */
-  corpusClient?: MobileDataClient | null;
   /** Forwarded to the header's surah chevrons. Omitted draws none. */
   prevSurahId?: number | null;
   nextSurahId?: number | null;
@@ -191,17 +175,6 @@ const TITLE_RISE = 10;
 // mount. If the OS font scale ever pushes the bar past this, pass the measured
 // height up instead of growing the number.
 const RECITATION_BAR_CLEARANCE = 56;
-
-/** The cross-fade between two renderings of the same surah. Short: both layers
- *  are the same words on the same ayah, so this is a change of treatment, not
- *  a transition between places. */
-const MODE_FADE_MS = 160;
-
-/** The style a layer rests at once it is the only one left. `opacity: 1`
- *  explicitly: the layer arrives wearing an animated opacity, and dropping
- *  that style off the array does not by itself repaint the value it left
- *  behind. */
-const RESTING_LAYER = { flex: 1, opacity: 1 } as const;
 
 /** The surah's opening block. Its own glass, like the cards below it: since
  *  M7c the mushaf is a pager rather than a list, so nothing here is ever the
@@ -366,9 +339,6 @@ function AyahList({
       // compiler cannot know that.
       if (!item) continue;
       const height = estimateRowHeight({
-        // A layer of this component is always translation mode now: the mushaf
-        // is a pager, and its pages are a fixed height that no model estimates.
-        mode: 'translation',
         arabicSize: arabicSizes.reader,
         listWidth,
         arabicChars: item.ayah.text_uthmani?.length ?? 0,
@@ -806,8 +776,6 @@ export function SurahReader({
   uiLocale,
   contentLanguage,
   onChangeContentLanguage,
-  readerMode,
-  onChangeReaderMode,
   showTranslation = true,
   onChangeShowTranslation,
   initialAyahNumber,
@@ -817,8 +785,6 @@ export function SurahReader({
   onEditNote,
   onToggleAudio,
   onReadingAyah,
-  onReadingPage,
-  corpusClient = null,
   // Defaulted rather than forwarded as undefined: exactOptionalPropertyTypes
   // rejects an explicit undefined for an optional prop, and null is what the
   // header already reads as "no surah that way".
@@ -843,70 +809,11 @@ export function SurahReader({
   // reserve room for exactly the frames the bar is on screen for.
   const barDocked = audioEnabled && dockedAyah !== null;
 
-  // The page index, for the header's title and the pager's footers. Loaded
-  // once per process, so a mode switch and a surah page-turn both read a map
-  // that is already there.
-  const mushafIndex = useMushafIndex(corpusClient);
-  // Which page each of this surah's ayahs is printed on. From the corpus rows
-  // the reader already holds -- ayahs.page is what M7b re-paged, and is the
-  // only thing that can turn `?ayah=` into an opening page (ruling 10).
-  const pageByAyah = useMemo(() => {
-    const byAyah = new Map<number, number>();
-    for (const item of data.ayahs) {
-      if (item.ayah.page !== null) byAyah.set(item.ayah.ayah_number, item.ayah.page);
-    }
-    return byAyah;
-  }, [data.ayahs]);
-  const pageOfAyah = useCallback(
-    (ayahNumber: number | null) => {
-      // The surah's own first page when the ayah is unknown or unpaged: a
-      // reader opened from the surah list has no ayah, and page 1 of the
-      // mushaf would be the wrong book entirely.
-      const first = data.ayahs[0]?.ayah.page ?? 1;
-      if (ayahNumber === null) return first;
-      return pageByAyah.get(ayahNumber) ?? first;
-    },
-    [data.ayahs, pageByAyah],
-  );
-  // The page the pager has settled on, once it has moved. Null until then, so
-  // the header falls back to the surah the reader was opened on rather than
-  // guessing a page before one exists.
-  const [mushafPage, setMushafPage] = useState<number | null>(null);
-  // Issue #58: the name is a function of the page, not of the screen's
-  // mount-time surah. A pager crosses into the next surah without the screen
-  // changing, and the old header could only ever name the one it was mounted
-  // with -- which after a chevron turn was a surah the reader had left.
-  const headerSurahName =
-    (readerMode === 'mushaf' && mushafPage !== null
-      ? mushafIndex.pages.get(mushafPage)?.surahName
-      : null) ?? data.surah.name_translit;
-  const bookmarkedKeys = useMemo(
-    () => new Set([...bookmarkedAyahs].map((ayahNumber) => ayahKey(data.surah.id, ayahNumber))),
-    [bookmarkedAyahs, data.surah.id],
-  );
-  // Ruling 19: the page follows the recitation. Null while nothing is playing,
-  // which leaves the pager exactly where the reader put it.
-  const focusPage = playingAyah === null ? null : (pageByAyah.get(playingAyah) ?? null);
-
-  const onMushafPageChange = useCallback(
-    (page: number) => {
-      setMushafPage(page);
-      const entry = mushafIndex.pages.get(page);
-      if (!entry) return;
-      // The in-memory position too, and only when the page opens in the surah
-      // on screen: it is keyed by surah, and it is what a switch to
-      // translation mode lands on.
-      if (entry.startSurahId === data.surah.id) {
-        setReaderPosition(data.surah.id, entry.startAyahNumber);
-      }
-      onReadingPage?.({
-        surahId: entry.startSurahId,
-        ayahNumber: entry.startAyahNumber,
-        page,
-      });
-    },
-    [mushafIndex.pages, data.surah.id, onReadingPage],
-  );
+  // The reader shows one surah again since M7d, so the header names it. Issue
+  // #58 -- a header that could only name its mount-time surah while the pager
+  // crossed into the next one -- is the mushaf tab's problem now, and the tab
+  // reads the page index for it.
+  const headerSurahName = data.surah.name_translit;
 
   // The nav header carries the surah name once the list header's 24pt heading
   // has scrolled off -- Android's own app-bar behaviour, and it keeps the name
@@ -958,12 +865,7 @@ export function SurahReader({
       header: () => (
         <ReaderHeader
           surahName={headerSurahName}
-          // No fade in mushaf mode: the fade is driven by the ayah list's
-          // scroll offset, and a pager never scrolls vertically -- the title
-          // would sit at opacity 0 for the whole session (issue #58).
-          {...(readerMode === 'mushaf' ? {} : { titleStyle })}
-          mode={readerMode}
-          onChangeMode={onChangeReaderMode}
+          titleStyle={titleStyle}
           showTranslation={showTranslation}
           {...(onChangeShowTranslation ? { onChangeShowTranslation } : {})}
           uiLocale={uiLocale}
@@ -1006,8 +908,6 @@ export function SurahReader({
     navigation,
     titleStyle,
     uiLocale,
-    readerMode,
-    onChangeReaderMode,
     showTranslation,
     onChangeShowTranslation,
     data.surah.id,
@@ -1109,129 +1009,17 @@ export function SurahReader({
     setOpenWord(null);
   }, []);
 
-  // The renderings currently mounted, oldest first. One entry is the steady
-  // state; a second appears for the length of a mode switch and then replaces
-  // the first.
-  //
-  // Identified by a counter rather than by mode, deliberately. Keyed on mode,
-  // the surviving layer would take a new key the moment it became the only one
-  // left, remount, and re-land behind a spinner -- which is the whole defect,
-  // moved to the end of the transition.
-  const layerSeqRef = useRef(0);
-  const [layers, setLayers] = useState<{ id: number; mode: ReaderMode; seedAyah: number | null }[]>(
-    () => [{ id: 0, mode: readerMode, seedAyah: initialAyahNumber ?? null }],
-  );
-  const incoming = useSharedValue(0);
-
-  useEffect(() => {
-    const current = layers[layers.length - 1];
-    if (!current || current.mode === readerMode) return;
-    incoming.value = 0;
-    layerSeqRef.current += 1;
-    setLayers((existing) => {
-      const arrival = {
-        id: layerSeqRef.current,
-        mode: readerMode,
-        // Where the reader actually is, not where the route opened -- after
-        // any scrolling those are different ayahs, and the route param is
-        // absent entirely when the reader was opened from the surah list.
-        seedAyah: getReaderPosition(data.surah.id) ?? initialAyahNumber ?? null,
-      };
-      // Never more than two. A switch asked for while one is still in flight
-      // replaces the arrival rather than stacking on it: the layer being
-      // replaced has never been seen -- it is at opacity 0 for its whole life
-      // -- so dropping it is invisible, where appending mounts another full
-      // list of the surah (2:255 renders ~255 rows before it can even try to
-      // scroll) for every tap of a mashed pill.
-      if (existing.length === 1) return [...existing, arrival];
-      // Back to what is already on screen underneath. Cancelling the arrival
-      // is the whole change: there is nothing to fade to.
-      if (existing[existing.length - 2]?.mode === readerMode) return existing.slice(0, -1);
-      return [...existing.slice(0, -1), arrival];
-    });
-  }, [readerMode, layers, incoming, data.surah.id, initialAyahNumber]);
-
-  // A change to the route's ayah param is an external deep link into the surah
-  // already on screen, and it has to re-land the layer the reader is looking
-  // at. Only a *change*: a seed captured when the layer was created is the
-  // right answer for a mode switch (the reading position, not the param the
-  // reader was opened with), so the param may not simply win every render.
-  const lastParamRef = useRef(initialAyahNumber ?? null);
-  useEffect(() => {
-    const next = initialAyahNumber ?? null;
-    if (next === lastParamRef.current) return;
-    lastParamRef.current = next;
-    setLayers((existing) =>
-      existing.map((layer, index) =>
-        index === existing.length - 1 ? { ...layer, seedAyah: next } : layer,
-      ),
-    );
-  }, [initialAyahNumber]);
-
-  const dropSpentLayers = useCallback(() => {
-    setLayers((existing) => (existing.length > 1 ? existing.slice(-1) : existing));
-  }, []);
-
-  // The arrival. Under reduced motion it is a cut, which is what the setting
-  // asks for -- and a cut here still never shows a blank, because the layer
-  // underneath is a finished rendering until the instant it is replaced.
-  //
-  // A zero-length timing rather than a bare `incoming.value = 1` followed by
-  // the drop. Both read as a cut, but only one of them survives the drop: a
-  // direct write is handed to the UI thread to apply, and dropping the spent
-  // layer in the same tick re-renders the survivor without an animated style
-  // at all, which unregisters the view before that write has landed. The
-  // opacity the node keeps is then the one reanimated last actually applied --
-  // 0, from the mount -- and the reader shows its header over an empty page
-  // (device, 2026-09-03: reduced motion only, into mushaf and translation
-  // alike). Routing through withTiming keeps the drop in the completion
-  // callback, which cannot run before the value has been committed.
-  const revealIncoming = useCallback(() => {
-    incoming.value = withTiming(1, { duration: reducedMotion ? 0 : MODE_FADE_MS }, (finished?: boolean) => {
-      // Only on a settled fade: an interrupted one leaves the incoming layer
-      // half-transparent, and dropping the layer under it would show the page
-      // through the gap.
-      if (finished) runOnJS(dropSpentLayers)();
-    });
-  }, [reducedMotion, incoming, dropSpentLayers]);
-
-  const incomingStyle = useAnimatedStyle(() => ({ opacity: incoming.value }));
-  // The other half of the cross-fade, and it is not optional. A layer's
-  // background is the bloom showing through, so an arriving layer at opacity 1
-  // does not hide the one beneath it -- both renderings sit on screen together
-  // until the spent one is dropped, and the drop is a JS-thread hop that the
-  // arriving list's own landing work can hold up. On device that was 420ms of
-  // two readings of 2:255 printed over each other (2026-09-01). Fading the
-  // outgoing layer out as the incoming comes in makes the drop invisible
-  // however late it runs.
-  const outgoingStyle = useAnimatedStyle(() => ({ opacity: 1 - incoming.value }));
-
-  // Stable no-ops, so a layer that is not driving either one does not get a
-  // fresh callback identity on every render of this component.
+  // Nothing waits on the landing now that there is no cross-fade to start, but
+  // AyahList still reports it. Stable so the list does not see a fresh
+  // callback on every playback tick.
   const noopLanded = useCallback(() => {}, []);
-  const noopScroll = useCallback(() => {}, []);
-  const noopPageChange = useCallback(() => {}, []);
 
-  // A tapped glyph carries a coordinate, not a word row. The reader's own word
-  // loader is what turns the ayah into words -- the same query the ayah cards
-  // prefetch through, so a page the reader has already looked at answers from
-  // its cache.
-  const onMushafWordPress = useCallback(
-    (ayahId: number, position: number) => {
-      if (!loadWords) return;
-      void loadWords(ayahId)
-        .then((words) => {
-          const word = words.find((candidate) => candidate.position === position);
-          // No word at that position is the ayah-end medallion, which has a
-          // layout row and no word row behind it. Nothing opens.
-          if (word) onWordPress(word);
-        })
-        .catch((cause: unknown) => {
-          console.error('[reader] mushaf word load failed', { ayahId, position, cause });
-        });
-    },
-    [loadWords, onWordPress],
-  );
+  // One rendering, since M7d: the mushaf left for its own tab (ruling 1) and
+  // took the layer machine with it. What stood here cross-faded an arriving
+  // mode in underneath the one on screen, because a mode switch that blanked
+  // and re-landed was the defect three device runs kept finding. With a single
+  // mode there is no switch to cover, and AyahList re-anchors on a seed change
+  // during render, so a deep link into the open surah still lands.
 
   const ayahNumberOf = useCallback(
     (word: Word) => data.ayahs.find((item) => item.ayah.id === word.ayah_id)?.ayah.ayah_number,
@@ -1249,100 +1037,30 @@ export function SurahReader({
 
   return (
     <View style={{ flex: 1 }}>
-      {/* One layer per rendering, and two of them only while a switch is in
-          flight. The incoming layer lays out and lands underneath the one the
-          reader is looking at, then fades in over it. Nothing blanks, and the
-          landing still lands exactly -- see the note on AyahList. */}
-      {layers.map((layer, index) => {
-        // Two questions, and answering both with "is this the newest layer"
-        // handed every touch to a list nobody could see. The arriving layer
-        // owns the cross-fade and fires the reveal; the layer the reader is
-        // *looking at* is the one underneath it until the arrival is dropped,
-        // and that is the one that takes touches, feeds the header's scroll
-        // offset, is exposed to TalkBack and records the reading position --
-        // which is what the note on AyahList's `live` has said all along.
-        const arriving = index > 0;
-        const list = layer.mode === 'mushaf' ? (
-          <MushafReader
-            key={layer.id}
-            client={corpusClient}
-            index={mushafIndex}
-            initialPage={pageOfAyah(layer.seedAyah)}
-            landingAyah={
-              layer.seedAyah === null
-                ? null
-                : { surahId: data.surah.id, ayahNumber: layer.seedAyah }
-            }
-            bookmarkedKeys={bookmarkedKeys}
-            playingAyah={
-              playingAyah === null ? null : { surahId: data.surah.id, ayahNumber: playingAyah }
-            }
-            // Only the live layer follows the recitation: a layer still laying
-            // out under a cross-fade would scroll itself to a page nobody has
-            // seen and arrive there instead of where the reader was.
-            focusPage={arriving ? null : focusPage}
-            uiLocale={uiLocale}
-            onPageChange={arriving ? noopPageChange : onMushafPageChange}
-            onWordPress={onMushafWordPress}
-            onLanded={arriving ? revealIncoming : noopLanded}
-          />
-        ) : (
-          <AyahList
-            key={layer.id}
-            data={data}
-            seedAyah={layer.seedAyah}
-            live={!arriving}
-            onLanded={arriving ? revealIncoming : noopLanded}
-            arriving={arriving}
-            bookmarkedAyahs={bookmarkedAyahs}
-            {...(notesByAyah ? { notesByAyah } : {})}
-            playingAyah={playingAyah}
-            audioEnabled={audioEnabled}
-            showTranslation={showTranslation}
-            uiLocale={uiLocale}
-            wordsByAyah={wordsByAyah}
-            onVisibleAyah={onVisibleAyah}
-            {...(onReadingAyah ? { onReadingAyah } : {})}
-            onToggleBookmark={onToggleBookmark}
-            {...(onEditNote ? { onEditNote } : {})}
-            onToggleAudio={onToggleAudio}
-            onWordPress={onWordPress}
-            onScroll={arriving ? noopScroll : onScroll}
-            headerHeight={headerHeight}
-            sheetsOpen={Boolean(openWord) || languageOpen || reciterOpen}
-            barDocked={barDocked}
-          />
-        );
-        // The first layer is the page; anything above it is an arrival. An
-        // arrival is absolutely positioned so the layer underneath keeps its
-        // own layout rather than being pushed out of the column, and
-        // untouchable until it has faded in -- a half-transparent list that
-        // swallows taps is worse than either mode.
-        //
-        // Every layer gets the same wrapper, arriving or not. Returning `list`
-        // bare at index 0 was a remount waiting to happen: once the spent
-        // layer is dropped the survivor moves from index 1 to index 0, and a
-        // child whose element type changes at the same position is unmounted
-        // and rebuilt. The rebuilt list re-lands from scratch, which is
-        // exactly the blank-and-spinner this layering exists to remove
-        // (device, 2026-09-01, Al-Baqara 2:255).
-        // Layer 0 stays in the column and every arrival is absolutely
-        // positioned over it, so the layer underneath keeps its own layout
-        // rather than being pushed out. While a switch is in flight the two
-        // cross-fade; alone, a layer rests at full opacity.
-        const base = index === 0 ? RESTING_LAYER : StyleSheet.absoluteFill;
-        const fade = layers.length === 1 ? null : arriving ? incomingStyle : outgoingStyle;
-        return (
-          <Animated.View
-            key={layer.id}
-            testID={`reader-layer-${layer.id}`}
-            pointerEvents={arriving ? 'none' : 'auto'}
-            style={fade ? [base, fade] : base}
-          >
-            {list}
-          </Animated.View>
-        );
-      })}
+      <AyahList
+        data={data}
+        seedAyah={initialAyahNumber ?? null}
+        live
+        onLanded={noopLanded}
+        arriving={false}
+        bookmarkedAyahs={bookmarkedAyahs}
+        {...(notesByAyah ? { notesByAyah } : {})}
+        playingAyah={playingAyah}
+        audioEnabled={audioEnabled}
+        showTranslation={showTranslation}
+        uiLocale={uiLocale}
+        wordsByAyah={wordsByAyah}
+        onVisibleAyah={onVisibleAyah}
+        {...(onReadingAyah ? { onReadingAyah } : {})}
+        onToggleBookmark={onToggleBookmark}
+        {...(onEditNote ? { onEditNote } : {})}
+        onToggleAudio={onToggleAudio}
+        onWordPress={onWordPress}
+        onScroll={onScroll}
+        headerHeight={headerHeight}
+        sheetsOpen={Boolean(openWord) || languageOpen || reciterOpen}
+        barDocked={barDocked}
+      />
       {/* Hidden from TalkBack behind a sheet for the same reason the list is:
           accessibilityViewIsModal is iOS-only, so on Android a swipe would
           otherwise walk from the sheet straight onto this bar. */}

@@ -141,6 +141,26 @@ export const glass = {
       shadowOffset: { width: 0, height: 10 },
       elevation: 6,
     },
+    /** A docked bar's shadow, deeper than a card's.
+     *
+     *  `boxShadow`, not the shadow* props. On Android those four are ignored
+     *  outright -- only `elevation` draws, and what it draws is Material's own
+     *  ambient shadow, whose colour, blur and offset are not ours to set. The
+     *  bar's shadow was therefore never the one written here; the owner
+     *  reported it as "very vague" (2026-09-10) and that is exactly what
+     *  elevation 16 looks like on cream paper. RN 0.86 on the new architecture
+     *  renders `boxShadow` on both platforms, so the values below are the ones
+     *  that actually reach the screen.
+     *
+     *  A card sits ON the page and needs only to be lifted off it. A docked bar
+     *  floats OVER a page that scrolls underneath, and the card shadow was not
+     *  enough to say so -- on the device the tab pill read as painted onto the
+     *  paper (owner, 2026-09-10). The bar is also the one surface whose
+     *  backdrop is arbitrary text, so the shadow is what gives its edge
+     *  somewhere to land. */
+    dockedShadow: {
+      boxShadow: '0px 12px 26px rgba(58, 50, 39, 0.22)',
+    },
   },
   dark: {
     // colors.night at 45%. Not a literal -- if the page colour moves, the card
@@ -157,6 +177,9 @@ export const glass = {
       shadowRadius: 19,
       shadowOffset: { width: 0, height: 16 },
       elevation: 10,
+    },
+    dockedShadow: {
+      boxShadow: '0px 18px 28px rgba(0, 0, 0, 0.55)',
     },
   },
 } as const;
@@ -187,6 +210,11 @@ export const fonts = {
   arabic: 'Hafs',
   display: 'Newsreader',
   displaySemiBold: 'Newsreader-SemiBold',
+  /** The surah's calligraphic name, one PUA glyph per surah. `surahNameAlt` is
+   *  not a weight or a style -- v2 simply has no glyph for surah 102, so that
+   *  one surah is drawn in v4. See `@quran-corpus/config/ornaments/surahName`. */
+  surahName: 'SurahNameV2',
+  surahNameAlt: 'SurahNameV4',
 } as const;
 
 /** Reader-Arabic size steps. Multipliers, not absolute sizes, so Android's own

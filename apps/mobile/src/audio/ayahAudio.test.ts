@@ -198,6 +198,35 @@ describe('useRecitation', () => {
     expect(r.state().playing).toBe(true);
   });
 
+  it('plays a surah it has not been rendered with yet, when the caller names one', () => {
+    // The mushaf tab has no surah of its own: it learns one from the word that
+    // was pressed and sets state with it, so the hook is still on the PREVIOUS
+    // value at the moment toggleAyah is called. With the surah only a prop,
+    // the very first press of a session sounded nothing at all -- `surah` was
+    // null and startAyah returned.
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: null, ayahCount: 0, player, continuous: false });
+
+    r.toggleAyah(5, 5);
+
+    expect(player.created).toEqual([ayahAudioUrl(5, 5, 'husary')]);
+    expect(r.state().playing).toBe(true);
+  });
+
+  it('does not resume the wrong surah-s file on a matching ayah number', () => {
+    // 51 pages carry two surahs, so 2:3 and 3:3 both reach toggleAyah as `3`.
+    // Resuming on the number alone sounds the file that is loaded under the
+    // highlight of the ayah that is not.
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 2, ayahCount: 286, player, continuous: false });
+
+    r.toggleAyah(3, 2);
+    r.toggleAyah(3, 3);
+
+    expect(player.replaced).toEqual([ayahAudioUrl(3, 3, 'husary')]);
+    expect(r.state().playing).toBe(true);
+  });
+
   it('leaves a paused ayah alone when the reciter has not changed', () => {
     // The other direction: pause/resume must not reload the source, or every
     // resume restarts the ayah from the beginning.
@@ -415,6 +444,24 @@ describe('paging to another surah', () => {
     expect(r.state().ayah).toBeNull();
   });
 
+  it('keeps playing when the surah arrives in the same tick as the ayah', () => {
+    // The mushaf tab has no surah of its own: pressing Play calls setPlaying
+    // and toggleAyah together, so the hook re-renders with the surah one commit
+    // AFTER the ayah has already started. Keyed on the prop, the stop above
+    // fired on that commit and paused the ayah it had just started -- a Pause
+    // icon that flipped back to Play with nothing sounding, on the very first
+    // press of every session.
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: null, ayahCount: 0, player, continuous: false });
+
+    r.toggleAyah(5, 5);
+    r.changeSurah(5);
+
+    expect(player.pauses).toBe(0);
+    expect(r.state().playing).toBe(true);
+    expect(r.state().ayah).toBe(5);
+  });
+
   it('leaves the driver alive so the next tap does not rebuild a player', () => {
     const player = fakePlayer();
     const r = renderRecitation({ surah: 2, ayahCount: 286, player, continuous: false });
@@ -529,7 +576,7 @@ function renderRecitation({
   continuous,
   reciterId = 'husary',
 }: {
-  surah: number;
+  surah: number | null;
   ayahCount: number;
   player: ReturnType<typeof fakePlayer>;
   continuous: boolean;
@@ -540,7 +587,7 @@ function renderRecitation({
   // different one.
   let props = { reciter: reciterId, surahId: surah };
   const hook = renderHook(
-    ({ reciter, surahId }: { reciter: string; surahId: number }) =>
+    ({ reciter, surahId }: { reciter: string; surahId: number | null }) =>
       useRecitation(surahId, ayahCount, reciter, {
         surahName: 'Al-Fatihah',
         createDriver: player.create,
@@ -553,7 +600,8 @@ function renderRecitation({
 
   return {
     state: () => hook.result.current,
-    toggleAyah: (ayah: number) => act(() => hook.result.current.toggleAyah(ayah)),
+    toggleAyah: (ayah: number, surahOverride?: number) =>
+      act(() => hook.result.current.toggleAyah(ayah, surahOverride)),
     seekTo: (seconds: number) => act(() => hook.result.current.seekTo(seconds)),
     skipNext: () => act(() => hook.result.current.skipNext()),
     skipPrevious: () => act(() => hook.result.current.skipPrevious()),
