@@ -46,6 +46,17 @@ const settleAt = (page: number) => ({
 });
 
 describe('MushafPager', () => {
+  it('memoises a page, so a chrome toggle two levels up does not redraw three', () => {
+    // Every prop a page takes is a stable reference from the reader. Without
+    // the memo one boolean -- the chrome's visibility -- re-rendered all three
+    // mounted pages, and a page render invalidates the hardware layer it is
+    // held in, so a 220ms slide competed with three full rasterisations.
+    const list = listPropsOf(render(<MushafPager {...props} />));
+    const cell = list.renderItem?.({ item: 106 } as never) as { type: { $$typeof?: symbol } };
+
+    expect(cell.type.$$typeof).toBe(Symbol.for('react.memo'));
+  });
+
   it('spans exactly the 604 pages of the mushaf', () => {
     const list = listPropsOf(render(<MushafPager {...props} />));
     expect(list.data).toHaveLength(604);

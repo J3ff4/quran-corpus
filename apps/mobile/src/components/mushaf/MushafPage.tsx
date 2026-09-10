@@ -145,6 +145,17 @@ export function MushafPage({
       testID="mushaf-page-tap"
       accessible={false}
       onPress={onTap}
+      // The page is held as GPU pixels rather than re-drawn every frame.
+      //
+      // A page carries ~150 whole-word QCF glyphs at ~90x100 device pixels
+      // each -- far more than fits in Skia's glyph atlas, so the atlas evicted
+      // and re-uploaded every glyph on every frame. Measured on device
+      // (2026-09-10): 146 `Texture upload` slices per frame while swiping, a
+      // 32ms median frame against an 11ms budget at 90Hz, 100% janky frames,
+      // with the GPU itself idle at 2ms. A page turn was therefore drawing at
+      // ~25fps whatever the pager did, which is what the owner compared
+      // against Ayah. Rasterised once into a hardware layer, a turn is a blit.
+      renderToHardwareTextureAndroid
       style={{ width, height, backgroundColor: theme.background }}
     >
       <View

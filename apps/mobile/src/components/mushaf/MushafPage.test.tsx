@@ -134,6 +134,18 @@ describe('MushafPage', () => {
     expect(screen.getByText('A').style.backgroundColor).toBe('');
   });
 
+  it('holds the page as GPU pixels rather than re-drawing it every frame', () => {
+    // A page carries ~150 whole-word QCF glyphs at ~90x100 device pixels, far
+    // more than fits in Skia's glyph atlas, so every frame evicted and
+    // re-uploaded the lot: 146 `Texture upload` slices per frame while
+    // swiping, a 32ms median frame against 11ms at 90Hz, 100% janky, GPU idle
+    // at 2ms (device, 2026-09-10). Rasterised once into a hardware layer the
+    // same swipe measured 8ms and 9% janky.
+    const { container } = render(<MushafPage {...props} />);
+
+    expect(container.querySelector('[data-testid="mushaf-page-tap"]')?.getAttribute('data-hardware-layer')).toBe('true');
+  });
+
   it('draws nothing but the page ground until the font is registered', () => {
     // A page drawn early renders QCF codepoints in the system face, which
     // looks like Arabic and is not the Qur'an. Blank is the safe state.

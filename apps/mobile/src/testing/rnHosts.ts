@@ -59,6 +59,7 @@ interface HostProps {
   onLayout?: unknown;
   onTextLayout?: unknown;
   pointerEvents?: 'auto' | 'none' | 'box-none' | 'box-only';
+  renderToHardwareTextureAndroid?: boolean;
 }
 
 /** RN accepts `style={[a, b]}`; the DOM does not.
@@ -299,6 +300,7 @@ export function host(tag: string) {
     onPressOut,
     onTextLayout: _onTextLayout,
     pointerEvents,
+    renderToHardwareTextureAndroid,
     ...props
   }: HostProps) {
     // Fires only when a suite has asked for a measured box; see setAutoLayout.
@@ -346,6 +348,10 @@ export function host(tag: string) {
         // takes a tap is behaviour, and there is no DOM equivalent to assert
         // against. React warns about the camelCase prop on a DOM node.
         'data-pointer-events': pointerEvents === undefined ? undefined : String(pointerEvents),
+        // Mapped rather than spread, same reason again: React warns about the
+        // camelCase prop on a DOM node, and dropping it would make the one
+        // assertion that the mushaf page is held as GPU pixels decorative.
+        'data-hardware-layer': renderToHardwareTextureAndroid ? 'true' : undefined,
         onClick: onPress,
         // RN's press phases, mapped onto the nearest DOM events rather than
         // spread (React logs "does not recognize the onPressIn prop" for every
