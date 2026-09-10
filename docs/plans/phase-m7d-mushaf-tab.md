@@ -534,3 +534,55 @@ plus the new checks below, and the PR.
 | 257 | Page 3 | Still a full 15-line grid — the centring is those two pages only |
 | 258 | Long-press → Play, fresh launch | Sound on the first press, Pause icon stays |
 | 259 | Tab bar on any tab, and the mushaf chrome | Reads as floating; a visible shadow under the edge |
+
+## Owner device pass on the m7d-2 APK (2026-09-10)
+
+Five reports off the installed build. Rulings taken in three rounds.
+
+| Report | Ruling | Fix |
+| --- | --- | --- |
+| Top bar animation "weird, seems like it is flipping"; bottom bar fine | Both suspects, fixed together | `53e2b38` |
+| Top bar "way too below from top" | Sits just under the status bar | `53e2b38` (gap 8 -> 2) |
+| Page sliding sluggish vs the Ayah app | Free fixes now; `react-native-pager-view` is a separate phase | `11ca54d` |
+| Arabic surah names "a bit small, hard to read" | 0.78 of band height (was 0.62) | `067d541` |
+| Drop shadow "very vague" | Real `boxShadow`, clearly visible | `479e950` |
+
+Three findings worth carrying forward:
+
+- **Android ignores `shadowColor`/`shadowOpacity`/`shadowRadius`/`shadowOffset`.**
+  Only `elevation` draws, and it draws Material's own ambient shadow. Every
+  shadow value tuned in `tokens.ts` before this was decoration in a file. RN
+  0.86 on the new architecture renders `boxShadow` on both platforms.
+- **`withTiming` inside `useAnimatedStyle` restarts on every render.** The
+  worklet re-evaluates whenever the component renders, and each re-issue
+  restarts the curve from the current value with a fresh full duration. The
+  mushaf screen renders on every page turn, press and recitation tick, so the
+  chrome was the one bar that could be caught mid-move. Drive it from a shared
+  value set in an effect.
+- **A swipe begins as a press on a word.** With the press wash held above the
+  pager, the first frames of every page turn paid for three page renders on
+  press-in and three more on press-out. State that only one page can hold
+  belongs to that page.
+
+`boxShadow` is drawn outside the view's bounds, but `GlassSurface` also sets
+`overflow: 'hidden'` on the same view. If the shadow is still invisible on
+device, that is the first thing to test -- move the shadow to a wrapper.
+
+### Device checks
+
+- [ ] 260. Mushaf, tap the page: the top bar slides down from the top edge. No
+      flicker, no fade-in-place, no stutter if tapped twice quickly.
+- [ ] 261. Same, tap again: it slides back up and fully clears the screen.
+- [ ] 262. Top bar's resting gap under the status bar reads as tight, not floating.
+- [ ] 263. Swipe through ten pages: the turn tracks the finger and stops
+      promptly, without a drift after release.
+- [ ] 264. Swipe starting with the finger down ON a word: no hitch at the
+      start of the gesture.
+- [ ] 265. Press and hold a word: the wash still appears before the sheet opens.
+- [ ] 266. Swipe fast through fifteen pages: no blank or half-drawn page.
+- [ ] 267. Surah band: the Arabic name reads clearly at arm's length and stays
+      inside the frame. Check a long name -- al-Munafiqun (63), page 554.
+- [ ] 268. Surah 102 (page 600) still draws its name (V4 fallback).
+- [ ] 269. Mushaf top bar: the shadow is plainly visible against the paper.
+- [ ] 270. Bottom tab bar: same, on every tab.
+- [ ] 271. Both in dark mode.
