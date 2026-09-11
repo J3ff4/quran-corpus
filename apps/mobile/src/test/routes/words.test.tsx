@@ -60,6 +60,49 @@ vi.mock('@/data/corpusRepository', async (importOriginal) => {
         [1, { text: 'Allah', lang: 'en', isFallback: false }],
         [2, { text: 'not', lang: 'en', isFallback: false }],
       ]),
+    // Same reason: the jump sheet's ayah ceiling comes from this list, and the
+    // real query would run SQL against openCorpusDb's stub object.
+    getSurahList: async () => [{ id: 2, nameArabic: '', nameTranslit: 'Al-Baqarah', nameTranslation: '', ayahCount: 286 }],
+  };
+});
+
+// Mocked for the reason WordSheet is: the real sheet reaches reanimated and
+// gesture-handler through BottomSheet, neither of which parses under this
+// transform. SurahJumpSheet.test.tsx covers its parsing and its rejections;
+// what matters here is that the name opens it and that what it returns is
+// where the screen lands.
+vi.mock('@/components/SurahJumpSheet', async () => {
+  const React = await import('react');
+  return {
+    SurahJumpSheet: ({
+      surahId,
+      onJump,
+    }: {
+      surahId: number;
+      onJump: (surahId: number, ayahNumber: number) => void;
+    }) => {
+      const [surah, setSurah] = React.useState(String(surahId));
+      const [ayah, setAyah] = React.useState('1');
+      return React.createElement(
+        'div',
+        null,
+        React.createElement('input', {
+          'data-testid': 'surah-jump-input',
+          value: surah,
+          onChange: (event: { target: { value: string } }) => setSurah(event.target.value),
+        }),
+        React.createElement('input', {
+          'data-testid': 'ayah-jump-input',
+          value: ayah,
+          onChange: (event: { target: { value: string } }) => setAyah(event.target.value),
+        }),
+        React.createElement(
+          'button',
+          { 'data-testid': 'surah-jump-go', onClick: () => onJump(Number(surah), Number(ayah)) },
+          'go',
+        ),
+      );
+    },
   };
 });
 
@@ -480,5 +523,45 @@ describe('word-by-word route', () => {
     });
 
     expect(screen.getByTestId('word-sheet').textContent).toContain('الكتاب');
+  });
+
+  it('opens the jump sheet from the surah name', async () => {
+    // Ruling S3: the name IS the control -- no new button, and the row we just
+    // cleared for the name keeps its width.
+    render(<WbwRoute />);
+    await screen.findAllByTestId('wbw-cell');
+
+    fireEvent.click(screen.getByTestId('wbw-surah-jump'));
+
+    expect(screen.getByTestId('surah-jump-input')).toBeTruthy();
+  });
+
+  it('lands on the surah and ayah the jump sheet returns', async () => {
+    render(<WbwRoute />);
+    await screen.findAllByTestId('wbw-cell');
+    fireEvent.click(screen.getByTestId('wbw-surah-jump'));
+
+    fireEvent.change(screen.getByTestId('ayah-jump-input'), { target: { value: '15' } });
+    fireEvent.click(screen.getByTestId('surah-jump-go'));
+
+    // The range query is what proves the jump landed: the screen re-reads from
+    // the requested ayah rather than from where the pager was.
+    await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenCalledWith({}, 2, 15));
+    expect(screen.queryByTestId('surah-jump-input')).toBeNull();
+  });
+
+  it('carries the ayah across a jump into another surah', async () => {
+    // A surah the reader steps to opens at its beginning; a surah they jumped
+    // to opens where they asked. Reusing the step path drops the ayah and
+    // lands every cross-surah jump on verse 1.
+    render(<WbwRoute />);
+    await screen.findAllByTestId('wbw-cell');
+    fireEvent.click(screen.getByTestId('wbw-surah-jump'));
+
+    fireEvent.change(screen.getByTestId('surah-jump-input'), { target: { value: '3' } });
+    fireEvent.change(screen.getByTestId('ayah-jump-input'), { target: { value: '5' } });
+    fireEvent.click(screen.getByTestId('surah-jump-go'));
+
+    await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenCalledWith({}, 3, 5));
   });
 });
