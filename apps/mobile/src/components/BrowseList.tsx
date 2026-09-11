@@ -22,6 +22,14 @@ export interface BrowseItem {
   subtitle?: string;
   /** Rendered right-aligned in the Arabic face when present. */
   arabic?: string;
+  /** Which face the `arabic` slot is drawn in.
+   *
+   *  'surahName' is the calligraphic V4 face, whose glyphs live in a private
+   *  use area -- it has NO glyph for ordinary Arabic text, so a row passing a
+   *  real Arabic string with this face renders tofu. Only pass it with the
+   *  output of `surahNameGlyph` (ruling S1). Absent = the reading face, which
+   *  is what juz, page and revealed rows want. */
+  arabicFace?: 'reading' | 'surahName';
   /** Says what the row opens. A bare number announces as a number. */
   accessibilityLabel: string;
   testID?: string;
@@ -138,7 +146,22 @@ function Row({ item }: { item: BrowseItem }) {
             ) : null}
           </View>
           {item.arabic ? (
-            <Text style={{ color: theme.text, fontFamily: fonts.arabic, fontSize: 26, textAlign: 'right' }}>
+            <Text
+              testID={`browse-arabic-${item.key}`}
+              style={{
+                color: theme.text,
+                // V4 (`surahNameAlt`), never V2: V2 has no glyph for surah 102
+                // and would draw a box on At-Takathur. V4 covers all 114 --
+                // verified 2026-09-11 during the M7e font spike. Do not
+                // "simplify" this to the mushaf band's face.
+                fontFamily: item.arabicFace === 'surahName' ? fonts.surahNameAlt : fonts.arabic,
+                // The calligraphic glyph carries its own side bearings and a
+                // tail below the baseline, so it needs more box than a 26pt
+                // reading run before it clips.
+                fontSize: item.arabicFace === 'surahName' ? 30 : 26,
+                textAlign: 'right',
+              }}
+            >
               {item.arabic}
             </Text>
           ) : null}
