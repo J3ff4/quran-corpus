@@ -18,10 +18,11 @@ describe('colorForWord', () => {
     expect(colorForWord(base, theme)(2, 5, 1)).toBe(theme.text);
   });
 
-  it('tints a bookmarked ayah', () => {
+  it('leaves a bookmarked ayah-s ink alone -- the band carries it now', () => {
+    // The owner read the old green type as "very vague" (2026-09-10): it was
+    // one of three greens on the page and the quietest of them. Ink stays ink.
     const c = colorForWord({ ...base, bookmarked: new Set([ayahKey(2, 5)]) }, theme);
-    expect(c(2, 5, 1)).not.toBe(theme.text);
-    expect(c(2, 6, 1)).toBe(theme.text);
+    expect(c(2, 5, 1)).toBe(theme.text);
   });
 
   it('lets audio win over a landing pulse and a bookmark on the same ayah', () => {
@@ -37,19 +38,18 @@ describe('colorForWord', () => {
     expect(colorForWord(all, theme)(2, 5, 1)).toBe(theme.accent);
   });
 
-  it('lets a landing pulse win over a bookmark', () => {
+  it('pulses a landing ayah above the page, bookmarked or not', () => {
     const bookmarked = new Set([ayahKey(2, 5)]);
     const c = colorForWord({ ...base, bookmarked, landing: ayahKey(2, 5), landingProgress: 1 }, theme);
     expect(c(2, 5, 1)).not.toBe(theme.text);
-    expect(c(2, 5, 1)).not.toBe(colorForWord({ ...base, bookmarked }, theme)(2, 5, 1));
     // Short of the accent, so a playing ayah is still the loudest thing there.
     expect(c(2, 5, 1)).not.toBe(theme.accent);
   });
 
-  it('returns the bookmark tint once the pulse has faded out', () => {
+  it('returns to plain ink once the pulse has faded out', () => {
     const withBookmark = { ...base, bookmarked: new Set([ayahKey(2, 5)]) };
     const faded = colorForWord({ ...withBookmark, landing: ayahKey(2, 5), landingProgress: 0 }, theme);
-    expect(faded(2, 5, 1)).toBe(colorForWord(withBookmark, theme)(2, 5, 1));
+    expect(faded(2, 5, 1)).toBe(theme.text);
   });
 
   it('keys on the surah too, so a page crossing a boundary tints one ayah', () => {
@@ -93,13 +93,46 @@ describe('colorForWord', () => {
     const color = colorForWord({ ...base, bookmarked, pressed }, theme);
 
     expect(color(2, 5, 3)).toBe(theme.accent);
-    expect(color(2, 5, 4)).toBe(colorForWord({ ...base, bookmarked }, theme)(2, 5, 4));
-    expect(color(2, 5, 4)).not.toBe(theme.accent);
+    expect(color(2, 5, 4)).toBe(theme.text);
   });
 
-  it('washes nothing at all while no word is pressed', () => {
+  it('washes nothing at all while nothing is pressed or bookmarked', () => {
     const background = backgroundForWord(base, theme);
     expect(background(2, 5, 1)).toBeUndefined();
+  });
+
+  it('bands every word of a bookmarked ayah, and only that ayah', () => {
+    const background = backgroundForWord({ ...base, bookmarked: new Set([ayahKey(2, 5)]) }, theme);
+
+    expect(background(2, 5, 1)).toBe(theme.bookmarkWash);
+    expect(background(2, 5, 9)).toBe(theme.bookmarkWash);
+    expect(background(2, 6, 1)).toBeUndefined();
+    // The surah too: 51 pages cross a boundary and an ayah number alone would
+    // band the wrong verse on one.
+    expect(background(3, 5, 1)).toBeUndefined();
+  });
+
+  it('keeps the bookmark band clear of the accent wash it sits under', () => {
+    // Two grounds, and the pressed one has to be visible ON the other. Equal
+    // tokens would make a long press inside a bookmarked ayah do nothing at
+    // all on screen -- which is the only feedback there is that the sheet is
+    // coming (M7d ruling 4, 500ms).
+    expect(theme.bookmarkWash).not.toBe(theme.accentWash);
+  });
+
+  it('lets the pressed word-s wash win over the band it sits on', () => {
+    const background = backgroundForWord(
+      {
+        ...base,
+        bookmarked: new Set([ayahKey(2, 5)]),
+        pressed: { surahId: 2, ayahNumber: 5, position: 3 },
+      },
+      theme,
+    );
+
+    expect(background(2, 5, 3)).toBe(theme.accentWash);
+    // Its neighbours keep the band rather than losing it to the press.
+    expect(background(2, 5, 2)).toBe(theme.bookmarkWash);
   });
 
   it('does not carry a press across a surah boundary on a shared page', () => {

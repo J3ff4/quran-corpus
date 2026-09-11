@@ -92,6 +92,7 @@ vi.mock('react-native-reanimated', async () => {
     // own bottom margin closing as it collapses -- lives entirely in one of
     // these, and a mock returning {} makes a row that leaves a gap behind
     // indistinguishable from one that does not.
+    // A closed keyboard: BottomSheet subtracts this from its own translate.
     useAnimatedStyle: (worklet: () => unknown) => worklet(),
     useSharedValue: (initial: unknown) => ({ value: initial }),
     withSpring: (to: unknown) => to,
@@ -128,16 +129,23 @@ vi.mock('react-native', async () => {
     value,
     accessibilityLabel,
     testID,
+    style,
   }: {
     onChangeText?: (text: string) => void;
     value?: string;
     accessibilityLabel?: string;
     testID?: string;
+    style?: Record<string, unknown>;
   }) =>
     React.createElement('input', {
       'data-testid': testID,
       'aria-label': accessibilityLabel,
       value: value ?? '',
+      // Forwarded, unlike every other prop here. The note field's height is
+      // now a bound rather than a fixed number, and a mock that drops `style`
+      // makes a field that opens three lines tall indistinguishable from one
+      // that opens at one.
+      style,
       onChange: (event: { target: { value: string } }) => onChangeText?.(event.target.value),
     });
 
@@ -162,6 +170,10 @@ vi.mock('react-native', async () => {
     Text: host('span'),
     TextInput: Input,
     View: host('div'),
+    // A keyboard that never opens. Whether the sheet lifts is a device check
+    // -- jsdom has no keyboard -- and BottomSheet.test.tsx drives these
+    // listeners by hand.
+    Keyboard: { addListener: () => ({ remove: () => {} }), metrics: () => undefined },
     Pressable: host('button'),
     Animated: { View: host('div'), createAnimatedComponent: () => host('button') },
   };
@@ -301,6 +313,64 @@ describe('BookmarksTab', () => {
     // The control that discarded a typed note was ~33dp.
     expect(screen.getByTestId('note-save').style.minHeight).toBe('48px');
     expect(screen.getByTestId('note-cancel').style.minHeight).toBe('48px');
+  });
+
+  it('says nothing about the count until running out is plausible', async () => {
+    // "Characters left \u00b7 500" on an empty note is a caption row that tells
+    // nobody anything, and it sat between the field and the buttons where the
+    // sheet is tightest (owner ruling 2026-09-10). Silent for the first 80%.
+    const userClient = requireUserClient();
+    await setBookmark(userClient, 2, 255, true);
+
+    render(<BookmarksTab />);
+    fireEvent.click(await screen.findByLabelText('Add note'));
+
+    expect(screen.queryByTestId('note-counter')).toBeNull();
+
+    fireEvent.change(screen.getByTestId('note-input'), { target: { value: 'x'.repeat(300) } });
+    expect(screen.queryByTestId('note-counter')).toBeNull();
+
+    // 401 typed, 99 left: over the threshold, so it appears.
+    fireEvent.change(screen.getByTestId('note-input'), { target: { value: 'x'.repeat(401) } });
+    expect(screen.getByTestId('note-counter').textContent).toContain('99');
+  });
+
+  it('turns the count to a warning colour over the last twenty', async () => {
+    // The threshold above only decides whether it is drawn. This is the one
+    // that says running out is imminent, and without it a mutant that dropped
+    // the danger branch left a muted grey caption at 3 characters left.
+    const userClient = requireUserClient();
+    await setBookmark(userClient, 2, 255, true);
+
+    render(<BookmarksTab />);
+    fireEvent.click(await screen.findByLabelText('Add note'));
+
+    fireEvent.change(screen.getByTestId('note-input'), { target: { value: 'x'.repeat(450) } });
+    const calm = screen.getByTestId('note-counter').style.color;
+
+    fireEvent.change(screen.getByTestId('note-input'), { target: { value: 'x'.repeat(495) } });
+    expect(screen.getByTestId('note-counter').style.color).not.toBe(calm);
+  });
+
+  it('opens the note field at one line and lets it grow to three', async () => {
+    // It used to open at a fixed 96dp -- three empty lines of nothing on a
+    // sheet with no room to spare. A multiline field with no height grows to
+    // its content by itself; these two bound that growth, and the max is what
+    // stops a long note pushing Save off the screen.
+    const userClient = requireUserClient();
+    await setBookmark(userClient, 2, 255, true);
+
+    render(<BookmarksTab />);
+    fireEvent.click(await screen.findByLabelText('Add note'));
+
+    const field = screen.getByTestId('note-input');
+    expect(field.style.height).toBe('');
+    const min = Number(field.style.minHeight.replace('px', ''));
+    const max = Number(field.style.maxHeight.replace('px', ''));
+    expect(min).toBeGreaterThanOrEqual(48);
+    expect(max).toBeGreaterThan(min);
+    // Three lines, not five and not one: the ruling was a specific number.
+    expect(max - min).toBe(2 * Math.round(16 * 1.5));
   });
 
   it('counts down the remaining characters while editing', async () => {

@@ -18,3 +18,21 @@ export function formColorFor(theme: Theme, posLabel: string): { color: string; t
   const color = theme.form[categorizeFormLabel(posLabel)];
   return { color, tint: formTint(color) };
 }
+
+/** The colour a morphological segment's label is drawn in, plus its pill
+ *  background -- or `undefined` where the corpus surfaces no bucket for the
+ *  tag, in which case the pill stays untinted rather than asserting a
+ *  category it does not have.
+ *
+ *  Same 16% as the form chips, and measured the same way: on the sheet's own
+ *  surface the lowest POS ratio on its own tint is 4.78:1, and on a glass
+ *  group inside it 5.76:1 (dark) -- both clear AA. Nothing may paint behind
+ *  the tint beyond that group. */
+export function posColorFor(
+  theme: Theme,
+  bucket: keyof Theme['pos'] | null,
+): { color: string; tint: string | undefined } {
+  if (bucket === null) return { color: theme.text, tint: undefined };
+  const color = theme.pos[bucket];
+  return { color, tint: formTint(color) };
+}

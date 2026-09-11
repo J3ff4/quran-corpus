@@ -45,6 +45,15 @@ export const themeColors = {
     // The accent at 12% over the page. Carries the tint that hue alone cannot:
     // accent on it is 4.82:1, so a tinted match clears AA for body text.
     accentWash: '#e0e8e1',
+    // A bookmark's own colour, and deliberately NOT the accent. Before this a
+    // bookmarked ayah was drawn in green *type* -- 45% of the way from ink to
+    // the accent -- which the owner read as "very vague" on the page
+    // (2026-09-10), and no wonder: the accent is already the playing ayah and
+    // accentWash is already the pressed word, so the one standing mark on the
+    // page was the least distinct of the three. Amber is the highlighter
+    // colour print uses, it belongs to nothing else here, and it lets the ink
+    // stay ink. Paper ink on it is 12.94:1.
+    bookmarkWash: '#f2ddaf',
     danger: colors.danger, // 6.9:1 on paper
     // The same red as a FILL rather than as text -- the swipe-to-delete panel
     // is 88pt of solid colour, not a line of type. Light mode can reuse the
@@ -73,6 +82,11 @@ export const themeColors = {
     // The night accent at 18% over night -- a heavier mix than light's 12%,
     // which is what it takes to be visible on #151412. Accent on it is 4.85:1.
     accentWash: '#212e28',
+    // The same mark, mixed down for night. Not the light amber dimmed by an
+    // alpha: over #151412 a translucent band reads as grey. nightText on it is
+    // 11.32:1, and it is 1.39:1 against the page -- present without glowing,
+    // which is the whole point of a standing mark on a mushaf page.
+    bookmarkWash: '#3a2e1c',
     // Not colors.danger: #9f2d2d on night is 2.5:1, well under AA. Error text
     // is exactly the text a user must be able to read, so the night palette
     // takes a lighter red rather than reusing the brand one.

@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { BackHandler, Modal, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { BackHandler, Keyboard, Modal, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import Animated, {
   Easing,
@@ -9,6 +9,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReducedMotion } from '@/motion/useReducedMotion';
 import { useThemeColors } from '@/theme/themeContext';
 
@@ -65,6 +66,47 @@ export function BottomSheet({ onClose, closeLabel, children }: BottomSheetProps)
   const translateY = useSharedValue(screenHeight);
   const fade = useSharedValue(0);
   const sheetHeight = useSharedValue(0);
+  // How far the sheet has to rise to clear the keyboard.
+  //
+  // Read from RN's own Keyboard events, NOT from reanimated's
+  // `useAnimatedKeyboard`, which was the first attempt and did nothing on the
+  // device (owner, 2026-09-10: "text area is still behind the keyboard").
+  // Reanimated attaches its listener to `currentActivity.window.decorView` and
+  // only updates the height once a WindowInsetsAnimation callback on THAT view
+  // has moved its state to OPEN. This sheet lives in a <Modal>, which is a
+  // separate native window: the IME animation is dispatched to the dialog's
+  // window, the activity's decor view never sees it, and the height stays 0
+  // for as long as the sheet is open. RN's own events read the static ime
+  // inset off the root window instead, with no animation callback to miss.
+  //
+  // Plus the bottom inset: `keyboardDidShow` reports the ime inset MINUS the
+  // system bars (ReactRootView.checkForKeyboardEvents), and this sheet is
+  // anchored at bottom: 0 of an edge-to-edge window -- i.e. behind the
+  // navigation bar, which the keyboard also covers. Without the inset the
+  // sheet stops a navigation bar short and its last row stays buried.
+  const keyboardLift = useSharedValue(0);
+  const bottomInset = useSafeAreaInsets().bottom;
+
+  useEffect(() => {
+    // Seeded from the metrics rather than starting at 0: a sheet opened while
+    // the keyboard is ALREADY up never receives a `didShow`, so it would sit
+    // under the keyboard for its whole life. No animation for this one -- the
+    // keyboard is not moving, so there is nothing to ride.
+    const open = Keyboard.metrics();
+    if (open) keyboardLift.value = open.height + bottomInset;
+
+    const shown = Keyboard.addListener('keyboardDidShow', (event) => {
+      const to = event.endCoordinates.height + bottomInset;
+      keyboardLift.value = reduced ? to : withTiming(to, ENTER);
+    });
+    const hidden = Keyboard.addListener('keyboardDidHide', () => {
+      keyboardLift.value = reduced ? 0 : withTiming(0, EXIT);
+    });
+    return () => {
+      shown.remove();
+      hidden.remove();
+    };
+  }, [bottomInset, keyboardLift, reduced]);
 
   // Read through a ref so the entrance effect below does not depend on it.
   // With screenHeight in those deps, an Android split-screen resize while the
@@ -108,7 +150,11 @@ export function BottomSheet({ onClose, closeLabel, children }: BottomSheetProps)
       const height = sheetHeight.value || screenHeight;
       if (event.translationY > height * DISMISS_FRACTION || event.velocityY > DISMISS_VELOCITY) {
         fade.value = withTiming(0, { duration: FADE_MS });
-        translateY.value = withTiming(height, EXIT, (finished?: boolean) => {
+        // Plus the lift: the sheet's visible offset is `translateY -
+        // keyboardLift`, so travelling only to `height` with the keyboard up
+        // leaves it a keyboard's worth still on screen when onClose unmounts
+        // it -- a pop instead of a slide.
+        translateY.value = withTiming(height + keyboardLift.value, EXIT, (finished?: boolean) => {
           // Only on a settled animation: unmounting mid-flight leaves the
           // sheet half-way down for the frame before it disappears.
           if (finished) runOnJS(onClose)();
@@ -129,7 +175,11 @@ export function BottomSheet({ onClose, closeLabel, children }: BottomSheetProps)
     // Under reduced motion the sheet fades with the backdrop and never moves;
     // otherwise it is opaque throughout and only translates.
     opacity: reduced ? fade.value : 1,
-    transform: [{ translateY: translateY.value }],
+    // Minus the keyboard, so the sheet sits ON its top edge rather than under
+    // it. Subtracted from the same value the entrance and the drag write, so
+    // a sheet dragged down with the keyboard up still lands where it should
+    // and a keyboard opening mid-entrance does not fight the slide.
+    transform: [{ translateY: translateY.value - keyboardLift.value }],
   }));
 
   return (
@@ -176,8 +226,15 @@ export function BottomSheet({ onClose, closeLabel, children }: BottomSheetProps)
               borderTopLeftRadius: 16,
               borderTopRightRadius: 16,
               paddingHorizontal: 20,
-              paddingTop: 12,
-              paddingBottom: 28,
+              // Owner, 2026-09-10, on the device: "remove these big padding on
+              // top word sheet. and note has both top and bottom big padding."
+              // The handle's own marginBottom is gone with it: the column's
+              // `gap` already separates it from the first row, so the two were
+              // stacking to 34dp under a 4dp bar. 8 + handle + gap puts the
+              // first row 26dp down, half of the 50 it was, and the 28 below
+              // was dead space under Save with the keyboard up.
+              paddingTop: 8,
+              paddingBottom: 16,
               gap: 14,
             },
             sheetStyle,
@@ -190,7 +247,6 @@ export function BottomSheet({ onClose, closeLabel, children }: BottomSheetProps)
               height: 4,
               borderRadius: 2,
               backgroundColor: theme.border,
-              marginBottom: 20,
             }}
           />
           {children}
