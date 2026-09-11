@@ -12,6 +12,11 @@ export type UiStringKey =
   | 'mushaf.jumpJuz'
   | 'mushaf.jumpGo'
   | 'mushaf.jumpOutOfRange'
+  | 'jump.surahTitle'
+  | 'jump.surah'
+  | 'jump.ayah'
+  | 'jump.go'
+  | 'jump.outOfRange'
   | 'tabs.settings'
   | 'tabs.dictionary'
   | 'tabs.menu'
@@ -284,6 +289,11 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'mushaf.jumpJuz': 'Juz',
     'mushaf.jumpGo': 'Go',
     'mushaf.jumpOutOfRange': 'Nothing there. Page 1-604, surah 1-114, juz 1-30.',
+    'jump.surahTitle': 'Go to surah',
+    'jump.surah': 'Surah',
+    'jump.ayah': 'Ayah',
+    'jump.go': 'Go',
+    'jump.outOfRange': 'No such surah or ayah',
     'tabs.surahs': 'Surahs',
     'tabs.bookmarks': 'Bookmarks',
     'tabs.mushaf': 'Mushaf',
@@ -500,6 +510,11 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'mushaf.jumpJuz': 'Juz',
     'mushaf.jumpGo': 'Oʻtish',
     'mushaf.jumpOutOfRange': 'Bunday joy yoʻq. Sahifa 1-604, sura 1-114, juz 1-30.',
+    'jump.surahTitle': 'Suraga oʻtish',
+    'jump.surah': 'Sura',
+    'jump.ayah': 'Oyat',
+    'jump.go': 'Oʻtish',
+    'jump.outOfRange': 'Bunday sura yoki oyat yoʻq',
     'tabs.surahs': 'Suralar',
     'tabs.bookmarks': 'Xatcho‘plar',
     'tabs.mushaf': 'Mushaf',
@@ -711,6 +726,11 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'mushaf.jumpJuz': 'Джуз',
     'mushaf.jumpGo': 'Перейти',
     'mushaf.jumpOutOfRange': 'Такого нет. Страница 1-604, сура 1-114, джуз 1-30.',
+    'jump.surahTitle': 'Перейти к суре',
+    'jump.surah': 'Сура',
+    'jump.ayah': 'Аят',
+    'jump.go': 'Перейти',
+    'jump.outOfRange': 'Такой суры или аята нет',
     'tabs.surahs': 'Суры',
     'tabs.bookmarks': 'Закладки',
     'tabs.mushaf': 'Мусхаф',
