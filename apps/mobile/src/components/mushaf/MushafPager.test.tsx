@@ -1,10 +1,15 @@
 import React from 'react';
-import { cleanup, render } from '@testing-library/react';
+import { act, cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('react-native', async () => {
   const { reactNativeTextMock } = await import('@/testing/rnHosts.js');
   return reactNativeTextMock();
+});
+
+vi.mock('react-native-pager-view', async () => {
+  const { pagerViewMock } = await import('@/testing/pagerHost.js');
+  return pagerViewMock();
 });
 
 // The page draws through expo-font, which dies at import under jsdom.
@@ -13,9 +18,9 @@ vi.mock('@/mushaf/pageFont', () => ({
   mushafFontFamily: (page: number) => `QCF2${String(page).padStart(3, '0')}`,
 }));
 
-import { listPropsOf, listScrollsOf } from '@/testing/rnHosts';
+import { pagerCommandsOf, pagerPropsOf } from '@/testing/pagerHost';
 
-import { MushafPager } from './MushafPager';
+import { MushafPager, WINDOW } from './MushafPager';
 
 afterEach(cleanup);
 
@@ -40,128 +45,116 @@ const props = {
   onTap: vi.fn(),
 };
 
-/** The settle event RN emits at the end of a paging scroll. */
-const settleAt = (page: number) => ({
-  nativeEvent: { contentOffset: { x: (page - 1) * props.width, y: 0 } },
-});
+/** The event ViewPager2 emits when a turn settles. Zero-based, unlike a page. */
+const selected = (page: number) => ({ nativeEvent: { position: page - 1 } });
+
+/** Fires a settle through React, so the window state it sets is committed. */
+const settle = (
+  result: { container: { querySelectorAll(s: string): ArrayLike<object> } },
+  page: number,
+) => {
+  act(() => {
+    pagerPropsOf(result).onPageSelected?.(selected(page));
+  });
+};
+
+/** How many cells are drawing a page rather than sitting empty.
+ *
+ *  Read off the child tree rather than the DOM: the cells that draw nothing
+ *  render an empty View, and the ones that draw hand off to a Pressable whose
+ *  testID the react-native shim does not forward to an attribute. */
+const drawnPages = (result: { container: { querySelectorAll(s: string): ArrayLike<object> } }) =>
+  React.Children.toArray(pagerPropsOf(result).children as React.ReactNode).filter(
+    (cell) => (cell as { props: { children: unknown } }).props.children !== null,
+  ).length;
 
 describe('MushafPager', () => {
-  it('memoises a page, so a chrome toggle two levels up does not redraw three', () => {
-    // Every prop a page takes is a stable reference from the reader. Without
-    // the memo one boolean -- the chrome's visibility -- re-rendered all three
-    // mounted pages, and a page render invalidates the hardware layer it is
-    // held in, so a 220ms slide competed with three full rasterisations.
-    const list = listPropsOf(render(<MushafPager {...props} />));
-    const cell = list.renderItem?.({ item: 106 } as never) as { type: { $$typeof?: symbol } };
-
-    expect(cell.type.$$typeof).toBe(Symbol.for('react.memo'));
-  });
-
   it('spans exactly the 604 pages of the mushaf', () => {
-    const list = listPropsOf(render(<MushafPager {...props} />));
-    expect(list.data).toHaveLength(604);
-    expect(list.data?.[0]).toBe(1);
-    expect(list.data?.[603]).toBe(604);
+    const pager = pagerPropsOf(render(<MushafPager {...props} />));
+    expect(React.Children.count(pager.children)).toBe(604);
   });
 
   it('starts on the page it was given', () => {
-    const list = listPropsOf(render(<MushafPager {...props} />));
-    expect(list.initialScrollIndex).toBe(105); // page 106
+    const pager = pagerPropsOf(render(<MushafPager {...props} />));
+    expect(pager.initialPage).toBe(105); // page 106, zero-based
   });
 
   it('opens on a real page when handed one outside the mushaf', () => {
-    // initialScrollIndex is not bounds-checked by FlatList: an index past the
-    // data crashes the scroll rather than showing an empty page, and this
-    // number arrives from a route param and the user DB.
-    const list = listPropsOf(render(<MushafPager {...props} initialPage={0} />));
-    expect(list.initialScrollIndex).toBe(0);
-    const past = listPropsOf(render(<MushafPager {...props} initialPage={999} />));
-    expect(past.initialScrollIndex).toBe(603);
+    // The number arrives from a route param and the user DB. ViewPager2 does
+    // not bounds-check it: an index past the children lands on a blank page.
+    expect(pagerPropsOf(render(<MushafPager {...props} initialPage={0} />)).initialPage).toBe(0);
+    expect(pagerPropsOf(render(<MushafPager {...props} initialPage={999} />)).initialPage).toBe(603);
   });
 
-  it('is inverted, so a right-to-left swipe advances like the book', () => {
-    // Ruling 7. Inverted and NOT I18nManager.forceRTL, which flips every
-    // screen in the app -- the UI locale is a separate user setting from the
-    // mushaf's reading direction.
-    const list = listPropsOf(render(<MushafPager {...props} />));
-    expect(list.inverted).toBe(true);
-    expect(list.pagingEnabled).toBe(true);
-    expect(list.horizontal).toBe(true);
+  it('turns right to left, like the book', () => {
+    // Ruling 7. layoutDirection on the pager, NOT I18nManager.forceRTL, which
+    // flips every screen in the app -- the UI locale is a separate user
+    // setting from the mushaf's reading direction.
+    expect(pagerPropsOf(render(<MushafPager {...props} />)).layoutDirection).toBe('rtl');
   });
 
-  it('gives every page the same width, so getItemLayout is exact', () => {
-    // 604 fixed-width items mean initialScrollIndex lands without a scan.
-    const list = listPropsOf(render(<MushafPager {...props} />));
-    expect(list.getItemLayout?.(null, 105)).toEqual({
-      length: 360,
-      offset: 360 * 105,
-      index: 105,
-    });
+  it('does not rubber-band past the first or last page', () => {
+    // The mushaf has no cover to pull open, and the overdrag reads as a page
+    // that failed to turn.
+    expect(pagerPropsOf(render(<MushafPager {...props} />)).overdrag).toBe(false);
+  });
+
+  it('draws only a narrow window of pages, and moves it with the reader', () => {
+    // The pager does NOT virtualize: every child it is handed renders. 604
+    // live queries, and a ~200KB font per drawn page that expo-font never
+    // unloads, is what this window exists to prevent -- so the cells all exist
+    // (ViewPager2 pages by child index) but only three draw anything.
+    const result = render(<MushafPager {...props} />);
+    expect(drawnPages(result)).toBe(2 * WINDOW + 1);
+
+    settle(result, 400);
+    expect(drawnPages(result)).toBe(2 * WINDOW + 1);
+  });
+
+  it('keeps the native offscreen limit in step with the drawn window', () => {
+    // A native limit wider than the drawn window pages onto a blank cell.
+    expect(pagerPropsOf(render(<MushafPager {...props} />)).offscreenPageLimit).toBe(WINDOW);
   });
 
   it('reports the settled page', () => {
     const onPageChange = vi.fn();
-    const list = listPropsOf(render(<MushafPager {...props} onPageChange={onPageChange} />));
-    list.onMomentumScrollEnd?.(settleAt(107));
+    const result = render(<MushafPager {...props} onPageChange={onPageChange} />);
+    settle(result, 107);
     expect(onPageChange).toHaveBeenCalledWith(107);
   });
 
   it('reports a page turn exactly once per settle', () => {
     // This is the write point for the durable reading position (ruling 15).
-    // Firing on every scroll frame would write the user DB dozens of times
-    // per swipe -- the whole reason issue #59's old scroll handler was wrong.
+    // Android also fires onPageSelected once at mount with the initial page,
+    // which must not be reported as a turn.
     const onPageChange = vi.fn();
-    const list = listPropsOf(render(<MushafPager {...props} onPageChange={onPageChange} />));
-    list.onMomentumScrollEnd?.(settleAt(107));
-    list.onMomentumScrollEnd?.(settleAt(107));
+    const result = render(<MushafPager {...props} onPageChange={onPageChange} />);
+    settle(result, 106);
+    settle(result, 107);
+    settle(result, 107);
     expect(onPageChange).toHaveBeenCalledTimes(1);
-  });
-
-  it('says nothing when a drag snaps back to the page it started on', () => {
-    const onPageChange = vi.fn();
-    const list = listPropsOf(render(<MushafPager {...props} onPageChange={onPageChange} />));
-    list.onMomentumScrollEnd?.(settleAt(106));
-    expect(onPageChange).not.toHaveBeenCalled();
-  });
-
-  it('keeps only a narrow window of pages mounted', () => {
-    // Every mounted page registers a ~200KB font that expo-font never
-    // unloads. Windowing is what bounds the cost of paging through a juz.
-    const list = listPropsOf(render(<MushafPager {...props} />));
-    expect(list.windowSize).toBe(3);
-    expect(list.maxToRenderPerBatch).toBe(1);
-    // NOT clipped. With a window of three there is nothing left to clip, and
-    // on Android it is a known source of blank and half-drawn cells on a
-    // horizontal list.
-    expect(list.removeClippedSubviews).toBeUndefined();
-    // Numeric, between RN's two named Android rates: `normal` (0.985) drifts
-    // after the finger leaves and reads as arriving late (owner, 2026-09-10),
-    // `fast` (0.9) lands hard enough to read as "too snappy" (2026-09-11).
-    expect(list.decelerationRate).toBe(0.95);
+    expect(onPageChange).toHaveBeenCalledWith(107);
   });
 
   it('turns to the page the recitation has moved onto', () => {
     // Ruling 19. Without this the audio tint moves onto a page the reader is
     // not looking at, and the mushaf silently stops following the recitation.
     const result = render(<MushafPager {...props} focusPage={null} />);
-    expect(listScrollsOf(result)).toEqual([]);
+    expect(pagerCommandsOf(result)).toEqual([]);
 
     result.rerender(<MushafPager {...props} focusPage={108} />);
-    expect(listScrollsOf(result)).toEqual([{ index: 107, animated: true }]);
+    expect(pagerCommandsOf(result)).toEqual([{ page: 107, animated: true }]);
   });
 
   it('does not turn to the page it is already on', () => {
     // The recitation crossing ayahs within one page reports the same page
-    // every time; scrolling on each would fight a reader mid-swipe.
-    const result = render(<MushafPager {...props} focusPage={106} />);
-    expect(listScrollsOf(result)).toEqual([]);
+    // every time; turning on each would fight a reader mid-swipe.
+    expect(pagerCommandsOf(render(<MushafPager {...props} focusPage={106} />))).toEqual([]);
   });
 
   it('ignores a focus page outside the mushaf', () => {
-    // 605 reaches scrollToIndex as index 604, which throws inside the list
-    // rather than doing nothing.
-    const result = render(<MushafPager {...props} focusPage={605} />);
-    expect(listScrollsOf(result)).toEqual([]);
+    expect(pagerCommandsOf(render(<MushafPager {...props} focusPage={605} />))).toEqual([]);
+    expect(pagerCommandsOf(render(<MushafPager {...props} focusPage={0} />))).toEqual([]);
   });
 
   it('reports the page an auto-turn settles on', () => {
@@ -171,12 +164,34 @@ describe('MushafPager', () => {
     const result = render(
       <MushafPager {...props} focusPage={108} onPageChange={onPageChange} />,
     );
-    listPropsOf(result).onMomentumScrollEnd?.(settleAt(108));
+    settle(result, 108);
     expect(onPageChange).toHaveBeenCalledWith(108);
   });
 
-  it('draws a page per item, keyed by its page number', () => {
-    const list = listPropsOf(render(<MushafPager {...props} />));
-    expect(list.keyExtractor?.(106, 105)).toBe('106');
+  it('memoises a page, so a chrome toggle two levels up does not redraw three', () => {
+    // Every prop a page takes is a stable reference from the reader. Without
+    // the memo one boolean -- the chrome's visibility -- re-rendered all three
+    // drawn pages, and a page render invalidates the hardware layer it is held
+    // in, so a 220ms slide competed with three full rasterisations.
+    const pager = pagerPropsOf(render(<MushafPager {...props} />));
+    const cell = React.Children.toArray(pager.children)[105] as {
+      props: { children: { type: { $$typeof?: symbol } } };
+    };
+
+    expect(cell.props.children.type.$$typeof).toBe(Symbol.for('react.memo'));
+  });
+
+  it('keeps every cell in the tree, sized, even when it draws nothing', () => {
+    // ViewPager2 pages by child index: a cell that collapses away shifts every
+    // page after it, so page 300 would no longer be page 300.
+    const pager = pagerPropsOf(render(<MushafPager {...props} />));
+    const far = React.Children.toArray(pager.children)[0] as {
+      key: string | null;
+      props: { collapsable: boolean; style: { width: number; height: number }; children: unknown };
+    };
+
+    expect(far.props.collapsable).toBe(false);
+    expect(far.props.style).toEqual({ width: 360, height: 720 });
+    expect(far.props.children).toBeNull();
   });
 });

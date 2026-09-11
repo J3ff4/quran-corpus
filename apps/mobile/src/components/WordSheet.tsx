@@ -110,7 +110,15 @@ export function WordSheet({
           marginTop: ayahActions ? -6 : 0,
         }}
       >
-        <SegmentedWord word={word} segments={segments} fontSize={sizes.title} />
+        <SegmentedWord
+          word={word}
+          segments={segments}
+          fontSize={sizes.title}
+          // 1.2x the glyph size. Measured on the device: the word's own ink is
+          // ~26dp tall at 45sp, so a 54dp box clears the tallest mark with
+          // room to spare while cutting ~40dp of empty band above it.
+          lineHeight={Math.round(sizes.title * 1.2)}
+        />
         {/* The tag is nested inside the gloss rather than set beside it so the
             two wrap as one phrase. Safe here where it would not be on an
             Arabic run: nesting Text breaks shaping across the boundary, and a

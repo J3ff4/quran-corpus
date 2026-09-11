@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Word, WordSegment } from '@quran-corpus/data/mobile';
 import type { Gloss, WordSummary } from '@/data/corpusRepository';
+import { typography } from '@/theme/tokens';
 import { WordSheet } from './WordSheet';
 
 const mocks = vi.hoisted(() => ({
@@ -376,6 +377,19 @@ describe('WordSheet', () => {
     // 24 under Save with the keyboard up is the dead space trimmed on 09-10.
     render(<WordSheet summary={summary()} {...handlers} />);
     expect(screen.getByTestId('sheet-surface').style.paddingBottom).toBe('24px');
+  });
+
+  it('pins the hero word-s line box to 1.2x its glyph size', () => {
+    // Measured on the device, 2026-09-11: at 45sp the word-s own ink is ~26dp
+    // tall, so a 1.2x box clears the tallest mark while cutting ~40dp of dead
+    // band above it. The sheet is the only caller that asks for this.
+    render(<WordSheet summary={summary()} {...handlers} />);
+
+    // The fallback path, since this summary carries no segments -- it shares
+    // the one style object with the segmented path, which is the point.
+    const word = screen.getByTestId('word-fallback');
+    expect(word.style.lineHeight).toBe(String(Math.round(typography.arabicTitle * 1.2)));
+    expect(word.getAttribute('data-rn-include-font-padding')).toBe('false');
   });
 
   it('draws a chevron on both rows, not a bare label', () => {

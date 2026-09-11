@@ -111,6 +111,29 @@ describe('SegmentedWord', () => {
     expect(screen.getByLabelText(word.text_arabic)).toBeTruthy();
   });
 
+  it('pins the line box only when asked, so the WBW grid is untouched', () => {
+    // Hafs reserves ascender room far above where its glyphs sit and Android
+    // adds includeFontPadding outside that: 62dp of empty band over the hero
+    // word on the device (2026-09-11), of which the layout gap was 8. Opt-in,
+    // because this component also draws every WBW cell and M6l's fitted
+    // row-height model is calibrated against the untouched box.
+    const { rerender } = render(
+      <SegmentedWord word={word} segments={[prefix('P'), stem('N')]} fontSize={36} />,
+    );
+    let text = screen.getByTestId('segmented-word');
+    expect(text.style.lineHeight).toBe('');
+    expect(text.getAttribute('data-rn-include-font-padding')).toBeNull();
+
+    rerender(
+      <SegmentedWord word={word} segments={[prefix('P'), stem('N')]} fontSize={36} lineHeight={43} />,
+    );
+    text = screen.getByTestId('segmented-word');
+    expect(text.style.lineHeight).toBe('43');
+    // Both, or neither works: Android's font padding is added OUTSIDE the line
+    // box, so pinning lineHeight alone leaves the band nearly untouched.
+    expect(text.getAttribute('data-rn-include-font-padding')).toBe('false');
+  });
+
   it('renders DET without a bucket colour, same as the pill', () => {
     render(<SegmentedWord word={word} segments={[prefix('DET'), stem('N')]} fontSize={36} />);
 

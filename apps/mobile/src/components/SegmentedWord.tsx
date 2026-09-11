@@ -7,6 +7,19 @@ export interface SegmentedWordProps {
   word: Word;
   segments: WordSegment[];
   fontSize: number;
+  /** An explicit line box for the word, where the font's own is too tall.
+   *
+   *  Hafs reserves ascender room far above where its glyphs actually sit, and
+   *  Android adds `includeFontPadding` on top of that: measured on the device
+   *  (2026-09-11), the hero word in the sheet sat under 62dp of empty band, of
+   *  which the layout gap was 8. Passing this switches that padding off and
+   *  pins the box.
+   *
+   *  Opt-in rather than applied to every word, because this component also
+   *  draws every WBW cell, and M6l's fitted row-height model is calibrated
+   *  against the untouched line box. Changing it here for everyone would
+   *  re-open a phase's worth of row estimation. */
+  lineHeight?: number;
 }
 
 /**
@@ -15,12 +28,18 @@ export interface SegmentedWordProps {
  * word in body colour while the pills beneath it were tinted, which read as
  * two unrelated things (owner device report, 2026-08-16).
  */
-export function SegmentedWord({ word, segments, fontSize }: SegmentedWordProps) {
+export function SegmentedWord({ word, segments, fontSize, lineHeight }: SegmentedWordProps) {
   const theme = useThemeColors();
   const style = {
     color: theme.text,
     fontFamily: 'Hafs',
     fontSize,
+    ...(lineHeight === undefined
+      ? null
+      : // Both, or neither works: Android's font padding is added OUTSIDE the
+        // line box, so pinning lineHeight alone leaves the padding in place
+        // and the band barely moves.
+        { lineHeight, includeFontPadding: false }),
     textAlign: 'right' as const,
     // textAlign places the block; writingDirection is iOS-only (see AyahText).
     // Android resolves direction from the content.
