@@ -121,6 +121,34 @@ describe('ReaderHeader', () => {
     expect(screen.getByTestId('reader-title').textContent).toBe('Al-Baqarah');
   });
 
+  it('opens the jump sheet from the surah name', () => {
+    const onOpenJump = vi.fn();
+    renderHeader({ titleVisible: true, onOpenJump });
+
+    fireEvent.click(screen.getByTestId('reader-surah-jump'));
+
+    expect(onOpenJump).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not take a tap while the name is faded out', () => {
+    // The name is animated to opacity 0 until the list's own heading scrolls
+    // off (M7e). A control that still takes presses there is an invisible hit
+    // target across the middle of the header, and the surah name is legible in
+    // the list heading at exactly that moment anyway.
+    const onOpenJump = vi.fn();
+    renderHeader({ titleVisible: false, titleStyle: { opacity: 0 }, onOpenJump });
+
+    fireEvent.click(screen.getByTestId('reader-surah-jump'));
+
+    expect(onOpenJump).not.toHaveBeenCalled();
+  });
+
+  it('hides the faded name from TalkBack rather than offering a dead control', () => {
+    renderHeader({ titleVisible: false, titleStyle: { opacity: 0 }, onOpenJump: vi.fn() });
+
+    expect(screen.getByTestId('reader-surah-jump').getAttribute('data-hidden-from-a11y')).toBe('true');
+  });
+
   it('pages to the next surah', () => {
     const onPageSurah = vi.fn();
     renderHeader({ prevSurahId: 1, nextSurahId: 3, onPageSurah });
@@ -156,7 +184,10 @@ describe('ReaderHeader', () => {
     // pill row; only back and the actions button share row 1 now.
     renderHeader({ prevSurahId: 1, nextSurahId: 3, onPageSurah: vi.fn() });
 
-    const row = screen.getByTestId('reader-title').parentElement!;
+    // From the jump control, not the title: the name sits inside a Pressable
+    // now (ruling S3), so the title's own parent is that control rather than
+    // the row.
+    const row = screen.getByTestId('reader-surah-jump').parentElement!;
     expect(within(row).queryByTestId('surah-previous')).toBeNull();
     expect(within(row).queryByTestId('surah-next')).toBeNull();
     expect(within(row).queryByTestId('reader-back')).not.toBeNull();

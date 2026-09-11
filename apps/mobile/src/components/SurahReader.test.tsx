@@ -166,6 +166,22 @@ vi.mock('./LanguageSheet', async () => {
   };
 });
 
+// Stubbed for the reason LanguageSheet is: the real sheet reaches BottomSheet,
+// and through it an Easing this suite's reanimated mock does not carry.
+// SurahJumpSheet.test.tsx covers its parsing; what matters here is that the
+// reader opens it and hands what it returns to onJump.
+vi.mock('./SurahJumpSheet', async () => {
+  const React = await import('react');
+  return {
+    SurahJumpSheet: ({ onJump }: { onJump: (surahId: number, ayahNumber: number) => void }) =>
+      React.createElement(
+        'div',
+        { 'data-testid': 'surah-jump-sheet' },
+        React.createElement('button', { 'data-testid': 'do-jump', onClick: () => onJump(3, 12) }),
+      ),
+  };
+});
+
 vi.mock('./ReciterSheet', async () => {
   const React = await import('react');
   return {
@@ -1404,6 +1420,37 @@ describe('SurahReader', () => {
     const { getByTestId } = renderReaderHeader();
 
     expect(getByTestId('reader-title').textContent).toBe('Al-Baqarah');
+  });
+
+  it('opens the jump sheet from the header name, once the name is there', async () => {
+    const onJump = vi.fn();
+    render(<SurahReader {...baseProps(readerData(30))} onJump={onJump} />);
+    // Past the fade: the control is dead while the name is, so a jump test
+    // that never scrolls is testing the guard, not the jump.
+    scrollTo(180, 400);
+    renderReaderHeader();
+
+    fireEvent.click(screen.getByTestId('reader-surah-jump'));
+    await screen.findByTestId('surah-jump-sheet');
+    fireEvent.click(screen.getByTestId('do-jump'));
+
+    // Handed up, not applied here: this component is keyed by the displayed
+    // surah, so it is remounted by the very jump it would be holding.
+    expect(onJump).toHaveBeenCalledWith(3, 12);
+  });
+
+  it('leaves the name dead to the touch while it is faded out', () => {
+    // One source of truth: the same offset drives the fade and the control, so
+    // there is no scroll position where the name is invisible and tappable.
+    const onJump = vi.fn();
+    render(<SurahReader {...baseProps(readerData(30))} onJump={onJump} />);
+    scrollTo(180, 0);
+    renderReaderHeader();
+
+    fireEvent.click(screen.getByTestId('reader-surah-jump'));
+
+    expect(screen.queryByTestId('surah-jump-sheet')).toBeNull();
+    expect(onJump).not.toHaveBeenCalled();
   });
 
   it('keeps the nav title hidden while the big heading is on screen', () => {

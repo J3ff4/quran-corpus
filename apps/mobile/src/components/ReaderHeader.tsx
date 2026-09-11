@@ -26,6 +26,12 @@ export interface ReaderHeaderProps {
    *  Passed in rather than computed here so this component stays a pure
    *  renderer and the reader keeps one source of truth for the scroll. */
   titleStyle?: StyleProp<TextStyle>;
+  /** Whether the name has faded in. It is the same scroll offset that drives
+   *  `titleStyle`, computed once in SurahReader: a second threshold here would
+   *  be a second source of truth for one fade. */
+  titleVisible?: boolean;
+  /** Omitted, the name is a label again and takes no presses. */
+  onOpenJump?: () => void;
   onOpenWbw: () => void;
   onOpenLanguage: () => void;
   /** Whether the cards draw their translation, and the language picker beside
@@ -75,6 +81,8 @@ export interface ReaderHeaderProps {
 export function ReaderHeader({
   surahName,
   titleStyle,
+  titleVisible = false,
+  onOpenJump,
   onOpenWbw,
   onOpenLanguage,
   showTranslation = true,
@@ -134,22 +142,41 @@ export function ReaderHeader({
               button with an empty middle -- accepted, because taking the fade
               away would put the name in the bar and in the list heading at
               once (ruling recorded in the phase plan). */}
-          <Animated.Text
-            testID="reader-title"
-            numberOfLines={1}
-            style={[
-              titleStyle,
-              {
-                flex: 1,
-                textAlign: 'center',
-                color: theme.text,
-                fontFamily: fonts.display,
-                fontSize: typography.title,
-              },
-            ]}
+          {/* The name IS the jump control (ruling S3) -- and only while it is
+              on screen. Faded out it is an invisible hit target across the
+              middle of the bar, and TalkBack would offer a button for
+              something the eye cannot see; the list's own heading carries the
+              surah name at exactly that moment anyway.
+
+              The Pressable wraps the Animated.Text rather than replacing it:
+              `titleStyle` still drives the fade, and the name is still always
+              mounted so a screen reader never loses it. */}
+          <Pressable
+            testID="reader-surah-jump"
+            accessibilityRole="button"
+            accessibilityLabel={t(uiLocale, 'jump.surahTitle')}
+            disabled={!titleVisible || !onOpenJump}
+            accessibilityElementsHidden={!titleVisible}
+            importantForAccessibility={titleVisible ? 'auto' : 'no-hide-descendants'}
+            onPress={onOpenJump}
+            style={{ flex: 1 }}
           >
-            {surahName}
-          </Animated.Text>
+            <Animated.Text
+              testID="reader-title"
+              numberOfLines={1}
+              style={[
+                titleStyle,
+                {
+                  textAlign: 'center',
+                  color: theme.text,
+                  fontFamily: fonts.display,
+                  fontSize: typography.title,
+                },
+              ]}
+            >
+              {surahName}
+            </Animated.Text>
+          </Pressable>
           {/* One button for three actions (ruling R1). A kebab: not a gear,
               because Settings is a real screen here and a gear would promise
               it, and not `menu`, whose three lines are Android's nav-drawer
