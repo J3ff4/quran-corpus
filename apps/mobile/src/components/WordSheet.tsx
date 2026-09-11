@@ -116,6 +116,10 @@ export function WordSheet({
         </Text>
       </View>
 
+      {/* Not for every word: SegmentedWord treats an empty segment list as a
+          real state and falls back to the raw word, so an unguarded group
+          draws a labelled, bordered card around nothing. */}
+      {segments.length > 0 ? (
       <GlassSurface style={{ padding: 14, gap: 10 }}>
         <Text
           style={{
@@ -134,6 +138,7 @@ export function WordSheet({
           ))}
         </View>
       </GlassSurface>
+      ) : null}
 
       <GlassSurface style={{ padding: 4 }}>
         <SheetRow

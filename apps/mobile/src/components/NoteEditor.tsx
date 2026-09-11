@@ -1,4 +1,4 @@
-import { Text, TextInput, View } from 'react-native';
+import { Text, TextInput } from 'react-native';
 import { useState } from 'react';
 
 import { BottomSheet } from '@/components/BottomSheet';

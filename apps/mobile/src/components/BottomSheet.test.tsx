@@ -12,6 +12,12 @@ function panEnd() {
 
 const mocks = vi.hoisted(() => ({
   backPress: null as (() => boolean) | null,
+  /** Read by the settings mock, so one test can run the whole sheet under
+   *  reduced motion without a second suite. */
+  reduceMotion: false,
+  /** What Keyboard.metrics() reports at mount: a keyboard already up before
+   *  the sheet existed, which fires no didShow event of its own. */
+  keyboardMetrics: undefined as undefined | { height: number },
   backRemove: vi.fn(),
   // In declaration order: translateY, fade, sheetHeight. The pan gesture is
   // otherwise unreachable from a test -- GestureDetector is stubbed out -- and
@@ -32,7 +38,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/settings/settingsStore', () => ({
-  useAppSettings: () => ({ reduceMotion: false }),
+  useAppSettings: () => ({ reduceMotion: mocks.reduceMotion }),
 }));
 
 vi.mock('react-native', async () => {
@@ -57,6 +63,7 @@ vi.mock('react-native', async () => {
       return React.createElement(React.Fragment, null, children);
     },
     Keyboard: {
+      metrics: () => mocks.keyboardMetrics,
       addListener: (event: string, handler: (payload: unknown) => void) => {
         mocks.keyboardListeners.set(event, handler);
         return { remove: () => mocks.keyboardListeners.delete(event) };
@@ -128,6 +135,8 @@ describe('BottomSheet', () => {
     mocks.animations = [];
     mocks.modalProps = null;
     mocks.keyboardListeners.clear();
+    mocks.keyboardMetrics = undefined;
+    mocks.reduceMotion = false;
     mocks.styleFactories = [];
   });
 
@@ -281,6 +290,44 @@ describe('BottomSheet', () => {
     unmount();
     // Left subscribed, every sheet ever opened keeps animating a dead value.
     expect(mocks.keyboardListeners.size).toBe(0);
+  });
+
+  it('starts lifted when the keyboard was already up before it opened', () => {
+    // No didShow fires for a keyboard that was already open, so a sheet that
+    // only listens sits under it for its whole life.
+    mocks.keyboardMetrics = { height: 300 };
+    render(<BottomSheet onClose={() => {}} closeLabel="Close">{null}</BottomSheet>);
+
+    const transform = mocks.styleFactories[1]!().transform as Array<{ translateY: number }>;
+    expect(transform[0]!.translateY).toBe(-324);
+  });
+
+  it('does not animate the lift under reduced motion', () => {
+    mocks.reduceMotion = true;
+    render(<BottomSheet onClose={() => {}} closeLabel="Close">{null}</BottomSheet>);
+    mocks.animations = [];
+
+    mocks.keyboardListeners.get('keyboardDidShow')?.({ endCoordinates: { height: 300 } });
+
+    // Every other movement in this sheet is already gated on reduced motion;
+    // an ungated lift slides 300+dp for a user who asked for none.
+    expect(mocks.animations).toHaveLength(0);
+    const transform = mocks.styleFactories[1]!().transform as Array<{ translateY: number }>;
+    expect(transform[0]!.translateY).toBe(-324);
+  });
+
+  it('drags all the way off screen with the keyboard up', () => {
+    // The visible offset is `translateY - keyboardLift`, so a dismiss that
+    // travels only to the sheet's height leaves a keyboard's worth of sheet
+    // still on screen at the moment onClose unmounts it -- a pop, not a slide.
+    render(<BottomSheet onClose={() => {}} closeLabel="Close">{null}</BottomSheet>);
+    const [translateY] = mocks.sharedValues;
+    mocks.keyboardListeners.get('keyboardDidShow')?.({ endCoordinates: { height: 300 } });
+
+    panEnd()?.({ translationY: 300, velocityY: 0 });
+
+    // 800 of screen (no onLayout in jsdom, so the fallback height) + 324.
+    expect(translateY!.value).toBe(1124);
   });
 
   it('sits where it always did when no keyboard is up', () => {

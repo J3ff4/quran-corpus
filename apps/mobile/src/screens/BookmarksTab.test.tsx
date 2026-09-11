@@ -173,7 +173,7 @@ vi.mock('react-native', async () => {
     // A keyboard that never opens. Whether the sheet lifts is a device check
     // -- jsdom has no keyboard -- and BottomSheet.test.tsx drives these
     // listeners by hand.
-    Keyboard: { addListener: () => ({ remove: () => {} }) },
+    Keyboard: { addListener: () => ({ remove: () => {} }), metrics: () => undefined },
     Pressable: host('button'),
     Animated: { View: host('div'), createAnimatedComponent: () => host('button') },
   };

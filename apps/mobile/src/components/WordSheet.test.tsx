@@ -37,7 +37,7 @@ vi.mock('react-native', async () => {
     // A keyboard that never opens. Whether the sheet lifts is a device check
     // -- jsdom has no keyboard -- and BottomSheet.test.tsx drives these
     // listeners by hand.
-    Keyboard: { addListener: () => ({ remove: () => {} }) },
+    Keyboard: { addListener: () => ({ remove: () => {} }), metrics: () => undefined },
     Pressable: host('button'),
     StyleSheet: { absoluteFill: {} },
     Text: host('span'),
@@ -182,6 +182,25 @@ describe('WordSheet', () => {
     const pills = screen.getAllByTestId('segment-pill');
     expect(pills).toHaveLength(2);
     expect(pills[0]!.textContent).toMatch(/determiner/i);
+  });
+
+  it('drops the segments group entirely when the word has none', () => {
+    // SegmentedWord treats an empty list as a real state and falls back to the
+    // raw word; without the guard the sheet still draws a labelled, bordered,
+    // shadowed card around nothing.
+    render(<WordSheet summary={summary({ segments: [] })} {...handlers} />);
+
+    expect(screen.queryByText(/segments/i)).toBeNull();
+    expect(screen.queryAllByTestId('segment-pill')).toHaveLength(0);
+    // The rest of the sheet is untouched -- this is a missing group, not a
+    // missing sheet.
+    expect(screen.getByTestId('full-analysis')).toBeTruthy();
+  });
+
+  it('keeps the segments group for a word that has segments', () => {
+    render(<WordSheet summary={summary({ segments: [seg(0, 'N')] })} {...handlers} />);
+
+    expect(screen.getByText(/segments/i)).toBeTruthy();
   });
 
   it('shows the gloss when there is one', () => {

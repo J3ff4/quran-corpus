@@ -88,17 +88,25 @@ export function BottomSheet({ onClose, closeLabel, children }: BottomSheetProps)
   const bottomInset = useSafeAreaInsets().bottom;
 
   useEffect(() => {
+    // Seeded from the metrics rather than starting at 0: a sheet opened while
+    // the keyboard is ALREADY up never receives a `didShow`, so it would sit
+    // under the keyboard for its whole life. No animation for this one -- the
+    // keyboard is not moving, so there is nothing to ride.
+    const open = Keyboard.metrics();
+    if (open) keyboardLift.value = open.height + bottomInset;
+
     const shown = Keyboard.addListener('keyboardDidShow', (event) => {
-      keyboardLift.value = withTiming(event.endCoordinates.height + bottomInset, ENTER);
+      const to = event.endCoordinates.height + bottomInset;
+      keyboardLift.value = reduced ? to : withTiming(to, ENTER);
     });
     const hidden = Keyboard.addListener('keyboardDidHide', () => {
-      keyboardLift.value = withTiming(0, EXIT);
+      keyboardLift.value = reduced ? 0 : withTiming(0, EXIT);
     });
     return () => {
       shown.remove();
       hidden.remove();
     };
-  }, [bottomInset, keyboardLift]);
+  }, [bottomInset, keyboardLift, reduced]);
 
   // Read through a ref so the entrance effect below does not depend on it.
   // With screenHeight in those deps, an Android split-screen resize while the
@@ -142,7 +150,11 @@ export function BottomSheet({ onClose, closeLabel, children }: BottomSheetProps)
       const height = sheetHeight.value || screenHeight;
       if (event.translationY > height * DISMISS_FRACTION || event.velocityY > DISMISS_VELOCITY) {
         fade.value = withTiming(0, { duration: FADE_MS });
-        translateY.value = withTiming(height, EXIT, (finished?: boolean) => {
+        // Plus the lift: the sheet's visible offset is `translateY -
+        // keyboardLift`, so travelling only to `height` with the keyboard up
+        // leaves it a keyboard's worth still on screen when onClose unmounts
+        // it -- a pop instead of a slide.
+        translateY.value = withTiming(height + keyboardLift.value, EXIT, (finished?: boolean) => {
           // Only on a settled animation: unmounting mid-flight leaves the
           // sheet half-way down for the frame before it disappears.
           if (finished) runOnJS(onClose)();
