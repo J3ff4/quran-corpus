@@ -868,6 +868,95 @@ git commit -m "docs(plans): record what surah-name-color-v4 actually is"
 
 ---
 
+## Task 7 spike report — `surah-name-color-v4` (2026-09-11)
+
+Read-only probe, per ruling R10. **Nothing shipped, nothing committed but this
+report.** The file was fetched to `$CLAUDE_JOB_DIR/tmp/` and never entered
+`assets/` or git (`temp-dir-and-ornament-provenance`).
+
+**What it actually is:** `QCF_SurahHeader_COLOR-Regular.ttf`, 386 KB, 124
+glyphs, from `https://quranfonts.com/fonts/Surah%20header%20font/`. The page's
+own download button serves this; there is no separate "color v4" artefact.
+
+### Tables
+
+| table | present | meaning |
+|---|---|---|
+| `COLR` (v0) | **yes** | Android's Skia renders COLRv0. Not the blocker. |
+| `CPAL` (v0) | yes | 6 palettes x 20 entries |
+| `SVG ` | no | the failure mode we feared is absent |
+| `sbix` / `CBDT` | no | not bitmap colour — it scales |
+
+120 of the 124 glyphs carry colour layers; each surah glyph is composed of ~7
+layers, the name plus shared frame parts (`glyph00118`-`glyph00123`).
+
+### Coverage — 114/114, but **not** at our codepoints
+
+It carries **no PUA at all**. Where `SurahNameV2`/`V4` map `0xE000 + surahId`,
+this font maps 114 glyphs onto Arabic Presentation Forms A, `U+FB51`-`U+FC64`,
+non-contiguously. The site claims "same V4 codes"; that is false against the
+`SurahNameV4.ttf` we already ship, which is PUA.
+
+The order is not surah order either. Rendered and compared glyph-by-glyph
+against our V4 at eight points (indices 0, 1, 7, 49, 60, 92, 93, 113 — all
+eight matched), the mapping over the 114 sorted non-control codepoints is:
+
+```
+surah = ((21 + index) % 114) + 1        # index 0 = U+FB51 = surah 22 (Al-Hajj)
+```
+
+So it starts at Al-Hajj and wraps. Derivable, and `needsSurahNameFallback`
+would not apply — this font has no 102 gap. But it is a mapping we reverse-
+engineered from renders, not one the publisher documents.
+
+### Licence (§11) — **unclear, and that is a stop on its own**
+
+- `name` ID 0: `King Fahad Complex, All rights reserved.`
+- `name` ID 7: `All rights reserved`
+- The site's only statement: *"All fonts belong to their respective creators."*
+  It calls itself a Sadaqah Jariyah project and the download "free", but grants
+  no licence and names no terms.
+
+"All rights reserved" with no accompanying grant is not a licence we can ship
+against. Our existing V2/V4 came through the same channel, so this is a
+question about the whole family, not only the colour build — worth settling
+once, separately.
+
+### Theming — the decisive finding
+
+CPAL carries **6 palettes**, and they are clearly authored as a light/dark set:
+
+| palette | entry 0 (the name's ink) | reads as |
+|---|---|---|
+| 0 (default) | `#000000` | for white paper |
+| 1 | `#FFFFFF` | for a dark ground |
+| 2 | `#000000` | paper, warm frame (`#FBE7D2`) |
+| 3 | `#000000` | near-mono, paper |
+| 4 | `#FFFFFF` | near-mono, dark |
+| 5 | `#000000` | near-mono, paper |
+
+A COLR glyph takes its colours from CPAL, not from `color:` — so our theme
+tokens do not reach it. **A palette index is the only control that would
+exist, and React Native does not expose one.** `font-palette` is a CSS
+feature; Android's `Typeface` has no palette selector, and neither does
+`expo-font` or RN's text style. We would get palette 0 on both themes: black
+ink on our near-black dark ground.
+
+That is the answer. The font is technically sound, covers all 114, and even
+ships the dark palette we would want — and we have no way to ask for it.
+
+### Recommendation
+
+**No**, not this phase, on two independent grounds: no palette control from RN
+(so dark mode is unreadable), and no licence grant. Step 6's device check was
+not run — it is gated on steps 2-5 passing, and step 5 fails.
+
+If the surah list wants colour later, the cheap path is not this font: take our
+existing monochrome V4 glyph and tint it ourselves, which keeps the theme
+tokens in charge. That is a UI decision, not a font one, and it needs no new
+asset.
+
+
 ## Acceptance criteria
 
 - [ ] `npx tsc --noEmit` exit 0 across the workspace.
