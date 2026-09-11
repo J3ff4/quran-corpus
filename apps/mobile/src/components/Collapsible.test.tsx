@@ -38,4 +38,23 @@ describe('Collapsible', () => {
     expect(result.getByTestId('clip').style.overflow).toBe('hidden');
     expect(result.getByTestId('child')).not.toBeNull();
   });
+  it('unmounts its children once the close lands', () => {
+    // Not at the top of the close: that collapses the clip instantly and
+    // there is no curtain left to watch. But they must go eventually --
+    // children left behind a shut curtain stay focusable by TalkBack.
+    const result = render(
+      <Collapsible open>
+        <div data-testid="child" />
+      </Collapsible>,
+    );
+    expect(result.getByTestId('child')).not.toBeNull();
+
+    result.rerender(
+      <Collapsible open={false}>
+        <div data-testid="child" />
+      </Collapsible>,
+    );
+
+    expect(result.queryByTestId('child')).toBeNull();
+  });
 });

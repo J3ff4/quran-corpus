@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BrowseList, type BrowseItem } from './BrowseList';
 
@@ -19,6 +19,21 @@ function item(overrides: Partial<BrowseItem> = {}): BrowseItem {
   };
 }
 
+/** The chevron's CSS transform. Read off the node rather than off the shared
+ *  value: rnHosts folds RN's transform array into a string precisely so a
+ *  rotation is assertable at all. */
+function rotationOf(testID: string) {
+  return screen.getByTestId(testID).style.transform;
+}
+
+/** Every glass card in the render. A card is the thing with a shadow, which
+ *  the shim folds into boxShadow for exactly this kind of assertion. */
+function cards() {
+  return Array.from(screen.getByTestId('browse-list-root').querySelectorAll('*')).filter(
+    (node) => (node as HTMLElement).style.boxShadow !== '',
+  );
+}
+
 afterEach(cleanup);
 
 describe('BrowseList disclosure rows', () => {
@@ -28,12 +43,80 @@ describe('BrowseList disclosure rows', () => {
     expect(screen.queryByTestId('browse-chevron-juz-1')).toBeNull();
   });
 
-  it('points the chevron down when the row is expanded and right when it is not', () => {
+  it('turns the chevron as the curtain unrolls', () => {
+    // One glyph that rotates, not two that swap: the chevron turning in step
+    // with the card opening is what says THIS card opened, rather than that
+    // unrelated rows arrived beneath it.
     const { rerender } = render(<BrowseList items={[item({ expanded: false })]} />);
-    expect(screen.getByTestId('browse-chevron-juz-1-chevronRight')).toBeTruthy();
+    expect(rotationOf('browse-chevron-juz-1')).toBe('rotate(0deg)');
 
     rerender(<BrowseList items={[item({ expanded: true })]} />);
-    expect(screen.getByTestId('browse-chevron-juz-1-chevronDown')).toBeTruthy();
+    expect(rotationOf('browse-chevron-juz-1')).toBe('rotate(90deg)');
+  });
+
+  it('draws an expanded juz as one card, not as four', () => {
+    // The children were sibling rows, each in its own GlassSurface with the
+    // same shape as a juz card -- so an expanded juz read as four juz (owner
+    // screenshot, 2026-09-11).
+    render(
+      <div data-testid="browse-list-root">
+        <BrowseList
+          items={[
+            item({
+              expanded: true,
+              children: [
+                item({ key: 'c1', testID: 'child-1', title: 'Al-Fatiha 1-7', accessibilityLabel: 'Al-Fatiha' }),
+                item({ key: 'c2', testID: 'child-2', title: 'Al-Baqara 1-141', accessibilityLabel: 'Al-Baqara' }),
+              ],
+            }),
+          ]}
+        />
+      </div>,
+    );
+
+    expect(within(screen.getByTestId('child-1')).getByText('Al-Fatiha 1-7')).toBeTruthy();
+    expect(cards()).toHaveLength(1);
+  });
+
+  it('keeps a collapsed juz childless', () => {
+    render(
+      <BrowseList
+        items={[
+          item({
+            expanded: false,
+            children: [item({ key: 'c1', title: 'Al-Fatiha 1-7', accessibilityLabel: 'Al-Fatiha' })],
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.queryByText('Al-Fatiha 1-7')).toBeNull();
+  });
+
+  it('opens the child a tap landed on, not the juz around it', () => {
+    // The card's surface sits outside the disclosure Pressable for this
+    // reason: wrapped inside it, every child tap is swallowed as a toggle and
+    // the ranges become decoration.
+    const onPress = vi.fn();
+    const childPress = vi.fn();
+    render(
+      <BrowseList
+        items={[
+          item({
+            expanded: true,
+            onPress,
+            children: [
+              item({ key: 'c1', testID: 'child-1', title: 'Al-Fatiha 1-7', accessibilityLabel: 'Al-Fatiha', onPress: childPress }),
+            ],
+          }),
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('child-1'));
+
+    expect(childPress).toHaveBeenCalledTimes(1);
+    expect(onPress).not.toHaveBeenCalled();
   });
 
   it('announces the disclosure state to a screen reader', () => {

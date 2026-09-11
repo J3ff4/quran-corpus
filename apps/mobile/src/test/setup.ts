@@ -92,15 +92,22 @@ vi.mock('react-native-reanimated', async () => {
         return [name, builder];
       }),
     ),
-    // Identity, not a no-op: a component that calls runOnJS(fn) and stores the
-    // result expects something callable back. Nothing here schedules it --
-    // withTiming below resolves to its target and never runs its callback, so
-    // a curtain's close completes instantly and its unmount is device-only
-    // behaviour (Collapsible).
+    // Identity: a component that calls runOnJS(fn) and stores the result
+    // expects something callable back, and withTiming below calls it straight
+    // away.
     runOnJS: (fn: unknown) => fn,
     useSharedValue: (initial: number) => ({ value: initial }),
     useAnimatedStyle: (factory: () => unknown) => factory(),
-    withTiming: (toValue: number) => toValue,
+    // Resolves to its target AND runs its completion callback, finished, in
+    // the same tick. Both halves matter: a component that unmounts its
+    // children when a close lands (Collapsible) never unmounted them at all
+    // while the callback was dropped, so a suite asserting that a collapsed
+    // disclosure is empty read the open one's rows. Nothing here asserts on a
+    // frame; what is being modelled is "the animation completed".
+    withTiming: (toValue: number, _config?: unknown, callback?: (finished?: boolean) => void) => {
+      callback?.(true);
+      return toValue;
+    },
     withSpring: (toValue: number) => toValue,
     // Resolves to its last step, like withTiming resolves to its target: the
     // pulse's SHAPE is asserted in motion/bookmarkReveal.test.ts, which

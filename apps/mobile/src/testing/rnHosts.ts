@@ -78,7 +78,30 @@ function flattenStyle(style: unknown): Record<string, unknown> | undefined {
       ? Object.assign({}, ...resolved.flat(Infinity).filter(Boolean))
       : resolved
   ) as Record<string, unknown> | undefined;
-  return withBoxShadow(flat);
+  return withTransform(withBoxShadow(flat));
+}
+
+/**
+ * RN's `transform` array expressed as a CSS transform string.
+ *
+ * Same blindness as the shadow props below: React assigns the style object
+ * onto `node.style`, and an ARRAY there stringifies to something jsdom throws
+ * away, so a rotated chevron and an unrotated one looked identical to the
+ * suite. Every animated rotation and press-scale in the app rides on this
+ * prop, so a test that could not read it could not defend any of them.
+ *
+ * Not a faithful CSS rendering of RN's transform model -- it only has to
+ * differ when the inputs differ, and to be parseable by the assertion that
+ * reads it.
+ */
+function withTransform(
+  flat: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  if (!flat || !Array.isArray(flat.transform)) return flat;
+  const css = (flat.transform as Record<string, unknown>[])
+    .flatMap((entry) => Object.entries(entry).map(([fn, value]) => `${fn}(${String(value)})`))
+    .join(' ');
+  return { ...flat, transform: css };
 }
 
 /** `includeFontPadding` as a string the DOM can hold, or undefined when the

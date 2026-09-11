@@ -201,22 +201,22 @@ export function SurahsScreen() {
             if (!next.delete(entry.juz)) next.add(entry.juz);
             return next;
           }),
-      });
-
-      if (!expanded) continue;
-      for (const range of entry.ranges) {
-        rows.push({
+        // Built whether or not the juz is open: the card's curtain measures
+        // them to know how far to unroll, and children gated on `expanded`
+        // make every open a drop from 0 to 0. They render inside this card
+        // rather than after it -- as sibling rows they looked exactly like
+        // juz cards, so an expanded juz read as four juz (ruling R6).
+        children: entry.ranges.map((range) => ({
           key: `juz-${entry.juz}-surah-${range.surahId}`,
           testID: `browse-juz-${entry.juz}-surah-${range.surahId}`,
           leading: '',
-          indent: true,
           title: `${range.surahName} ${range.firstAyahNumber}–${range.lastAyahNumber}`,
           // 'Ayahs' rather than a fourth key saying the same word -- the
           // word-by-word pager already carries it in all three locales.
           accessibilityLabel: `${range.surahName}, ${t(uiLocale, 'wbw.rangeLabel')} ${range.firstAyahNumber}–${range.lastAyahNumber}`,
           onPress: () => openAyah(range.surahId, range.firstAyahNumber),
-        });
-      }
+        })),
+      });
     }
     return rows;
   }, [data.juz, openJuz, uiLocale]);
