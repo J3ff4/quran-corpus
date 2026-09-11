@@ -12,7 +12,17 @@ import { useThemeColors } from '@/theme/themeContext';
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export interface SegmentedControlProps<T extends string> {
-  options: readonly { value: T; label: string }[];
+  options: readonly {
+    value: T;
+    label: string;
+    /** A segment that leaves the screen rather than selecting.
+     *
+     *  It fires `onChange` and then nothing: no optimistic hold, no travel
+     *  that sticks. Without it the hold never clears -- `value` can never
+     *  catch up to a value the caller will never apply -- and the wash sits
+     *  on the door for good. The reader's 'Words' is the only one today. */
+    door?: boolean;
+  }[];
   value: T;
   onChange: (value: T) => void;
   /** Names the group, not the options -- see the note on the row below. */
@@ -236,6 +246,12 @@ export function SegmentedControl<T extends string>({
             // change, and a tab-mash would refetch 604 rows per tap.
             onPress={() => {
               if (option.value === shown) return;
+              if (option.door) {
+                // No place(), no setOptimistic, no settle hold: there is no
+                // travel to protect, because the wash is not going anywhere.
+                onChange(option.value);
+                return;
+              }
               // Started here rather than left to the effect above, which runs
               // only after the commit that `onChange` causes. That commit
               // rebuilds the screen's list -- 604 surahs, the whole letter

@@ -208,4 +208,32 @@ describe('SegmentedControl on a measured row', () => {
     expect(tabs[2]?.getAttribute('aria-selected')).toBe('true');
     expect(tabs[0]?.getAttribute('aria-selected')).toBe('false');
   });
+  it('does not park the wash on a door option', () => {
+    // A door fires onChange and navigates away; it never becomes the
+    // selection. Without this the optimistic hold never clears -- the
+    // caller's `value` can never catch up to a value it will never apply --
+    // and the pill sits on the door for the life of the screen (owner,
+    // device, 2026-09-11).
+    const onChange = vi.fn();
+    const options = [
+      { value: 'translation', label: 'Translation' },
+      { value: 'wbw', label: 'Words', door: true },
+    ] as const;
+    render(
+      <ThemeContext.Provider value={themeColors.dark}>
+        <SegmentedControl
+          options={options}
+          value="translation"
+          onChange={onChange}
+          accessibilityLabel="Mode"
+        />
+      </ThemeContext.Provider>,
+    );
+
+    fireEvent.click(screen.getByTestId('segment-wbw'));
+
+    expect(onChange).toHaveBeenCalledWith('wbw');
+    expect(screen.getByTestId('segment-translation').getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByTestId('segment-wbw').getAttribute('aria-selected')).toBe('false');
+  });
 });
