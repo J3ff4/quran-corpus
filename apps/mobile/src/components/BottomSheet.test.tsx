@@ -191,6 +191,16 @@ describe('BottomSheet', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps 16 under the last row unless the sheet asks for more', () => {
+    // The note sheet's floor: 24 under Save with the keyboard up was dead
+    // space, trimmed 2026-09-10. Only the word sheet overrides it.
+    const { rerender } = render(<BottomSheet onClose={() => {}} closeLabel="Close"><span>body</span></BottomSheet>);
+    expect(screen.getByTestId('sheet-surface').style.paddingBottom).toBe('16px');
+
+    rerender(<BottomSheet onClose={() => {}} closeLabel="Close" bottomPadding={24}><span>body</span></BottomSheet>);
+    expect(screen.getByTestId('sheet-surface').style.paddingBottom).toBe('24px');
+  });
+
   it('names the backdrop so TalkBack does not read an unlabelled button', () => {
     render(<BottomSheet onClose={() => {}} closeLabel="Dismiss languages"><span>body</span></BottomSheet>);
 

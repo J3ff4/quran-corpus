@@ -39,6 +39,12 @@ export interface BottomSheetProps {
   /** Accessible name for the backdrop, which is otherwise an unlabelled
    *  full-screen button to TalkBack. */
   closeLabel: string;
+  /** How much room under the last row, where 16 is not right for this sheet.
+   *  The word sheet asks for more (owner, 2026-09-11): its last row is a
+   *  tappable link rather than a button, so it needs to read as finished
+   *  rather than as cut off. The note sheet keeps 16 -- 24 under Save with the
+   *  keyboard up is the dead space that got trimmed the day before. */
+  bottomPadding?: number;
   children: ReactNode;
 }
 
@@ -56,7 +62,7 @@ export interface BottomSheetProps {
  * so the backdrop dims the pill too and swallows its taps -- which is what an
  * Android system sheet does.
  */
-export function BottomSheet({ onClose, closeLabel, children }: BottomSheetProps) {
+export function BottomSheet({ onClose, closeLabel, bottomPadding = 16, children }: BottomSheetProps) {
   const theme = useThemeColors();
   const reduced = useReducedMotion();
   const { height: screenHeight } = useWindowDimensions();
@@ -213,6 +219,7 @@ export function BottomSheet({ onClose, closeLabel, children }: BottomSheetProps)
         <Animated.View
           role="dialog"
           aria-modal
+          testID="sheet-surface"
           onLayout={(event: LayoutChangeEvent) => {
             sheetHeight.value = event.nativeEvent.layout.height;
           }}
@@ -234,7 +241,7 @@ export function BottomSheet({ onClose, closeLabel, children }: BottomSheetProps)
               // first row 26dp down, half of the 50 it was, and the 28 below
               // was dead space under Save with the keyboard up.
               paddingTop: 8,
-              paddingBottom: 16,
+              paddingBottom: bottomPadding,
               gap: 14,
             },
             sheetStyle,

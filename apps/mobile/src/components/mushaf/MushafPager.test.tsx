@@ -132,10 +132,12 @@ describe('MushafPager', () => {
     expect(list.maxToRenderPerBatch).toBe(1);
     // NOT clipped. With a window of three there is nothing left to clip, and
     // on Android it is a known source of blank and half-drawn cells on a
-    // horizontal list. `fast` deceleration is what stops the turn drifting
-    // after the finger leaves (owner, 2026-09-10).
+    // horizontal list.
     expect(list.removeClippedSubviews).toBeUndefined();
-    expect(list.decelerationRate).toBe('fast');
+    // Numeric, between RN's two named Android rates: `normal` (0.985) drifts
+    // after the finger leaves and reads as arriving late (owner, 2026-09-10),
+    // `fast` (0.9) lands hard enough to read as "too snappy" (2026-09-11).
+    expect(list.decelerationRate).toBe(0.95);
   });
 
   it('turns to the page the recitation has moved onto', () => {

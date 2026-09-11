@@ -356,6 +356,28 @@ describe('WordSheet', () => {
     expect(screen.getByTestId('word-ayah-actions').textContent).toContain('Al-Fatiha 1:2');
   });
 
+  it('tucks the word up under the actions row, and only when there is one', () => {
+    // Owner, 2026-09-11: at the column's full 14 gap the word read as a block
+    // separate from the actions above it, when the label there is what names
+    // the ayah the word sits in. Without an actions row the hero is the first
+    // child, and the same pull would ride it up under the grab handle.
+    const { rerender } = render(
+      <WordSheet summary={summary()} {...handlers} ayahActions={<span>acts</span>} ayahLabel="Al-Fatiha 1:2" />,
+    );
+    expect(screen.getByTestId('word-hero').style.marginTop).toBe('-6px');
+
+    rerender(<WordSheet summary={summary()} {...handlers} />);
+    expect(screen.getByTestId('word-hero').style.marginTop).toBe('0px');
+  });
+
+  it('leaves more room under the last row than a sheet with a button', () => {
+    // The word sheet ends in a tappable link rather than a Save button, so 16
+    // read as cut off (owner, 2026-09-11). The note sheet keeps the default --
+    // 24 under Save with the keyboard up is the dead space trimmed on 09-10.
+    render(<WordSheet summary={summary()} {...handlers} />);
+    expect(screen.getByTestId('sheet-surface').style.paddingBottom).toBe('24px');
+  });
+
   it('draws a chevron on both rows, not a bare label', () => {
     // Closes the outstanding SheetRow finding: `trailingIcon` had no consumer
     // passing a non-empty value anywhere in the suite, so a mutant that

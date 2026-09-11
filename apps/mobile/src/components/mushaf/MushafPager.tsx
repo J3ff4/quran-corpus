@@ -131,10 +131,12 @@ export function MushafPager({
       windowSize={3}
       maxToRenderPerBatch={1}
       initialNumToRender={1}
-      // Android's default paging deceleration drifts for a beat after the
-      // finger leaves, which reads as the page arriving late. `fast` is what a
-      // native pager does.
-      decelerationRate="fast"
+      // Between RN's two named rates (Android: fast 0.9, normal 0.985).
+      // `normal` drifts for a beat after the finger leaves and reads as the
+      // page arriving late; `fast` lands hard enough that the owner called the
+      // turn "too snappy" (2026-09-11). One number, so it stays tunable across
+      // device runs.
+      decelerationRate={0.95}
       // NOT removeClippedSubviews. With a window of three there is nothing to
       // save -- one page either side is already all that is mounted -- and on
       // Android it is a known source of blank and half-drawn cells on a

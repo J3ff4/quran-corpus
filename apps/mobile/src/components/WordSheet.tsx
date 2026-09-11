@@ -84,7 +84,7 @@ export function WordSheet({
   const rootBuckwalter = word.root_buckwalter;
 
   return (
-    <BottomSheet onClose={onClose} closeLabel={t(uiLocale, 'word.close')}>
+    <BottomSheet onClose={onClose} closeLabel={t(uiLocale, 'word.close')} bottomPadding={24}>
       {ayahActions ? (
         <View
           testID="word-ayah-actions"
@@ -97,7 +97,19 @@ export function WordSheet({
         </View>
       ) : null}
 
-      <View testID="word-hero" style={{ alignItems: 'center', gap: 8 }}>
+      <View
+        testID="word-hero"
+        style={{
+          alignItems: 'center',
+          gap: 8,
+          // Pulled up out of the column's 14 gap to 8: the word belongs to the
+          // actions row above it -- the label there names the ayah the word is
+          // in -- and at 14 the two read as separate blocks (owner,
+          // 2026-09-11). Only when there IS an actions row; without one the
+          // hero is the first child and this would ride up under the handle.
+          marginTop: ayahActions ? -6 : 0,
+        }}
+      >
         <SegmentedWord word={word} segments={segments} fontSize={sizes.title} />
         {/* The tag is nested inside the gloss rather than set beside it so the
             two wrap as one phrase. Safe here where it would not be on an
