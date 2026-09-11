@@ -56,14 +56,21 @@ export const SURAH_BAND_MEDALLIONS = {
  *
  * Two values per script because digit count changes the apparent size at a
  * fixed one: a two-digit Western numeral reads smaller than a three-digit one,
- * and a three-digit Eastern numeral reads larger. Both are the web frame's
+ * and a three-digit Eastern numeral reads larger. Both were the web frame's
  * fitted rem values divided by the band height they were fitted at.
+ *
+ * All four are now that fitted set x 1.12, rounded to four places: the
+ * numerals read small inside their medallions on the device (owner ruling R8,
+ * 2026-09-11). The factor is applied to all four, not only to the pair the
+ * owner was looking at -- scaling the short values alone would make 114
+ * smaller RELATIVE to 2 for the first time, which is the one proportion this
+ * table exists to hold.
  */
 export const SURAH_BAND_NUMERAL_SIZE = {
-  westernShort: 0.1636,
-  westernLong: 0.1487,
-  easternShort: 0.2478,
-  easternLong: 0.228,
+  westernShort: 0.1832,
+  westernLong: 0.1665,
+  easternShort: 0.2775,
+  easternLong: 0.2554,
 } as const;
 
 /**
