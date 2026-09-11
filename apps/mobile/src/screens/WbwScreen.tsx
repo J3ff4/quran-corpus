@@ -221,34 +221,31 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
             already does: app/_layout.tsx sets `title: ''` on the Stack so the nav
             header carries the back affordance and nothing else.
 
-            Name and pager share one row on purpose. Stacked as separate rows
-            under a header they ate roughly a third of the screen before the
-            first word (owner screenshot, 2026-08-17). */}
+            **The name owns its row** (owner ruling R5, device screenshot
+            2026-09-11). It shared one with four controls -- both surah
+            chevrons and the ayah pager -- and 'Al-Munafiqoon' clamped to
+            'Al-Munafi...' between them. The earlier argument here was that
+            stacking them ate roughly a third of the screen before the first
+            word; that was measured against a full header above a full pager
+            row, and what this costs now is about 40pt. A name the reader
+            cannot read is the worse trade.
+
+            The ayah pager stays beside the name, because that is what it
+            pages WITHIN. Surah paging moves down to the density row, still
+            bounding the ayah pager rather than sitting inside it (D49), so
+            the two orders of movement do not read as one control. */}
         <View style={{ paddingHorizontal: 14, paddingTop: 10, gap: 10 }}>
           <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 12,
-            }}
+            testID="wbw-title-row"
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
           >
-            <AdjacentNavButton
-              side="prev"
-              target={
-                currentSurahId !== null && currentSurahId > 1 ? String(currentSurahId - 1) : null
-              }
-              onNavigate={(target, side) => setSurah(Number(target), side)}
-              uiLocale={uiLocale}
-              testIDPrefix="surah"
-            />
             <Text
               accessibilityRole="header"
-              // Clamped and shrinkable: 'Al-Munafiqoon' beside the pager
-              // overflows a 390pt frame, and an unclamped name would push the
-              // pager off the edge instead of truncating itself.
+              // Clamped still, but `flex: 1` rather than `flexShrink: 1`: the
+              // name has a row to fill now, and shrink-only leaves it hugging
+              // its own text with the pager floating at the far edge.
               numberOfLines={1}
-              style={{ color: theme.text, fontSize: typography.title, fontWeight: '700', flexShrink: 1 }}
+              style={{ color: theme.text, fontSize: typography.title, fontWeight: '700', flex: 1 }}
             >
               {view.surah.name_translit}
             </Text>
@@ -259,9 +256,31 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
               uiLocale={uiLocale}
               onRange={(nextFrom) => setFrom(nextFrom)}
             />
-            {/* The row is bounded by surah navigation with the ayah pager
-                inside it (D49), so the two orders of movement do not read as
-                one control. */}
+          </View>
+          <View
+            testID="wbw-density-row"
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+          >
+            <AdjacentNavButton
+              side="prev"
+              target={
+                currentSurahId !== null && currentSurahId > 1 ? String(currentSurahId - 1) : null
+              }
+              onNavigate={(target, side) => setSurah(Number(target), side)}
+              uiLocale={uiLocale}
+              testIDPrefix="surah"
+            />
+            <View style={{ flex: 1 }}>
+              <SegmentedControl
+                options={DENSITY_OPTIONS.map((option) => ({
+                  value: option.value,
+                  label: t(uiLocale, option.labelKey),
+                }))}
+                value={wbwDensity}
+                onChange={setWbwDensity}
+                accessibilityLabel={t(uiLocale, 'wbw.density')}
+              />
+            </View>
             <AdjacentNavButton
               side="next"
               target={
@@ -272,15 +291,6 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
               testIDPrefix="surah"
             />
           </View>
-          <SegmentedControl
-            options={DENSITY_OPTIONS.map((option) => ({
-              value: option.value,
-              label: t(uiLocale, option.labelKey),
-            }))}
-            value={wbwDensity}
-            onChange={setWbwDensity}
-            accessibilityLabel={t(uiLocale, 'wbw.density')}
-          />
         </View>
         <FlatList
           // Held across a range change now that the screen no longer blanks,
