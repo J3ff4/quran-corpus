@@ -7,9 +7,48 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-08-30
+Updated: 2026-09-10
 
 ## Now
+
+### ✅ WORD SHEET + BOOKMARK BAND + KEYBOARD — MERGED 2026-09-10 as `87a9439` (PR #67)
+Seven commits of device-driven polish, every change from an owner reading the real
+screen. Owner verified on debug APK before merge.
+
+- **Bookmark band** — a bookmarked mushaf ayah was tinted green type; owner read it
+  as "very vague" (one of three greens, the quietest). Ink back to plain, ayah gets
+  an amber wash. `bookmarkWash` deliberately != `accentWash`, so long-press feedback
+  inside a bookmarked ayah still reads.
+- **Word sheet** — flat column → four blocks: ayah actions as a named header, word +
+  gloss as centred hero, morphology group, corpus links group. Play/bookmark at the
+  TOP: on a mushaf page (M7d ruling 4) they are the only way to bookmark or play,
+  and buried under two links they were the hardest thing to reach.
+- **Keyboard lift** — note editor buried input, counter, Cancel AND Save. Fixed in
+  `BottomSheet`, not the note sheet. **First attempt with reanimated's
+  `useAnimatedKeyboard` did nothing on device**: it attaches to
+  `currentActivity.window.decorView` and only updates while state is OPEN, a state
+  only its animation callback sets — a `<Modal>` is a separate native window, the
+  IME animation goes to the dialog, the activity decor view never sees it, height
+  stays 0. Switched to RN's own `keyboardDidShow`/`Hide`, which read the *static*
+  ime inset. Lift adds `useSafeAreaInsets().bottom` back: RN reports the ime inset
+  MINUS system bars and the sheet is anchored behind them. No new dependency —
+  `react-native-keyboard-controller` stays a §12 question.
+- **Sheet padding** — top gap was two spacings stacked on a 4dp bar (handle's own
+  `marginBottom: 20` AND the column `gap: 14`, under `paddingTop: 12` = 50dp). Handle
+  margin deleted, `paddingTop` 8, bottom 28 → 16 flat (owner picked flat over a
+  safe-area variant). Shared shell, so all five sheets moved together.
+- **`/code-review` round** (`e2584e4`) — 5 findings, 4 real, 0 declined. Unused
+  `View` import left `npm run lint` RED on the pushed branch (§4 step 3 unmet).
+  Other three were one oversight three ways — the lift was added to the resting
+  position and nowhere else: drag-to-dismiss travelled to `height` not
+  `height + lift` (sheet popped instead of sliding); no `Keyboard.metrics()` seed so
+  a sheet opened under an already-open keyboard never got a `didShow`; the lift
+  ignored reduced motion while every other movement in the component is gated on it.
+  Plus WordSheet drew its SEGMENTS group unconditionally — `SegmentedWord` treats an
+  empty list as a real state, so it was a bordered card around nothing.
+
+1050 tests pass, tsc + eslint clean, all four fixes mutation-checked.
+§5 not triggered: no `packages/data`, no trust boundary, no user-DB write.
 
 ### 🐛 FORM/LEMMA NFC MISMATCH — MERGED 2026-08-27 as `06db088` (PR #29)
 Owner report: root `Hqq`, form حَآقَّة, chip says 3 occurrences, filter says none.
