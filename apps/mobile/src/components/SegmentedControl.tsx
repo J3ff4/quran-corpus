@@ -6,13 +6,23 @@ import { GlassSurface } from './GlassSurface';
 import { PILL_SETTLE_MS, PILL_SPRING, SEGMENT_GAP, pillOffset, segmentWidth } from '@/motion/segmentedPill';
 import { useReducedMotion } from '@/motion/useReducedMotion';
 import { usePressScale } from '@/motion/usePressScale';
-import { radii, touchTargets, typography } from '@/theme/tokens';
+import { radii, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export interface SegmentedControlProps<T extends string> {
-  options: readonly { value: T; label: string }[];
+  options: readonly {
+    value: T;
+    label: string;
+    /** A segment that leaves the screen rather than selecting.
+     *
+     *  It fires `onChange` and then nothing: no optimistic hold, no travel
+     *  that sticks. Without it the hold never clears -- `value` can never
+     *  catch up to a value the caller will never apply -- and the wash sits
+     *  on the door for good. The reader's 'Words' is the only one today. */
+    door?: boolean;
+  }[];
   value: T;
   onChange: (value: T) => void;
   /** Names the group, not the options -- see the note on the row below. */
@@ -51,6 +61,11 @@ function Segment<T extends string>({
       testID={`segment-${option.value}`}
       accessibilityRole="tab"
       accessibilityState={{ selected }}
+      // The visual pill is 34 tall; the target is 48 (§8, WCAG 2.5.5). Only
+      // vertical: the segments tile the row edge to edge, so horizontal slop
+      // would overlap its neighbour's and the boundary between two tabs would
+      // stop being where it looks.
+      hitSlop={{ top: 7, bottom: 7 }}
       onPress={onPress}
       onPressIn={press.onPressIn}
       onPressOut={press.onPressOut}
@@ -60,10 +75,15 @@ function Segment<T extends string>({
           flex: 1,
           alignItems: 'center',
           justifyContent: 'center',
-          // compact (40), not minimum (48): four segments cannot each be 48
-          // wide on a 390pt frame, and the guideline measures the row, which
-          // the padding below carries to 48.
-          minHeight: touchTargets.compact,
+          // 34, below even compact (40): at 40 plus 4pt of glass padding the
+          // pill stood 48 tall and read as a second toolbar under the first
+          // (owner, device, 2026-09-11). Four segments cannot each be 48 wide
+          // on a 390pt frame either.
+          //
+          // The height the finger gets is NOT this one -- see hitSlop below.
+          // A parent's padding does not extend a Pressable's hit area, so
+          // nothing about the caller's layout carries this to 48 on its own.
+          minHeight: 34,
           paddingHorizontal: 8,
           borderRadius: radii.pill,
           // No background of its own any more: the wash is one pill that
@@ -176,7 +196,7 @@ export function SegmentedControl<T extends string>({
   const pillStyle = useAnimatedStyle(() => ({ transform: [{ translateX: offset.value }] }));
 
   return (
-    <GlassSurface radius="pill" style={{ padding: 4 }}>
+    <GlassSurface radius="pill" style={{ padding: 3 }}>
       {/* The label lives here rather than on each option: four segments each
           announcing "Browse by" is four swipes of the same words.
 
@@ -236,6 +256,12 @@ export function SegmentedControl<T extends string>({
             // change, and a tab-mash would refetch 604 rows per tap.
             onPress={() => {
               if (option.value === shown) return;
+              if (option.door) {
+                // No place(), no setOptimistic, no settle hold: there is no
+                // travel to protect, because the wash is not going anywhere.
+                onChange(option.value);
+                return;
+              }
               // Started here rather than left to the effect above, which runs
               // only after the commit that `onChange` causes. That commit
               // rebuilds the screen's list -- 604 surahs, the whole letter

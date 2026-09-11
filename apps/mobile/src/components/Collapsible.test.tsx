@@ -1,0 +1,112 @@
+import { cleanup, render, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { setAutoLayout } from '@/testing/rnHosts';
+
+vi.mock('react-native', async () => (await import('@/testing/rnHosts.js')).reactNativeTextMock());
+// useReducedMotion reads the in-app setting as well as the system one; the
+// real store opens expo-secure-store, which jsdom has no counterpart for.
+vi.mock('@/settings/settingsStore', () => ({
+  useAppSettings: () => ({ uiLocale: 'en', reduceMotion: false }),
+}));
+
+import { Collapsible } from './Collapsible';
+
+describe('Collapsible', () => {
+  afterEach(() => {
+    setAutoLayout(null);
+    cleanup();
+  });
+
+  it('keeps its children out of the tree while shut', () => {
+    // Not merely clipped: a shut curtain holding a mounted row leaves that
+    // row focusable by TalkBack and re-laid-out on every parent render.
+    const result = render(
+      <Collapsible open={false}>
+        <div data-testid="child" />
+      </Collapsible>,
+    );
+
+    expect(result.queryByTestId('child')).toBeNull();
+  });
+
+  it('clips from the top, so the content drops as one block', () => {
+    // A curtain, not a fade (owner ruling R7). overflow:hidden on the clip is
+    // what makes the height animation read as an unroll rather than as the
+    // children squashing with the container.
+    const result = render(
+      <Collapsible open testID="clip">
+        <div data-testid="child" />
+      </Collapsible>,
+    );
+
+    expect(result.getByTestId('clip').style.overflow).toBe('hidden');
+    expect(result.getByTestId('child')).not.toBeNull();
+  });
+  it('unmounts its children once the close lands, and not before', async () => {
+    // Not at the top of the close: that collapses the clip instantly and
+    // there is no curtain left to watch. But they must go eventually --
+    // children left behind a shut curtain stay focusable by TalkBack.
+    const result = render(
+      <Collapsible open>
+        <div data-testid="child" />
+      </Collapsible>,
+    );
+    expect(result.getByTestId('child')).not.toBeNull();
+
+    result.rerender(
+      <Collapsible open={false}>
+        <div data-testid="child" />
+      </Collapsible>,
+    );
+
+    // Still there while the curtain is travelling. Unmounting at the top of
+    // the close collapses the clip to nothing instantly and there is no
+    // curtain left to watch -- the defect a same-tick assertion cannot see.
+    expect(result.getByTestId('child')).not.toBeNull();
+
+    await waitFor(() => expect(result.queryByTestId('child')).toBeNull());
+  });
+  it('opens the clip to the height it measured', () => {
+    // The bug this exists for: the clip stayed at 0 forever, so the chevron
+    // turned and the button swapped its glyph and NOTHING opened (owner,
+    // device, 2026-09-11). Measured in the shim, so it catches a broken
+    // measure -> clip path for any reason jsdom can see.
+    setAutoLayout({ width: 320, height: 96 });
+    const result = render(
+      <Collapsible open testID="clip">
+        <div data-testid="child" />
+      </Collapsible>,
+    );
+
+    // A re-render, because the measurement lands in a layout effect and
+    // writes a shared value, which commits no render of its own.
+    result.rerender(
+      <Collapsible open testID="clip">
+        <div data-testid="child" />
+      </Collapsible>,
+    );
+
+    expect(result.getByTestId('clip').style.height).toBe('96px');
+  });
+
+  it('measures its content out of the clip s flow', () => {
+    // Why the test above could pass while the device showed nothing: in flow,
+    // the content is a child of a clip whose height is 0 until something
+    // measures it -- and the only thing that measures it is that child's own
+    // onLayout. The circle never breaks. Out of flow its height is its
+    // content's and owes nothing to the parent's.
+    //
+    // A structural assertion, and deliberately so: the shim has no layout
+    // engine, so it cannot reproduce the starvation itself. This pins the
+    // mechanism that avoids it.
+    setAutoLayout({ width: 320, height: 96 });
+    const result = render(
+      <Collapsible open testID="clip">
+        <div data-testid="child" />
+      </Collapsible>,
+    );
+
+    const measurer = result.getByTestId('child').parentElement!;
+    expect(measurer.style.position).toBe('absolute');
+  });
+});

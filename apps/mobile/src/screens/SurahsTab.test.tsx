@@ -308,7 +308,10 @@ describe('SurahsTab', () => {
 
     fireEvent.click(screen.getByTestId('browse-juz-3'));
 
-    expect(screen.queryByText('Al-Baqara 253–286')).toBeNull();
+    // waitFor, not a bare query: the ranges leave when the curtain LANDS, not
+    // when the tap fires -- an unmount at the top of the close would collapse
+    // the card instantly with nothing to watch.
+    await waitFor(() => expect(screen.queryByText('Al-Baqara 253–286')).toBeNull());
   });
 
   it('forgets which juz were open when the mode changes and comes back', async () => {

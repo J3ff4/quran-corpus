@@ -201,22 +201,26 @@ export function SurahsScreen() {
             if (!next.delete(entry.juz)) next.add(entry.juz);
             return next;
           }),
-      });
-
-      if (!expanded) continue;
-      for (const range of entry.ranges) {
-        rows.push({
+        // Built whether or not the juz is open. The curtain only exists where
+        // there are children to hang in it, so gating them here would leave
+        // the first open with nothing to unroll -- the ranges would simply
+        // appear. Collapsible itself unmounts them while shut, which is where
+        // that saving actually happens.
+        //
+        // They render inside this card rather than after it: as sibling rows
+        // they looked exactly like juz cards, so an expanded juz read as four
+        // juz (ruling R6).
+        children: entry.ranges.map((range) => ({
           key: `juz-${entry.juz}-surah-${range.surahId}`,
           testID: `browse-juz-${entry.juz}-surah-${range.surahId}`,
           leading: '',
-          indent: true,
           title: `${range.surahName} ${range.firstAyahNumber}–${range.lastAyahNumber}`,
           // 'Ayahs' rather than a fourth key saying the same word -- the
           // word-by-word pager already carries it in all three locales.
           accessibilityLabel: `${range.surahName}, ${t(uiLocale, 'wbw.rangeLabel')} ${range.firstAyahNumber}–${range.lastAyahNumber}`,
           onPress: () => openAyah(range.surahId, range.firstAyahNumber),
-        });
-      }
+        })),
+      });
     }
     return rows;
   }, [data.juz, openJuz, uiLocale]);
