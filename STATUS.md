@@ -7,9 +7,49 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-09-10
+Updated: 2026-09-11
 
 ## Now
+
+### 🚧 M7e HEADER + BROWSE POLISH — PR #69 OPEN (branch `feat/m7e-header-polish`)
+Six device-reported UI defects + a read-only font spike. Plan +10 owner rulings in
+`docs/plans/phase-m7e-header-and-browse-polish.md`. Entry written at merge, not here
+(`ledger-prose-feeds-review-rounds`); this line is the pointer.
+**Device checks 300-314 OWED**, incl. 314 = #68's page-1/604 `overScrollMode` edge.
+
+### ✅ NATIVE PAGER + WORD-SHEET DEAD BAND — MERGED 2026-09-11 as `7a309f8` (PR #68)
+Two owner reports from the device, both of which took a wrong turn before landing.
+
+- **Page turn.** Reported "too snappy", then after the first attempt *"i did not see
+  any change on page snap. still hard. i have to slide more to get to next page."*
+  `decelerationRate` was never the lever, and the first attempt moved it the wrong
+  way: Android's `pagingEnabled` does not snap from where the finger stopped —
+  `ReactScrollView.flingAndSnap()` **predicts** where the fling would have ended,
+  using `decelerationRate` as friction, and snaps to the nearest boundary of that
+  predicted point. A lower rate predicts shorter travel, so `fast` made a flick land
+  short of halfway and snap back. A ScrollView exposes neither a drag threshold nor
+  a settle curve at any value of it. Mushaf now turns on **react-native-pager-view**
+  (ViewPager2) — installed at the owner's explicit direction, overriding the earlier
+  ruling that held it to its own phase.
+  Traps, all load-bearing: `layoutDirection="rtl"` replaces `inverted`; **PagerView
+  does not virtualize** (all 604 cells exist, only `WINDOW` of them draw — a drawn
+  page registers a ~200KB font expo-font never unloads); `onPageSelected` fires once
+  at mount; **`overdrag={false}` is inert on Android** (bare `return` in 8.0.2, iOS
+  only) so `overScrollMode="never"` is the lever; **PagerView is a plain
+  `React.Component`**, so one render is a `Children.map` + `cloneElement` over 604
+  children — the landing pulse's six steps meant ~1800 allocations a tick, so marks
+  moved to a context the drawn pages read and the pager is memoised.
+- **Word sheet.** Reported too airy, then *"i did not see the difference. arabic
+  letters are not any closer to the actions row."* Measured off the owner's
+  screenshot at 1440x3120: **216px = 62dp** of dead band, of which the layout gap was
+  8 and the first attempt's pull 6. The rest is Hafs's ascender room plus Android's
+  `includeFontPadding`, which sits OUTSIDE the line box — so pinning `lineHeight`
+  alone would barely have moved it. `SegmentedWord` gains an opt-in `lineHeight`
+  switching both off; opt-in because it also draws every WBW cell and M6l's fitted
+  row-height model is calibrated against the untouched box.
+
+**Owed:** the page-1/604 edge. `overScrollMode` landed after the owner's device run,
+so it is asserted in a unit test and not on glass. Carried as M7e check 314.
 
 ### ✅ WORD SHEET + BOOKMARK BAND + KEYBOARD — MERGED 2026-09-10 as `87a9439` (PR #67)
 Seven commits of device-driven polish, every change from an owner reading the real
