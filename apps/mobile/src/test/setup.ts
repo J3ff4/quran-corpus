@@ -92,6 +92,12 @@ vi.mock('react-native-reanimated', async () => {
         return [name, builder];
       }),
     ),
+    // Identity, not a no-op: a component that calls runOnJS(fn) and stores the
+    // result expects something callable back. Nothing here schedules it --
+    // withTiming below resolves to its target and never runs its callback, so
+    // a curtain's close completes instantly and its unmount is device-only
+    // behaviour (Collapsible).
+    runOnJS: (fn: unknown) => fn,
     useSharedValue: (initial: number) => ({ value: initial }),
     useAnimatedStyle: (factory: () => unknown) => factory(),
     withTiming: (toValue: number) => toValue,
