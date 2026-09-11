@@ -6,6 +6,7 @@ import type { MobileDataClient } from '@quran-corpus/mobile-data';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { useReducedMotion } from '@/motion/useReducedMotion';
 import { ayahKey, type HighlightInput } from '@/mushaf/highlights';
+import { HighlightsProvider } from '@/mushaf/highlightsContext';
 import { useMushafAyahs, type MushafIndex } from '@/mushaf/mushafReaderData';
 import { useMushafPageFont } from '@/mushaf/pageFont';
 import { useThemeColors } from '@/theme/themeContext';
@@ -201,12 +202,12 @@ export function MushafReader({
       }}
     >
       {size && size.height > 0 ? (
+        <HighlightsProvider value={highlights}>
         <MushafPager
           client={client}
           initialPage={initialPage}
           width={size.width}
           height={size.height}
-          highlights={highlights}
           ayahTexts={ayahTexts}
           surahNames={index.surahNames}
           juzByPage={juzByPage}
@@ -216,6 +217,7 @@ export function MushafReader({
           onWordLongPress={onPagerWordLongPress}
           onTap={onTap}
         />
+        </HighlightsProvider>
       ) : null}
     </View>
   );

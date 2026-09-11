@@ -81,6 +81,14 @@ function flattenStyle(style: unknown): Record<string, unknown> | undefined {
   return withBoxShadow(flat);
 }
 
+/** `includeFontPadding` as a string the DOM can hold, or undefined when the
+ *  style does not set it. See the attribute it feeds, in `host` below. */
+function includeFontPaddingOf(style: unknown): string | undefined {
+  const flat = flattenStyle(style) as Record<string, unknown> | undefined;
+  const value = flat?.includeFontPadding;
+  return value === undefined ? undefined : String(value);
+}
+
 /**
  * RN's shadow props expressed as a `boxShadow` the DOM can hold.
  *
@@ -352,6 +360,13 @@ export function host(tag: string) {
         // camelCase prop on a DOM node, and dropping it would make the one
         // assertion that the mushaf page is held as GPU pixels decorative.
         'data-hardware-layer': renderToHardwareTextureAndroid ? 'true' : undefined,
+        // Android-only, and not a CSS property: React drops it onto node.style
+        // where it simply vanishes, so a Text given the padding and a Text
+        // denied it looked identical to the suite. Same blindness as
+        // `shadowOpacity` above, and the reason the hero word carried 54dp of
+        // invisible band for a phase. Read it with
+        // `node.getAttribute('data-rn-include-font-padding')`.
+        'data-rn-include-font-padding': includeFontPaddingOf(style),
         onClick: onPress,
         // RN's press phases, mapped onto the nearest DOM events rather than
         // spread (React logs "does not recognize the onPressIn prop" for every
