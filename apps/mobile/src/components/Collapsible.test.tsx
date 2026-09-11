@@ -1,4 +1,4 @@
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, render, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('react-native', async () => (await import('@/testing/rnHosts.js')).reactNativeTextMock());
@@ -38,7 +38,7 @@ describe('Collapsible', () => {
     expect(result.getByTestId('clip').style.overflow).toBe('hidden');
     expect(result.getByTestId('child')).not.toBeNull();
   });
-  it('unmounts its children once the close lands', () => {
+  it('unmounts its children once the close lands, and not before', async () => {
     // Not at the top of the close: that collapses the clip instantly and
     // there is no curtain left to watch. But they must go eventually --
     // children left behind a shut curtain stay focusable by TalkBack.
@@ -55,6 +55,11 @@ describe('Collapsible', () => {
       </Collapsible>,
     );
 
-    expect(result.queryByTestId('child')).toBeNull();
+    // Still there while the curtain is travelling. Unmounting at the top of
+    // the close collapses the clip to nothing instantly and there is no
+    // curtain left to watch -- the defect a same-tick assertion cannot see.
+    expect(result.getByTestId('child')).not.toBeNull();
+
+    await waitFor(() => expect(result.queryByTestId('child')).toBeNull());
   });
 });

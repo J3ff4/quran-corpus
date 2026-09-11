@@ -35,6 +35,12 @@ export function Collapsible({ open, children, testID }: CollapsibleProps) {
   const measured = useRef(0);
   // Mount state, separate from `open`: it trails the close by one animation.
   const [mounted, setMounted] = useState(open);
+  // True until the first measurement lands on a curtain that MOUNTED open.
+  // Without it such a curtain replays its unroll from 0 every time it is
+  // built -- a juz card scrolled out of the FlatList's window and back
+  // animates open again, as does any remount of a header whose actions were
+  // left open. An open curtain arriving on screen is not an opening.
+  const openOnMount = useRef(open);
 
   useEffect(() => {
     if (open) {
@@ -66,10 +72,14 @@ export function Collapsible({ open, children, testID }: CollapsibleProps) {
           onLayout={(event: LayoutChangeEvent) => {
             const next = event.nativeEvent.layout.height;
             if (next <= 0 || next === measured.current) return;
+            const snap = openOnMount.current;
+            openOnMount.current = false;
             measured.current = next;
             // Only while open: a layout arriving mid-close must not re-inflate
             // the clip we are in the middle of shutting.
-            if (open) height.value = reduceMotion ? next : withTiming(next, { duration: UNROLL_MS });
+            if (!open) return;
+            height.value =
+              reduceMotion || snap ? next : withTiming(next, { duration: UNROLL_MS });
           }}
         >
           {children}

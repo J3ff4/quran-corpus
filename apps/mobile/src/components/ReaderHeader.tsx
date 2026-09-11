@@ -103,7 +103,11 @@ export function ReaderHeader({
     // starts under the status bar and pads its own content down draws a tinted
     // strip behind the clock.
     <View style={{ paddingTop: insets.top + 8, paddingHorizontal: 16, paddingBottom: 8 }}>
-      <GlassSurface radius="card" style={{ paddingHorizontal: 12, paddingVertical: 10, gap: 10 }}>
+      {/* No `gap` on the surface: the curtain below is a zero-height flex child
+          while it is shut, and a gap would still be paid for it -- 10pt of
+          dead space under the mode row whenever the actions are closed. The
+          rows carry their own spacing instead. */}
+      <GlassSurface radius="card" style={{ paddingHorizontal: 12, paddingVertical: 10 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <Pressable
             testID="reader-back"
@@ -169,7 +173,10 @@ export function ReaderHeader({
             surah, and this is the row with width to spare. Paging is state,
             not navigation, so the button hands back the surah it means and the
             screen above changes to it. */}
-        <View testID="reader-mode-row" style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <View
+          testID="reader-mode-row"
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}
+        >
           {onPageSurah ? (
             <AdjacentNavButton
               side="prev"

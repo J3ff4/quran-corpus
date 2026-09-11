@@ -98,14 +98,20 @@ vi.mock('react-native-reanimated', async () => {
     runOnJS: (fn: unknown) => fn,
     useSharedValue: (initial: number) => ({ value: initial }),
     useAnimatedStyle: (factory: () => unknown) => factory(),
-    // Resolves to its target AND runs its completion callback, finished, in
-    // the same tick. Both halves matter: a component that unmounts its
-    // children when a close lands (Collapsible) never unmounted them at all
-    // while the callback was dropped, so a suite asserting that a collapsed
-    // disclosure is empty read the open one's rows. Nothing here asserts on a
-    // frame; what is being modelled is "the animation completed".
+    // Resolves to its target, and runs its completion callback, finished, on a
+    // microtask -- NOT in the same tick.
+    //
+    // Both halves matter. Dropped entirely (which is what it did until M7e), a
+    // component that unmounts its children when a close LANDS never unmounted
+    // them at all, so a suite asserting that a collapsed disclosure is empty
+    // was reading the open one's rows. Run synchronously, the opposite defect
+    // becomes invisible: unmounting at the TOP of a close collapses the
+    // curtain instantly with nothing left to watch, and no assertion could
+    // tell the two apart. A microtask is the smallest gap that distinguishes
+    // them, and `waitFor` already spans it. Nothing here asserts on a frame;
+    // what is modelled is only "later, and finished".
     withTiming: (toValue: number, _config?: unknown, callback?: (finished?: boolean) => void) => {
-      callback?.(true);
+      if (callback) queueMicrotask(() => callback(true));
       return toValue;
     },
     withSpring: (toValue: number) => toValue,

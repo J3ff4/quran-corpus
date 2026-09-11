@@ -208,6 +208,19 @@ describe('SegmentedControl on a measured row', () => {
     expect(tabs[2]?.getAttribute('aria-selected')).toBe('true');
     expect(tabs[0]?.getAttribute('aria-selected')).toBe('false');
   });
+  it('gives a 34pt segment a 48pt target', () => {
+    // The pill lost 8pt of height in M7e so it stopped reading as a second
+    // toolbar. A parent's padding does not extend a Pressable's hit area, so
+    // without slop that is a 34dp target -- below this codebase's own
+    // touchTargets floor (§8, WCAG 2.5.5). Vertical only: the segments tile
+    // the row edge to edge, and horizontal slop would put the boundary
+    // between two tabs somewhere other than where it looks.
+    renderControl('surah');
+
+    const slop = screen.getAllByRole('tab')[0]!.getAttribute('data-hit-slop');
+    expect(JSON.parse(slop!)).toEqual({ top: 7, bottom: 7 });
+  });
+
   it('does not park the wash on a door option', () => {
     // A door fires onChange and navigates away; it never becomes the
     // selection. Without this the optimistic hold never clears -- the

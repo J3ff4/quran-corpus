@@ -61,6 +61,11 @@ function Segment<T extends string>({
       testID={`segment-${option.value}`}
       accessibilityRole="tab"
       accessibilityState={{ selected }}
+      // The visual pill is 34 tall; the target is 48 (§8, WCAG 2.5.5). Only
+      // vertical: the segments tile the row edge to edge, so horizontal slop
+      // would overlap its neighbour's and the boundary between two tabs would
+      // stop being where it looks.
+      hitSlop={{ top: 7, bottom: 7 }}
       onPress={onPress}
       onPressIn={press.onPressIn}
       onPressOut={press.onPressOut}
@@ -70,13 +75,14 @@ function Segment<T extends string>({
           flex: 1,
           alignItems: 'center',
           justifyContent: 'center',
-          // 34, below even compact (40): four segments cannot each be 48 wide
-          // on a 390pt frame, and the guideline measures the ROW. The reader's
-          // mode row sits inside the header's own 10pt vertical padding and
-          // the browse rows inside their screen's, which carries the reachable
-          // target past 48 in every caller. Dropped from compact on the
-          // device (owner, 2026-09-11): at 40 plus 4pt of glass padding the
-          // pill was 48 tall and read as a second toolbar under the first.
+          // 34, below even compact (40): at 40 plus 4pt of glass padding the
+          // pill stood 48 tall and read as a second toolbar under the first
+          // (owner, device, 2026-09-11). Four segments cannot each be 48 wide
+          // on a 390pt frame either.
+          //
+          // The height the finger gets is NOT this one -- see hitSlop below.
+          // A parent's padding does not extend a Pressable's hit area, so
+          // nothing about the caller's layout carries this to 48 on its own.
           minHeight: 34,
           paddingHorizontal: 8,
           borderRadius: radii.pill,

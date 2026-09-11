@@ -30,6 +30,7 @@ interface HostProps {
   role?: string;
   style?: unknown;
   testID?: string;
+  hitSlop?: unknown;
   // Native-only props with no DOM equivalent. Destructured so they never reach
   // createElement: React logs "Unknown event handler property" for onLayout and
   // onTextLayout, and a non-boolean-attribute warning for `accessible`, on
@@ -331,6 +332,7 @@ export function host(tag: string) {
     onPressOut,
     onTextLayout: _onTextLayout,
     pointerEvents,
+    hitSlop,
     renderToHardwareTextureAndroid,
     ...props
   }: HostProps) {
@@ -383,6 +385,14 @@ export function host(tag: string) {
         // camelCase prop on a DOM node, and dropping it would make the one
         // assertion that the mushaf page is held as GPU pixels decorative.
         'data-hardware-layer': renderToHardwareTextureAndroid ? 'true' : undefined,
+        // Mapped, not spread: it is an object, so React would render it as an
+        // unknown attribute and warn. It is also the only thing standing
+        // between a control's drawn height and the 48dp its finger needs
+        // (§8), and a parent's padding does not extend a hit area -- so a
+        // control that shrank below the floor and forgot this is exactly the
+        // regression a suite has to be able to see.
+        'data-hit-slop':
+          hitSlop === undefined ? undefined : JSON.stringify(hitSlop),
         // Android-only, and not a CSS property: React drops it onto node.style
         // where it simply vanishes, so a Text given the padding and a Text
         // denied it looked identical to the suite. Same blindness as
