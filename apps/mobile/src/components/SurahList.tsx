@@ -1,4 +1,6 @@
 import { useMemo } from 'react';
+import { surahNameGlyph } from '@quran-corpus/config/ornaments/surahName';
+
 import { BrowseList, type BrowseItem } from './BrowseList';
 import type { SurahListItem } from '@/data/corpusRepository';
 import type { UiLocaleCode } from '@/i18n/languages';
@@ -28,7 +30,13 @@ export function SurahList({ surahs, uiLocale, onOpenSurah }: SurahListProps) {
         leading: String(surah.id),
         title: surah.nameTranslit,
         subtitle: `${surah.nameTranslation} · ${surah.ayahCount} ${ayahsSuffix}`,
-        arabic: surah.nameArabic,
+        // The calligraphic glyph, not `nameArabic` (ruling S1). This is the
+        // one list where the Arabic is a title rather than text to be read,
+        // and the plain name is already carried by the translit beside it.
+        // The accessibilityLabel below is unchanged and load-bearing: a PUA
+        // codepoint announces as nothing at all.
+        arabic: surahNameGlyph(surah.id),
+        arabicFace: 'surahName' as const,
         accessibilityLabel: `${surah.nameTranslit}, ${surah.ayahCount} ${ayahsSuffix}`,
         onPress: () => onOpenSurah(surah),
       })),
