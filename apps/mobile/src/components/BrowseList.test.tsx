@@ -51,6 +51,12 @@ describe('BrowseList disclosure rows', () => {
     expect(rotationOf('browse-chevron-juz-1')).toBe('rotate(0deg)');
 
     rerender(<BrowseList items={[item({ expanded: true })]} />);
+    // Twice: the turn is issued from an effect, which runs after the render
+    // that reads the shared value, so the first commit still paints the old
+    // angle. Until 2026-09-11 the shim handed back a FRESH box on every
+    // render, seeded from the current prop -- so this passed without the
+    // effect ever running, and would have passed with no effect at all.
+    rerender(<BrowseList items={[item({ expanded: true })]} />);
     expect(rotationOf('browse-chevron-juz-1')).toBe('rotate(90deg)');
   });
 

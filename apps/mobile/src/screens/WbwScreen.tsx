@@ -234,7 +234,11 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
             pages WITHIN. Surah paging moves down to the density row, still
             bounding the ayah pager rather than sitting inside it (D49), so
             the two orders of movement do not read as one control. */}
-        <View style={{ paddingHorizontal: 14, paddingTop: 10, gap: 10 }}>
+        {/* paddingTop 2, not 10: the Stack's own header sits directly above
+            this and carries its own bottom inset, so 10 on top of two stacked
+            rows read as a band of dead chrome before the first word (owner,
+            device, 2026-09-11). */}
+        <View style={{ paddingHorizontal: 14, paddingTop: 2, gap: 10 }}>
           <View
             testID="wbw-title-row"
             style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}

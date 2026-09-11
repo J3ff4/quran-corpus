@@ -69,6 +69,19 @@ export function Collapsible({ open, children, testID }: CollapsibleProps) {
     <Animated.View testID={testID} style={[{ overflow: 'hidden' }, clipStyle]}>
       {mounted ? (
         <View
+          // **Absolutely positioned, and that is the whole mechanism.**
+          //
+          // In flow, this view is a child of a clip whose height is 0 until
+          // something measures it -- and the only thing that measures it is
+          // this view's own onLayout. On the device that circle never broke:
+          // the chevron turned, the header's button swapped to its close
+          // glyph, and nothing opened (owner, device, 2026-09-11).
+          //
+          // Out of flow, its height is its content's and owes nothing to the
+          // parent's, so the measurement is available on the first layout
+          // pass and the clip has a target to travel to. left/right rather
+          // than a width: the content still has to fill the card it sits in.
+          style={{ position: 'absolute', left: 0, right: 0, top: 0 }}
           onLayout={(event: LayoutChangeEvent) => {
             const next = event.nativeEvent.layout.height;
             if (next <= 0 || next === measured.current) return;

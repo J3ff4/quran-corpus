@@ -1,5 +1,6 @@
 import { cleanup, render, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { setAutoLayout } from '@/testing/rnHosts';
 
 vi.mock('react-native', async () => (await import('@/testing/rnHosts.js')).reactNativeTextMock());
 // useReducedMotion reads the in-app setting as well as the system one; the
@@ -11,7 +12,10 @@ vi.mock('@/settings/settingsStore', () => ({
 import { Collapsible } from './Collapsible';
 
 describe('Collapsible', () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    setAutoLayout(null);
+    cleanup();
+  });
 
   it('keeps its children out of the tree while shut', () => {
     // Not merely clipped: a shut curtain holding a mounted row leaves that
@@ -61,5 +65,48 @@ describe('Collapsible', () => {
     expect(result.getByTestId('child')).not.toBeNull();
 
     await waitFor(() => expect(result.queryByTestId('child')).toBeNull());
+  });
+  it('opens the clip to the height it measured', () => {
+    // The bug this exists for: the clip stayed at 0 forever, so the chevron
+    // turned and the button swapped its glyph and NOTHING opened (owner,
+    // device, 2026-09-11). Measured in the shim, so it catches a broken
+    // measure -> clip path for any reason jsdom can see.
+    setAutoLayout({ width: 320, height: 96 });
+    const result = render(
+      <Collapsible open testID="clip">
+        <div data-testid="child" />
+      </Collapsible>,
+    );
+
+    // A re-render, because the measurement lands in a layout effect and
+    // writes a shared value, which commits no render of its own.
+    result.rerender(
+      <Collapsible open testID="clip">
+        <div data-testid="child" />
+      </Collapsible>,
+    );
+
+    expect(result.getByTestId('clip').style.height).toBe('96px');
+  });
+
+  it('measures its content out of the clip s flow', () => {
+    // Why the test above could pass while the device showed nothing: in flow,
+    // the content is a child of a clip whose height is 0 until something
+    // measures it -- and the only thing that measures it is that child's own
+    // onLayout. The circle never breaks. Out of flow its height is its
+    // content's and owes nothing to the parent's.
+    //
+    // A structural assertion, and deliberately so: the shim has no layout
+    // engine, so it cannot reproduce the starvation itself. This pins the
+    // mechanism that avoids it.
+    setAutoLayout({ width: 320, height: 96 });
+    const result = render(
+      <Collapsible open testID="clip">
+        <div data-testid="child" />
+      </Collapsible>,
+    );
+
+    const measurer = result.getByTestId('child').parentElement!;
+    expect(measurer.style.position).toBe('absolute');
   });
 });

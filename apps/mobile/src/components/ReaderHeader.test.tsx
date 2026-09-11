@@ -187,6 +187,21 @@ describe('ReaderHeader', () => {
     expect(screen.queryByLabelText('Search')).not.toBeNull();
   });
 
+  it('draws a kebab, not the nav-drawer glyph', () => {
+    // Three lines is Android's drawer icon everywhere else; on this button it
+    // promised a drawer and opened an action row (owner, device,
+    // 2026-09-11). Three dots is "more actions here". Asserted by path count,
+    // which is also what catches a name with no entry in PATHS -- that
+    // renders an empty <svg> rather than failing.
+    renderHeader();
+    expect(screen.getByTestId('reader-actions').querySelectorAll('path')).toHaveLength(3);
+
+    openActions();
+
+    // Two strokes: the close cross.
+    expect(screen.getByTestId('reader-actions').querySelectorAll('path')).toHaveLength(2);
+  });
+
   it('says what the actions button will do', () => {
     // A disclosure whose only cue is its glyph tells TalkBack nothing about
     // the state it is in.

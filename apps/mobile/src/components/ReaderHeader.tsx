@@ -150,9 +150,10 @@ export function ReaderHeader({
           >
             {surahName}
           </Animated.Text>
-          {/* One button for three actions (ruling R1). `menu`, not a gear:
-              Settings is a real screen in this app and a gear here would
-              promise it. */}
+          {/* One button for three actions (ruling R1). A kebab: not a gear,
+              because Settings is a real screen here and a gear would promise
+              it, and not `menu`, whose three lines are Android's nav-drawer
+              glyph and promised a drawer (owner, device, 2026-09-11). */}
           <Pressable
             testID="reader-actions"
             accessibilityRole="button"
@@ -166,7 +167,7 @@ export function ReaderHeader({
               justifyContent: 'center',
             }}
           >
-            <Icon name={actionsOpen ? 'close' : 'menu'} color={theme.text} />
+            <Icon name={actionsOpen ? 'close' : 'kebab'} color={theme.text} />
           </Pressable>
         </View>
         {/* Flanking the pill (R2), not the name (D47): the chevrons page the

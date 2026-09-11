@@ -14,6 +14,7 @@ export type IconName =
   | 'translationOff'
   | 'dictionary'
   | 'menu'
+  | 'kebab'
   | 'info'
   | 'search'
   | 'back'
@@ -93,6 +94,13 @@ const PATHS: Record<IconName, string[]> = {
     'M12 6v14',
   ],
   menu: ['M4 6h16M4 12h16M4 18h16'],
+  // Three dots, for "more actions on this screen". `menu` above is three
+  // LINES, which is the nav-drawer glyph everywhere else on Android -- on the
+  // reader it promised a drawer and opened an action row (owner, device,
+  // 2026-09-11). Drawn as zero-length segments so each dot takes the same
+  // round cap and stroke width as every other glyph in the set, the way
+  // `info`'s dot already does.
+  kebab: ['M12 5.4v.2', 'M12 11.9v.2', 'M12 18.4v.2'],
   // The About row's glyph, and the only one of the three Menu rows with no
   // icon already. Ring plus stem plus a zero-length dot: the dot is drawn as a
   // 0.2-unit segment rather than a filled circle so it takes the same round

@@ -51,6 +51,7 @@ vi.mock('react-native-safe-area-context', () => ({
 // nothing here asserts on a frame, and the timing branch that *is* worth
 // testing (reduced motion) lives in the pure nextPressScale.
 vi.mock('react-native-reanimated', async () => {
+  const React = await import('react');
   const { host } = await import('@/testing/rnHosts.js');
   return {
     default: {
@@ -96,7 +97,16 @@ vi.mock('react-native-reanimated', async () => {
     // expects something callable back, and withTiming below calls it straight
     // away.
     runOnJS: (fn: unknown) => fn,
-    useSharedValue: (initial: number) => ({ value: initial }),
+    // A ref, not a fresh object per call. It is used as a hook, and the mock
+    // returning a NEW box on every render meant every write to a shared value
+    // was silently discarded at the next one -- so nothing driven by one
+    // could be asserted after a re-render, which is most of what a shared
+    // value is for (found 2026-09-11, when a curtain that measured itself
+    // correctly still read as height 0 in the suite).
+    useSharedValue: (initial: number) => {
+      const box = React.useRef({ value: initial });
+      return box.current;
+    },
     useAnimatedStyle: (factory: () => unknown) => factory(),
     // Resolves to its target, and runs its completion callback, finished, on a
     // microtask -- NOT in the same tick.
