@@ -834,6 +834,7 @@ describe('SurahReader', () => {
     const list = () => container.querySelector('[data-important-for-accessibility]');
 
     renderReaderHeader();
+    openHeaderActions();
 
     expect(list()?.getAttribute('data-important-for-accessibility')).toBe('auto');
 
@@ -1267,6 +1268,7 @@ describe('SurahReader', () => {
 
     renderReaderHeader();
     expect(screen.getByTestId('segment-wbw')).toBeTruthy();
+    openHeaderActions();
     expect(screen.getByTestId('open-language')).toBeTruthy();
   });
 
@@ -1280,6 +1282,7 @@ describe('SurahReader', () => {
     );
 
     renderReaderHeader();
+    openHeaderActions();
 
     // Closed until asked for: an always-mounted sheet leaves a full-screen
     // backdrop swallowing every tap in the reader.
@@ -1314,6 +1317,7 @@ describe('SurahReader', () => {
     expect(screen.getByTestId('word-sheet')).toBeTruthy();
 
     renderReaderHeader();
+    openHeaderActions();
     fireEvent.click(screen.getByTestId('open-language'));
 
     expect(screen.queryByTestId('word-sheet')).toBeNull();
@@ -1377,6 +1381,12 @@ describe('SurahReader', () => {
     const header = readerHeaderFactory();
     if (!header) throw new Error('the reader never set a header');
     return render(<div>{header()}</div>);
+  }
+
+  /** The header's three actions live in a curtain since M7e; the language
+   *  control is unreachable until it is unrolled. */
+  function openHeaderActions() {
+    fireEvent.click(screen.getByTestId('reader-actions'));
   }
 
   /** Scrolls to `y` with a header of `height` behind it. */

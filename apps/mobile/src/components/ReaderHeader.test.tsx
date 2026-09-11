@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('react-native', async () => (await import('@/testing/rnHosts.js')).reactNativeTextMock());
@@ -32,6 +32,12 @@ function renderHeader(props: Partial<ReaderHeaderProps> = {}) {
     </ThemeContext.Provider>,
   );
   return handlers;
+}
+
+/** The three actions live in a curtain now (ruling R1): the button that
+ *  unrolls it is the only way to reach them, on the device and here. */
+function openActions() {
+  fireEvent.click(screen.getByTestId('reader-actions'));
 }
 
 describe('ReaderHeader', () => {
@@ -70,6 +76,7 @@ describe('ReaderHeader', () => {
 
   it('keeps the search and language actions reachable', () => {
     const { onOpenSearch, onOpenLanguage } = renderHeader();
+    openActions();
 
     fireEvent.click(screen.getByTestId('open-language'));
     expect(onOpenLanguage).toHaveBeenCalledTimes(1);
@@ -80,6 +87,7 @@ describe('ReaderHeader', () => {
 
   it('switches the translation off and back on', () => {
     const { onChangeShowTranslation } = renderHeader({ showTranslation: true });
+    openActions();
 
     fireEvent.click(screen.getByTestId('toggle-translation'));
 
@@ -90,6 +98,7 @@ describe('ReaderHeader', () => {
     // A switch whose only difference is which handler argument it sends tells
     // a screen reader nothing about the state it is in.
     renderHeader({ showTranslation: false });
+    openActions();
 
     expect(screen.getByTestId('toggle-translation').getAttribute('aria-checked')).toBe('false');
   });
@@ -97,6 +106,7 @@ describe('ReaderHeader', () => {
   it('hides the language control when the translation is off', () => {
     // A picker that changes nothing visible is a dead control.
     renderHeader({ showTranslation: false });
+    openActions();
 
     expect(screen.queryByTestId('open-language')).toBeNull();
     expect(screen.getByTestId('toggle-translation')).toBeTruthy();
@@ -139,5 +149,83 @@ describe('ReaderHeader', () => {
     // The dictionary reaches this header through no path today, but a header
     // with two dead controls is worse than one without them.
     expect(screen.queryByTestId('surah-previous')).toBeNull();
+  });
+  it('gives the surah name a row of its own', () => {
+    // Seven controls in a 390pt row left the name ~34pt -- 'Al-B...' on the
+    // device (owner screenshot, 2026-09-11). The chevrons moved down to the
+    // pill row; only back and the actions button share row 1 now.
+    renderHeader({ prevSurahId: 1, nextSurahId: 3, onPageSurah: vi.fn() });
+
+    const row = screen.getByTestId('reader-title').parentElement!;
+    expect(within(row).queryByTestId('surah-previous')).toBeNull();
+    expect(within(row).queryByTestId('surah-next')).toBeNull();
+    expect(within(row).queryByTestId('reader-back')).not.toBeNull();
+    expect(within(row).queryByTestId('reader-actions')).not.toBeNull();
+  });
+
+  it('keeps the surah chevrons beside the mode pill', () => {
+    // Ruling R2. They page the surah and this is the row with width to spare.
+    renderHeader({ prevSurahId: 1, nextSurahId: 3, onPageSurah: vi.fn() });
+
+    const row = screen.getByTestId('reader-mode-row');
+    expect(within(row).queryByTestId('surah-previous')).not.toBeNull();
+    expect(within(row).queryByTestId('surah-next')).not.toBeNull();
+  });
+
+  it('hides the three actions until the actions button is pressed', () => {
+    // Ruling R4: an inline expanding row, not a sheet -- nothing covers the
+    // verses, and the row is part of the same glass surface.
+    renderHeader();
+    expect(screen.queryByTestId('toggle-translation')).toBeNull();
+    expect(screen.queryByTestId('open-language')).toBeNull();
+    expect(screen.queryByLabelText('Search')).toBeNull();
+
+    openActions();
+
+    expect(screen.queryByTestId('toggle-translation')).not.toBeNull();
+    expect(screen.queryByTestId('open-language')).not.toBeNull();
+    expect(screen.queryByLabelText('Search')).not.toBeNull();
+  });
+
+  it('says what the actions button will do', () => {
+    // A disclosure whose only cue is its glyph tells TalkBack nothing about
+    // the state it is in.
+    renderHeader();
+
+    expect(screen.getByTestId('reader-actions').getAttribute('aria-expanded')).toBe('false');
+    expect(screen.getByTestId('reader-actions').getAttribute('aria-label')).toBe('More actions');
+
+    openActions();
+
+    expect(screen.getByTestId('reader-actions').getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByTestId('reader-actions').getAttribute('aria-label')).toBe('Hide actions');
+  });
+
+  it('draws the translation switch as the script it is showing', () => {
+    // Colour alone is not a state (WCAG 1.4.1): the glyph itself changes. ON
+    // draws the Latin line under the Arabic stroke, OFF drops it -- so the
+    // path count is the state, and it is the one thing a colour swap cannot
+    // fake.
+    renderHeader({ showTranslation: true });
+    openActions();
+    expect(screen.getByTestId('toggle-translation').querySelectorAll('path')).toHaveLength(2);
+
+    cleanup();
+
+    renderHeader({ showTranslation: false });
+    openActions();
+    expect(screen.getByTestId('toggle-translation').querySelectorAll('path')).toHaveLength(1);
+  });
+
+  it('never lets the mode pill settle on the word-by-word door', () => {
+    // The reader's 'Words' navigates; it is not a rendering this screen has,
+    // so the wash must not park on it (owner, device, 2026-09-11).
+    const { onOpenWbw } = renderHeader();
+
+    fireEvent.click(screen.getByTestId('segment-wbw'));
+
+    expect(onOpenWbw).toHaveBeenCalled();
+    expect(screen.getByTestId('segment-translation').getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByTestId('segment-wbw').getAttribute('aria-selected')).toBe('false');
   });
 });

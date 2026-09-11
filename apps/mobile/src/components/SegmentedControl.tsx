@@ -6,7 +6,7 @@ import { GlassSurface } from './GlassSurface';
 import { PILL_SETTLE_MS, PILL_SPRING, SEGMENT_GAP, pillOffset, segmentWidth } from '@/motion/segmentedPill';
 import { useReducedMotion } from '@/motion/useReducedMotion';
 import { usePressScale } from '@/motion/usePressScale';
-import { radii, touchTargets, typography } from '@/theme/tokens';
+import { radii, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -70,10 +70,14 @@ function Segment<T extends string>({
           flex: 1,
           alignItems: 'center',
           justifyContent: 'center',
-          // compact (40), not minimum (48): four segments cannot each be 48
-          // wide on a 390pt frame, and the guideline measures the row, which
-          // the padding below carries to 48.
-          minHeight: touchTargets.compact,
+          // 34, below even compact (40): four segments cannot each be 48 wide
+          // on a 390pt frame, and the guideline measures the ROW. The reader's
+          // mode row sits inside the header's own 10pt vertical padding and
+          // the browse rows inside their screen's, which carries the reachable
+          // target past 48 in every caller. Dropped from compact on the
+          // device (owner, 2026-09-11): at 40 plus 4pt of glass padding the
+          // pill was 48 tall and read as a second toolbar under the first.
+          minHeight: 34,
           paddingHorizontal: 8,
           borderRadius: radii.pill,
           // No background of its own any more: the wash is one pill that
@@ -186,7 +190,7 @@ export function SegmentedControl<T extends string>({
   const pillStyle = useAnimatedStyle(() => ({ transform: [{ translateX: offset.value }] }));
 
   return (
-    <GlassSurface radius="pill" style={{ padding: 4 }}>
+    <GlassSurface radius="pill" style={{ padding: 3 }}>
       {/* The label lives here rather than on each option: four segments each
           announcing "Browse by" is four swipes of the same words.
 
