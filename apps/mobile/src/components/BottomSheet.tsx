@@ -214,8 +214,15 @@ export function BottomSheet({ onClose, closeLabel, children }: BottomSheetProps)
               borderTopLeftRadius: 16,
               borderTopRightRadius: 16,
               paddingHorizontal: 20,
-              paddingTop: 12,
-              paddingBottom: 28,
+              // Owner, 2026-09-10, on the device: "remove these big padding on
+              // top word sheet. and note has both top and bottom big padding."
+              // The handle's own marginBottom is gone with it: the column's
+              // `gap` already separates it from the first row, so the two were
+              // stacking to 34dp under a 4dp bar. 8 + handle + gap puts the
+              // first row 26dp down, half of the 50 it was, and the 28 below
+              // was dead space under Save with the keyboard up.
+              paddingTop: 8,
+              paddingBottom: 16,
               gap: 14,
             },
             sheetStyle,
@@ -228,7 +235,6 @@ export function BottomSheet({ onClose, closeLabel, children }: BottomSheetProps)
               height: 4,
               borderRadius: 2,
               backgroundColor: theme.border,
-              marginBottom: 20,
             }}
           />
           {children}
