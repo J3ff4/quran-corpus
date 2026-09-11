@@ -81,6 +81,14 @@ function flattenStyle(style: unknown): Record<string, unknown> | undefined {
   return withBoxShadow(flat);
 }
 
+/** `includeFontPadding` as a string the DOM can hold, or undefined when the
+ *  style does not set it. See the attribute it feeds, in `host` below. */
+function includeFontPaddingOf(style: unknown): string | undefined {
+  const flat = flattenStyle(style) as Record<string, unknown> | undefined;
+  const value = flat?.includeFontPadding;
+  return value === undefined ? undefined : String(value);
+}
+
 /**
  * RN's shadow props expressed as a `boxShadow` the DOM can hold.
  *
@@ -94,14 +102,6 @@ function flattenStyle(style: unknown): Record<string, unknown> | undefined {
  * The value is not a faithful CSS rendering of RN's shadow model -- it does not
  * need to be. It only has to differ when the inputs differ.
  */
-/** `includeFontPadding` as a string the DOM can hold, or undefined when the
- *  style does not set it. See the attribute it feeds, in `host` below. */
-function includeFontPaddingOf(style: unknown): string | undefined {
-  const flat = flattenStyle(style) as Record<string, unknown> | undefined;
-  const value = flat?.includeFontPadding;
-  return value === undefined ? undefined : String(value);
-}
-
 function withBoxShadow(flat: Record<string, unknown> | undefined) {
   if (!flat) return flat;
   const { shadowOpacity, shadowRadius, shadowOffset, elevation } = flat;

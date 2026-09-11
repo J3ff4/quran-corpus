@@ -12,6 +12,21 @@ vi.mock('react-native-pager-view', async () => {
   return pagerViewMock();
 });
 
+const mocks = vi.hoisted(() => ({ pageProps: [] as Array<Record<string, unknown>> }));
+
+// Mocked only so the marks the pager hands DOWN are observable: with no client
+// the real page has no lines, so nothing it draws can show whether it was
+// given the reader's marks or the context's empty default.
+vi.mock('./MushafPage', async () => {
+  const React = await import('react');
+  return {
+    MushafPage: (props: Record<string, unknown>) => {
+      mocks.pageProps.push(props);
+      return React.createElement('div', { 'data-testid': 'page' });
+    },
+  };
+});
+
 // The page draws through expo-font, which dies at import under jsdom.
 vi.mock('@/mushaf/pageFont', () => ({
   useMushafPageFont: () => ({ family: 'QCF2106', ready: false, error: null }),
@@ -19,23 +34,30 @@ vi.mock('@/mushaf/pageFont', () => ({
 }));
 
 import { pagerCommandsOf, pagerPropsOf } from '@/testing/pagerHost';
+import { HighlightsProvider } from '@/mushaf/highlightsContext';
+import { MUSHAF_PAGE_MAX, MUSHAF_PAGE_MIN } from '@quran-corpus/data/mobile';
 
 import { MushafPager, WINDOW } from './MushafPager';
 
-afterEach(cleanup);
+/** The reader's marks at one step of the landing pulse. */
+const marks = (landingProgress: number) => ({
+  bookmarked: new Set<string>(),
+  landing: '2:255',
+  playing: null,
+  landingProgress,
+  pressed: null,
+});
+
+afterEach(() => {
+  cleanup();
+  mocks.pageProps = [];
+});
 
 const props = {
   client: null,
   initialPage: 106,
   width: 360,
   height: 720,
-  highlights: {
-    bookmarked: new Set<string>(),
-    landing: null,
-    playing: null,
-    landingProgress: 0,
-    pressed: null,
-  },
   ayahTexts: new Map<string, string>(),
   surahNames: new Map<number, string>(),
   juzByPage: new Map<number, number>(),
@@ -94,9 +116,13 @@ describe('MushafPager', () => {
   });
 
   it('does not rubber-band past the first or last page', () => {
-    // The mushaf has no cover to pull open, and the overdrag reads as a page
-    // that failed to turn.
-    expect(pagerPropsOf(render(<MushafPager {...props} />)).overdrag).toBe(false);
+    // The mushaf has no cover to pull open, and the stretch reads as a page
+    // that failed to turn. It must be overScrollMode, NOT `overdrag={false}`:
+    // that prop's Android setter is a bare `return` in 8.0.2, so it reads as
+    // this fix while leaving the stretch exactly where it was.
+    const pager = pagerPropsOf(render(<MushafPager {...props} />));
+    expect(pager.overScrollMode).toBe('never');
+    expect(pager.overdrag).toBeUndefined();
   });
 
   it('draws only a narrow window of pages, and moves it with the reader', () => {
@@ -181,17 +207,66 @@ describe('MushafPager', () => {
     expect(cell.props.children.type.$$typeof).toBe(Symbol.for('react.memo'));
   });
 
-  it('keeps every cell in the tree, sized, even when it draws nothing', () => {
-    // ViewPager2 pages by child index: a cell that collapses away shifts every
-    // page after it, so page 300 would no longer be page 300.
+  it('keeps every cell in the tree, even when it draws nothing', () => {
+    // ViewPager2 pages by child index: a cell that is not handed over shifts
+    // every page after it, so page 300 would no longer be page 300.
     const pager = pagerPropsOf(render(<MushafPager {...props} />));
-    const far = React.Children.toArray(pager.children)[0] as {
-      key: string | null;
-      props: { collapsable: boolean; style: { width: number; height: number }; children: unknown };
-    };
+    const cells = React.Children.toArray(pager.children) as {
+      props: { children: unknown };
+    }[];
 
-    expect(far.props.collapsable).toBe(false);
-    expect(far.props.style).toEqual({ width: 360, height: 720 });
-    expect(far.props.children).toBeNull();
+    expect(cells).toHaveLength(MUSHAF_PAGE_MAX - MUSHAF_PAGE_MIN + 1);
+    expect(cells[0]!.props.children).toBeNull();
+  });
+
+  it('does not re-render when only the marks change', () => {
+    // The pager hands PagerView all 604 children and PagerView is a plain
+    // React.Component, so one of its renders is a Children.map + cloneElement
+    // over every one of them. The landing pulse alone steps six times in
+    // ~900ms. The marks therefore travel by context, and the pager is memoised
+    // -- which only holds while no often-changing prop is passed to it.
+    const result = render(
+      <HighlightsProvider value={marks(0)}>
+        <MushafPager {...props} />
+      </HighlightsProvider>,
+    );
+    const before = pagerPropsOf(result).children;
+
+    result.rerender(
+      <HighlightsProvider value={marks(0.6)}>
+        <MushafPager {...props} />
+      </HighlightsProvider>,
+    );
+
+    // Same element array object: the pager never re-ran, so nothing rebuilt
+    // the 604 cells.
+    expect(pagerPropsOf(result).children).toBe(before);
+  });
+
+  it('hands the reader marks down to the pages that draw', () => {
+    // The other half of the context move: the pager stops re-rendering, so the
+    // ONLY path left from the reader's marks to a drawn page runs through
+    // PagerPage's useHighlights. Lose that and every page draws unmarked --
+    // no bookmark band, no landing pulse, no playing ayah -- while the pager's
+    // own props still look exactly right.
+    render(
+      <HighlightsProvider value={marks(0.6)}>
+        <MushafPager {...props} />
+      </HighlightsProvider>,
+    );
+
+    expect(mocks.pageProps).not.toHaveLength(0);
+    for (const page of mocks.pageProps) {
+      expect(page['highlights']).toMatchObject({ landing: '2:255', landingProgress: 0.6 });
+    }
+  });
+
+  it('clamps a page that is not a whole number in range', () => {
+    // initialPage reaches a native Int32 prop, and Math.min(Math.max(NaN)) is
+    // NaN -- which the range-only clamp let straight through.
+    expect(pagerPropsOf(render(<MushafPager {...props} initialPage={NaN} />)).initialPage).toBe(0);
+    expect(pagerPropsOf(render(<MushafPager {...props} initialPage={9000} />)).initialPage).toBe(
+      MUSHAF_PAGE_MAX - 1,
+    );
   });
 });

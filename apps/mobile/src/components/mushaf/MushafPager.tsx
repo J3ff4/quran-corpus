@@ -9,7 +9,7 @@ import {
 import type { MobileDataClient } from '@quran-corpus/mobile-data';
 
 import type { UiLocaleCode } from '@/i18n/languages';
-import type { HighlightInput } from '@/mushaf/highlights';
+import { useHighlights } from '@/mushaf/highlightsContext';
 import { useMushafPage } from '@/mushaf/useMushafPage';
 
 import { MushafPage } from './MushafPage';
@@ -26,9 +26,16 @@ const PAGES = Array.from(
  *  is about to see. */
 export const WINDOW = 1;
 
-/** Clamps a page arriving from a route param or the user DB. */
+/** The one page a number arriving from outside is allowed to mean.
+ *
+ *  Range AND integrality: this value reaches a native `Int32` prop, and
+ *  `Math.min(Math.max(NaN, 1), 604)` is `NaN`. The route param and the user DB
+ *  both hold integers today, so the guard is for the day one of them does not
+ *  -- and it is the same guard the focusPage effect below already applies. */
 const clampPage = (page: number) =>
-  Math.min(Math.max(page, MUSHAF_PAGE_MIN), MUSHAF_PAGE_MAX);
+  Number.isFinite(page)
+    ? Math.min(Math.max(Math.round(page), MUSHAF_PAGE_MIN), MUSHAF_PAGE_MAX)
+    : MUSHAF_PAGE_MIN;
 
 export interface MushafPagerProps {
   /** Null until the corpus DB is open; every page then loads its own rows. */
@@ -36,7 +43,6 @@ export interface MushafPagerProps {
   initialPage: number;
   width: number;
   height: number;
-  highlights: HighlightInput;
   /** Page-agnostic lookups, shared by every mounted page. See MushafPage. */
   ayahTexts: Map<string, string>;
   surahNames: Map<number, string>;
@@ -74,8 +80,19 @@ type PageProps = Omit<MushafPagerProps, 'initialPage' | 'onPageChange' | 'focusP
  *  turning to.
  */
 const PagerPage = memo(function PagerPage({ client, page, juzByPage, ...rest }: PageProps) {
+  // Context, not a prop: see HighlightsProvider. A mark change has to reach
+  // the pages that draw WITHOUT re-rendering the pager that holds all 604.
+  const highlights = useHighlights();
   const { lines } = useMushafPage(client, page);
-  return <MushafPage page={page} lines={lines} juz={juzByPage.get(page) ?? 0} {...rest} />;
+  return (
+    <MushafPage
+      page={page}
+      lines={lines}
+      juz={juzByPage.get(page) ?? 0}
+      highlights={highlights}
+      {...rest}
+    />
+  );
 });
 
 /**
@@ -104,14 +121,20 @@ const PagerPage = memo(function PagerPage({ client, page, juzByPage, ...rest }: 
  * needs a stable child list to page across) but only those within WINDOW of
  * the current page draw anything; the rest are empty, correctly-sized views.
  * That keeps exactly the three-page footprint the list's `windowSize` gave.
+ *
+ * **Memoised, and the marks arrive by context.** Because PagerView renders all
+ * 604 children on each of its own renders, the pager must not re-render for
+ * anything but a page turn or a resize -- so the one prop that changed often,
+ * `highlights`, moved to a context the drawn pages read directly (see
+ * HighlightsProvider). Every remaining prop is a stable reference from the
+ * reader, so `memo` here holds.
  */
-export function MushafPager({
+export const MushafPager = memo(function MushafPager({
   initialPage,
   onPageChange,
   focusPage = null,
   ...page
 }: MushafPagerProps) {
-  const { width, height } = page;
   const pagerRef = useRef<PagerView | null>(null);
   // Which pages draw. Separate from `settled` because it drives rendering and
   // therefore has to be state, where the settle guard must NOT re-render.
@@ -154,18 +177,22 @@ export function MushafPager({
       layoutDirection="rtl"
       offscreenPageLimit={WINDOW}
       onPageSelected={onPageSelected}
-      // No overdrag past page 1 or 604: the mushaf has no cover to pull open,
-      // and the rubber-band reads as a page that failed to turn.
-      overdrag={false}
+      // No stretch past page 1 or 604: the mushaf has no cover to pull open,
+      // and the rubber-band reads as a page that failed to turn. NOT
+      // `overdrag={false}` -- that prop's Android setter is a bare `return` in
+      // 8.0.2 (iOS only), so it reads as the fix while doing nothing.
+      overScrollMode="never"
     >
+      {/* Sized and flattening-proofed by the pager itself: PagerView wraps
+          every child in its own `collapsable={false}` View and appends
+          `StyleSheet.absoluteFill` to the child's style, so a width/height
+          here would be overridden and a collapsable here would guard a view
+          ViewPager2 never indexes. */}
       {PAGES.map((item) => (
-        // collapsable={false} because an empty View outside the window is
-        // exactly what Android's view flattening removes -- and ViewPager2
-        // pages by child index, so a removed child shifts every page after it.
-        <View key={item} collapsable={false} style={{ width, height }}>
+        <View key={item}>
           {Math.abs(item - current) <= WINDOW ? <PagerPage page={item} {...page} /> : null}
         </View>
       ))}
     </PagerView>
   );
-}
+});

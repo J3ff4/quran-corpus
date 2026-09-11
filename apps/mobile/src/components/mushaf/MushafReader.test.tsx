@@ -20,9 +20,15 @@ const mocks = vi.hoisted(() => ({
 // what the pager is handed.
 vi.mock('./MushafPager', async () => {
   const React = await import('react');
+  const { useHighlights } = await import('@/mushaf/highlightsContext');
   return {
+    // `highlights` is recorded off the CONTEXT, not off the props: the marks
+    // reach the drawn pages that way so the real pager can stay memoised
+    // (see HighlightsProvider). Reading it from inside the pager's own
+    // position in the tree is what keeps these assertions honest -- drop the
+    // provider and every one of them sees the context's empty default.
     MushafPager: (props: Record<string, unknown>) => {
-      mocks.pagerProps.push(props);
+      mocks.pagerProps.push({ ...props, highlights: useHighlights() });
       return React.createElement('div', { 'data-testid': 'pager' });
     },
   };
