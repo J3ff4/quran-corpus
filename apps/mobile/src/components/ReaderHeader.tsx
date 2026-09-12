@@ -278,31 +278,39 @@ export function ReaderHeader({
                 }}
               >
                 {/* The glyph itself carries the state, not only its colour
-                    (WCAG 1.4.1): ON draws the Latin line under the Arabic
-                    stroke, OFF drops it. */}
+                    (WCAG 1.4.1): OFF is the same mark struck through. */}
                 <Icon
-                  name={showTranslation ? 'translationOn' : 'translationOff'}
+                  name={showTranslation ? 'translate' : 'translateOff'}
                   color={showTranslation ? theme.accent : theme.mutedText}
                 />
               </Pressable>
             ) : null}
             <SearchHeaderButton uiLocale={uiLocale} onPress={onOpenSearch} />
-            {showTranslation ? (
-              <Pressable
-                testID="open-language"
-                accessibilityRole="button"
-                accessibilityLabel={t(uiLocale, 'reader.chooseLanguage')}
-                onPress={onOpenLanguage}
-                style={{
-                  minHeight: touchTargets.minimum,
-                  minWidth: touchTargets.minimum,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Icon name="translate" color={theme.accent} />
-              </Pressable>
-            ) : null}
+            {/* Always here, translation on or off (owner, 2026-09-12). It used
+                to be hidden while the translation was off, on the rule that a
+                picker changing nothing visible is a dead control -- but a
+                control that vanishes reflows the row under the thumb and
+                leaves no way to say "show me this in Uzbek" in one move. It is
+                not dead now: picking a language while the translation is off
+                turns the translation back on, so the choice is always visible
+                the moment it is made. */}
+            <Pressable
+              testID="open-language"
+              accessibilityRole="button"
+              accessibilityLabel={t(uiLocale, 'reader.chooseLanguage')}
+              onPress={() => {
+                if (!showTranslation) onChangeShowTranslation?.(true);
+                onOpenLanguage();
+              }}
+              style={{
+                minHeight: touchTargets.minimum,
+                minWidth: touchTargets.minimum,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Icon name="globe" color={theme.accent} />
+            </Pressable>
           </View>
         </Collapsible>
       </GlassSurface>
