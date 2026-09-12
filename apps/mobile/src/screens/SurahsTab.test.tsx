@@ -366,6 +366,22 @@ describe('SurahsTab', () => {
     expect(screen.getByTestId('browse-section-Meccan').textContent).toContain('1');
   });
 
+  it('sets the revealed rows in the calligraphic face, like the surah index', async () => {
+    // The same 114 surahs in another order (owner, 2026-09-12). Set in one
+    // face here and another there, the two lists read as unrelated.
+    render(<SurahsTab />);
+    await screen.findByText('Al-Fatihah');
+
+    fireEvent.click(screen.getByTestId('segment-revealed'));
+
+    const arabic = await screen.findByTestId('browse-arabic-revealed-96');
+    // V4, not V2: V2 has no glyph for surah 102.
+    expect(arabic.style.fontFamily).toContain('SurahNameV4');
+    // The glyph for surah 96, not `nameArabic` -- which this face has no
+    // glyph for at all, so the row would draw tofu.
+    expect(arabic.textContent).toBe(String.fromCodePoint(0xe000 + 96));
+  });
+
   it('announces the era count that the header button hides', async () => {
     // The count renders as a non-focusable child of the header button, so a
     // screen reader stops at the button's label and never reaches it. A

@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
+import { surahNameGlyph } from '@quran-corpus/config/ornaments/surahName';
 
 import { BrowseList, type BrowseItem, type BrowseSection } from '@/components/BrowseList';
 import { SegmentedControl } from '@/components/SegmentedControl';
@@ -258,7 +259,13 @@ export function SurahsScreen() {
         testID: `browse-revealed-${entry.surahId}`,
         leading: String(entry.orderNumber),
         title: entry.nameTranslit,
-        arabic: entry.nameArabic,
+        // The calligraphic glyph, as the surah index draws it: these rows are
+        // the same 114 surahs in another order, and a name set in one face
+        // here and another there reads as two different lists.
+        arabic: surahNameGlyph(entry.surahId),
+        arabicFace: 'surahName' as const,
+        // Load-bearing beside a glyph: a PUA codepoint announces as nothing,
+        // so this label is the whole row for TalkBack.
         accessibilityLabel: `${entry.orderNumber}, ${entry.nameTranslit}, ${title}`,
         onPress: () => openAyah(entry.surahId, 1),
       };
