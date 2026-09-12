@@ -103,13 +103,36 @@ describe('ReaderHeader', () => {
     expect(screen.getByTestId('toggle-translation').getAttribute('aria-checked')).toBe('false');
   });
 
-  it('hides the language control when the translation is off', () => {
-    // A picker that changes nothing visible is a dead control.
+  it('keeps the language control when the translation is off', () => {
+    // It used to be hidden here, on the rule that a picker changing nothing
+    // visible is a dead control (owner reversed it, 2026-09-12). A control
+    // that vanishes reflows the row under the thumb mid-tap.
     renderHeader({ showTranslation: false });
     openActions();
 
-    expect(screen.queryByTestId('open-language')).toBeNull();
+    expect(screen.getByTestId('open-language')).toBeTruthy();
     expect(screen.getByTestId('toggle-translation')).toBeTruthy();
+  });
+
+  it('turns the translation on when a language is picked while it is off', () => {
+    // What keeps the control above from being the dead one the old rule
+    // warned about: the language chosen is visible the moment it is chosen.
+    const { onChangeShowTranslation, onOpenLanguage } = renderHeader({ showTranslation: false });
+    openActions();
+
+    fireEvent.click(screen.getByTestId('open-language'));
+
+    expect(onChangeShowTranslation).toHaveBeenCalledWith(true);
+    expect(onOpenLanguage).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not re-assert the translation when it is already on', () => {
+    const { onChangeShowTranslation } = renderHeader({ showTranslation: true });
+    openActions();
+
+    fireEvent.click(screen.getByTestId('open-language'));
+
+    expect(onChangeShowTranslation).not.toHaveBeenCalled();
   });
 
   it('names the surah in the bar for a screen reader even while it is faded out', () => {
@@ -259,20 +282,19 @@ describe('ReaderHeader', () => {
     expect(screen.getByTestId('reader-actions').getAttribute('aria-label')).toBe('Hide actions');
   });
 
-  it('draws the translation switch as the script it is showing', () => {
-    // Colour alone is not a state (WCAG 1.4.1): the glyph itself changes. ON
-    // draws the Latin line under the Arabic stroke, OFF drops it -- so the
-    // path count is the state, and it is the one thing a colour swap cannot
-    // fake.
+  it('strikes the translation switch through when it is off', () => {
+    // Colour alone is not a state (WCAG 1.4.1): OFF is the same A-plus-CJK
+    // mark with a slash across it, so the extra path IS the state, and it is
+    // the one thing a colour swap cannot fake.
     renderHeader({ showTranslation: true });
     openActions();
-    expect(screen.getByTestId('toggle-translation').querySelectorAll('path')).toHaveLength(2);
+    expect(screen.getByTestId('toggle-translation').querySelectorAll('path')).toHaveLength(6);
 
     cleanup();
 
     renderHeader({ showTranslation: false });
     openActions();
-    expect(screen.getByTestId('toggle-translation').querySelectorAll('path')).toHaveLength(1);
+    expect(screen.getByTestId('toggle-translation').querySelectorAll('path')).toHaveLength(7);
   });
 
   it('never lets the mode pill settle on the word-by-word door', () => {
