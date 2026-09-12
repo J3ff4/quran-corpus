@@ -103,6 +103,10 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
       // Not setSurah(): that one opens a surah at its beginning, and this one
       // was asked for an ayah.
       setPage({ key: `${targetSurah}:${initialFrom}`, from: ayahNumber });
+      // What setFrom does on the in-surah arm, and the reason D46 gives for it:
+      // the ayah carries between renderings. Without it, jumping from 2:5 to
+      // 3:12 here and going back to the reader opened surah 3 at its top.
+      setReaderPosition(targetSurah, ayahNumber);
       return;
     }
     setFrom(ayahNumber);
@@ -275,7 +279,10 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
             <Pressable
               testID="wbw-surah-jump"
               accessibilityRole="button"
-              accessibilityLabel={t(uiLocale, 'jump.surahTitle')}
+              // The name first: a Pressable is `accessible` by default and
+              // collapses its children, so the Text below -- heading role and
+              // all -- is not announced and this label is the whole utterance.
+              accessibilityLabel={`${view.surah.name_translit}, ${t(uiLocale, 'jump.surahTitle')}`}
               onPress={() => setJumpOpen(true)}
               style={(state) => [
                 pressStyle(state),
