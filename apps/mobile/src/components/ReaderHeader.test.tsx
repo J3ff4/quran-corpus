@@ -130,6 +130,18 @@ describe('ReaderHeader', () => {
     expect(onOpenJump).toHaveBeenCalledTimes(1);
   });
 
+  it('still announces the surah name now that the name is a control', () => {
+    // A Pressable is `accessible` by default and collapses its descendants, so
+    // the Animated.Text is no longer announced and the label is the whole
+    // utterance. Left as the action alone, wrapping the name in a control took
+    // the surah name away from TalkBack entirely.
+    renderHeader({ titleVisible: true, onOpenJump: vi.fn() });
+
+    expect(screen.getByTestId('reader-surah-jump').getAttribute('aria-label')).toBe(
+      'Al-Baqarah, Go to surah',
+    );
+  });
+
   it('does not take a tap while the name is faded out', () => {
     // The name is animated to opacity 0 until the list's own heading scrolls
     // off (M7e). A control that still takes presses there is an invisible hit

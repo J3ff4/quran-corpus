@@ -154,7 +154,13 @@ export function ReaderHeader({
           <Pressable
             testID="reader-surah-jump"
             accessibilityRole="button"
-            accessibilityLabel={t(uiLocale, 'jump.surahTitle')}
+            // The NAME first, then what pressing it does. A Pressable is
+            // `accessible` by default, which collapses its descendants -- so
+            // the Animated.Text below is no longer announced and this label is
+            // the entire utterance. Left as just the action, wrapping the name
+            // in a control silently took the surah name away from TalkBack,
+            // which is the opposite of what the note above promises.
+            accessibilityLabel={`${surahName}, ${t(uiLocale, 'jump.surahTitle')}`}
             disabled={!titleVisible || !onOpenJump}
             accessibilityElementsHidden={!titleVisible}
             importantForAccessibility={titleVisible ? 'auto' : 'no-hide-descendants'}

@@ -563,5 +563,21 @@ describe('word-by-word route', () => {
     fireEvent.click(screen.getByTestId('surah-jump-go'));
 
     await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenCalledWith({}, 3, 5));
+    // D46: the ayah carries between renderings. The in-surah arm publishes it
+    // through setFrom; this arm writes the page directly, so without a write of
+    // its own, going back to the reader opened surah 3 at its top.
+    expect(mocks.setReaderPosition).toHaveBeenCalledWith(3, 5);
+  });
+
+  it('names the surah in the jump control, not just what pressing it does', async () => {
+    // A Pressable is `accessible` by default and collapses its children, so the
+    // heading Text inside it is not announced -- this label is the whole
+    // utterance, and without the name the screen never says which surah it is.
+    render(<WbwRoute />);
+    await screen.findAllByTestId('wbw-cell');
+
+    expect(screen.getByTestId('wbw-surah-jump').getAttribute('aria-label')).toBe(
+      'Al-Baqarah, Go to surah',
+    );
   });
 });
