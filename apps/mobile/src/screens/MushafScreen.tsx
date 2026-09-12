@@ -59,9 +59,7 @@ export function MushafScreen() {
     uiLocale,
     contentLanguage,
     reciterId,
-    continuousPlay,
     setReciterId,
-    setContinuousPlay,
   } = useAppSettings();
   const theme = useThemeColors();
   const [client, setClient] = useState<MobileDataClient | null>(null);
@@ -229,10 +227,16 @@ export function MushafScreen() {
 
   // The surah being recited, not the screen's -- a tab has none. `useRecitation`
   // reads `surah` when it starts an ayah rather than at mount, so moving it
-  // between ayahs is safe; continuous play still advances WITHIN a surah only,
-  // and stops at its last ayah exactly as the reader's does.
+  // between ayahs is safe.
+  //
+  // `continuous: true` unconditionally, NOT the saved setting (owner,
+  // 2026-09-12). The only control here is one button saying "Play this page",
+  // and a page is fifteen lines of ayahs -- a button making that promise and
+  // then stopping after the first one is broken however the setting reads. The
+  // setting still governs the reader, where play is a per-ayah control and
+  // "just this ayah" is a coherent thing to ask for.
   const audio = useRecitation(playing?.surahId ?? null, (playing ? (index.ayahCounts.get(playing.surahId) ?? 0) : 0), reciterId, {
-    continuous: continuousPlay,
+    continuous: true,
     ...(playing ? { surahName: index.surahNames.get(playing.surahId) ?? '' } : {}),
   });
 
@@ -302,10 +306,10 @@ export function MushafScreen() {
   // carry two surahs, so at those the hook will not advance and the screen has
   // to. Turn the page, then start whatever it begins once its rows arrive.
   useEffect(() => {
-    if (!audio.finished || !continuousPlay || currentPage === null) return;
+    if (!audio.finished || currentPage === null) return;
     setFocusPage(currentPage + 1);
     setPendingPlayPage(currentPage + 1);
-  }, [audio.finished, continuousPlay]);
+  }, [audio.finished]);
 
   useEffect(() => {
     // `currentPage === pendingPlayPage` is what keeps this off the page being
@@ -466,17 +470,12 @@ export function MushafScreen() {
         ayahNumber={audio.ayah}
         positionSec={audio.positionSec}
         durationSec={audio.durationSec}
-        continuous={audio.continuous}
         reciterLabel={reciterById(reciterId)?.label ?? ''}
         uiLocale={uiLocale}
         onTogglePlay={onTogglePlay}
         onSkipNext={audio.skipNext}
         onSkipPrevious={audio.skipPrevious}
         onSeek={audio.seekTo}
-        // Straight to the setting, like the reader's: the bar and the Settings
-        // switch are two views of one stored value, not two toggles to keep in
-        // step.
-        onToggleContinuous={() => setContinuousPlay(!continuousPlay)}
         onOpenReciters={() => setReciterOpen(true)}
         bottomOffset={tabBarTop + 8}
       />

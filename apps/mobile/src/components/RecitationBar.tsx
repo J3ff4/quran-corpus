@@ -60,14 +60,19 @@ export interface RecitationBarProps {
   positionSec: number;
   /** NaN until the track reports one. */
   durationSec: number;
-  continuous: boolean;
+  /** Omitted together with `onToggleContinuous`, and then there is no repeat
+   *  button at all. */
+  continuous?: boolean;
   reciterLabel: string;
   onTogglePlay: () => void;
   onSkipNext: () => void;
   onSkipPrevious: () => void;
   /** Absolute seconds, never a 0..1 fraction. */
   onSeek: (sec: number) => void;
-  onToggleContinuous: () => void;
+  /** Omitted hides the repeat button. The mushaf plays a page through whatever
+   *  the setting says, so a toggle there would be a control that changes
+   *  nothing the reader can hear on this screen. */
+  onToggleContinuous?: (() => void) | undefined;
   /** Omitted renders the reciter name as plain text rather than a control.
    *  The picker arrives in M6f task 5; until then there is nothing for a tap
    *  to open, and a button that does nothing is worse than a label. */
@@ -95,7 +100,7 @@ export function RecitationBar({
   playing,
   positionSec,
   durationSec,
-  continuous,
+  continuous = false,
   reciterLabel,
   onTogglePlay,
   onSkipNext,
@@ -198,13 +203,15 @@ export function RecitationBar({
             </Text>
             <ReciterLabel label={reciterLabel} uiLocale={uiLocale} onPress={onOpenReciters} />
           </View>
-          <TransportButton
-            icon="repeat"
-            label={t(uiLocale, 'reader.continuous')}
-            color={continuous ? theme.accent : theme.mutedText}
-            selected={continuous}
-            onPress={onToggleContinuous}
-          />
+          {onToggleContinuous ? (
+            <TransportButton
+              icon="repeat"
+              label={t(uiLocale, 'reader.continuous')}
+              color={continuous ? theme.accent : theme.mutedText}
+              selected={continuous}
+              onPress={onToggleContinuous}
+            />
+          ) : null}
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Text testID="recitation-elapsed" style={{ color: theme.mutedText, fontSize: typography.caption }}>

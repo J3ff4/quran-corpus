@@ -40,14 +40,12 @@ export interface MushafPlayerProps {
   positionSec: number;
   /** NaN until the track reports one. */
   durationSec: number;
-  continuous: boolean;
   reciterLabel: string;
   uiLocale: UiLocaleCode;
   onTogglePlay: () => void;
   onSkipNext: () => void;
   onSkipPrevious: () => void;
   onSeek: (sec: number) => void;
-  onToggleContinuous: () => void;
   onOpenReciters: () => void;
   /** Where the tab pill's top edge is, so the player docks above it. Measured
    *  by the screen: the tab bar's height is not exported, and a constant here
@@ -75,14 +73,12 @@ export function MushafPlayer({
   ayahNumber,
   positionSec,
   durationSec,
-  continuous,
   reciterLabel,
   uiLocale,
   onTogglePlay,
   onSkipNext,
   onSkipPrevious,
   onSeek,
-  onToggleContinuous,
   onOpenReciters,
   bottomOffset,
 }: MushafPlayerProps) {
@@ -174,14 +170,12 @@ export function MushafPlayer({
                 playing={playing}
                 positionSec={positionSec}
                 durationSec={durationSec}
-                continuous={continuous}
                 reciterLabel={reciterLabel}
                 uiLocale={uiLocale}
                 onTogglePlay={onTogglePlay}
                 onSkipNext={onSkipNext}
                 onSkipPrevious={onSkipPrevious}
                 onSeek={onSeek}
-                onToggleContinuous={onToggleContinuous}
                 onOpenReciters={onOpenReciters}
               />
             </View>

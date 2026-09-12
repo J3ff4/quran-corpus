@@ -571,7 +571,6 @@ describe('MushafScreen', () => {
     mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
     mocks.pageLines.set(106, [{ words: [{ surahId: 4, ayahNumber: 176, position: 1 }] }]);
     mocks.pageLines.set(107, [{ words: [{ surahId: 5, ayahNumber: 1, position: 1 }] }]);
-    mocks.continuousPlay = true;
     const props = await renderScreen();
     pressPlay();
     mocks.toggleAyah.mockClear();
@@ -586,17 +585,27 @@ describe('MushafScreen', () => {
     expect(mocks.toggleAyah).toHaveBeenCalledWith(1, 5);
   });
 
-  it('does not run on past a surah when continuous is off', async () => {
-    // Finishing an ayah with the setting off is where recitation is meant to
-    // stop. Turning the page there would be the app deciding to keep reading.
+  it('plays the page through with the continuous setting off', async () => {
+    // The setting governs the reader, where play is a per-ayah control. Here
+    // the only control says "Play this page", and a page is fifteen lines of
+    // ayahs -- so it plays them, and the seam is turned at whatever the switch
+    // in Settings reads.
+    mocks.continuousPlay = false;
     mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
     mocks.pageLines.set(106, [{ words: [{ surahId: 4, ayahNumber: 176, position: 1 }] }]);
     const props = await renderScreen();
     pressPlay();
 
+    expect(mocks.useRecitation).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ continuous: true }),
+    );
+
     await park(props, { ayah: 176, playing: false, finished: true });
 
-    expect(props()['focusPage']).toBeNull();
+    expect(props()['focusPage']).toBe(107);
   });
 
   it('carries every bookmark, not one surah-s worth', async () => {
