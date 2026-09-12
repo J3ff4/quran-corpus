@@ -450,5 +450,20 @@ export function useRecitation(
     };
   }, []);
 
-  return { ...state, continuous, toggleAyah, seekTo, skipNext, skipPrevious };
+  return {
+    ...state,
+    continuous,
+    // The ayah ran out rather than being stopped. A pause and a finish both
+    // report `playing: false` with the ayah still parked, so nothing outside
+    // could tell them apart -- and the mushaf has to, because the end of a
+    // surah is where continuous play stops and its page still has to turn.
+    //
+    // A ref read at render, not state: it is only ever written beside a
+    // setState, so the render that observes the stop observes this too.
+    finished: finishedRef.current,
+    toggleAyah,
+    seekTo,
+    skipNext,
+    skipPrevious,
+  };
 }

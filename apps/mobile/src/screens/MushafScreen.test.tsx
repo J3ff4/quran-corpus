@@ -36,9 +36,10 @@ const mocks = vi.hoisted(() => ({
   toggleAyah: vi.fn(),
   // The hook's two facts are separate on purpose: `ayah` is what the player is
   // parked on and outlives a pause, `playing` is whether sound is coming out.
-  audio: { ayah: null as number | null, playing: false },
+  audio: { ayah: null as number | null, playing: false, finished: false },
   loadWordSummary: vi.fn(),
   loadFails: false,
+  continuousPlay: false,
   focusTeardowns: [] as Array<() => void>,
   hideChrome: vi.fn(),
   releaseChrome: vi.fn(),
@@ -156,7 +157,7 @@ vi.mock('@/settings/settingsStore', () => ({
     uiLocale: 'en',
     contentLanguage: 'en',
     reciterId: 'husary',
-    continuousPlay: false,
+    continuousPlay: mocks.continuousPlay,
   }),
 }));
 
@@ -184,13 +185,14 @@ beforeEach(() => {
   mocks.position = null;
   mocks.bookmarks = [];
   mocks.loadFails = false;
+  mocks.continuousPlay = false;
   mocks.focusTeardowns = [];
   mocks.appStateListeners = [];
   mocks.recordReadingPosition.mockClear();
   mocks.hideChrome.mockClear();
   mocks.releaseChrome.mockClear();
   mocks.toggleAyah.mockClear();
-  mocks.audio = { ayah: null, playing: false };
+  mocks.audio = { ayah: null, playing: false, finished: false };
 });
 
 afterEach(cleanup);
@@ -212,9 +214,9 @@ function player() {
  *  reporting the page it is already on is the smallest such nudge. */
 async function park(
   props: () => Record<string, unknown>,
-  audio: { ayah: number; playing: boolean },
+  audio: { ayah: number; playing: boolean; finished?: boolean },
 ) {
-  mocks.audio = audio;
+  mocks.audio = { finished: false, ...audio };
   await act(async () => {
     (props()['onPageChange'] as (page: number) => void)(
       (props()['initialPage'] as number),
@@ -514,6 +516,87 @@ describe('MushafScreen', () => {
 
     expect(player()['playing']).toBe(false);
     expect(player()['ayahNumber']).toBe(83);
+  });
+
+  it('turns the page when the playhead runs off it', async () => {
+    // The mushaf follows the voice: continuous has advanced past the last
+    // ayah printed here, so the page has to catch up.
+    mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
+    mocks.pageLines.set(106, [{ words: [{ surahId: 5, ayahNumber: 83, position: 1 }] }]);
+    const props = await renderScreen();
+    pressPlay();
+
+    await park(props, { ayah: 90, playing: true });
+
+    expect(props()['focusPage']).toBe(107);
+  });
+
+  it('does not turn the page for an ayah still printed on it', async () => {
+    // Continuous advances ayah by ayah, and most of those advances stay on the
+    // page. A turn per ayah would flip a whole juz during one page's recitation.
+    mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
+    mocks.pageLines.set(106, [
+      { words: [{ surahId: 5, ayahNumber: 83, position: 1 }] },
+      { words: [{ surahId: 5, ayahNumber: 84, position: 1 }] },
+    ]);
+    const props = await renderScreen();
+    pressPlay();
+
+    await park(props, { ayah: 84, playing: true });
+
+    expect(props()['focusPage']).toBeNull();
+  });
+
+  it('leaves the page alone once the reader swipes away mid-recitation', async () => {
+    // The pager is the truth about which page is in view. A swipe leaves the
+    // playhead on an ayah the new page does not carry -- the very state the
+    // auto-turn reacts to -- so watching the page's rows here would drag the
+    // reader forward again with every swipe.
+    mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
+    mocks.pageLines.set(106, [{ words: [{ surahId: 5, ayahNumber: 83, position: 1 }] }]);
+    mocks.pageLines.set(1, [{ words: [{ surahId: 1, ayahNumber: 1, position: 1 }] }]);
+    const props = await renderScreen();
+    pressPlay();
+    await park(props, { ayah: 83, playing: true });
+
+    turnTo(props, 1);
+
+    expect(props()['focusPage']).toBeNull();
+  });
+
+  it('carries the recitation over a surah seam the hook stops at', async () => {
+    // `useRecitation` stops at the last ayah of a surah by design -- wrapping
+    // would restart al-Fatiha behind a locked screen. 51 pages carry two
+    // surahs, so at those the hook will not advance and the screen must.
+    mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
+    mocks.pageLines.set(106, [{ words: [{ surahId: 4, ayahNumber: 176, position: 1 }] }]);
+    mocks.pageLines.set(107, [{ words: [{ surahId: 5, ayahNumber: 1, position: 1 }] }]);
+    mocks.continuousPlay = true;
+    const props = await renderScreen();
+    pressPlay();
+    mocks.toggleAyah.mockClear();
+
+    // The surah ran out: parked on its last ayah, silent, and finished.
+    await park(props, { ayah: 176, playing: false, finished: true });
+    expect(props()['focusPage']).toBe(107);
+
+    // ...and the pager arrives, which is when the next page's rows do.
+    turnTo(props, 107);
+
+    expect(mocks.toggleAyah).toHaveBeenCalledWith(1, 5);
+  });
+
+  it('does not run on past a surah when continuous is off', async () => {
+    // Finishing an ayah with the setting off is where recitation is meant to
+    // stop. Turning the page there would be the app deciding to keep reading.
+    mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
+    mocks.pageLines.set(106, [{ words: [{ surahId: 4, ayahNumber: 176, position: 1 }] }]);
+    const props = await renderScreen();
+    pressPlay();
+
+    await park(props, { ayah: 176, playing: false, finished: true });
+
+    expect(props()['focusPage']).toBeNull();
   });
 
   it('carries every bookmark, not one surah-s worth', async () => {

@@ -274,6 +274,55 @@ export function MushafScreen() {
     audio.toggleAyah(target.ayahNumber, target.surahId);
   }, [audio, playing, pageLines]);
 
+  // The page the recitation has asked for and is waiting on the rows of, so it
+  // can start that page's first ayah. Only set at a surah seam: everywhere
+  // else the hook runs on by itself and the page merely follows.
+  const [pendingPlayPage, setPendingPlayPage] = useState<number | null>(null);
+
+  // The page follows the voice.
+  //
+  // Keyed on the PLAYHEAD alone, deliberately. A dependency on the page's rows
+  // would turn a manual swipe into a page turn: swiping away mid-recitation
+  // leaves the playhead on an ayah the new page does not carry, which is
+  // exactly the state this effect reacts to. The pager is the truth about
+  // which page is in view; this is a request, and a finger outranks it.
+  useEffect(() => {
+    if (!audio.playing || playing === null || currentPage === null) return;
+    // No rows yet means the page is still arriving, not that the playhead has
+    // left it -- and a turn on that reading would run through the whole juz
+    // one page per query.
+    if (pageLines.length === 0) return;
+    if (ayahOnPage(pageLines, playing)) return;
+    setFocusPage(currentPage + 1);
+    // pageLines and currentPage are read, not watched: see above.
+  }, [playing?.surahId, playing?.ayahNumber, audio.playing]);
+
+  // The seam. `useRecitation` stops at the last ayah of a surah by design --
+  // wrapping would restart al-Fatiha behind a locked screen -- and 51 pages
+  // carry two surahs, so at those the hook will not advance and the screen has
+  // to. Turn the page, then start whatever it begins once its rows arrive.
+  useEffect(() => {
+    if (!audio.finished || !continuousPlay || currentPage === null) return;
+    setFocusPage(currentPage + 1);
+    setPendingPlayPage(currentPage + 1);
+  }, [audio.finished, continuousPlay]);
+
+  useEffect(() => {
+    // `currentPage === pendingPlayPage` is what keeps this off the page being
+    // left: until the pager reports the turn these rows are the old page's,
+    // and its first ayah is the one that has just finished.
+    if (pendingPlayPage === null || currentPage !== pendingPlayPage) return;
+    if (pageLines.length === 0) return;
+    setPendingPlayPage(null);
+    const target = firstAyahOnPage(pageLines);
+    // A page that begins nothing -- 2:282 alone fills more than one -- has
+    // nothing to start, and the recitation ends there rather than skipping an
+    // ayah the reader can see.
+    if (target === null) return;
+    setPlaying(target);
+    audio.toggleAyah(target.ayahNumber, target.surahId);
+  }, [pendingPlayPage, currentPage, pageLines]);
+
   const toggleBookmark = useCallback(
     async (target: { surahId: number; ayahNumber: number }) => {
       const key = ayahKey(target.surahId, target.ayahNumber);
