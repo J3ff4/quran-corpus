@@ -363,6 +363,21 @@ describe('SurahReader', () => {
 
   afterEach(cleanup);
 
+  it('crowns the surah plate with the calligraphic name, not the reading face', () => {
+    // Owner, 2026-09-12: the Arabic name on the plate is a title, not text to
+    // be read, and the index, the mushaf band and this plate now set it in
+    // one face.
+    render(<SurahReader {...baseProps(readerData(30))} />);
+
+    const name = screen.getByTestId('surah-plate-name');
+    // V4 for all 114: V2 has no glyph for surah 102 and draws a box.
+    expect(name.style.fontFamily).toContain('SurahNameV4');
+    expect(name.textContent).toBe(String.fromCodePoint(0xe000 + 2));
+    // A PUA codepoint announces as nothing at all, so without this the plate
+    // loses the Arabic name for a screen reader entirely.
+    expect(name.getAttribute('aria-label')).toBe('البقرة');
+  });
+
   it('uses the latest reading callback after rerender', () => {
     const firstHandler = vi.fn();
     const secondHandler = vi.fn();

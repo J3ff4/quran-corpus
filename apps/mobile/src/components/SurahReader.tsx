@@ -20,6 +20,7 @@ import {
 } from 'react-native-reanimated';
 import { router, useFocusEffect, useNavigation } from 'expo-router';
 import { reciterById, splitBasmala, type Word } from '@quran-corpus/data/mobile';
+import { surahNameGlyph } from '@quran-corpus/config/ornaments/surahName';
 import type { ReaderAyah, SurahReaderData, WordSummary } from '@/data/corpusRepository';
 import { getReaderPosition, setReaderPosition } from '@/data/readerPosition';
 import { useSurahAyahCounts } from '@/data/useSurahAyahCounts';
@@ -701,14 +702,30 @@ function AyahList({
                 the count and revelation type are a muted caption. */}
             <SurahPlate>
               <Text
+                testID="surah-plate-name"
+                // The calligraphic glyph, not `name_arabic` (owner, 2026-09-12).
+                // The plain Arabic name is a title here, not text to be read,
+                // and the index, the mushaf band and this plate now set it in
+                // one face. Announced as the real name: the glyph is a PUA
+                // codepoint, which announces as nothing at all.
+                accessibilityLabel={data.surah.name_arabic}
                 style={{
                   color: theme.text,
-                  fontFamily: fonts.arabic,
-                  fontSize: arabicSizes.banner,
+                  // V4 for all 114, never V2: V2 has no glyph for surah 102
+                  // and draws a box on At-Takathur.
+                  fontFamily: fonts.surahNameAlt,
+                  // The glyph draws the whole name as one piece of calligraphy
+                  // with a tail below the baseline, so it needs more box than
+                  // a banner-sized reading run before it clips. Tracks the
+                  // reader's Arabic size setting like everything else on the
+                  // plate.
+                  fontSize: Math.round(arabicSizes.banner * 1.5),
+                  lineHeight: Math.round(arabicSizes.banner * 2),
+                  textAlign: 'center',
                   writingDirection: 'rtl',
                 }}
               >
-                {data.surah.name_arabic}
+                {surahNameGlyph(data.surah.id)}
               </Text>
               <Text
                 accessibilityRole="header"
