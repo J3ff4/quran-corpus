@@ -22,6 +22,10 @@ vi.mock('react-native', async () => {
 
 const mocks = vi.hoisted(() => ({
   readerProps: [] as Array<Record<string, unknown>>,
+  playerProps: [] as Array<Record<string, unknown>>,
+  // The layout rows of whichever page is asked for. The index cannot say which
+  // ayah a page BEGINS -- that is the whole reason the screen reads the rows.
+  pageLines: new Map<number, Array<{ words: Array<{ surahId: number; ayahNumber: number; position: number }> }>>(),
   sheetProps: [] as Array<Record<string, unknown>>,
   position: null as { surahId: number; ayahNumber: number; page: number | null } | null,
   bookmarks: [] as { surahId: number; ayahNumber: number; note: string | null }[],
@@ -90,6 +94,24 @@ vi.mock('@/mushaf/chromeVisibility', () => ({
   useChromeVisible: () => true,
 }));
 vi.mock('@/components/mushaf/PageJumpSheet', () => ({ PageJumpSheet: () => null }));
+vi.mock('@/components/ReciterSheet', () => ({ ReciterSheet: () => null }));
+vi.mock('@/mushaf/useMushafPage', () => ({
+  useMushafPage: (_client: unknown, page: number) => ({
+    lines: mocks.pageLines.get(page) ?? [],
+    loading: false,
+    error: null,
+  }),
+}));
+// Captured rather than rendered, like the reader above. The player has its own
+// suite; what this screen decides is WHICH ayah its play button starts. Also
+// the only way to keep the real one out: it renders a RecitationBar, whose
+// gesture handler is not mocked here.
+vi.mock('@/components/mushaf/MushafPlayer', () => ({
+  MushafPlayer: (props: Record<string, unknown>) => {
+    mocks.playerProps.push(props);
+    return null;
+  },
+}));
 
 vi.mock('@/data/openCorpusDb', () => ({
   openCorpusDb: () => (mocks.loadFails ? Promise.reject(new Error('no db')) : Promise.resolve({})),
@@ -156,6 +178,8 @@ import { MushafScreen } from './MushafScreen';
 
 beforeEach(() => {
   mocks.readerProps = [];
+  mocks.playerProps = [];
+  mocks.pageLines = new Map();
   mocks.sheetProps = [];
   mocks.position = null;
   mocks.bookmarks = [];
@@ -175,6 +199,40 @@ async function renderScreen() {
   render(<MushafScreen />);
   await waitFor(() => expect(screen.getByTestId('mushaf-reader')).toBeTruthy());
   return () => mocks.readerProps.at(-1) ?? {};
+}
+
+/** The player's current props -- chiefly its `onTogglePlay`, which is the
+ *  compact bar's play button and so the whole of what starts a page. */
+function player() {
+  return mocks.playerProps.at(-1) ?? {};
+}
+
+/** Move the playhead and let the screen re-render against it. The hook is
+ *  mocked, so its value only changes when something else renders the screen --
+ *  reporting the page it is already on is the smallest such nudge. */
+async function park(
+  props: () => Record<string, unknown>,
+  audio: { ayah: number; playing: boolean },
+) {
+  mocks.audio = audio;
+  await act(async () => {
+    (props()['onPageChange'] as (page: number) => void)(
+      (props()['initialPage'] as number),
+    );
+  });
+}
+
+/** A swipe: the pager is the truth about which page is in view. */
+function turnTo(props: () => Record<string, unknown>, page: number) {
+  act(() => {
+    (props()['onPageChange'] as (page: number) => void)(page);
+  });
+}
+
+function pressPlay() {
+  act(() => {
+    (player()['onTogglePlay'] as () => void)();
+  });
 }
 
 describe('MushafScreen', () => {
@@ -369,6 +427,93 @@ describe('MushafScreen', () => {
     await act(async () => longPress(word, 9));
 
     expect(props()['playingAyah']).toBeNull();
+  });
+
+  it('starts the page at the first ayah that begins on it', async () => {
+    // The page opens on a tail carried over from the page before, and the tail
+    // is not what plays: its opening is on the page the reader is not looking
+    // at. Only the layout rows know -- the index's `startAyahNumber` IS that
+    // tail.
+    mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
+    mocks.pageLines.set(106, [
+      { words: [{ surahId: 5, ayahNumber: 82, position: 40 }] },
+      { words: [{ surahId: 5, ayahNumber: 83, position: 1 }] },
+      { words: [{ surahId: 5, ayahNumber: 84, position: 1 }] },
+    ]);
+    await renderScreen();
+
+    pressPlay();
+
+    expect(mocks.toggleAyah).toHaveBeenCalledWith(83, 5);
+  });
+
+  it('resumes the parked ayah instead of restarting the page', async () => {
+    // Pausing shrinks the player back to one line, so its play button IS the
+    // resume control. Without this, pause-then-play would throw the reader
+    // back to the top of the page and pausing would be a trap.
+    mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
+    mocks.pageLines.set(106, [
+      { words: [{ surahId: 5, ayahNumber: 82, position: 40 }] },
+      { words: [{ surahId: 5, ayahNumber: 83, position: 1 }] },
+      { words: [{ surahId: 5, ayahNumber: 84, position: 1 }] },
+    ]);
+    const props = await renderScreen();
+    pressPlay();
+    // Continuous has moved on an ayah and then been paused: the playhead is
+    // parked on 84, which is not the ayah this page begins.
+    await park(props, { ayah: 84, playing: false });
+    mocks.toggleAyah.mockClear();
+
+    pressPlay();
+
+    expect(mocks.toggleAyah).toHaveBeenCalledWith(84, 5);
+  });
+
+  it('starts the page over when the parked ayah is not printed here', async () => {
+    // Paused, then swiped on. Resuming an ayah that is not on the page in
+    // front of the reader would sound something they cannot see.
+    mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
+    mocks.pageLines.set(106, [{ words: [{ surahId: 5, ayahNumber: 83, position: 1 }] }]);
+    mocks.pageLines.set(107, [{ words: [{ surahId: 5, ayahNumber: 90, position: 1 }] }]);
+    const props = await renderScreen();
+    pressPlay();
+    await park(props, { ayah: 83, playing: false });
+    turnTo(props, 107);
+    mocks.toggleAyah.mockClear();
+
+    pressPlay();
+
+    expect(mocks.toggleAyah).toHaveBeenCalledWith(90, 5);
+  });
+
+  it('pauses the sounding ayah rather than starting the page again', async () => {
+    // The same button, and the same press, while sound is coming out: it has
+    // to reach the ayah being recited even when the reader has swiped to a
+    // page that begins somewhere else entirely.
+    mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
+    mocks.pageLines.set(106, [{ words: [{ surahId: 5, ayahNumber: 83, position: 1 }] }]);
+    mocks.pageLines.set(107, [{ words: [{ surahId: 5, ayahNumber: 90, position: 1 }] }]);
+    const props = await renderScreen();
+    pressPlay();
+    await park(props, { ayah: 83, playing: true });
+    turnTo(props, 107);
+    mocks.toggleAyah.mockClear();
+
+    pressPlay();
+
+    expect(mocks.toggleAyah).toHaveBeenCalledWith(83, 5);
+  });
+
+  it('hands the player the sound, not the parking spot', async () => {
+    // The player shrinks back to one line on `playing` alone. Given the parked
+    // ayah instead it would sit on the full transport for ever after the first
+    // play, since the parking spot outlives a pause on purpose.
+    mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
+    mocks.audio = { ayah: 83, playing: false };
+    await renderScreen();
+
+    expect(player()['playing']).toBe(false);
+    expect(player()['ayahNumber']).toBe(83);
   });
 
   it('carries every bookmark, not one surah-s worth', async () => {

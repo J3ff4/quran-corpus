@@ -6,6 +6,9 @@ import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } fr
 
 import { AyahControls } from '@/components/AyahControls';
 import { NoteEditor } from '@/components/NoteEditor';
+import { ReciterSheet } from '@/components/ReciterSheet';
+import { useTabBarTop } from '@/components/GlassTabBar';
+import { MushafPlayer } from '@/components/mushaf/MushafPlayer';
 import { MushafChrome } from '@/components/mushaf/MushafChrome';
 import { MushafReader } from '@/components/mushaf/MushafReader';
 import { PageJumpSheet, type JumpKind } from '@/components/mushaf/PageJumpSheet';
@@ -24,9 +27,12 @@ import {
 import { useUserDbOnFocus } from '@/data/useUserDbOnFocus';
 import { useWordSummaryLoader } from '@/data/useWordSummaryLoader';
 import { useRecitation } from '@/audio/ayahAudio';
+import { reciterById } from '@quran-corpus/data/mobile';
 import { t } from '@/i18n/uiStrings';
 import { ayahKey, type PressedWord } from '@/mushaf/highlights';
 import { useMushafIndex } from '@/mushaf/mushafReaderData';
+import { useMushafPage } from '@/mushaf/useMushafPage';
+import { ayahOnPage, firstAyahOnPage } from '@/mushaf/pageAudio';
 import { pageForAyah, pageForJump } from '@/mushaf/pageJump';
 import {
   hideChrome,
@@ -49,7 +55,14 @@ const FIRST_PAGE = 1;
  * count, its bookmarks -- was a surah-shaped answer to a page-shaped question.
  */
 export function MushafScreen() {
-  const { uiLocale, contentLanguage, reciterId, continuousPlay } = useAppSettings();
+  const {
+    uiLocale,
+    contentLanguage,
+    reciterId,
+    continuousPlay,
+    setReciterId,
+    setContinuousPlay,
+  } = useAppSettings();
   const theme = useThemeColors();
   const [client, setClient] = useState<MobileDataClient | null>(null);
   // Null until the saved position has been read AND resolved to a page. The
@@ -83,10 +96,26 @@ export function MushafScreen() {
   const bookmarkedKeys = useMemo(() => new Set(bookmarks.keys()), [bookmarks]);
   const index = useMushafIndex(client);
   const chromeVisible = useChromeVisible();
+  // Measured by the tab bar itself: its height is its icon, its label and its
+  // padding at whatever type scale the device is set to, and a player docked
+  // above a guessed one either overlaps the pill or floats over the page.
+  const tabBarTop = useTabBarTop();
   const [jumpOpen, setJumpOpen] = useState(false);
+  const [reciterOpen, setReciterOpen] = useState(false);
+  // The page the pager is actually on. Null until it reports its first turn:
+  // the reader takes `initialPage` at mount and never announces it, so
+  // `?? initialPage` is not a fallback but the answer for the opening page.
+  const [pageInView, setPageInView] = useState<number | null>(null);
   /** A page the reader has to be taken to without swiping there. */
   const [focusPage, setFocusPage] = useState<number | null>(null);
   const loadWordSummary = useWordSummaryLoader(client, null, contentLanguage);
+  // The page in view, as rows. The INDEX cannot answer what the player needs:
+  // `startAyahNumber` is the ayah a page opens in, which is a tail carried over
+  // from the page before on most pages. Only the layout says which ayah begins
+  // here. Held back until the opening page is known, so the cold start does not
+  // fetch page 1's rows on its way to the page the reader actually saved.
+  const currentPage = pageInView ?? initialPage;
+  const pageLines = useMushafPage(currentPage === null ? null : client, currentPage ?? FIRST_PAGE).lines;
   // Every bookmark, keyed by coordinate, re-read on every focus and resume.
   // The reader narrows its own to one surah because it only ever shows one; a
   // page can hold two, and the second surah's bookmarks are exactly what a
@@ -219,6 +248,32 @@ export function MushafScreen() {
     });
   }, [audio.ayah]);
 
+  // What the player's play button starts.
+  //
+  // The parked ayah resumes when it is printed on the page in front of the
+  // reader; anything else starts the page from the top. Both halves are
+  // load-bearing. Pausing shrinks the player back to one line, so this IS the
+  // resume control -- without the first case, pause-then-play would throw the
+  // reader back to the top of the page and pausing would be a trap. And
+  // without the second, a pause followed by two swipes would resume an ayah
+  // that is nowhere on the page they are looking at.
+  //
+  // Null target means a page that begins no ayah at all -- 2:282 alone fills
+  // more than a page -- and there is nothing there to start.
+  const onTogglePlay = useCallback(() => {
+    if (audio.playing && playing) {
+      audio.toggleAyah(playing.ayahNumber, playing.surahId);
+      return;
+    }
+    const target = playing && ayahOnPage(pageLines, playing) ? playing : firstAyahOnPage(pageLines);
+    if (target === null) return;
+    // The surah goes with the call, and the state beside it: `useRecitation`
+    // was rendered with the PREVIOUS `playing`, so the id it would infer on
+    // its own is a page behind.
+    setPlaying(target);
+    audio.toggleAyah(target.ayahNumber, target.surahId);
+  }, [audio, playing, pageLines]);
+
   const toggleBookmark = useCallback(
     async (target: { surahId: number; ayahNumber: number }) => {
       const key = ayahKey(target.surahId, target.ayahNumber);
@@ -347,11 +402,34 @@ export function MushafScreen() {
           // Cleared once the pager has arrived, or the next jump to the same
           // page would be a prop that never changes and so never moves it.
           setFocusPage(null);
+          setPageInView(page);
           onPageChange(page);
         }}
         onWordPress={onWordPress}
         onTap={toggleChrome}
         onLanded={noop}
+      />
+      <MushafPlayer
+        // Sounding, not parked. Keyed on the parked ayah the bar would never
+        // shrink back to one line: the parking spot outlives a pause on
+        // purpose, so that resuming knows where to go.
+        playing={audio.playing}
+        ayahNumber={audio.ayah}
+        positionSec={audio.positionSec}
+        durationSec={audio.durationSec}
+        continuous={audio.continuous}
+        reciterLabel={reciterById(reciterId)?.label ?? ''}
+        uiLocale={uiLocale}
+        onTogglePlay={onTogglePlay}
+        onSkipNext={audio.skipNext}
+        onSkipPrevious={audio.skipPrevious}
+        onSeek={audio.seekTo}
+        // Straight to the setting, like the reader's: the bar and the Settings
+        // switch are two views of one stored value, not two toggles to keep in
+        // step.
+        onToggleContinuous={() => setContinuousPlay(!continuousPlay)}
+        onOpenReciters={() => setReciterOpen(true)}
+        bottomOffset={tabBarTop + 8}
       />
       <MushafChrome
         visible={chromeVisible}
@@ -361,6 +439,17 @@ export function MushafScreen() {
       />
       {jumpOpen ? (
         <PageJumpSheet uiLocale={uiLocale} onClose={() => setJumpOpen(false)} onJump={onJump} />
+      ) : null}
+      {reciterOpen ? (
+        <ReciterSheet
+          current={reciterId}
+          uiLocale={uiLocale}
+          // The playhead is left alone. `useRecitation` reloads the source
+          // under the new voice at the next press, and a picker that restarted
+          // the ayah would punish a reader for browsing the list.
+          onSelect={setReciterId}
+          onClose={() => setReciterOpen(false)}
+        />
       ) : null}
       {editingNote ? (
         <NoteEditor

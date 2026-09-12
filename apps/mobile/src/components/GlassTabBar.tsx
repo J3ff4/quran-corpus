@@ -1,4 +1,5 @@
-import { Pressable, Text } from 'react-native';
+import { useSyncExternalStore } from 'react';
+import { Pressable, Text, type LayoutChangeEvent } from 'react-native';
 import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
 
 import { GlassSurface } from './GlassSurface';
@@ -47,6 +48,44 @@ const TABS: Record<string, { icon: IconName; label: UiStringKey }> = {
 };
 
 /**
+ * How far the tab pill's top edge sits above the bottom of the screen.
+ *
+ * Published rather than exported as a constant because it is measured: the
+ * pill's height is its icon, its label and its padding at whatever type scale
+ * the device is set to, and a bar docked above a guessed one either overlaps
+ * it or floats. Module state, like `chromeVisibility` next door and for the
+ * same reason -- the bar is rendered by the tabs navigator and the screen that
+ * has to clear it is rendered inside, so there is nothing above them both to
+ * hang a provider on.
+ *
+ * The seed is a plausible pill on a gesture-bar phone. It is only ever the
+ * value for the frames before the real bar has laid itself out, and anything
+ * docking above it corrects on the next frame.
+ */
+let tabBarTop = 84;
+const tabBarListeners = new Set<() => void>();
+
+function setTabBarTop(next: number) {
+  if (tabBarTop === next) return;
+  tabBarTop = next;
+  for (const listener of tabBarListeners) listener();
+}
+
+function subscribeTabBarTop(listener: () => void) {
+  tabBarListeners.add(listener);
+  return () => tabBarListeners.delete(listener);
+}
+
+/** Where a bar docking above the tab pill has to start. */
+export function useTabBarTop(): number {
+  return useSyncExternalStore(
+    subscribeTabBarTop,
+    () => tabBarTop,
+    () => tabBarTop,
+  );
+}
+
+/**
  * The floating glass pill that replaces the default tab bar.
  *
  * Rendered as `tabBar` rather than styled through `tabBarStyle`: the design
@@ -74,6 +113,12 @@ export function GlassTabBar({ state, navigation, insets }: GlassTabBarProps) {
   return (
     <Animated.View
       testID="tab-bar"
+      // Measured here rather than on the pill inside: this view wraps the pill
+      // exactly, and the translate that slides it away is a transform, which
+      // does not move layout. So the height stays right even mid-fade.
+      onLayout={(event: LayoutChangeEvent) =>
+        setTabBarTop(insets.bottom + 12 + event.nativeEvent.layout.height)
+      }
       // `none` and not `box-none` while hidden: a bar faded to nothing still
       // occupies the bottom of the screen, and the tap that is supposed to
       // bring it back would land on it instead of on the page.
