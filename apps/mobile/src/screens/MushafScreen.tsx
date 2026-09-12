@@ -337,7 +337,10 @@ export function MushafScreen() {
         initialPage={initialPage}
         landingAyah={null}
         bookmarkedKeys={bookmarkedKeys}
-        playingAyah={playing}
+        // Sounding, not parked: `playing` is the ayah the player sits ON and
+        // survives a pause, so passing it raw kept an ayah lit with nothing
+        // coming out of it. The reader draws the same distinction.
+        playingAyah={audio.playing ? playing : null}
         focusPage={focusPage}
         uiLocale={uiLocale}
         onPageChange={(page) => {
@@ -397,7 +400,12 @@ export function MushafScreen() {
                   note={
                     bookmarks.get(ayahKey(openMushafWord.surahId, openMushafWord.ayahNumber)) ?? null
                   }
+                  // `audio.playing` is the sound; `playing` is only which ayah
+                  // the player is parked on and stays put across a pause. Left
+                  // off, the sheet's control sat on Pause for ever once an
+                  // ayah had been pressed -- it paused, and said it had not.
                   playing={
+                    audio.playing &&
                     playing?.surahId === openMushafWord.surahId &&
                     playing.ayahNumber === openMushafWord.ayahNumber
                   }

@@ -30,6 +30,9 @@ const mocks = vi.hoisted(() => ({
   setBookmarkNote: vi.fn(),
   useRecitation: vi.fn(),
   toggleAyah: vi.fn(),
+  // The hook's two facts are separate on purpose: `ayah` is what the player is
+  // parked on and outlives a pause, `playing` is whether sound is coming out.
+  audio: { ayah: null as number | null, playing: false },
   loadWordSummary: vi.fn(),
   loadFails: false,
   focusTeardowns: [] as Array<() => void>,
@@ -112,7 +115,7 @@ vi.mock('@/data/userRepository', () => ({
 vi.mock('@/audio/ayahAudio', () => ({
   useRecitation: (...args: unknown[]) => {
     mocks.useRecitation(...args);
-    return { ayah: null, playing: false, toggleAyah: mocks.toggleAyah };
+    return { ...mocks.audio, toggleAyah: mocks.toggleAyah };
   },
 }));
 vi.mock('@/components/AyahControls', () => ({ AyahControls: () => null }));
@@ -163,6 +166,7 @@ beforeEach(() => {
   mocks.hideChrome.mockClear();
   mocks.releaseChrome.mockClear();
   mocks.toggleAyah.mockClear();
+  mocks.audio = { ayah: null, playing: false };
 });
 
 afterEach(cleanup);
@@ -312,6 +316,59 @@ describe('MushafScreen', () => {
     act(() => actions.props.onToggleAudio());
 
     expect(mocks.toggleAyah).toHaveBeenCalledWith(2, 5);
+  });
+
+  it('says the ayah is not playing once it is paused', async () => {
+    // The screen's `playing` is which ayah the player sits ON, and it survives
+    // a pause by design -- that is how resume knows where to go. Fed to the
+    // sheet as though it meant sound, the control sat on Pause for ever: it
+    // paused, and said it had not (owner, device, 2026-09-12).
+    mocks.position = { surahId: 4, ayahNumber: 176, page: 106 };
+    const props = await renderScreen();
+    const longPress = props()['onWordPress'] as (word: unknown, ayahId: number) => void;
+    const word = { surahId: 5, ayahNumber: 2, position: 1, charType: 'word', glyph: '' };
+    const controls = () =>
+      (mocks.sheetProps.at(-1)?.['ayahActions'] as { props: { playing: boolean } }).props;
+
+    mocks.audio = { ayah: 2, playing: true };
+    await act(async () => longPress(word, 9));
+    act(() => {
+      (mocks.sheetProps.at(-1)?.['ayahActions'] as { props: { onToggleAudio: () => void } }).props
+        .onToggleAudio();
+    });
+    // Re-opened rather than re-rendered by hand: the sheet's props are
+    // rebuilt on the press above, and this is the screen's own way there.
+    await act(async () => longPress(word, 9));
+    expect(controls().playing).toBe(true);
+
+    // The pause. `ayah` stays -- the player is still parked there.
+    mocks.audio = { ayah: 2, playing: false };
+    await act(async () => longPress(word, 9));
+
+    expect(controls().playing).toBe(false);
+  });
+
+  it('stops lighting the page-s ayah when the sound stops', async () => {
+    // With the player hidden alongside the chrome, this highlight is the only
+    // thing on screen saying audio is running. Left on the parked ayah it
+    // claimed a paused page was reciting.
+    mocks.position = { surahId: 4, ayahNumber: 176, page: 106 };
+    const props = await renderScreen();
+    const longPress = props()['onWordPress'] as (word: unknown, ayahId: number) => void;
+    const word = { surahId: 5, ayahNumber: 2, position: 1, charType: 'word', glyph: '' };
+
+    mocks.audio = { ayah: 2, playing: true };
+    await act(async () => longPress(word, 9));
+    act(() => {
+      (mocks.sheetProps.at(-1)?.['ayahActions'] as { props: { onToggleAudio: () => void } }).props
+        .onToggleAudio();
+    });
+    expect(props()['playingAyah']).not.toBeNull();
+
+    mocks.audio = { ayah: 2, playing: false };
+    await act(async () => longPress(word, 9));
+
+    expect(props()['playingAyah']).toBeNull();
   });
 
   it('carries every bookmark, not one surah-s worth', async () => {
