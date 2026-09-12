@@ -1574,6 +1574,34 @@ describe('SurahReader shared reading position', () => {
     expect(mocks.setReaderPosition).not.toHaveBeenCalled();
   });
 
+  it('lands a jump inside the surah being read, not the ayah it was read at', () => {
+    // getReaderPosition is the LIVE position, rewritten on every viewable-items
+    // change for the surah on screen. So for a jump INSIDE that surah it is
+    // always set -- an anchor reset that preferred it over the seed could never
+    // move, and asking for 2:255 from 2:3 left the reader exactly where it was.
+    const props = baseProps(readerData(300));
+    const { rerender } = render(<SurahReader {...props} initialAyahNumber={3} />);
+    mocks.scrollToIndex.mockClear();
+    mocks.getReaderPosition.mockReturnValue(3);
+
+    rerender(<SurahReader {...props} initialAyahNumber={255} />);
+
+    expect(mocks.scrollToIndex).toHaveBeenCalledWith({ index: 254, animated: false });
+  });
+
+  it('falls back to the saved position when the key changes with no seed', () => {
+    // The reason the fallback exists at all: a key change carrying no ayah of
+    // its own should open the surah where it was last read.
+    const props = baseProps(readerData(300));
+    const { rerender } = render(<SurahReader {...props} initialAyahNumber={3} />);
+    mocks.scrollToIndex.mockClear();
+    mocks.getReaderPosition.mockReturnValue(40);
+
+    rerender(<SurahReader {...props} initialAyahNumber={null} />);
+
+    expect(mocks.scrollToIndex).toHaveBeenCalledWith({ index: 39, animated: false });
+  });
+
   it('does not re-anchor when the store has nothing for this surah', () => {
     const props = baseProps(readerData(10));
     const { rerender } = render(<SurahReader {...props} />);
