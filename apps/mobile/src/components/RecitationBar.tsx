@@ -73,6 +73,12 @@ export interface RecitationBarProps {
    *  to open, and a button that does nothing is worse than a label. */
   onOpenReciters?: () => void;
   uiLocale: UiLocaleCode;
+  /** Omitted, the bar docks itself above the gesture bar -- which is what the
+   *  reader wants, since it is a stack screen with nothing under it. `false`
+   *  leaves it in its parent's flow: the mushaf stacks it above the floating
+   *  tab pill and inside its own grow animation, so the position is not this
+   *  component's to choose there. */
+  dock?: boolean;
 }
 
 /**
@@ -98,6 +104,7 @@ export function RecitationBar({
   onToggleContinuous,
   onOpenReciters,
   uiLocale,
+  dock = true,
 }: RecitationBarProps) {
   const theme = useThemeColors();
   const insets = useSafeAreaInsets();
@@ -151,7 +158,7 @@ export function RecitationBar({
 
   return (
     // The reader is a stack screen, so there is no tab pill to clear -- just
-    // the gesture bar.
+    // the gesture bar. Undocked, the parent has already placed it.
     <View
       testID="recitation-bar"
       // The label is here, not only on the button: "Pause" alone tells a
@@ -160,7 +167,7 @@ export function RecitationBar({
       // the buttons inside it (see rn-accessible-view-collapses-children).
       accessibilityLabel={`${ayahLabel} · ${action}`}
       pointerEvents="box-none"
-      style={{ position: 'absolute', left: 16, right: 16, bottom: insets.bottom + 12 }}
+      style={dock ? { position: 'absolute', left: 16, right: 16, bottom: insets.bottom + 12 } : undefined}
     >
       <GlassSurface docked radius="pill" style={{ paddingHorizontal: 14, paddingVertical: 10, gap: 6 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>

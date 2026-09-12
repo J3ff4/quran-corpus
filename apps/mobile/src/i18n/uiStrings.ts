@@ -12,6 +12,9 @@ export type UiStringKey =
   | 'mushaf.jumpJuz'
   | 'mushaf.jumpGo'
   | 'mushaf.jumpOutOfRange'
+  // The compact player's play button. Not "Play": it starts the page, which
+  // on 15 lines of glyphs is the fact worth announcing.
+  | 'mushaf.playPage'
   | 'jump.surahTitle'
   | 'jump.surah'
   | 'jump.ayah'
@@ -289,6 +292,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'mushaf.jumpJuz': 'Juz',
     'mushaf.jumpGo': 'Go',
     'mushaf.jumpOutOfRange': 'Nothing there. Page 1-604, surah 1-114, juz 1-30.',
+    'mushaf.playPage': 'Play this page',
     'jump.surahTitle': 'Go to surah',
     'jump.surah': 'Surah',
     'jump.ayah': 'Ayah',
@@ -510,6 +514,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'mushaf.jumpJuz': 'Juz',
     'mushaf.jumpGo': 'Oʻtish',
     'mushaf.jumpOutOfRange': 'Bunday joy yoʻq. Sahifa 1-604, sura 1-114, juz 1-30.',
+    'mushaf.playPage': 'Sahifani tinglash',
     'jump.surahTitle': 'Suraga oʻtish',
     'jump.surah': 'Sura',
     'jump.ayah': 'Oyat',
@@ -726,6 +731,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'mushaf.jumpJuz': 'Джуз',
     'mushaf.jumpGo': 'Перейти',
     'mushaf.jumpOutOfRange': 'Такого нет. Страница 1-604, сура 1-114, джуз 1-30.',
+    'mushaf.playPage': 'Слушать страницу',
     'jump.surahTitle': 'Перейти к суре',
     'jump.surah': 'Сура',
     'jump.ayah': 'Аят',
