@@ -82,6 +82,15 @@ export default function SurahRoute() {
   // SurahReader: that component is keyed by the displayed surah, so a jump
   // into another surah remounts the very thing holding the ayah it asked for.
   const [jump, setJump] = useState<{ surahId: number; ayahNumber: number } | null>(null);
+  // A new route target outranks a jump made under the old one. Without this the
+  // jump shadows it for good: SurahReader documents an `ayah` param change on an
+  // already-mounted reader as a supported path (an external deep link into the
+  // surah on screen), and a stale jump into the same surah still matched
+  // `displayedSurahId` -- jump to 2:10, then open a bookmark for 2:100, and 10
+  // won, then and for every later deep link into that surah.
+  useEffect(() => {
+    setJump(null);
+  }, [routeSurahId, routeAyahNumber]);
   // The jump wins over the route while it names the surah on screen: it is the
   // more recent of the two, and the route's own ayah belongs to how the reader
   // was opened.
