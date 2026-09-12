@@ -254,6 +254,10 @@ interface AyahListProps {
   onWordPress: (word: Word) => void;
   onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
   headerHeight: SharedValue<number>;
+  /** The header has been measured again. `headerHeight` is a shared value, so
+   *  a remeasure -- the Arabic font swapping in, the OS font scale changing --
+   *  reaches the worklet but tells the JS side nothing. */
+  onHeaderMeasured?: () => void;
   /** A sheet is over the reader, so this list must leave the TalkBack order. */
   sheetsOpen: boolean;
   barDocked: boolean;
@@ -297,6 +301,7 @@ function AyahList({
   onWordPress,
   onScroll,
   headerHeight,
+  onHeaderMeasured,
   sheetsOpen,
   barDocked,
 }: AyahListProps) {
@@ -416,7 +421,14 @@ function AyahList({
   if (anchor.key !== anchorKey) {
     setAnchor({
       key: anchorKey,
-      ayah: getReaderPosition(data.surah.id) ?? seedAyah,
+      // The seed FIRST, the saved position only as its fallback. The other way
+      // round, an in-surah jump could never land: getReaderPosition is the
+      // live position, rewritten on every onViewableItemsChanged for the surah
+      // on screen, so for a jump inside the surah being read it is always
+      // non-null and always won -- asking for 2:255 from 2:3 re-anchored to 3
+      // and the reader did not move. The saved position is for a key change
+      // that carries no seed at all (a page turn into a surah read before).
+      ayah: seedAyah ?? getReaderPosition(data.surah.id),
       nonce: anchor.nonce + 1,
     });
   }
@@ -680,6 +692,7 @@ function AyahList({
             onLayout={(event: LayoutChangeEvent) => {
               headerHeight.value = event.nativeEvent.layout.height;
               setHeaderOffset(event.nativeEvent.layout.height);
+              onHeaderMeasured?.();
             }}
             style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16 }}
           >
@@ -870,6 +883,25 @@ export function SurahReader({
   const [titleVisible, setTitleVisible] = useState(false);
   const titleVisibleRef = useRef(false);
 
+  // Off the same function the fade uses, and written only when it CHANGES -- a
+  // setState per scroll frame is the re-render `scrollY` exists to avoid.
+  // Twice per surah, at the two edges of the fade.
+  //
+  // Called from all three places an input to the fade can move, not just from
+  // the scroll: the header remeasures when the Arabic font swaps in or the OS
+  // font scale changes, and `reducedMotion` is a live setting. Either one
+  // moving alone would leave the guard disagreeing with what is on screen
+  // until the next scroll event -- a visible name that takes no press, or the
+  // invisible hit target the guard exists to prevent.
+  const syncTitleVisible = useCallback(() => {
+    const visible = titleOpacityAt(scrollY.value, headerHeight.value, reducedMotion) > 0;
+    if (visible === titleVisibleRef.current) return;
+    titleVisibleRef.current = visible;
+    setTitleVisible(visible);
+  }, [scrollY, headerHeight, reducedMotion]);
+
+  useEffect(syncTitleVisible, [syncTitleVisible]);
+
 
   const titleStyle = useAnimatedStyle(() => {
     const progress = titleOpacityAt(scrollY.value, headerHeight.value, reducedMotion);
@@ -955,17 +987,10 @@ export function SurahReader({
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       // A shared value, not state: this runs on every scroll frame and setting
       // state here re-rendered the whole navigator.
-      const offset = event.nativeEvent.contentOffset.y;
-      scrollY.value = offset;
-      // Off the same function the fade uses, and written only when it CHANGES
-      // -- a setState per scroll frame is the re-render the line above exists
-      // to avoid. Twice per surah, at the two edges of the fade.
-      const visible = titleOpacityAt(offset, headerHeight.value, reducedMotion) > 0;
-      if (visible === titleVisibleRef.current) return;
-      titleVisibleRef.current = visible;
-      setTitleVisible(visible);
+      scrollY.value = event.nativeEvent.contentOffset.y;
+      syncTitleVisible();
     },
-    [scrollY, headerHeight, reducedMotion],
+    [scrollY, syncTitleVisible],
   );
 
   // Read by fetchWordsRef, which is built once and so cannot close over a
@@ -1100,6 +1125,7 @@ export function SurahReader({
         onWordPress={onWordPress}
         onScroll={onScroll}
         headerHeight={headerHeight}
+        onHeaderMeasured={syncTitleVisible}
         sheetsOpen={Boolean(openWord) || languageOpen || reciterOpen}
         barDocked={barDocked}
       />
