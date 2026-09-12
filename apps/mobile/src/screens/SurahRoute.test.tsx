@@ -519,6 +519,23 @@ describe('SurahRoute', () => {
     expect(await screen.findByText('anchor:12')).toBeTruthy();
   });
 
+  it('lets a later deep link outrank a jump made before it', async () => {
+    // SurahReader treats an `ayah` param change on an already-mounted reader as
+    // a deep link into the surah on screen. A jump into the same surah still
+    // matched displayedSurahId, so it won over that param -- and, never being
+    // cleared, over every later deep link into the surah too.
+    mocks.params = { surahId: '2' };
+    const { rerender } = render(<SurahRoute />);
+    await screen.findByText('reader-content');
+    fireEvent.click(screen.getByText('jump here'));
+    await screen.findByText('anchor:255');
+
+    mocks.params = { surahId: '2', ayah: '100' };
+    rerender(<SurahRoute />);
+
+    expect(await screen.findByText('anchor:100')).toBeTruthy();
+  });
+
   it('drops a jump-s ayah when the reader is paged by a chevron', async () => {
     // A chevron opens a surah where a step opens one. Left standing, the jump
     // is still there when the reader is paged BACK into the surah it was made
