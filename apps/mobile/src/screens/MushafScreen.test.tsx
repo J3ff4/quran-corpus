@@ -96,13 +96,25 @@ vi.mock('@/mushaf/chromeVisibility', () => ({
 }));
 vi.mock('@/components/mushaf/PageJumpSheet', () => ({ PageJumpSheet: () => null }));
 vi.mock('@/components/ReciterSheet', () => ({ ReciterSheet: () => null }));
-vi.mock('@/mushaf/useMushafPage', () => ({
-  useMushafPage: (_client: unknown, page: number) => ({
-    lines: mocks.pageLines.get(page) ?? [],
-    loading: false,
-    error: null,
-  }),
-}));
+// Lagged, exactly like the real hook, and the lag is the point: rows are
+// fetched in an effect, so the render in which the pager reports a turn still
+// carries the PREVIOUS page's rows. A mock that answers from `page` directly
+// cannot see a player acting on the page it has just left.
+vi.mock('@/mushaf/useMushafPage', async () => {
+  const React = await import('react');
+  return {
+    useMushafPage: (_client: unknown, page: number) => {
+      const [state, setState] = React.useState<{
+        lines: Array<{ words: Array<{ surahId: number; ayahNumber: number; position: number }> }>;
+        page: number | null;
+      }>({ lines: [], page: null });
+      React.useEffect(() => {
+        setState({ lines: mocks.pageLines.get(page) ?? [], page });
+      }, [page]);
+      return { ...state, loading: false, error: null };
+    },
+  };
+});
 // Captured rather than rendered, like the reader above. The player has its own
 // suite; what this screen decides is WHICH ayah its play button starts. Also
 // the only way to keep the real one out: it renders a RecitationBar, whose
@@ -582,6 +594,29 @@ describe('MushafScreen', () => {
     // ...and the pager arrives, which is when the next page's rows do.
     turnTo(props, 107);
 
+    expect(mocks.toggleAyah).toHaveBeenCalledWith(1, 5);
+  });
+
+  it('starts the page it turned to, never the one it just left', async () => {
+    // The turn lands a render before the new page's rows do, so the screen is
+    // still holding the OLD page's. Acting on those restarts the ayah that
+    // just finished -- and then turns a page per ayah, because the playhead is
+    // never on the page in view. Observed on device: page 1 finished, turned
+    // to page 2, and recited al-Fatiha again there.
+    mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
+    mocks.pageLines.set(106, [{ words: [{ surahId: 4, ayahNumber: 176, position: 1 }] }]);
+    mocks.pageLines.set(107, [{ words: [{ surahId: 5, ayahNumber: 1, position: 1 }] }]);
+    const props = await renderScreen();
+    pressPlay();
+
+    await park(props, { ayah: 176, playing: false, finished: true });
+    mocks.toggleAyah.mockClear();
+    turnTo(props, 107);
+
+    // There is a render in which the pager reports 107 while the rows still
+    // say 106. Nothing may start off it -- 4:176 is the ayah that just
+    // finished, and restarting it is the loop the reader saw.
+    expect(mocks.toggleAyah).not.toHaveBeenCalledWith(176, 4);
     expect(mocks.toggleAyah).toHaveBeenCalledWith(1, 5);
   });
 

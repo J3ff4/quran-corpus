@@ -4,6 +4,15 @@ import type { MobileDataClient } from '@quran-corpus/mobile-data';
 
 export interface MushafPageData {
   lines: MushafLine[];
+  /** The page `lines` belong to, or null while none have settled.
+   *
+   *  Not redundant with the `page` argument. The render in which the pager
+   *  reports a turn still carries the PREVIOUS page's rows -- this hook's
+   *  effect has not run yet -- so `lines` is non-empty and describes a page the
+   *  reader has left. A caller that only acts on the rows of the page in front
+   *  of the reader (starting its first ayah) has to compare this, not
+   *  `lines.length`. */
+  page: number | null;
   loading: boolean;
   error: Error | null;
 }
@@ -22,23 +31,29 @@ export interface MushafPageData {
  * of M6, in another costume).
  */
 export function useMushafPage(client: MobileDataClient | null, page: number): MushafPageData {
-  const [state, setState] = useState<MushafPageData>({ lines: [], loading: true, error: null });
+  const [state, setState] = useState<MushafPageData>({
+    lines: [],
+    page: null,
+    loading: true,
+    error: null,
+  });
 
   useEffect(() => {
     if (!client) {
-      setState({ lines: [], loading: true, error: null });
+      setState({ lines: [], page: null, loading: true, error: null });
       return;
     }
     let cancelled = false;
-    setState({ lines: [], loading: true, error: null });
+    setState({ lines: [], page: null, loading: true, error: null });
     getMushafPage(client, page)
       .then((lines) => {
-        if (!cancelled) setState({ lines, loading: false, error: null });
+        if (!cancelled) setState({ lines, page, loading: false, error: null });
       })
       .catch((e: unknown) => {
         if (!cancelled) {
           setState({
             lines: [],
+            page: null,
             loading: false,
             error: e instanceof Error ? e : new Error(String(e)),
           });

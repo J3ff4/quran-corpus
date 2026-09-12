@@ -66,4 +66,20 @@ describe('useMushafPage', () => {
     await new Promise((r) => setTimeout(r, 0));
     expect(result.current.lines).toEqual([lineOf(2)]);
   });
+
+  it('names the page its lines belong to, and none while they are in flight', async () => {
+    // The mushaf screen starts a page-s first ayah off these rows, so it has
+    // to be able to tell rows for the page in front of the reader from the
+    // ones still on screen for the page they just left. `lines.length` cannot:
+    // the old page-s rows are non-empty.
+    getMushafPage.mockResolvedValueOnce([lineOf(1)]).mockImplementationOnce(() => new Promise(() => {}));
+    const { result, rerender } = renderHook(({ page }) => useMushafPage(client, page), {
+      initialProps: { page: 106 },
+    });
+    await waitFor(() => expect(result.current.page).toBe(106));
+
+    rerender({ page: 107 });
+
+    expect(result.current.page).toBeNull();
+  });
 });

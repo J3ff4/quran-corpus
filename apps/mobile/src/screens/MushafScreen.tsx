@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
-import type { MushafWord, Word } from '@quran-corpus/data/mobile';
+import type { MushafLine, MushafWord, Word } from '@quran-corpus/data/mobile';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 
 import { AyahControls } from '@/components/AyahControls';
@@ -45,6 +45,10 @@ import { useThemeColors } from '@/theme/themeContext';
 
 /** Where the mushaf opens with nothing saved. Page 1 is the Fatiha. */
 const FIRST_PAGE = 1;
+
+/** One shared empty array, because it stands in effect dependency lists: a
+ *  fresh `[]` per render would re-run them on every render. */
+const NO_LINES: readonly MushafLine[] = [];
 
 /**
  * The mushaf tab: the printed page, full screen, with no reader around it.
@@ -113,7 +117,14 @@ export function MushafScreen() {
   // here. Held back until the opening page is known, so the cold start does not
   // fetch page 1's rows on its way to the page the reader actually saved.
   const currentPage = pageInView ?? initialPage;
-  const pageLines = useMushafPage(currentPage === null ? null : client, currentPage ?? FIRST_PAGE).lines;
+  const pageData = useMushafPage(currentPage === null ? null : client, currentPage ?? FIRST_PAGE);
+  // The rows of the page in front of the reader, and NOTHING otherwise. The
+  // render in which the pager reports a turn still carries the previous page's
+  // rows -- `useMushafPage`'s effect has not run yet -- and every reader below
+  // is the player, which would then act on the page it has just left. That is
+  // what turned page 1 to page 2 and started al-Fatiha over on it, then turned
+  // a page per ayah: the playhead was never on the page in view.
+  const pageLines = pageData.page === currentPage ? pageData.lines : NO_LINES;
   // Every bookmark, keyed by coordinate, re-read on every focus and resume.
   // The reader narrows its own to one surah because it only ever shows one; a
   // page can hold two, and the second surah's bookmarks are exactly what a
