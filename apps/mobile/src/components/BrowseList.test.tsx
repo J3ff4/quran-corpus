@@ -125,6 +125,18 @@ describe('BrowseList disclosure rows', () => {
     expect(onPress).not.toHaveBeenCalled();
   });
 
+  it('leaves every other browse row in the reading face', () => {
+    // Juz and page rows carry no arabicFace (revealed rows are surah rows and
+    // draw the glyph, 2026-09-12). A default that reached these would put a
+    // private-use surah-name font on ordinary Arabic text, which has no
+    // glyphs for it -- tofu in two of the four browse modes.
+    render(<BrowseList items={[item({ arabic: 'البقرة' })]} />);
+
+    const arabic = screen.getByTestId('browse-arabic-juz-1');
+    expect(arabic.style.fontFamily).not.toContain('SurahName');
+    expect(arabic.textContent).toBe('البقرة');
+  });
+
   it('announces the disclosure state to a screen reader', () => {
     render(<BrowseList items={[item({ expanded: false })]} />);
 

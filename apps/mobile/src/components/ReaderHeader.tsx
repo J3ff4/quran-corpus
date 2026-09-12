@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, View, type StyleProp, type TextStyle } from 'react-native';
+import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -25,7 +25,13 @@ export interface ReaderHeaderProps {
   /** The scroll-linked fade, authored in SurahReader where the offset lives.
    *  Passed in rather than computed here so this component stays a pure
    *  renderer and the reader keeps one source of truth for the scroll. */
-  titleStyle?: StyleProp<TextStyle>;
+  titleStyle?: StyleProp<ViewStyle>;
+  /** Whether the name has faded in. It is the same scroll offset that drives
+   *  `titleStyle`, computed once in SurahReader: a second threshold here would
+   *  be a second source of truth for one fade. */
+  titleVisible?: boolean;
+  /** Omitted, the name is a label again and takes no presses. */
+  onOpenJump?: () => void;
   onOpenWbw: () => void;
   onOpenLanguage: () => void;
   /** Whether the cards draw their translation, and the language picker beside
@@ -75,6 +81,8 @@ export interface ReaderHeaderProps {
 export function ReaderHeader({
   surahName,
   titleStyle,
+  titleVisible = false,
+  onOpenJump,
   onOpenWbw,
   onOpenLanguage,
   showTranslation = true,
@@ -134,22 +142,64 @@ export function ReaderHeader({
               button with an empty middle -- accepted, because taking the fade
               away would put the name in the bar and in the list heading at
               once (ruling recorded in the phase plan). */}
-          <Animated.Text
-            testID="reader-title"
-            numberOfLines={1}
-            style={[
-              titleStyle,
-              {
-                flex: 1,
-                textAlign: 'center',
-                color: theme.text,
-                fontFamily: fonts.display,
-                fontSize: typography.title,
-              },
-            ]}
+          {/* The name IS the jump control (ruling S3) -- and only while it is
+              on screen. Faded out it is an invisible hit target across the
+              middle of the bar, and TalkBack would offer a button for
+              something the eye cannot see; the list's own heading carries the
+              surah name at exactly that moment anyway.
+
+              The Pressable wraps the name rather than replacing it:
+              `titleStyle` still drives the fade, and the name is still always
+              mounted so a screen reader never loses it. */}
+          <Pressable
+            testID="reader-surah-jump"
+            accessibilityRole="button"
+            // The NAME first, then what pressing it does. A Pressable is
+            // `accessible` by default, which collapses its descendants -- so
+            // the Animated.Text below is no longer announced and this label is
+            // the entire utterance. Left as just the action, wrapping the name
+            // in a control silently took the surah name away from TalkBack,
+            // which is the opposite of what the note above promises.
+            accessibilityLabel={`${surahName}, ${t(uiLocale, 'jump.surahTitle')}`}
+            disabled={!titleVisible || !onOpenJump}
+            accessibilityElementsHidden={!titleVisible}
+            importantForAccessibility={titleVisible ? 'auto' : 'no-hide-descendants'}
+            onPress={onOpenJump}
+            style={{ flex: 1 }}
           >
-            {surahName}
-          </Animated.Text>
+            {/* The caret is the affordance (owner, 2026-09-12): a tappable
+                name with nothing to say so is a control nobody finds, and the
+                word-by-word header has carried one since M6e. It sits inside
+                the faded View rather than beside it, so it disappears with the
+                name -- a caret left behind over an invisible name would point
+                at a control that is not taking presses.
+
+                A row View wrapping the text, not two siblings: `titleStyle`
+                drives one opacity for both, and the name stays centred with
+                the caret trailing it rather than the pair being centred as a
+                block, which walked the name off-centre by half the caret. */}
+            <Animated.View
+              style={[
+                titleStyle,
+                { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+              ]}
+            >
+              <Text
+                testID="reader-title"
+                numberOfLines={1}
+                style={{
+                  textAlign: 'center',
+                  color: theme.text,
+                  fontFamily: fonts.display,
+                  fontSize: typography.title,
+                  flexShrink: 1,
+                }}
+              >
+                {surahName}
+              </Text>
+              {onOpenJump ? <Icon name="chevronDown" size={14} color={theme.mutedText} /> : null}
+            </Animated.View>
+          </Pressable>
           {/* One button for three actions (ruling R1). A kebab: not a gear,
               because Settings is a real screen here and a gear would promise
               it, and not `menu`, whose three lines are Android's nav-drawer
@@ -245,31 +295,39 @@ export function ReaderHeader({
                 }}
               >
                 {/* The glyph itself carries the state, not only its colour
-                    (WCAG 1.4.1): ON draws the Latin line under the Arabic
-                    stroke, OFF drops it. */}
+                    (WCAG 1.4.1): OFF is the same mark struck through. */}
                 <Icon
-                  name={showTranslation ? 'translationOn' : 'translationOff'}
+                  name={showTranslation ? 'translate' : 'translateOff'}
                   color={showTranslation ? theme.accent : theme.mutedText}
                 />
               </Pressable>
             ) : null}
             <SearchHeaderButton uiLocale={uiLocale} onPress={onOpenSearch} />
-            {showTranslation ? (
-              <Pressable
-                testID="open-language"
-                accessibilityRole="button"
-                accessibilityLabel={t(uiLocale, 'reader.chooseLanguage')}
-                onPress={onOpenLanguage}
-                style={{
-                  minHeight: touchTargets.minimum,
-                  minWidth: touchTargets.minimum,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Icon name="translate" color={theme.accent} />
-              </Pressable>
-            ) : null}
+            {/* Always here, translation on or off (owner, 2026-09-12). It used
+                to be hidden while the translation was off, on the rule that a
+                picker changing nothing visible is a dead control -- but a
+                control that vanishes reflows the row under the thumb and
+                leaves no way to say "show me this in Uzbek" in one move. It is
+                not dead now: picking a language while the translation is off
+                turns the translation back on, so the choice is always visible
+                the moment it is made. */}
+            <Pressable
+              testID="open-language"
+              accessibilityRole="button"
+              accessibilityLabel={t(uiLocale, 'reader.chooseLanguage')}
+              onPress={() => {
+                if (!showTranslation) onChangeShowTranslation?.(true);
+                onOpenLanguage();
+              }}
+              style={{
+                minHeight: touchTargets.minimum,
+                minWidth: touchTargets.minimum,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Icon name="globe" color={theme.accent} />
+            </Pressable>
           </View>
         </Collapsible>
       </GlassSurface>

@@ -25,6 +25,12 @@ interface HostProps {
   children?: React.ReactNode;
   onPress?: () => void;
   onLongPress?: () => void;
+  /** Pressable's own disabled, NOT accessibilityState.disabled. Honoured here
+   *  rather than spread: spread, React puts a `disabled` attribute on a div,
+   *  which does nothing to a click -- so a control the app had switched off
+   *  still fired its handler in the suite. Same blindness as `hitSlop` and
+   *  `shadowOpacity` (2026-09-11, the reader's faded surah name). */
+  disabled?: boolean;
   onPressIn?: () => void;
   onPressOut?: () => void;
   role?: string;
@@ -313,6 +319,7 @@ export function host(tag: string) {
     children,
     onPress,
     onLongPress,
+    disabled,
     role,
     style,
     testID,
@@ -358,7 +365,7 @@ export function host(tag: string) {
         // Mapped rather than spread: React warns about an unknown
         // accessibilityState attribute on a DOM node, and mapping it is what
         // lets a test see the state a control announces.
-        'aria-disabled': accessibilityState?.disabled,
+        'aria-disabled': accessibilityState?.disabled ?? (disabled ? true : undefined),
         'aria-selected': accessibilityState?.selected,
         // `checked` as well as `selected`: RN's radio role carries selection in
         // `checked`, and a shim that mapped only `selected` left every
@@ -400,7 +407,13 @@ export function host(tag: string) {
         // invisible band for a phase. Read it with
         // `node.getAttribute('data-rn-include-font-padding')`.
         'data-rn-include-font-padding': includeFontPaddingOf(style),
-        onClick: onPress,
+        // Passed through AS WELL as being honoured below: a suite that asserts a
+        // control is off reads this, and the host element is a button.
+        disabled,
+        // Not `onPress` straight through: a disabled Pressable takes no press
+        // on the device, and a suite that still fires one asserts nothing
+        // about the control being off.
+        onClick: disabled ? undefined : onPress,
         // RN's press phases, mapped onto the nearest DOM events rather than
         // spread (React logs "does not recognize the onPressIn prop" for every
         // card on every render) and rather than dropped, which is what they
@@ -409,9 +422,9 @@ export function host(tag: string) {
         // on a sheet's own props -- and the mushaf's long press is now the only
         // way to open the word sheet, so it is exactly the prop a suite must be
         // able to fire. onContextMenu is the DOM's long press.
-        onContextMenu: onLongPress,
-        onMouseDown: onPressIn,
-        onMouseUp: onPressOut,
+        onContextMenu: disabled ? undefined : onLongPress,
+        onMouseDown: disabled ? undefined : onPressIn,
+        onMouseUp: disabled ? undefined : onPressOut,
         style: flattenStyle(style),
       },
       children,

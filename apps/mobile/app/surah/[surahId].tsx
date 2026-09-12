@@ -78,7 +78,28 @@ export default function SurahRoute() {
   // a bookmark opening Al-Baqarah at 2:50 landed the next surah on 3:50.
   // Against the displayed surah rather than the pager's, so the outgoing
   // reader is not re-anchored during the frames it is still sliding out.
-  const initialAyahNumber = displayedSurahId === routeSurahId ? routeAyahNumber : null;
+  // Where the jump sheet was last sent, carried HERE rather than inside
+  // SurahReader: that component is keyed by the displayed surah, so a jump
+  // into another surah remounts the very thing holding the ayah it asked for.
+  const [jump, setJump] = useState<{ surahId: number; ayahNumber: number } | null>(null);
+  // A new route target outranks a jump made under the old one. Without this the
+  // jump shadows it for good: SurahReader documents an `ayah` param change on an
+  // already-mounted reader as a supported path (an external deep link into the
+  // surah on screen), and a stale jump into the same surah still matched
+  // `displayedSurahId` -- jump to 2:10, then open a bookmark for 2:100, and 10
+  // won, then and for every later deep link into that surah.
+  useEffect(() => {
+    setJump(null);
+  }, [routeSurahId, routeAyahNumber]);
+  // The jump wins over the route while it names the surah on screen: it is the
+  // more recent of the two, and the route's own ayah belongs to how the reader
+  // was opened.
+  const initialAyahNumber =
+    jump && jump.surahId === displayedSurahId
+      ? jump.ayahNumber
+      : displayedSurahId === routeSurahId
+        ? routeAyahNumber
+        : null;
   // ayahCount is what stops continuous play at the end of the surah, so it
   // comes from the loaded surah rather than a constant; 0 until the reader
   // loads, which is also the window in which nothing can be tapped to play.
@@ -206,8 +227,26 @@ export default function SurahRoute() {
   // whole header and dispatched setOptions into the navigator several times a
   // second while audio played.
   const onPageSurah = useCallback(
-    (target: number, side: 'prev' | 'next') => pager.goTo(String(target), side),
+    (target: number, side: 'prev' | 'next') => {
+      // A chevron is not a jump: without this, paging back into the surah a
+      // jump landed in would re-anchor it on the jumped-to ayah rather than
+      // opening it where a step opens a surah.
+      setJump(null);
+      pager.goTo(String(target), side);
+    },
     [pager.goTo],
+  );
+
+  const onJump = useCallback(
+    (target: number, ayahNumber: number) => {
+      setJump({ surahId: target, ayahNumber });
+      // Within the surah on screen there is nothing to page: the seed above is
+      // the whole move, and AyahList re-anchors on a seed change.
+      if (surahId !== null && target !== surahId) {
+        pager.goTo(String(target), target > surahId ? 'next' : 'prev');
+      }
+    },
+    [pager.goTo, surahId],
   );
 
   const loadWords = useCallback(
@@ -381,6 +420,7 @@ export default function SurahRoute() {
         prevSurahId={surahId !== null && surahId > 1 ? surahId - 1 : null}
         nextSurahId={surahId !== null && surahId < 114 ? surahId + 1 : null}
         onPageSurah={onPageSurah}
+        onJump={onJump}
       />
       </Animated.View>
       {/* Live regions: a bookmark or playback failure happens after the tap,

@@ -20,8 +20,10 @@ import {
 } from 'react-native-reanimated';
 import { router, useFocusEffect, useNavigation } from 'expo-router';
 import { reciterById, splitBasmala, type Word } from '@quran-corpus/data/mobile';
+import { surahNameGlyph } from '@quran-corpus/config/ornaments/surahName';
 import type { ReaderAyah, SurahReaderData, WordSummary } from '@/data/corpusRepository';
 import { getReaderPosition, setReaderPosition } from '@/data/readerPosition';
+import { useSurahAyahCounts } from '@/data/useSurahAyahCounts';
 import type { ContentLanguageCode, UiLocaleCode } from '@/i18n/languages';
 
 import { AyahCard } from './AyahCard';
@@ -31,6 +33,7 @@ import { Bismillah } from './Bismillah';
 import { LanguageSheet } from './LanguageSheet';
 import { ReciterSheet } from './ReciterSheet';
 import { AyahControls } from './AyahControls';
+import { SurahJumpSheet } from './SurahJumpSheet';
 import { WordSheet } from './WordSheet';
 import { GlassSurface } from './GlassSurface';
 import { estimateRowHeight } from './rowHeightModel';
@@ -97,6 +100,12 @@ interface SurahReaderProps {
   prevSurahId?: number | null;
   nextSurahId?: number | null;
   onPageSurah?: (surahId: number, side: 'prev' | 'next') => void;
+  /** A validated surah+ayah from the jump sheet (M7f, ruling S2). Applied by
+   *  the route rather than here: this component is remounted per surah (it is
+   *  keyed by the displayed surah so the pager has two views to animate), so
+   *  an ayah held in state here would not survive the jump that set it.
+   *  Omitted, the surah name is a label and the sheet never opens. */
+  onJump?: (surahId: number, ayahNumber: number) => void;
 }
 
 // Ayah cards are variable height (Arabic runs wrap differently per ayah), so
@@ -163,6 +172,30 @@ const TITLE_FADE_DISTANCE = 40;
 // settling into the bar, not as a second element flying in.
 const TITLE_RISE = 10;
 
+/** How visible the nav title is at a given scroll offset, 0..1.
+ *
+ *  A function rather than an expression inside the animated style, because two
+ *  things need it now: the fade itself, and whether the name is on screen at
+ *  all -- the name is the jump control (M7f, ruling S3) and a control at
+ *  opacity 0 is an invisible hit target across the middle of the bar. A second
+ *  threshold written beside the first is a second source of truth for one
+ *  fade, and they drift the first time either constant moves. */
+export function titleOpacityAt(
+  scrollOffset: number,
+  headerOffset: number,
+  reducedMotion: boolean,
+): number {
+  'worklet';
+  // Until the header has measured there is no threshold to cross, and the
+  // title stays hidden rather than fading in at the very top of the surah.
+  if (headerOffset <= 0) return 0;
+  const end = headerOffset - TITLE_FADE_END;
+  // No travel and no ramp: a fade is still motion, and this setting is a
+  // standing instruction not to animate.
+  if (reducedMotion) return scrollOffset > end ? 1 : 0;
+  return interpolate(scrollOffset, [end - TITLE_FADE_DISTANCE, end], [0, 1], Extrapolation.CLAMP);
+}
+
 // Extra room under the last ayah while the recitation bar is docked.
 //
 // useListBottomPadding clears the floating tab pill, which this stack screen
@@ -222,6 +255,10 @@ interface AyahListProps {
   onWordPress: (word: Word) => void;
   onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
   headerHeight: SharedValue<number>;
+  /** The header has been measured again. `headerHeight` is a shared value, so
+   *  a remeasure -- the Arabic font swapping in, the OS font scale changing --
+   *  reaches the worklet but tells the JS side nothing. */
+  onHeaderMeasured?: () => void;
   /** A sheet is over the reader, so this list must leave the TalkBack order. */
   sheetsOpen: boolean;
   barDocked: boolean;
@@ -265,6 +302,7 @@ function AyahList({
   onWordPress,
   onScroll,
   headerHeight,
+  onHeaderMeasured,
   sheetsOpen,
   barDocked,
 }: AyahListProps) {
@@ -384,7 +422,14 @@ function AyahList({
   if (anchor.key !== anchorKey) {
     setAnchor({
       key: anchorKey,
-      ayah: getReaderPosition(data.surah.id) ?? seedAyah,
+      // The seed FIRST, the saved position only as its fallback. The other way
+      // round, an in-surah jump could never land: getReaderPosition is the
+      // live position, rewritten on every onViewableItemsChanged for the surah
+      // on screen, so for a jump inside the surah being read it is always
+      // non-null and always won -- asking for 2:255 from 2:3 re-anchored to 3
+      // and the reader did not move. The saved position is for a key change
+      // that carries no seed at all (a page turn into a surah read before).
+      ayah: seedAyah ?? getReaderPosition(data.surah.id),
       nonce: anchor.nonce + 1,
     });
   }
@@ -648,6 +693,7 @@ function AyahList({
             onLayout={(event: LayoutChangeEvent) => {
               headerHeight.value = event.nativeEvent.layout.height;
               setHeaderOffset(event.nativeEvent.layout.height);
+              onHeaderMeasured?.();
             }}
             style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16 }}
           >
@@ -656,14 +702,30 @@ function AyahList({
                 the count and revelation type are a muted caption. */}
             <SurahPlate>
               <Text
+                testID="surah-plate-name"
+                // The calligraphic glyph, not `name_arabic` (owner, 2026-09-12).
+                // The plain Arabic name is a title here, not text to be read,
+                // and the index, the mushaf band and this plate now set it in
+                // one face. Announced as the real name: the glyph is a PUA
+                // codepoint, which announces as nothing at all.
+                accessibilityLabel={data.surah.name_arabic}
                 style={{
                   color: theme.text,
-                  fontFamily: fonts.arabic,
-                  fontSize: arabicSizes.banner,
+                  // V4 for all 114, never V2: V2 has no glyph for surah 102
+                  // and draws a box on At-Takathur.
+                  fontFamily: fonts.surahNameAlt,
+                  // The glyph draws the whole name as one piece of calligraphy
+                  // with a tail below the baseline, so it needs more box than
+                  // a banner-sized reading run before it clips. Tracks the
+                  // reader's Arabic size setting like everything else on the
+                  // plate.
+                  fontSize: Math.round(arabicSizes.banner * 1.5),
+                  lineHeight: Math.round(arabicSizes.banner * 2),
+                  textAlign: 'center',
                   writingDirection: 'rtl',
                 }}
               >
-                {data.surah.name_arabic}
+                {surahNameGlyph(data.surah.id)}
               </Text>
               <Text
                 accessibilityRole="header"
@@ -791,10 +853,13 @@ export function SurahReader({
   prevSurahId = null,
   nextSurahId = null,
   onPageSurah,
+  onJump,
 }: SurahReaderProps) {
   const navigation = useNavigation();
 
   const [languageOpen, setLanguageOpen] = useState(false);
+  const [jumpOpen, setJumpOpen] = useState(false);
+  const ayahCountOf = useSurahAyahCounts();
   const [reciterOpen, setReciterOpen] = useState(false);
 
   // The ayah the docked bar is parked on. Not `playingAyah`: that goes null the
@@ -829,27 +894,38 @@ export function SurahReader({
   const headerHeight = useSharedValue(0);
   const reducedMotion = useReducedMotion();
 
+  // Whether the name has actually arrived. State, because the header is a
+  // React tree and `disabled` is a prop -- and the fade itself is not, which is
+  // why it stays a worklet.
+  const [titleVisible, setTitleVisible] = useState(false);
+  const titleVisibleRef = useRef(false);
+
+  // Off the same function the fade uses, and written only when it CHANGES -- a
+  // setState per scroll frame is the re-render `scrollY` exists to avoid.
+  // Twice per surah, at the two edges of the fade.
+  //
+  // Called from all three places an input to the fade can move, not just from
+  // the scroll: the header remeasures when the Arabic font swaps in or the OS
+  // font scale changes, and `reducedMotion` is a live setting. Either one
+  // moving alone would leave the guard disagreeing with what is on screen
+  // until the next scroll event -- a visible name that takes no press, or the
+  // invisible hit target the guard exists to prevent.
+  const syncTitleVisible = useCallback(() => {
+    const visible = titleOpacityAt(scrollY.value, headerHeight.value, reducedMotion) > 0;
+    if (visible === titleVisibleRef.current) return;
+    titleVisibleRef.current = visible;
+    setTitleVisible(visible);
+  }, [scrollY, headerHeight, reducedMotion]);
+
+  useEffect(syncTitleVisible, [syncTitleVisible]);
+
+
   const titleStyle = useAnimatedStyle(() => {
-    // Until the header has measured there is no threshold to cross, and the
-    // title stays hidden rather than fading in at the very top of the surah.
-    if (headerHeight.value <= 0) return { opacity: 0, transform: [{ translateY: 0 }] };
-
-    const end = headerHeight.value - TITLE_FADE_END;
-
-    if (reducedMotion) {
-      // No travel and no ramp: a fade is still motion, and this setting is a
-      // standing instruction not to animate.
-      return { opacity: scrollY.value > end ? 1 : 0, transform: [{ translateY: 0 }] };
-    }
-
-    const progress = interpolate(
-      scrollY.value,
-      [end - TITLE_FADE_DISTANCE, end],
-      [0, 1],
-      Extrapolation.CLAMP,
-    );
-
-    return { opacity: progress, transform: [{ translateY: (1 - progress) * TITLE_RISE }] };
+    const progress = titleOpacityAt(scrollY.value, headerHeight.value, reducedMotion);
+    // No travel under reduced motion: the opacity above is already a switch
+    // there, and a rise would be the animation the setting forbids.
+    const rise = reducedMotion ? 0 : (1 - progress) * TITLE_RISE;
+    return { opacity: progress, transform: [{ translateY: rise }] };
   });
 
   useEffect(() => {
@@ -866,6 +942,11 @@ export function SurahReader({
         <ReaderHeader
           surahName={headerSurahName}
           titleStyle={titleStyle}
+          titleVisible={titleVisible}
+          {...(onJump ? { onOpenJump: () => {
+            closeSheet();
+            setJumpOpen(true);
+          } } : {})}
           showTranslation={showTranslation}
           {...(onChangeShowTranslation ? { onChangeShowTranslation } : {})}
           uiLocale={uiLocale}
@@ -907,6 +988,8 @@ export function SurahReader({
   }, [
     navigation,
     titleStyle,
+    titleVisible,
+    onJump,
     uiLocale,
     showTranslation,
     onChangeShowTranslation,
@@ -922,8 +1005,9 @@ export function SurahReader({
       // A shared value, not state: this runs on every scroll frame and setting
       // state here re-rendered the whole navigator.
       scrollY.value = event.nativeEvent.contentOffset.y;
+      syncTitleVisible();
     },
-    [scrollY],
+    [scrollY, syncTitleVisible],
   );
 
   // Read by fetchWordsRef, which is built once and so cannot close over a
@@ -1058,6 +1142,7 @@ export function SurahReader({
         onWordPress={onWordPress}
         onScroll={onScroll}
         headerHeight={headerHeight}
+        onHeaderMeasured={syncTitleVisible}
         sheetsOpen={Boolean(openWord) || languageOpen || reciterOpen}
         barDocked={barDocked}
       />
@@ -1141,6 +1226,18 @@ export function SurahReader({
           uiLocale={uiLocale}
           onChange={onChangeContentLanguage}
           onClose={() => setLanguageOpen(false)}
+        />
+      ) : null}
+      {jumpOpen && onJump ? (
+        <SurahJumpSheet
+          uiLocale={uiLocale}
+          surahId={data.surah.id}
+          ayahCountOf={ayahCountOf}
+          onClose={() => setJumpOpen(false)}
+          onJump={(surahId, ayahNumber) => {
+            setJumpOpen(false);
+            onJump(surahId, ayahNumber);
+          }}
         />
       ) : null}
     </View>
