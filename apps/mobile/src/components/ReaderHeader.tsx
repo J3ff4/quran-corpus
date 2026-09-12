@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, View, type StyleProp, type TextStyle } from 'react-native';
+import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -25,7 +25,7 @@ export interface ReaderHeaderProps {
   /** The scroll-linked fade, authored in SurahReader where the offset lives.
    *  Passed in rather than computed here so this component stays a pure
    *  renderer and the reader keeps one source of truth for the scroll. */
-  titleStyle?: StyleProp<TextStyle>;
+  titleStyle?: StyleProp<ViewStyle>;
   /** Whether the name has faded in. It is the same scroll offset that drives
    *  `titleStyle`, computed once in SurahReader: a second threshold here would
    *  be a second source of truth for one fade. */
@@ -148,7 +148,7 @@ export function ReaderHeader({
               something the eye cannot see; the list's own heading carries the
               surah name at exactly that moment anyway.
 
-              The Pressable wraps the Animated.Text rather than replacing it:
+              The Pressable wraps the name rather than replacing it:
               `titleStyle` still drives the fade, and the name is still always
               mounted so a screen reader never loses it. */}
           <Pressable
@@ -167,21 +167,38 @@ export function ReaderHeader({
             onPress={onOpenJump}
             style={{ flex: 1 }}
           >
-            <Animated.Text
-              testID="reader-title"
-              numberOfLines={1}
+            {/* The caret is the affordance (owner, 2026-09-12): a tappable
+                name with nothing to say so is a control nobody finds, and the
+                word-by-word header has carried one since M6e. It sits inside
+                the faded View rather than beside it, so it disappears with the
+                name -- a caret left behind over an invisible name would point
+                at a control that is not taking presses.
+
+                A row View wrapping the text, not two siblings: `titleStyle`
+                drives one opacity for both, and the name stays centred with
+                the caret trailing it rather than the pair being centred as a
+                block, which walked the name off-centre by half the caret. */}
+            <Animated.View
               style={[
                 titleStyle,
-                {
+                { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+              ]}
+            >
+              <Text
+                testID="reader-title"
+                numberOfLines={1}
+                style={{
                   textAlign: 'center',
                   color: theme.text,
                   fontFamily: fonts.display,
                   fontSize: typography.title,
-                },
-              ]}
-            >
-              {surahName}
-            </Animated.Text>
+                  flexShrink: 1,
+                }}
+              >
+                {surahName}
+              </Text>
+              {onOpenJump ? <Icon name="chevronDown" size={14} color={theme.mutedText} /> : null}
+            </Animated.View>
           </Pressable>
           {/* One button for three actions (ruling R1). A kebab: not a gear,
               because Settings is a real screen here and a gear would promise

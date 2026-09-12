@@ -297,6 +297,22 @@ describe('ReaderHeader', () => {
     expect(screen.getByTestId('toggle-translation').querySelectorAll('path')).toHaveLength(7);
   });
 
+  it('points the surah name at the sheet it opens', () => {
+    // A tappable name with nothing to say so is a control nobody finds (owner,
+    // device, 2026-09-12). The caret lives inside the faded wrapper, so it
+    // leaves with the name rather than pointing at a control that is no
+    // longer taking presses.
+    renderHeader({ titleVisible: true, onOpenJump: vi.fn() });
+
+    expect(screen.getByTestId('reader-surah-jump').querySelectorAll('svg')).toHaveLength(1);
+  });
+
+  it('draws no caret when the name opens nothing', () => {
+    renderHeader({ titleVisible: true });
+
+    expect(screen.getByTestId('reader-surah-jump').querySelectorAll('svg')).toHaveLength(0);
+  });
+
   it('never lets the mode pill settle on the word-by-word door', () => {
     // The reader's 'Words' navigates; it is not a rendering this screen has,
     // so the wash must not park on it (owner, device, 2026-09-11).
