@@ -12,10 +12,13 @@ on:
   push:
     branches: [main]
 
-# A force-push supersedes its own in-flight run; nothing here is worth paying twice for.
+# A force-push supersedes its own in-flight run; nothing here is worth paying
+# twice for. On main it is the opposite: cancelling there leaves a merged commit
+# with no gate evidence, which is the hole issue #1 was opened about. Observed
+# live -- the merge of #76 (1eced07) was cancelled by the push right after it.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
