@@ -128,4 +128,46 @@ The gate is the new logic here, so it gets the same treatment as a parser.
 
 ## Verification log
 
-(filled by Task 4)
+**2026-09-13, PR #76, branch `ci/gate-workflow`.**
+
+| run | head | node | python |
+|---|---|---|---|
+| [34785557744](https://github.com/J3ff4/quran-corpus/actions/runs/34785557744) | `43fe2c0` | **pass**, 2m07s | **pass**, 18s |
+| [34786608056](https://github.com/J3ff4/quran-corpus/actions/runs/34786608056) | `a07cdbb` (deliberate break) | **fail** | **fail** |
+| [see PR](https://github.com/J3ff4/quran-corpus/pull/76/checks) | revert | pass | pass |
+
+Task 4 mutation-check: one failing assert appended to
+`tests/test_buckwalter.py`, one type error appended to
+`apps/web/src/lib/db.ts`. Both jobs went red, each for its own injected
+reason -- not incidentally:
+
+- `FAILED tests/test_buckwalter.py::test_ci_mutation_check - assert 1 == 2`
+- `87:7 error 'ciMutationCheck' is assigned a value but never used`
+
+The node job failed at `lint` before reaching `type-check`, so lint is proven
+to gate and type-check is proven only by the local `--force` run. Turbo stops
+the pipeline at the first red task by design; a second break placed past lint
+would prove nothing the first did not.
+
+Revert was byte-identical (restored from copies taken before the edit, never
+`git checkout` -- see `never-git-stash-for-a-baseline`).
+
+### One finding: CI runs three fewer tests than local
+
+Local `pytest -q` reports **825 passed**; CI reports **822 passed, 3 skipped**.
+The three are `@pytest.mark.skipif`-guarded on files outside the repo:
+`test_hanswehr.py:110` (`hanswehr.sqlite`) and `test_hamza_seat_regression.py:35,47`
+(the live `quran.db`). Same story on the node side: `m1-reader-db-contract.test.ts`
+skips 3 of its 7 without a generated M1 DB.
+
+This is the Ruling-3 boundary showing up as a number. It is recorded here
+because "825 passed" in a PR body and "822 passed" in CI are both true, and a
+future reader comparing them without this note would reasonably suspect the
+gate of dropping tests.
+
+## Owner hand-off
+
+Branch protection is a Settings change the agent cannot make. On
+`Settings > Branches > Add rule` for `main`: require status checks to pass,
+select **`node (test, lint, type-check)`** and **`python (ruff, mypy, pytest)`**,
+and require branches to be up to date before merging.

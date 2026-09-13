@@ -90,8 +90,3 @@ def test_roundtrip_known_letters_are_arabic() -> None:
     out = buckwalter_to_arabic("ktb")
     assert out is not None
     assert all(ord(c) > 0x600 for c in out)
-
-
-def test_ci_mutation_check() -> None:
-    """Throwaway: proves the python job can go red. Reverted in the next commit."""
-    assert 1 == 2

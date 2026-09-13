@@ -82,6 +82,3 @@ export function getDatabase(): Promise<Client> {
   }
   return _dbPromise;
 }
-
-// Throwaway: proves the node job can go red. Reverted in the next commit.
-const ciMutationCheck: number = 'not a number';
