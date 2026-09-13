@@ -407,7 +407,7 @@ describe('MushafScreen', () => {
     const controls = () =>
       (mocks.sheetProps.at(-1)?.['ayahActions'] as { props: { playing: boolean } }).props;
 
-    mocks.audio = { ayah: 2, playing: true };
+    mocks.audio = { ayah: 2, playing: true, finished: false };
     await act(async () => longPress(word, 9));
     act(() => {
       (mocks.sheetProps.at(-1)?.['ayahActions'] as { props: { onToggleAudio: () => void } }).props
@@ -419,7 +419,7 @@ describe('MushafScreen', () => {
     expect(controls().playing).toBe(true);
 
     // The pause. `ayah` stays -- the player is still parked there.
-    mocks.audio = { ayah: 2, playing: false };
+    mocks.audio = { ayah: 2, playing: false, finished: false };
     await act(async () => longPress(word, 9));
 
     expect(controls().playing).toBe(false);
@@ -434,7 +434,7 @@ describe('MushafScreen', () => {
     const longPress = props()['onWordPress'] as (word: unknown, ayahId: number) => void;
     const word = { surahId: 5, ayahNumber: 2, position: 1, charType: 'word', glyph: '' };
 
-    mocks.audio = { ayah: 2, playing: true };
+    mocks.audio = { ayah: 2, playing: true, finished: false };
     await act(async () => longPress(word, 9));
     act(() => {
       (mocks.sheetProps.at(-1)?.['ayahActions'] as { props: { onToggleAudio: () => void } }).props
@@ -442,7 +442,7 @@ describe('MushafScreen', () => {
     });
     expect(props()['playingAyah']).not.toBeNull();
 
-    mocks.audio = { ayah: 2, playing: false };
+    mocks.audio = { ayah: 2, playing: false, finished: false };
     await act(async () => longPress(word, 9));
 
     expect(props()['playingAyah']).toBeNull();
@@ -528,7 +528,7 @@ describe('MushafScreen', () => {
     // ayah instead it would sit on the full transport for ever after the first
     // play, since the parking spot outlives a pause on purpose.
     mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
-    mocks.audio = { ayah: 83, playing: false };
+    mocks.audio = { ayah: 83, playing: false, finished: false };
     await renderScreen();
 
     expect(player()['playing']).toBe(false);
