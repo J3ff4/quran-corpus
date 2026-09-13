@@ -644,3 +644,21 @@ frames to run in at 34ms each -- a ~15% jump per frame. The toggle now measures
 
 Still owed: 271, the M7c carry-forward 217/218, 219-248, 224/224a, 249-259, and
 the PR.
+
+## Carry-forward checks run 2026-09-13 (vc11 APK off `main` `399396b`)
+
+| # | Result |
+| --- | --- |
+| 249 | PASS — opened the Mushaf tab twice, once from a cold launch: no bars on the first frame, and a pixel diff against the frame 4s later shows only the status-bar clock changing |
+| 250 | PASS — tapping blank paper brings back the Go-to bar, the compact player and the tab bar; all three are gone again at 5s |
+| 251 | PASS — the ornament band and a page margin both summon them; neither is deaf |
+| 252 | PASS — long-press opens the word sheet (An-Nas 114:5, صُدُور, with bookmark + play); the chrome does not flip |
+| 258 | PASS — force-stop, relaunch, Mushaf, long-press 1:5, one press of Play: audio started on that first press (`AudioPlaybackConfiguration … state:started`) and the icon stayed on Pause |
+| 271 | PASS — in dark mode the shadow is real under both bars: the column under each bar's edge drops to `11,11,9` and ramps back to `16,15,14` over ~80px |
+
+Reciter persistence was spot-checked three times across force-stop/relaunch
+(Saud Al-Shuraim, then Abdul Basit twice) and survived every time.
+
+Still owed after this run: 260/261/306 (owner's judgement), the TalkBack and
+reduced-motion checks (`WRITE_SECURE_SETTINGS` is denied to adb on this phone),
+the M7c carry-forward 217/218, and 219-248.
