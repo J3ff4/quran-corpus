@@ -134,7 +134,7 @@ The gate is the new logic here, so it gets the same treatment as a parser.
 |---|---|---|---|
 | [34785557744](https://github.com/J3ff4/quran-corpus/actions/runs/34785557744) | `43fe2c0` | **pass**, 2m07s | **pass**, 18s |
 | [34786608056](https://github.com/J3ff4/quran-corpus/actions/runs/34786608056) | `a07cdbb` (deliberate break) | **fail** | **fail** |
-| [see PR](https://github.com/J3ff4/quran-corpus/pull/76/checks) | revert | pass | pass |
+| [34786705666](https://github.com/J3ff4/quran-corpus/actions/runs/34786705666) | `3ee923a` (revert) | **pass** | **pass** |
 
 Task 4 mutation-check: one failing assert appended to
 `tests/test_buckwalter.py`, one type error appended to
