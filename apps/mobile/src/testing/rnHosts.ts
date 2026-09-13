@@ -30,6 +30,7 @@ interface HostProps {
   role?: string;
   style?: unknown;
   testID?: string;
+  hitSlop?: unknown;
   // Native-only props with no DOM equivalent. Destructured so they never reach
   // createElement: React logs "Unknown event handler property" for onLayout and
   // onTextLayout, and a non-boolean-attribute warning for `accessible`, on
@@ -78,7 +79,30 @@ function flattenStyle(style: unknown): Record<string, unknown> | undefined {
       ? Object.assign({}, ...resolved.flat(Infinity).filter(Boolean))
       : resolved
   ) as Record<string, unknown> | undefined;
-  return withBoxShadow(flat);
+  return withTransform(withBoxShadow(flat));
+}
+
+/**
+ * RN's `transform` array expressed as a CSS transform string.
+ *
+ * Same blindness as the shadow props below: React assigns the style object
+ * onto `node.style`, and an ARRAY there stringifies to something jsdom throws
+ * away, so a rotated chevron and an unrotated one looked identical to the
+ * suite. Every animated rotation and press-scale in the app rides on this
+ * prop, so a test that could not read it could not defend any of them.
+ *
+ * Not a faithful CSS rendering of RN's transform model -- it only has to
+ * differ when the inputs differ, and to be parseable by the assertion that
+ * reads it.
+ */
+function withTransform(
+  flat: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  if (!flat || !Array.isArray(flat.transform)) return flat;
+  const css = (flat.transform as Record<string, unknown>[])
+    .flatMap((entry) => Object.entries(entry).map(([fn, value]) => `${fn}(${String(value)})`))
+    .join(' ');
+  return { ...flat, transform: css };
 }
 
 /** `includeFontPadding` as a string the DOM can hold, or undefined when the
@@ -308,6 +332,7 @@ export function host(tag: string) {
     onPressOut,
     onTextLayout: _onTextLayout,
     pointerEvents,
+    hitSlop,
     renderToHardwareTextureAndroid,
     ...props
   }: HostProps) {
@@ -360,6 +385,14 @@ export function host(tag: string) {
         // camelCase prop on a DOM node, and dropping it would make the one
         // assertion that the mushaf page is held as GPU pixels decorative.
         'data-hardware-layer': renderToHardwareTextureAndroid ? 'true' : undefined,
+        // Mapped, not spread: it is an object, so React would render it as an
+        // unknown attribute and warn. It is also the only thing standing
+        // between a control's drawn height and the 48dp its finger needs
+        // (§8), and a parent's padding does not extend a hit area -- so a
+        // control that shrank below the floor and forgot this is exactly the
+        // regression a suite has to be able to see.
+        'data-hit-slop':
+          hitSlop === undefined ? undefined : JSON.stringify(hitSlop),
         // Android-only, and not a CSS property: React drops it onto node.style
         // where it simply vanishes, so a Text given the padding and a Text
         // denied it looked identical to the suite. Same blindness as

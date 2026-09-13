@@ -72,6 +72,31 @@ describe('SurahBand', () => {
     expect(screen.getByTestId('band-numeral-eastern').textContent).toBe('١١٤');
   });
 
+  it('sizes each numeral from the shared table, by script and by digit count', () => {
+    // The four fractions had nothing asserting them at all, in either product,
+    // so a change to the table -- or a swapped branch here -- was invisible to
+    // every suite (found while applying ruling R8, 2026-09-11).
+    //
+    // Asserted where they are USED rather than in packages/config, which has
+    // no test runner of its own: this pins the numbers AND the digit-count
+    // branch that picks between them, which pinning the constants alone would
+    // not.
+    const sizeOf = (testID: string) =>
+      (screen.getByTestId(testID).firstElementChild as HTMLElement).style.fontSize;
+
+    render(<SurahBand surahName="Al-Baqarah" surahId={2} height={40} width={400} />);
+    expect(sizeOf('band-numeral-western')).toBe(`${40 * 0.1832}px`);
+    expect(sizeOf('band-numeral-eastern')).toBe(`${40 * 0.2775}px`);
+
+    cleanup();
+
+    // Three digits: the Western numeral shrinks to keep its medallion, the
+    // Eastern one takes the long value in the other direction.
+    render(<SurahBand surahName="An-Nas" surahId={114} height={40} width={400} />);
+    expect(sizeOf('band-numeral-western')).toBe(`${40 * 0.1665}px`);
+    expect(sizeOf('band-numeral-eastern')).toBe(`${40 * 0.2554}px`);
+  });
+
   it('keeps the numerals out of the reading order, since the name is there', () => {
     // Read aloud they are the same fact twice, in two alphabets.
     render(<SurahBand surahName="An-Nas" surahId={114} height={40} width={400} />);

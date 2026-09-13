@@ -1,9 +1,12 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { FlatList, Pressable, SectionList, Text, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
+import { Collapsible } from './Collapsible';
 import { GlassSurface } from './GlassSurface';
 import { Icon } from './icons/Icon';
 import { usePressScaleStyle } from '@/motion/usePressScale';
+import { useReducedMotion } from '@/motion/useReducedMotion';
 import { fonts, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
@@ -26,8 +29,13 @@ export interface BrowseItem {
    *  state. The row still owns what pressing it does -- BrowseList never
    *  toggles anything itself, because the open set belongs to the screen. */
   expanded?: boolean;
-  /** A child of a disclosure row: inset, and no medallion of its own. */
-  indent?: boolean;
+  /** Rows that belong to this one, drawn inside its own card while
+   *  `expanded`. Not siblings in the list: a child card looked exactly like a
+   *  juz card, so an expanded juz read as four juz (owner ruling R6, device
+   *  screenshot 2026-09-11). Always build them -- the curtain measures them to
+   *  know how far to unroll, and children gated on `expanded` make every open
+   *  a drop from 0 to 0. */
+  children?: BrowseItem[];
   onPress: () => void;
 }
 
@@ -44,36 +52,70 @@ export interface BrowseSection {
   onToggle?: () => void;
 }
 
+/** How long the chevron takes to turn. The curtain beside it is UNROLL_MS;
+ *  the two are one motion and must not read as two. */
+const SPIN_MS = 220;
+
+/**
+ * The disclosure chevron, turning between shut and open.
+ *
+ * A component of its own, mounted ONLY by a disclosure row, because it is the
+ * one thing here that builds reanimated nodes. Held inline in `Row` it built a
+ * shared value and an animated style for every row in the list -- 114 surahs,
+ * 604 pages, none of which draw a chevron at all -- on the Fabric commit that
+ * mounts them, which is the UI thread. That is precisely the cost
+ * `usePressScaleStyle` exists to avoid: 450ms in one uninterrupted block on a
+ * Surahs mode switch (device, 2026-08-31), and the block that froze the tab
+ * pill mid-travel in PR #48.
+ */
+function DisclosureChevron({ expanded, testID }: { expanded: boolean; testID: string }) {
+  const theme = useThemeColors();
+  const reduceMotion = useReducedMotion();
+  const spin = useSharedValue(expanded ? 90 : 0);
+
+  useEffect(() => {
+    const target = expanded ? 90 : 0;
+    spin.value = reduceMotion ? target : withTiming(target, { duration: SPIN_MS });
+  }, [expanded, reduceMotion, spin]);
+
+  const spinStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${spin.value}deg` }] }));
+
+  return (
+    <Animated.View testID={testID} style={spinStyle}>
+      <Icon name="chevronRight" color={theme.mutedText} size={18} />
+    </Animated.View>
+  );
+}
+
 function Row({ item }: { item: BrowseItem }) {
   const theme = useThemeColors();
   const pressStyle = usePressScaleStyle();
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={item.accessibilityLabel}
-      // Only on a disclosure. A surah row navigates, and announcing that as
-      // collapsed promises a disclosure that is not there.
-      {...(item.expanded === undefined ? {} : { accessibilityState: { expanded: item.expanded } })}
-      onPress={item.onPress}
-      style={pressStyle}
-      {...(item.testID ? { testID: item.testID } : {})}
-    >
-      <GlassSurface
-        style={{
-          minHeight: touchTargets.minimum + 20,
-          paddingHorizontal: 16,
-          paddingVertical: 12,
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 14,
-        }}
+    // The surface is outside the header Pressable now, not inside it: the
+    // children live in this same card, and a card wrapped in the disclosure's
+    // own Pressable would swallow every child tap as a toggle.
+    <GlassSurface>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={item.accessibilityLabel}
+        // Only on a disclosure. A surah row navigates, and announcing that as
+        // collapsed promises a disclosure that is not there.
+        {...(item.expanded === undefined ? {} : { accessibilityState: { expanded: item.expanded } })}
+        onPress={item.onPress}
+        style={pressStyle}
+        {...(item.testID ? { testID: item.testID } : {})}
       >
-        {item.indent ? (
-          // No medallion on a child: the number belongs to the juz above it,
-          // and repeating it under every range reads as four juz.
-          <View style={{ width: 34 }} />
-        ) : (
+        <View
+          style={{
+            minHeight: touchTargets.minimum + 20,
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 14,
+          }}
+        >
           <Text
             style={{
               color: theme.accent,
@@ -85,32 +127,68 @@ function Row({ item }: { item: BrowseItem }) {
           >
             {item.leading}
           </Text>
-        )}
-        <View style={{ flex: 1, gap: 3 }}>
-          <Text numberOfLines={1} style={{ color: theme.text, fontSize: 17, fontWeight: '600' }}>
-            {item.title}
-          </Text>
-          {item.subtitle ? (
-            <Text numberOfLines={1} style={{ color: theme.mutedText, fontSize: typography.caption }}>
-              {item.subtitle}
+          <View style={{ flex: 1, gap: 3 }}>
+            <Text numberOfLines={1} style={{ color: theme.text, fontSize: 17, fontWeight: '600' }}>
+              {item.title}
+            </Text>
+            {item.subtitle ? (
+              <Text numberOfLines={1} style={{ color: theme.mutedText, fontSize: typography.caption }}>
+                {item.subtitle}
+              </Text>
+            ) : null}
+          </View>
+          {item.arabic ? (
+            <Text style={{ color: theme.text, fontFamily: fonts.arabic, fontSize: 26, textAlign: 'right' }}>
+              {item.arabic}
             </Text>
           ) : null}
+          {/* One glyph that turns, not two that swap. The chevron rotating in
+              step with the curtain is what says this card opened, rather than
+              that unrelated rows arrived beneath it. Mounted only on a
+              disclosure -- see the note on the component. */}
+          {item.expanded === undefined ? null : (
+            <DisclosureChevron expanded={item.expanded} testID={`browse-chevron-${item.key}`} />
+          )}
         </View>
-        {item.arabic ? (
-          <Text style={{ color: theme.text, fontFamily: fonts.arabic, fontSize: 26, textAlign: 'right' }}>
-            {item.arabic}
-          </Text>
-        ) : null}
-        {item.expanded === undefined ? null : (
-          <Icon
-            testID={`browse-chevron-${item.key}-${item.expanded ? 'chevronDown' : 'chevronRight'}`}
-            name={item.expanded ? 'chevronDown' : 'chevronRight'}
-            color={theme.mutedText}
-            size={18}
-          />
-        )}
-      </GlassSurface>
-    </Pressable>
+      </Pressable>
+      {item.children ? (
+        <Collapsible open={item.expanded === true}>
+          {item.children.map((child, index) => (
+            <View key={child.key}>
+              {/* Inset to the child text's own left edge, so it reads as a rule
+                  between two rows of one card rather than as the card's edge --
+                  the same rule the word sheet's group divider follows. */}
+              {index === 0 ? null : (
+                <View style={{ height: 1, marginLeft: 48, backgroundColor: theme.border }} />
+              )}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={child.accessibilityLabel}
+                onPress={child.onPress}
+                {...(child.testID ? { testID: child.testID } : {})}
+                // Two-tier feedback, deliberately: the card's own surface sits
+                // outside every Pressable in here (it has to -- see above), so
+                // what squeezes on a press is the row's content rather than
+                // the card. A child with no squeeze at all read as dead.
+                style={(state) => [
+                  pressStyle(state),
+                  {
+                    minHeight: touchTargets.minimum,
+                    justifyContent: 'center',
+                    paddingLeft: 48,
+                    paddingRight: 16,
+                  },
+                ]}
+              >
+                <Text numberOfLines={1} style={{ color: theme.text, fontSize: typography.body }}>
+                  {child.title}
+                </Text>
+              </Pressable>
+            </View>
+          ))}
+        </Collapsible>
+      ) : null}
+    </GlassSurface>
   );
 }
 

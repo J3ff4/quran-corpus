@@ -51,6 +51,7 @@ vi.mock('react-native-safe-area-context', () => ({
 // nothing here asserts on a frame, and the timing branch that *is* worth
 // testing (reduced motion) lives in the pure nextPressScale.
 vi.mock('react-native-reanimated', async () => {
+  const React = await import('react');
   const { host } = await import('@/testing/rnHosts.js');
   return {
     default: {
@@ -92,9 +93,37 @@ vi.mock('react-native-reanimated', async () => {
         return [name, builder];
       }),
     ),
-    useSharedValue: (initial: number) => ({ value: initial }),
+    // Identity: a component that calls runOnJS(fn) and stores the result
+    // expects something callable back, and withTiming below calls it straight
+    // away.
+    runOnJS: (fn: unknown) => fn,
+    // A ref, not a fresh object per call. It is used as a hook, and the mock
+    // returning a NEW box on every render meant every write to a shared value
+    // was silently discarded at the next one -- so nothing driven by one
+    // could be asserted after a re-render, which is most of what a shared
+    // value is for (found 2026-09-11, when a curtain that measured itself
+    // correctly still read as height 0 in the suite).
+    useSharedValue: (initial: number) => {
+      const box = React.useRef({ value: initial });
+      return box.current;
+    },
     useAnimatedStyle: (factory: () => unknown) => factory(),
-    withTiming: (toValue: number) => toValue,
+    // Resolves to its target, and runs its completion callback, finished, on a
+    // microtask -- NOT in the same tick.
+    //
+    // Both halves matter. Dropped entirely (which is what it did until M7e), a
+    // component that unmounts its children when a close LANDS never unmounted
+    // them at all, so a suite asserting that a collapsed disclosure is empty
+    // was reading the open one's rows. Run synchronously, the opposite defect
+    // becomes invisible: unmounting at the TOP of a close collapses the
+    // curtain instantly with nothing left to watch, and no assertion could
+    // tell the two apart. A microtask is the smallest gap that distinguishes
+    // them, and `waitFor` already spans it. Nothing here asserts on a frame;
+    // what is modelled is only "later, and finished".
+    withTiming: (toValue: number, _config?: unknown, callback?: (finished?: boolean) => void) => {
+      if (callback) queueMicrotask(() => callback(true));
+      return toValue;
+    },
     withSpring: (toValue: number) => toValue,
     // Resolves to its last step, like withTiming resolves to its target: the
     // pulse's SHAPE is asserted in motion/bookmarkReveal.test.ts, which

@@ -10,9 +10,11 @@ export type IconName =
   | 'settings'
   | 'words'
   | 'translate'
-  | 'translationText'
+  | 'translationOn'
+  | 'translationOff'
   | 'dictionary'
   | 'menu'
+  | 'kebab'
   | 'info'
   | 'search'
   | 'back'
@@ -25,7 +27,8 @@ export type IconName =
   | 'skipForward'
   | 'repeat'
   | 'trash'
-  | 'check';
+  | 'check'
+  | 'close';
 
 /**
  * Path data ported verbatim from web so the two products draw one glyph set:
@@ -37,10 +40,16 @@ export type IconName =
  * RN has no currentColor, so the stroke arrives as a prop from the theme.
  */
 const PATHS: Record<IconName, string[]> = {
-  // Lines of prose, for the switch that draws or hides the translation under
-  // the Arabic. Deliberately not a second globe: the globe beside it picks the
-  // language, and two glyphs of the same thing name neither.
-  translationText: ['M4 7.5h16', 'M4 12h16', 'M4 16.5h10'],
+  // The switch that draws or hides the translation under the Arabic. An
+  // Arabic-style stroke over a Latin line: ON shows both, OFF drops the Latin
+  // line, so the glyph says which script is on screen rather than merely that
+  // something is toggled. The three flat lines this replaces read as a
+  // hamburger on the device (owner, 2026-09-11, ruling R3).
+  //
+  // Deliberately not a second globe: the globe beside it picks the language,
+  // and two glyphs of the same thing name neither.
+  translationOn: ['M4 8.5c1.7-2.4 3.2.6 4.9-.7 1.5-1.2 3 1.3 4.5.9 1.3-.3 2.1-1.3 3.7-1.3', 'M5 15.5h14'],
+  translationOff: ['M4 8.5c1.7-2.4 3.2.6 4.9-.7 1.5-1.2 3 1.3 4.5.9 1.3-.3 2.1-1.3 3.7-1.3'],
   home: ['M3 10.5 12 3l9 7.5', 'M5 9.5V21h14V9.5'],
   book: [
     'M4 5a2 2 0 0 1 2-2h5v18H6a2 2 0 0 1-2-2z',
@@ -85,6 +94,13 @@ const PATHS: Record<IconName, string[]> = {
     'M12 6v14',
   ],
   menu: ['M4 6h16M4 12h16M4 18h16'],
+  // Three dots, for "more actions on this screen". `menu` above is three
+  // LINES, which is the nav-drawer glyph everywhere else on Android -- on the
+  // reader it promised a drawer and opened an action row (owner, device,
+  // 2026-09-11). Drawn as zero-length segments so each dot takes the same
+  // round cap and stroke width as every other glyph in the set, the way
+  // `info`'s dot already does.
+  kebab: ['M12 5.4v.2', 'M12 11.9v.2', 'M12 18.4v.2'],
   // The About row's glyph, and the only one of the three Menu rows with no
   // icon already. Ring plus stem plus a zero-length dot: the dot is drawn as a
   // 0.2-unit segment rather than a filled circle so it takes the same round
@@ -133,6 +149,9 @@ const PATHS: Record<IconName, string[]> = {
   // Stroked like every other glyph in this set (RN has no currentColor, so the
   // stroke arrives from the theme). 24x24 box, same as the rest.
   check: ['M20 6L9 17l-5-5'],
+  // Dismisses whatever `menu` opened -- the reader's action curtain today. Two
+  // strokes on the same 24 box, so the swap in place does not shift weight.
+  close: ['M6 6l12 12', 'M18 6L6 18'],
 };
 
 export function Icon({

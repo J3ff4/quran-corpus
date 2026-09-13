@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Word, WordSegment } from '@quran-corpus/data/mobile';
 import type * as CorpusRepository from '@/data/corpusRepository';
@@ -397,6 +397,24 @@ describe('word-by-word route', () => {
     // D47: disabled, not hidden -- still there for TalkBack to announce.
     expect(screen.getByTestId('surah-previous')).toBeTruthy();
     expect(mocks.getWbwScreen.mock.calls.length).toBe(calls);
+  });
+
+  it('keeps the surah name off the pager row', async () => {
+    // 'Al-Munafiqoon' clamped to 'Al-Munafi...' between four controls on the
+    // device (owner screenshot, 2026-09-11). Surah paging moves to the density
+    // row; the ayah pager stays beside the name, which is what it pages
+    // within.
+    render(<WbwRoute />);
+    await screen.findAllByTestId('wbw-cell');
+
+    const title = screen.getByTestId('wbw-title-row');
+    expect(within(title).queryByTestId('surah-previous')).toBeNull();
+    expect(within(title).queryByTestId('surah-next')).toBeNull();
+    expect(within(title).queryByTestId('wbw-next')).not.toBeNull();
+
+    const density = screen.getByTestId('wbw-density-row');
+    expect(within(density).queryByTestId('surah-previous')).not.toBeNull();
+    expect(within(density).queryByTestId('surah-next')).not.toBeNull();
   });
 
   it('opens the sheet on the word that was tapped', async () => {
