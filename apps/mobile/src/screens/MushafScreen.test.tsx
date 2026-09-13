@@ -177,6 +177,7 @@ const indexPages = new Map([
   [1, { page: 1, startSurahId: 1, startAyahNumber: 1, surahName: 'Al-Fatihah', juz: 1 }],
   [106, { page: 106, startSurahId: 5, startAyahNumber: 82, surahName: 'Al-Maidah', juz: 6 }],
   [107, { page: 107, startSurahId: 5, startAyahNumber: 90, surahName: 'Al-Maidah', juz: 7 }],
+  [604, { page: 604, startSurahId: 112, startAyahNumber: 1, surahName: 'Al-Ikhlas', juz: 30 }],
 ]);
 vi.mock('@/mushaf/mushafReaderData', () => ({
   useMushafIndex: () => ({
@@ -212,6 +213,10 @@ afterEach(cleanup);
 async function renderScreen() {
   render(<MushafScreen />);
   await waitFor(() => expect(screen.getByTestId('mushaf-reader')).toBeTruthy());
+  // The rows arrive in an effect, here as in the app, and the screen acts on
+  // NOTHING until they match the page in view. Without this flush a test that
+  // presses play races that effect and fails perhaps one run in ten.
+  await act(async () => {});
   return () => mocks.readerProps.at(-1) ?? {};
 }
 
@@ -618,6 +623,76 @@ describe('MushafScreen', () => {
     // finished, and restarting it is the loop the reader saw.
     expect(mocks.toggleAyah).not.toHaveBeenCalledWith(176, 4);
     expect(mocks.toggleAyah).toHaveBeenCalledWith(1, 5);
+  });
+
+  it('finishes the surahs printed below the seam before turning', async () => {
+    // A surah does not have to end where a page does: 54 pages carry two or
+    // three. Page 106 ends surah 4 at 4:176 with 5:1 and 5:2 still printed
+    // below it, and turning at `finished` skipped both -- on the page the
+    // reader was looking at.
+    mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
+    mocks.pageLines.set(106, [
+      { words: [{ surahId: 4, ayahNumber: 176, position: 1 }] },
+      { words: [{ surahId: 5, ayahNumber: 1, position: 1 }] },
+      { words: [{ surahId: 5, ayahNumber: 2, position: 1 }] },
+    ]);
+    const props = await renderScreen();
+    pressPlay();
+    mocks.toggleAyah.mockClear();
+
+    await park(props, { ayah: 176, playing: false, finished: true });
+
+    expect(mocks.toggleAyah).toHaveBeenCalledWith(1, 5);
+    expect(props()['focusPage']).toBeNull();
+  });
+
+  it('does not ask for a page past the last one', async () => {
+    // Page 604 holds 112, 113 and 114. The pager refuses a turn past 604, so a
+    // request for 605 is never answered and the play that was waiting on it
+    // waits for ever -- recitation dead, with two surahs still on screen.
+    mocks.position = { surahId: 114, ayahNumber: 6, page: 604 };
+    mocks.pageLines.set(604, [{ words: [{ surahId: 114, ayahNumber: 6, position: 1 }] }]);
+    const props = await renderScreen();
+    pressPlay();
+
+    await park(props, { ayah: 6, playing: false, finished: true });
+
+    expect(props()['focusPage']).toBeNull();
+  });
+
+  it('turns to the page the playhead is on, in either direction', async () => {
+    // Previous from a page's first ayah lands on the page BEFORE. A fixed
+    // forward step turned to 108 -- away from the ayah being recited, and two
+    // pages off it.
+    mocks.position = { surahId: 5, ayahNumber: 90, page: 107 };
+    mocks.pageLines.set(107, [{ words: [{ surahId: 5, ayahNumber: 90, position: 1 }] }]);
+    mocks.pageLines.set(106, [{ words: [{ surahId: 5, ayahNumber: 83, position: 1 }] }]);
+    const props = await renderScreen();
+    pressPlay();
+
+    await park(props, { ayah: 83, playing: true });
+
+    expect(props()['focusPage']).toBe(106);
+  });
+
+  it('drops a turn request the reader has swiped away from', async () => {
+    // The seam asks for the next page and waits on its rows. If the reader
+    // swipes elsewhere first, that request is stale: left standing it fires
+    // minutes later, when a swipe happens to land on that page, and starts
+    // reciting with nothing pressed.
+    mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
+    mocks.pageLines.set(106, [{ words: [{ surahId: 4, ayahNumber: 176, position: 1 }] }]);
+    mocks.pageLines.set(107, [{ words: [{ surahId: 5, ayahNumber: 1, position: 1 }] }]);
+    mocks.pageLines.set(1, [{ words: [{ surahId: 1, ayahNumber: 1, position: 1 }] }]);
+    const props = await renderScreen();
+    pressPlay();
+    await park(props, { ayah: 176, playing: false, finished: true });
+    mocks.toggleAyah.mockClear();
+
+    turnTo(props, 1);
+    turnTo(props, 107);
+
+    expect(mocks.toggleAyah).not.toHaveBeenCalled();
   });
 
   it('plays the page through with the continuous setting off', async () => {

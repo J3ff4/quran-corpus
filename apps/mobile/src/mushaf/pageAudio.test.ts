@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ayahOnPage, firstAyahOnPage } from './pageAudio';
+import { ayahOnPage, firstAyahOnPage, nextAyahOnPage } from './pageAudio';
 
 describe('firstAyahOnPage', () => {
   it('skips the tail carried over from the previous page', () => {
@@ -62,5 +62,49 @@ describe('ayahOnPage', () => {
   it('says no when the playhead has run off the page', () => {
     const lines = [{ words: [{ surahId: 2, ayahNumber: 26, position: 1 }] }];
     expect(ayahOnPage(lines, { surahId: 2, ayahNumber: 27 })).toBe(false);
+  });
+});
+
+describe('nextAyahOnPage', () => {
+  it('keeps a page that carries two surahs on the page', () => {
+    // Page 106: surah 4 ends at 4:176 and surah 5 begins below it. The reciter
+    // stops at a surah's last ayah, so without this the screen turned the page
+    // and 5:1-5:2 were never recited though the reader was looking at them.
+    const lines = [
+      { words: [{ surahId: 4, ayahNumber: 176, position: 1 }] },
+      { words: [{ surahId: 5, ayahNumber: 1, position: 1 }] },
+      { words: [{ surahId: 5, ayahNumber: 2, position: 1 }] },
+    ];
+    expect(nextAyahOnPage(lines, { surahId: 4, ayahNumber: 176 })).toEqual({ surahId: 5, ayahNumber: 1 });
+  });
+
+  it('answers null once nothing on the page follows the playhead', () => {
+    // The page's last opener. Only here may the caller turn.
+    const lines = [
+      { words: [{ surahId: 5, ayahNumber: 1, position: 1 }] },
+      { words: [{ surahId: 5, ayahNumber: 2, position: 1 }] },
+    ];
+    expect(nextAyahOnPage(lines, { surahId: 5, ayahNumber: 2 })).toBeNull();
+  });
+
+  it('skips the rest of the ayah that just finished', () => {
+    // The playhead's own later words are not a next ayah, and its second word
+    // never has position 1, so scanning from the FIRST occurrence would be
+    // fine here but not on the tail case below.
+    const lines = [
+      {
+        words: [
+          { surahId: 112, ayahNumber: 4, position: 1 },
+          { surahId: 112, ayahNumber: 4, position: 2 },
+          { surahId: 113, ayahNumber: 1, position: 1 },
+        ],
+      },
+    ];
+    expect(nextAyahOnPage(lines, { surahId: 112, ayahNumber: 4 })).toEqual({ surahId: 113, ayahNumber: 1 });
+  });
+
+  it('answers null when the playhead is not printed on the page', () => {
+    const lines = [{ words: [{ surahId: 5, ayahNumber: 1, position: 1 }] }];
+    expect(nextAyahOnPage(lines, { surahId: 4, ayahNumber: 176 })).toBeNull();
   });
 });

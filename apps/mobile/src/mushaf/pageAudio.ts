@@ -57,3 +57,28 @@ export function ayahOnPage(lines: readonly PageLine[], playhead: AyahRef): boole
     ),
   );
 }
+
+/**
+ * The next ayah that BEGINS on this page after `after` finishes, or null.
+ *
+ * 54 pages carry two or three surahs, and `useRecitation` stops at the last
+ * ayah of a surah by design. Turning the page there skips every ayah of the
+ * next surah that is printed on the page the reader is still looking at --
+ * page 106 holds 4:176 AND 5:1-5:2, and page 604 holds the whole of 113 and
+ * 114 behind the end of 112.
+ *
+ * Scanned in page order from where `after` starts. Null means the page has
+ * nothing left after it and the caller should turn -- including when `after`
+ * is not printed here at all.
+ */
+export function nextAyahOnPage(lines: readonly PageLine[], after: AyahRef): AyahRef | null {
+  const words = lines.flatMap((line) => line.words);
+  const start = words.findIndex(
+    (word) => word.surahId === after.surahId && word.ayahNumber === after.ayahNumber,
+  );
+  if (start === -1) return null;
+  for (const word of words.slice(start + 1)) {
+    if (word.position === 1) return { surahId: word.surahId, ayahNumber: word.ayahNumber };
+  }
+  return null;
+}

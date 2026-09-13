@@ -27,12 +27,12 @@ import {
 import { useUserDbOnFocus } from '@/data/useUserDbOnFocus';
 import { useWordSummaryLoader } from '@/data/useWordSummaryLoader';
 import { useRecitation } from '@/audio/ayahAudio';
-import { reciterById } from '@quran-corpus/data/mobile';
+import { MUSHAF_PAGE_MAX, reciterById } from '@quran-corpus/data/mobile';
 import { t } from '@/i18n/uiStrings';
 import { ayahKey, type PressedWord } from '@/mushaf/highlights';
 import { useMushafIndex } from '@/mushaf/mushafReaderData';
 import { useMushafPage } from '@/mushaf/useMushafPage';
-import { ayahOnPage, firstAyahOnPage } from '@/mushaf/pageAudio';
+import { ayahOnPage, firstAyahOnPage, nextAyahOnPage } from '@/mushaf/pageAudio';
 import { pageForAyah, pageForJump } from '@/mushaf/pageJump';
 import {
   hideChrome,
@@ -308,8 +308,15 @@ export function MushafScreen() {
     // one page per query.
     if (pageLines.length === 0) return;
     if (ayahOnPage(pageLines, playing)) return;
-    setFocusPage(currentPage + 1);
-    // pageLines and currentPage are read, not watched: see above.
+    // Where the voice actually went, not `currentPage + 1`. The playhead moves
+    // backwards too -- Previous from the first ayah of a page lands on the page
+    // before -- and a fixed forward step turned AWAY from the ayah being
+    // recited, two pages off it. The index knows the page an ayah is printed on
+    // without reading any layout rows.
+    const target = pageForAyah(index.pages, playing.surahId, playing.ayahNumber);
+    if (target === null || target === currentPage) return;
+    setFocusPage(target);
+    // pageLines, currentPage and index are read, not watched: see above.
   }, [playing?.surahId, playing?.ayahNumber, audio.playing]);
 
   // The seam. `useRecitation` stops at the last ayah of a surah by design --
@@ -317,7 +324,21 @@ export function MushafScreen() {
   // carry two surahs, so at those the hook will not advance and the screen has
   // to. Turn the page, then start whatever it begins once its rows arrive.
   useEffect(() => {
-    if (!audio.finished || currentPage === null) return;
+    if (!audio.finished || currentPage === null || playing === null) return;
+    // The rest of THIS page first. A surah does not have to end where a page
+    // does: 54 pages carry two or three, so page 106 finishes surah 4 with 5:1
+    // and 5:2 still printed below it, and page 604 hides the whole of 113 and
+    // 114 behind the end of 112. Turning here skipped every one of them.
+    const next = nextAyahOnPage(pageLines, playing);
+    if (next !== null) {
+      setPlaying(next);
+      audio.toggleAyah(next.ayahNumber, next.surahId);
+      return;
+    }
+    // The last page begins nothing further and there is no page after it; a
+    // turn request the pager refuses would leave `pendingPlayPage` set for
+    // ever, and the next manual swipe would start reciting on its own.
+    if (currentPage >= MUSHAF_PAGE_MAX) return;
     setFocusPage(currentPage + 1);
     setPendingPlayPage(currentPage + 1);
   }, [audio.finished]);
@@ -466,6 +487,11 @@ export function MushafScreen() {
           // Cleared once the pager has arrived, or the next jump to the same
           // page would be a prop that never changes and so never moves it.
           setFocusPage(null);
+          // A page that is not the one the seam asked for means the reader
+          // swiped somewhere else, and the request is stale: left standing, it
+          // would fire minutes later when a swipe happened to land on that page
+          // and start reciting with nothing pressed.
+          setPendingPlayPage((pending) => (pending === null || pending === page ? pending : null));
           setPageInView(page);
           onPageChange(page);
         }}
