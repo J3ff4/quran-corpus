@@ -196,6 +196,14 @@ describe('RecitationBar', () => {
     expect(onToggleContinuous).toHaveBeenCalledTimes(1);
   });
 
+  it('drops the repeat button where there is nothing for it to toggle', () => {
+    // The mushaf plays a page through whatever the setting says, so a repeat
+    // control there would change nothing the reader can hear on that screen.
+    renderBar({ onToggleContinuous: undefined });
+
+    expect(screen.queryByLabelText('Continuous play')).toBeNull();
+  });
+
   it('shows elapsed and remaining time', () => {
     renderBar({ positionSec: 65, durationSec: 125 });
 
