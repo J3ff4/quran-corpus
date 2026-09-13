@@ -47,7 +47,7 @@ vi.mock('@/components/SurahReader', async () => {
     // `loadWords` is destructured and driven, not dropped: a function prop a
     // mock omits renders nothing, so no assertion in this file could ever see
     // it and the route's own loader would sit unexercised (F1).
-    SurahReader: ({ onToggleBookmark, onEditNote, notesByAyah, onReadingAyah, bookmarkedAyahs, loadWords, prevSurahId, nextSurahId, onPageSurah, initialAyahNumber }: {
+    SurahReader: ({ onToggleBookmark, onEditNote, notesByAyah, onReadingAyah, bookmarkedAyahs, loadWords, prevSurahId, nextSurahId, onPageSurah, onJump, initialAyahNumber }: {
       onToggleBookmark: (ayahNumber: number) => void;
       onEditNote?: (ayahNumber: number) => void;
       notesByAyah?: Map<number, string | null>;
@@ -57,6 +57,7 @@ vi.mock('@/components/SurahReader', async () => {
       prevSurahId?: number | null;
       nextSurahId?: number | null;
       onPageSurah?: (surahId: number, side: 'prev' | 'next') => void;
+      onJump?: (surahId: number, ayahNumber: number) => void;
       initialAyahNumber?: number | null;
     }) => {
       // Recorded rather than asserted here: the route rebuilds the reader's
@@ -74,6 +75,11 @@ vi.mock('@/components/SurahReader', async () => {
           { onClick: () => nextSurahId && onPageSurah?.(nextSurahId, 'next') },
           'page next',
         ),
+        React.createElement(
+          'button',
+          { onClick: () => prevSurahId && onPageSurah?.(prevSurahId, 'prev') },
+          'page previous',
+        ),
         React.createElement('span', null, `bookmarked:${[...bookmarkedAyahs].sort((a, b) => a - b).join(',')}`),
         React.createElement('span', null, `note:${notesByAyah?.get(255) ?? 'none'}`),
         React.createElement('button', { onClick: () => onEditNote?.(255) }, 'edit note'),
@@ -81,6 +87,8 @@ vi.mock('@/components/SurahReader', async () => {
         React.createElement('button', { onClick: () => onToggleBookmark(257) }, 'bookmark other'),
         React.createElement('button', { onClick: () => onReadingAyah?.(256) }, 'read ayah'),
         React.createElement('button', { onClick: () => void loadWords(8) }, 'open word sheet'),
+        React.createElement('button', { onClick: () => onJump?.(2, 255) }, 'jump here'),
+        React.createElement('button', { onClick: () => onJump?.(3, 12) }, 'jump away'),
       );
     },
   };
@@ -480,6 +488,73 @@ describe('SurahRoute', () => {
 
     // Paging is state, so ?ayah= does not change with the surah. Handed on, a
     // bookmark that opened Al-Baqarah at 2:50 landed Aal-Imran on 3:50.
+    expect(await screen.findByText('anchor:none')).toBeTruthy();
+  });
+
+  it('anchors a jump inside the surah on screen', async () => {
+    mocks.params = { surahId: '2' };
+    render(<SurahRoute />);
+    await screen.findByText('anchor:none');
+
+    fireEvent.click(screen.getByText('jump here'));
+
+    // No page turn: the surah is already the one asked for, so the seed is the
+    // whole move.
+    expect(await screen.findByText('anchor:255')).toBeTruthy();
+    expect(mocks.getSurahReader).toHaveBeenCalledTimes(1);
+  });
+
+  it('carries the ayah into the surah a jump pages to', async () => {
+    mocks.params = { surahId: '2' };
+    render(<SurahRoute />);
+    await screen.findByText('reader-content');
+
+    fireEvent.click(screen.getByText('jump away'));
+
+    await waitFor(() =>
+      expect(mocks.getSurahReader).toHaveBeenLastCalledWith(expect.anything(), 3, 'en'),
+    );
+    // The whole point of holding the jump out here: the reader is keyed by the
+    // displayed surah, so it is remounted by this very turn.
+    expect(await screen.findByText('anchor:12')).toBeTruthy();
+  });
+
+  it('lets a later deep link outrank a jump made before it', async () => {
+    // SurahReader treats an `ayah` param change on an already-mounted reader as
+    // a deep link into the surah on screen. A jump into the same surah still
+    // matched displayedSurahId, so it won over that param -- and, never being
+    // cleared, over every later deep link into the surah too.
+    mocks.params = { surahId: '2' };
+    const { rerender } = render(<SurahRoute />);
+    await screen.findByText('reader-content');
+    fireEvent.click(screen.getByText('jump here'));
+    await screen.findByText('anchor:255');
+
+    mocks.params = { surahId: '2', ayah: '100' };
+    rerender(<SurahRoute />);
+
+    expect(await screen.findByText('anchor:100')).toBeTruthy();
+  });
+
+  it('drops a jump-s ayah when the reader is paged by a chevron', async () => {
+    // A chevron opens a surah where a step opens one. Left standing, the jump
+    // is still there when the reader is paged BACK into the surah it was made
+    // in, and 2 -> 3 -> 2 re-lands on the jumped-to ayah for ever.
+    mocks.params = { surahId: '2' };
+    render(<SurahRoute />);
+    await screen.findByText('reader-content');
+    fireEvent.click(screen.getByText('jump here'));
+    await screen.findByText('anchor:255');
+
+    fireEvent.click(screen.getByText('page next'));
+    await waitFor(() =>
+      expect(mocks.getSurahReader).toHaveBeenLastCalledWith(expect.anything(), 3, 'en'),
+    );
+    fireEvent.click(screen.getByText('page previous'));
+    await waitFor(() =>
+      expect(mocks.getSurahReader).toHaveBeenLastCalledWith(expect.anything(), 2, 'en'),
+    );
+
     expect(await screen.findByText('anchor:none')).toBeTruthy();
   });
 

@@ -103,13 +103,36 @@ describe('ReaderHeader', () => {
     expect(screen.getByTestId('toggle-translation').getAttribute('aria-checked')).toBe('false');
   });
 
-  it('hides the language control when the translation is off', () => {
-    // A picker that changes nothing visible is a dead control.
+  it('keeps the language control when the translation is off', () => {
+    // It used to be hidden here, on the rule that a picker changing nothing
+    // visible is a dead control (owner reversed it, 2026-09-12). A control
+    // that vanishes reflows the row under the thumb mid-tap.
     renderHeader({ showTranslation: false });
     openActions();
 
-    expect(screen.queryByTestId('open-language')).toBeNull();
+    expect(screen.getByTestId('open-language')).toBeTruthy();
     expect(screen.getByTestId('toggle-translation')).toBeTruthy();
+  });
+
+  it('turns the translation on when a language is picked while it is off', () => {
+    // What keeps the control above from being the dead one the old rule
+    // warned about: the language chosen is visible the moment it is chosen.
+    const { onChangeShowTranslation, onOpenLanguage } = renderHeader({ showTranslation: false });
+    openActions();
+
+    fireEvent.click(screen.getByTestId('open-language'));
+
+    expect(onChangeShowTranslation).toHaveBeenCalledWith(true);
+    expect(onOpenLanguage).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not re-assert the translation when it is already on', () => {
+    const { onChangeShowTranslation } = renderHeader({ showTranslation: true });
+    openActions();
+
+    fireEvent.click(screen.getByTestId('open-language'));
+
+    expect(onChangeShowTranslation).not.toHaveBeenCalled();
   });
 
   it('names the surah in the bar for a screen reader even while it is faded out', () => {
@@ -119,6 +142,46 @@ describe('ReaderHeader', () => {
     renderHeader({ titleStyle: { opacity: 0 } });
 
     expect(screen.getByTestId('reader-title').textContent).toBe('Al-Baqarah');
+  });
+
+  it('opens the jump sheet from the surah name', () => {
+    const onOpenJump = vi.fn();
+    renderHeader({ titleVisible: true, onOpenJump });
+
+    fireEvent.click(screen.getByTestId('reader-surah-jump'));
+
+    expect(onOpenJump).toHaveBeenCalledTimes(1);
+  });
+
+  it('still announces the surah name now that the name is a control', () => {
+    // A Pressable is `accessible` by default and collapses its descendants, so
+    // the Animated.Text is no longer announced and the label is the whole
+    // utterance. Left as the action alone, wrapping the name in a control took
+    // the surah name away from TalkBack entirely.
+    renderHeader({ titleVisible: true, onOpenJump: vi.fn() });
+
+    expect(screen.getByTestId('reader-surah-jump').getAttribute('aria-label')).toBe(
+      'Al-Baqarah, Go to surah',
+    );
+  });
+
+  it('does not take a tap while the name is faded out', () => {
+    // The name is animated to opacity 0 until the list's own heading scrolls
+    // off (M7e). A control that still takes presses there is an invisible hit
+    // target across the middle of the header, and the surah name is legible in
+    // the list heading at exactly that moment anyway.
+    const onOpenJump = vi.fn();
+    renderHeader({ titleVisible: false, titleStyle: { opacity: 0 }, onOpenJump });
+
+    fireEvent.click(screen.getByTestId('reader-surah-jump'));
+
+    expect(onOpenJump).not.toHaveBeenCalled();
+  });
+
+  it('hides the faded name from TalkBack rather than offering a dead control', () => {
+    renderHeader({ titleVisible: false, titleStyle: { opacity: 0 }, onOpenJump: vi.fn() });
+
+    expect(screen.getByTestId('reader-surah-jump').getAttribute('data-hidden-from-a11y')).toBe('true');
   });
 
   it('pages to the next surah', () => {
@@ -156,7 +219,10 @@ describe('ReaderHeader', () => {
     // pill row; only back and the actions button share row 1 now.
     renderHeader({ prevSurahId: 1, nextSurahId: 3, onPageSurah: vi.fn() });
 
-    const row = screen.getByTestId('reader-title').parentElement!;
+    // From the jump control, not the title: the name sits inside a Pressable
+    // now (ruling S3), so the title's own parent is that control rather than
+    // the row.
+    const row = screen.getByTestId('reader-surah-jump').parentElement!;
     expect(within(row).queryByTestId('surah-previous')).toBeNull();
     expect(within(row).queryByTestId('surah-next')).toBeNull();
     expect(within(row).queryByTestId('reader-back')).not.toBeNull();
@@ -216,20 +282,35 @@ describe('ReaderHeader', () => {
     expect(screen.getByTestId('reader-actions').getAttribute('aria-label')).toBe('Hide actions');
   });
 
-  it('draws the translation switch as the script it is showing', () => {
-    // Colour alone is not a state (WCAG 1.4.1): the glyph itself changes. ON
-    // draws the Latin line under the Arabic stroke, OFF drops it -- so the
-    // path count is the state, and it is the one thing a colour swap cannot
-    // fake.
+  it('strikes the translation switch through when it is off', () => {
+    // Colour alone is not a state (WCAG 1.4.1): OFF is the same A-plus-CJK
+    // mark with a slash across it, so the extra path IS the state, and it is
+    // the one thing a colour swap cannot fake.
     renderHeader({ showTranslation: true });
     openActions();
-    expect(screen.getByTestId('toggle-translation').querySelectorAll('path')).toHaveLength(2);
+    expect(screen.getByTestId('toggle-translation').querySelectorAll('path')).toHaveLength(6);
 
     cleanup();
 
     renderHeader({ showTranslation: false });
     openActions();
-    expect(screen.getByTestId('toggle-translation').querySelectorAll('path')).toHaveLength(1);
+    expect(screen.getByTestId('toggle-translation').querySelectorAll('path')).toHaveLength(7);
+  });
+
+  it('points the surah name at the sheet it opens', () => {
+    // A tappable name with nothing to say so is a control nobody finds (owner,
+    // device, 2026-09-12). The caret lives inside the faded wrapper, so it
+    // leaves with the name rather than pointing at a control that is no
+    // longer taking presses.
+    renderHeader({ titleVisible: true, onOpenJump: vi.fn() });
+
+    expect(screen.getByTestId('reader-surah-jump').querySelectorAll('svg')).toHaveLength(1);
+  });
+
+  it('draws no caret when the name opens nothing', () => {
+    renderHeader({ titleVisible: true });
+
+    expect(screen.getByTestId('reader-surah-jump').querySelectorAll('svg')).toHaveLength(0);
   });
 
   it('never lets the mode pill settle on the word-by-word door', () => {

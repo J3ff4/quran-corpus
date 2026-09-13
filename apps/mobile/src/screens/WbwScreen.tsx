@@ -1,11 +1,13 @@
 import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 import type { Word } from '@quran-corpus/data/mobile';
 import { AdjacentNavButton } from '@/components/AdjacentNav';
+import { Icon } from '@/components/icons/Icon';
 import { SegmentedControl } from '@/components/SegmentedControl';
+import { SurahJumpSheet } from '@/components/SurahJumpSheet';
 import { VersePicker } from '@/components/VersePicker';
 import { WbwDense } from '@/components/WbwDense';
 import { WbwHybrid } from '@/components/WbwHybrid';
@@ -19,9 +21,11 @@ import {
 } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { setReaderPosition } from '@/data/readerPosition';
+import { useSurahAyahCounts } from '@/data/useSurahAyahCounts';
 import { useWordSummaryLoader } from '@/data/useWordSummaryLoader';
 import { t } from '@/i18n/uiStrings';
 import { useEntryPager, useHeldEntry } from '@/motion/entryPager';
+import { usePressScaleStyle } from '@/motion/usePressScale';
 import { useAppSettings, type WbwDensity } from '@/settings/settingsStore';
 import { typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
@@ -83,6 +87,29 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
     // rather than left to the key above, which only resets on a *param*
     // change and this is not one.
     setPage({ key: `${target}:${initialFrom}`, from: 1 });
+  };
+
+  const [jumpOpen, setJumpOpen] = useState(false);
+  const ayahCountOf = useSurahAyahCounts();
+  const pressStyle = usePressScaleStyle();
+
+  // A jump can land in this surah or in another one, and the two are different
+  // moves: within the surah it is a range change, across it is a page turn the
+  // pager has to animate in the direction travelled.
+  const jumpTo = (targetSurah: number, ayahNumber: number) => {
+    setJumpOpen(false);
+    if (currentSurahId !== null && targetSurah !== currentSurahId) {
+      pager.goTo(String(targetSurah), targetSurah > currentSurahId ? 'next' : 'prev');
+      // Not setSurah(): that one opens a surah at its beginning, and this one
+      // was asked for an ayah.
+      setPage({ key: `${targetSurah}:${initialFrom}`, from: ayahNumber });
+      // What setFrom does on the in-surah arm, and the reason D46 gives for it:
+      // the ayah carries between renderings. Without it, jumping from 2:5 to
+      // 3:12 here and going back to the reader opened surah 3 at its top.
+      setReaderPosition(targetSurah, ayahNumber);
+      return;
+    }
+    setFrom(ayahNumber);
   };
 
   // Carries the surah it was loaded FOR: see the note on the reader route. The
@@ -243,16 +270,37 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
             testID="wbw-title-row"
             style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
           >
-            <Text
-              accessibilityRole="header"
-              // Clamped still, but `flex: 1` rather than `flexShrink: 1`: the
-              // name has a row to fill now, and shrink-only leaves it hugging
-              // its own text with the pager floating at the far edge.
-              numberOfLines={1}
-              style={{ color: theme.text, fontSize: typography.title, fontWeight: '700', flex: 1 }}
+            {/* The name IS the jump control (ruling S3): no button of its own,
+                because the row has no width to spend on one. The chevron is
+                the only affordance -- a tappable name with nothing to say so
+                is a control nobody finds -- and the press scale is the other
+                half of that, since a name that does not react to a press reads
+                as a rendering bug. */}
+            <Pressable
+              testID="wbw-surah-jump"
+              accessibilityRole="button"
+              // The name first: a Pressable is `accessible` by default and
+              // collapses its children, so the Text below -- heading role and
+              // all -- is not announced and this label is the whole utterance.
+              accessibilityLabel={`${view.surah.name_translit}, ${t(uiLocale, 'jump.surahTitle')}`}
+              onPress={() => setJumpOpen(true)}
+              style={(state) => [
+                pressStyle(state),
+                { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
+              ]}
             >
-              {view.surah.name_translit}
-            </Text>
+              <Text
+                accessibilityRole="header"
+                // Clamped still, but `flex: 1` rather than `flexShrink: 1`: the
+                // name has a row to fill now, and shrink-only leaves it hugging
+                // its own text with the pager floating at the far edge.
+                numberOfLines={1}
+                style={{ color: theme.text, fontSize: typography.title, fontWeight: '700', flexShrink: 1 }}
+              >
+                {view.surah.name_translit}
+              </Text>
+              <Icon name="chevronDown" size={14} color={theme.mutedText} />
+            </Pressable>
             <VersePicker
               from={view.from}
               to={view.to}
@@ -336,6 +384,15 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
           router.push(`/root/${encodeURIComponent(rootBuckwalter)}`);
         }}
       />
+      {jumpOpen && currentSurahId !== null ? (
+        <SurahJumpSheet
+          uiLocale={uiLocale}
+          surahId={currentSurahId}
+          ayahCountOf={ayahCountOf}
+          onClose={() => setJumpOpen(false)}
+          onJump={jumpTo}
+        />
+      ) : null}
     </View>
   );
 }

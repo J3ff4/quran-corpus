@@ -10,8 +10,8 @@ export type IconName =
   | 'settings'
   | 'words'
   | 'translate'
-  | 'translationOn'
-  | 'translationOff'
+  | 'translateOff'
+  | 'globe'
   | 'dictionary'
   | 'menu'
   | 'kebab'
@@ -40,16 +40,33 @@ export type IconName =
  * RN has no currentColor, so the stroke arrives as a prop from the theme.
  */
 const PATHS: Record<IconName, string[]> = {
-  // The switch that draws or hides the translation under the Arabic. An
-  // Arabic-style stroke over a Latin line: ON shows both, OFF drops the Latin
-  // line, so the glyph says which script is on screen rather than merely that
-  // something is toggled. The three flat lines this replaces read as a
-  // hamburger on the device (owner, 2026-09-11, ruling R3).
+  // The switch that draws or hides the translation under the Arabic: a Latin
+  // A beside a CJK glyph, which is the mark every Android user already reads
+  // as "translate" (owner, device, 2026-09-12). The hand-drawn Arabic stroke
+  // over a Latin line that this replaces was not legible as anything at 24pt
+  // -- it read as an ornament, not a control.
   //
-  // Deliberately not a second globe: the globe beside it picks the language,
-  // and two glyphs of the same thing name neither.
-  translationOn: ['M4 8.5c1.7-2.4 3.2.6 4.9-.7 1.5-1.2 3 1.3 4.5.9 1.3-.3 2.1-1.3 3.7-1.3', 'M5 15.5h14'],
-  translationOff: ['M4 8.5c1.7-2.4 3.2.6 4.9-.7 1.5-1.2 3 1.3 4.5.9 1.3-.3 2.1-1.3 3.7-1.3'],
+  // OFF is the same glyph struck through, not merely a dimmer one: state must
+  // not ride on colour alone (WCAG 1.4.1), and the slash is the one channel a
+  // colour swap cannot fake. The path count is therefore the state, which is
+  // also what the test asserts.
+  translate: [
+    'M2.6 14 6.3 4.6 10 14',
+    'M4 11.1h4.6',
+    'M17 9.2l-.7 1.3',
+    'M13 12.4h8',
+    'M19.6 13.8 14.2 20',
+    'M14.4 13.8 19.8 20',
+  ],
+  translateOff: [
+    'M2.6 14 6.3 4.6 10 14',
+    'M4 11.1h4.6',
+    'M17 9.2l-.7 1.3',
+    'M13 12.4h8',
+    'M19.6 13.8 14.2 20',
+    'M14.4 13.8 19.8 20',
+    'M3.4 20.6 20.6 3.4',
+  ],
   home: ['M3 10.5 12 3l9 7.5', 'M5 9.5V21h14V9.5'],
   book: [
     'M4 5a2 2 0 0 1 2-2h5v18H6a2 2 0 0 1-2-2z',
@@ -79,11 +96,11 @@ const PATHS: Record<IconName, string[]> = {
   // Four cells, not a page of lines: the word-by-word screen is a chip grid,
   // and a lines glyph would be the `book` icon again at a smaller size.
   words: ['M4 5h6.5v5.5H4z', 'M13.5 5H20v5.5h-6.5z', 'M4 13.5h6.5V19H4z', 'M13.5 13.5H20V19h-6.5z'],
-  // A globe, not a pair of letterforms: the reader's language control picks
-  // the *translation* language, and a Latin "A" beside an Arabic glyph would
-  // read as the word-by-word toggle. Drawn here -- web's LanguageBar is a text
+  // The language picker. A globe rather than a second pair of letterforms:
+  // `translate` above is the on/off switch, and two glyphs of the same thing
+  // beside each other name neither. Drawn here -- web's LanguageBar is a text
   // pill row with no icon to port.
-  translate: [
+  globe: [
     'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z',
     'M3.5 9h17M3.5 15h17',
     'M12 3c2.4 2.5 3.6 5.5 3.6 9s-1.2 6.5-3.6 9c-2.4-2.5-3.6-5.5-3.6-9s1.2-6.5 3.6-9z',
@@ -108,7 +125,7 @@ const PATHS: Record<IconName, string[]> = {
   info: ['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z', 'M12 11v6', 'M12 7.4v.2'],
   // Circle plus handle, matching web's SearchTrigger (circle cx=11 cy=11 r=7,
   // handle from 20,20). The circle is drawn as two arcs closing back on
-  // itself, the same technique `translate`'s outer ring above uses.
+  // itself, the same technique `globe`'s outer ring above uses.
   search: ['M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z', 'M20 20l-3.5-3.5'],
   // Chevron only, no shaft: mockup 1e's back affordance, and the reader draws
   // its own header now that the native toolbar is gone.

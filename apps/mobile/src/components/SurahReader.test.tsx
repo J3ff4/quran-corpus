@@ -166,6 +166,22 @@ vi.mock('./LanguageSheet', async () => {
   };
 });
 
+// Stubbed for the reason LanguageSheet is: the real sheet reaches BottomSheet,
+// and through it an Easing this suite's reanimated mock does not carry.
+// SurahJumpSheet.test.tsx covers its parsing; what matters here is that the
+// reader opens it and hands what it returns to onJump.
+vi.mock('./SurahJumpSheet', async () => {
+  const React = await import('react');
+  return {
+    SurahJumpSheet: ({ onJump }: { onJump: (surahId: number, ayahNumber: number) => void }) =>
+      React.createElement(
+        'div',
+        { 'data-testid': 'surah-jump-sheet' },
+        React.createElement('button', { 'data-testid': 'do-jump', onClick: () => onJump(3, 12) }),
+      ),
+  };
+});
+
 vi.mock('./ReciterSheet', async () => {
   const React = await import('react');
   return {
@@ -346,6 +362,21 @@ describe('SurahReader', () => {
   });
 
   afterEach(cleanup);
+
+  it('crowns the surah plate with the calligraphic name, not the reading face', () => {
+    // Owner, 2026-09-12: the Arabic name on the plate is a title, not text to
+    // be read, and the index, the mushaf band and this plate now set it in
+    // one face.
+    render(<SurahReader {...baseProps(readerData(30))} />);
+
+    const name = screen.getByTestId('surah-plate-name');
+    // V4 for all 114: V2 has no glyph for surah 102 and draws a box.
+    expect(name.style.fontFamily).toContain('SurahNameV4');
+    expect(name.textContent).toBe(String.fromCodePoint(0xe000 + 2));
+    // A PUA codepoint announces as nothing at all, so without this the plate
+    // loses the Arabic name for a screen reader entirely.
+    expect(name.getAttribute('aria-label')).toBe('البقرة');
+  });
 
   it('uses the latest reading callback after rerender', () => {
     const firstHandler = vi.fn();
@@ -1406,6 +1437,37 @@ describe('SurahReader', () => {
     expect(getByTestId('reader-title').textContent).toBe('Al-Baqarah');
   });
 
+  it('opens the jump sheet from the header name, once the name is there', async () => {
+    const onJump = vi.fn();
+    render(<SurahReader {...baseProps(readerData(30))} onJump={onJump} />);
+    // Past the fade: the control is dead while the name is, so a jump test
+    // that never scrolls is testing the guard, not the jump.
+    scrollTo(180, 400);
+    renderReaderHeader();
+
+    fireEvent.click(screen.getByTestId('reader-surah-jump'));
+    await screen.findByTestId('surah-jump-sheet');
+    fireEvent.click(screen.getByTestId('do-jump'));
+
+    // Handed up, not applied here: this component is keyed by the displayed
+    // surah, so it is remounted by the very jump it would be holding.
+    expect(onJump).toHaveBeenCalledWith(3, 12);
+  });
+
+  it('leaves the name dead to the touch while it is faded out', () => {
+    // One source of truth: the same offset drives the fade and the control, so
+    // there is no scroll position where the name is invisible and tappable.
+    const onJump = vi.fn();
+    render(<SurahReader {...baseProps(readerData(30))} onJump={onJump} />);
+    scrollTo(180, 0);
+    renderReaderHeader();
+
+    fireEvent.click(screen.getByTestId('reader-surah-jump'));
+
+    expect(screen.queryByTestId('surah-jump-sheet')).toBeNull();
+    expect(onJump).not.toHaveBeenCalled();
+  });
+
   it('keeps the nav title hidden while the big heading is on screen', () => {
     // Duplicating the 24pt heading in the app bar on the first screenful is
     // exactly the doubled-up look CLAUDE.md §8 rules out.
@@ -1525,6 +1587,34 @@ describe('SurahReader shared reading position', () => {
     // saved reading position is gated on exactly this, and a shared position
     // written from an un-landed list would then re-land the reader on it.
     expect(mocks.setReaderPosition).not.toHaveBeenCalled();
+  });
+
+  it('lands a jump inside the surah being read, not the ayah it was read at', () => {
+    // getReaderPosition is the LIVE position, rewritten on every viewable-items
+    // change for the surah on screen. So for a jump INSIDE that surah it is
+    // always set -- an anchor reset that preferred it over the seed could never
+    // move, and asking for 2:255 from 2:3 left the reader exactly where it was.
+    const props = baseProps(readerData(300));
+    const { rerender } = render(<SurahReader {...props} initialAyahNumber={3} />);
+    mocks.scrollToIndex.mockClear();
+    mocks.getReaderPosition.mockReturnValue(3);
+
+    rerender(<SurahReader {...props} initialAyahNumber={255} />);
+
+    expect(mocks.scrollToIndex).toHaveBeenCalledWith({ index: 254, animated: false });
+  });
+
+  it('falls back to the saved position when the key changes with no seed', () => {
+    // The reason the fallback exists at all: a key change carrying no ayah of
+    // its own should open the surah where it was last read.
+    const props = baseProps(readerData(300));
+    const { rerender } = render(<SurahReader {...props} initialAyahNumber={3} />);
+    mocks.scrollToIndex.mockClear();
+    mocks.getReaderPosition.mockReturnValue(40);
+
+    rerender(<SurahReader {...props} initialAyahNumber={null} />);
+
+    expect(mocks.scrollToIndex).toHaveBeenCalledWith({ index: 39, animated: false });
   });
 
   it('does not re-anchor when the store has nothing for this surah', () => {
