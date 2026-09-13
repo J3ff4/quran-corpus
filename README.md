@@ -23,6 +23,29 @@ pnpm build
 pnpm android
 ```
 
+## CI
+
+`.github/workflows/ci.yml` runs on every pull request and every push to `main`.
+Two jobs, both required to be green:
+
+| job | runs |
+|---|---|
+| `node` | `pnpm exec turbo test lint type-check` across `apps/*` and `packages/*` |
+| `python` | `ruff check`, `ruff format --check`, `mypy scraper`, `pytest -q` in `packages/scraper` |
+
+Neither job needs a database. The corpus DB is gitignored, `packages/data`
+generates its schema from `schema.sql`, and no test opens `quran.db`.
+
+**What CI does not cover, and cannot:**
+
+- **The Hans Wehr differential gate.** It reads `quran.db` and `hanswehr.sqlite`
+  from `~/quran-data/`, outside the repo, so it stays local:
+  `cd packages/scraper && uv run pytest tests/test_hanswehr_baseline.py`.
+- **The on-device smoke checklists** below. `apps/mobile` has no emulator in CI
+  (CLAUDE.md §10); a milestone is not complete until the checklist has been run
+  on real hardware and recorded in the phase plan.
+- **The Playwright E2E reading-flow smoke test** (§10). It does not exist yet.
+
 ### Mushaf page fonts
 
 The 604 KFGQPC V2 page fonts are ~180MB and are **not in git**. A mobile build
