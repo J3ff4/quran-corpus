@@ -291,7 +291,8 @@ def test_gloss_source_column_and_backfill(tmp_path) -> None:
            INSERT INTO word_glosses(word_id,language_code,gloss_text)
              VALUES (1,'en','from');"""
     )
-    raw.commit(); raw.close()
+    raw.commit()
+    raw.close()
 
     db = ScraperDatabase(p)  # _apply_schema runs the migration
     cols = {r["name"] for r in db._conn.execute("PRAGMA table_info(word_glosses)")}

@@ -21,7 +21,8 @@ class ParsedWord:
     pos_tag: str | None  # stem's <b> text in col3 (the word's main part of speech)
     english_gloss: str | None  # bare text node in cell 0 (not inside spans/links)
     morphology_json: str | None  # JSON array of all POS codes from <b> tags in col3
-    grammar_note: str | None = None  # arabicGrammar div text, \n-joined per <br/> clause
+    # arabicGrammar div text, \n-joined per <br/> clause
+    grammar_note: str | None = None
 
 
 def _is_prefixed(b_tag: Tag) -> bool:

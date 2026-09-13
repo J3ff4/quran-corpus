@@ -24,7 +24,8 @@ def main() -> None:
 
     for root_id, bw in roots:
         cur.execute(
-            "SELECT COUNT(*) FROM (SELECT DISTINCT word_id FROM word_segments WHERE root = ?)",
+            "SELECT COUNT(*) FROM "
+            "(SELECT DISTINCT word_id FROM word_segments WHERE root = ?)",
             (bw,),
         )
         occ = cur.fetchone()[0]

@@ -75,7 +75,9 @@ def main(db: str) -> None:
                     ayah_number = int(ayah["numberInSurah"])
                     ayah_id = ayah_map.get((surah_id, ayah_number))
                     if ayah_id is None:
-                        click.echo(f"  WARN: no ayah for {surah_id}:{ayah_number}", err=True)
+                        click.echo(
+                            f"  WARN: no ayah for {surah_id}:{ayah_number}", err=True
+                        )
                         continue
                     database.upsert_translation(TranslationModel(
                         ayah_id=ayah_id,

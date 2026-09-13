@@ -135,7 +135,7 @@ def check_lines(
         dist[len(lines)] += 1
         if len(lines) != LINES_PER_PAGE:
             short[len(lines)].append(page)
-        stray = sorted(l for l in lines if not 1 <= l <= LINES_PER_PAGE)
+        stray = sorted(ln for ln in lines if not 1 <= ln <= LINES_PER_PAGE)
         if stray:
             problems.append(f"page {page}: line numbers outside 1..15: {stray}")
     return dist, short, problems
@@ -157,7 +157,8 @@ def check_word_ranges(pages: dict[int, list[dict]]) -> list[str]:
     """Lines must partition the page's words, in order, with nothing left over.
 
     Word ids from the API are database ids and are not ordered by reading order
-    at all, so no arithmetic on them proves anything. Document order does: the words arrive in reading order, so a
+    at all, so no arithmetic on them proves anything. Document order does: the
+    words arrive in reading order, so a
     page's line numbers must be non-decreasing through that order, and each
     line must own one unbroken run of it. A word that appears after its line
     has been left behind means the layout and the text disagree about order.
@@ -172,7 +173,8 @@ def check_word_ranges(pages: dict[int, list[dict]]) -> list[str]:
                 continue
             if previous_line is not None and line < previous_line:
                 problems.append(
-                    f"page {page}: line {line} appears after line {previous_line} in reading order"
+                    f"page {page}: line {line} appears after "
+                    f"line {previous_line} in reading order"
                 )
             if line in seen and previous_line != line:
                 problems.append(f"page {page}: line {line} is broken into two runs")
@@ -191,7 +193,10 @@ def check_glyphs(pages: dict[int, list[dict]], edition: str) -> list[str]:
     for page, words in sorted(pages.items()):
         blank = [w["id"] for w in words if not w["code"]]
         if blank:
-            problems.append(f"page {page}: {len(blank)} words with no code_{edition} (first id {blank[0]})")
+            problems.append(
+                f"page {page}: {len(blank)} words with no code_{edition} "
+                f"(first id {blank[0]})"
+            )
     return problems
 
 
@@ -218,7 +223,8 @@ def check_corpus_alignment(pages: dict[int, list[dict]], corpus_db: str) -> list
         only_corpus = sorted(mine - theirs)
         if only_layout or only_corpus:
             problems.append(
-                f"page {page}: layout-only {only_layout or '-'}, corpus-only {only_corpus or '-'}"
+                f"page {page}: layout-only {only_layout or '-'}, "
+                f"corpus-only {only_corpus or '-'}"
             )
     return problems
 
