@@ -1009,3 +1009,27 @@ Record results in this file's verification log. "Implementation complete, verifi
 - Anything in `apps/web`.
 - The M6 baseline device run, still owed and still blocked on the owner's wireless-debugging `IP:port`.
 - `STATUS.md`, which is written at merge, not inside an open PR (`ledger-prose-feeds-review-rounds`).
+
+## Verification log — device run 2026-09-13
+
+OnePlus 7 Pro (GM1917), Android 12, adb over wifi, local release APK
+**versionCode 11** off `main` `399396b`. Dark theme. Driven from the host;
+every result below is a screenshot off the device.
+
+| # | Result |
+| --- | --- |
+| 300 | PASS — "Al-Munafiqun" and "Al-Baqara" both fully legible in the reader header, no ellipsis |
+| 301 | PASS — `⋮` unrolls three actions (translation toggle, search, globe), `✕` rolls them back, the first verse is pushed down, never covered |
+| 302 | PASS — row 1 at a surah top still carries back + `⋮`; it does not read as empty chrome |
+| 303 | PASS — the glyph changes to a struck-through A, not only its colour |
+| 304 | PASS — Words → back leaves the pill on **Translation** |
+| 305 | PASS — `‹ ›` page the surah (2 → Aal-Imran); dimmed and inert at surah 1 and at 114 |
+| 306 | NOT RUN — one-handed reach is the owner's judgement, not a screenshot's |
+| 307 | PASS — Al-Munafiqun legible on the morphology header; verse picker `‹ 1–10 ›` and both surah chevrons present |
+| 308 | PASS — one card, children inset, chevron rotated, curtain unrolled |
+| 309 | PASS — the child opened Al-Baqara 1; on return juz 1 was still expanded |
+| 310 | PASS — four juz expanded, three fast flings each way: no broken or half-drawn row |
+| 311 | PASS — surah 2 (page 2) and surah 114 (page 604) numerals larger and well inside their medallions |
+| 312 | BLOCKED — `settings put global animator_duration_scale` is denied here (`WRITE_SECURE_SETTINGS`). Owner-only. |
+| 313 | BLOCKED — TalkBack cannot be switched on from adb on this device. Owner-only. |
+| 314 | PASS — an 850px drag held at page 1 and at page 604 moves the page not at all; no rubber-band at either end |

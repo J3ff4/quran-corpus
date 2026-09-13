@@ -333,3 +333,36 @@ Dropping the mount restores today's mushaf; Task 1 is pure and harmless if left.
 - Reciter change mid-ayah restarting the ayah — it keeps the playhead (check 335).
 - Any change to the reader's own `RecitationBar` behaviour (R5 is mushaf-only, done by
   unmounting, not by editing the bar).
+
+## Verification log — device run 2026-09-13
+
+OnePlus 7 Pro (GM1917), Android 12, local release APK **versionCode 11** off
+`main` `399396b`, dark theme, media volume dropped to 4/30 for the run and
+restored afterwards.
+
+| # | Result |
+| --- | --- |
+| 325 | PASS — the compact bar sits above the tab bar on every page; reciter name legible and unclipped |
+| 326 | **N/A — the scenario does not exist in this layout.** `mushaf_layout` has **no page whose first word is `position != 1`**, and **no ayah spans two pages** (both queried across all 604). Closest reachable case run instead: page 49 (2:283–2:286), whose first *beginning* ayah 2:283 is what sounded. `firstAyahOnPage` is still the right rule; there is simply no page here that can falsify it |
+| 327 | PASS — caught mid-grow: a correctly sized bar sliding up as one motion, no 0-height frame observed (F5) |
+| 328 | PASS — pause shrank it back to the one-line compact bar (R5); play resumed the same ayah and did not restart the page (R6) |
+| 329 | PASS — paused on 49, swiped to 52, played: started **3:16**, which `mushaf_layout` confirms is page 52's first ayah |
+| 330 | PASS — at page 49's last ayah (2:286) the page turned itself to 50 and recitation ran straight on into 3:1 (R3) |
+| 331 | PASS — page 596 (92 tail, all of 93, head of 94): 93:11 ran on into 94:1 and 94:2 **on the same page**, and the page turned to 597 only for 94:3 (F2) |
+| 332 | PASS — swiped 50 → 51 while reciting; 51 is the page that stayed, twelve seconds later (F6) |
+| 333 | PASS — a tap takes header, tab bar and player together, playing or not; a second tap brings all three back (R1) |
+| 334 | PASS — 3.5s idle while playing hides all three; green ink is then the only sign of audio — 6,856 green pixels measured on the playing ayah with the chrome gone (R7) |
+| 335 | PASS — the compact bar's chevron opens the picker; choosing Abdul Basit kept the playhead (ayah 18 → 19, not a restart at the page's 3:16) |
+| 336 | PASS — skip-next, skip-prev (first press restarts the current ayah, a second within ~2s steps back) and scrub all work. The continuous toggle is **not** in this bar; it lives in Settings → Recitation and works there |
+| 337 | BLOCKED — reduced motion needs `WRITE_SECURE_SETTINGS`, denied on this device. Owner-only. |
+| 338 | BLOCKED — TalkBack cannot be switched on from adb here. Owner-only. |
+| 339 | PASS — twenty back-to-back 120ms flings. **Playing:** 21.8% janky, 14 inter-frame gaps > 32ms, max 55.7ms. **Paused, same burst:** 15.7%, 10 gaps, max **78ms**. Same order of magnitude and the worst single stall is on the *paused* run, so player state is not reaching the pager |
+
+### Note on the continuous setting
+
+With **Settings → Continuous play OFF**, mushaf play still runs ayah to ayah and
+still turns the page at the seam (verified live: 1:5 → 1:7 with the switch off).
+That is by design — `MushafScreen.test.tsx:698` states it: the mushaf's only
+control says "play this page", so it passes `continuous: true` regardless, and
+the setting governs the reader's per-ayah play. Check 330's wording
+("Continuous on:") is misleading and should be reworded; the behaviour is right.

@@ -430,3 +430,21 @@ Record results in this file's verification log. "Implementation complete, verifi
 - The **licence question on the whole surah-name family** (V2 and V4 are both "All rights reserved" from quranfonts.com). Worth its own issue; it is not a blocker for a face already shipping in the mushaf band.
 - Jump by juz or page in these two headers. The mushaf already has both.
 - Changing the mushaf band's V2 → V4.
+
+## Verification log — device run 2026-09-13
+
+OnePlus 7 Pro (GM1917), Android 12, local release APK **versionCode 11** off
+`main` `399396b`, dark theme.
+
+| # | Result |
+| --- | --- |
+| 315 | PASS — every name calligraphic, right-aligned, clipped at neither end |
+| 316 | PASS — surah 102 draws التكاثر from V4, not a tofu box |
+| 317 | PASS — surah 7: "The Heights · 206 ayahs" ends well clear of the glyph at 390pt. Surah 102's *translit* line ellipsises on its own long name, which is the row's own truncation, not a collision |
+| 318 | PASS — Juz, Page and Revealed rows unchanged |
+| 319 | PASS — morphology name opens the sheet; 2 + 255 landed on Al-Baqara 255 |
+| 320 | PASS — reader the same; the name is faded and dead to the touch at the top of a surah |
+| 321 | PASS — with the keyboard up the sheet lifts: both inputs, the error line and Go all reachable |
+| 322 | PASS — 1 + 8 → "No such surah or ayah", the sheet stays open, nothing navigates |
+| 323 | BLOCKED — TalkBack cannot be switched on from adb here. Owner-only. |
+| 324 | BLOCKED — reduced motion needs `WRITE_SECURE_SETTINGS`, denied here. Owner-only. |
