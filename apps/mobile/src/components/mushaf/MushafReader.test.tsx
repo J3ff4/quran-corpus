@@ -20,7 +20,7 @@ const mocks = vi.hoisted(() => ({
 // what the pager is handed.
 vi.mock('./MushafPager', async () => {
   const React = await import('react');
-  const { useHighlights } = await import('@/mushaf/highlightsContext');
+  const { useHighlights } = await import('@/mushaf/highlightsContext.js');
   return {
     // `highlights` is recorded off the CONTEXT, not off the props: the marks
     // reach the drawn pages that way so the real pager can stay memoised
