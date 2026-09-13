@@ -662,3 +662,68 @@ Reciter persistence was spot-checked three times across force-stop/relaunch
 Still owed after this run: 260/261/306 (owner's judgement), the TalkBack and
 reduced-motion checks (`WRITE_SECURE_SETTINGS` is denied to adb on this phone),
 the M7c carry-forward 217/218, and 219-248.
+
+## Task 10 device run 2026-09-13 (vc11 APK off `main` `40a086b`)
+
+OnePlus 7 Pro (GM1917, Android 12), adb over wireless debugging, dark theme.
+Checks 219-240 are Task 10's own list; 257 is the one row of 249-259 that no
+earlier run logged.
+
+**241-248 do not exist.** Three "still owed" lines in this file name that range,
+but no check is defined for any of those numbers anywhere in `docs/plans/`. The
+range is a bookkeeping slip carried forward from the M7d review notes, not
+outstanding work.
+
+| # | Result |
+| --- | --- |
+| 219 | PASS **on a fresh mount**, and by design not on a tab switch. Reader scrolled to Aal-Imran 3:20; force-stop, cold start, Mushaf → **page 52**, the page that ends at 3:22. Switching tabs inside a live session keeps the pager where it was (604 stayed 604) — that is the mount-time read the M7d review deliberately declined to change, so the pager cannot move under a reader who turned pages here and stepped away. |
+| 220 | PASS. Two page turns in the mushaf (52 → 54); Home's Continue reading then read **Aal-Imran 3:30** with page 54's opening words, and tapping it opened the reader at 3:30. One position, written by the mushaf, read by the reader. |
+| 221 | PASS. Chrome up, one tap, hidden inside 1.5s — well short of the 3.5s idle, so the tap did it, not the timer. |
+| 222 | PASS. A tap on blank paper brings back the Go-to bar, the compact player and the tab bar together. |
+| 223 | PASS. Left untouched after a tap, all three are gone by 6s. |
+| 224 | PASS, and **Task 6's premise does not reproduce on this build.** Twelve long-presses left to right across one line of page 46 (2:272-273), at x = 1320 … 130. Every press returned a word from that line, in strict reading order right to left: وَأَنتُمْ, وَأَنتُمْ, لَا, لَا, تُظْلَمُونَ, —, —, لِلْفُقَرَآءِ, ٱلَّذِينَ, ٱلَّذِينَ, أُحْصِرُوا۟, أُحْصِرُوا۟. The two presses that returned nothing were on the ayah-end medallion and the gap beside it, where there is no word to open. Repeats at a boundary are my x-estimates read off a half-scale screenshot, not the app's error. |
+| 224a | N/A — the classification step needs an error to classify. No constant shift, no proportional drift, no mirroring, nothing unpredictable. Branch A and branch B are both unnecessary; Task 6 can be closed against this build. |
+| 225 | PASS. Captured mid-press with the touch held down: the pressed word (مِّن, page 46 line 1) takes a green wash and green ink; after the sheet closes the word is plain again. |
+| 226 | PASS on a two-surah page. Page 106 carries 4:176 then Al-Ma'idah; bookmarking from the sheet on **5:2** filled the icon and washed exactly 5:2 on the page behind — the wash starts mid-line after the ۝١ medallion and runs to the end of the ayah, not from the top of the page. |
+| 227 | PASS. The note pencil appears once the ayah is bookmarked; "Add note / Al-Maidah 5:2", saved `vc11-check227`, and the pencil reads as filled when the sheet is reopened. |
+| 228 | PASS. Play on 5:2 flipped the control to Pause and `dumpsys audio` showed `AudioTrack … state:started … USAGE_MEDIA`; the pause control stopped it (0 started media players). |
+| 229 | PASS both halves. Page 1 and page 3: number bottom-**right**. Pages 2, 46, 604: number bottom-**left**. |
+| 230 | PASS. Surah name top-left, juz top-right, on every page sampled (Al-Baqara/Juz 1, Al-Baqara/Juz 3, An-Naba/Juz 30, Al-Ikhlas/Juz 30). |
+| 231 | PASS. Both are painted on the page, not on the chrome: they and the page number are still there in every chrome-hidden screenshot. |
+| 232 | PASS. Page 604, surah 114's band: `114` in the left cutout and `١١٤` in the right, both legible at size. Same on 112, 113 and on An-Naba's band. |
+| 233 | PASS. Go to → Page → 46 → page 46. |
+| 234 | PASS. Go to → Surah → 5 → page 106, Al-Ma'idah's first page. The header reads "An-Nisa" there because the page *opens* in 4:176 — the header names the page's opening surah, per M7c. |
+| 235 | PASS. Go to → Juz → 30 → An-Naba, "Juz 30" in the header. |
+| 236 | PASS. Page 605: the field turns red and the sheet stays open with **"Nothing there. Page 1-604, surah 1-114, juz 1-30."** Editing the field clears the error. |
+| 237 | PASS. Menu → Morphology opens the word-by-word screen, at Al-Ikhlas — the surah the mushaf was on. |
+| 238 | PASS. The reader's chips are exactly **Translation \| Words**. |
+| 239 | BLOCKED — TalkBack. `adb shell settings put` is denied `WRITE_SECURE_SETTINGS` on this phone, and TalkBack would take over the screen this session uses as its display. Owner action. |
+| 240 | BLOCKED — Remove animations, same denial (re-confirmed this run: `SecurityException: Permission denial: writing to settings requires:android.permission.WRITE_SECURE_SETTINGS`). Owner action. |
+| 257 | PASS. Page 3 is a full 15-line grid; the centring is pages 1-2 only. |
+
+### One observation, not reproducible
+
+Once during this run the app reached a state where **the Menu tab had no tab
+bar and no way to switch tabs**, cured only by a force-stop. It appeared after:
+mushaf chrome shown → Menu tab → Morphology → back.
+
+Six targeted attempts failed to reproduce it, including that exact sequence
+step-by-step with the bar verified present at each step, and three timed
+variants (1.5s / 3.0s / 5.0s on Menu before pushing Morphology). A control —
+Home → Menu with the mushaf never opened, 8s idle — kept the bar. `logcat`
+carries no JS error from the window.
+
+The mechanism is at least plausible: `chromeVisibility` is module state shared
+by the mushaf and `GlassTabBar`, `/morphology` is a root route outside the tabs
+navigator so the bar unmounts while it is pushed, and only the mushaf screen
+ever calls `showChrome`. If `visible` is false when the tabs navigator comes
+back, no screen but the mushaf can turn it true again. `MushafScreen`'s
+`useFocusEffect` cleanup calls `releaseChrome` on blur, which is what normally
+prevents this — the failure would be a path where that cleanup does not run.
+Recorded here rather than filed: one sighting, no repro, and a guess at the
+mechanism is not a bug report.
+
+### Still owed
+
+217, 218, 239, 240 — TalkBack and reduced motion, all four blocked on
+`WRITE_SECURE_SETTINGS`. 260, 261 and 306 remain the owner's judgement calls.
