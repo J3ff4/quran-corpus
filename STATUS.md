@@ -7,9 +7,21 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-09-11
+Updated: 2026-09-13
 
 ## Now
+
+### ✅ CI GATE — MERGED 2026-09-13 as `1eced07` (PR #76), issue #1 CLOSED
+`.github/workflows/ci.yml`: job `node` = turbo test+lint+type-check, job `python` =
+ruff check + format --check + mypy + pytest. GitHub-hosted, no secret, no DB.
+Mutation-checked, not just green — break run [34786608056](https://github.com/J3ff4/quran-corpus/actions/runs/34786608056)
+took BOTH jobs red, revert run [34786705666](https://github.com/J3ff4/quran-corpus/actions/runs/34786705666) green.
+Two style commits cleared the red ruff gates first (13 errors, then 27 files).
+**OWED, owner-only:** branch protection on `main` — require both checks in Settings.
+Until set, the gate reports but blocks nothing.
+Local pytest 825 vs CI 822+3 skipped is BY DESIGN (DB-guarded skips) — see
+`docs/plans/phase-ci-gate.md`. Still owed and unrelated: the §10 Playwright E2E smoke
+test has never been written.
 
 ### 🚧 M7e HEADER + BROWSE POLISH — PR #69 OPEN (branch `feat/m7e-header-polish`)
 Six device-reported UI defects + a read-only font spike. Plan +10 owner rulings in
