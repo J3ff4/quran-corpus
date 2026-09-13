@@ -89,7 +89,9 @@ def scrape(
 @click.option("--db", default="quran.db", show_default=True, help="SQLite output path")
 @click.option("--checkpoint", default="dict_checkpoint.json", show_default=True)
 @click.option(
-    "--snapshot-dir", default=".snapshots/roots", show_default=True,
+    "--snapshot-dir",
+    default=".snapshots/roots",
+    show_default=True,
     help="Persist raw HTML here (CLAUDE.md §11)",
 )
 @rate_limit_option
@@ -117,10 +119,12 @@ def scrape_dictionary_cmd(
     "--checkpoint",
     required=True,
     help="Checkpoint file. Required: defaulting to the main dict_checkpoint"
-         " would mark roots done in the checkpoint the full scrape depends on.",
+    " would mark roots done in the checkpoint the full scrape depends on.",
 )
 @click.option(
-    "--snapshot-dir", default=".snapshots/roots", show_default=True,
+    "--snapshot-dir",
+    default=".snapshots/roots",
+    show_default=True,
     help="Persist raw HTML here so a future parser fix needs no re-fetch",
 )
 @rate_limit_option
@@ -165,7 +169,9 @@ def rescrape_formless_roots_cmd(
 
 @main.command("migrate-snapshot-names")
 @click.option(
-    "--snapshot-dir", default=".snapshots/roots", show_default=True,
+    "--snapshot-dir",
+    default=".snapshots/roots",
+    show_default=True,
     type=click.Path(exists=True, file_okay=False),
     help="Snapshot archive to rename in place",
 )
@@ -200,7 +206,9 @@ def migrate_snapshot_names_cmd(snapshot_dir: str, dry_run: bool) -> None:
 @main.command("reparse-snapshots")
 @click.option("--db", default="quran.db", show_default=True, help="SQLite output path")
 @click.option(
-    "--snapshot-dir", default=".snapshots/roots", show_default=True,
+    "--snapshot-dir",
+    default=".snapshots/roots",
+    show_default=True,
     type=click.Path(exists=True, file_okay=False),
     help="Archive to re-parse (written by scrape-dictionary --snapshot-dir)",
 )
@@ -605,7 +613,6 @@ def fetch_salmone(dest: str, force: bool) -> None:
     path = download_salmone(Path(dest), force=force)
     size = path.stat().st_size
     click.echo(f"Salmone: {path.name}, {size} bytes -> {dest}")
-
 
 
 @main.command("mushaf-fetch")

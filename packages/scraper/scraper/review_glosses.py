@@ -8,6 +8,7 @@ them. import_reviewed writes the corrected UZ back to every word sharing that
 EN gloss, CREATING the uz row if it didn't exist and flipping source to
 'mt-reviewed' either way. Both idempotent. source values: mt -> mt-reviewed.
 """
+
 from __future__ import annotations
 
 from .db import ScraperDatabase

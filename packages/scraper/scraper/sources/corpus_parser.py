@@ -21,7 +21,8 @@ class ParsedWord:
     pos_tag: str | None  # stem's <b> text in col3 (the word's main part of speech)
     english_gloss: str | None  # bare text node in cell 0 (not inside spans/links)
     morphology_json: str | None  # JSON array of all POS codes from <b> tags in col3
-    grammar_note: str | None = None  # arabicGrammar div text, \n-joined per <br/> clause
+    # arabicGrammar div text, \n-joined per <br/> clause
+    grammar_note: str | None = None
 
 
 def _is_prefixed(b_tag: Tag) -> bool:
@@ -121,8 +122,10 @@ def parse_verse_words(html: str) -> list[ParsedWord]:
                         stem_pos_tag = code
             grammar_note = _extract_grammar_note(col3)
 
-        pos_tag = stem_pos_tag if stem_pos_tag is not None else (
-            pos_codes[0] if pos_codes else None
+        pos_tag = (
+            stem_pos_tag
+            if stem_pos_tag is not None
+            else (pos_codes[0] if pos_codes else None)
         )
         morphology_json = (
             json.dumps(pos_codes, ensure_ascii=False) if pos_codes else None

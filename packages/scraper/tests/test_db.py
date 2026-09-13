@@ -282,6 +282,7 @@ def test_gloss_source_column_and_backfill(tmp_path) -> None:
     p = str(tmp_path / "s.db")
     # simulate a legacy DB: create word_glosses WITHOUT source, insert an EN row
     import sqlite3
+
     raw = sqlite3.connect(p)
     raw.executescript(
         """CREATE TABLE word_glosses(
@@ -291,7 +292,8 @@ def test_gloss_source_column_and_backfill(tmp_path) -> None:
            INSERT INTO word_glosses(word_id,language_code,gloss_text)
              VALUES (1,'en','from');"""
     )
-    raw.commit(); raw.close()
+    raw.commit()
+    raw.close()
 
     db = ScraperDatabase(p)  # _apply_schema runs the migration
     cols = {r["name"] for r in db._conn.execute("PRAGMA table_info(word_glosses)")}
@@ -360,8 +362,11 @@ def test_delete_root_forms_removes_only_that_root(tmp_path):
     for rid in (keep, drop):
         db.upsert_root_form(
             RootFormModel(
-                root_id=rid, sort_order=0, pos_label="Noun",
-                form_arabic="ك", occurrence_count=1,
+                root_id=rid,
+                sort_order=0,
+                pos_label="Noun",
+                form_arabic="ك",
+                occurrence_count=1,
             )
         )
 
@@ -395,8 +400,8 @@ def test_get_or_create_root_inserts_when_absent(tmp_path):
     db = ScraperDatabase(str(tmp_path / "d.db"))
     rid = db.get_or_create_root("ktb", "كتب")
     row = db._conn.execute(
-        "SELECT root_buckwalter, root_arabic, occurrence_count FROM roots"
-        " WHERE id=?", (rid,)
+        "SELECT root_buckwalter, root_arabic, occurrence_count FROM roots WHERE id=?",
+        (rid,),
     ).fetchone()
     assert tuple(row) == ("ktb", "كتب", 0)
     db.close()
@@ -428,10 +433,7 @@ def _seed_ranked_roots(db) -> None:
 
 
 def _ranks(db) -> list:
-    return [
-        r[0]
-        for r in db._conn.execute("SELECT sort_order FROM roots ORDER BY id")
-    ]
+    return [r[0] for r in db._conn.execute("SELECT sort_order FROM roots ORDER BY id")]
 
 
 @pytest.fixture

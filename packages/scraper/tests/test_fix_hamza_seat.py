@@ -37,9 +37,7 @@ def _db(tmp_path) -> ScraperDatabase:
 
 def test_fixes_ayah_and_word_text(tmp_path) -> None:
     db = _db(tmp_path)
-    aid = db.upsert_ayah(
-        AyahModel(surah_id=2, ayah_number=8, text_uthmani=_GIVEN_WORD)
-    )
+    aid = db.upsert_ayah(AyahModel(surah_id=2, ayah_number=8, text_uthmani=_GIVEN_WORD))
     db.upsert_word(WordModel(ayah_id=aid, position=8, text_arabic=_GIVEN_WORD))
 
     ayahs_changed, words_changed = fix_hamza_seat(db)
@@ -71,9 +69,7 @@ def test_root_internal_hamza_untouched(tmp_path) -> None:
 
 def test_idempotent_second_run_is_noop(tmp_path) -> None:
     db = _db(tmp_path)
-    aid = db.upsert_ayah(
-        AyahModel(surah_id=2, ayah_number=8, text_uthmani=_GIVEN_WORD)
-    )
+    aid = db.upsert_ayah(AyahModel(surah_id=2, ayah_number=8, text_uthmani=_GIVEN_WORD))
     db.upsert_word(WordModel(ayah_id=aid, position=1, text_arabic=_GIVEN_WORD))
     assert fix_hamza_seat(db) == (1, 1)
     assert fix_hamza_seat(db) == (0, 0)

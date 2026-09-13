@@ -1,4 +1,5 @@
-"""Importer for Tarteel AI's Quranic Universal Library (QUL) "simple" translation format.
+"""Importer for the "simple" translation format of Tarteel AI's
+Quranic Universal Library (QUL).
 
 Format is a dict keyed by "surah:ayah", e.g.:
   {"1:1": {"t": "..."}, "1:2": {"t": "...", "f": {...}}, ...}

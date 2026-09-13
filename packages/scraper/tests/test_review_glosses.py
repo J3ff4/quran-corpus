@@ -14,7 +14,9 @@ def _db(tmp_path):
     for pos, g in [(1, "from"), (2, "from"), (3, "Allah")]:
         aid = db.upsert_ayah(AyahModel(surah_id=1, ayah_number=1, text_uthmani="x"))
         wid = db.upsert_word(WordModel(ayah_id=aid, position=pos, text_arabic="x"))
-        db.upsert_word_gloss(WordGlossModel(word_id=wid, language_code="en", gloss_text=g))
+        db.upsert_word_gloss(
+            WordGlossModel(word_id=wid, language_code="en", gloss_text=g)
+        )
     translate_glosses(db, FakeMt())
     return db
 
@@ -47,7 +49,9 @@ def _add_en_only_word(db, gloss_text: str) -> int:
     """
     aid = db.upsert_ayah(AyahModel(surah_id=1, ayah_number=2, text_uthmani="y"))
     wid = db.upsert_word(WordModel(ayah_id=aid, position=1, text_arabic="y"))
-    db.upsert_word_gloss(WordGlossModel(word_id=wid, language_code="en", gloss_text=gloss_text))
+    db.upsert_word_gloss(
+        WordGlossModel(word_id=wid, language_code="en", gloss_text=gloss_text)
+    )
     return wid
 
 
@@ -67,7 +71,8 @@ def test_import_reviewed_creates_missing_uz_row(tmp_path):
     n = import_reviewed(db, [{"en": "except", "uz": "dan"}])
     assert n == 1
     row = db._conn.execute(
-        "SELECT gloss_text, source FROM word_glosses WHERE word_id=? AND language_code='uz'",
+        "SELECT gloss_text, source FROM word_glosses "
+        "WHERE word_id=? AND language_code='uz'",
         (wid,),
     ).fetchone()
     assert (row["gloss_text"], row["source"]) == ("dan", "mt-reviewed")

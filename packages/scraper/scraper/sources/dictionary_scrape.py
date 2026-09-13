@@ -139,9 +139,7 @@ def scrape_word_details(
                     " ".join(detail.grammar_arabic) or None,
                 )
                 for tag in detail.concept_tags:
-                    db.upsert_concept_tag(
-                        ConceptTagModel(word_id=wid, tag_label=tag)
-                    )
+                    db.upsert_concept_tag(ConceptTagModel(word_id=wid, tag_label=tag))
                 stored += 1
             checkpoint.mark_done(key)
             if rate_limit:

@@ -33,9 +33,7 @@ def import_corpus_morphology(path: Path, db: ScraperDatabase) -> int:
 
         word_texts = text_uthmani.split() if text_uthmani else []
         text_arabic = (
-            word_texts[pw.position - 1]
-            if 0 < pw.position <= len(word_texts)
-            else ""
+            word_texts[pw.position - 1] if 0 < pw.position <= len(word_texts) else ""
         )
 
         db.upsert_word(

@@ -13,16 +13,22 @@ def _mkdb(tmp_path):
     aid = 0
     for surah, ayah, pos, exp_ar, exp_tr in GROUND_TRUTH:
         if surah not in seen_surah:
-            db.upsert_surah(SurahModel(id=surah, name_arabic="x", name_translit="x",
-                name_translation="x", revelation_type="meccan", ayah_count=ayah,
-                order_number=surah))
+            db.upsert_surah(
+                SurahModel(
+                    id=surah,
+                    name_arabic="x",
+                    name_translit="x",
+                    name_translation="x",
+                    revelation_type="meccan",
+                    ayah_count=ayah,
+                    order_number=surah,
+                )
+            )
             seen_surah.add(surah)
         if (surah, ayah) not in ayah_id:
             aid += 1
             db.upsert_ayah(
-                AyahModel(
-                    id=aid, surah_id=surah, ayah_number=ayah, text_uthmani="x"
-                )
+                AyahModel(id=aid, surah_id=surah, ayah_number=ayah, text_uthmani="x")
             )
             ayah_id[(surah, ayah)] = aid
         _w(db, ayah_id[(surah, ayah)], pos, exp_ar, exp_tr)
@@ -91,8 +97,10 @@ def test_flags_word_without_segments(tmp_path):
     # the inner-join misalignment check can't see it — the gate must still flag.
     db.upsert_word(
         WordModel(
-            ayah_id=ayah_id[(112, 1)], position=2,
-            text_arabic="", transliteration="x",
+            ayah_id=ayah_id[(112, 1)],
+            position=2,
+            text_arabic="",
+            transliteration="x",
         )
     )
     errs = validate_alignment(db)
@@ -106,8 +114,10 @@ def test_empty_form_suffix_is_not_flagged(tmp_path):
     db, ayah_id = _mkdb(tmp_path)
     wid = db.upsert_word(
         WordModel(
-            ayah_id=ayah_id[(112, 1)], position=2,
-            text_arabic="رَبِّ", transliteration="rabbi",
+            ayah_id=ayah_id[(112, 1)],
+            position=2,
+            text_arabic="رَبِّ",
+            transliteration="rabbi",
         )
     )
     db.upsert_word_segment(

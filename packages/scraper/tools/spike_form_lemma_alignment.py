@@ -4,6 +4,7 @@ hand during design? Diagnostic only -- not imported by app code.
 
 Run: python3 packages/scraper/tools/spike_form_lemma_alignment.py
 """
+
 import sqlite3
 
 DB_PATH = "/home/claude/quran-data/quran.db"
@@ -24,7 +25,8 @@ def main() -> None:
 
     for root_id, bw in roots:
         cur.execute(
-            "SELECT COUNT(*) FROM (SELECT DISTINCT word_id FROM word_segments WHERE root = ?)",
+            "SELECT COUNT(*) FROM "
+            "(SELECT DISTINCT word_id FROM word_segments WHERE root = ?)",
             (bw,),
         )
         occ = cur.fetchone()[0]

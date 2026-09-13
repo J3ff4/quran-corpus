@@ -5,6 +5,7 @@ NllbMt is the one concrete impl — Meta NLLB-200 distilled-600M, run locally
 (free, offline, no key). Heavy deps (transformers, torch) are imported lazily
 so the module and the fast tests never need them; install with the `mt` extra.
 """
+
 from __future__ import annotations
 
 from typing import Protocol
@@ -55,8 +56,6 @@ class NllbMt:
         for i in range(0, len(texts), self._batch_size):
             chunk = texts[i : i + self._batch_size]
             enc = self._tok(chunk, return_tensors="pt", padding=True, truncation=True)
-            gen = self._model.generate(
-                **enc, forced_bos_token_id=bos, max_length=128
-            )
+            gen = self._model.generate(**enc, forced_bos_token_id=bos, max_length=128)
             out.extend(self._tok.batch_decode(gen, skip_special_tokens=True))
         return out
