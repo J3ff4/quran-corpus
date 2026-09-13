@@ -1,0 +1,64 @@
+# The repo's only automated gate. Before this existed, every test and lint
+# result was produced locally and reported in prose (issue #1, CLAUDE.md §14).
+#
+# Two independent jobs because the two toolchains share nothing: turbo drives
+# the JS workspace, uv drives the scraper. Neither needs a database — the
+# corpus DB is gitignored, packages/data generates its schema from schema.sql,
+# and no test opens quran.db.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A force-push supersedes its own in-flight run; nothing here is worth paying twice for.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  node:
+    name: node (test, lint, type-check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # No version pin: pnpm/action-setup reads packageManager from package.json,
+      # so the lockfile and the CI pnpm can never drift apart.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # One turbo invocation: test and type-check both dependsOn ^build, so
+      # splitting them into steps would rebuild the shared packages twice.
+      - run: pnpm exec turbo test lint type-check
+
+  python:
+    name: python (ruff, mypy, pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/scraper
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: packages/scraper/uv.lock
+
+      # --frozen everywhere: a stale uv.lock fails the gate instead of being
+      # silently resolved around.
+      - run: uv run --frozen ruff check .
+      - run: uv run --frozen ruff format --check .
+      - run: uv run --frozen mypy scraper
+      - run: uv run --frozen pytest -q
