@@ -14,7 +14,7 @@ FIX = Path(__file__).parent / "fixtures"
 # Single-form root page (Phase 17 shape): no <ul class="also">, the one form
 # is named inline. Shared with tests/test_replay.py -- same page, same root.
 _ONE_FORM_HTML = (
-    '<html><body>The triliteral root hamza rā ḍād '
+    "<html><body>The triliteral root hamza rā ḍād "
     '(<span class="at">أ ر ض</span>) occurs 461 times in the Quran as the '
     'noun <i class="ab">arḍ</i> (<span class="at">أَرْض</span>).</body></html>'
 )
@@ -161,8 +161,12 @@ def test_done_root_is_refetched_when_its_snapshot_is_missing(tmp_path):
         return _FakeClient(_ONE_FORM_HTML, calls)
 
     scrape_dictionary(
-        db, ckpt, client_factory=factory, rate_limit=0,
-        roots=["ArD"], snapshot_dir=str(tmp_path / "snaps"),
+        db,
+        ckpt,
+        client_factory=factory,
+        rate_limit=0,
+        roots=["ArD"],
+        snapshot_dir=str(tmp_path / "snaps"),
     )
 
     assert len(calls) == 1
@@ -180,8 +184,12 @@ def test_done_root_is_skipped_when_its_snapshot_exists(tmp_path):
     calls: list[str] = []
 
     scrape_dictionary(
-        db, ckpt, client_factory=lambda: _FakeClient(_ONE_FORM_HTML, calls),
-        rate_limit=0, roots=["ArD"], snapshot_dir=str(tmp_path / "snaps"),
+        db,
+        ckpt,
+        client_factory=lambda: _FakeClient(_ONE_FORM_HTML, calls),
+        rate_limit=0,
+        roots=["ArD"],
+        snapshot_dir=str(tmp_path / "snaps"),
     )
 
     # Already archived -- re-fetching would be a pointless request against a
@@ -199,8 +207,12 @@ def test_done_root_is_skipped_when_snapshots_are_off(tmp_path):
     calls: list[str] = []
 
     scrape_dictionary(
-        db, ckpt, client_factory=lambda: _FakeClient(_ONE_FORM_HTML, calls),
-        rate_limit=0, roots=["ArD"], snapshot_dir=None,
+        db,
+        ckpt,
+        client_factory=lambda: _FakeClient(_ONE_FORM_HTML, calls),
+        rate_limit=0,
+        roots=["ArD"],
+        snapshot_dir=None,
     )
 
     assert calls == []
@@ -217,15 +229,21 @@ def test_rescrape_replaces_stale_forms(tmp_path):
     for i in range(3):
         db.upsert_root_form(
             RootFormModel(
-                root_id=rid, sort_order=i, pos_label="Stale",
-                form_arabic="ستالة", occurrence_count=1,
+                root_id=rid,
+                sort_order=i,
+                pos_label="Stale",
+                form_arabic="ستالة",
+                occurrence_count=1,
             )
         )
     ckpt = Checkpoint(str(tmp_path / "c.json"))
 
     scrape_dictionary(
-        db, ckpt, client_factory=lambda: _FakeClient(_ONE_FORM_HTML, []),
-        rate_limit=0, roots=["ArD"],
+        db,
+        ckpt,
+        client_factory=lambda: _FakeClient(_ONE_FORM_HTML, []),
+        rate_limit=0,
+        roots=["ArD"],
     )
 
     rows = db._conn.execute(
@@ -252,8 +270,12 @@ def test_interrupt_after_snapshot_does_not_strand_the_root(tmp_path):
     ):
         try:
             scrape_dictionary(
-                db, ckpt, client_factory=lambda: boom, rate_limit=0,
-                roots=["ArD"], snapshot_dir=snaps,
+                db,
+                ckpt,
+                client_factory=lambda: boom,
+                rate_limit=0,
+                roots=["ArD"],
+                snapshot_dir=snaps,
             )
         except KeyboardInterrupt:
             pass
@@ -264,9 +286,12 @@ def test_interrupt_after_snapshot_does_not_strand_the_root(tmp_path):
 
     calls: list[str] = []
     scrape_dictionary(
-        db, Checkpoint(str(tmp_path / "c.json")),
+        db,
+        Checkpoint(str(tmp_path / "c.json")),
         client_factory=lambda: _FakeClient(_ONE_FORM_HTML, calls),
-        rate_limit=0, roots=["ArD"], snapshot_dir=snaps,
+        rate_limit=0,
+        roots=["ArD"],
+        snapshot_dir=snaps,
     )
 
     assert len(calls) == 1, "stranded root was skipped instead of re-fetched"

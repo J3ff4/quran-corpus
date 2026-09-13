@@ -5,6 +5,7 @@ from scraper.mt import MtProvider
 
 class FakeMt:
     """Deterministic stand-in used across gloss tests."""
+
     def translate(self, texts: list[str]) -> list[str]:
         return [f"uz:{t}" for t in texts]
 
@@ -17,11 +18,13 @@ def test_fake_satisfies_protocol() -> None:
 def test_nllb_importable_without_torch() -> None:
     # Module must import even when transformers/torch absent (lazy load).
     from scraper.mt import NllbMt
+
     assert NllbMt is not None
 
 
 class _FakeTok:
     """Tokenizer that fails to resolve the target-language token (returns unk)."""
+
     unk_token_id = 3
 
     def convert_tokens_to_ids(self, token):

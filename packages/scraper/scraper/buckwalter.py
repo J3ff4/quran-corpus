@@ -67,7 +67,7 @@ _BUCKWALTER_TO_ARABIC: dict[str, str] = {
     # Quranic / extended symbols present in the corpus
     ":": "ۜ",  # small high seen
     "@": "۟",  # small high rounded zero
-    "\"": "۠",  # small high upright rectangular zero
+    '"': "۠",  # small high upright rectangular zero
     "[": "ۢ",  # small high meem isolated form
     ";": "ۣ",  # small low seen
     ",": "ۥ",  # small waw

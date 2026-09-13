@@ -50,9 +50,21 @@ _SINGLE_FORM_LEAD_RE = re.compile(
 )
 _ARABIC_RE = re.compile(r"[؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿]")
 _NUMBER_WORDS = {
-    "once": 1, "twice": 2, "thrice": 3,
-    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
-    "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+    "once": 1,
+    "twice": 2,
+    "thrice": 3,
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+    "eleven": 11,
+    "twelve": 12,
 }
 
 
@@ -170,9 +182,7 @@ def _extract_single_form(soup: BeautifulSoup, total: int) -> list[ParsedRootForm
         # The root header's own <i class="ab"> fails this match, so the loop
         # skips past it without a special case.
         lead = " ".join(
-            " ".join(
-                (s.get_text(" ") if isinstance(s, Tag) else str(s)).split()
-            )
+            " ".join((s.get_text(" ") if isinstance(s, Tag) else str(s)).split())
             for s in reversed(list(translit_el.previous_siblings))
         )
         m = _SINGLE_FORM_LEAD_RE.search(lead)

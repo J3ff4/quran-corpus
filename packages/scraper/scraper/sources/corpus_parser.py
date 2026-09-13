@@ -122,8 +122,10 @@ def parse_verse_words(html: str) -> list[ParsedWord]:
                         stem_pos_tag = code
             grammar_note = _extract_grammar_note(col3)
 
-        pos_tag = stem_pos_tag if stem_pos_tag is not None else (
-            pos_codes[0] if pos_codes else None
+        pos_tag = (
+            stem_pos_tag
+            if stem_pos_tag is not None
+            else (pos_codes[0] if pos_codes else None)
         )
         morphology_json = (
             json.dumps(pos_codes, ensure_ascii=False) if pos_codes else None

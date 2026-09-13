@@ -23,9 +23,7 @@ def db() -> ScraperDatabase:
     database.upsert_ayah(
         AyahModel(surah_id=1, ayah_number=1, text_uthmani="بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ")
     )
-    database.upsert_ayah(
-        AyahModel(surah_id=1, ayah_number=2, text_uthmani="ٱلْحَمْدُ")
-    )
+    database.upsert_ayah(AyahModel(surah_id=1, ayah_number=2, text_uthmani="ٱلْحَمْدُ"))
     return database
 
 

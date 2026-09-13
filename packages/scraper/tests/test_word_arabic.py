@@ -24,8 +24,17 @@ _FIXED_WORD = _ALEF_WASLA + _SEAT + _AKHIRI
 
 def _mkdb(tmp_path):
     db = ScraperDatabase(str(tmp_path / "t.db"))
-    db.upsert_surah(SurahModel(id=1, name_arabic="x", name_translit="x",
-        name_translation="x", revelation_type="meccan", ayah_count=1, order_number=1))
+    db.upsert_surah(
+        SurahModel(
+            id=1,
+            name_arabic="x",
+            name_translit="x",
+            name_translation="x",
+            revelation_type="meccan",
+            ayah_count=1,
+            order_number=1,
+        )
+    )
     db.upsert_ayah(AyahModel(id=1, surah_id=1, ayah_number=1, text_uthmani="x"))
     return db
 
@@ -44,15 +53,17 @@ def _seg(db, word_id, idx, form):
 
 def test_derive_fixes_drift_and_leaves_aligned(tmp_path):
     db = _mkdb(tmp_path)
-    drift = _word(db, 1, "بِسْمِ")       # wrong
-    _seg(db, drift, 0, "قُلْ")           # truth
-    ok = _word(db, 2, "ٱلْكِتَٰبُ")       # already right (2 segments)
+    drift = _word(db, 1, "بِسْمِ")  # wrong
+    _seg(db, drift, 0, "قُلْ")  # truth
+    ok = _word(db, 2, "ٱلْكِتَٰبُ")  # already right (2 segments)
     _seg(db, ok, 0, "ٱلْ")
     _seg(db, ok, 1, "كِتَٰبُ")
     changed = derive_word_arabic(db)
     assert changed == 1
-    rows = {r["position"]: r["text_arabic"] for r in
-            db._conn.execute("SELECT position,text_arabic FROM words")}
+    rows = {
+        r["position"]: r["text_arabic"]
+        for r in db._conn.execute("SELECT position,text_arabic FROM words")
+    }
     assert rows[1] == "قُلْ"
     assert rows[2] == "ٱلْكِتَٰبُ"
     # idempotent
@@ -68,9 +79,7 @@ def test_derive_concats_in_segment_index_order_not_insertion_order(tmp_path):
     _seg(db, wid, 0, "ا")
     _seg(db, wid, 1, "ب")
     derive_word_arabic(db)
-    row = db._conn.execute(
-        "SELECT text_arabic FROM words WHERE position=1"
-    ).fetchone()
+    row = db._conn.execute("SELECT text_arabic FROM words WHERE position=1").fetchone()
     assert row["text_arabic"] == "ابج"
 
 
@@ -91,7 +100,5 @@ def test_derive_reapplies_hamza_seat_fix_after_rebuild(tmp_path):
     _seg(db, wid, 0, _ARTICLE_SEG)
     _seg(db, wid, 1, _HAMZA_SEG)
     derive_word_arabic(db)
-    row = db._conn.execute(
-        "SELECT text_arabic FROM words WHERE position=1"
-    ).fetchone()
+    row = db._conn.execute("SELECT text_arabic FROM words WHERE position=1").fetchone()
     assert row["text_arabic"] == _FIXED_WORD

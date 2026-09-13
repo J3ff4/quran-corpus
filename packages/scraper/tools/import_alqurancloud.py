@@ -48,13 +48,15 @@ def main(db: str) -> None:
         for surah in data["data"]["surahs"]:
             surah_id: int = surah["number"]
             for ayah in surah["ayahs"]:
-                database.upsert_ayah(AyahModel(
-                    surah_id=surah_id,
-                    ayah_number=int(ayah["numberInSurah"]),
-                    text_uthmani=fix_seatless_hamza(ayah["text"]),
-                    juz=ayah.get("juz"),
-                    page=ayah.get("page"),
-                ))
+                database.upsert_ayah(
+                    AyahModel(
+                        surah_id=surah_id,
+                        ayah_number=int(ayah["numberInSurah"]),
+                        text_uthmani=fix_seatless_hamza(ayah["text"]),
+                        juz=ayah.get("juz"),
+                        page=ayah.get("page"),
+                    )
+                )
                 total += 1
         click.echo(f"  {total} ayahs imported.")
 
@@ -79,12 +81,14 @@ def main(db: str) -> None:
                             f"  WARN: no ayah for {surah_id}:{ayah_number}", err=True
                         )
                         continue
-                    database.upsert_translation(TranslationModel(
-                        ayah_id=ayah_id,
-                        language_code=lang_code,
-                        translator=translator,
-                        text=ayah["text"],
-                    ))
+                    database.upsert_translation(
+                        TranslationModel(
+                            ayah_id=ayah_id,
+                            language_code=lang_code,
+                            translator=translator,
+                            text=ayah["text"],
+                        )
+                    )
                     count += 1
             click.echo(f"  {count} translations imported.")
 

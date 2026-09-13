@@ -26,8 +26,7 @@ class Mismatch:
 def validate_against_gpl(gpl_path: Path, db: ScraperDatabase) -> list[Mismatch]:
     """Return per-field mismatches between DB words and the GPL ground truth."""
     truth = {
-        (pw.surah, pw.ayah, pw.position): pw
-        for pw in parse_corpus_morphology(gpl_path)
+        (pw.surah, pw.ayah, pw.position): pw for pw in parse_corpus_morphology(gpl_path)
     }
     mismatches: list[Mismatch] = []
     for row in db.get_all_word_annotations():

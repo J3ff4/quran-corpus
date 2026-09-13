@@ -237,8 +237,10 @@ def main() -> int:
     args = ap.parse_args()
 
     pages = load_layout(os.path.expanduser(args.layout), args.edition)
-    print(f"edition {args.edition}: {len(pages)} pages loaded, "
-          f"{sum(len(w) for w in pages.values())} words")
+    print(
+        f"edition {args.edition}: {len(pages)} pages loaded, "
+        f"{sum(len(w) for w in pages.values())} words"
+    )
 
     failures = 0
 

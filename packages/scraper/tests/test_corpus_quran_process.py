@@ -4,8 +4,12 @@ from scraper.sources.corpus_parser import ParsedWord
 
 def test_process_page_leaves_text_arabic_empty(monkeypatch):
     pw = ParsedWord(
-        verse_number=1, position=1, transliteration="qul",
-        pos_tag="V", english_gloss="Say", morphology_json=None,
+        verse_number=1,
+        position=1,
+        transliteration="qul",
+        pos_tag="V",
+        english_gloss="Say",
+        morphology_json=None,
     )
     monkeypatch.setattr(corpus_quran, "parse_verse_words", lambda html: [pw])
     captured = {}
@@ -13,9 +17,11 @@ def test_process_page_leaves_text_arabic_empty(monkeypatch):
     class FakeDB:
         def get_ayah(self, chapter, verse):
             return {"id": 42, "text_uthmani": "بِسْمِ ٱللَّهِ"}
+
         def upsert_word(self, word):
             captured["word"] = word
             return 7
+
         def upsert_word_gloss(self, gloss):
             captured["gloss"] = gloss
 
@@ -27,8 +33,12 @@ def test_process_page_leaves_text_arabic_empty(monkeypatch):
 
 def test_process_page_forwards_grammar_note(monkeypatch):
     pw = ParsedWord(
-        verse_number=1, position=1, transliteration="qul",
-        pos_tag="V", english_gloss="Say", morphology_json=None,
+        verse_number=1,
+        position=1,
+        transliteration="qul",
+        pos_tag="V",
+        english_gloss="Say",
+        morphology_json=None,
         grammar_note="فعل أمر",
     )
     monkeypatch.setattr(corpus_quran, "parse_verse_words", lambda html: [pw])
@@ -37,9 +47,11 @@ def test_process_page_forwards_grammar_note(monkeypatch):
     class FakeDB:
         def get_ayah(self, chapter, verse):
             return {"id": 42, "text_uthmani": "بِسْمِ ٱللَّهِ"}
+
         def upsert_word(self, word):
             captured["word"] = word
             return 7
+
         def upsert_word_gloss(self, gloss):
             captured["gloss"] = gloss
 

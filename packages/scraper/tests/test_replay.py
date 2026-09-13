@@ -10,7 +10,7 @@ from scraper.replay import replay_root_snapshots
 from scraper.snapshots import save_snapshot
 
 _ONE_FORM_HTML = (
-    '<html><body>The triliteral root hamza rā ḍād '
+    "<html><body>The triliteral root hamza rā ḍād "
     '(<span class="at">أ ر ض</span>) occurs 461 times in the Quran as the '
     'noun <i class="ab">arḍ</i> (<span class="at">أَرْض</span>).</body></html>'
 )
@@ -24,8 +24,7 @@ def test_replay_writes_roots_and_forms(tmp_path):
 
     assert (updated, bad, unreadable) == (1, 0, 0)
     row = db._conn.execute(
-        "SELECT root_arabic, occurrence_count FROM roots"
-        " WHERE root_buckwalter='ArD'"
+        "SELECT root_arabic, occurrence_count FROM roots WHERE root_buckwalter='ArD'"
     ).fetchone()
     assert (row[0], row[1]) == ("أرض", 461)
     form = db._conn.execute(
@@ -53,7 +52,9 @@ def test_replay_import_chain_is_network_free():
     # noqa S603: no untrusted input -- this interpreter, a literal probe.
     out = subprocess.run(  # noqa: S603
         [sys.executable, "-c", probe],
-        capture_output=True, text=True, check=True,
+        capture_output=True,
+        text=True,
+        check=True,
         cwd=Path(__file__).resolve().parent.parent,
     )
     assert out.stdout.strip() == "[]", out.stdout
@@ -88,9 +89,7 @@ def test_replay_recovers_the_key_through_percent_encoding(tmp_path):
     save_snapshot(tmp_path / "snaps", "root_$El", _ONE_FORM_HTML)
     db = ScraperDatabase(str(tmp_path / "t.db"))
     replay_root_snapshots(tmp_path / "snaps", db)
-    assert db._conn.execute(
-        "SELECT root_buckwalter FROM roots"
-    ).fetchone()[0] == "$El"
+    assert db._conn.execute("SELECT root_buckwalter FROM roots").fetchone()[0] == "$El"
     db.close()
 
 
@@ -109,9 +108,7 @@ def test_replay_prefers_the_canonical_name_over_a_stale_legacy_twin(tmp_path):
 
     assert replay_root_snapshots(snaps, db) == (1, 0, 0)  # one root, not two
 
-    row = db._conn.execute(
-        "SELECT root_arabic, occurrence_count FROM roots"
-    ).fetchone()
+    row = db._conn.execute("SELECT root_arabic, occurrence_count FROM roots").fetchone()
     assert (row[0], row[1]) == ("أرض", 461), "stale legacy twin won"
     db.close()
 

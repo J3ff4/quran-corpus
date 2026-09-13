@@ -57,8 +57,7 @@ def test_import_lane_does_not_revert_a_scraped_hamza_seat(tmp_path):
     assert import_lane_definitions(tsv, db) == 1
 
     row = db._conn.execute(
-        "SELECT root_arabic, occurrence_count FROM roots"
-        " WHERE root_buckwalter='ArD'"
+        "SELECT root_arabic, occurrence_count FROM roots WHERE root_buckwalter='ArD'"
     ).fetchone()
     # Lane is an additive definitions layer. It is not an authority on
     # spelling or counts, and re-running it must not undo the scrape.

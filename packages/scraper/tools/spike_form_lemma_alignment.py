@@ -4,6 +4,7 @@ hand during design? Diagnostic only -- not imported by app code.
 
 Run: python3 packages/scraper/tools/spike_form_lemma_alignment.py
 """
+
 import sqlite3
 
 DB_PATH = "/home/claude/quran-data/quran.db"

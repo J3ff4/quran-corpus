@@ -11,6 +11,7 @@ before MT (NLLB mangles it), and empty MT output is skipped (NLLB returns ''
 for words like 'from'/'except') so the word keeps its EN fallback instead of a
 blank uz gloss.
 """
+
 from __future__ import annotations
 
 import re

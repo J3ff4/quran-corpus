@@ -79,16 +79,22 @@ _WORD_ARABIC_CONCAT_CTE = """WITH concat AS (
 #
 # Rebuild every word's text_arabic from its segment concat, but only where it
 # actually differs (idempotent; IS NOT is NULL-safe).
-_REBUILD_TEXT_ARABIC_SQL = _WORD_ARABIC_CONCAT_CTE + """
+_REBUILD_TEXT_ARABIC_SQL = (
+    _WORD_ARABIC_CONCAT_CTE  # noqa: S608
+    + """
 UPDATE words
    SET text_arabic = (SELECT ta FROM concat WHERE concat.word_id = words.id)
  WHERE EXISTS (SELECT 1 FROM concat WHERE concat.word_id = words.id)
-   AND text_arabic IS NOT (SELECT ta FROM concat WHERE concat.word_id = words.id)"""  # noqa: S608
+   AND text_arabic IS NOT (SELECT ta FROM concat WHERE concat.word_id = words.id)"""
+)
 
 # Count words whose text_arabic disagrees with their segment concat.
-_COUNT_MISALIGNED_SQL = _WORD_ARABIC_CONCAT_CTE + """
+_COUNT_MISALIGNED_SQL = (
+    _WORD_ARABIC_CONCAT_CTE  # noqa: S608
+    + """
 SELECT count(*) FROM words w JOIN concat c ON c.word_id = w.id
-WHERE w.text_arabic IS NOT c.ta"""  # noqa: S608
+WHERE w.text_arabic IS NOT c.ta"""
+)
 
 
 class ScraperDatabase:
@@ -417,9 +423,7 @@ class ScraperDatabase:
         Merging on ON CONFLICT(root_id, sort_order) alone would leave stale
         tail rows whenever the page now yields fewer forms than are stored.
         """
-        cur = self._conn.execute(
-            "DELETE FROM root_forms WHERE root_id = ?", (root_id,)
-        )
+        cur = self._conn.execute("DELETE FROM root_forms WHERE root_id = ?", (root_id,))
         self._conn.commit()
         return int(cur.rowcount)
 
@@ -547,9 +551,7 @@ class ScraperDatabase:
             "WHERE morphology_description IS NOT NULL AND morphology_description <> ''"
         ).fetchall()
 
-    def update_word_descriptions_bulk(
-        self, updates: list[tuple[str, int]]
-    ) -> None:
+    def update_word_descriptions_bulk(self, updates: list[tuple[str, int]]) -> None:
         """Apply many (description, word_id) updates in one transaction."""
         self._conn.executemany(
             "UPDATE words SET morphology_description = ? WHERE id = ?",
@@ -577,9 +579,7 @@ class ScraperDatabase:
 
     def delete_null_arabic_root_forms(self) -> int:
         """Delete root_forms rows with no Arabic (See-Also junk). Idempotent."""
-        cur = self._conn.execute(
-            "DELETE FROM root_forms WHERE form_arabic IS NULL"
-        )
+        cur = self._conn.execute("DELETE FROM root_forms WHERE form_arabic IS NULL")
         self._conn.commit()
         return cur.rowcount
 
@@ -706,10 +706,12 @@ class ScraperDatabase:
         ).fetchall()
 
     def count_words_without_segments(self) -> int:
-        return int(self._conn.execute(
-            "SELECT count(*) FROM words WHERE id NOT IN "
-            "(SELECT DISTINCT word_id FROM word_segments)"
-        ).fetchone()[0])
+        return int(
+            self._conn.execute(
+                "SELECT count(*) FROM words WHERE id NOT IN "
+                "(SELECT DISTINCT word_id FROM word_segments)"
+            ).fetchone()[0]
+        )
 
     def rebuild_text_arabic_from_segments(self) -> int:
         """Set words.text_arabic = concat(form_arabic ORDER BY segment_index).
@@ -732,15 +734,15 @@ class ScraperDatabase:
         return changed
 
     def count_text_arabic_misaligned(self) -> int:
-        return int(
-            self._conn.execute(_COUNT_MISALIGNED_SQL).fetchone()[0]
-        )
+        return int(self._conn.execute(_COUNT_MISALIGNED_SQL).fetchone()[0])
 
     def count_words_missing_translit(self) -> int:
-        return int(self._conn.execute(
-            "SELECT count(*) FROM words "
-            "WHERE transliteration IS NULL OR transliteration = ''"
-        ).fetchone()[0])
+        return int(
+            self._conn.execute(
+                "SELECT count(*) FROM words "
+                "WHERE transliteration IS NULL OR transliteration = ''"
+            ).fetchone()[0]
+        )
 
     def get_word_align(
         self, surah_id: int, ayah_number: int, position: int

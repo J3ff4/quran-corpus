@@ -68,7 +68,7 @@ def test_non_root_page_returns_none() -> None:
 # "occurs once") instead of digits — these must still parse (regression: the
 # digit-only total regex silently dropped ~1000 roots).
 _WORD_TOTAL_HTML = (
-    '<html><body>The triliteral root shīn hamza mīm '
+    "<html><body>The triliteral root shīn hamza mīm "
     '(<span class="at">ش أ م</span>) occurs three times in the Quran as the noun '
     '<i class="ab">mashamat</i> (<span class="at">مَشْـَٔمَة</span>).'
     '<ul class="also"><li>three times as the noun '
@@ -110,7 +110,7 @@ def test_occurs_only_once_parses() -> None:
 # A root with NO derived forms: its only <ul class="also"> is the See-Also box.
 # Its <li> (a Lane's Lexicon link, no <span class="at">) must NOT become a form.
 _SEE_ALSO_ONLY_HTML = (
-    '<html><body>The triliteral root hamza bā dāl '
+    "<html><body>The triliteral root hamza bā dāl "
     '(<span class="at">أ ب د</span>) occurs 28 times in the Quran.'
     '<h4>See Also</h4><ul class="also"><li>'
     '<a href="https://lexicon.quranic-research.net/">Lane\'s Lexicon</a>'
@@ -129,13 +129,13 @@ def test_see_also_only_page_has_no_forms() -> None:
 # Corpus omits <ul class="also"> when a root has exactly ONE derived form and
 # states it inline instead. 712 roots (43.4%) hit this. Real sentences, 2026-07-27.
 _ONE_FORM_ONCE_HTML = (
-    '<html><body>The triliteral root shīn ʿayn lām '
+    "<html><body>The triliteral root shīn ʿayn lām "
     '(<span class="at">ش ع ل</span>) occurs only once in the Quran, as the '
     'form VIII verb <i class="ab">ish\'taʿala</i> '
     '(<span class="at">ٱشْتَعَلَ</span>).</body></html>'
 )
 _ONE_FORM_MANY_HTML = (
-    '<html><body>The triliteral root hamza rā ḍād '
+    "<html><body>The triliteral root hamza rā ḍād "
     '(<span class="at">أ ر ض</span>) occurs 461 times in the Quran as the '
     'noun <i class="ab">arḍ</i> (<span class="at">أَرْض</span>).</body></html>'
 )
@@ -169,7 +169,7 @@ def test_single_form_root_high_frequency_is_parsed() -> None:
 # a \S+ match kept only the last token and glued the rest onto the POS label
 # ("Proper noun banī" / "isrāīl").
 _MULTI_WORD_TRANSLIT_HTML = (
-    '<html><body>The triliteral root bā nūn yā '
+    "<html><body>The triliteral root bā nūn yā "
     '(<span class="at">ب ن ي</span>) occurs 5 times in the Quran as the '
     'proper noun <i class="ab">banī isrāīl</i> '
     '(<span class="at">بَنِىٓ إِسْرَٰٓءِيل</span>).</body></html>'
@@ -190,7 +190,7 @@ def test_single_form_multi_word_translit_stays_whole() -> None:
 # forward through flattened text used to fabricate one from the next
 # parenthesis anywhere on the page ("Lane Lexicon (page 42)").
 _NO_ARABIC_INLINE_HTML = (
-    '<html><body><p>The triliteral root kāf tā bā '
+    "<html><body><p>The triliteral root kāf tā bā "
     '(<span class="at">ك ت ب</span>) occurs 319 times in the Quran, as the '
     "noun kitab.</p>"
     '<p>See Also: <i class="ab">Lane Lexicon</i> (page 42).</p>'
@@ -209,7 +209,7 @@ def test_single_form_without_arabic_fabricates_nothing() -> None:
 # ("nūn wāw nūn"). Deriving the lead text by splitting the sentence on the
 # translit cuts at the header and drops the whole "as the noun" clause.
 _TRANSLIT_REPEATS_IN_HEADER_HTML = (
-    '<html><body><p>The triliteral root nūn wāw nūn '
+    "<html><body><p>The triliteral root nūn wāw nūn "
     '(<span class="at">ن و ن</span>) occurs only once in the Quran, as the '
     'noun <i class="ab">nūn</i> (<span class="at">نُّون</span>).</p>'
     "</body></html>"

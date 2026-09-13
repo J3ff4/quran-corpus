@@ -72,7 +72,7 @@ DEFINITION_AFTER_SUB_SENSE = (
     '<div2 n="nTq" type="root">'
     '<entryFree id="n12"><form><itype>1</itype><orth lang="ar">naTaq</orth></form>'
     ' (S, K,) said of a speaker. ―  -b2-  <hi rend="ital">he pronounced it, or'
-    ' articulated it.</hi> (M.)</entryFree>'
+    " articulated it.</hi> (M.)</entryFree>"
     '<entryFree id="n13"><form><orth lang="ar">niTaAqN</orth></form> The'
     ' <hi rend="ital">bar</hi> of a door.</entryFree></div2>'
 )
@@ -138,7 +138,7 @@ def test_extract_gloss_stops_at_the_sub_sense_after_the_one_it_fell_through():
     entry = (
         '<div2 n="Zfr" type="root">'
         '<entryFree id="n1"><form><itype>1</itype><orth lang="ar">Zafir</orth></form>'
-        " (S, K,) said of a man. ―  -b2-  <hi rend=\"ital\">His eye had a"
+        ' (S, K,) said of a man. ―  -b2-  <hi rend="ital">His eye had a'
         ' pterygium.</hi> ―  -b3-  <hi rend="ital">He attained his wish.</hi>'
         "</entryFree></div2>"
     )
