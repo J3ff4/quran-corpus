@@ -11,6 +11,24 @@ Updated: 2026-09-14
 
 ## Now
 
+### ✅ READER/PLAYER FIXES — MERGED 2026-09-14 as `c4f8ec0` (PR #78), issues #58/#59/#63 CLOSED
+- #59 (real): the deep-link landing wrote the in-memory position store but NOT the
+  durable one, so the Continue-reading card never followed a landing. Nothing else
+  covered it — onViewableItemsChanged is muted for the whole jump AND only fires when
+  the viewable SET changes, so a long ayah (2:282 fills a screen alone) never fires one
+  after the reveal. Card sat on 2:1 across cold starts.
+- #63 (real): `loading` = `playing && !Number.isFinite(durationSec)`, spinner in the
+  same box, control stays pressable, wait announced as `accessibilityState.busy` with
+  the wording on the bar's label (that last part = the §5 review's one finding).
+- #58: NOT a live bug — fixed by M7d `aaf1133`; regression test only.
+- **OWED: the device repros.** §10 says the on-device run is the gate for apps/mobile
+  and both live fixes came OFF device runs, but the merge was taken without one (owner's
+  call, 2026-09-14). Re-run: #59 = cold launch `surah/2?ayah=282`, back to Home, card
+  must read 2:282, force-stop, cold launch, still 2:282. #63 = force-stop, cold launch,
+  first play = spinner not a transport glyph.
+- Shim note: `ActivityIndicator` + `aria-busy` now live in `rnHosts.ts`; five suites had
+  copied the stub, three dropped their copy.
+
 ### ✅ LEMMA NEIGHBOURS — MERGED 2026-09-14 as `dd81b9e` (PR #77), issues #19 + #15 CLOSED
 `getLemmaFrequencyNeighbors` ran its `GROUP BY` over `words` THREE times per lemma
 screen (current/prev/next); for `verbs` the `pos_tag` predicate is unindexed, so all
