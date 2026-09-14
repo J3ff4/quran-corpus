@@ -94,37 +94,40 @@ export async function getLemmaFrequencyNeighbors(
       : `SELECT lemma_buckwalter AS bw, COUNT(*) AS count FROM words
          WHERE lemma_buckwalter IS NOT NULL GROUP BY lemma_buckwalter`;
 
-  const cur = await db.execute({
-    sql: `WITH agg AS (${agg}) SELECT count FROM agg WHERE bw = ?`,
-    args: [lemmaBuckwalter],
+  // One statement, and `MATERIALIZED` so the aggregate over `words` is computed
+  // ONCE for all three references. It used to be three separate statements --
+  // current, prev, next -- and for `verbs` the `pos_tag` predicate is
+  // unindexed, so that was three full scans of the widest table in the DB per
+  // lemma screen (issues #15/#19). Measured on the live corpus, best of 3:
+  // verbs 148.7 -> 75.3 ms, lemmas 10.5 -> 6.1 ms per lookup.
+  //
+  // The hint is load-bearing, not decorative: without it SQLite is free to
+  // inline the CTE at each reference and we are back to three scans. It needs
+  // SQLite >= 3.35; expo-sqlite 57 ships 3.49/3.50 and libSQL is newer still.
+  //
+  // The two comparisons are unchanged from the form a §5 review verified
+  // row-for-row against the live corpus, and re-verified here: prev is one row
+  // EARLIER in `count DESC, bw ASC` (a higher count, or the same count and an
+  // earlier bw), read back nearest-first, hence the reversed ORDER BY.
+  const res = await db.execute({
+    sql: `WITH agg AS MATERIALIZED (${agg})
+          SELECT (SELECT bw FROM agg
+                   WHERE count > c OR (count = c AND bw < ?)
+                   ORDER BY count ASC, bw DESC LIMIT 1) AS prev,
+                 (SELECT bw FROM agg
+                   WHERE count < c OR (count = c AND bw > ?)
+                   ORDER BY count DESC, bw ASC LIMIT 1) AS next
+            FROM (SELECT count AS c FROM agg WHERE bw = ?)`,
+    args: [lemmaBuckwalter, lemmaBuckwalter, lemmaBuckwalter],
   });
-  // Not in this ranking at all: a noun reached with ?from=verbs, or a lemma
-  // the corpus does not carry. Both arrive here off a deep link.
-  if (cur.rows.length === 0) return { prev: null, next: null };
-  const count = cur.rows[0]!['count'] as number;
-
-  const [prev, next] = await Promise.all([
-    // One row EARLIER in `count DESC, bw ASC`: a higher count, or the same
-    // count and an earlier bw. Read back nearest-first, hence the reversed
-    // ORDER BY.
-    db.execute({
-      sql: `WITH agg AS (${agg})
-            SELECT bw FROM agg
-            WHERE count > ? OR (count = ? AND bw < ?)
-            ORDER BY count ASC, bw DESC LIMIT 1`,
-      args: [count, count, lemmaBuckwalter],
-    }),
-    db.execute({
-      sql: `WITH agg AS (${agg})
-            SELECT bw FROM agg
-            WHERE count < ? OR (count = ? AND bw > ?)
-            ORDER BY count DESC, bw ASC LIMIT 1`,
-      args: [count, count, lemmaBuckwalter],
-    }),
-  ]);
+  // Not in this ranking at all: a noun reached with ?from=verbs, or a lemma the
+  // corpus does not carry. Both arrive here off a deep link. The inner SELECT
+  // returns no row, so the outer one does not either.
+  if (res.rows.length === 0) return { prev: null, next: null };
+  const row = res.rows[0]!;
 
   return {
-    prev: (prev.rows[0]?.['bw'] as string) ?? null,
-    next: (next.rows[0]?.['bw'] as string) ?? null,
+    prev: (row['prev'] as string | null) ?? null,
+    next: (row['next'] as string | null) ?? null,
   };
 }
