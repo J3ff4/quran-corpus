@@ -39,7 +39,11 @@ export function formatClock(seconds: number): string {
 
 /** Time left, as `-m:ss`. Never a bare minus in front of the placeholder. */
 export function formatRemaining(positionSec: number, durationSec: number): string {
-  if (!Number.isFinite(durationSec)) return '--:--';
+  // `> 0` rather than `isFinite`: expo-audio reports `duration: 0` on the
+  // status ticks before the source has loaded, which is finite and renders
+  // `-0:00` -- a real-looking clock on a track nobody has heard yet (device
+  // run, 2026-09-14).
+  if (!(durationSec > 0)) return '--:--';
   return `-${formatClock(Math.max(0, durationSec - positionSec))}`;
 }
 
@@ -166,12 +170,13 @@ export function RecitationBar({
   // otherwise read 0:00 / --:-- with a transport glyph on it, which is exactly
   // what a paused player looks like, so a tap that never starts (issue #63)
   // was indistinguishable from one that did and then stopped. `durationSec` is
-  // the signal because it is NaN until the first status update lands and
-  // finite from then on; no second piece of state to keep in step.
-  const loading = playing && !Number.isFinite(durationSec);
+  // the signal because it is unknown -- NaN before the first status tick, 0 on
+  // every tick until the source loads -- and positive from then on; no second
+  // piece of state to keep in step. `> 0` also catches NaN, which is not.
+  const loading = playing && !(durationSec > 0);
   const action = t(uiLocale, playing ? 'reader.pause' : 'reader.play');
   const progress =
-    Number.isFinite(durationSec) && durationSec > 0
+    durationSec > 0
       ? Math.min(Math.max(shownSec / durationSec, 0), 1)
       : 0;
 
