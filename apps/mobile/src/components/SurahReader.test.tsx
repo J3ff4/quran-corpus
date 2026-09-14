@@ -766,7 +766,14 @@ describe('SurahReader', () => {
     // landed on 2:1.
     vi.useFakeTimers();
     try {
-      render(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />);
+      const onReadingAyah = vi.fn();
+      render(
+        <SurahReader
+          {...baseProps(readerData(300))}
+          initialAyahNumber={255}
+          onReadingAyah={onReadingAyah}
+        />,
+      );
       // Not before the landing: mid-jump the list is wherever it happens to be.
       expect(mocks.setReaderPosition).not.toHaveBeenCalled();
 
@@ -775,6 +782,13 @@ describe('SurahReader', () => {
       });
 
       expect(mocks.setReaderPosition).toHaveBeenCalledWith(1, 255);
+      // The durable half, and the whole of issue #59: the shared store above
+      // is in memory and dies with the process, so a landing that writes only
+      // that leaves the user database holding whatever it held before. The
+      // reported symptom was a Continue-reading card stuck on 2:1 across cold
+      // starts after deep-linking to 2:282 -- 282 is one screen of one ayah,
+      // so no scroll ever changed the viewable set to fire the other write.
+      expect(onReadingAyah).toHaveBeenCalledWith(255);
     } finally {
       vi.useRealTimers();
     }
