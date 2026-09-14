@@ -1,5 +1,12 @@
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View, type LayoutChangeEvent } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  Text,
+  View,
+  type AccessibilityState,
+  type LayoutChangeEvent,
+} from 'react-native';
 import Animated from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -162,9 +169,7 @@ export function RecitationBar({
   // the signal because it is NaN until the first status update lands and
   // finite from then on; no second piece of state to keep in step.
   const loading = playing && !Number.isFinite(durationSec);
-  const action = loading
-    ? t(uiLocale, 'reader.loadingAudio')
-    : t(uiLocale, playing ? 'reader.pause' : 'reader.play');
+  const action = t(uiLocale, playing ? 'reader.pause' : 'reader.play');
   const progress =
     Number.isFinite(durationSec) && durationSec > 0
       ? Math.min(Math.max(shownSec / durationSec, 0), 1)
@@ -179,7 +184,7 @@ export function RecitationBar({
       // screen-reader user nothing about which ayah is sounding. No
       // `accessible` on it -- that would make the bar one element and swallow
       // the buttons inside it (see rn-accessible-view-collapses-children).
-      accessibilityLabel={`${ayahLabel} · ${action}`}
+      accessibilityLabel={`${ayahLabel} · ${loading ? t(uiLocale, 'reader.loadingAudio') : action}`}
       pointerEvents="box-none"
       style={dock ? { position: 'absolute', left: 16, right: 16, bottom: insets.bottom + 12 } : undefined}
     >
@@ -196,8 +201,11 @@ export function RecitationBar({
             label={action}
             color={theme.accent}
             onPress={onTogglePlay}
-            // Still pressable while loading: a stream that never opens has to
-            // be stoppable, and the press is what the player reads as a pause.
+            // Still pressable while loading, and still labelled Pause: a
+            // stream that never opens has to be stoppable, and a button that
+            // renames itself to a status leaves a screen-reader user with
+            // nothing saying a press does anything. The wait is announced as
+            // `busy` on the control and spelled out on the bar's own label.
             busy={loading}
           />
           <TransportButton
@@ -284,14 +292,18 @@ function TransportButton({
   onPress: () => void;
 }) {
   const press = usePressScale();
+  const state: AccessibilityState | undefined =
+    selected === undefined && !busy
+      ? undefined
+      : { ...(selected === undefined ? {} : { selected }), ...(busy ? { busy: true } : {}) };
   return (
     <AnimatedPressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      // Only where there is a state to announce. On the three transport
-      // buttons a `selected: false` would have TalkBack read "not selected"
-      // after every press.
-      accessibilityState={selected === undefined ? undefined : { selected }}
+      // Only the states there are to announce. On the three transport buttons
+      // a `selected: false` would have TalkBack read "not selected" after
+      // every press, and a `busy: false` the same for the wait.
+      accessibilityState={state}
       onPress={onPress}
       onPressIn={press.onPressIn}
       onPressOut={press.onPressOut}

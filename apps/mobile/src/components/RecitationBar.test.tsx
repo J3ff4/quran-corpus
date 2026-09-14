@@ -175,14 +175,16 @@ describe('RecitationBar', () => {
     expect(screen.getByTestId('recitation-loading')).toBeTruthy();
     // The announcement, not just the glyph: the whole complaint is that two
     // different states looked the same, and TalkBack heard the same word too.
-    expect(screen.getByLabelText('Loading audio')).toBeTruthy();
-    expect(screen.queryByLabelText('Pause')).toBeNull();
+    // On the bar, which is what describes the state -- the button keeps saying
+    // what a press DOES, because a press still pauses.
+    expect(screen.getByLabelText('Ayah 255 · Loading audio')).toBeTruthy();
+    expect(screen.getByLabelText('Pause').getAttribute('aria-busy')).toBe('true');
   });
 
   it('stays pressable while loading, so a stream that never opens can be stopped', () => {
     const { onTogglePlay } = renderBar({ playing: true, durationSec: Number.NaN });
 
-    fireEvent.click(screen.getByLabelText('Loading audio'));
+    fireEvent.click(screen.getByLabelText('Pause'));
 
     expect(onTogglePlay).toHaveBeenCalledTimes(1);
   });
@@ -193,6 +195,8 @@ describe('RecitationBar', () => {
     // it while paused would spin for ever on a bar nobody is playing.
     renderBar({ playing: true, durationSec: 30 });
     expect(screen.queryByTestId('recitation-loading')).toBeNull();
+    // No leftover "busy" on a control that is not waiting for anything.
+    expect(screen.getByLabelText('Pause').getAttribute('aria-busy')).toBeNull();
     cleanup();
 
     renderBar({ playing: false, durationSec: Number.NaN });
