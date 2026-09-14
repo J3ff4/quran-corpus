@@ -75,14 +75,16 @@ describe('GlassTabBar', () => {
   });
 
   it('goes away with the mushaf-s chrome, touches and TalkBack together', () => {
-    const { rerender } = renderBar(props(0));
+    // Index 2 is the mushaf: the hidden state only applies on the one tab that
+    // can undo it.
+    const { rerender } = renderBar(props(2));
     expect(screen.getByTestId('tab-bar').getAttribute('data-hidden-from-a11y')).toBeNull();
     expect(screen.getByTestId('tab-bar').getAttribute('data-pointer-events')).toBe('box-none');
 
     act(() => hideChrome());
     rerender(
       <ThemeContext.Provider value={themeColors.dark}>
-        <GlassTabBar {...props(0)} />
+        <GlassTabBar {...props(2)} />
       </ThemeContext.Provider>,
     );
     // A faded bar still fills the bottom of the screen. If it keeps its touches
@@ -90,6 +92,19 @@ describe('GlassTabBar', () => {
     // becomes a room with no door.
     expect(screen.getByTestId('tab-bar').getAttribute('data-hidden-from-a11y')).toBe('true');
     expect(screen.getByTestId('tab-bar').getAttribute('data-pointer-events')).toBe('none');
+  });
+
+  it('stays on screen on every tab but the mushaf, whatever the chrome says', () => {
+    // The chrome flag is module state and MushafScreen is its only writer, so a
+    // blur cleanup that does not run leaves it false for the whole app. Seen
+    // once on the Menu tab (vc11 run, 2026-09-13): no tab bar, no way to switch
+    // tabs, force-stop the only way out. The bar knows which tab it is drawing
+    // for, so a stranded flag cannot reach the tabs that have no undo.
+    act(() => hideChrome());
+    renderBar(props(4));
+
+    expect(screen.getByTestId('tab-bar').getAttribute('data-hidden-from-a11y')).toBeNull();
+    expect(screen.getByTestId('tab-bar').getAttribute('data-pointer-events')).toBe('box-none');
   });
 
   it('navigates to the route that was pressed', () => {

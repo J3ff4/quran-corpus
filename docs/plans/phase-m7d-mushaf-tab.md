@@ -713,6 +713,16 @@ variants (1.5s / 3.0s / 5.0s on Menu before pushing Morphology). A control —
 Home → Menu with the mushaf never opened, 8s idle — kept the bar. `logcat`
 carries no JS error from the window.
 
+**Fixed 2026-09-14 without a repro** (`fix/tab-bar-stranded-chrome`). The
+mechanism below does not need to be pinned down for the state to be
+unreachable: `chromeVisibility` is module state and `MushafScreen` is its only
+writer, so a hidden flag on any other tab is a room with no door whatever path
+left it there. `GlassTabBar` already receives the focused route, so it now
+refuses the hidden state unless the mushaf is the tab it is drawing for. Device
+run the same day: Mushaf (chrome hidden) -> external intent to `/--/menu` -> bar
+present; Menu -> Morphology -> back -> bar present; back to Mushaf -> tap shows
+Go-to bar, player and tab bar together, all three gone again at 6s.
+
 The mechanism is at least plausible: `chromeVisibility` is module state shared
 by the mushaf and `GlassTabBar`, `/morphology` is a root route outside the tabs
 navigator so the bar unmounts while it is pushed, and only the mushaf screen
