@@ -102,7 +102,16 @@ export function GlassTabBar({ state, navigation, insets }: GlassTabBarProps) {
   const { uiLocale } = useAppSettings();
   // The mushaf hides the bar along with its own chrome (M7d ruling 7). Every
   // other screen leaves the value alone, where it is permanently true.
-  const visible = useChromeVisible();
+  //
+  // Gated on the focused tab, not trusted on its own: `chromeVisibility` is
+  // module state and `MushafScreen` is its only writer, so any path where that
+  // screen's blur cleanup does not run strands a hidden bar on a screen with
+  // nothing able to bring it back -- no tabs, no way out but a force-stop. Seen
+  // once on the Menu tab during the vc11 run of 2026-09-13 and never
+  // reproduced; the state is reachable however it was reached, and the bar
+  // already knows which tab it is drawing for.
+  const onMushaf = state.routes[state.index]?.name === 'mushaf';
+  const visible = useChromeVisible() || !onMushaf;
   const reducedMotion = useReducedMotion();
   const duration = reducedMotion ? 0 : CHROME_FADE_MS;
   const style = useAnimatedStyle(() => ({
