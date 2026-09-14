@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pressable, Text, View, type LayoutChangeEvent } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View, type LayoutChangeEvent } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -155,7 +155,16 @@ export function RecitationBar({
   if (ayahNumber === null) return null;
 
   const ayahLabel = `${t(uiLocale, 'reader.ayahLabel')} ${ayahNumber}`;
-  const action = t(uiLocale, playing ? 'reader.pause' : 'reader.play');
+  // Asked to play, but the track has told us nothing yet -- the bar would
+  // otherwise read 0:00 / --:-- with a transport glyph on it, which is exactly
+  // what a paused player looks like, so a tap that never starts (issue #63)
+  // was indistinguishable from one that did and then stopped. `durationSec` is
+  // the signal because it is NaN until the first status update lands and
+  // finite from then on; no second piece of state to keep in step.
+  const loading = playing && !Number.isFinite(durationSec);
+  const action = loading
+    ? t(uiLocale, 'reader.loadingAudio')
+    : t(uiLocale, playing ? 'reader.pause' : 'reader.play');
   const progress =
     Number.isFinite(durationSec) && durationSec > 0
       ? Math.min(Math.max(shownSec / durationSec, 0), 1)
@@ -187,6 +196,9 @@ export function RecitationBar({
             label={action}
             color={theme.accent}
             onPress={onTogglePlay}
+            // Still pressable while loading: a stream that never opens has to
+            // be stoppable, and the press is what the player reads as a pause.
+            busy={loading}
           />
           <TransportButton
             icon="skipForward"
@@ -259,12 +271,16 @@ function TransportButton({
   label,
   color,
   selected,
+  busy,
   onPress,
 }: {
   icon: IconName;
   label: string;
   color: string;
   selected?: boolean;
+  /** Waiting on something: the spinner replaces the glyph in the same box, so
+   *  the row does not reflow under the thumb when the wait ends. */
+  busy?: boolean;
   onPress: () => void;
 }) {
   const press = usePressScale();
@@ -289,7 +305,11 @@ function TransportButton({
         },
       ]}
     >
-      <Icon name={icon} color={color} size={22} />
+      {busy ? (
+        <ActivityIndicator testID="recitation-loading" color={color} size="small" />
+      ) : (
+        <Icon name={icon} color={color} size={22} />
+      )}
     </AnimatedPressable>
   );
 }

@@ -165,6 +165,41 @@ describe('RecitationBar', () => {
     expect(screen.queryByLabelText('Pause')).toBeNull();
   });
 
+  it('says it is loading rather than showing a paused-looking bar', () => {
+    // Issue #63. Between the tap and the first status update the bar read
+    // 0:00 / --:-- under a transport glyph -- identical to a player sitting
+    // paused, so a tap that never started looked exactly like one that did.
+    // NaN is what the player reports for a duration it has not read yet.
+    renderBar({ playing: true, durationSec: Number.NaN });
+
+    expect(screen.getByTestId('recitation-loading')).toBeTruthy();
+    // The announcement, not just the glyph: the whole complaint is that two
+    // different states looked the same, and TalkBack heard the same word too.
+    expect(screen.getByLabelText('Loading audio')).toBeTruthy();
+    expect(screen.queryByLabelText('Pause')).toBeNull();
+  });
+
+  it('stays pressable while loading, so a stream that never opens can be stopped', () => {
+    const { onTogglePlay } = renderBar({ playing: true, durationSec: Number.NaN });
+
+    fireEvent.click(screen.getByLabelText('Loading audio'));
+
+    expect(onTogglePlay).toHaveBeenCalledTimes(1);
+  });
+
+  it('is not loading once the duration lands, nor while merely paused', () => {
+    // The two states either side of it. A bar that kept the spinner after the
+    // first status update would never show the transport again; one that drew
+    // it while paused would spin for ever on a bar nobody is playing.
+    renderBar({ playing: true, durationSec: 30 });
+    expect(screen.queryByTestId('recitation-loading')).toBeNull();
+    cleanup();
+
+    renderBar({ playing: false, durationSec: Number.NaN });
+    expect(screen.queryByTestId('recitation-loading')).toBeNull();
+    expect(screen.getByLabelText('Play')).toBeTruthy();
+  });
+
   it('labels every transport control for a screen reader', () => {
     // The transport is five icons and no text. Unlabelled, TalkBack announces
     // five identical "button"s.

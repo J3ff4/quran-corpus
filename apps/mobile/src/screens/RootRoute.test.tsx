@@ -92,10 +92,8 @@ vi.mock('@/components/ConcordanceList', async () => {
 // Pressable for the Previous/Next arrows -- see reactNativeTextMock's doc
 // comment in rnHosts.ts.
 vi.mock('react-native', async () => {
-  const React = await import('react');
   const { reactNativeTextMock } = await import('@/testing/rnHosts.js');
   return {
-    ActivityIndicator: () => React.createElement('span', null, 'loading'),
     ...reactNativeTextMock(),
   };
 });

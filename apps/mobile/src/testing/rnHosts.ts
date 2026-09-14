@@ -210,6 +210,9 @@ export function reactNativeTextMock() {
     Text,
     View: host('div'),
     Pressable: host('button'),
+    // A host, not a stub returning text: it carries `testID`, which is the
+    // only handle a spinner gives a test -- it has no label and no children.
+    ActivityIndicator: host('span'),
     AccessibilityInfo,
     AppState,
     FlatList,
