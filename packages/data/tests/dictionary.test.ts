@@ -121,4 +121,24 @@ describe('getLemmaFrequencyNeighbors', () => {
       next: 'zz206',
     });
   });
+
+  it('asks the DB once, and materializes the aggregate', async () => {
+    // The whole point of issues #15/#19: this used to issue three statements,
+    // each re-running a GROUP BY over `words` -- and for 'verbs' the pos_tag
+    // predicate is unindexed, so each was a full scan. Splitting it back apart,
+    // or dropping MATERIALIZED (which lets SQLite inline the CTE per
+    // reference), restores the three scans, so both are asserted here.
+    const seen: string[] = [];
+    const spy = {
+      execute: (q: { sql: string; args?: unknown[] }) => {
+        seen.push(q.sql);
+        return db.execute(q as never);
+      },
+    };
+    const res = await getLemmaFrequencyNeighbors(spy as never, 'brk', 'lemmas');
+
+    expect(res).toEqual({ prev: 'qwl', next: 'ktb' });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toContain('MATERIALIZED');
+  });
 });
