@@ -11,6 +11,27 @@ Updated: 2026-09-14
 
 ## Now
 
+**2026-09-14 — device run for #59 / #63 (owner present, adb over wifi).**
+
+- **#59 PASS.** Cold launch `exp://.../surah/2?ayah=282` landed on 2:282; Home's
+  Continue-reading card read `Al-Baqara 2:282` immediately, and still read it
+  after a force-stop and a second cold launch. The durable half of the fix does
+  reach the user DB.
+- **#63 PASS on the symptom, and it found a residual.** The bar no longer sits
+  there looking paused: within one sample of the tap it shows a pause glyph and
+  a live clock. But the spinner never appeared, and for the first seconds of a
+  track the bar read `0:00 / -0:00`. Cause: expo-audio reports `duration: 0`
+  while a source opens, not NaN, and `Number.isFinite(0)` is true, so the
+  loading state ended on the first status tick. Fixed on
+  `fix/recitation-zero-duration` (`be8e17d`) by making `> 0` the test for
+  "known" in both the loading predicate and `formatRemaining`.
+- **Not observed on device: the spinner frame itself.** The load window on this
+  connection is under ~300 ms, which is faster than `adb screencap` can sample,
+  and the levers that would slow it (`settings put`, `svc wifi disable`) are
+  blocked or would drop adb. The branch's three loading tests are
+  mutation-checked in both directions; the spinner is verified there, not on
+  hardware.
+
 ### ✅ READER/PLAYER FIXES — MERGED 2026-09-14 as `c4f8ec0` (PR #78), issues #58/#59/#63 CLOSED
 - #59 (real): the deep-link landing wrote the in-memory position store but NOT the
   durable one, so the Continue-reading card never followed a landing. Nothing else
