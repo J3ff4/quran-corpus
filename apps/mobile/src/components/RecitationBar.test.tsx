@@ -100,6 +100,10 @@ describe('formatClock', () => {
     expect(formatClock(Number.POSITIVE_INFINITY)).toBe('--:--');
     expect(formatClock(-1)).toBe('--:--');
     expect(formatRemaining(0, Number.NaN)).toBe('--:--');
+    // And zero, which is what expo-audio reports on every status tick between
+    // play() and the source loading. It is finite, so it used to reach the
+    // arithmetic and render "-0:00" -- a plausible clock on an empty track.
+    expect(formatRemaining(0, 0)).toBe('--:--');
   });
 });
 
@@ -202,6 +206,16 @@ describe('RecitationBar', () => {
     renderBar({ playing: false, durationSec: Number.NaN });
     expect(screen.queryByTestId('recitation-loading')).toBeNull();
     expect(screen.getByLabelText('Play')).toBeTruthy();
+  });
+
+  it('is still loading while the player reports a zero duration', () => {
+    // The device run of 2026-09-14: expo-audio seeds `duration` at 0, not NaN,
+    // for the seconds a remote ayah takes to open. Finite is not the same as
+    // known, and on the NaN-only test the spinner never appeared on hardware.
+    renderBar({ playing: true, durationSec: 0 });
+
+    expect(screen.getByTestId('recitation-loading')).toBeTruthy();
+    expect(screen.getByLabelText('Pause').getAttribute('aria-busy')).toBe('true');
   });
 
   it('labels every transport control for a screen reader', () => {
