@@ -766,7 +766,14 @@ describe('SurahReader', () => {
     // landed on 2:1.
     vi.useFakeTimers();
     try {
-      render(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />);
+      const onReadingAyah = vi.fn();
+      render(
+        <SurahReader
+          {...baseProps(readerData(300))}
+          initialAyahNumber={255}
+          onReadingAyah={onReadingAyah}
+        />,
+      );
       // Not before the landing: mid-jump the list is wherever it happens to be.
       expect(mocks.setReaderPosition).not.toHaveBeenCalled();
 
@@ -775,6 +782,13 @@ describe('SurahReader', () => {
       });
 
       expect(mocks.setReaderPosition).toHaveBeenCalledWith(1, 255);
+      // The durable half, and the whole of issue #59: the shared store above
+      // is in memory and dies with the process, so a landing that writes only
+      // that leaves the user database holding whatever it held before. The
+      // reported symptom was a Continue-reading card stuck on 2:1 across cold
+      // starts after deep-linking to 2:282 -- 282 is one screen of one ayah,
+      // so no scroll ever changed the viewable set to fire the other write.
+      expect(onReadingAyah).toHaveBeenCalledWith(255);
     } finally {
       vi.useRealTimers();
     }
@@ -1107,6 +1121,26 @@ describe('SurahReader', () => {
     // the top of the surah.
     expect(mocks.push).toHaveBeenCalledWith('/surah/2/words?from=1');
   });
+  it('names the surah on screen after a page turn, not the one it mounted on', async () => {
+    // Issue #58: the header went blank for the rest of the session once the
+    // chevrons paged. M7d made the reader one surah again and the name comes
+    // off `data`, so this pins that -- a header that reads anything but its
+    // current data fails here.
+    const first = readerData(1);
+    const base = readerData(30);
+    const { rerender } = render(<SurahReader {...baseProps(first)} />);
+    await waitFor(() => expect(mocks.setOptions).toHaveBeenCalled());
+    renderReaderHeader();
+    expect(screen.getByTestId('reader-title').textContent).toBe('Al-Fatihah');
+
+    rerender(<SurahReader {...baseProps(base)} />);
+    await waitFor(() => expect(mocks.setOptions).toHaveBeenCalled());
+    cleanup();
+    renderReaderHeader();
+
+    expect(screen.getByTestId('reader-title').textContent).toBe('Al-Baqarah');
+  });
+
   it('opens word-by-word at the ayah on screen', async () => {
     const props = baseProps(readerData(10));
     mocks.getReaderPosition.mockReturnValue(6);

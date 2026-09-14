@@ -85,10 +85,8 @@ vi.mock('expo-router', async () => {
 // sense chips need Pressable-free Views -- see RootRoute.test.tsx's identical
 // note on the same switch.
 vi.mock('react-native', async () => {
-  const React = await import('react');
   const { reactNativeTextMock } = await import('@/testing/rnHosts.js');
   return {
-    ActivityIndicator: () => React.createElement('span', null, 'loading'),
     ...reactNativeTextMock(),
   };
 });

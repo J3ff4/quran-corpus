@@ -536,6 +536,14 @@ function AyahList({
       if (anchor.ayah !== null) {
         lastVisibleRef.current = anchor.ayah;
         setReaderPosition(data.surah.id, anchor.ayah);
+        // And the durable half (issue #59). The store above is in memory and
+        // dies with the process; the row the Continue-reading card reads is in
+        // the user database, and nothing else writes it for a landing either.
+        // onViewableItemsChanged only fires when the viewable SET changes, so
+        // on a long ayah -- 2:282 fills more than a screen on its own -- a
+        // reader can scroll for as long as they like after landing without one
+        // ever firing. The card sat on 2:1 across cold starts.
+        onReadingAyahRef.current?.(anchor.ayah);
       }
       onLandedRef.current();
       // The landing is over: later layouts of the target row are the user

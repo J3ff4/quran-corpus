@@ -92,6 +92,7 @@ export type UiStringKey =
   | 'reader.removeBookmark'
   | 'reader.play'
   | 'reader.pause'
+  | 'reader.loadingAudio'
   | 'reader.previousAyah'
   | 'reader.nextAyah'
   // Names the repeat toggle. "Continuous" alone is an adjective with no noun;
@@ -364,6 +365,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.removeBookmark': 'Remove bookmark',
     'reader.play': 'Play',
     'reader.pause': 'Pause',
+    'reader.loadingAudio': 'Loading audio',
     'reader.previousAyah': 'Previous ayah',
     'reader.nextAyah': 'Next ayah',
     'reader.continuous': 'Continuous play',
@@ -586,6 +588,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.removeBookmark': 'Xatcho‘pni olib tashlash',
     'reader.play': 'Ijro etish',
     'reader.pause': 'To‘xtatish',
+    'reader.loadingAudio': 'Audio yuklanmoqda',
     'reader.previousAyah': 'Oldingi oyat',
     'reader.nextAyah': 'Keyingi oyat',
     'reader.continuous': 'Ketma-ket ijro',
@@ -803,6 +806,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.removeBookmark': 'Удалить закладку',
     'reader.play': 'Воспроизвести',
     'reader.pause': 'Пауза',
+    'reader.loadingAudio': 'Загрузка аудио',
     'reader.previousAyah': 'Предыдущий аят',
     'reader.nextAyah': 'Следующий аят',
     'reader.continuous': 'Непрерывное воспроизведение',

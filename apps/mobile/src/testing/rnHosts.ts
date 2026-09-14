@@ -21,7 +21,13 @@ interface HostProps {
   accessibilityLabel?: string;
   accessibilityLiveRegion?: 'none' | 'polite' | 'assertive';
   accessibilityRole?: string;
-  accessibilityState?: { disabled?: boolean; selected?: boolean; checked?: boolean; expanded?: boolean };
+  accessibilityState?: {
+    disabled?: boolean;
+    selected?: boolean;
+    checked?: boolean;
+    expanded?: boolean;
+    busy?: boolean;
+  };
   children?: React.ReactNode;
   onPress?: () => void;
   onLongPress?: () => void;
@@ -210,6 +216,9 @@ export function reactNativeTextMock() {
     Text,
     View: host('div'),
     Pressable: host('button'),
+    // A host, not a stub returning text: it carries `testID`, which is the
+    // only handle a spinner gives a test -- it has no label and no children.
+    ActivityIndicator: host('span'),
     AccessibilityInfo,
     AppState,
     FlatList,
@@ -372,6 +381,10 @@ export function host(tag: string) {
         // radiogroup in the app assertable on the wrong half of its own state.
         'aria-checked': accessibilityState?.checked,
         'aria-expanded': accessibilityState?.expanded,
+        // `busy` too: a control that is still an action while it waits says so
+        // through this rather than by renaming itself, so the shim has to carry
+        // it or the announcement is untestable.
+        'aria-busy': accessibilityState?.busy,
         // `role` wins: it is the cross-platform prop, and components that set
         // it (role="dialog") leave accessibilityRole undefined, which would
         // otherwise overwrite it with nothing.
