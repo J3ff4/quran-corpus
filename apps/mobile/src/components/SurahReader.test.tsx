@@ -1107,6 +1107,26 @@ describe('SurahReader', () => {
     // the top of the surah.
     expect(mocks.push).toHaveBeenCalledWith('/surah/2/words?from=1');
   });
+  it('names the surah on screen after a page turn, not the one it mounted on', async () => {
+    // Issue #58: the header went blank for the rest of the session once the
+    // chevrons paged. M7d made the reader one surah again and the name comes
+    // off `data`, so this pins that -- a header that reads anything but its
+    // current data fails here.
+    const first = readerData(1);
+    const base = readerData(30);
+    const { rerender } = render(<SurahReader {...baseProps(first)} />);
+    await waitFor(() => expect(mocks.setOptions).toHaveBeenCalled());
+    renderReaderHeader();
+    expect(screen.getByTestId('reader-title').textContent).toBe('Al-Fatihah');
+
+    rerender(<SurahReader {...baseProps(base)} />);
+    await waitFor(() => expect(mocks.setOptions).toHaveBeenCalled());
+    cleanup();
+    renderReaderHeader();
+
+    expect(screen.getByTestId('reader-title').textContent).toBe('Al-Baqarah');
+  });
+
   it('opens word-by-word at the ayah on screen', async () => {
     const props = baseProps(readerData(10));
     mocks.getReaderPosition.mockReturnValue(6);
