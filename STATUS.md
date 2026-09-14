@@ -7,9 +7,21 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-09-13
+Updated: 2026-09-14
 
 ## Now
+
+### ✅ LEMMA NEIGHBOURS — MERGED 2026-09-14 as `dd81b9e` (PR #77), issues #19 + #15 CLOSED
+`getLemmaFrequencyNeighbors` ran its `GROUP BY` over `words` THREE times per lemma
+screen (current/prev/next); for `verbs` the `pos_tag` predicate is unindexed, so all
+three were full scans. Now ONE statement, `WITH agg AS MATERIALIZED`. Live corpus,
+best of 3: verbs 148.7 -> 75.3 ms, lemmas 10.5 -> 6.1 ms per lookup.
+Took #19's option 2 — NO schema change, `words.pos_tag` still unindexed on purpose
+(index size ships on device). #15 was the same defect filed twice, closed as dup.
+Verified vs the old impl over 619 sampled lemmas both rankings, 0 mismatches.
+§5 `/code-review`: clean, no findings. `MATERIALIZED` is load-bearing — drop it and
+SQLite may inline the CTE per reference and the three scans come back; a test asserts
+both the single statement and the hint.
 
 ### ✅ CI GATE — MERGED 2026-09-13 as `1eced07` (PR #76), issue #1 CLOSED
 `.github/workflows/ci.yml`: job `node` = turbo test+lint+type-check, job `python` =
