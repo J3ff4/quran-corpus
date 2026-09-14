@@ -11,6 +11,21 @@ Updated: 2026-09-14
 
 ## Now
 
+**2026-09-14 — both device-run fixes merged.** `6342692` (PR #79, the #63
+residual) and `f1ebcde` (PR #80, the stranded tab bar). CI green on both, no
+§5 trigger on either, branches deleted.
+
+**2026-09-14 — the stranded tab bar, fixed without a repro (PR #80).** The vc11
+run of 2026-09-13 saw the Menu tab once with no tab bar and no way to switch
+tabs, and six targeted attempts failed to reproduce it. `chromeVisibility` is
+module state and `MushafScreen` is its only writer, so a hidden flag on any
+other tab is a room with no door however it got there — the path does not need
+pinning down for the state to be made unreachable. `GlassTabBar` already
+receives the focused route, so it now honours the hidden flag only while the
+mushaf is the tab on screen. Device-verified the same day: mushaf with chrome
+hidden → external intent to `/--/menu` → bar present; Menu → Morphology → back →
+bar present; mushaf's own tap-to-show and 3.5s idle hide unchanged.
+
 **2026-09-14 — device run for #59 / #63 (owner present, adb over wifi).**
 
 - **#59 PASS.** Cold launch `exp://.../surah/2?ayah=282` landed on 2:282; Home's
