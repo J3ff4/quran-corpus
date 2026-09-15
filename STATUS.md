@@ -7,9 +7,60 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-09-14
+Updated: 2026-09-15
 
 ## Now
+
+**2026-09-15 — phase M8 merged (PR #81, squash `2996092`).** One recitation
+engine for the whole app: `useRecitation` moved out of the screens into
+`RecitationProvider`, so reader and mushaf share one playhead and starting one
+stops the other. A `TrackContext` carries the surah, its count, its name and
+`continuous` to the engine at play time, plus an `owner` (reader | mushaf |
+home) so a screen paints its highlight only for its own. Also: the status bar
+hides with the mushaf chrome; the 3.5s idle countdown restarts from the last
+touch of the player or the tab bar; the grow is 280ms; Home has its own player
+card under Continue; a mini-player docks on every tab while it recites, with an
+X that stops. Plan + all twelve owner rulings in
+`docs/plans/phase-m8-global-recitation.md`.
+
+**M8 IS NOT DEVICE-VERIFIED.** Checks 340-352 are owed on vc16
+(`quran-corpus-main-vc16.apk`). Per §10 that is an unmet exit criterion, not a
+pass. The four that matter most: 342 (leave the mushaf chrome-down, both system
+bars must return on the next tab — #80's shape one window higher), 349 (mushaf
+playing, walk to Home: no mini-player, card stays compact), 350 (Home's play
+runs on with Continuous OFF), 352 (starting the mushaf stops the reader).
+
+**Open design question from the M8 review.** Ruling 8 says the mini-player is
+suppressed on Home, flatly. CodeRabbit argued it should be suppressed only for
+*home-owned* tracks — as written, a reader-owned recitation playing while the
+user stands on Home has no transport there, and Home's compact card would start
+a different, home-owned track over the top of it. Declined as a code change
+pending an owner ruling; raise it at the device run.
+
+**Two review rounds on #81, both worth the cost.** `/code-review` caught the
+Home suppression never matching (expo-router pops a trailing `index` segment, so
+Home's segments are `['(tabs)']` — the unit test passed only because its mock
+returned a shape that never occurs), a mini-player that vanished on its own
+Pause, Home's Pause restarting the stored ayah instead of the playhead, a mushaf
+play callback that could start with `ayahCount: 0`, and a `stop()` that left the
+media session up so the OS could resume sound with no bar anywhere in the app.
+CodeRabbit then caught a stale `surahName` on cross-screen handoff, an unstable
+provider root remounting `AyahCard` once per ayah, an unclipped grow on Home, a
+silent Home failure, a stale coordinate pairing, and two countdown tests firing
+at a `pointerEvents:'none'` view — unreachable, so neither could see the
+countdown restart at all. Three declined with reasons on the PR.
+
+**CodeRabbit fail-open #1 seen live again, 2026-09-15.** The second trigger on
+#81 was refused: commit status `CodeRabbit | success | "Review rate limited"`,
+green, with no review object and no CodeRabbit check-run at head. `gh pr checks`
+prints `pass`. Only the description string says otherwise. 34 minutes of
+polling confirmed nothing ran.
+
+**CI caught a type-check the local gate missed.** `pnpm run type-check` runs two
+tsconfigs; a bare `tsc --noEmit` runs only the first. A top-level `await import()`
+in `useStableInsets.test.ts` was red under `tsconfig.test.json`'s node16
+resolution (TS1309, TS2835) and green locally. Read `PIPESTATUS`, not `$?` after
+a pipe.
 
 **2026-09-14 — both device-run fixes merged.** `6342692` (PR #79, the #63
 residual) and `f1ebcde` (PR #80, the stranded tab bar). CI green on both, no
