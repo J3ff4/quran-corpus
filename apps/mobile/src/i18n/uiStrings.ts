@@ -99,6 +99,7 @@ export type UiStringKey =
   // the control turns play-through-the-surah on and off.
   | 'reader.continuous'
   | 'player.stop'
+  | 'home.listen'
   // Names the tappable reciter label. The name itself is a proper noun, so
   // without this TalkBack announces only "Mahmoud Khalil Al-Husary" with
   // nothing to say it opens a picker.
@@ -371,6 +372,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.nextAyah': 'Next ayah',
     'reader.continuous': 'Continuous play',
     'player.stop': 'Stop recitation',
+    'home.listen': 'Listen',
     'reader.reciter': 'Reciter',
     'reader.chooseReciter': 'Choose reciter',
     'reader.ayahLabel': 'Ayah',
@@ -595,6 +597,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.nextAyah': 'Keyingi oyat',
     'reader.continuous': 'Ketma-ket ijro',
     'player.stop': "Qiroatni to'xtatish",
+    'home.listen': 'Tinglash',
     'reader.reciter': 'Qori',
     'reader.chooseReciter': 'Qorini tanlang',
     'reader.ayahLabel': 'Oyat',
@@ -814,6 +817,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'reader.nextAyah': 'Следующий аят',
     'reader.continuous': 'Непрерывное воспроизведение',
     'player.stop': 'Остановить чтение',
+    'home.listen': 'Слушать',
     'reader.reciter': 'Чтец',
     'reader.chooseReciter': 'Выберите чтеца',
     'reader.ayahLabel': 'Аят',

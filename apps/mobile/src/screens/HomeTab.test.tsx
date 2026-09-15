@@ -61,6 +61,36 @@ vi.mock('expo-router', async () => {
   };
 });
 
+// Home draws a player card now, and the transport inside it uses a pan gesture
+// for its scrub track. Unmocked, Vite parses gesture-handler's own Flow-typed
+// source and the suite fails to COLLECT -- which reads as a broken test file
+// rather than as a missing mock (see Bloom.test.tsx for the same trap).
+// The engine lives in a provider at the app root, which this suite renders the
+// tab without. Mocked rather than wrapped: what the card does with the
+// controller is HomePlayerCard's own suite to assert, and a real provider here
+// would drag expo-audio's native module into a test about counters and streaks.
+vi.mock('@/audio/recitationContext', () => ({
+  useRecitationController: () => ({
+    track: null,
+    ayah: null,
+    playing: false,
+    positionSec: 0,
+    durationSec: Number.NaN,
+    finished: false,
+    continuous: false,
+    error: null,
+    toggle: vi.fn(),
+    stop: vi.fn(),
+    seekTo: vi.fn(),
+    skipNext: vi.fn(),
+    skipPrevious: vi.fn(),
+  }),
+}));
+
+vi.mock('react-native-gesture-handler', async () =>
+  (await import('@/testing/rnHosts.js')).reactNativeGestureHandlerMock(),
+);
+
 vi.mock('react-native', async () => {
   const { AppState, host, StyleSheet } = await import('@/testing/rnHosts.js');
   const React = await import('react');

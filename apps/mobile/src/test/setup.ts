@@ -170,3 +170,20 @@ vi.mock('expo-status-bar', async () => {
       }),
   };
 });
+
+// expo-audio, for the same reason again: its JS entry reads __DEV__ and reaches
+// ExpoAudio through expo-modules-core, so under jsdom it fails to parse before
+// anything can be asserted. Declared here now that the recitation engine sits
+// in a provider at the root -- every screen's suite reaches it, not only the
+// two that play audio.
+//
+// Inert on purpose. The suites that exercise playback pass their own driver
+// into useRecitation and never touch these; the rest only need the import to
+// resolve.
+vi.mock('expo-audio', () => ({
+  createAudioPlayer: vi.fn(),
+  setAudioModeAsync: vi.fn(async () => undefined),
+  preload: vi.fn(async () => undefined),
+  clearPreloadedSource: vi.fn(async () => undefined),
+  clearAllPreloadedSources: vi.fn(async () => undefined),
+}));

@@ -15,6 +15,7 @@ import {
 } from '@/data/userRepository';
 import { useUserDbOnFocus } from '@/data/useUserDbOnFocus';
 import { ayahForDay } from '@/home/ayahOfTheDay';
+import { HomePlayerCard } from '@/home/HomePlayerCard';
 import { WEEK_DAYS, localDay, streakFrom, weeklyLog, type DailyRoots } from '@/home/counters';
 import { t } from '@/i18n/uiStrings';
 import type { UiLocaleCode } from '@/i18n/languages';
@@ -48,7 +49,7 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
  * of them rejected.
  */
 export function HomeScreen() {
-  const { uiLocale } = useAppSettings();
+  const { uiLocale, reciterId } = useAppSettings();
   const theme = useThemeColors();
   const paddingBottom = useListBottomPadding();
   const today = localDay(new Date());
@@ -101,6 +102,18 @@ export function HomeScreen() {
           ayahNumber={position.data.ayahNumber}
           location={continueAyah.data}
           error={continueAyah.error ? t(uiLocale, 'reader.loadFailed') : null}
+          uiLocale={uiLocale}
+        />
+      ) : null}
+      {/* Under Continue, never folded into it (ruling 7): Continue is the way
+          back into the reader, and a control that starts a sound without going
+          anywhere is a different promise. */}
+      {!position.loading && !position.error && position.data ? (
+        <HomePlayerCard
+          surahId={position.data.surahId}
+          ayahNumber={position.data.ayahNumber}
+          location={continueAyah.data}
+          reciterId={reciterId}
           uiLocale={uiLocale}
         />
       ) : null}
