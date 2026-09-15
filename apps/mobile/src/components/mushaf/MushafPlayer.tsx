@@ -7,7 +7,7 @@ import { RecitationBar } from '@/components/RecitationBar';
 import { Icon } from '@/components/icons/Icon';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
-import { useChromeVisible } from '@/mushaf/chromeVisibility';
+import { showChrome, useChromeVisible } from '@/mushaf/chromeVisibility';
 import { useReducedMotion } from '@/motion/useReducedMotion';
 import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
@@ -16,9 +16,10 @@ import { useThemeColors } from '@/theme/themeContext';
 const CHROME_FADE_MS = 220;
 /** Far enough to clear the player, the tab pill under it and both insets. */
 const BAR_TRAVEL = 220;
-/** The grow. Shorter than the chrome fade: this one happens under the thumb
- *  that pressed play, and anything slower reads as lag rather than motion. */
-const GROW_MS = 180;
+/** The grow. 180ms read as a snap rather than a motion on the device (owner,
+ *  2026-09-15), so it is slower than the chrome fade now: the bar unfolds
+ *  under the thumb that pressed play and that unfolding is worth seeing. */
+const GROW_MS = 280;
 /**
  * Room around the clipped box for the surface's own drop shadow.
  *
@@ -135,6 +136,20 @@ export function MushafPlayer({
       // occupies the bottom of the page, and the tap meant to bring the chrome
       // back would land on it instead.
       pointerEvents={visible ? 'box-none' : 'none'}
+      // Ruling 10: the idle countdown runs from the last touch of the player,
+      // not from the last page turn -- so a reader working the transport is
+      // never left reaching for a bar that slid away mid-press.
+      //
+      // Capture phase returning false: this observes every touch starting
+      // anywhere inside without claiming the responder, so the transport
+      // buttons and the scrub pan behave exactly as they did. It does not
+      // cover the scrub track, whose pan runs through gesture-handler and
+      // never enters RN's responder system -- `onInteract` on the bar below is
+      // what reaches that one.
+      onStartShouldSetResponderCapture={() => {
+        showChrome();
+        return false;
+      }}
       // Out of the reading order with the chrome, the same rule the tab bar
       // and the mushaf header follow. A bar TalkBack can reach is a bar the
       // user cannot see to know they reached.
@@ -177,6 +192,7 @@ export function MushafPlayer({
                 onSkipPrevious={onSkipPrevious}
                 onSeek={onSeek}
                 onOpenReciters={onOpenReciters}
+                onInteract={showChrome}
               />
             </View>
           ) : (

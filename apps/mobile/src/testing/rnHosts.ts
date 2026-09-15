@@ -43,6 +43,8 @@ interface HostProps {
   style?: unknown;
   testID?: string;
   hitSlop?: unknown;
+  /** RN's responder system, not the DOM's. Mapped to `touchstart` below. */
+  onStartShouldSetResponderCapture?: () => boolean;
   // Native-only props with no DOM equivalent. Destructured so they never reach
   // createElement: React logs "Unknown event handler property" for onLayout and
   // onTextLayout, and a non-boolean-attribute warning for `accessible`, on
@@ -350,6 +352,7 @@ export function host(tag: string) {
     pointerEvents,
     hitSlop,
     renderToHardwareTextureAndroid,
+    onStartShouldSetResponderCapture,
     ...props
   }: HostProps) {
     // Fires only when a suite has asked for a measured box; see setAutoLayout.
@@ -405,6 +408,21 @@ export function host(tag: string) {
         // camelCase prop on a DOM node, and dropping it would make the one
         // assertion that the mushaf page is held as GPU pixels decorative.
         'data-hardware-layer': renderToHardwareTextureAndroid ? 'true' : undefined,
+        // React DOM has no responder system, so this RN-only prop would be
+        // rendered as an unknown attribute and warn. Mapped onto `touchstart`
+        // rather than dropped: it is how a component observes every touch
+        // inside itself without claiming the responder -- the mushaf restarts
+        // its chrome countdown from it -- and a dropped prop leaves that
+        // untestable, which is the blindness that let the hero word carry 54dp
+        // of invisible band for a phase. The DOM event bubbles where RN's
+        // capture descends; for "a touch started somewhere in here" the two
+        // observe the same thing.
+        onTouchStart:
+          typeof onStartShouldSetResponderCapture === 'function'
+            ? () => {
+                (onStartShouldSetResponderCapture as () => boolean)();
+              }
+            : undefined,
         // Mapped, not spread: it is an object, so React would render it as an
         // unknown attribute and warn. It is also the only thing standing
         // between a control's drawn height and the 48dp its finger needs

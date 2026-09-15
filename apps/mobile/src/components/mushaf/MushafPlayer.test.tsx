@@ -111,6 +111,20 @@ describe('MushafPlayer', () => {
     expect(screen.getByTestId('mushaf-player').getAttribute('data-pointer-events')).toBe('box-none');
   });
 
+  it('restarts the idle countdown from a touch anywhere on it', () => {
+    // Ruling 10: the 3.5s runs from the LAST touch of the player, not from the
+    // last page turn. Asserted through the real chromeVisibility module rather
+    // than a spy -- what matters is that the chrome came back, not that a
+    // function was called.
+    hideChrome();
+    render(<MushafPlayer {...props()} />);
+    expect(screen.getByTestId('mushaf-player').getAttribute('data-pointer-events')).toBe('none');
+
+    fireEvent.touchStart(screen.getByTestId('mushaf-player'));
+
+    expect(screen.getByTestId('mushaf-player').getAttribute('data-pointer-events')).toBe('box-none');
+  });
+
   it('sizes its box to the bar it measured, not to a guess', () => {
     // The grow is a height animation, so an unmeasured box is a bar clipped to
     // nothing. The box carries the shadow room on top of the measured height.

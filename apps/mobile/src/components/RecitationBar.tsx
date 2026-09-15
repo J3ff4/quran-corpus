@@ -89,6 +89,14 @@ export interface RecitationBarProps {
    *  to open, and a button that does nothing is worse than a label. */
   onOpenReciters?: () => void;
   uiLocale: UiLocaleCode;
+  /** Every touch that reaches a control on this bar -- a transport press, and
+   *  both ends of a scrub. The mushaf restarts its chrome countdown from it
+   *  (M8 ruling 10); the reader has no chrome to keep up and passes none.
+   *
+   *  Both ends of the scrub, not just the begin: the countdown runs from the
+   *  LAST touch, and a four-second drag reported only at its start would hide
+   *  the chrome out from under the finger still holding it. */
+  onInteract?: (() => void) | undefined;
   /** Omitted, the bar docks itself above the gesture bar -- which is what the
    *  reader wants, since it is a stack screen with nothing under it. `false`
    *  leaves it in its parent's flow: the mushaf stacks it above the floating
@@ -120,6 +128,7 @@ export function RecitationBar({
   onToggleContinuous,
   onOpenReciters,
   uiLocale,
+  onInteract,
   dock = true,
 }: RecitationBarProps) {
   const theme = useThemeColors();
@@ -149,12 +158,14 @@ export function RecitationBar({
     .runOnJS(true)
     .minDistance(0)
     .onBegin((event) => {
+      onInteract?.();
       previewAt(event.x);
     })
     .onUpdate((event) => {
       previewAt(event.x);
     })
     .onEnd((event) => {
+      onInteract?.();
       const target = previewAt(event.x);
       if (target !== null) onSeek(target);
     })
@@ -199,12 +210,14 @@ export function RecitationBar({
             icon="skipBack"
             label={t(uiLocale, 'reader.previousAyah')}
             color={theme.text}
+            onInteract={onInteract}
             onPress={onSkipPrevious}
           />
           <TransportButton
             icon={playing ? 'pause' : 'play'}
             label={action}
             color={theme.accent}
+            onInteract={onInteract}
             onPress={onTogglePlay}
             // Still pressable while loading, and still labelled Pause: a
             // stream that never opens has to be stoppable, and a button that
@@ -217,6 +230,7 @@ export function RecitationBar({
             icon="skipForward"
             label={t(uiLocale, 'reader.nextAyah')}
             color={theme.text}
+            onInteract={onInteract}
             onPress={onSkipNext}
           />
           {/* Two lines rather than one: a reciter's full name runs to
@@ -234,6 +248,7 @@ export function RecitationBar({
               label={t(uiLocale, 'reader.continuous')}
               color={continuous ? theme.accent : theme.mutedText}
               selected={continuous}
+              onInteract={onInteract}
               onPress={onToggleContinuous}
             />
           ) : null}
@@ -285,6 +300,7 @@ function TransportButton({
   color,
   selected,
   busy,
+  onInteract,
   onPress,
 }: {
   icon: IconName;
@@ -294,6 +310,8 @@ function TransportButton({
   /** Waiting on something: the spinner replaces the glyph in the same box, so
    *  the row does not reflow under the thumb when the wait ends. */
   busy?: boolean;
+  /** Reported alongside the press, never instead of it. */
+  onInteract?: (() => void) | undefined;
   onPress: () => void;
 }) {
   const press = usePressScale();
@@ -309,7 +327,10 @@ function TransportButton({
       // a `selected: false` would have TalkBack read "not selected" after
       // every press, and a `busy: false` the same for the wait.
       accessibilityState={state}
-      onPress={onPress}
+      onPress={() => {
+        onInteract?.();
+        onPress();
+      }}
       onPressIn={press.onPressIn}
       onPressOut={press.onPressOut}
       style={[
