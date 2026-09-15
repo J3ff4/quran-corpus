@@ -28,7 +28,7 @@ import {
 } from '@/data/userRepository';
 import { useUserDbOnFocus } from '@/data/useUserDbOnFocus';
 import { useWordSummaryLoader } from '@/data/useWordSummaryLoader';
-import { useRecitation } from '@/audio/ayahAudio';
+import { useRecitationController } from '@/audio/recitationContext';
 import { MUSHAF_PAGE_MAX, reciterById } from '@quran-corpus/data/mobile';
 import { t } from '@/i18n/uiStrings';
 import { ayahKey, type PressedWord } from '@/mushaf/highlights';
@@ -246,9 +246,20 @@ export function MushafScreen() {
     [index.pages, recorder],
   );
 
-  // The surah being recited, not the screen's -- a tab has none. `useRecitation`
-  // reads `surah` when it starts an ayah rather than at mount, so moving it
-  // between ayahs is safe.
+  const audio = useRecitationController();
+  // Whether the engine is sounding for US. It is one engine app-wide now, so a
+  // recitation the reader started is audible here too -- and painting a band
+  // for it would put a green highlight on a page the reader is not looking at,
+  // driven by a screen they cannot see. Every read below goes through these
+  // three rather than through `audio` directly.
+  const mine = audio.track?.owner === 'mushaf';
+  const sounding = mine && audio.playing;
+  const soundingAyah = mine ? audio.ayah : null;
+  const soundingFinished = mine && audio.finished;
+
+  // The surah being recited, not the screen's -- a tab has none, and it moves
+  // as continuous play crosses a surah boundary. It travels with the call
+  // because the engine has no screen of its own to read it off.
   //
   // `continuous: true` unconditionally, NOT the saved setting (owner,
   // 2026-09-12). The only control here is one button saying "Play this page",
@@ -256,22 +267,33 @@ export function MushafScreen() {
   // then stopping after the first one is broken however the setting reads. The
   // setting still governs the reader, where play is a per-ayah control and
   // "just this ayah" is a coherent thing to ask for.
-  const audio = useRecitation(playing?.surahId ?? null, (playing ? (index.ayahCounts.get(playing.surahId) ?? 0) : 0), reciterId, {
-    continuous: true,
-    ...(playing ? { surahName: index.surahNames.get(playing.surahId) ?? '' } : {}),
-  });
+  const toggleAyah = useCallback(
+    (ayahNumber: number, surahId: number) => {
+      audio.toggle(
+        {
+          owner: 'mushaf',
+          surahId,
+          ayahCount: index.ayahCounts.get(surahId) ?? 0,
+          surahName: index.surahNames.get(surahId) ?? '',
+          continuous: true,
+        },
+        ayahNumber,
+      );
+    },
+    [audio, index.ayahCounts, index.surahNames],
+  );
 
   // The hook owns which ayah is sounding; this screen owns which surah that
   // ayah belongs to, so the two are reconciled here rather than duplicated.
   useEffect(() => {
     setPlaying((current) => {
-      if (audio.ayah === null) return null;
+      if (soundingAyah === null) return null;
       if (current === null) return null;
-      return current.ayahNumber === audio.ayah
+      return current.ayahNumber === soundingAyah
         ? current
-        : { surahId: current.surahId, ayahNumber: audio.ayah };
+        : { surahId: current.surahId, ayahNumber: soundingAyah };
     });
-  }, [audio.ayah]);
+  }, [soundingAyah]);
 
   // What the player's play button starts.
   //
@@ -286,8 +308,8 @@ export function MushafScreen() {
   // Null target means a page that begins no ayah at all -- 2:282 alone fills
   // more than a page -- and there is nothing there to start.
   const onTogglePlay = useCallback(() => {
-    if (audio.playing && playing) {
-      audio.toggleAyah(playing.ayahNumber, playing.surahId);
+    if (sounding && playing) {
+      toggleAyah(playing.ayahNumber, playing.surahId);
       return;
     }
     const target = playing && ayahOnPage(pageLines, playing) ? playing : firstAyahOnPage(pageLines);
@@ -296,7 +318,7 @@ export function MushafScreen() {
     // was rendered with the PREVIOUS `playing`, so the id it would infer on
     // its own is a page behind.
     setPlaying(target);
-    audio.toggleAyah(target.ayahNumber, target.surahId);
+    toggleAyah(target.ayahNumber, target.surahId);
   }, [audio, playing, pageLines]);
 
   // The page the recitation has asked for and is waiting on the rows of, so it
@@ -312,7 +334,7 @@ export function MushafScreen() {
   // exactly the state this effect reacts to. The pager is the truth about
   // which page is in view; this is a request, and a finger outranks it.
   useEffect(() => {
-    if (!audio.playing || playing === null || currentPage === null) return;
+    if (!sounding || playing === null || currentPage === null) return;
     // No rows yet means the page is still arriving, not that the playhead has
     // left it -- and a turn on that reading would run through the whole juz
     // one page per query.
@@ -327,14 +349,14 @@ export function MushafScreen() {
     if (target === null || target === currentPage) return;
     setFocusPage(target);
     // pageLines, currentPage and index are read, not watched: see above.
-  }, [playing?.surahId, playing?.ayahNumber, audio.playing]);
+  }, [playing?.surahId, playing?.ayahNumber, sounding]);
 
   // The seam. `useRecitation` stops at the last ayah of a surah by design --
   // wrapping would restart al-Fatiha behind a locked screen -- and 51 pages
   // carry two surahs, so at those the hook will not advance and the screen has
   // to. Turn the page, then start whatever it begins once its rows arrive.
   useEffect(() => {
-    if (!audio.finished || currentPage === null || playing === null) return;
+    if (!soundingFinished || currentPage === null || playing === null) return;
     // The rest of THIS page first. A surah does not have to end where a page
     // does: 54 pages carry two or three, so page 106 finishes surah 4 with 5:1
     // and 5:2 still printed below it, and page 604 hides the whole of 113 and
@@ -342,7 +364,7 @@ export function MushafScreen() {
     const next = nextAyahOnPage(pageLines, playing);
     if (next !== null) {
       setPlaying(next);
-      audio.toggleAyah(next.ayahNumber, next.surahId);
+      toggleAyah(next.ayahNumber, next.surahId);
       return;
     }
     // The last page begins nothing further and there is no page after it; a
@@ -351,7 +373,7 @@ export function MushafScreen() {
     if (currentPage >= MUSHAF_PAGE_MAX) return;
     setFocusPage(currentPage + 1);
     setPendingPlayPage(currentPage + 1);
-  }, [audio.finished]);
+  }, [soundingFinished]);
 
   useEffect(() => {
     // `currentPage === pendingPlayPage` is what keeps this off the page being
@@ -366,7 +388,7 @@ export function MushafScreen() {
     // ayah the reader can see.
     if (target === null) return;
     setPlaying(target);
-    audio.toggleAyah(target.ayahNumber, target.surahId);
+    toggleAyah(target.ayahNumber, target.surahId);
   }, [pendingPlayPage, currentPage, pageLines]);
 
   const toggleBookmark = useCallback(
@@ -490,7 +512,7 @@ export function MushafScreen() {
         // Sounding, not parked: `playing` is the ayah the player sits ON and
         // survives a pause, so passing it raw kept an ayah lit with nothing
         // coming out of it. The reader draws the same distinction.
-        playingAyah={audio.playing ? playing : null}
+        playingAyah={sounding ? playing : null}
         focusPage={focusPage}
         uiLocale={uiLocale}
         onPageChange={(page) => {
@@ -513,8 +535,8 @@ export function MushafScreen() {
         // Sounding, not parked. Keyed on the parked ayah the bar would never
         // shrink back to one line: the parking spot outlives a pause on
         // purpose, so that resuming knows where to go.
-        playing={audio.playing}
-        ayahNumber={audio.ayah}
+        playing={sounding}
+        ayahNumber={soundingAyah}
         positionSec={audio.positionSec}
         durationSec={audio.durationSec}
         reciterLabel={reciterById(reciterId)?.label ?? ''}
@@ -601,7 +623,7 @@ export function MushafScreen() {
                   // off, the sheet's control sat on Pause for ever once an
                   // ayah had been pressed -- it paused, and said it had not.
                   playing={
-                    audio.playing &&
+                    sounding &&
                     playing?.surahId === openMushafWord.surahId &&
                     playing.ayahNumber === openMushafWord.ayahNumber
                   }
@@ -623,7 +645,7 @@ export function MushafScreen() {
                     // rendered with the PREVIOUS `playing`, so on the first
                     // press it holds null and nothing sounds at all, and on a
                     // page carrying two surahs it holds the other one.
-                    audio.toggleAyah(openMushafWord.ayahNumber, openMushafWord.surahId);
+                    toggleAyah(openMushafWord.ayahNumber, openMushafWord.surahId);
                   }}
                 />
               ),

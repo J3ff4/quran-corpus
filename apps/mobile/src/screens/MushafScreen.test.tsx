@@ -37,6 +37,9 @@ const mocks = vi.hoisted(() => ({
   // The hook's two facts are separate on purpose: `ayah` is what the player is
   // parked on and outlives a pause, `playing` is whether sound is coming out.
   audio: { ayah: null as number | null, playing: false, finished: false },
+  /** What the shared engine is sounding, and for whom. Null = silence. */
+  track: null as { owner: string; surahId: number } | null,
+  toggle: vi.fn(),
   loadWordSummary: vi.fn(),
   loadFails: false,
   continuousPlay: false,
@@ -153,11 +156,25 @@ vi.mock('@/data/userRepository', () => ({
     return Promise.resolve();
   },
 }));
-vi.mock('@/audio/ayahAudio', () => ({
-  useRecitation: (...args: unknown[]) => {
-    mocks.useRecitation(...args);
-    return { ...mocks.audio, toggleAyah: mocks.toggleAyah };
-  },
+vi.mock('@/audio/recitationContext', () => ({
+  useRecitationController: () => ({
+    ...mocks.audio,
+    // The engine is app-wide now, so what this screen paints depends on WHO
+    // started the sound. `owner: 'mushaf'` by default -- the tests below that
+    // care about a foreign track set it themselves.
+    // Defaults to this screen's own track whenever an ayah is parked: that is
+    // what a per-screen hook used to mean, so every test written against one
+    // keeps meaning it. A test about a foreign track sets `mocks.track`.
+    track: mocks.track ?? (mocks.audio.ayah === null ? null : { owner: 'mushaf', surahId: 1 }),
+    toggle: (track: { surahId: number }, ayah: number) => {
+      mocks.toggle(track, ayah);
+      // Forwarded in the old (ayah, surah) shape as well, so every assertion
+      // written against the per-screen hook keeps asserting the same thing:
+      // which ayah of which surah this screen asked for.
+      mocks.toggleAyah(ayah, track.surahId);
+    },
+    stop: vi.fn(),
+  }),
 }));
 vi.mock('@/components/AyahControls', () => ({ AyahControls: () => null }));
 vi.mock('@/components/NoteEditor', () => ({ NoteEditor: () => null }));
@@ -211,6 +228,8 @@ beforeEach(() => {
   mocks.hideChrome.mockClear();
   mocks.releaseChrome.mockClear();
   mocks.toggleAyah.mockClear();
+  mocks.toggle.mockClear();
+  mocks.track = null;
   mocks.audio = { ayah: null, playing: false, finished: false };
   mocks.isFocused = true;
   mocks.chromeVisible = true;
@@ -322,12 +341,28 @@ describe('MushafScreen', () => {
     expect(mocks.sheetProps.at(-1)?.['ayahActions']).toBeTruthy();
   });
 
-  it('starts the recitation with no surah, since a tab has none to assume', async () => {
-    // Nothing is playing, so there is no surah to give the hook. The surah
-    // travels with the toggle call instead -- see the test below.
+  it('paints nothing for a recitation the reader started', async () => {
+    // One engine app-wide: a reader-owned ayah is audible while this tab sits
+    // mounted behind it. Painting a band for it would light a page nobody is
+    // looking at, driven by a screen they cannot see.
+    mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
+    mocks.pageLines.set(106, [{ words: [{ surahId: 5, ayahNumber: 82, position: 1 }] }]);
+    const props = await renderScreen();
+
+    mocks.track = { owner: 'reader', surahId: 5 };
+    await park(props, { ayah: 82, playing: true });
+
+    expect(props()['playingAyah']).toBe(null);
+    expect(mocks.playerProps.at(-1)?.['playing']).toBe(false);
+    expect(mocks.playerProps.at(-1)?.['ayahNumber']).toBe(null);
+  });
+
+  it('claims no track at mount, since a tab has no surah to assume', async () => {
+    // A tab has no surah of its own. Nothing is sounding until a word or the
+    // play button says which ayah, and the surah travels with that call.
     await renderScreen();
 
-    expect(mocks.useRecitation).toHaveBeenCalledWith(null, 0, 'husary', expect.anything());
+    expect(mocks.toggle).not.toHaveBeenCalled();
   });
 
   it('re-reads the bookmarks after the app comes back, rather than trusting the ones it started with', async () => {
@@ -714,11 +749,9 @@ describe('MushafScreen', () => {
     const props = await renderScreen();
     pressPlay();
 
-    expect(mocks.useRecitation).toHaveBeenLastCalledWith(
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      expect.objectContaining({ continuous: true }),
+    expect(mocks.toggle).toHaveBeenLastCalledWith(
+      expect.objectContaining({ owner: 'mushaf', continuous: true }),
+      expect.any(Number),
     );
 
     await park(props, { ayah: 176, playing: false, finished: true });

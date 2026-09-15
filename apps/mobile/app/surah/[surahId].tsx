@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
-import { useRecitation } from '@/audio/ayahAudio';
+import { useRecitationController } from '@/audio/recitationContext';
 import { ConfirmSheet } from '@/components/ConfirmSheet';
 import { NoteEditor } from '@/components/NoteEditor';
 import { SurahReader } from '@/components/SurahReader';
@@ -107,10 +107,38 @@ export default function SurahRoute() {
   // Switching reciter mid-surah changes the voice from the NEXT ayah, not this
   // one: the hook reads reciterId when it starts an ayah, and the one already
   // sounding keeps its source (device check 87).
-  const audio = useRecitation(surahId, reader?.data.surah.ayah_count ?? 0, reciterId, {
-    surahName: reader?.data.surah.name_translit,
-    continuous: continuousPlay,
-  });
+  const audio = useRecitationController();
+  // The engine is app-wide, so a mushaf-owned recitation is audible here too.
+  // The reader paints and transports only its own -- otherwise its bar would
+  // offer a Pause for an ayah belonging to a screen behind this one.
+  const mine = audio.track?.owner === 'reader' && audio.track.surahId === surahId;
+  const soundingAyah = mine && audio.playing ? audio.ayah : null;
+
+  // The surah travels with the call rather than being read off this screen:
+  // one engine, and it has no screen of its own. ayahCount is what stops
+  // continuous play at the end of the surah, so it comes from the loaded surah
+  // rather than a constant; 0 until the reader loads, which is also the window
+  // in which nothing can be tapped to play.
+  //
+  // Switching reciter mid-surah changes the voice from the NEXT ayah, not this
+  // one: the engine reads reciterId when it starts an ayah, and the one already
+  // sounding keeps its source (device check 87).
+  const toggleAyah = useCallback(
+    (ayahNumber: number) => {
+      if (surahId === null) return;
+      audio.toggle(
+        {
+          owner: 'reader',
+          surahId,
+          ayahCount: reader?.data.surah.ayah_count ?? 0,
+          surahName: reader?.data.surah.name_translit ?? '',
+          continuous: continuousPlay,
+        },
+        ayahNumber,
+      );
+    },
+    [audio, surahId, reader?.data.surah.ayah_count, reader?.data.surah.name_translit, continuousPlay],
+  );
   // Kept so the reader can query words for the ayahs scrolling into view,
   // rather than reopening the database on every tap.
   const [corpusClient, setCorpusClient] = useState<MobileDataClient | null>(null);
@@ -382,12 +410,12 @@ export default function SurahRoute() {
         data={held}
         bookmarkedAyahs={bookmarkedAyahs}
         notesByAyah={bookmarks}
-        playingAyah={audio.playing ? audio.ayah : null}
+        playingAyah={soundingAyah}
         audioEnabled
         recitation={{
           positionSec: audio.positionSec,
           durationSec: audio.durationSec,
-          continuous: audio.continuous,
+          continuous: continuousPlay,
           reciterId,
           onChangeReciter: setReciterId,
           onSkipNext: audio.skipNext,
@@ -408,7 +436,7 @@ export default function SurahRoute() {
         loadWordSummary={loadWordSummary}
         onToggleBookmark={toggleBookmark}
         onEditNote={(ayahNumber) => setEditingNote(ayahNumber)}
-        onToggleAudio={audio.toggleAyah}
+        onToggleAudio={toggleAyah}
         onReadingAyah={(ayahNumber) => {
           // No page: this reader scrolls by ayah, and a null page clears
           // whatever page a mushaf session left in the shared row (ruling 13).
@@ -476,7 +504,7 @@ export default function SurahRoute() {
           {readingError}
         </Text>
       ) : null}
-      {audio.error ? (
+      {mine && audio.error ? (
         <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={errorTextStyle(theme.danger)}>
           {t(uiLocale, audio.error)}
         </Text>

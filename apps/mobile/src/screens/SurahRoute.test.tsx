@@ -26,15 +26,26 @@ vi.mock('@quran-corpus/mobile-data', () => ({
   createExpoSqliteClient: (db: unknown) => db,
 }));
 
-vi.mock('@/audio/ayahAudio', () => ({
-  useRecitation: () => ({
-    ayah: null,
-    playing: false,
+const audioMocks = vi.hoisted(() => ({
+  ayah: null as number | null,
+  playing: false,
+  track: null as { owner: string; surahId: number } | null,
+  toggle: vi.fn(),
+}));
+
+vi.mock('@/audio/recitationContext', () => ({
+  useRecitationController: () => ({
+    ayah: audioMocks.ayah,
+    playing: audioMocks.playing,
     positionSec: 0,
     durationSec: Number.NaN,
     error: null,
     continuous: false,
-    toggleAyah: vi.fn(),
+    finished: false,
+    // What the shared engine is sounding, and for whom. Null = silence.
+    track: audioMocks.track,
+    toggle: audioMocks.toggle,
+    stop: vi.fn(),
     seekTo: vi.fn(),
     skipNext: vi.fn(),
     skipPrevious: vi.fn(),
@@ -47,7 +58,7 @@ vi.mock('@/components/SurahReader', async () => {
     // `loadWords` is destructured and driven, not dropped: a function prop a
     // mock omits renders nothing, so no assertion in this file could ever see
     // it and the route's own loader would sit unexercised (F1).
-    SurahReader: ({ onToggleBookmark, onEditNote, notesByAyah, onReadingAyah, bookmarkedAyahs, loadWords, prevSurahId, nextSurahId, onPageSurah, onJump, initialAyahNumber }: {
+    SurahReader: ({ onToggleBookmark, onEditNote, notesByAyah, onReadingAyah, bookmarkedAyahs, loadWords, prevSurahId, nextSurahId, onPageSurah, onJump, initialAyahNumber, playingAyah, onToggleAudio }: {
       onToggleBookmark: (ayahNumber: number) => void;
       onEditNote?: (ayahNumber: number) => void;
       notesByAyah?: Map<number, string | null>;
@@ -59,6 +70,8 @@ vi.mock('@/components/SurahReader', async () => {
       onPageSurah?: (surahId: number, side: 'prev' | 'next') => void;
       onJump?: (surahId: number, ayahNumber: number) => void;
       initialAyahNumber?: number | null;
+      playingAyah?: number | null;
+      onToggleAudio?: (ayahNumber: number) => void;
     }) => {
       // Recorded rather than asserted here: the route rebuilds the reader's
       // whole header when this changes identity, and it re-renders on every
@@ -69,6 +82,8 @@ vi.mock('@/components/SurahReader', async () => {
         null,
         React.createElement('span', null, 'reader-content'),
         React.createElement('span', null, `anchor:${initialAyahNumber ?? 'none'}`),
+        React.createElement('span', null, `playing:${playingAyah ?? 'none'}`),
+        React.createElement('button', { onClick: () => onToggleAudio?.(255) }, 'play ayah'),
         React.createElement('span', null, `adjacent:${prevSurahId ?? 'none'}/${nextSurahId ?? 'none'}`),
         React.createElement(
           'button',
@@ -239,6 +254,59 @@ describe('SurahRoute', () => {
     mocks.setBookmarkNote.mockReset();
     mocks.params = { surahId: '2' };
     mocks.pageSurahProps.length = 0;
+    audioMocks.ayah = null;
+    audioMocks.playing = false;
+    audioMocks.track = null;
+    audioMocks.toggle.mockReset();
+  });
+
+  it('lights the ayah it is itself reciting', async () => {
+    audioMocks.track = { owner: 'reader', surahId: 2 };
+    audioMocks.ayah = 255;
+    audioMocks.playing = true;
+
+    render(<SurahRoute />);
+
+    expect(await screen.findByText('playing:255')).toBeTruthy();
+  });
+
+  it('lights nothing for a recitation the mushaf started', async () => {
+    // One engine app-wide: the mushaf's page recitation is audible while this
+    // reader sits in the stack. Painting it here would light a card for a
+    // playhead this screen does not control, and offer a Pause for an ayah
+    // belonging to a screen behind it.
+    audioMocks.track = { owner: 'mushaf', surahId: 2 };
+    audioMocks.ayah = 255;
+    audioMocks.playing = true;
+
+    render(<SurahRoute />);
+
+    expect(await screen.findByText('playing:none')).toBeTruthy();
+  });
+
+  it('lights nothing for its own owner on a surah it is not showing', async () => {
+    // Continuous play runs on past the end of a surah. The reader paged away
+    // is still a reader-owned track -- on a different surah, whose ayah 5 is
+    // not this surah's ayah 5.
+    audioMocks.track = { owner: 'reader', surahId: 3 };
+    audioMocks.ayah = 5;
+    audioMocks.playing = true;
+
+    render(<SurahRoute />);
+
+    expect(await screen.findByText('playing:none')).toBeTruthy();
+  });
+
+  it('carries its own surah and the saved continuous setting into the track', async () => {
+    render(<SurahRoute />);
+    await screen.findByText('reader-content');
+
+    fireEvent.click(screen.getByText('play ayah'));
+
+    expect(audioMocks.toggle).toHaveBeenCalledWith(
+      expect.objectContaining({ owner: 'reader', surahId: 2, continuous: false }),
+      255,
+    );
   });
 
   it('opens the note editor for the ayah the reader asked about', async () => {
