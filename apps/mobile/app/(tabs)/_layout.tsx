@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { useStableInsets } from '@/theme/useStableInsets';
 import { GlassTabBar } from '@/components/GlassTabBar';
+import { MiniPlayer } from '@/components/MiniPlayer';
 
 export default function TabsLayout() {
   // The native header used to push tab content clear of the status bar. With
@@ -13,6 +14,7 @@ export default function TabsLayout() {
   const { top } = useStableInsets();
 
   return (
+    <>
     <Tabs
       tabBar={(props) => <GlassTabBar {...props} />}
       screenOptions={{
@@ -46,5 +48,11 @@ export default function TabsLayout() {
       <Tabs.Screen name="dictionary" />
       <Tabs.Screen name="menu" />
     </Tabs>
+      {/* Outside the navigator, so it survives every tab switch, and inside
+          this layout, so a pushed stack screen draws over it rather than
+          under it (ruling 6). It renders nothing unless something is
+          sounding. */}
+      <MiniPlayer />
+    </>
   );
 }

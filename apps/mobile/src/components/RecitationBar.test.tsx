@@ -374,3 +374,24 @@ describe('RecitationBar onInteract', () => {
     expect(handlers.onTogglePlay).toHaveBeenCalled();
   });
 });
+
+describe('RecitationBar onDismiss', () => {
+  afterEach(cleanup);
+
+  it('offers an X that ends the recitation', () => {
+    const onDismiss = vi.fn();
+    renderBar({ onDismiss });
+
+    fireEvent.click(screen.getByLabelText('Stop recitation'));
+
+    expect(onDismiss).toHaveBeenCalled();
+  });
+
+  it('has no X where nothing supplied one', () => {
+    // The reader and the mushaf both have their own way back to the sound.
+    // Only the docked mini-player, on a screen that owns neither, needs one.
+    renderBar();
+
+    expect(screen.queryByLabelText('Stop recitation')).toBeNull();
+  });
+});

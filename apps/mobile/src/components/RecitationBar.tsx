@@ -97,6 +97,10 @@ export interface RecitationBarProps {
    *  LAST touch, and a four-second drag reported only at its start would hide
    *  the chrome out from under the finger still holding it. */
   onInteract?: (() => void) | undefined;
+  /** Omitted, there is no X. Supplied, a trailing button that ends the
+   *  recitation -- the docked mini-player's way off a screen that is not the
+   *  reader's or the mushaf's. */
+  onDismiss?: (() => void) | undefined;
   /** Omitted, the bar docks itself above the gesture bar -- which is what the
    *  reader wants, since it is a stack screen with nothing under it. `false`
    *  leaves it in its parent's flow: the mushaf stacks it above the floating
@@ -129,6 +133,7 @@ export function RecitationBar({
   onOpenReciters,
   uiLocale,
   onInteract,
+  onDismiss,
   dock = true,
 }: RecitationBarProps) {
   const theme = useThemeColors();
@@ -250,6 +255,18 @@ export function RecitationBar({
               selected={continuous}
               onInteract={onInteract}
               onPress={onToggleContinuous}
+            />
+          ) : null}
+          {onDismiss ? (
+            <TransportButton
+              icon="close"
+              label={t(uiLocale, 'player.stop')}
+              // Muted, not `danger`: it ends a recitation, it does not destroy
+              // anything, and a red glyph beside a play button reads as a
+              // warning about the audio rather than a way to put it away.
+              color={theme.mutedText}
+              onInteract={onInteract}
+              onPress={onDismiss}
             />
           ) : null}
         </View>
