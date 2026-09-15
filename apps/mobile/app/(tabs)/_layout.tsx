@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useStableInsets } from '@/theme/useStableInsets';
 import { GlassTabBar } from '@/components/GlassTabBar';
 
 export default function TabsLayout() {
@@ -7,7 +7,10 @@ export default function TabsLayout() {
   // headerShown off below, nothing does -- the first row of every tab rendered
   // under the clock. Applied to the scene rather than inside the five screens
   // so there is one place to change it.
-  const { top } = useSafeAreaInsets();
+  // Stable, not live: the mushaf hides the status bar, which collapses this
+  // inset to 0 and would drag every mounted tab's content up by its height --
+  // and drop it back on the next tap (M8 ruling 2).
+  const { top } = useStableInsets();
 
   return (
     <Tabs

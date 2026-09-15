@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 import { NavigationBar } from 'expo-navigation-bar';
+import { StatusBar } from 'expo-status-bar';
 import type { MushafLine, MushafWord, Word } from '@quran-corpus/data/mobile';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 
@@ -531,6 +532,12 @@ export function MushafScreen() {
           rest of the chrome: tap to bring the bars back, and the reading state
           -- chrome down -- is the state where the whole page is visible. */}
       <NavigationBar hidden={mushafFocused && !chromeVisible} />
+      {/* And the status bar with it (M8 ruling 1), so the leaf runs to the top
+          edge of the glass. Same gate as the navigation bar, for the same
+          reason: this is a tab screen that stays mounted after a blur, and a
+          standing request left behind would take the clock off every other
+          tab. The page itself does not move -- see useStableInsets. */}
+      <StatusBar hidden={mushafFocused && !chromeVisible} />
       <MushafChrome
         visible={chromeVisible}
         uiLocale={uiLocale}

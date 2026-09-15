@@ -154,3 +154,19 @@ vi.mock('expo-navigation-bar', async () => {
       }),
   };
 });
+
+// expo-status-bar, for the same reason as expo-navigation-bar above: a native
+// module with no jsdom counterpart, reached by the mushaf on every render.
+// Rendered as a real element so a suite can assert WHICH request is being made
+// -- on the device the component renders null and RN merges the props of every
+// mounted instance by mount order.
+vi.mock('expo-status-bar', async () => {
+  const React = await import('react');
+  return {
+    StatusBar: ({ hidden }: { hidden?: boolean }) =>
+      React.createElement('div', {
+        'data-testid': 'system-status-bar',
+        'data-hidden': hidden ? 'true' : 'false',
+      }),
+  };
+});

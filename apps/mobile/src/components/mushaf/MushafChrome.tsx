@@ -5,7 +5,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useStableInsets } from '@/theme/useStableInsets';
 
 import { GlassSurface } from '@/components/GlassSurface';
 import { SearchHeaderButton } from '@/components/SearchHeaderButton';
@@ -51,7 +51,10 @@ export interface MushafChromeProps {
  */
 export function MushafChrome({ visible, uiLocale, onOpenJump, onOpenSearch }: MushafChromeProps) {
   const theme = useThemeColors();
-  const insets = useSafeAreaInsets();
+  // The bar is positioned off the status bar's inset and fades out as that
+  // bar is hidden. Read live, the inset collapses to 0 mid-fade and the chrome
+  // jumps up the screen on its way out.
+  const insets = useStableInsets();
   const reducedMotion = useReducedMotion();
   const duration = reducedMotion ? 0 : CHROME_FADE_MS;
 

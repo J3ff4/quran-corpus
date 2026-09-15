@@ -1,4 +1,4 @@
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useStableInsets } from './useStableInsets';
 
 /** Breathing room under the last row of a scrolling screen, plus whatever the
  *  device reserves for its gesture bar.
@@ -25,5 +25,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 const TAB_PILL_CLEARANCE = 88;
 
 export function useListBottomPadding(): number {
-  return useSafeAreaInsets().bottom + TAB_PILL_CLEARANCE;
+  // Stable, not live: the mushaf hides the navigation bar, and every other
+  // tab's list is still mounted behind it -- read live, all of them reflow
+  // their bottom padding twice per chrome toggle on a screen nobody is looking
+  // at.
+  return useStableInsets().bottom + TAB_PILL_CLEARANCE;
 }

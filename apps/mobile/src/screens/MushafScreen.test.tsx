@@ -756,6 +756,34 @@ describe('MushafScreen', () => {
     expect(screen.getByTestId('system-nav-bar').getAttribute('data-hidden')).toBe('false');
   });
 
+  it('takes the status bar down with the navigation buttons', async () => {
+    // Both system bars on one rule (M8 ruling 1). Separate assertions rather
+    // than one: they are two independent native modules, and a screen that
+    // hid one and forgot the other is exactly the defect this pairs against.
+    mocks.chromeVisible = false;
+    await renderScreen();
+
+    expect(screen.getByTestId('system-status-bar').getAttribute('data-hidden')).toBe('true');
+  });
+
+  it('gives the status bar back when the chrome comes back', async () => {
+    mocks.chromeVisible = true;
+    await renderScreen();
+
+    expect(screen.getByTestId('system-status-bar').getAttribute('data-hidden')).toBe('false');
+  });
+
+  it('leaves the status bar alone while another tab is the one on screen', async () => {
+    // The status bar is app-wide state. A standing request from a blurred tab
+    // would take the clock off whatever screen the reader moved to -- the #80
+    // stranded-chrome shape, one window higher.
+    mocks.chromeVisible = false;
+    mocks.isFocused = false;
+    await renderScreen();
+
+    expect(screen.getByTestId('system-status-bar').getAttribute('data-hidden')).toBe('false');
+  });
+
   it('carries every bookmark, not one surah-s worth', async () => {
     // A page holds whatever surahs print put on it. A set narrowed to the
     // screen's "own" surah -- which a tab does not have -- drops exactly the
