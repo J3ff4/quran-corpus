@@ -60,7 +60,11 @@ export function PlayerShell({ expanded, compact, full, growMs }: PlayerShellProp
   }
 
   return (
-    <Animated.View pointerEvents="box-none" style={boxStyle}>
+    // Clipped here, not by the caller. The child is absolute and keeps its
+    // full intrinsic height while this box animates, and RN's default overflow
+    // is visible -- so a caller without a clipping parent of its own (Home's
+    // card has none) paints the whole transport before the grow has run.
+    <Animated.View pointerEvents="box-none" style={[{ overflow: 'hidden' }, boxStyle]}>
       {/* Absolute, and anchored to the bottom. Absolute because a child inside
           a height-animated clip otherwise measures the clip rather than itself
           and reports the height it is being given -- so the grow would run
