@@ -1,13 +1,17 @@
 import { renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const insets = { value: { top: 28, bottom: 48, left: 0, right: 0 } };
+// Hoisted, because the mock factory below runs during the static import of the
+// hook -- which is itself hoisted above this line. A plain const would be in
+// its temporal dead zone by then. (A top-level `await import` dodged that and
+// type-checked red under tsconfig.test.json's node16 resolution.)
+const insets = vi.hoisted(() => ({ value: { top: 28, bottom: 48, left: 0, right: 0 } }));
 
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insets.value,
 }));
 
-const { useStableInsets } = await import('./useStableInsets');
+import { useStableInsets } from './useStableInsets';
 
 beforeEach(() => {
   insets.value = { top: 28, bottom: 48, left: 0, right: 0 };
