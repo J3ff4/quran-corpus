@@ -121,5 +121,12 @@ export function AyahCard({
     </GlassSurface>
   );
 
-  return playing ? <ThemeContext.Provider value={playingTheme}>{card}</ThemeContext.Provider> : card;
+  // The provider is always the root, and only its value changes. Rendered
+  // conditionally, the root element type changed every time the playhead
+  // entered or left this ayah -- which remounts the whole card subtree and
+  // takes descendant state and accessibility focus with it, once per ayah of a
+  // continuous recitation.
+  return (
+    <ThemeContext.Provider value={playing ? playingTheme : theme}>{card}</ThemeContext.Provider>
+  );
 }
