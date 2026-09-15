@@ -319,7 +319,12 @@ export function MushafScreen() {
     // its own is a page behind.
     setPlaying(target);
     toggleAyah(target.ayahNumber, target.surahId);
-  }, [audio, playing, pageLines]);
+    // `toggleAyah` and `sounding`, not `audio`: the callback reads both, and
+    // `toggleAyah` is itself memoized on the mushaf index. Depending on
+    // `audio` alone let this close over a toggleAyah built before the index
+    // resolved, which hands the engine `ayahCount: 0` -- continuous play that
+    // stops after one ayah, no preload, an empty lock-screen title.
+  }, [toggleAyah, sounding, playing, pageLines]);
 
   // The page the recitation has asked for and is waiting on the rows of, so it
   // can start that page's first ayah. Only set at a surah seam: everywhere
