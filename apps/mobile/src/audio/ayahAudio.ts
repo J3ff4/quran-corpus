@@ -388,6 +388,28 @@ export function useRecitation(
     startAyah(ayah, surahOverride);
   }
 
+  /**
+   * Halt, and forget which ayah was parked.
+   *
+   * The mini-player's X and nothing else (M8 ruling 5). Distinct from a pause
+   * on purpose: a pause keeps the ayah so the next tap resumes it, and this is
+   * the control that says the recitation is over.
+   *
+   * The driver is paused, not destroyed -- destroying belongs to unmount, and
+   * rebuilding a player for the next tap costs a visible delay before the first
+   * syllable. The refs are cleared so nothing downstream can advance from an
+   * ayah the user stopped: skipNext reads ayahRef, and left standing it would
+   * have started the NEXT ayah of a recitation that had just been dismissed.
+   */
+  function stop() {
+    driverRef.current?.pause();
+    ayahRef.current = null;
+    loadedSurahRef.current = null;
+    finishedRef.current = false;
+    soundedRef.current = false;
+    setState(IDLE);
+  }
+
   function seekTo(seconds: number) {
     const driver = driverRef.current;
     if (!driver) return;
@@ -462,6 +484,7 @@ export function useRecitation(
     // setState, so the render that observes the stop observes this too.
     finished: finishedRef.current,
     toggleAyah,
+    stop,
     seekTo,
     skipNext,
     skipPrevious,

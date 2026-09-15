@@ -427,6 +427,52 @@ describe('useRecitation', () => {
 });
 
 /** A RecitationDriver that records what the controller asked it to do. */
+describe('stop', () => {
+  it('halts the player and forgets the ayah', () => {
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: true });
+
+    r.toggleAyah(3);
+    r.stop();
+
+    expect(player.pauses).toBe(1);
+    expect(r.state().playing).toBe(false);
+    // Forgotten, not parked. A pause keeps the ayah so the next tap resumes it;
+    // this is the control that says the recitation is over.
+    expect(r.state().ayah).toBe(null);
+  });
+
+  it('leaves nothing behind that could advance on its own', () => {
+    // skipNext reads the ayah ref, not state. Left standing, the transport of
+    // a bar the user had just dismissed would start the NEXT ayah of a
+    // recitation that was supposed to be over.
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: true });
+
+    r.toggleAyah(3);
+    player.replaced.length = 0;
+    r.stop();
+    r.skipNext();
+
+    expect(player.replaced).toEqual([]);
+    expect(r.state().ayah).toBe(null);
+  });
+
+  it('keeps the player alive, so the next play is not a cold start', () => {
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: true });
+
+    r.toggleAyah(3);
+    r.stop();
+    r.toggleAyah(5);
+
+    // One created player across the whole sequence: destroying on stop would
+    // put a rebuild between the next tap and the first syllable.
+    expect(player.created).toHaveLength(1);
+    expect(r.state().ayah).toBe(5);
+  });
+});
+
 describe('paging to another surah', () => {
   it('stops the recitation when the surah changes under it', () => {
     const player = fakePlayer();
@@ -603,6 +649,7 @@ function renderRecitation({
     toggleAyah: (ayah: number, surahOverride?: number) =>
       act(() => hook.result.current.toggleAyah(ayah, surahOverride)),
     seekTo: (seconds: number) => act(() => hook.result.current.seekTo(seconds)),
+    stop: () => act(() => hook.result.current.stop()),
     skipNext: () => act(() => hook.result.current.skipNext()),
     skipPrevious: () => act(() => hook.result.current.skipPrevious()),
     /** The setting changing under the hook, the way the reciter sheet does. */

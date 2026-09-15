@@ -6,6 +6,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { configureAudioSession } from '@/audio/ayahAudio';
+import { RecitationProvider } from '@/audio/recitationContext';
 import { Bloom } from '@/components/Bloom';
 import { openCorpusDb, useCorpusFonts } from '@/data/openCorpusDb';
 import { AppSettingsProvider } from '@/settings/settingsStore';
@@ -105,7 +106,12 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AppSettingsProvider>
         <ThemeProvider>
-          <AppStack />
+          {/* Inside AppSettingsProvider, which owns the chosen reciter, and
+              outside the navigator, so a tab switch never remounts the engine
+              -- a remount destroys the player and takes the sound with it. */}
+          <RecitationProvider>
+            <AppStack />
+          </RecitationProvider>
         </ThemeProvider>
       </AppSettingsProvider>
     </GestureHandlerRootView>
