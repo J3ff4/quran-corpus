@@ -9,6 +9,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { NavigationBar } from 'expo-navigation-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReducedMotion } from '@/motion/useReducedMotion';
 import { useThemeColors } from '@/theme/themeContext';
@@ -206,6 +207,15 @@ export function BottomSheet({ onClose, closeLabel, bottomPadding = 16, children 
       {/* RNGH needs its own root inside a Modal: the one in app/_layout.tsx
           belongs to the main window, and gestures in this window are not
           routed through it, so drag-to-dismiss dies silently on Android. */}
+      {/* The sheet is anchored at bottom: 0 of an edge-to-edge window, so on a
+          device with three-button navigation the buttons sit ON its last row
+          (owner, on an S24, 2026-09-15). Hidden for as long as the sheet is
+          mounted and restored by its unmount -- no cleanup of our own to skip,
+          which is what made the stranded tab bar unrecoverable. Android still
+          reveals the bar on a swipe from the bottom edge whatever we ask for,
+          so a request that somehow outlived its sheet is a nuisance rather
+          than a trap. */}
+      <NavigationBar hidden />
       <GestureHandlerRootView style={StyleSheet.absoluteFill}>
         <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <AnimatedPressable

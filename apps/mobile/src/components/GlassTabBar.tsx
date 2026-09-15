@@ -6,7 +6,7 @@ import { GlassSurface } from './GlassSurface';
 import { Icon, type IconName } from './icons/Icon';
 import { t, type UiStringKey } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
-import { useChromeVisible } from '@/mushaf/chromeVisibility';
+import { showChrome, useChromeVisible } from '@/mushaf/chromeVisibility';
 import { useReducedMotion } from '@/motion/useReducedMotion';
 import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
@@ -132,6 +132,25 @@ export function GlassTabBar({ state, navigation, insets }: GlassTabBarProps) {
       // occupies the bottom of the screen, and the tap that is supposed to
       // bring it back would land on it instead of on the page.
       pointerEvents={visible ? 'box-none' : 'none'}
+      // Ruling 10: the mushaf's idle countdown runs from the last touch of the
+      // bar as well as of the player, so reaching for a tab and changing your
+      // mind does not leave the chrome sliding away under a finger.
+      //
+      // Gated on the mushaf, because showChrome() also ARMS the 3.5s timer.
+      // Called from a tab with chrome of its own permanently up, it would arm a
+      // hide against a mushaf nobody is looking at, and walking back to it four
+      // seconds later would find the page already bare.
+      //
+      // Capture phase returning false: observes the touch without claiming the
+      // responder, so every tab press behaves exactly as it did.
+      onStartShouldSetResponderCapture={
+        onMushaf
+          ? () => {
+              showChrome();
+              return false;
+            }
+          : undefined
+      }
       // Off the screen and out of the reading order together. A bar TalkBack
       // can still reach is a bar the user cannot see to know they reached.
       accessibilityElementsHidden={!visible}

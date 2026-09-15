@@ -61,6 +61,8 @@ export interface RecitationDriver {
   /** Drop a warmed URL again. On Android nothing else ever does. */
   clearPreload(url: string): void;
   setLockScreen(title: string, artist: string): void;
+  /** Take the media notification down without tearing the player down. */
+  clearLockScreen(): void;
   destroy(): void;
 }
 
@@ -121,6 +123,7 @@ export const createExpoRecitationDriver: CreateRecitationDriver = (url, onStatus
     },
     setLockScreen: (title: string, artist: string) =>
       player.setActiveForLockScreen(true, { title, artist }),
+    clearLockScreen: () => player.clearLockScreenControls(),
     destroy: () => {
       player.clearLockScreenControls();
       // The cache outlives the player, so leaving the reader has to empty it.
@@ -226,7 +229,7 @@ export function useRecitation(
   // toggleAyah the hook has still been rendered with the PREVIOUS surah, or
   // with null. Hence the override: the caller that knows the surah says so in
   // the same call, rather than hoping a re-render lands first.
-  function startAyah(ayah: number, surahOverride?: number) {
+  function startAyah(ayah: number, surahOverride?: number, nameOverride?: string) {
     const surahId = surahOverride ?? surah;
     if (surahId === null) return;
 
@@ -264,7 +267,13 @@ export function useRecitation(
     // Re-asserted on every ayah rather than once on the first: the reciter can
     // change mid-surah (device check 87) and the artist line has to change with
     // it.
-    driver.setLockScreen(options.surahName ?? `Surah ${surahId}`, reciterById(reciterId)?.label ?? '');
+    // The override first: a cross-screen handoff calls this in the render the
+    // new track was only just set in, so `options.surahName` is still the
+    // PREVIOUS track's -- which is the name the lock screen would keep.
+    driver.setLockScreen(
+      nameOverride ?? options.surahName ?? `Surah ${surahId}`,
+      reciterById(reciterId)?.label ?? '',
+    );
     driver.play();
 
     // One behind, not all: the file sounding right now was itself warmed by the
@@ -346,7 +355,7 @@ export function useRecitation(
   const statusRef = useRef(handleStatus);
   statusRef.current = handleStatus;
 
-  function toggleAyah(ayah: number, surahOverride?: number) {
+  function toggleAyah(ayah: number, surahOverride?: number, nameOverride?: string) {
     const driver = driverRef.current;
     // `state.error === null` is what makes the second tap after a failure a
     // retry rather than a resume: the source that failed is still loaded, so
@@ -385,7 +394,35 @@ export function useRecitation(
       }
       return;
     }
-    startAyah(ayah, surahOverride);
+    startAyah(ayah, surahOverride, nameOverride);
+  }
+
+  /**
+   * Halt, and forget which ayah was parked.
+   *
+   * The mini-player's X and nothing else (M8 ruling 5). Distinct from a pause
+   * on purpose: a pause keeps the ayah so the next tap resumes it, and this is
+   * the control that says the recitation is over.
+   *
+   * The driver is paused, not destroyed -- destroying belongs to unmount, and
+   * rebuilding a player for the next tap costs a visible delay before the first
+   * syllable. The refs are cleared so nothing downstream can advance from an
+   * ayah the user stopped: skipNext reads ayahRef, and left standing it would
+   * have started the NEXT ayah of a recitation that had just been dismissed.
+   */
+  function stop() {
+    driverRef.current?.pause();
+    // And the media session with it. Left standing, the notification keeps
+    // showing the dismissed ayah and its Play button resumes ExoPlayer --
+    // sound with no bar anywhere in the app, because `ayahRef` is null by then
+    // and the status tick can no longer say what is playing. Ruling 5 says X
+    // ends the recitation, and a recitation the OS can restart has not ended.
+    driverRef.current?.clearLockScreen();
+    ayahRef.current = null;
+    loadedSurahRef.current = null;
+    finishedRef.current = false;
+    soundedRef.current = false;
+    setState(IDLE);
   }
 
   function seekTo(seconds: number) {
@@ -462,6 +499,7 @@ export function useRecitation(
     // setState, so the render that observes the stop observes this too.
     finished: finishedRef.current,
     toggleAyah,
+    stop,
     seekTo,
     skipNext,
     skipPrevious,

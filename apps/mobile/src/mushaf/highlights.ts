@@ -60,6 +60,11 @@ function mix(from: string, to: string, t: number): string {
  * One colour per word. Precedence, strongest first:
  * **pressed -> audio -> landing -> plain text.**
  *
+ * Audio's answer is now plain text: the playing ayah moved out of the ink and
+ * into a band (owner, 2026-09-15), the same move the bookmark made five days
+ * earlier and for the same reason -- green type on a warm page reads as a
+ * smudge, not as a mark.
+ *
  * A bookmark is absent from this list on purpose. It is the one state that
  * stands for weeks rather than for a gesture or a playhead, and as a fourth
  * shade of green it was indistinguishable from the other two -- so it moved
@@ -83,8 +88,13 @@ export function colorForWord(
   return (surahId, ayahNumber, position) => {
     if (isPressed(pressed, surahId, ayahNumber, position)) return theme.accent;
     const key = ayahKey(surahId, ayahNumber);
-    if (input.playing === key) return theme.accent;
-    // A bookmark no longer appears here at all: it is the band underneath.
+    // Plain ink, and returned rather than fallen through: a playing ayah is a
+    // band now (see backgroundForWord), and the early return is what keeps a
+    // landing pulse from tinting the type under it -- audio still wins over a
+    // landing, it just wins by staying black.
+    if (input.playing === key) return theme.text;
+    // Neither a bookmark nor the playhead appears here any more: both are
+    // bands underneath.
     if (input.landing === key) {
       return mix(theme.text, theme.accent, LANDING_PEAK * input.landingProgress);
     }
@@ -107,8 +117,9 @@ function isPressed(
 }
 
 /**
- * The ground a word sits on: the amber band of a bookmarked ayah, and the
- * accent wash under the one word being pressed.
+ * The ground a word sits on: the green band of the ayah being recited, the
+ * amber band of a bookmarked ayah, and the accent wash under the one word
+ * being pressed.
  *
  * Both live here because both are grounds, and one sits on the other: press a
  * word inside a bookmarked ayah and the green wash has to win over the amber
@@ -125,12 +136,18 @@ export function backgroundForWord(
   theme: typeof themeColors.light,
 ): (surahId: number, ayahNumber: number, position: number) => string | undefined {
   const pressed = input.pressed;
-  const { bookmarked } = input;
-  // Nothing to draw at all: hand back one closure rather than run two lookups
-  // per word on every page that has neither.
-  if (pressed === null && bookmarked.size === 0) return () => undefined;
+  const { bookmarked, playing } = input;
+  // Nothing to draw at all: hand back one closure rather than run three lookups
+  // per word on every page that has none of them.
+  if (pressed === null && playing === null && bookmarked.size === 0) return () => undefined;
   return (surahId, ayahNumber, position) => {
     if (isPressed(pressed, surahId, ayahNumber, position)) return theme.accentWash;
-    return bookmarked.has(ayahKey(surahId, ayahNumber)) ? theme.bookmarkWash : undefined;
+    const key = ayahKey(surahId, ayahNumber);
+    // The playhead over the bookmark, not under it. Both are bands and only one
+    // can be painted, so the one that is moving wins for as long as it is on
+    // this ayah -- the bookmark is still there when it moves on, whereas a
+    // playhead the reader cannot see is a playhead they have lost.
+    if (playing === key) return theme.playingWash;
+    return bookmarked.has(key) ? theme.bookmarkWash : undefined;
   };
 }

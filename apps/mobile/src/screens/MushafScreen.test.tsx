@@ -37,6 +37,9 @@ const mocks = vi.hoisted(() => ({
   // The hook's two facts are separate on purpose: `ayah` is what the player is
   // parked on and outlives a pause, `playing` is whether sound is coming out.
   audio: { ayah: null as number | null, playing: false, finished: false },
+  /** What the shared engine is sounding, and for whom. Null = silence. */
+  track: null as { owner: string; surahId: number } | null,
+  toggle: vi.fn(),
   loadWordSummary: vi.fn(),
   loadFails: false,
   continuousPlay: false,
@@ -44,6 +47,11 @@ const mocks = vi.hoisted(() => ({
   hideChrome: vi.fn(),
   releaseChrome: vi.fn(),
   appStateListeners: [] as Array<(state: string) => void>,
+  // Whether the mushaf is the tab being looked at. A tab screen stays mounted
+  // after a blur, so this is the difference between the screen's requests
+  // applying and the screen sitting there quietly.
+  isFocused: true,
+  chromeVisible: true,
 }));
 
 // The reader half has its own suite; what this screen does is decide what it
@@ -74,6 +82,7 @@ vi.mock('expo-router', async () => {
   const React = await import('react');
   return {
     router: { push: vi.fn() },
+    useIsFocused: () => mocks.isFocused,
     useFocusEffect: (callback: () => void | (() => void)) => {
       React.useEffect(() => {
         const teardown = callback();
@@ -92,7 +101,7 @@ vi.mock('@/mushaf/chromeVisibility', () => ({
   showChrome: vi.fn(),
   releaseChrome: (...args: unknown[]) => mocks.releaseChrome(...args),
   toggleChrome: vi.fn(),
-  useChromeVisible: () => true,
+  useChromeVisible: () => mocks.chromeVisible,
 }));
 vi.mock('@/components/mushaf/PageJumpSheet', () => ({ PageJumpSheet: () => null }));
 vi.mock('@/components/ReciterSheet', () => ({ ReciterSheet: () => null }));
@@ -147,11 +156,25 @@ vi.mock('@/data/userRepository', () => ({
     return Promise.resolve();
   },
 }));
-vi.mock('@/audio/ayahAudio', () => ({
-  useRecitation: (...args: unknown[]) => {
-    mocks.useRecitation(...args);
-    return { ...mocks.audio, toggleAyah: mocks.toggleAyah };
-  },
+vi.mock('@/audio/recitationContext', () => ({
+  useRecitationController: () => ({
+    ...mocks.audio,
+    // The engine is app-wide now, so what this screen paints depends on WHO
+    // started the sound. `owner: 'mushaf'` by default -- the tests below that
+    // care about a foreign track set it themselves.
+    // Defaults to this screen's own track whenever an ayah is parked: that is
+    // what a per-screen hook used to mean, so every test written against one
+    // keeps meaning it. A test about a foreign track sets `mocks.track`.
+    track: mocks.track ?? (mocks.audio.ayah === null ? null : { owner: 'mushaf', surahId: 1 }),
+    toggle: (track: { surahId: number }, ayah: number) => {
+      mocks.toggle(track, ayah);
+      // Forwarded in the old (ayah, surah) shape as well, so every assertion
+      // written against the per-screen hook keeps asserting the same thing:
+      // which ayah of which surah this screen asked for.
+      mocks.toggleAyah(ayah, track.surahId);
+    },
+    stop: vi.fn(),
+  }),
 }));
 vi.mock('@/components/AyahControls', () => ({ AyahControls: () => null }));
 vi.mock('@/components/NoteEditor', () => ({ NoteEditor: () => null }));
@@ -205,7 +228,11 @@ beforeEach(() => {
   mocks.hideChrome.mockClear();
   mocks.releaseChrome.mockClear();
   mocks.toggleAyah.mockClear();
+  mocks.toggle.mockClear();
+  mocks.track = null;
   mocks.audio = { ayah: null, playing: false, finished: false };
+  mocks.isFocused = true;
+  mocks.chromeVisible = true;
 });
 
 afterEach(cleanup);
@@ -314,12 +341,28 @@ describe('MushafScreen', () => {
     expect(mocks.sheetProps.at(-1)?.['ayahActions']).toBeTruthy();
   });
 
-  it('starts the recitation with no surah, since a tab has none to assume', async () => {
-    // Nothing is playing, so there is no surah to give the hook. The surah
-    // travels with the toggle call instead -- see the test below.
+  it('paints nothing for a recitation the reader started', async () => {
+    // One engine app-wide: a reader-owned ayah is audible while this tab sits
+    // mounted behind it. Painting a band for it would light a page nobody is
+    // looking at, driven by a screen they cannot see.
+    mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
+    mocks.pageLines.set(106, [{ words: [{ surahId: 5, ayahNumber: 82, position: 1 }] }]);
+    const props = await renderScreen();
+
+    mocks.track = { owner: 'reader', surahId: 5 };
+    await park(props, { ayah: 82, playing: true });
+
+    expect(props()['playingAyah']).toBe(null);
+    expect(mocks.playerProps.at(-1)?.['playing']).toBe(false);
+    expect(mocks.playerProps.at(-1)?.['ayahNumber']).toBe(null);
+  });
+
+  it('claims no track at mount, since a tab has no surah to assume', async () => {
+    // A tab has no surah of its own. Nothing is sounding until a word or the
+    // play button says which ayah, and the surah travels with that call.
     await renderScreen();
 
-    expect(mocks.useRecitation).toHaveBeenCalledWith(null, 0, 'husary', expect.anything());
+    expect(mocks.toggle).not.toHaveBeenCalled();
   });
 
   it('re-reads the bookmarks after the app comes back, rather than trusting the ones it started with', async () => {
@@ -706,16 +749,72 @@ describe('MushafScreen', () => {
     const props = await renderScreen();
     pressPlay();
 
-    expect(mocks.useRecitation).toHaveBeenLastCalledWith(
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-      expect.objectContaining({ continuous: true }),
+    expect(mocks.toggle).toHaveBeenLastCalledWith(
+      expect.objectContaining({ owner: 'mushaf', continuous: true }),
+      expect.any(Number),
     );
 
     await park(props, { ayah: 176, playing: false, finished: true });
 
     expect(props()['focusPage']).toBe(107);
+  });
+
+  it('takes the system navigation buttons down with the rest of the chrome', async () => {
+    // The page number is printed in the bottom corner of the leaf, which is
+    // where three-button navigation lives (owner, on an S24, 2026-09-15). The
+    // buttons therefore leave when the chrome does, so the reading state shows
+    // the whole page.
+    mocks.chromeVisible = false;
+    await renderScreen();
+
+    expect(screen.getByTestId('system-nav-bar').getAttribute('data-hidden')).toBe('true');
+  });
+
+  it('gives the buttons back when the chrome comes back', async () => {
+    mocks.chromeVisible = true;
+    await renderScreen();
+
+    expect(screen.getByTestId('system-nav-bar').getAttribute('data-hidden')).toBe('false');
+  });
+
+  it('asks for nothing while another tab is the one on screen', async () => {
+    // The mushaf is a TAB screen: it stays mounted after a blur. A request made
+    // here and left standing would hide the navigation buttons on whatever tab
+    // the reader moved to -- a screen with no tap-to-restore of its own, which
+    // is the shape of the stranded tab bar (#80).
+    mocks.chromeVisible = false;
+    mocks.isFocused = false;
+    await renderScreen();
+
+    expect(screen.getByTestId('system-nav-bar').getAttribute('data-hidden')).toBe('false');
+  });
+
+  it('takes the status bar down with the navigation buttons', async () => {
+    // Both system bars on one rule (M8 ruling 1). Separate assertions rather
+    // than one: they are two independent native modules, and a screen that
+    // hid one and forgot the other is exactly the defect this pairs against.
+    mocks.chromeVisible = false;
+    await renderScreen();
+
+    expect(screen.getByTestId('system-status-bar').getAttribute('data-hidden')).toBe('true');
+  });
+
+  it('gives the status bar back when the chrome comes back', async () => {
+    mocks.chromeVisible = true;
+    await renderScreen();
+
+    expect(screen.getByTestId('system-status-bar').getAttribute('data-hidden')).toBe('false');
+  });
+
+  it('leaves the status bar alone while another tab is the one on screen', async () => {
+    // The status bar is app-wide state. A standing request from a blurred tab
+    // would take the clock off whatever screen the reader moved to -- the #80
+    // stranded-chrome shape, one window higher.
+    mocks.chromeVisible = false;
+    mocks.isFocused = false;
+    await renderScreen();
+
+    expect(screen.getByTestId('system-status-bar').getAttribute('data-hidden')).toBe('false');
   });
 
   it('carries every bookmark, not one surah-s worth', async () => {

@@ -27,7 +27,10 @@ describe('colorForWord', () => {
 
   it('lets audio win over a landing pulse and a bookmark on the same ayah', () => {
     // Ruling 20 puts all three on one ayah. The playing ayah is the one that
-    // moves, so it has to stay legible as it moves.
+    // moves, so it has to stay legible as it moves -- and since 2026-09-15 it
+    // stays legible by keeping black ink and taking the band, rather than by
+    // turning green. Winning is now visible in the GROUND, so both halves are
+    // asserted: plain text, and the playhead's wash over the bookmark's.
     const all = {
       bookmarked: new Set([ayahKey(2, 5)]),
       landing: ayahKey(2, 5),
@@ -35,7 +38,8 @@ describe('colorForWord', () => {
       landingProgress: 1,
       pressed: null,
     };
-    expect(colorForWord(all, theme)(2, 5, 1)).toBe(theme.accent);
+    expect(colorForWord(all, theme)(2, 5, 1)).toBe(theme.text);
+    expect(backgroundForWord(all, theme)(2, 5, 1)).toBe(theme.playingWash);
   });
 
   it('pulses a landing ayah above the page, bookmarked or not', () => {
@@ -52,10 +56,13 @@ describe('colorForWord', () => {
     expect(faded(2, 5, 1)).toBe(theme.text);
   });
 
-  it('keys on the surah too, so a page crossing a boundary tints one ayah', () => {
-    const c = colorForWord({ ...base, playing: ayahKey(78, 5) }, theme);
-    expect(c(78, 5, 1)).toBe(theme.accent);
-    expect(c(77, 5, 1)).toBe(theme.text);
+  it('keys on the surah too, so a page crossing a boundary bands one ayah', () => {
+    // On the background now: the playhead stopped being a colour on the type,
+    // so the ink no longer distinguishes ayah 5 of two different surahs at all
+    // and an assertion on it would pass whatever the key did.
+    const b = backgroundForWord({ ...base, playing: ayahKey(78, 5) }, theme);
+    expect(b(78, 5, 1)).toBe(theme.playingWash);
+    expect(b(77, 5, 1)).toBeUndefined();
   });
 
   it('survives a spring overshooting past the pulse-s peak', () => {
@@ -70,8 +77,8 @@ describe('colorForWord', () => {
   it('marks the pressed word over every other state, and only that word', () => {
     // M7d ruling 4: a long press opens the sheet, so something has to say
     // which word it is about. Press a word inside the ayah being recited and
-    // the colour alone cannot -- both are the accent -- which is why the wash
-    // is what carries it.
+    // both states now want the ground, so the pressed wash has to win the
+    // ground for that one word.
     const pressed = { surahId: 2, ayahNumber: 5, position: 3 };
     const input = { ...base, playing: ayahKey(2, 5), pressed };
 
@@ -79,9 +86,10 @@ describe('colorForWord', () => {
     const background = backgroundForWord(input, theme);
 
     expect(background(2, 5, 3)).toBe(theme.accentWash);
-    // Its neighbours in the same ayah keep the playing colour and no wash.
-    expect(color(2, 5, 4)).toBe(theme.accent);
-    expect(background(2, 5, 4)).toBeUndefined();
+    // Its neighbours in the same ayah keep the playhead's band, and the
+    // pressed word is the one hole punched in it.
+    expect(color(2, 5, 4)).toBe(theme.text);
+    expect(background(2, 5, 4)).toBe(theme.playingWash);
   });
 
   it('takes the pressed word to the accent over a state that is not the accent', () => {

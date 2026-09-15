@@ -338,3 +338,60 @@ describe('RecitationBar', () => {
     expect(screen.getByTestId('recitation-reciter').getAttribute('aria-label')).toContain('Reciter');
   });
 });
+
+describe('RecitationBar onInteract', () => {
+  afterEach(cleanup);
+
+  it('reports a transport press', () => {
+    const onInteract = vi.fn();
+    renderBar({ onInteract });
+
+    fireEvent.click(screen.getByLabelText('Pause'));
+
+    expect(onInteract).toHaveBeenCalled();
+  });
+
+  it('reports the END of a scrub, not only its start', () => {
+    // The mushaf restarts its 3.5s idle countdown from this. Reported on the
+    // begin alone, a four-second drag would hide the chrome out from under the
+    // finger still holding it.
+    const onInteract = vi.fn();
+    renderBar({ onInteract });
+    layoutTrack();
+
+    act(() => pan('onBegin')?.({ x: 100 }));
+    onInteract.mockClear();
+    act(() => pan('onEnd')?.({ x: 200 }));
+
+    expect(onInteract).toHaveBeenCalled();
+  });
+
+  it('still works with no handler at all -- the reader passes none', () => {
+    const handlers = renderBar();
+
+    fireEvent.click(screen.getByLabelText('Pause'));
+
+    expect(handlers.onTogglePlay).toHaveBeenCalled();
+  });
+});
+
+describe('RecitationBar onDismiss', () => {
+  afterEach(cleanup);
+
+  it('offers an X that ends the recitation', () => {
+    const onDismiss = vi.fn();
+    renderBar({ onDismiss });
+
+    fireEvent.click(screen.getByLabelText('Stop recitation'));
+
+    expect(onDismiss).toHaveBeenCalled();
+  });
+
+  it('has no X where nothing supplied one', () => {
+    // The reader and the mushaf both have their own way back to the sound.
+    // Only the docked mini-player, on a screen that owns neither, needs one.
+    renderBar();
+
+    expect(screen.queryByLabelText('Stop recitation')).toBeNull();
+  });
+});

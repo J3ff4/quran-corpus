@@ -1,15 +1,20 @@
 import { Tabs } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useStableInsets } from '@/theme/useStableInsets';
 import { GlassTabBar } from '@/components/GlassTabBar';
+import { MiniPlayer } from '@/components/MiniPlayer';
 
 export default function TabsLayout() {
   // The native header used to push tab content clear of the status bar. With
   // headerShown off below, nothing does -- the first row of every tab rendered
   // under the clock. Applied to the scene rather than inside the five screens
   // so there is one place to change it.
-  const { top } = useSafeAreaInsets();
+  // Stable, not live: the mushaf hides the status bar, which collapses this
+  // inset to 0 and would drag every mounted tab's content up by its height --
+  // and drop it back on the next tap (M8 ruling 2).
+  const { top } = useStableInsets();
 
   return (
+    <>
     <Tabs
       tabBar={(props) => <GlassTabBar {...props} />}
       screenOptions={{
@@ -43,5 +48,11 @@ export default function TabsLayout() {
       <Tabs.Screen name="dictionary" />
       <Tabs.Screen name="menu" />
     </Tabs>
+      {/* Outside the navigator, so it survives every tab switch, and inside
+          this layout, so a pushed stack screen draws over it rather than
+          under it (ruling 6). It renders nothing unless something is
+          sounding. */}
+      <MiniPlayer />
+    </>
   );
 }

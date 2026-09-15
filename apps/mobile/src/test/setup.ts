@@ -132,3 +132,58 @@ vi.mock('react-native-reanimated', async () => {
     Easing: { bezier: () => undefined, out: (fn: unknown) => fn, ease: undefined },
   };
 });
+
+// expo-navigation-bar is a native module: its JS entry reaches for
+// ExpoNavigationBar through expo-modules-core, which has no jsdom counterpart.
+// Declared here rather than per suite for the same reason the three mocks above
+// are -- every sheet in the app reaches it through BottomSheet, so the suite
+// that forgot it would fail on a module-resolution error naming the navigation
+// bar rather than the component under test.
+//
+// Rendered as a real element rather than as null, so a suite can assert WHICH
+// request a screen is making. On the device the component renders null and the
+// module merges the props of every mounted instance; the mock models one
+// instance at a time, which is all any single suite mounts.
+vi.mock('expo-navigation-bar', async () => {
+  const React = await import('react');
+  return {
+    NavigationBar: ({ hidden }: { hidden?: boolean }) =>
+      React.createElement('div', {
+        'data-testid': 'system-nav-bar',
+        'data-hidden': hidden ? 'true' : 'false',
+      }),
+  };
+});
+
+// expo-status-bar, for the same reason as expo-navigation-bar above: a native
+// module with no jsdom counterpart, reached by the mushaf on every render.
+// Rendered as a real element so a suite can assert WHICH request is being made
+// -- on the device the component renders null and RN merges the props of every
+// mounted instance by mount order.
+vi.mock('expo-status-bar', async () => {
+  const React = await import('react');
+  return {
+    StatusBar: ({ hidden }: { hidden?: boolean }) =>
+      React.createElement('div', {
+        'data-testid': 'system-status-bar',
+        'data-hidden': hidden ? 'true' : 'false',
+      }),
+  };
+});
+
+// expo-audio, for the same reason again: its JS entry reads __DEV__ and reaches
+// ExpoAudio through expo-modules-core, so under jsdom it fails to parse before
+// anything can be asserted. Declared here now that the recitation engine sits
+// in a provider at the root -- every screen's suite reaches it, not only the
+// two that play audio.
+//
+// Inert on purpose. The suites that exercise playback pass their own driver
+// into useRecitation and never touch these; the rest only need the import to
+// resolve.
+vi.mock('expo-audio', () => ({
+  createAudioPlayer: vi.fn(),
+  setAudioModeAsync: vi.fn(async () => undefined),
+  preload: vi.fn(async () => undefined),
+  clearPreloadedSource: vi.fn(async () => undefined),
+  clearAllPreloadedSources: vi.fn(async () => undefined),
+}));

@@ -19,12 +19,29 @@ vi.mock('react-native-reanimated', async () => {
 });
 
 import { GlassTabBar, type GlassTabBarProps } from './GlassTabBar';
-import { hideChrome, releaseChrome } from '@/mushaf/chromeVisibility';
+import {
+  CHROME_IDLE_MS,
+  hideChrome,
+  releaseChrome,
+  showChrome,
+  useChromeVisible,
+} from '@/mushaf/chromeVisibility';
 import { ThemeContext } from '@/theme/themeContext';
 import { themeColors } from '@/theme/tokens';
 import { rgb } from '@/testing/rgb';
 
 const ROUTES = ['index', 'surahs', 'mushaf', 'dictionary', 'menu'];
+
+/** The module's own value, read without a component of the bar's in the way. */
+function chromeIsVisible(): boolean {
+  let seen = false;
+  function Probe() {
+    seen = useChromeVisible();
+    return null;
+  }
+  render(<Probe />);
+  return seen;
+}
 
 function props(index: number, navigate = vi.fn(), defaultPrevented = false): GlassTabBarProps {
   return {
@@ -116,6 +133,46 @@ describe('GlassTabBar', () => {
     // index-based call silently lands on the wrong screen the moment a tab is
     // inserted.
     expect(navigate).toHaveBeenCalledWith('dictionary');
+  });
+
+  it('restarts the mushaf idle countdown from a touch on the bar', () => {
+    // Ruling 10: the countdown runs from the last touch of EITHER the player or
+    // the bar, so reaching for a tab and changing your mind does not leave the
+    // chrome sliding away under your finger.
+    //
+    // From a VISIBLE bar: hidden, it is pointerEvents:'none' and no touch
+    // reaches it at all -- the tap that brings the chrome back lands on the
+    // page. Firing at it there asserted only that the chrome appeared, which
+    // is not what this handler is for.
+    vi.useFakeTimers();
+    try {
+      act(() => showChrome());
+      renderBar(props(2));
+
+      act(() => vi.advanceTimersByTime(CHROME_IDLE_MS - 500));
+      fireEvent.touchStart(screen.getByTestId('tab-bar'));
+
+      act(() => vi.advanceTimersByTime(600));
+      expect(chromeIsVisible()).toBe(true);
+
+      act(() => vi.advanceTimersByTime(CHROME_IDLE_MS));
+      expect(chromeIsVisible()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not start a countdown from a touch on any other tab', () => {
+    // showChrome() also STARTS the 3.5s timer. Called from a tab with no chrome
+    // of its own, it would arm a hide against a mushaf nobody is looking at --
+    // so walking back to it 4 seconds later would find the page already bare.
+    hideChrome();
+    renderBar(props(0));
+
+    fireEvent.touchStart(screen.getByTestId('tab-bar'));
+
+    // Visible because it is not the mushaf, not because anything was shown.
+    expect(chromeIsVisible()).toBe(false);
   });
 
   it('does not navigate when the active tab is pressed again', () => {

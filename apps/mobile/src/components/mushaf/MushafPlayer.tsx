@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react';
-import { Pressable, Text, View, type LayoutChangeEvent } from 'react-native';
+import { useEffect } from 'react';
+import { Pressable, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { GlassSurface } from '@/components/GlassSurface';
+import { PlayerShell, SHADOW_ROOM } from '@/components/PlayerShell';
 import { RecitationBar } from '@/components/RecitationBar';
 import { Icon } from '@/components/icons/Icon';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
-import { useChromeVisible } from '@/mushaf/chromeVisibility';
+import { showChrome, useChromeVisible } from '@/mushaf/chromeVisibility';
 import { useReducedMotion } from '@/motion/useReducedMotion';
 import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
@@ -16,19 +17,10 @@ import { useThemeColors } from '@/theme/themeContext';
 const CHROME_FADE_MS = 220;
 /** Far enough to clear the player, the tab pill under it and both insets. */
 const BAR_TRAVEL = 220;
-/** The grow. Shorter than the chrome fade: this one happens under the thumb
- *  that pressed play, and anything slower reads as lag rather than motion. */
-const GROW_MS = 180;
-/**
- * Room around the clipped box for the surface's own drop shadow.
- *
- * The grow is a height animation, so the box has to clip -- and a clip tight
- * to the bar would shave the shadow that separates it from the page for as
- * long as the player is on screen, not only while it moves. The content is
- * inset by this much and the box is pushed down by it, so the bar lands in
- * exactly the same place it would with no clip at all.
- */
-const SHADOW_ROOM = 16;
+/** The grow. 180ms read as a snap rather than a motion on the device (owner,
+ *  2026-09-15), so it is slower than the chrome fade now: the bar unfolds
+ *  under the thumb that pressed play and that unfolding is worth seeing. */
+const GROW_MS = 280;
 
 export interface MushafPlayerProps {
   /** Sound is coming out. The ONLY thing that picks compact vs full. A bar
@@ -100,34 +92,6 @@ export function MushafPlayer({
     transform: [{ translateY: (1 - chrome.value) * BAR_TRAVEL }],
   }));
 
-  // Measured, never assumed. The full bar's height depends on the reciter
-  // name's line count and on the type scale, and a constant would clip the
-  // transport on whichever device disagreed.
-  const [compactHeight, setCompactHeight] = useState(0);
-  const [fullHeight, setFullHeight] = useState(0);
-  const target = playing ? fullHeight : compactHeight;
-
-  const height = useSharedValue(0);
-  useEffect(() => {
-    // Nothing measured yet. Skipping rather than animating to 0 is what keeps
-    // the first frame from collapsing the bar it is about to draw.
-    if (target <= 0) return;
-    // The first measurement of either state snaps: there is no height to grow
-    // FROM on the frame a state first appears, and a 0 -> full curve would
-    // play an unasked-for entrance every time the player mounts.
-    if (height.value === 0) height.value = target;
-    else height.value = withTiming(target, { duration: reducedMotion ? 0 : GROW_MS });
-  }, [target, reducedMotion, height]);
-  const boxStyle = useAnimatedStyle(() =>
-    // `height.value || undefined`, not a bare 0: before the first measurement
-    // the box sizes to its content, which is how the content gets measured.
-    height.value > 0 ? { height: height.value + SHADOW_ROOM * 2 } : {},
-  );
-
-  function measure(set: (value: number) => void) {
-    return (event: LayoutChangeEvent) => set(event.nativeEvent.layout.height);
-  }
-
   return (
     <Animated.View
       testID="mushaf-player"
@@ -135,6 +99,20 @@ export function MushafPlayer({
       // occupies the bottom of the page, and the tap meant to bring the chrome
       // back would land on it instead.
       pointerEvents={visible ? 'box-none' : 'none'}
+      // Ruling 10: the idle countdown runs from the last touch of the player,
+      // not from the last page turn -- so a reader working the transport is
+      // never left reaching for a bar that slid away mid-press.
+      //
+      // Capture phase returning false: this observes every touch starting
+      // anywhere inside without claiming the responder, so the transport
+      // buttons and the scrub pan behave exactly as they did. It does not
+      // cover the scrub track, whose pan runs through gesture-handler and
+      // never enters RN's responder system -- `onInteract` on the bar below is
+      // what reaches that one.
+      onStartShouldSetResponderCapture={() => {
+        showChrome();
+        return false;
+      }}
       // Out of the reading order with the chrome, the same rule the tab bar
       // and the mushaf header follow. A bar TalkBack can reach is a bar the
       // user cannot see to know they reached.
@@ -152,85 +130,79 @@ export function MushafPlayer({
         chromeStyle,
       ]}
     >
-      <Animated.View pointerEvents="box-none" style={boxStyle}>
-        {/* Absolute, and anchored to the bottom. Absolute because a child
-            inside a height-animated clip otherwise measures the clip rather
-            than itself and reports the height it is being given -- so the
-            grow would run 0 -> 0 for ever. Bottom-anchored because the bar
-            grows upward from the tab pill it docks above. */}
-        <View
-          pointerEvents="box-none"
-          style={{ position: 'absolute', left: SHADOW_ROOM, right: SHADOW_ROOM, bottom: SHADOW_ROOM }}
-        >
-          {playing ? (
-            <View testID="mushaf-player-full" onLayout={measure(setFullHeight)}>
-              <RecitationBar
-                dock={false}
-                ayahNumber={ayahNumber}
-                playing={playing}
-                positionSec={positionSec}
-                durationSec={durationSec}
-                reciterLabel={reciterLabel}
-                uiLocale={uiLocale}
-                onTogglePlay={onTogglePlay}
-                onSkipNext={onSkipNext}
-                onSkipPrevious={onSkipPrevious}
-                onSeek={onSeek}
-                onOpenReciters={onOpenReciters}
-              />
-            </View>
-          ) : (
-            <View testID="mushaf-player-compact" onLayout={measure(setCompactHeight)}>
-              <GlassSurface
-                docked
-                radius="pill"
-                style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14 }}
+      <PlayerShell
+        expanded={playing}
+        growMs={reducedMotion ? 0 : GROW_MS}
+        full={
+          <View testID="mushaf-player-full">
+          <RecitationBar
+            dock={false}
+            ayahNumber={ayahNumber}
+            playing={playing}
+            positionSec={positionSec}
+            durationSec={durationSec}
+            reciterLabel={reciterLabel}
+            uiLocale={uiLocale}
+            onTogglePlay={onTogglePlay}
+            onSkipNext={onSkipNext}
+            onSkipPrevious={onSkipPrevious}
+            onSeek={onSeek}
+            onOpenReciters={onOpenReciters}
+            onInteract={showChrome}
+          />
+          </View>
+        }
+        compact={
+          <View testID="mushaf-player-compact">
+          <GlassSurface
+            docked
+            radius="pill"
+            style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14 }}
+          >
+            <Pressable
+              testID="mushaf-player-reciter"
+              accessibilityRole="button"
+              // The name alone announces as a proper noun with nothing to
+              // say it is a control: "Reciter, Mahmoud Khalil Al-Husary".
+              accessibilityLabel={`${t(uiLocale, 'reader.reciter')}, ${reciterLabel}`}
+              onPress={onOpenReciters}
+              style={{
+                flex: 1,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                minHeight: touchTargets.minimum,
+              }}
+            >
+              <Text
+                numberOfLines={1}
+                style={{ color: theme.text, fontSize: typography.caption, flexShrink: 1 }}
               >
-                <Pressable
-                  testID="mushaf-player-reciter"
-                  accessibilityRole="button"
-                  // The name alone announces as a proper noun with nothing to
-                  // say it is a control: "Reciter, Mahmoud Khalil Al-Husary".
-                  accessibilityLabel={`${t(uiLocale, 'reader.reciter')}, ${reciterLabel}`}
-                  onPress={onOpenReciters}
-                  style={{
-                    flex: 1,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 6,
-                    minHeight: touchTargets.minimum,
-                  }}
-                >
-                  <Text
-                    numberOfLines={1}
-                    style={{ color: theme.text, fontSize: typography.caption, flexShrink: 1 }}
-                  >
-                    {reciterLabel}
-                  </Text>
-                  <Icon name="chevronDown" color={theme.mutedText} size={14} />
-                </Pressable>
-                <Pressable
-                  testID="mushaf-player-play"
-                  accessibilityRole="button"
-                  // Not "Play": this control starts the page, not whatever the
-                  // last thing to play was, and on a page of 15 lines that is
-                  // the fact worth announcing.
-                  accessibilityLabel={t(uiLocale, 'mushaf.playPage')}
-                  onPress={onTogglePlay}
-                  style={{
-                    minHeight: touchTargets.minimum,
-                    minWidth: touchTargets.minimum,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Icon name="play" color={theme.accent} size={22} />
-                </Pressable>
-              </GlassSurface>
-            </View>
-          )}
-        </View>
-      </Animated.View>
+                {reciterLabel}
+              </Text>
+              <Icon name="chevronDown" color={theme.mutedText} size={14} />
+            </Pressable>
+            <Pressable
+              testID="mushaf-player-play"
+              accessibilityRole="button"
+              // Not "Play": this control starts the page, not whatever the
+              // last thing to play was, and on a page of 15 lines that is
+              // the fact worth announcing.
+              accessibilityLabel={t(uiLocale, 'mushaf.playPage')}
+              onPress={onTogglePlay}
+              style={{
+                minHeight: touchTargets.minimum,
+                minWidth: touchTargets.minimum,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Icon name="play" color={theme.accent} size={22} />
+            </Pressable>
+          </GlassSurface>
+          </View>
+        }
+      />
     </Animated.View>
   );
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ reduceMotion: false }));
@@ -19,7 +19,7 @@ vi.mock('@/settings/settingsStore', () => ({
 }));
 
 import { setAutoLayout } from '@/testing/rnHosts';
-import { hideChrome, releaseChrome } from '@/mushaf/chromeVisibility';
+import { CHROME_IDLE_MS, hideChrome, releaseChrome, showChrome } from '@/mushaf/chromeVisibility';
 
 import { MushafPlayer } from './MushafPlayer';
 
@@ -109,6 +109,39 @@ describe('MushafPlayer', () => {
     render(<MushafPlayer {...props()} />);
     expect(screen.getByTestId('mushaf-player').getAttribute('data-hidden-from-a11y')).toBeNull();
     expect(screen.getByTestId('mushaf-player').getAttribute('data-pointer-events')).toBe('box-none');
+  });
+
+  it('restarts the idle countdown from a touch anywhere on it', () => {
+    // Ruling 10: the 3.5s runs from the LAST touch of the player, not from the
+    // last page turn. Asserted through the real chromeVisibility module rather
+    // than a spy -- what matters is that the chrome stayed, not that a
+    // function was called.
+    //
+    // From a VISIBLE bar, because that is the only state where the handler is
+    // reachable: hidden, the player is pointerEvents:'none' and the platform
+    // hit-test never gets to it. Touching it there tested a path no finger can
+    // take, and proved only that the chrome appeared -- never that the
+    // countdown restarted, which is the whole of the ruling.
+    vi.useFakeTimers();
+    try {
+      act(() => showChrome());
+      render(<MushafPlayer {...props()} />);
+
+      act(() => vi.advanceTimersByTime(CHROME_IDLE_MS - 500));
+      fireEvent.touchStart(screen.getByTestId('mushaf-player'));
+
+      // Past the ORIGINAL expiry, and still up: the touch replaced the timer.
+      act(() => vi.advanceTimersByTime(600));
+      expect(screen.getByTestId('mushaf-player').getAttribute('data-pointer-events')).toBe(
+        'box-none',
+      );
+
+      // And it is a restart, not a cancel -- a full fresh interval still hides.
+      act(() => vi.advanceTimersByTime(CHROME_IDLE_MS));
+      expect(screen.getByTestId('mushaf-player').getAttribute('data-pointer-events')).toBe('none');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('sizes its box to the bar it measured, not to a guess', () => {

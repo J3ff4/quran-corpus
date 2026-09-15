@@ -427,6 +427,64 @@ describe('useRecitation', () => {
 });
 
 /** A RecitationDriver that records what the controller asked it to do. */
+describe('stop', () => {
+  it('halts the player and forgets the ayah', () => {
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: true });
+
+    r.toggleAyah(3);
+    r.stop();
+
+    expect(player.pauses).toBe(1);
+    expect(r.state().playing).toBe(false);
+    // Forgotten, not parked. A pause keeps the ayah so the next tap resumes it;
+    // this is the control that says the recitation is over.
+    expect(r.state().ayah).toBe(null);
+  });
+
+  it('leaves nothing behind that could advance on its own', () => {
+    // skipNext reads the ayah ref, not state. Left standing, the transport of
+    // a bar the user had just dismissed would start the NEXT ayah of a
+    // recitation that was supposed to be over.
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: true });
+
+    r.toggleAyah(3);
+    player.replaced.length = 0;
+    r.stop();
+    r.skipNext();
+
+    expect(player.replaced).toEqual([]);
+    expect(r.state().ayah).toBe(null);
+  });
+
+  it('takes the media notification down with it', () => {
+    // Left standing, its Play button resumes ExoPlayer while the refs are
+    // cleared -- sound with no bar anywhere in the app and no way to stop it.
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: true });
+
+    r.toggleAyah(3);
+    r.stop();
+
+    expect(player.lockScreenCleared).toBe(1);
+  });
+
+  it('keeps the player alive, so the next play is not a cold start', () => {
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: true });
+
+    r.toggleAyah(3);
+    r.stop();
+    r.toggleAyah(5);
+
+    // One created player across the whole sequence: destroying on stop would
+    // put a rebuild between the next tap and the first syllable.
+    expect(player.created).toHaveLength(1);
+    expect(r.state().ayah).toBe(5);
+  });
+});
+
 describe('paging to another surah', () => {
   it('stops the recitation when the surah changes under it', () => {
     const player = fakePlayer();
@@ -490,6 +548,7 @@ function fakePlayer({
     cleared: [] as string[],
     seeks: [] as number[],
     lockScreen: [] as { title: string; artist: string }[],
+    lockScreenCleared: 0,
     plays: 0,
     pauses: 0,
     destroyed: 0,
@@ -522,6 +581,9 @@ function fakePlayer({
         preload: (next: string) => recorder.preloaded.push(next),
         clearPreload: (stale: string) => recorder.cleared.push(stale),
         setLockScreen: (title: string, artist: string) => recorder.lockScreen.push({ title, artist }),
+        clearLockScreen: () => {
+          recorder.lockScreenCleared += 1;
+        },
         destroy: () => {
           recorder.destroyed += 1;
         },
@@ -603,6 +665,7 @@ function renderRecitation({
     toggleAyah: (ayah: number, surahOverride?: number) =>
       act(() => hook.result.current.toggleAyah(ayah, surahOverride)),
     seekTo: (seconds: number) => act(() => hook.result.current.seekTo(seconds)),
+    stop: () => act(() => hook.result.current.stop()),
     skipNext: () => act(() => hook.result.current.skipNext()),
     skipPrevious: () => act(() => hook.result.current.skipPrevious()),
     /** The setting changing under the hook, the way the reciter sheet does. */

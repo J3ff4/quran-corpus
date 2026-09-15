@@ -2,6 +2,8 @@ import React from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AyahCard } from './AyahCard';
+import { themeColors } from '@/theme/tokens';
+import { rgb } from '@/testing/rgb';
 
 vi.mock('@/settings/settingsStore', () => ({
   // Not a provider: the real store pulls expo-sqlite into the jsdom module
@@ -109,6 +111,54 @@ describe('AyahCard', () => {
     // count rather than the path data, which is retuned when a glyph is
     // re-centred.
     expect(screen.getByLabelText('Pause').querySelectorAll('path')).toHaveLength(2);
+  });
+
+  it('puts the playhead-s ground under the whole card while it recites', () => {
+    // Owner, 2026-09-15: the playing ayah was "very subtle" as green type, so
+    // it became a ground -- and in the reader the ground is the whole card,
+    // not just the Arabic run, because a card among cards is what the eye
+    // picks out while scrolling.
+    const props = {
+      ...baseProps,
+      ayahNumber: 1,
+      arabicText: 'Arabic text',
+      translationText: 'A translation',
+      bookmarked: false,
+      uiLocale: 'en' as const,
+      onToggleBookmark: vi.fn(),
+      onToggleAudio: vi.fn(),
+    };
+    const { rerender } = render(<AyahCard {...props} playing={false} />);
+
+    const card = () => screen.getByTestId('ayah-2-1-card');
+    expect(card().style.backgroundColor).not.toBe(rgb(themeColors.light.playingWash));
+
+    rerender(<AyahCard {...props} playing />);
+    expect(card().style.backgroundColor).toBe(rgb(themeColors.light.playingWash));
+  });
+
+  it('takes the ayah number off muted ink while the card is tinted', () => {
+    // muted is 2.93:1 on the light band and the medallion prints the ayah
+    // NUMBER in it. Leaving it muted buys a ground at the price of a number
+    // nobody can read, so the card raises muted ink to the page ink for as
+    // long as it is tinted.
+    const props = {
+      ...baseProps,
+      ayahNumber: 1,
+      arabicText: 'Arabic text',
+      translationText: null,
+      bookmarked: false,
+      uiLocale: 'en' as const,
+      onToggleBookmark: vi.fn(),
+      onToggleAudio: vi.fn(),
+    };
+    const { rerender } = render(<AyahCard {...props} playing={false} />);
+
+    const number = () => screen.getByText('1');
+    expect(number().style.color).toBe(rgb(themeColors.light.mutedText));
+
+    rerender(<AyahCard {...props} playing />);
+    expect(number().style.color).toBe(rgb(themeColors.light.text));
   });
 
   it('offers a note only on a bookmarked ayah', () => {

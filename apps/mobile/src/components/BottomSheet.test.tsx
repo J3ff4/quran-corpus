@@ -201,6 +201,21 @@ describe('BottomSheet', () => {
     expect(screen.getByTestId('sheet-surface').style.paddingBottom).toBe('24px');
   });
 
+  it('takes the system navigation buttons down for as long as it is open', () => {
+    // The sheet is anchored at bottom: 0 of an edge-to-edge window, so on a
+    // device with three-button navigation the buttons land on its last row
+    // (owner, on an S24, 2026-09-15). Restored by the unmount rather than by a
+    // cleanup of our own, which is the part that cannot be skipped.
+    const { unmount } = render(
+      <BottomSheet onClose={() => {}} closeLabel="Close"><span>body</span></BottomSheet>,
+    );
+
+    expect(screen.getByTestId('system-nav-bar').getAttribute('data-hidden')).toBe('true');
+
+    unmount();
+    expect(screen.queryByTestId('system-nav-bar')).toBeNull();
+  });
+
   it('names the backdrop so TalkBack does not read an unlabelled button', () => {
     render(<BottomSheet onClose={() => {}} closeLabel="Dismiss languages"><span>body</span></BottomSheet>);
 

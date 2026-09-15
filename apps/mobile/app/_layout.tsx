@@ -1,3 +1,4 @@
+import { NavigationBar } from 'expo-navigation-bar';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
@@ -5,6 +6,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { configureAudioSession } from '@/audio/ayahAudio';
+import { RecitationProvider } from '@/audio/recitationContext';
 import { Bloom } from '@/components/Bloom';
 import { openCorpusDb, useCorpusFonts } from '@/data/openCorpusDb';
 import { AppSettingsProvider } from '@/settings/settingsStore';
@@ -104,7 +106,12 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AppSettingsProvider>
         <ThemeProvider>
-          <AppStack />
+          {/* Inside AppSettingsProvider, which owns the chosen reciter, and
+              outside the navigator, so a tab switch never remounts the engine
+              -- a remount destroys the player and takes the sound with it. */}
+          <RecitationProvider>
+            <AppStack />
+          </RecitationProvider>
         </ThemeProvider>
       </AppSettingsProvider>
     </GestureHandlerRootView>
@@ -117,6 +124,15 @@ function AppStack() {
   const theme = useThemeColors();
   return (
     <View style={{ flex: 1 }}>
+      {/* The baseline the system navigation bar falls back to. Every other
+          instance in the app asks for it to be HIDDEN and is mounted later --
+          expo-navigation-bar merges the props of all mounted instances in mount
+          order, so the last one to ask wins and this one decides what happens
+          once they have all gone. Without a standing instance the bar's state
+          when the final asker unmounts is whatever the native module last
+          applied, which is how a sheet closing on one screen would leave the
+          buttons hidden on every other. */}
+      <NavigationBar hidden={false} />
       {/* One instance for the whole app, behind the navigator. A per-screen
           copy would repaint a full-screen gradient on every navigation. */}
       <Bloom />
