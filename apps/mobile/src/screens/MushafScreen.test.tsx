@@ -44,6 +44,11 @@ const mocks = vi.hoisted(() => ({
   hideChrome: vi.fn(),
   releaseChrome: vi.fn(),
   appStateListeners: [] as Array<(state: string) => void>,
+  // Whether the mushaf is the tab being looked at. A tab screen stays mounted
+  // after a blur, so this is the difference between the screen's requests
+  // applying and the screen sitting there quietly.
+  isFocused: true,
+  chromeVisible: true,
 }));
 
 // The reader half has its own suite; what this screen does is decide what it
@@ -74,6 +79,7 @@ vi.mock('expo-router', async () => {
   const React = await import('react');
   return {
     router: { push: vi.fn() },
+    useIsFocused: () => mocks.isFocused,
     useFocusEffect: (callback: () => void | (() => void)) => {
       React.useEffect(() => {
         const teardown = callback();
@@ -92,7 +98,7 @@ vi.mock('@/mushaf/chromeVisibility', () => ({
   showChrome: vi.fn(),
   releaseChrome: (...args: unknown[]) => mocks.releaseChrome(...args),
   toggleChrome: vi.fn(),
-  useChromeVisible: () => true,
+  useChromeVisible: () => mocks.chromeVisible,
 }));
 vi.mock('@/components/mushaf/PageJumpSheet', () => ({ PageJumpSheet: () => null }));
 vi.mock('@/components/ReciterSheet', () => ({ ReciterSheet: () => null }));
@@ -206,6 +212,8 @@ beforeEach(() => {
   mocks.releaseChrome.mockClear();
   mocks.toggleAyah.mockClear();
   mocks.audio = { ayah: null, playing: false, finished: false };
+  mocks.isFocused = true;
+  mocks.chromeVisible = true;
 });
 
 afterEach(cleanup);
@@ -716,6 +724,36 @@ describe('MushafScreen', () => {
     await park(props, { ayah: 176, playing: false, finished: true });
 
     expect(props()['focusPage']).toBe(107);
+  });
+
+  it('takes the system navigation buttons down with the rest of the chrome', async () => {
+    // The page number is printed in the bottom corner of the leaf, which is
+    // where three-button navigation lives (owner, on an S24, 2026-09-15). The
+    // buttons therefore leave when the chrome does, so the reading state shows
+    // the whole page.
+    mocks.chromeVisible = false;
+    await renderScreen();
+
+    expect(screen.getByTestId('system-nav-bar').getAttribute('data-hidden')).toBe('true');
+  });
+
+  it('gives the buttons back when the chrome comes back', async () => {
+    mocks.chromeVisible = true;
+    await renderScreen();
+
+    expect(screen.getByTestId('system-nav-bar').getAttribute('data-hidden')).toBe('false');
+  });
+
+  it('asks for nothing while another tab is the one on screen', async () => {
+    // The mushaf is a TAB screen: it stays mounted after a blur. A request made
+    // here and left standing would hide the navigation buttons on whatever tab
+    // the reader moved to -- a screen with no tap-to-restore of its own, which
+    // is the shape of the stranded tab bar (#80).
+    mocks.chromeVisible = false;
+    mocks.isFocused = false;
+    await renderScreen();
+
+    expect(screen.getByTestId('system-nav-bar').getAttribute('data-hidden')).toBe('false');
   });
 
   it('carries every bookmark, not one surah-s worth', async () => {

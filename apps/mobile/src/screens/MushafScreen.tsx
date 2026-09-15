@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
+import { NavigationBar } from 'expo-navigation-bar';
 import type { MushafLine, MushafWord, Word } from '@quran-corpus/data/mobile';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 
@@ -98,6 +99,14 @@ export function MushafScreen() {
   const bookmarkedKeys = useMemo(() => new Set(bookmarks.keys()), [bookmarks]);
   const index = useMushafIndex(client);
   const chromeVisible = useChromeVisible();
+  // Gated on focus, not on `chromeVisible` alone. This is a TAB screen: it
+  // stays mounted after the user leaves it, so a request made from here
+  // outlives the visit that made it and would hide the system buttons on
+  // whatever tab they went to. `releaseChrome` on blur happens to cover that
+  // today, but it is the same single-writer cleanup whose one skipped run
+  // stranded the tab bar (#80) -- and the screen already knows whether it is
+  // the one being looked at.
+  const mushafFocused = useIsFocused();
   // Measured by the tab bar itself: its height is its icon, its label and its
   // padding at whatever type scale the device is set to, and a player docked
   // above a guessed one either overlaps the pill or floats over the page.
@@ -516,6 +525,12 @@ export function MushafScreen() {
         onOpenReciters={() => setReciterOpen(true)}
         bottomOffset={tabBarTop + 8}
       />
+      {/* The page number is printed in a bottom corner of the leaf (ruling 8),
+          which on a device with three-button navigation is exactly where the
+          buttons sit (owner, on an S24, 2026-09-15). So they leave with the
+          rest of the chrome: tap to bring the bars back, and the reading state
+          -- chrome down -- is the state where the whole page is visible. */}
+      <NavigationBar hidden={mushafFocused && !chromeVisible} />
       <MushafChrome
         visible={chromeVisible}
         uiLocale={uiLocale}

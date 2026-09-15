@@ -1,3 +1,4 @@
+import { NavigationBar } from 'expo-navigation-bar';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
@@ -117,6 +118,15 @@ function AppStack() {
   const theme = useThemeColors();
   return (
     <View style={{ flex: 1 }}>
+      {/* The baseline the system navigation bar falls back to. Every other
+          instance in the app asks for it to be HIDDEN and is mounted later --
+          expo-navigation-bar merges the props of all mounted instances in mount
+          order, so the last one to ask wins and this one decides what happens
+          once they have all gone. Without a standing instance the bar's state
+          when the final asker unmounts is whatever the native module last
+          applied, which is how a sheet closing on one screen would leave the
+          buttons hidden on every other. */}
+      <NavigationBar hidden={false} />
       {/* One instance for the whole app, behind the navigator. A per-screen
           copy would repaint a full-screen gradient on every navigation. */}
       <Bloom />

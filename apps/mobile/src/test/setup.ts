@@ -132,3 +132,25 @@ vi.mock('react-native-reanimated', async () => {
     Easing: { bezier: () => undefined, out: (fn: unknown) => fn, ease: undefined },
   };
 });
+
+// expo-navigation-bar is a native module: its JS entry reaches for
+// ExpoNavigationBar through expo-modules-core, which has no jsdom counterpart.
+// Declared here rather than per suite for the same reason the three mocks above
+// are -- every sheet in the app reaches it through BottomSheet, so the suite
+// that forgot it would fail on a module-resolution error naming the navigation
+// bar rather than the component under test.
+//
+// Rendered as a real element rather than as null, so a suite can assert WHICH
+// request a screen is making. On the device the component renders null and the
+// module merges the props of every mounted instance; the mock models one
+// instance at a time, which is all any single suite mounts.
+vi.mock('expo-navigation-bar', async () => {
+  const React = await import('react');
+  return {
+    NavigationBar: ({ hidden }: { hidden?: boolean }) =>
+      React.createElement('div', {
+        'data-testid': 'system-nav-bar',
+        'data-hidden': hidden ? 'true' : 'false',
+      }),
+  };
+});
