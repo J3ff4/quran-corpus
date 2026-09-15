@@ -61,6 +61,8 @@ export interface RecitationDriver {
   /** Drop a warmed URL again. On Android nothing else ever does. */
   clearPreload(url: string): void;
   setLockScreen(title: string, artist: string): void;
+  /** Take the media notification down without tearing the player down. */
+  clearLockScreen(): void;
   destroy(): void;
 }
 
@@ -121,6 +123,7 @@ export const createExpoRecitationDriver: CreateRecitationDriver = (url, onStatus
     },
     setLockScreen: (title: string, artist: string) =>
       player.setActiveForLockScreen(true, { title, artist }),
+    clearLockScreen: () => player.clearLockScreenControls(),
     destroy: () => {
       player.clearLockScreenControls();
       // The cache outlives the player, so leaving the reader has to empty it.
@@ -403,6 +406,12 @@ export function useRecitation(
    */
   function stop() {
     driverRef.current?.pause();
+    // And the media session with it. Left standing, the notification keeps
+    // showing the dismissed ayah and its Play button resumes ExoPlayer --
+    // sound with no bar anywhere in the app, because `ayahRef` is null by then
+    // and the status tick can no longer say what is playing. Ruling 5 says X
+    // ends the recitation, and a recitation the OS can restart has not ended.
+    driverRef.current?.clearLockScreen();
     ayahRef.current = null;
     loadedSurahRef.current = null;
     finishedRef.current = false;

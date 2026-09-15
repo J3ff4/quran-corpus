@@ -458,6 +458,18 @@ describe('stop', () => {
     expect(r.state().ayah).toBe(null);
   });
 
+  it('takes the media notification down with it', () => {
+    // Left standing, its Play button resumes ExoPlayer while the refs are
+    // cleared -- sound with no bar anywhere in the app and no way to stop it.
+    const player = fakePlayer();
+    const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: true });
+
+    r.toggleAyah(3);
+    r.stop();
+
+    expect(player.lockScreenCleared).toBe(1);
+  });
+
   it('keeps the player alive, so the next play is not a cold start', () => {
     const player = fakePlayer();
     const r = renderRecitation({ surah: 1, ayahCount: 7, player, continuous: true });
@@ -536,6 +548,7 @@ function fakePlayer({
     cleared: [] as string[],
     seeks: [] as number[],
     lockScreen: [] as { title: string; artist: string }[],
+    lockScreenCleared: 0,
     plays: 0,
     pauses: 0,
     destroyed: 0,
@@ -568,6 +581,9 @@ function fakePlayer({
         preload: (next: string) => recorder.preloaded.push(next),
         clearPreload: (stale: string) => recorder.cleared.push(stale),
         setLockScreen: (title: string, artist: string) => recorder.lockScreen.push({ title, artist }),
+        clearLockScreen: () => {
+          recorder.lockScreenCleared += 1;
+        },
         destroy: () => {
           recorder.destroyed += 1;
         },

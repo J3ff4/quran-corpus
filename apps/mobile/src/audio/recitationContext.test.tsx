@@ -35,6 +35,7 @@ function fakeDriver() {
     created: [] as string[],
     replaced: [] as string[],
     pauses: 0,
+    lockScreenCleared: 0,
     create(url: string, _onStatus: (status: RecitationStatus) => void) {
       recorder.created.push(url);
       return {
@@ -47,6 +48,9 @@ function fakeDriver() {
         preload: () => undefined,
         clearPreload: () => undefined,
         setLockScreen: () => undefined,
+        clearLockScreen: () => {
+          recorder.lockScreenCleared += 1;
+        },
         destroy: () => undefined,
       };
     },
