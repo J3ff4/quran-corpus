@@ -54,6 +54,10 @@ function ResultCard({
       style={[press.style, { marginBottom: 9 }]}
     >
       <GlassSurface
+        // Through `tint` rather than a backgroundColor in `style`: both reach
+        // the same declaration, and one of the two is the surface's documented
+        // way of saying "paint this instead of the glass fill".
+        tint={tinted ? theme.accentWash : undefined}
         style={{
           shadowOpacity: 0,
           elevation: 0,
@@ -61,9 +65,7 @@ function ResultCard({
           paddingHorizontal: 18,
           paddingVertical: 14,
           gap: 9,
-          ...(tinted
-            ? { backgroundColor: theme.accentWash, borderColor: theme.accent }
-            : null),
+          ...(tinted ? { borderColor: theme.accent } : null),
         }}
       >
         {children}

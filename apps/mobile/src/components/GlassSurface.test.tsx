@@ -32,6 +32,23 @@ describe('GlassSurface', () => {
     expect(screen.getByTestId('card').style.backgroundColor).toBe(rgba(glass.light.fill));
   });
 
+  it('paints a tint instead of the glass fill, never behind it', () => {
+    // The fill is 85% opaque, so a ground laid UNDER it arrives diluted by
+    // exactly the amount that makes a measured contrast figure wrong. The
+    // failure this guards is a refactor that keeps both declarations and lets
+    // the fill win.
+    renderIn(
+      themeColors.light,
+      <GlassSurface testID="card" tint={themeColors.light.playingWash}>
+        {null}
+      </GlassSurface>,
+    );
+
+    const card = screen.getByTestId('card');
+    expect(card.style.backgroundColor).toBe(rgb(themeColors.light.playingWash));
+    expect(card.style.backgroundColor).not.toBe(rgba(glass.light.fill));
+  });
+
   it('draws the inset highlight as a child, not as a border', () => {
     // The highlight is the top 1px of the card and the whole reason the fill
     // reads as glass rather than as a grey rectangle. A borderTopColor cannot

@@ -22,6 +22,16 @@ export interface GlassSurfaceProps {
    * the next docked bar cannot be copy-pasted wrong again.
    */
   docked?: boolean;
+  /**
+   * Paint this instead of the translucent glass fill.
+   *
+   * Instead of, never behind: the fill is 85% opaque, so a colour laid under it
+   * arrives washed out by the exact amount that makes a measured contrast
+   * figure a lie. The alphabet tile and the filter chip avoid the problem by
+   * painting the glass recipe themselves; a card that needs a ground takes this
+   * instead of forking a third copy.
+   */
+  tint?: string | undefined;
   testID?: string;
 }
 
@@ -50,10 +60,11 @@ export function useGlassSkin() {
  * from the bloom.
  *
  * ponytail: no blur variant, no elevation prop, no "intensity". One surface,
- * two themes, and one variant -- `docked` -- which is a fact about where the
- * surface sits rather than a knob. Add another when a screen actually needs it.
+ * two themes, and two variants -- `docked`, a fact about where the surface
+ * sits, and `tint`, a fact about what state it is in. Add another when a screen
+ * actually needs it; `tint` arrived when the reader's playing ayah did.
  */
-export function GlassSurface({ children, radius = 'card', style, testID, docked = false }: GlassSurfaceProps) {
+export function GlassSurface({ children, radius = 'card', style, testID, tint, docked = false }: GlassSurfaceProps) {
   const skin = useGlassSkin();
   const theme = useThemeColors();
 
@@ -62,7 +73,7 @@ export function GlassSurface({ children, radius = 'card', style, testID, docked 
       testID={testID}
       style={[
         {
-          backgroundColor: skin.fill,
+          backgroundColor: tint ?? skin.fill,
           borderColor: skin.border,
           borderWidth: 1,
           borderRadius: radii[radius],

@@ -54,6 +54,18 @@ export const themeColors = {
     // colour print uses, it belongs to nothing else here, and it lets the ink
     // stay ink. Paper ink on it is 12.94:1.
     bookmarkWash: '#f2ddaf',
+    // The ayah the reciter is on, as a band rather than as green type. The ink
+    // used to turn `accent` for it, which the owner read as "very subtle" on
+    // the light page (2026-09-15) -- and it was: #1f6f5b against #1f1a14 is a
+    // change of hue at nearly the same darkness, so at Uthmani weight it says
+    // almost nothing. A band says it at a glance and lets the ink stay ink.
+    //
+    // Deliberately louder than the bookmark's amber against the page (1.54:1
+    // vs 1.26:1): a bookmark is a standing mark that must not shout, and a
+    // playhead is the thing moving under the reader's eye. Paper ink on it is
+    // 10.57:1, and it is 1.31:1 against accentWash -- the pressed word's
+    // ground, which sits on top of it.
+    playingWash: '#a8d5b5',
     danger: colors.danger, // 6.9:1 on paper
     // The same red as a FILL rather than as text -- the swipe-to-delete panel
     // is 88pt of solid colour, not a line of type. Light mode can reuse the
@@ -87,6 +99,10 @@ export const themeColors = {
     // 11.32:1, and it is 1.39:1 against the page -- present without glowing,
     // which is the whole point of a standing mark on a mushaf page.
     bookmarkWash: '#3a2e1c',
+    // The playhead's band, mixed for night on the same reasoning as the light
+    // one: stronger against the page than the bookmark (1.79:1 vs 1.39:1),
+    // because it moves and the bookmark stands. nightText on it is 8.79:1.
+    playingWash: '#26473a',
     // Not colors.danger: #9f2d2d on night is 2.5:1, well under AA. Error text
     // is exactly the text a user must be able to read, so the night palette
     // takes a lighter red rather than reusing the brand one.

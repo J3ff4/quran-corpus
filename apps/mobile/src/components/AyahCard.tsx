@@ -1,8 +1,9 @@
+import { useMemo } from 'react';
 import { Text, View } from 'react-native';
 import type { Word } from '@quran-corpus/data/mobile';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { typography } from '@/theme/tokens';
-import { useThemeColors } from '@/theme/themeContext';
+import { ThemeContext, useThemeColors } from '@/theme/themeContext';
 import { AyahControls } from './AyahControls';
 import { AyahMedallion } from './AyahMedallion';
 import { AyahText } from './AyahText';
@@ -51,10 +52,27 @@ export function AyahCard({
   onWordPress,
 }: AyahCardProps) {
   const theme = useThemeColors();
-  return (
+  // The whole card takes the playhead's ground while this ayah recites (owner,
+  // 2026-09-15), so the reader can find what is sounding without reading a
+  // single icon -- the same green that bands the ayah on the mushaf page.
+  //
+  // Muted ink goes up to full ink with it, and it has to: `mutedText` is
+  // 2.93:1 on the light band, and the medallion prints the ayah NUMBER in it.
+  // No tint worth seeing leaves that colour readable -- muted is only 4.63:1 on
+  // the bare page to begin with -- so the choice is a ground you cannot see or
+  // an ayah number you cannot read. Raised through the context rather than
+  // threaded as a prop through AyahMedallion, AyahControls and the icons
+  // underneath them: the override is "everything inside this card", which is
+  // exactly what a provider says and what four new props would only approximate.
+  const playingTheme = useMemo(() => ({ ...theme, mutedText: theme.text }), [theme]);
+  const card = (
     // A glass card per ayah, not a row with a rule under it (mockup 1j). The
     // margins are the gutter between cards; the reader's list adds none.
-    <GlassSurface style={{ marginHorizontal: 16, marginBottom: 11, padding: 20, gap: 14 }}>
+    <GlassSurface
+      testID={`ayah-${surahId}-${ayahNumber}-card`}
+      tint={playing ? theme.playingWash : undefined}
+      style={{ marginHorizontal: 16, marginBottom: 11, padding: 20, gap: 14 }}
+    >
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <AyahMedallion n={ayahNumber} uiLocale={uiLocale} />
         {/* Shared with the scroll mushaf's row until M7c replaced it with a
@@ -102,4 +120,6 @@ export function AyahCard({
       ) : null}
     </GlassSurface>
   );
+
+  return playing ? <ThemeContext.Provider value={playingTheme}>{card}</ThemeContext.Provider> : card;
 }

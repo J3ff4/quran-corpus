@@ -39,6 +39,29 @@ describe('themeColors', () => {
     expect(contrast(themeColors.light.accent, themeColors.light.accentWash)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(themeColors.dark.accent, themeColors.dark.accentWash)).toBeGreaterThanOrEqual(4.5);
   });
+
+  it('keeps page ink readable on the playhead-s band', () => {
+    // The whole point of the 2026-09-15 change is that the type stays the
+    // page's own ink and the band carries the state, so the band has to be one
+    // the ink is readable on. A band tuned for presence alone would quietly
+    // take body text under AA.
+    expect(contrast(themeColors.light.text, themeColors.light.playingWash)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(themeColors.dark.text, themeColors.dark.playingWash)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('makes the playhead-s band louder than the standing bookmark', () => {
+    // Owner, 2026-09-15: the playing ayah was "very subtle". A bookmark stands
+    // for weeks and must not shout; a playhead moves under the reader's eye
+    // and has to be findable at a glance. If a palette refactor ever mixes the
+    // two to the same strength, the state the reader is chasing becomes the
+    // quieter of the two.
+    for (const mode of ['light', 'dark'] as const) {
+      const t = themeColors[mode];
+      expect(contrast(t.playingWash, t.background)).toBeGreaterThan(
+        contrast(t.bookmarkWash, t.background),
+      );
+    }
+  });
 });
 
 describe('fonts', () => {
