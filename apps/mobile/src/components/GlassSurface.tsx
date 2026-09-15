@@ -90,6 +90,14 @@ export function GlassSurface({ children, radius = 'card', style, testID, tint, d
           style={[StyleSheet.absoluteFill, { backgroundColor: theme.background }]}
         />
       ) : null}
+      {/* The tint again, over the opaque backing rather than under it. The
+          fill set on the view itself is covered by that backing, so without
+          this a docked surface would silently ignore `tint` -- and the
+          backing cannot simply BE the tint, since a tint is translucent by
+          design and the whole job of a docked backing is to be opaque. */}
+      {docked && tint ? (
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: tint }]} />
+      ) : null}
       {children}
       {/* After the children, not before them. The recitation bar puts an opaque
           backing over the translucent fill (RN has no backdrop-filter), and as
