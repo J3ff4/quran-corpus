@@ -19,7 +19,13 @@ vi.mock('react-native-reanimated', async () => {
 });
 
 import { GlassTabBar, type GlassTabBarProps } from './GlassTabBar';
-import { hideChrome, releaseChrome, useChromeVisible } from '@/mushaf/chromeVisibility';
+import {
+  CHROME_IDLE_MS,
+  hideChrome,
+  releaseChrome,
+  showChrome,
+  useChromeVisible,
+} from '@/mushaf/chromeVisibility';
 import { ThemeContext } from '@/theme/themeContext';
 import { themeColors } from '@/theme/tokens';
 import { rgb } from '@/testing/rgb';
@@ -133,13 +139,27 @@ describe('GlassTabBar', () => {
     // Ruling 10: the countdown runs from the last touch of EITHER the player or
     // the bar, so reaching for a tab and changing your mind does not leave the
     // chrome sliding away under your finger.
-    hideChrome();
-    renderBar(props(2));
-    expect(screen.getByTestId('tab-bar').getAttribute('data-pointer-events')).toBe('none');
+    //
+    // From a VISIBLE bar: hidden, it is pointerEvents:'none' and no touch
+    // reaches it at all -- the tap that brings the chrome back lands on the
+    // page. Firing at it there asserted only that the chrome appeared, which
+    // is not what this handler is for.
+    vi.useFakeTimers();
+    try {
+      act(() => showChrome());
+      renderBar(props(2));
 
-    fireEvent.touchStart(screen.getByTestId('tab-bar'));
+      act(() => vi.advanceTimersByTime(CHROME_IDLE_MS - 500));
+      fireEvent.touchStart(screen.getByTestId('tab-bar'));
 
-    expect(screen.getByTestId('tab-bar').getAttribute('data-pointer-events')).toBe('box-none');
+      act(() => vi.advanceTimersByTime(600));
+      expect(chromeIsVisible()).toBe(true);
+
+      act(() => vi.advanceTimersByTime(CHROME_IDLE_MS));
+      expect(chromeIsVisible()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('does not start a countdown from a touch on any other tab', () => {

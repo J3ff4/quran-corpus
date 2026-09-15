@@ -417,8 +417,14 @@ export function host(tag: string) {
         // of invisible band for a phase. The DOM event bubbles where RN's
         // capture descends; for "a touch started somewhere in here" the two
         // observe the same thing.
+        //
+        // Not while `pointerEvents` is 'none': the platform hit-test never
+        // reaches such a view, so a test firing touchStart straight at one
+        // would exercise a handler a finger cannot. The mushaf's player and
+        // tab bar both set it while the chrome is down, which is precisely
+        // when their countdown-restart handlers must NOT be reachable.
         onTouchStart:
-          typeof onStartShouldSetResponderCapture === 'function'
+          typeof onStartShouldSetResponderCapture === 'function' && pointerEvents !== 'none'
             ? () => {
                 (onStartShouldSetResponderCapture as () => boolean)();
               }
