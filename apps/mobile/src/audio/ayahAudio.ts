@@ -229,7 +229,7 @@ export function useRecitation(
   // toggleAyah the hook has still been rendered with the PREVIOUS surah, or
   // with null. Hence the override: the caller that knows the surah says so in
   // the same call, rather than hoping a re-render lands first.
-  function startAyah(ayah: number, surahOverride?: number) {
+  function startAyah(ayah: number, surahOverride?: number, nameOverride?: string) {
     const surahId = surahOverride ?? surah;
     if (surahId === null) return;
 
@@ -267,7 +267,13 @@ export function useRecitation(
     // Re-asserted on every ayah rather than once on the first: the reciter can
     // change mid-surah (device check 87) and the artist line has to change with
     // it.
-    driver.setLockScreen(options.surahName ?? `Surah ${surahId}`, reciterById(reciterId)?.label ?? '');
+    // The override first: a cross-screen handoff calls this in the render the
+    // new track was only just set in, so `options.surahName` is still the
+    // PREVIOUS track's -- which is the name the lock screen would keep.
+    driver.setLockScreen(
+      nameOverride ?? options.surahName ?? `Surah ${surahId}`,
+      reciterById(reciterId)?.label ?? '',
+    );
     driver.play();
 
     // One behind, not all: the file sounding right now was itself warmed by the
@@ -349,7 +355,7 @@ export function useRecitation(
   const statusRef = useRef(handleStatus);
   statusRef.current = handleStatus;
 
-  function toggleAyah(ayah: number, surahOverride?: number) {
+  function toggleAyah(ayah: number, surahOverride?: number, nameOverride?: string) {
     const driver = driverRef.current;
     // `state.error === null` is what makes the second tap after a failure a
     // retry rather than a resume: the source that failed is still loaded, so
@@ -388,7 +394,7 @@ export function useRecitation(
       }
       return;
     }
-    startAyah(ayah, surahOverride);
+    startAyah(ayah, surahOverride, nameOverride);
   }
 
   /**

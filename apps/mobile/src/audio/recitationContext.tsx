@@ -74,11 +74,16 @@ export function RecitationProvider({
       // the PREVIOUS track's surah. That is what the override argument exists
       // for.
       //
+      // `surahName` goes the same way and for the same reason: it is read
+      // straight into setLockScreen at the start of the track, so left to the
+      // re-render the notification would name the surah the LAST screen was
+      // playing.
+      //
       // `ayahCount` and `continuous` are stale for the same one tick, and
       // harmlessly: the count only gates a preload one ayah ahead, and
       // continuous is not consulted until the track finishes -- seconds later,
       // long after the re-render has landed.
-      audio.toggleAyah(ayah, next.surahId);
+      audio.toggleAyah(ayah, next.surahId, next.surahName);
     },
     [audio],
   );
