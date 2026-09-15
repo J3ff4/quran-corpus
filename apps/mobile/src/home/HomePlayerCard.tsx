@@ -55,7 +55,12 @@ export function HomePlayerCard({
   // arrives with the corpus read. Starting without it would run a recitation
   // with nowhere to stop, so the control waits rather than starting something
   // it cannot finish.
-  const ayahCount = location?.surah.ayah_count ?? 0;
+  //
+  // And only when it is THIS surah's read. The query keeps the previous
+  // result while a new coordinate resolves, so a card already showing the new
+  // surahId would otherwise start it under the old surah's name and count.
+  const loaded = location !== null && location.surah.id === surahId ? location : null;
+  const ayahCount = loaded?.surah.ayah_count ?? 0;
 
   // The live ayah while this card owns the sound, the stored one otherwise.
   //
@@ -71,7 +76,7 @@ export function HomePlayerCard({
         owner: 'home',
         surahId,
         ayahCount,
-        surahName: location?.surah.name_translit ?? '',
+        surahName: loaded?.surah.name_translit ?? '',
         // Always, regardless of the saved setting (ruling 9). This is a resume-
         // listening control, not a per-ayah one: the setting exists for the
         // reader, where "just this ayah" is a coherent thing to ask of a
@@ -84,6 +89,19 @@ export function HomePlayerCard({
 
   return (
     <View testID="home-player">
+      {/* A failed load takes `playing` false, which shrinks this card straight
+          back to its resting line -- so without this the tap simply does
+          nothing and says nothing. The reader announces its own the same way. */}
+      {mine && audio.error ? (
+        <Text
+          testID="home-player-error"
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          style={{ color: theme.danger, fontSize: typography.caption, marginBottom: 8 }}
+        >
+          {t(uiLocale, audio.error)}
+        </Text>
+      ) : null}
       <PlayerShell
         expanded={sounding}
         growMs={reducedMotion ? 0 : GROW_MS}
