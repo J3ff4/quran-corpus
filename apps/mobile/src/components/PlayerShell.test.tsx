@@ -1,0 +1,129 @@
+import React from 'react';
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('react-native', async () => (await import('@/testing/rnHosts.js')).reactNativeTextMock());
+
+const timings = vi.hoisted(() => ({ durations: [] as number[] }));
+
+// A local reanimated shim, because the global one resolves withTiming straight
+// to its target -- which makes an animated step and an instant one identical to
+// every assertion about height. Whether a curve was ISSUED is the only
+// observable difference, so this records that.
+vi.mock('react-native-reanimated', async () => {
+  const React = await import('react');
+  const { host } = await import('@/testing/rnHosts.js');
+  return {
+    default: { View: host('div') },
+    // One box per mount, not a fresh object per render: a shared value handed
+    // back new each time loses every write made to it.
+    useSharedValue: (initial: number) => {
+      const box = React.useRef({ value: initial });
+      return box.current;
+    },
+    useAnimatedStyle: (fn: () => object) => fn(),
+    withTiming: (to: number, config?: { duration: number }) => {
+      timings.durations.push(config?.duration ?? 0);
+      return to;
+    },
+  };
+});
+
+import { setAutoLayout } from '@/testing/rnHosts';
+import { PlayerShell, SHADOW_ROOM } from './PlayerShell';
+
+afterEach(() => {
+  cleanup();
+  setAutoLayout(null);
+  timings.durations.length = 0;
+});
+
+function shell(expanded: boolean, growMs = 280) {
+  return (
+    <PlayerShell
+      expanded={expanded}
+      growMs={growMs}
+      compact={<span>one line</span>}
+      full={<span>full transport</span>}
+    />
+  );
+}
+
+/** The box whose height the grow animates. */
+function box() {
+  return screen.getByText(/one line|full transport/).closest('div')?.parentElement
+    ?.parentElement as HTMLElement;
+}
+
+describe('PlayerShell', () => {
+  it('shows the resting line, and the transport once expanded', () => {
+    const { rerender } = render(shell(false));
+    expect(screen.getByText('one line')).toBeTruthy();
+    expect(screen.queryByText('full transport')).toBeNull();
+
+    rerender(shell(true));
+
+    expect(screen.getByText('full transport')).toBeTruthy();
+    expect(screen.queryByText('one line')).toBeNull();
+  });
+
+  it('sizes the box to what it measured, with room for the shadow', () => {
+    // The grow is a height animation, so an unmeasured box is a bar clipped to
+    // nothing. Rendered twice on purpose: the shim reads an animated style at
+    // render time, while on the device the shared value drives it from the UI
+    // thread with no render at all -- the second pass is the suite's only
+    // window onto a value written after the first one's layout.
+    setAutoLayout({ width: 320, height: 48 });
+    const { rerender } = render(shell(false));
+    rerender(shell(false));
+
+    expect(box().style.height).toBe(`${48 + SHADOW_ROOM * 2}px`);
+  });
+
+  it('snaps to the first height it measures rather than growing into it', () => {
+    // There is no height to grow FROM on the frame a state first appears. A
+    // 0 -> full curve there would play an unasked-for entrance every time the
+    // player mounts, which is a bar unfolding at someone who did nothing.
+    setAutoLayout({ width: 320, height: 48 });
+    const { rerender } = render(shell(false));
+    rerender(shell(false));
+
+    expect(box().style.height).toBe(`${48 + SHADOW_ROOM * 2}px`);
+    // No curve was issued at all -- which is the half an assertion on the
+    // height cannot see, since a resolved curve and a snap land on the same
+    // number.
+    expect(timings.durations).toEqual([]);
+  });
+
+  it('grows with a curve once there is a height to grow from', () => {
+    setAutoLayout({ width: 320, height: 48 });
+    const { rerender } = render(shell(false));
+    rerender(shell(false));
+    timings.durations.length = 0;
+
+    setAutoLayout({ width: 320, height: 96 });
+    rerender(shell(true));
+
+    expect(timings.durations).toEqual([280]);
+  });
+
+  it('crosses instantly under reduced motion', () => {
+    setAutoLayout({ width: 320, height: 48 });
+    const { rerender } = render(shell(false, 0));
+    rerender(shell(false, 0));
+
+    setAutoLayout({ width: 320, height: 96 });
+    rerender(shell(true, 0));
+
+    expect(timings.durations).toEqual([0]);
+  });
+
+  it('draws nothing but its content before anything is measured', () => {
+    // Before the first measurement the box has to size to its content, which
+    // is how the content gets measured at all. A height of 0 here is a player
+    // that never appears.
+    render(shell(false));
+
+    expect(box().style.height).toBe('');
+  });
+});
