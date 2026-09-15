@@ -57,8 +57,15 @@ export function HomePlayerCard({
   // it cannot finish.
   const ayahCount = location?.surah.ayah_count ?? 0;
 
+  // The live ayah while this card owns the sound, the stored one otherwise.
+  //
+  // Continuous play walks past the ayah this card was rendered with, so a
+  // Pause on the grown bar that passed the PROP would not match the playhead
+  // and would restart the last-read ayah instead of pausing -- jumping the
+  // recitation backwards on the one control that is supposed to hold it still.
   function start() {
     if (ayahCount === 0) return;
+    const target = mine && audio.ayah !== null ? audio.ayah : ayahNumber;
     audio.toggle(
       {
         owner: 'home',
@@ -71,7 +78,7 @@ export function HomePlayerCard({
         // control sitting on that ayah's own card.
         continuous: true,
       },
-      ayahNumber,
+      target,
     );
   }
 

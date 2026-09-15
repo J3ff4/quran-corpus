@@ -163,3 +163,20 @@ describe('HomePlayerCard', () => {
     expect(screen.getByLabelText('Play 2:255')).toBeTruthy();
   });
 });
+
+describe('HomePlayerCard, once it has run past where it started', () => {
+  it('pauses the ayah that is sounding, not the one the reading stopped on', () => {
+    // Continuous play walks past ayah 255. Passing the PROP here would miss
+    // the playhead, fall through to a fresh start and jump the recitation
+    // backwards on the one control meant to hold it still.
+    mocks.track = { owner: 'home' };
+    mocks.ayah = 257;
+    mocks.playing = true;
+
+    renderCard();
+
+    fireEvent.click(screen.getByLabelText('Pause'));
+
+    expect(mocks.toggle).toHaveBeenCalledWith(expect.objectContaining({ owner: 'home' }), 257);
+  });
+});
