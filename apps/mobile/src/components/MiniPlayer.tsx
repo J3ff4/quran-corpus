@@ -1,5 +1,5 @@
 import { View } from 'react-native';
-import { useSegments } from 'expo-router';
+import { usePathname } from 'expo-router';
 
 import { RecitationBar } from './RecitationBar';
 import { useTabBarTop } from './GlassTabBar';
@@ -7,8 +7,15 @@ import { useRecitationController } from '@/audio/recitationContext';
 import { reciterById } from '@quran-corpus/data/mobile';
 import { useAppSettings } from '@/settings/settingsStore';
 
-/** The tabs that already draw a transport of their own. */
-const HAS_ITS_OWN_PLAYER = new Set(['mushaf', 'index']);
+/**
+ * The tabs that already draw a transport of their own, by pathname.
+ *
+ * Pathname and not `useSegments()`: expo-router pops a trailing `index`
+ * segment off the route info, so Home's segments are `['(tabs)']` and a check
+ * for `'index'` never matches -- which put two transports on Home, the one
+ * thing ruling 8 exists to prevent. The URL has no such quirk.
+ */
+const HAS_ITS_OWN_PLAYER = new Set(['/', '/mushaf']);
 
 /**
  * The transport, docked over whichever tab you walked to while it was
@@ -29,17 +36,22 @@ export function MiniPlayer() {
   const audio = useRecitationController();
   const { uiLocale, reciterId } = useAppSettings();
   const tabBarTop = useTabBarTop();
-  const segments = useSegments();
+  const pathname = usePathname();
 
   // Read before the guard so it narrows: the toggle below needs the track it
   // is resuming, and `audio.track` is a property TypeScript cannot know stays
   // non-null inside a closure.
   const track = audio.track;
   const ayah = audio.ayah;
-  const tab = segments.at(-1);
   // The mushaf has its player, Home has its card (ruling 8). Two transports on
   // one screen is two answers to "what is playing".
-  if (track === null || ayah === null || !audio.playing || (tab !== undefined && HAS_ITS_OWN_PLAYER.has(tab))) {
+  //
+  // Keyed on the TRACK, not on `playing`. A bar that vanished on pause would
+  // take its own Pause button with it and leave a parked recitation with no
+  // transport and no reachable X anywhere in the tabs -- and an OS pause (a
+  // call, another app taking focus) would do the same unasked. The X is what
+  // dismisses this bar; that is the whole reason it has one.
+  if (track === null || ayah === null || HAS_ITS_OWN_PLAYER.has(pathname)) {
     return null;
   }
 

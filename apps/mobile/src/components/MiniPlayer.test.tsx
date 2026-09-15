@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  segments: ['(tabs)', 'surahs'] as string[],
+  pathname: '/surahs',
   track: null as { owner: string; surahId: number } | null,
   ayah: null as number | null,
   playing: false,
@@ -15,7 +15,7 @@ vi.mock('react-native', async () => (await import('@/testing/rnHosts.js')).react
 vi.mock('react-native-gesture-handler', async () =>
   (await import('@/testing/rnHosts.js')).reactNativeGestureHandlerMock(),
 );
-vi.mock('expo-router', () => ({ useSegments: () => mocks.segments }));
+vi.mock('expo-router', () => ({ usePathname: () => mocks.pathname }));
 vi.mock('@/settings/settingsStore', () => ({
   useAppSettings: () => ({ uiLocale: 'en', reciterId: 'husary' }),
 }));
@@ -57,7 +57,7 @@ function sounding() {
 }
 
 beforeEach(() => {
-  mocks.segments = ['(tabs)', 'surahs'];
+  mocks.pathname = '/surahs';
   mocks.track = null;
   mocks.ayah = null;
   mocks.playing = false;
@@ -86,19 +86,22 @@ describe('MiniPlayer', () => {
     expect(screen.queryByTestId('mini-player')).toBeNull();
   });
 
-  it('stays away while the sound is only paused', () => {
+  it('stays put while the sound is only paused', () => {
+    // It carries its own Pause, so vanishing on pause would take the only way
+    // to resume with it -- and an OS pause would do that unasked.
     mocks.track = { owner: 'reader', surahId: 2 };
     mocks.ayah = 255;
     mocks.playing = false;
 
     renderMini();
 
-    expect(screen.queryByTestId('mini-player')).toBeNull();
+    expect(screen.getByTestId('mini-player')).toBeTruthy();
+    expect(screen.getByLabelText('Play')).toBeTruthy();
   });
 
   it('leaves the mushaf to its own player', () => {
     sounding();
-    mocks.segments = ['(tabs)', 'mushaf'];
+    mocks.pathname = '/mushaf';
 
     renderMini();
 
@@ -109,7 +112,10 @@ describe('MiniPlayer', () => {
     // Ruling 8. Two transports on one screen is two answers to the question of
     // what is playing.
     sounding();
-    mocks.segments = ['(tabs)', 'index'];
+    // The real value expo-router reports on Home: it pops a trailing `index`
+    // segment, so anything matching on the SEGMENT never fired here and the
+    // bar docked on top of Home's own card.
+    mocks.pathname = '/';
 
     renderMini();
 
