@@ -24,10 +24,17 @@ _APOSTROPHE_LETTERS = {"o": "ў", "g": "ғ"}
 
 # Longest match wins, so digraphs lead. `ng` is left out deliberately: it
 # transliterates to н + г, which is exactly what the singles already produce.
+#
+# `ts` is left out for a stronger reason. It is the standard spelling of ц in
+# Russian loanwords, but t followed by s is also ordinary Uzbek morphology --
+# the conditional -sa and the privative -siz both produce it. Across every
+# gloss in the Tasnim database there are 46 tokens containing `ts` and all 46
+# are the native sequence (yetsa, baxtsiz, hidoyatsiz, qaytsangiz); not one is
+# a ц word. The digraph would turn айтса into айца on every one of them, so
+# the singles are left to produce т + с.
 _DIGRAPHS = [
     ("sh", "ш"),
     ("ch", "ч"),
-    ("ts", "ц"),
     ("yo", "ё"),
     ("yu", "ю"),
     ("ya", "я"),

@@ -79,3 +79,12 @@ def test_a_trailing_o_or_g_is_not_an_apostrophe_letter():
     # string, so a bare membership test on the lookahead turns "no" into нў.
     assert to_cyrillic("no") == "но"
     assert to_cyrillic("bog") == "бог"
+
+
+def test_t_plus_s_is_not_the_cyrillic_ts():
+    # ц belongs to Russian loanwords, but t + s is ordinary Uzbek morphology --
+    # the conditional -sa and the privative -siz. Every one of the 46 `ts`
+    # tokens in the Tasnim glosses is this, not a ц word.
+    assert to_cyrillic("aytsa") == "айтса"
+    assert to_cyrillic("baxtsiz") == "бахтсиз"
+    assert to_cyrillic("qaytsangiz") == "қайтсангиз"
