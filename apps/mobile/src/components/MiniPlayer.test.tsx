@@ -76,7 +76,10 @@ describe('MiniPlayer', () => {
     expect(screen.getByTestId('mini-player')).toBeTruthy();
     // The surah too. This bar docks over tabs that are not the reader's, so
     // the ayah number alone names nothing a reader who walked away can place.
-    expect(screen.getByText('Al-Baqarah · Ayah 255')).toBeTruthy();
+    // Without the word "Ayah": the surah beside it already says what the
+    // number is (owner, 2026-09-16). The spoken label still carries it.
+    expect(screen.getByText('Al-Baqarah · 255')).toBeTruthy();
+    expect(screen.getByLabelText(/Al-Baqarah · Ayah 255/)).toBeTruthy();
   });
 
   it('is not there at all when nothing is sounding', () => {

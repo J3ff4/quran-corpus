@@ -151,6 +151,25 @@ describe('RecitationBar', () => {
     expect(screen.getByTestId('recitation-bar').getAttribute('aria-label')).toContain('255');
   });
 
+  it('prints the coordinate without the word Ayah, but still speaks it', () => {
+    renderBar({ surahName: 'At-Tawbah', ayahNumber: 2 });
+
+    // On screen the surah frames the number, so the word is noise (owner,
+    // 2026-09-16).
+    expect(screen.getByText('At-Tawbah · 2')).toBeTruthy();
+    // Spoken, it is the only thing saying what the number counts.
+    expect(screen.getByTestId('recitation-bar').getAttribute('aria-label')).toContain(
+      'At-Tawbah · Ayah 2',
+    );
+  });
+
+  it('keeps the word where there is no surah to frame the number', () => {
+    // A bare "2" on a bar names nothing at all.
+    renderBar({ ayahNumber: 2 });
+
+    expect(screen.getByText('Ayah 2')).toBeTruthy();
+  });
+
   it('toggles playback', () => {
     const { onTogglePlay } = renderBar();
 

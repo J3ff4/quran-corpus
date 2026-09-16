@@ -190,6 +190,12 @@ export function RecitationBar({
   // The surah first: it is the coarser coordinate, and the one a reader who
   // walked away from the screen that started this has lost track of.
   const trackLabel = surahName ? `${surahName} · ${ayahLabel}` : ayahLabel;
+  // On screen the word "Ayah" is dead weight beside the surah that already
+  // frames it -- "At-Tawbah · 2" is the coordinate a reader reads (owner,
+  // 2026-09-16). Only when the surah is there to do the framing: alone, a bare
+  // "2" on a bar names nothing. The spoken label keeps the word, since a
+  // screen reader has no column of coordinates to read it against.
+  const trackText = surahName ? `${surahName} · ${ayahNumber}` : ayahLabel;
   // Asked to play, but the track has told us nothing yet -- the bar would
   // otherwise read 0:00 / --:-- with a transport glyph on it, which is exactly
   // what a paused player looks like, so a tap that never starts (issue #63)
@@ -251,7 +257,7 @@ export function RecitationBar({
               number on one line leaves neither readable. */}
           <View style={{ flex: 1, paddingHorizontal: 6 }}>
             <Text numberOfLines={1} style={{ color: theme.text, fontSize: typography.caption }}>
-              {trackLabel}
+              {trackText}
             </Text>
             <ReciterLabel label={reciterLabel} uiLocale={uiLocale} onPress={onOpenReciters} />
           </View>
