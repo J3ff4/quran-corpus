@@ -62,19 +62,21 @@ weakened.
 | `translateEn` filled | 0 |
 | Our corpus words | 77429 |
 | Ayahs where word counts already match | 1846 (29.6%) — positional join is dead |
-| Ayahs aligned, tier 1 (base form) | 2959 |
-| Ayahs aligned, tier 2 (consonant skeleton) | 3261 |
-| **Ayahs aligned total** | **6220 / 6236 = 99.74%** |
-| **Corpus words glossed** | **77115 / 77429 = 99.59%** |
-| Group sizes | 54954×1, 9591×2, 887×3, 77×4, 2×5 |
-| Failing ayahs | 16 |
+| Ayahs aligned, tier 1 (base form) | 2960 |
+| Ayahs aligned, tier 2 (consonant skeleton) | 3267 |
+| **Ayahs aligned total** | **6227 / 6236 = 99.86%** |
+| **Corpus words glossed** | **77253 / 77429 = 99.77%** |
+| Group sizes | 55414×1, 9448×2, 875×3, 77×4, 2×5 |
+| Failing ayahs | 9 |
 | Existing uz glosses to replace | 75539, `source='mt'` |
 | Tasnim `surah_name` | 114 rows, `nameUzlat` + `suraMeanUzlat` + Cyrillic |
 | Tasnim `quran` | 6236 rows, `uzlat` verse translation |
 
-**The 16 failures** (Tasnim splits a word across a different boundary; 4:36
-genuinely drops ابن السبيل): 2:181, 3:119, 4:36, 4:109, 8:6, 11:47 + 10 more —
-the aligner's residue report is the authority, not this list.
+**The 9 failures** (2026-09-16, symmetric walk): 4:36, 11:47, 17:60, 21:88,
+29:28, 38:27, 42:15, 63:10, 72:16. 4:36 genuinely drops ابن السبيل. Fewer than
+the 16 first measured because the aligner is symmetric — Tasnim also *splits*
+where we join (يٰقَوْمِ → يا + قوم), which the first pass could not express and
+which cost 166 ayahs. The residue report is the authority, not this list.
 
 **Why two tiers.** Tasnim is imlāʾī (`مالك`, `الصراط`, `العالمين`); our corpus is
 Uthmani (`ملك`, `الصرط`, `العلمين`). Tier 1 strips diacritics + folds
