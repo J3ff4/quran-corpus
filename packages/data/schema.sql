@@ -225,7 +225,6 @@ CREATE INDEX IF NOT EXISTS idx_words_root_bw       ON words(root_buckwalter);
 CREATE INDEX IF NOT EXISTS idx_words_lemma_bw      ON words(lemma_buckwalter);
 CREATE INDEX IF NOT EXISTS idx_root_forms_root     ON root_forms(root_id, sort_order);
 CREATE INDEX IF NOT EXISTS idx_root_defs_root      ON root_definitions(root_id);
-CREATE INDEX IF NOT EXISTS idx_root_glosses_root  ON root_glosses(root_id, language_code, rank);
 CREATE INDEX IF NOT EXISTS idx_roots_sort_order     ON roots(sort_order);
 CREATE INDEX IF NOT EXISTS idx_word_segments_word  ON word_segments(word_id, segment_index);
 CREATE INDEX IF NOT EXISTS idx_word_segments_root  ON word_segments(root);
