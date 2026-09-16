@@ -2,10 +2,11 @@ import { useSyncExternalStore } from 'react';
 
 /** How long the chrome stays up with nothing touching it (ruling 7).
  *
- *  3.5s: long enough to read the page number and reach the jump control, short
- *  enough that a reader who tapped by accident is not left with a bar over the
- *  text. */
-export const CHROME_IDLE_MS = 3500;
+ *  5s. Was 3.5, which the owner found too quick to reach the jump control and
+ *  the player without the chrome sliding away mid-reach (2026-09-16). Still
+ *  short enough that a reader who tapped by accident is not left with a bar
+ *  over the text. */
+export const CHROME_IDLE_MS = 5000;
 
 /**
  * Whether the mushaf's chrome -- its compact header AND the app's tab bar --

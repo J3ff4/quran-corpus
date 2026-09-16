@@ -42,7 +42,11 @@ export function PageCorners({ page, uiLocale }: PageCornersProps) {
         accessibilityLabel={`${t(uiLocale, 'browse.pageLabel')} ${page}`}
         style={{
           position: 'absolute',
-          bottom: 4,
+          // Roughly the middle of MushafPage's 72dp footer band, not 4dp off
+          // the leaf's bottom edge (owner, 2026-09-16): down there it read as
+          // marooned under a wide empty gap. The text block does not move --
+          // the band is unchanged, only what sits in it.
+          bottom: 28,
           ...(numberOnRight ? { right: 16 } : { left: 16 }),
           width: MEDALLION_SIZE,
           height: MEDALLION_SIZE,
