@@ -38,6 +38,7 @@ function props(overrides: Partial<React.ComponentProps<typeof MushafPlayer>> = {
     onSeek: vi.fn(),
     onToggleContinuous: vi.fn(),
     onOpenReciters: vi.fn(),
+    onDismiss: vi.fn(),
     bottomOffset: 96,
     ...overrides,
   };
@@ -57,6 +58,18 @@ afterEach(() => {
 });
 
 describe('MushafPlayer', () => {
+  it('stops the recitation from the transport\'s close button', () => {
+    // The X every other player in the app has (owner, 2026-09-16). It stops
+    // what is sounding; the shrink back to the resting line follows from
+    // `playing` going false, because this player -- unlike the mini-player --
+    // has nowhere to dismiss to: that line is the only way to start a page.
+    const onDismiss = vi.fn();
+    render(<MushafPlayer {...props({ playing: true, ayahNumber: 3, onDismiss })} />);
+
+    fireEvent.click(screen.getByLabelText('Stop recitation'));
+    expect(onDismiss).toHaveBeenCalled();
+  });
+
   it('shows one line at rest and the transport while playing', () => {
     const { rerender } = render(<MushafPlayer {...props()} playing={false} />);
     expect(screen.getByTestId('mushaf-player-compact')).toBeTruthy();

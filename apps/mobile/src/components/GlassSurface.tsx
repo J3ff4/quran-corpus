@@ -32,6 +32,18 @@ export interface GlassSurfaceProps {
    * instead of forking a third copy.
    */
   tint?: string | undefined;
+  /**
+   * No drop shadow at all.
+   *
+   * For a surface inside a clip. PlayerShell's box is `overflow: hidden`, and
+   * a clipped shadow is worse than no shadow: it stops at the box edge, so
+   * where the surface's corner curves away the shadow stays square and a hard
+   * grey wedge sits in each bottom corner (owner, on the device, 2026-09-16).
+   * Home's listen card cannot buy the shadow room back -- the room is what
+   * made it narrower than every other card on the tab -- so it gives up the
+   * shadow instead.
+   */
+  flat?: boolean;
   testID?: string;
 }
 
@@ -64,7 +76,15 @@ export function useGlassSkin() {
  * sits, and `tint`, a fact about what state it is in. Add another when a screen
  * actually needs it; `tint` arrived when the reader's playing ayah did.
  */
-export function GlassSurface({ children, radius = 'card', style, testID, tint, docked = false }: GlassSurfaceProps) {
+export function GlassSurface({
+  children,
+  radius = 'card',
+  style,
+  testID,
+  tint,
+  docked = false,
+  flat = false,
+}: GlassSurfaceProps) {
   const skin = useGlassSkin();
   const theme = useThemeColors();
 
@@ -78,7 +98,7 @@ export function GlassSurface({ children, radius = 'card', style, testID, tint, d
           borderWidth: 1,
           borderRadius: radii[radius],
           overflow: 'hidden',
-          ...(docked ? skin.dockedShadow : skin.shadow),
+          ...(flat ? {} : docked ? skin.dockedShadow : skin.shadow),
         },
         style,
       ]}

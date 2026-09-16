@@ -21,6 +21,7 @@ vi.mock('@/settings/settingsStore', () => ({
     reciterId: 'husary',
     continuousPlay: mocks.continuousPlay,
     reduceMotion: false,
+    setReciterId: vi.fn(),
   }),
 }));
 vi.mock('@/audio/recitationContext', () => ({
@@ -76,10 +77,13 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('HomePlayerCard', () => {
-  it('rests as one line naming the reciter', () => {
+  it('rests as a card naming the surah it would recite, not the voice', () => {
+    // The reciter is a setting. What this card is about is the recitation, and
+    // the surah is the half of the coordinate a bare "2:255" does not carry.
     renderCard();
 
-    expect(screen.getByText(/Listen · Mahmoud/)).toBeTruthy();
+    expect(screen.getByText('Al-Baqarah')).toBeTruthy();
+    expect(screen.queryByText(/Mahmoud/)).toBeNull();
     expect(screen.getByLabelText('Play 2:255')).toBeTruthy();
   });
 
@@ -148,19 +152,74 @@ describe('HomePlayerCard', () => {
     expect(screen.queryByLabelText('Play 2:255')).toBeNull();
   });
 
-  it('stays a resting line while the sound belongs to another screen', () => {
-    // A reader-owned recitation is audible here. This card is Home's own
-    // control, not a mirror of whatever is playing -- and the mini-player is
-    // suppressed on this tab, which is deliberate: the reader is one tap away
-    // and owns its own bar.
+  it('mirrors a recitation another screen started', () => {
+    // The mini-player is suppressed on this tab, so if this card stayed a
+    // resting line there would be no transport anywhere on Home for a
+    // recitation the whole room can hear (owner, 2026-09-15).
     mocks.track = { owner: 'reader' };
     mocks.ayah = 255;
     mocks.playing = true;
 
     renderCard();
 
-    expect(screen.queryByTestId('recitation-bar')).toBeNull();
-    expect(screen.getByLabelText('Play 2:255')).toBeTruthy();
+    expect(screen.getByTestId('recitation-bar')).toBeTruthy();
+    expect(screen.queryByLabelText('Play 2:255')).toBeNull();
+  });
+
+  it('pauses a foreign track rather than starting its own over the top', () => {
+    mocks.track = { owner: 'reader' };
+    mocks.ayah = 255;
+    mocks.playing = true;
+
+    renderCard();
+    fireEvent.click(screen.getByLabelText('Pause'));
+
+    // The reader's track, toggled -- not a fresh home-owned one at the same
+    // ayah, which would restart the audio under a new owner and move the
+    // highlight off the screen that is showing it.
+    expect(mocks.toggle).toHaveBeenCalledWith({ owner: 'reader' }, 255);
+  });
+});
+
+describe('HomePlayerCard with no reading history', () => {
+  it('draws nothing at all when there is no position and no track', () => {
+    render(
+      <ThemeContext.Provider value={themeColors.dark}>
+        <HomePlayerCard
+          surahId={null}
+          ayahNumber={null}
+          location={null}
+          reciterId="husary"
+          uiLocale="en"
+        />
+      </ThemeContext.Provider>,
+    );
+
+    expect(screen.queryByTestId('home-player')).toBeNull();
+  });
+
+  it('is still the transport for a recitation started elsewhere', () => {
+    // Fresh install, nothing read yet, and the mushaf is reciting. The
+    // mini-player suppresses itself on this tab, so without this there is no
+    // control anywhere on Home for audible recitation.
+    mocks.track = { owner: 'mushaf' };
+    mocks.ayah = 12;
+    mocks.playing = true;
+
+    render(
+      <ThemeContext.Provider value={themeColors.dark}>
+        <HomePlayerCard
+          surahId={null}
+          ayahNumber={null}
+          location={null}
+          reciterId="husary"
+          uiLocale="en"
+        />
+      </ThemeContext.Provider>,
+    );
+
+    expect(screen.getByTestId('recitation-bar')).toBeTruthy();
+    expect(screen.getByLabelText('Pause')).toBeTruthy();
   });
 });
 

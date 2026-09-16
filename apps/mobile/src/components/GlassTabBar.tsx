@@ -63,6 +63,14 @@ const TABS: Record<string, { icon: IconName; label: UiStringKey }> = {
  * docking above it corrects on the next frame.
  */
 let tabBarTop = 84;
+/** Last non-zero bottom inset. See the onLayout below for why zero is ignored. */
+let heldBottom = 0;
+
+function stableBottom(live: number): number {
+  if (live > 0) heldBottom = live;
+  return heldBottom;
+}
+
 const tabBarListeners = new Set<() => void>();
 
 function setTabBarTop(next: number) {
@@ -125,8 +133,17 @@ export function GlassTabBar({ state, navigation, insets }: GlassTabBarProps) {
       // Measured here rather than on the pill inside: this view wraps the pill
       // exactly, and the translate that slides it away is a transform, which
       // does not move layout. So the height stays right even mid-fade.
+      // `insets.bottom || heldBottom`, never the live value alone. Hiding a
+      // system bar collapses its inset to 0, and everything that docks above
+      // this pill -- the mini-player, the mushaf's player -- is positioned
+      // from the number published here. A sheet that hid the navigation bar
+      // therefore dropped every docked bar by the height of that bar and put
+      // them back on close: the dip the owner reported on the mushaf's player
+      // after picking a reciter (2026-09-16). Same rule, and the same reason,
+      // as useStableInsets -- module state here rather than that hook because
+      // this value is published to subscribers outside the tree.
       onLayout={(event: LayoutChangeEvent) =>
-        setTabBarTop(insets.bottom + 12 + event.nativeEvent.layout.height)
+        setTabBarTop(stableBottom(insets.bottom) + 12 + event.nativeEvent.layout.height)
       }
       // `none` and not `box-none` while hidden: a bar faded to nothing still
       // occupies the bottom of the screen, and the tap that is supposed to

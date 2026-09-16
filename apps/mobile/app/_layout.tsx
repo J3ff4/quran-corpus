@@ -8,6 +8,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { configureAudioSession } from '@/audio/ayahAudio';
 import { RecitationProvider } from '@/audio/recitationContext';
 import { Bloom } from '@/components/Bloom';
+import { ThemedStatusBar } from '@/components/ThemedStatusBar';
 import { openCorpusDb, useCorpusFonts } from '@/data/openCorpusDb';
 import { AppSettingsProvider } from '@/settings/settingsStore';
 import { ThemeProvider } from '@/theme/ThemeProvider';
@@ -133,6 +134,11 @@ function AppStack() {
           applied, which is how a sheet closing on one screen would leave the
           buttons hidden on every other. */}
       <NavigationBar hidden={false} />
+      {/* The baseline for the status bar's glyphs, from the APP's theme --
+          expo's default follows the OS, so a phone in dark mode running the
+          app in Light drew a white clock on paper (owner, 2026-09-16). The
+          mushaf mounts its own to hide the bar with the chrome. */}
+      <ThemedStatusBar />
       {/* One instance for the whole app, behind the navigator. A per-screen
           copy would repaint a full-screen gradient on every navigation. */}
       <Bloom />

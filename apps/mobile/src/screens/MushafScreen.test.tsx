@@ -23,6 +23,7 @@ vi.mock('react-native', async () => {
 const mocks = vi.hoisted(() => ({
   readerProps: [] as Array<Record<string, unknown>>,
   playerProps: [] as Array<Record<string, unknown>>,
+  stripProps: [] as Array<Record<string, unknown>>,
   // The layout rows of whichever page is asked for. The index cannot say which
   // ayah a page BEGINS -- that is the whole reason the screen reads the rows.
   pageLines: new Map<number, Array<{ words: Array<{ surahId: number; ayahNumber: number; position: number }> }>>(),
@@ -38,7 +39,7 @@ const mocks = vi.hoisted(() => ({
   // parked on and outlives a pause, `playing` is whether sound is coming out.
   audio: { ayah: null as number | null, playing: false, finished: false },
   /** What the shared engine is sounding, and for whom. Null = silence. */
-  track: null as { owner: string; surahId: number } | null,
+  track: null as { owner: string; surahId: number; surahName?: string } | null,
   toggle: vi.fn(),
   loadWordSummary: vi.fn(),
   loadFails: false,
@@ -96,6 +97,13 @@ vi.mock('expo-router', async () => {
   };
 });
 vi.mock('@/components/mushaf/MushafChrome', () => ({ MushafChrome: () => null }));
+vi.mock('@/components/mushaf/MushafTopStrip', () => ({
+  MushafTopStrip: (props: Record<string, unknown>) => {
+    mocks.stripProps.push(props);
+    return null;
+  },
+  STRIP_ROW_HEIGHT: 26,
+}));
 vi.mock('@/mushaf/chromeVisibility', () => ({
   hideChrome: (...args: unknown[]) => mocks.hideChrome(...args),
   showChrome: vi.fn(),
@@ -216,6 +224,7 @@ import { MushafScreen } from './MushafScreen';
 beforeEach(() => {
   mocks.readerProps = [];
   mocks.playerProps = [];
+  mocks.stripProps = [];
   mocks.pageLines = new Map();
   mocks.sheetProps = [];
   mocks.position = null;
@@ -341,20 +350,57 @@ describe('MushafScreen', () => {
     expect(mocks.sheetProps.at(-1)?.['ayahActions']).toBeTruthy();
   });
 
-  it('paints nothing for a recitation the reader started', async () => {
-    // One engine app-wide: a reader-owned ayah is audible while this tab sits
-    // mounted behind it. Painting a band for it would light a page nobody is
-    // looking at, driven by a screen they cannot see.
+  it('paints no band for a recitation the reader started, but mirrors it on the player', async () => {
+    // Two halves, and they pull in opposite directions on purpose.
+    //
+    // The BAND stays owner-gated: one engine app-wide means a reader-owned
+    // ayah is audible while this tab sits mounted behind it, and painting it
+    // would light a page nobody is looking at, driven by a screen they cannot
+    // see.
+    //
+    // The PLAYER does not: it is the transport for whatever is sounding
+    // wherever you are standing (owner, 2026-09-15). A bar showing Play over
+    // audible recitation is the one thing it must never do.
     mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
     mocks.pageLines.set(106, [{ words: [{ surahId: 5, ayahNumber: 82, position: 1 }] }]);
     const props = await renderScreen();
 
-    mocks.track = { owner: 'reader', surahId: 5 };
+    mocks.track = { owner: 'reader', surahId: 5, surahName: 'Al-Maidah' };
     await park(props, { ayah: 82, playing: true });
 
     expect(props()['playingAyah']).toBe(null);
-    expect(mocks.playerProps.at(-1)?.['playing']).toBe(false);
-    expect(mocks.playerProps.at(-1)?.['ayahNumber']).toBe(null);
+    expect(mocks.playerProps.at(-1)?.['playing']).toBe(true);
+    expect(mocks.playerProps.at(-1)?.['ayahNumber']).toBe(82);
+    expect(mocks.playerProps.at(-1)?.['surahName']).toBe('Al-Maidah');
+  });
+
+  it('pauses a foreign track from its player rather than seizing the page', async () => {
+    mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
+    mocks.pageLines.set(106, [{ words: [{ surahId: 5, ayahNumber: 82, position: 1 }] }]);
+    const props = await renderScreen();
+
+    const track = { owner: 'reader', surahId: 5, surahName: 'Al-Maidah' };
+    mocks.track = track;
+    await park(props, { ayah: 82, playing: true });
+
+    await act(async () => {
+      (mocks.playerProps.at(-1)?.['onTogglePlay'] as () => void)();
+    });
+
+    // That track, toggled. Taking over is what the resting bar's Play page
+    // does, and it is one tap away once this pause shrinks the bar.
+    expect(mocks.toggle).toHaveBeenCalledWith(track, 82);
+  });
+
+  it('names the page in the strip above the leaf, surah and juz', async () => {
+    // Off the page's own corner, where they cost the leaf a header strip to
+    // say what the band above it was saying nothing with.
+    mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
+    mocks.pageLines.set(106, [{ words: [{ surahId: 5, ayahNumber: 82, position: 1 }] }]);
+    await renderScreen();
+
+    await waitFor(() => expect(mocks.stripProps.at(-1)?.['surahName']).toBe('Al-Maidah'));
+    expect(mocks.stripProps.at(-1)?.['juz']).toBe(6);
   });
 
   it('claims no track at mount, since a tab has no surah to assume', async () => {

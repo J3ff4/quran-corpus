@@ -194,26 +194,27 @@ describe('BottomSheet', () => {
   it('keeps 16 under the last row unless the sheet asks for more', () => {
     // The note sheet's floor: 24 under Save with the keyboard up was dead
     // space, trimmed 2026-09-10. Only the word sheet overrides it.
+    // Plus the bottom inset in both cases -- see the next test.
     const { rerender } = render(<BottomSheet onClose={() => {}} closeLabel="Close"><span>body</span></BottomSheet>);
-    expect(screen.getByTestId('sheet-surface').style.paddingBottom).toBe('16px');
+    expect(screen.getByTestId('sheet-surface').style.paddingBottom).toBe('40px');
 
     rerender(<BottomSheet onClose={() => {}} closeLabel="Close" bottomPadding={24}><span>body</span></BottomSheet>);
-    expect(screen.getByTestId('sheet-surface').style.paddingBottom).toBe('24px');
+    expect(screen.getByTestId('sheet-surface').style.paddingBottom).toBe('48px');
   });
 
-  it('takes the system navigation buttons down for as long as it is open', () => {
+  it('pads past the system navigation buttons rather than hiding them', () => {
     // The sheet is anchored at bottom: 0 of an edge-to-edge window, so on a
     // device with three-button navigation the buttons land on its last row
-    // (owner, on an S24, 2026-09-15). Restored by the unmount rather than by a
-    // cleanup of our own, which is the part that cannot be skipped.
-    const { unmount } = render(
-      <BottomSheet onClose={() => {}} closeLabel="Close"><span>body</span></BottomSheet>,
-    );
+    // (owner, on an S24, 2026-09-15). It used to answer that by hiding the
+    // bar, which collapsed insets.bottom to 0 for as long as any sheet was
+    // open -- and everything docked off the tab pill is positioned from that
+    // inset, so the mushaf's player dropped behind the sheet and came back on
+    // close (owner, 2026-09-16). Padding leaves the inset alone.
+    render(<BottomSheet onClose={() => {}} closeLabel="Close"><span>body</span></BottomSheet>);
 
-    expect(screen.getByTestId('system-nav-bar').getAttribute('data-hidden')).toBe('true');
-
-    unmount();
     expect(screen.queryByTestId('system-nav-bar')).toBeNull();
+    // 16 of its own room, clear of the 24dp inset.
+    expect(screen.getByTestId('sheet-surface').style.paddingBottom).toBe('40px');
   });
 
   it('names the backdrop so TalkBack does not read an unlabelled button', () => {

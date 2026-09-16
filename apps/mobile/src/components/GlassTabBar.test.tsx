@@ -18,7 +18,7 @@ vi.mock('react-native-reanimated', async () => {
   };
 });
 
-import { GlassTabBar, type GlassTabBarProps } from './GlassTabBar';
+import { GlassTabBar, useTabBarTop, type GlassTabBarProps } from './GlassTabBar';
 import {
   CHROME_IDLE_MS,
   hideChrome,
@@ -29,6 +29,7 @@ import {
 import { ThemeContext } from '@/theme/themeContext';
 import { themeColors } from '@/theme/tokens';
 import { rgb } from '@/testing/rgb';
+import { setAutoLayout } from '@/testing/rnHosts';
 
 const ROUTES = ['index', 'surahs', 'mushaf', 'dictionary', 'menu'];
 
@@ -63,6 +64,34 @@ describe('GlassTabBar', () => {
   afterEach(() => {
     cleanup();
     releaseChrome();
+  });
+
+  it('keeps publishing the docked height when a system bar collapses the inset', () => {
+    // Everything that docks above the pill -- the mini-player, the mushaf's
+    // player -- is positioned from useTabBarTop(). Hiding a system bar takes
+    // insets.bottom to 0, so a value tracking it live dropped every docked bar
+    // by the height of that bar and put it back when the bar returned: the dip
+    // the owner saw on the mushaf's player after picking a reciter
+    // (2026-09-16).
+    setAutoLayout({ width: 360, height: 60 });
+    try {
+      let top = 0;
+      function Probe() {
+        top = useTabBarTop();
+        return null;
+      }
+
+      renderBar({ ...props(0), insets: { bottom: 24 } });
+      render(<Probe />);
+      expect(top).toBe(24 + 12 + 60);
+
+      cleanup();
+      renderBar({ ...props(0), insets: { bottom: 0 } });
+      render(<Probe />);
+      expect(top).toBe(24 + 12 + 60);
+    } finally {
+      setAutoLayout(null);
+    }
   });
 
   it('renders one button per route', () => {

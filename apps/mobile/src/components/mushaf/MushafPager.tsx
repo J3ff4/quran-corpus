@@ -46,7 +46,6 @@ export interface MushafPagerProps {
   /** Page-agnostic lookups, shared by every mounted page. See MushafPage. */
   ayahTexts: Map<string, string>;
   surahNames: Map<number, string>;
-  juzByPage: Map<number, number>;
   uiLocale: UiLocaleCode;
   /** Fired once per settled page turn -- this is the write point for the
    *  durable reading position. */
@@ -79,7 +78,7 @@ type PageProps = Omit<MushafPagerProps, 'initialPage' | 'onPageChange' | 'focusP
  *  query in the pager would refetch on every turn and blank the page it is
  *  turning to.
  */
-const PagerPage = memo(function PagerPage({ client, page, juzByPage, ...rest }: PageProps) {
+const PagerPage = memo(function PagerPage({ client, page, ...rest }: PageProps) {
   // Context, not a prop: see HighlightsProvider. A mark change has to reach
   // the pages that draw WITHOUT re-rendering the pager that holds all 604.
   const highlights = useHighlights();
@@ -88,7 +87,6 @@ const PagerPage = memo(function PagerPage({ client, page, juzByPage, ...rest }: 
     <MushafPage
       page={page}
       lines={lines}
-      juz={juzByPage.get(page) ?? 0}
       highlights={highlights}
       {...rest}
     />

@@ -153,7 +153,9 @@ describe('HomeTab', () => {
       for (const callback of mocks.focusCallbacks) callback();
     });
 
-    await waitFor(() => expect(screen.getByText('2:255')).toBeTruthy());
+    // Two of them: Continue reading and the Listen card under it both name the
+    // saved coordinate now.
+    await waitFor(() => expect(screen.getAllByText('2:255')).toHaveLength(2));
     expect(screen.queryByText('No reading history yet')).toBeNull();
   });
 
@@ -288,7 +290,7 @@ describe('HomeTab', () => {
     render(<HomeTab />);
 
     await screen.findByText('Unable to load your counters');
-    expect(screen.getByText('2:255')).toBeTruthy();
+    expect(screen.getAllByText('2:255').length).toBeGreaterThan(0);
   });
 
   it("opens the reader at the day's ayah", async () => {

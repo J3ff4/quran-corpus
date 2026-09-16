@@ -29,6 +29,9 @@ export interface MushafPlayerProps {
   playing: boolean;
   /** Parked ayah, for the full bar's label. Null before the first play. */
   ayahNumber: number | null;
+  /** The surah that ayah belongs to. The bar mirrors recitations started on
+   *  other screens, so the surah is not this page's to assume. */
+  surahName?: string | undefined;
   positionSec: number;
   /** NaN until the track reports one. */
   durationSec: number;
@@ -39,6 +42,11 @@ export interface MushafPlayerProps {
   onSkipPrevious: () => void;
   onSeek: (sec: number) => void;
   onOpenReciters: () => void;
+  /** The X. Stops the recitation; the bar then shrinks back to its resting
+   *  line rather than leaving, because on the mushaf that line is the only way
+   *  to start a page (owner, 2026-09-16). Every other player in the app
+   *  dismisses itself instead -- this one has nowhere to dismiss to. */
+  onDismiss: () => void;
   /** Where the tab pill's top edge is, so the player docks above it. Measured
    *  by the screen: the tab bar's height is not exported, and a constant here
    *  would drift the first time its padding changes. */
@@ -63,6 +71,7 @@ export interface MushafPlayerProps {
 export function MushafPlayer({
   playing,
   ayahNumber,
+  surahName,
   positionSec,
   durationSec,
   reciterLabel,
@@ -72,6 +81,7 @@ export function MushafPlayer({
   onSkipPrevious,
   onSeek,
   onOpenReciters,
+  onDismiss,
   bottomOffset,
 }: MushafPlayerProps) {
   const theme = useThemeColors();
@@ -138,6 +148,7 @@ export function MushafPlayer({
           <RecitationBar
             dock={false}
             ayahNumber={ayahNumber}
+            surahName={surahName}
             playing={playing}
             positionSec={positionSec}
             durationSec={durationSec}
@@ -148,6 +159,7 @@ export function MushafPlayer({
             onSkipPrevious={onSkipPrevious}
             onSeek={onSeek}
             onOpenReciters={onOpenReciters}
+            onDismiss={onDismiss}
             onInteract={showChrome}
           />
           </View>

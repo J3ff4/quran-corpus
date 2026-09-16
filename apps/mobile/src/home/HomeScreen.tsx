@@ -107,11 +107,17 @@ export function HomeScreen() {
       ) : null}
       {/* Under Continue, never folded into it (ruling 7): Continue is the way
           back into the reader, and a control that starts a sound without going
-          anywhere is a different promise. */}
-      {!position.loading && !position.error && position.data ? (
+          anywhere is a different promise.
+
+          NOT gated on a saved position, unlike the card above it. This is the
+          only transport on the tab -- the mini-player suppresses itself here --
+          so on a fresh install a recitation started elsewhere would have
+          nothing anywhere on Home to pause it with. The card draws nothing of
+          its own when there is neither a position nor a track. */}
+      {!position.loading && !position.error ? (
         <HomePlayerCard
-          surahId={position.data.surahId}
-          ayahNumber={position.data.ayahNumber}
+          surahId={position.data?.surahId ?? null}
+          ayahNumber={position.data?.ayahNumber ?? null}
           location={continueAyah.data}
           reciterId={reciterId}
           uiLocale={uiLocale}

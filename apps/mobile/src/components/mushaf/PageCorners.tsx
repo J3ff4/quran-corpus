@@ -4,23 +4,18 @@ import { MEDALLION_OUTLINE_PATH, MEDALLION_VIEW_BOX } from '@quran-corpus/config
 
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
-import { typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
 const MEDALLION_SIZE = 34;
 
 export interface PageCornersProps {
   page: number;
-  juz: number;
-  /** The surah the page opens with, transliterated. Print names that one even
-   *  where the page goes on to head another. */
-  surahName: string;
   uiLocale: UiLocaleCode;
 }
 
 /**
- * A page's own furniture: juz, surah name and page number, printed on the page
- * rather than hung on the chrome.
+ * A page's own furniture: its number, printed on the leaf rather than hung on
+ * the chrome. The surah and the juz moved up to MushafTopStrip.
  *
  * On the page deliberately (M7d ruling 9). The chrome hides itself on a timer,
  * and a reader who has hidden it is exactly the reader who needs to know where
@@ -32,7 +27,7 @@ export interface PageCornersProps {
  * are rectos. The app shows one page at a time, so the alternation is the only
  * thing left of the spread -- and it is what a reader's thumb learns.
  */
-export function PageCorners({ page, juz, surahName, uiLocale }: PageCornersProps) {
+export function PageCorners({ page, uiLocale }: PageCornersProps) {
   const theme = useThemeColors();
   const numberOnRight = page % 2 === 1;
 
@@ -42,40 +37,16 @@ export function PageCorners({ page, juz, surahName, uiLocale }: PageCornersProps
     // unopenable.
     <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
       <View
-        style={{
-          position: 'absolute',
-          top: 6,
-          left: 16,
-          right: 16,
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <Text
-          testID="page-surah-name"
-          numberOfLines={1}
-          accessibilityLabel={surahName}
-          style={{ color: theme.mutedText, fontSize: typography.caption, flexShrink: 1 }}
-        >
-          {surahName}
-        </Text>
-        <Text
-          testID="page-juz"
-          accessibilityLabel={`${t(uiLocale, 'browse.juzLabel')} ${juz}`}
-          style={{ color: theme.mutedText, fontSize: typography.caption }}
-        >
-          {`${t(uiLocale, 'browse.juzLabel')} ${juz}`}
-        </Text>
-      </View>
-
-      <View
         testID="page-number"
         accessible
         accessibilityLabel={`${t(uiLocale, 'browse.pageLabel')} ${page}`}
         style={{
           position: 'absolute',
-          bottom: 4,
+          // Roughly the middle of MushafPage's 72dp footer band, not 4dp off
+          // the leaf's bottom edge (owner, 2026-09-16): down there it read as
+          // marooned under a wide empty gap. The text block does not move --
+          // the band is unchanged, only what sits in it.
+          bottom: 28,
           ...(numberOnRight ? { right: 16 } : { left: 16 }),
           width: MEDALLION_SIZE,
           height: MEDALLION_SIZE,

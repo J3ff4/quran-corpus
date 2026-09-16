@@ -1,8 +1,8 @@
 import { StyleSheet, View } from 'react-native';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 
-import { bloom, themeColors } from '@/theme/tokens';
-import { useThemeColors } from '@/theme/themeContext';
+import { bloom } from '@/theme/tokens';
+import { useIsDarkTheme, useThemeColors } from '@/theme/themeContext';
 
 /**
  * The radial wash the whole app sits on.
@@ -32,7 +32,7 @@ function stopParts(stop: string): { color: string; opacity: number } {
 
 export function Bloom() {
   const theme = useThemeColors();
-  const isDark = theme.background === themeColors.dark.background;
+  const isDark = useIsDarkTheme();
   const wash = isDark ? bloom.dark : bloom.light;
 
   return (

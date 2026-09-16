@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   pathname: '/surahs',
-  track: null as { owner: string; surahId: number } | null,
+  track: null as { owner: string; surahId: number; surahName?: string } | null,
   ayah: null as number | null,
   playing: false,
   toggle: vi.fn(),
@@ -51,7 +51,7 @@ function renderMini() {
 
 /** Something is sounding, started by the reader. */
 function sounding() {
-  mocks.track = { owner: 'reader', surahId: 2 };
+  mocks.track = { owner: 'reader', surahId: 2, surahName: 'Al-Baqarah' };
   mocks.ayah = 255;
   mocks.playing = true;
 }
@@ -74,7 +74,12 @@ describe('MiniPlayer', () => {
     renderMini();
 
     expect(screen.getByTestId('mini-player')).toBeTruthy();
-    expect(screen.getByText('Ayah 255')).toBeTruthy();
+    // The surah too. This bar docks over tabs that are not the reader's, so
+    // the ayah number alone names nothing a reader who walked away can place.
+    // Without the word "Ayah": the surah beside it already says what the
+    // number is (owner, 2026-09-16). The spoken label still carries it.
+    expect(screen.getByText('Al-Baqarah · 255')).toBeTruthy();
+    expect(screen.getByLabelText(/Al-Baqarah · Ayah 255/)).toBeTruthy();
   });
 
   it('is not there at all when nothing is sounding', () => {
@@ -137,6 +142,9 @@ describe('MiniPlayer', () => {
 
     fireEvent.click(screen.getByLabelText('Pause'));
 
-    expect(mocks.toggle).toHaveBeenCalledWith({ owner: 'reader', surahId: 2 }, 255);
+    expect(mocks.toggle).toHaveBeenCalledWith(
+      { owner: 'reader', surahId: 2, surahName: 'Al-Baqarah' },
+      255,
+    );
   });
 });

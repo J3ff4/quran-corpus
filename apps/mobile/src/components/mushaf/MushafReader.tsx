@@ -118,14 +118,6 @@ export function MushafReader({
     return texts;
   }, [ayahs]);
 
-  const juzByPage = useMemo(() => {
-    const byPage = new Map<number, number>();
-    for (const [pageNumber, entry] of index.pages) {
-      if (entry.juz !== null) byPage.set(pageNumber, entry.juz);
-    }
-    return byPage;
-  }, [index.pages]);
-
   const landingKey = landingAyah ? ayahKey(landingAyah.surahId, landingAyah.ayahNumber) : null;
   const [pulse, setPulse] = useState(landingKey ? 1 : 0);
   useEffect(() => {
@@ -210,7 +202,6 @@ export function MushafReader({
           height={size.height}
           ayahTexts={ayahTexts}
           surahNames={index.surahNames}
-          juzByPage={juzByPage}
           uiLocale={uiLocale}
           focusPage={focusPage}
           onPageChange={onListPageChange}

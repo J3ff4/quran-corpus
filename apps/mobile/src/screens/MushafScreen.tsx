@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 import { NavigationBar } from 'expo-navigation-bar';
-import { StatusBar } from 'expo-status-bar';
 import type { MushafLine, MushafWord, Word } from '@quran-corpus/data/mobile';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 
@@ -13,7 +12,9 @@ import { useTabBarTop } from '@/components/GlassTabBar';
 import { MushafPlayer } from '@/components/mushaf/MushafPlayer';
 import { MushafChrome } from '@/components/mushaf/MushafChrome';
 import { MushafReader } from '@/components/mushaf/MushafReader';
+import { MushafTopStrip } from '@/components/mushaf/MushafTopStrip';
 import { PageJumpSheet, type JumpKind } from '@/components/mushaf/PageJumpSheet';
+import { ThemedStatusBar } from '@/components/ThemedStatusBar';
 import { WordSheet } from '@/components/WordSheet';
 import { getWordsForAyah, type WordSummary } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
@@ -44,6 +45,7 @@ import {
 } from '@/mushaf/chromeVisibility';
 import { useAppSettings } from '@/settings/settingsStore';
 import { useThemeColors } from '@/theme/themeContext';
+import { useStableInsets } from '@/theme/useStableInsets';
 
 /** Where the mushaf opens with nothing saved. Page 1 is the Fatiha. */
 const FIRST_PAGE = 1;
@@ -112,6 +114,9 @@ export function MushafScreen() {
   // padding at whatever type scale the device is set to, and a player docked
   // above a guessed one either overlaps the pill or floats over the page.
   const tabBarTop = useTabBarTop();
+  // Stable, not live: hiding the status bar collapses this to 0, and the strip
+  // painted off it would vanish and take the page up with it.
+  const { top: insetTop } = useStableInsets();
   const [jumpOpen, setJumpOpen] = useState(false);
   const [reciterOpen, setReciterOpen] = useState(false);
   // The page the pager is actually on. Null until it reports its first turn:
@@ -128,6 +133,9 @@ export function MushafScreen() {
   // fetch page 1's rows on its way to the page the reader actually saved.
   const currentPage = pageInView ?? initialPage;
   const pageData = useMushafPage(currentPage === null ? null : client, currentPage ?? FIRST_PAGE);
+  // The page in view's index row: its opening surah and its juz, both known
+  // the instant the pager reports a turn.
+  const currentPageEntry = currentPage === null ? undefined : index.pages.get(currentPage);
   // The rows of the page in front of the reader, and NOTHING otherwise. The
   // render in which the pager reports a turn still carries the previous page's
   // rows -- `useMushafPage`'s effect has not run yet -- and every reader below
@@ -308,6 +316,16 @@ export function MushafScreen() {
   // Null target means a page that begins no ayah at all -- 2:282 alone fills
   // more than a page -- and there is nothing there to start.
   const onTogglePlay = useCallback(() => {
+    // Sounding under another screen's track. This bar is MIRRORING that one
+    // (owner, 2026-09-15): one recitation, one transport, wherever you are
+    // standing -- so its control pauses what is audible rather than replacing
+    // it with this page. Taking over is what the resting bar's "Play page" is
+    // for, and it is still one tap away once this pause shrinks the bar.
+    const live = audio.track;
+    if (!mine && live !== null && audio.playing && audio.ayah !== null) {
+      audio.toggle(live, audio.ayah);
+      return;
+    }
     if (sounding && playing) {
       toggleAyah(playing.ayahNumber, playing.surahId);
       return;
@@ -324,7 +342,7 @@ export function MushafScreen() {
     // `audio` alone let this close over a toggleAyah built before the index
     // resolved, which hands the engine `ayahCount: 0` -- continuous play that
     // stops after one ayah, no preload, an empty lock-screen title.
-  }, [toggleAyah, sounding, playing, pageLines]);
+  }, [toggleAyah, sounding, playing, pageLines, mine, audio]);
 
   // The page the recitation has asked for and is waiting on the rows of, so it
   // can start that page's first ayah. Only set at a surah seam: everywhere
@@ -507,7 +525,24 @@ export function MushafScreen() {
   }
 
   return (
-    <View testID="mushaf-screen" style={{ flex: 1 }}>
+    // The scene's own top padding cancelled, so the strip below can paint the
+    // status bar's band in the page's colour. Left padded, the tabs layout's
+    // transparent scene showed the app bloom there -- a green strip across the
+    // top of a printed leaf.
+    <View testID="mushaf-screen" style={{ flex: 1, marginTop: -insetTop }}>
+      {/* Both read off the INDEX, not off `pageLines`. The rows arrive an
+          async fetch after the pager settles, and until they do `pageLines` is
+          empty by design -- so a name taken from them blanks on every page
+          turn while the juz beside it, read from the index, updates at once.
+          The index answers both synchronously and answers the same question:
+          the surah a page opens in. */}
+      <MushafTopStrip
+        insetTop={insetTop}
+        surahName={index.surahNames.get(currentPageEntry?.startSurahId ?? 0) ?? ''}
+        juz={currentPageEntry?.juz ?? 0}
+        uiLocale={uiLocale}
+        onTap={toggleChrome}
+      />
       <MushafReader
         client={client}
         index={index}
@@ -540,8 +575,14 @@ export function MushafScreen() {
         // Sounding, not parked. Keyed on the parked ayah the bar would never
         // shrink back to one line: the parking spot outlives a pause on
         // purpose, so that resuming knows where to go.
-        playing={sounding}
-        ayahNumber={soundingAyah}
+        // Any owner's sound, not only this screen's. The green band on the
+        // page stays gated on `mine` -- a reader-started ayah must not light a
+        // page nobody is looking at -- but the transport is app-wide, and a
+        // bar showing Play while something is audible is the one thing it must
+        // never do.
+        playing={audio.playing}
+        ayahNumber={audio.ayah}
+        surahName={audio.track?.surahName}
         positionSec={audio.positionSec}
         durationSec={audio.durationSec}
         reciterLabel={reciterById(reciterId)?.label ?? ''}
@@ -551,6 +592,11 @@ export function MushafScreen() {
         onSkipPrevious={audio.skipPrevious}
         onSeek={audio.seekTo}
         onOpenReciters={() => setReciterOpen(true)}
+        // Stops whatever is sounding, whoever started it -- the bar mirrors
+        // other screens' recitations, so an X that only stopped the mushaf's
+        // own would be a control that does nothing on the track it is
+        // labelling.
+        onDismiss={audio.stop}
         bottomOffset={tabBarTop + 8}
       />
       {/* The page number is printed in a bottom corner of the leaf (ruling 8),
@@ -564,7 +610,7 @@ export function MushafScreen() {
           reason: this is a tab screen that stays mounted after a blur, and a
           standing request left behind would take the clock off every other
           tab. The page itself does not move -- see useStableInsets. */}
-      <StatusBar hidden={mushafFocused && !chromeVisible} />
+      <ThemedStatusBar hidden={mushafFocused && !chromeVisible} />
       <MushafChrome
         visible={chromeVisible}
         uiLocale={uiLocale}

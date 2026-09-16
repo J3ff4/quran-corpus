@@ -137,14 +137,13 @@ describe('BismillahLine', () => {
 });
 
 describe('PageCorners', () => {
-  const props = { juz: 6, surahName: 'Al-Maidah', uiLocale: 'en' as const };
+  const props = { uiLocale: 'en' as const };
 
-  it('shows the page number, its juz and the surah the page opens with', () => {
+  it('prints the page number, and nothing else -- the surah and juz moved to the strip', () => {
     const { container } = render(<PageCorners {...props} page={106} />);
     const text = container.textContent ?? '';
     expect(text).toContain('106');
-    expect(text).toContain('Juz 6');
-    expect(text).toContain('Al-Maidah');
+    expect(text).not.toContain('Juz');
   });
 
   it('puts an odd page-s number on the right and an even one on the left', () => {

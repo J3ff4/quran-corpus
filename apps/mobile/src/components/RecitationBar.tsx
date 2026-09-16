@@ -67,6 +67,10 @@ export function scrubSeconds(x: number, trackWidth: number, durationSec: number)
 export interface RecitationBarProps {
   /** null = nothing has played yet, so there is no bar. */
   ayahNumber: number | null;
+  /** The surah the sounding ayah belongs to, transliterated. Omitted, the bar
+   *  names the ayah alone -- which on a screen that is not the reader's says
+   *  "Ayah 1" and nothing about which of the 114 surahs that is. */
+  surahName?: string | undefined;
   playing: boolean;
   positionSec: number;
   /** NaN until the track reports one. */
@@ -107,6 +111,10 @@ export interface RecitationBarProps {
    *  tab pill and inside its own grow animation, so the position is not this
    *  component's to choose there. */
   dock?: boolean;
+  /** No drop shadow. For a caller that clips: Home grows this bar inside a
+   *  PlayerShell with no shadow room, and a clipped shadow leaves a square
+   *  grey wedge in each bottom corner. See GlassSurface's `flat`. */
+  flat?: boolean;
 }
 
 /**
@@ -120,6 +128,7 @@ export interface RecitationBarProps {
  */
 export function RecitationBar({
   ayahNumber,
+  surahName,
   playing,
   positionSec,
   durationSec,
@@ -135,6 +144,7 @@ export function RecitationBar({
   onInteract,
   onDismiss,
   dock = true,
+  flat = false,
 }: RecitationBarProps) {
   const theme = useThemeColors();
   const insets = useSafeAreaInsets();
@@ -182,6 +192,15 @@ export function RecitationBar({
   if (ayahNumber === null) return null;
 
   const ayahLabel = `${t(uiLocale, 'reader.ayahLabel')} ${ayahNumber}`;
+  // The surah first: it is the coarser coordinate, and the one a reader who
+  // walked away from the screen that started this has lost track of.
+  const trackLabel = surahName ? `${surahName} · ${ayahLabel}` : ayahLabel;
+  // On screen the word "Ayah" is dead weight beside the surah that already
+  // frames it -- "At-Tawbah · 2" is the coordinate a reader reads (owner,
+  // 2026-09-16). Only when the surah is there to do the framing: alone, a bare
+  // "2" on a bar names nothing. The spoken label keeps the word, since a
+  // screen reader has no column of coordinates to read it against.
+  const trackText = surahName ? `${surahName} · ${ayahNumber}` : ayahLabel;
   // Asked to play, but the track has told us nothing yet -- the bar would
   // otherwise read 0:00 / --:-- with a transport glyph on it, which is exactly
   // what a paused player looks like, so a tap that never starts (issue #63)
@@ -205,11 +224,11 @@ export function RecitationBar({
       // screen-reader user nothing about which ayah is sounding. No
       // `accessible` on it -- that would make the bar one element and swallow
       // the buttons inside it (see rn-accessible-view-collapses-children).
-      accessibilityLabel={`${ayahLabel} · ${loading ? t(uiLocale, 'reader.loadingAudio') : action}`}
+      accessibilityLabel={`${trackLabel} · ${loading ? t(uiLocale, 'reader.loadingAudio') : action}`}
       pointerEvents="box-none"
       style={dock ? { position: 'absolute', left: 16, right: 16, bottom: insets.bottom + 12 } : undefined}
     >
-      <GlassSurface docked radius="pill" style={{ paddingHorizontal: 14, paddingVertical: 10, gap: 6 }}>
+      <GlassSurface docked flat={flat} radius="pill" style={{ paddingHorizontal: 14, paddingVertical: 10, gap: 6 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <TransportButton
             icon="skipBack"
@@ -243,7 +262,7 @@ export function RecitationBar({
               number on one line leaves neither readable. */}
           <View style={{ flex: 1, paddingHorizontal: 6 }}>
             <Text numberOfLines={1} style={{ color: theme.text, fontSize: typography.caption }}>
-              {ayahLabel}
+              {trackText}
             </Text>
             <ReciterLabel label={reciterLabel} uiLocale={uiLocale} onPress={onOpenReciters} />
           </View>

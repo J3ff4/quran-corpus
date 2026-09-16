@@ -77,6 +77,18 @@ describe('GlassSurface', () => {
     );
   });
 
+  it('drops the shadow entirely where the caller clips', () => {
+    // A clipped shadow is worse than none: it stops square at the clip's edge
+    // while the surface's own corner curves away from it, leaving a grey wedge
+    // in each bottom corner (owner, on the device, 2026-09-16). Both variants,
+    // because Home clips a card AND the docked bar it grows into.
+    renderIn(themeColors.light, <GlassSurface testID="flat-card" flat>{null}</GlassSurface>);
+    renderIn(themeColors.light, <GlassSurface testID="flat-bar" docked flat>{null}</GlassSurface>);
+
+    expect(screen.getByTestId('flat-card').style.boxShadow).toBe('');
+    expect(screen.getByTestId('flat-bar').style.boxShadow).toBe('');
+  });
+
   it('takes its radius from the named token', () => {
     renderIn(themeColors.light, <GlassSurface testID="bar" radius="pill">{null}</GlassSurface>);
 
