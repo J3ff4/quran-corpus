@@ -305,6 +305,39 @@ def test_gloss_source_column_and_backfill(tmp_path) -> None:
     db.close()
 
 
+def test_gloss_group_column_on_a_legacy_db(tmp_path) -> None:
+    # The TS migration cannot cover this: apps/web opens a pre-provisioned DB
+    # with DB_SKIP_MIGRATIONS, and per CLAUDE.md §7 the scraper is the corpus
+    # DB's only writer -- so without the ALTER here, the first Uzbek gloss
+    # insert into the live quran.db fails with "no such column: gloss_group".
+    import sqlite3
+
+    p = str(tmp_path / "g.db")
+    raw = sqlite3.connect(p)
+    raw.executescript(
+        """CREATE TABLE word_glosses(
+             id INTEGER PRIMARY KEY AUTOINCREMENT,
+             word_id INTEGER NOT NULL, language_code TEXT NOT NULL,
+             gloss_text TEXT NOT NULL, source TEXT,
+             UNIQUE(word_id, language_code));
+           INSERT INTO word_glosses(word_id,language_code,gloss_text,source)
+             VALUES (1,'en','from','corpus');"""
+    )
+    raw.commit()
+    raw.close()
+
+    db = ScraperDatabase(p)
+    cols = {r["name"] for r in db._conn.execute("PRAGMA table_info(word_glosses)")}
+    assert "gloss_group" in cols
+    # NULL, not backfilled: "ungrouped" is the correct reading of every row
+    # written before grouping existed.
+    row = db._conn.execute(
+        "SELECT gloss_group FROM word_glosses WHERE word_id=1"
+    ).fetchone()
+    assert row["gloss_group"] is None
+    db.close()
+
+
 def test_get_roots_without_forms(tmp_path):
     from scraper.db import ScraperDatabase
     from scraper.models import RootFormModel, RootModel

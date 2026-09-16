@@ -120,6 +120,7 @@ class ScraperDatabase:
             self._conn.execute(stmt)
         self._migrate_add_word_columns()
         self._migrate_add_gloss_source()
+        self._migrate_add_gloss_group()
         for stmt in indexes:
             self._conn.execute(stmt)
         self._conn.commit()
@@ -159,6 +160,26 @@ class ScraperDatabase:
         self._conn.execute(
             "UPDATE word_glosses SET source = 'corpus' WHERE source IS NULL"
         )
+
+    def _migrate_add_gloss_group(self) -> None:
+        """Add word_glosses.gloss_group on legacy DBs.
+
+        The TS migration cannot cover this one. Per CLAUDE.md §7 the scraper is
+        the only writer of the corpus DB, and apps/web opens a pre-provisioned
+        database with DB_SKIP_MIGRATIONS set -- so without the ALTER here, the
+        Uzbek importer's first insert into the live quran.db (created long
+        before this column) fails with "no such column: gloss_group".
+
+        No backfill: NULL is the correct value for every pre-existing row. It
+        means "ungrouped", which is what every source that does not group is.
+        """
+        cols = {
+            row["name"] for row in self._conn.execute("PRAGMA table_info(word_glosses)")
+        }
+        if "gloss_group" not in cols:
+            self._conn.execute(
+                "ALTER TABLE word_glosses ADD COLUMN gloss_group INTEGER"
+            )
 
     def reseed_surahs(self, surahs: Iterable[SurahModel]) -> None:
         """Rewrite every surah row, revelation ranks included, atomically.
