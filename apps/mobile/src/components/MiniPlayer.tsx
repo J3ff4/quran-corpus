@@ -64,6 +64,7 @@ export function MiniPlayer() {
       <RecitationBar
         dock={false}
         ayahNumber={ayah}
+        surahName={track.surahName}
         playing={audio.playing}
         positionSec={audio.positionSec}
         durationSec={audio.durationSec}
