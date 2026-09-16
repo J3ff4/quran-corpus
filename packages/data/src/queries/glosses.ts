@@ -30,6 +30,12 @@ export interface GlossWithLang {
   word_id: number;
   gloss_text: string;
   gloss_lang: string;
+  /** Which phrase this word belongs to, from whichever row supplied the text.
+   *  Words sharing a group are ONE gloss and render once across the span.
+   *  NULL for every ungrouped source, and for a fallback row -- the fallback
+   *  language does its own segmentation and never inherits the preferred
+   *  language's grouping. */
+  gloss_group: number | null;
 }
 
 /** One gloss per word for a surah: the requested lang where a row exists,
@@ -44,7 +50,9 @@ export async function getGlossesWithFallback(
   const result = await db.execute({
     sql: `SELECT w.id AS word_id,
                  COALESCE(pref.gloss_text, fb.gloss_text) AS gloss_text,
-                 CASE WHEN pref.gloss_text IS NOT NULL THEN ? ELSE ? END AS gloss_lang
+                 CASE WHEN pref.gloss_text IS NOT NULL THEN ? ELSE ? END AS gloss_lang,
+                 CASE WHEN pref.gloss_text IS NOT NULL
+                      THEN pref.gloss_group ELSE fb.gloss_group END AS gloss_group
           FROM words w
           JOIN ayahs a ON a.id = w.ayah_id
           LEFT JOIN word_glosses pref ON pref.word_id = w.id AND pref.language_code = ?
@@ -57,5 +65,6 @@ export async function getGlossesWithFallback(
     word_id: r['word_id'] as number,
     gloss_text: r['gloss_text'] as string,
     gloss_lang: r['gloss_lang'] as string,
+    gloss_group: (r['gloss_group'] as number | null) ?? null,
   }));
 }

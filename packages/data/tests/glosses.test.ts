@@ -48,9 +48,13 @@ beforeAll(async () => {
           VALUES ('uz', 'O''zbekcha', 'Uzbek', 'ltr')`,
     args: [],
   });
+  // Both words share one Uzbek gloss under group 7 -- Tasnim glosses the
+  // phrase, not the word. word 2 also has an EN row, so the fallback branch
+  // still has something to lose to.
   await db.execute({
-    sql: `INSERT INTO word_glosses (word_id, language_code, gloss_text) VALUES (?, 'uz', 'dan')`,
-    args: [word1Id],
+    sql: `INSERT INTO word_glosses (word_id, language_code, gloss_text, gloss_group) VALUES
+          (?, 'uz', 'nomi bilan', 7), (?, 'uz', 'nomi bilan', 7)`,
+    args: [word1Id, word2Id],
   });
 });
 
@@ -79,8 +83,32 @@ describe('getGlossesWithFallback', () => {
   it('returns uz gloss where present, EN fallback where missing', async () => {
     const rows = await getGlossesWithFallback(db, 1, 'uz');
     const byWord = Object.fromEntries(rows.map((r) => [r.word_id, r]));
-    expect(byWord[1]).toMatchObject({ gloss_text: 'dan', gloss_lang: 'uz' });
-    expect(byWord[2]).toMatchObject({ gloss_text: 'Allah', gloss_lang: 'en' });
+    expect(byWord[1]).toMatchObject({ gloss_text: 'nomi bilan', gloss_lang: 'uz' });
+    expect(byWord[2]).toMatchObject({ gloss_text: 'nomi bilan', gloss_lang: 'uz' });
+  });
+
+  it('carries gloss_group through the COALESCE', async () => {
+    const rows = await getGlossesWithFallback(db, 1, 'uz');
+    expect(rows.map((r) => r.gloss_group)).toEqual([7, 7]);
+  });
+
+  it('does not take the fallback row\'s group when the preferred row won', async () => {
+    // EN is ungrouped and UZ is grouped, so asking for EN with a UZ fallback
+    // is the case that separates "the winning row's group" from "whichever
+    // group is non-null": every word here has BOTH rows, EN wins, and EN's
+    // group is NULL. A COALESCE would hand back UZ's 7 and span two words
+    // that the English segmentation glosses separately.
+    const rows = await getGlossesWithFallback(db, 1, 'en', 'uz');
+    expect(rows).toHaveLength(2);
+    expect(rows.every((r) => r.gloss_lang === 'en' && r.gloss_group === null)).toBe(true);
+  });
+
+  it('reports gloss_group null when the fallback row won', async () => {
+    // The group belongs to whichever row supplied the text. An EN fallback is
+    // ungrouped, so a UI that spans by group must not inherit uz's grouping.
+    const rows = await getGlossesWithFallback(db, 1, 'ru');
+    expect(rows).toHaveLength(2);
+    expect(rows.every((r) => r.gloss_lang === 'en' && r.gloss_group === null)).toBe(true);
   });
 
   it('lang=en yields all gloss_lang=en', async () => {
