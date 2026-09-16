@@ -7,9 +7,49 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-09-15
+Updated: 2026-09-16
 
 ## Now
+
+**2026-09-16 — phase M8a merged (PR #82, squash `d0d51ab`).** Player polish: one
+player idea across Home and the mushaf. 16 commits, 39 files, +896/-188, vc21.
+
+- `PlayerShell` extracted — one line at rest, full transport while it sounds, one
+  280ms grow between them, shared by Home and the mushaf. A re-measure of the
+  state already showing SNAPS; without that the reciter sheet closing re-measured
+  the bar underneath and it visibly sagged and came back.
+- The transport names the surah and prints `At-Tawbah · 2`. "Ayah" survives in
+  the spoken label only, and in the no-surah fallback.
+- Home's listen card is a card IN the stack, not on top of one. `PlayerShell`'s
+  shadow gutter is four-sided and it is LAYOUT — it inset the card 16dp from both
+  screen edges, so it was 32dp narrower than every neighbour. `room={0}` kills
+  it. Then the tight clip shaved the shadow square while the 20dp corner curved
+  away and left a grey wedge in each bottom corner, so `GlassSurface` gained
+  `flat` and the card gives the shadow up. A clipped shadow is worse than none.
+- The mushaf player got the close button every other player had; it shrinks to
+  its resting line rather than leaving (that line is the only way to start a
+  page). Paper-coloured top strip carrying surah + juz.
+- A sheet must not move the bars docked behind it: `<NavigationBar hidden />`
+  inside `BottomSheet` zeroed `insets.bottom` and dropped the player as the sheet
+  opened. Docked bars are fully opaque now, not 94% — no backdrop-filter in RN.
+- **Status bar colour comes from the APP theme, not the OS.** expo-status-bar
+  defaults to `style="auto"`, which reads `useColorScheme()` — the phone's
+  setting. Phone dark + app Light = white clock/battery/signal on the paper
+  background, invisible. `ThemedStatusBar` resolves from `useIsDarkTheme()`, and
+  BOTH call sites must pass it: the expo component always hands a resolved
+  `barStyle` to RN's StatusBar, whose stack is last-mounted-wins per prop, so the
+  mushaf's bare `<StatusBar hidden>` put the OS's answer back app-wide.
+- Gate: 1239 tests / 111 files, lint 0, type-check 0. CI green both jobs. No §5
+  trigger (no `packages/data`, no trust boundary, no user-DB write).
+
+**M8a device coverage is partial.** Verified by hand on vc17-vc21 (OnePlus 7 Pro,
+local debug-signed APK): the grow, the reciter-select dip (bar top edge held at
+y=2599 across the whole window, measured frame by frame), the mushaf close, the
+5s chrome window, the card's gaps/width/radius, the corner. **Not run:** the
+three-button-navigation sheet check — this phone is on gesture nav and
+`adb shell settings put` is blocked. Still open from M7d: ruling 9 and ruling 3's
+edge. The gesture pill's own low contrast has the same root cause as the status
+bar; owner declined the fix 2026-09-16.
 
 **2026-09-15 — phase M8 merged (PR #81, squash `2996092`).** One recitation
 engine for the whole app: `useRecitation` moved out of the screens into
