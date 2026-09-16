@@ -187,8 +187,12 @@ describe('MushafPage', () => {
   });
 
   it('draws a surah band where the composition puts one', () => {
-    const { container } = render(<MushafPage {...props} lines={openingLines} />);
-    expect(container.textContent).toContain('Al-Ma-idah');
+    // Its own label, not the page's text. The band's name is drawn in the
+    // surah-name PUA font, so its text content is a private-use codepoint --
+    // the transliteration only ever appeared in the page's corner, which has
+    // since moved to MushafTopStrip and took this assertion's subject with it.
+    render(<MushafPage {...props} lines={openingLines} />);
+    expect(screen.getByLabelText('Al-Ma-idah')).toBeTruthy();
   });
 
   it('draws the bismillah from the surah-s own ayah 1, not a constant', () => {

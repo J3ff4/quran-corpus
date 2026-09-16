@@ -29,6 +29,9 @@ export interface MushafPlayerProps {
   playing: boolean;
   /** Parked ayah, for the full bar's label. Null before the first play. */
   ayahNumber: number | null;
+  /** The surah that ayah belongs to. The bar mirrors recitations started on
+   *  other screens, so the surah is not this page's to assume. */
+  surahName?: string | undefined;
   positionSec: number;
   /** NaN until the track reports one. */
   durationSec: number;
@@ -63,6 +66,7 @@ export interface MushafPlayerProps {
 export function MushafPlayer({
   playing,
   ayahNumber,
+  surahName,
   positionSec,
   durationSec,
   reciterLabel,
@@ -138,6 +142,7 @@ export function MushafPlayer({
           <RecitationBar
             dock={false}
             ayahNumber={ayahNumber}
+            surahName={surahName}
             playing={playing}
             positionSec={positionSec}
             durationSec={durationSec}

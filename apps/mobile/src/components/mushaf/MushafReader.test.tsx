@@ -134,14 +134,6 @@ describe('MushafReader', () => {
     expect(mocks.ayahSurahIds).toContain(114);
   });
 
-  it('gives the footer a juz per page, and skips the pages that have none', () => {
-    render(<MushafReader {...props} />);
-
-    const juzByPage = mocks.pagerProps.at(-1)?.['juzByPage'] as Map<number, number>;
-    expect(juzByPage.get(106)).toBe(6);
-    expect(juzByPage.has(107)).toBe(false);
-  });
-
   it('turns a long-pressed glyph into the ayah row the word sheet needs', () => {
     // The layout rows carry a coordinate, not a word id. Without the lookup
     // the sheet has nothing to open on.

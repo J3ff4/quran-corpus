@@ -25,16 +25,22 @@ import { SurahBand } from './SurahBand';
  *  at the top and bottom. All three are subtracted before the page is scaled,
  *  so the type never runs into any of them.
  *
- *  The furniture moved into the page's corners in M7d (rulings 8 and 9), but
- *  the space it needs did not change: the same 44dp that was one centred
- *  footer is now a page number in one bottom corner, and the top strip is the
- *  juz and the surah name. */
+ *  The furniture moved into the page's corners in M7d (rulings 8 and 9), and
+ *  in 2026-09 the top half of it moved again, off the leaf and onto
+ *  MushafTopStrip. What is left on the page is the number in a bottom
+ *  corner. */
 const PAGE_MARGIN = 16;
-const FOOTER_HEIGHT = 44;
-// 26, not 22: PageCorners puts its row at top 6 with a 13pt caption, whose
-// line box on Android is ~18dp -- 24 in all, which the old figure did not
-// reserve, so the juz and the surah name could graze the first glyph line.
-const HEADER_HEIGHT = 26;
+// 72, not 44. The leaf used to sit flush against the bottom of the glass while
+// a strip of chrome ran across the top of it; the owner asked for the text
+// block up and the gap under it (2026-09-15). The surah and juz moving into
+// MushafTopStrip freed the 26dp header at the same time, so the block rises by
+// that and the space lands here.
+const FOOTER_HEIGHT = 72;
+// The page's own header strip is gone: MushafTopStrip prints the surah and the
+// juz above the leaf now, in the band the tabs layout was already reserving for
+// the status bar. Kept as a named 0 rather than deleted from the scale
+// arithmetic, so what the page reserves stays legible in one place.
+const HEADER_HEIGHT = 0;
 
 export interface MushafPageProps {
   page: number;
@@ -51,7 +57,6 @@ export interface MushafPageProps {
   ayahTexts: Map<string, string>;
   /** Transliterated surah names, by surah id, for the bands on this page. */
   surahNames: Map<number, string>;
-  juz: number;
   uiLocale: UiLocaleCode;
   onWordLongPress: (word: MushafWord) => void;
   /** A tap anywhere on the page. Toggles the chrome (ruling 3). */
@@ -89,7 +94,6 @@ export function MushafPage({
   highlights,
   ayahTexts,
   surahNames,
-  juz,
   uiLocale,
   onWordLongPress,
   onTap,
@@ -235,12 +239,7 @@ export function MushafPage({
       </View>
 
       <View style={{ height: FOOTER_HEIGHT }} />
-      <PageCorners
-        page={page}
-        juz={juz}
-        surahName={surahNames.get(openingSurahId(lines)) ?? ''}
-        uiLocale={uiLocale}
-      />
+      <PageCorners page={page} uiLocale={uiLocale} />
     </Pressable>
   );
 }
@@ -273,8 +272,4 @@ function surahOfBismillah(slots: Map<number, PageSlot>, line: number): number {
   return 0;
 }
 
-/** The surah a page opens with -- the one print names in its corner, even on a
- *  page that goes on to head another. */
-function openingSurahId(lines: MushafLine[]): number {
-  return lines[0]?.words[0]?.surahId ?? 0;
-}
+

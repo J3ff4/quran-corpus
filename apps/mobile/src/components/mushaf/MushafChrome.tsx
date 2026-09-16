@@ -6,6 +6,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useStableInsets } from '@/theme/useStableInsets';
+import { STRIP_ROW_HEIGHT } from './MushafTopStrip';
 
 import { GlassSurface } from '@/components/GlassSurface';
 import { SearchHeaderButton } from '@/components/SearchHeaderButton';
@@ -27,8 +28,11 @@ const CHROME_FADE_MS = 220;
  *  rather than sliding (2026-09-10). Derived from the inset instead, so the
  *  bar is genuinely gone by the time it is invisible. */
 const BAR_HEIGHT = 56;
-/** Was 8. The bar sits just under the status bar now (owner, 2026-09-10). */
-const TOP_GAP = 2;
+/** Was 8. The bar sits just under the status bar now (owner, 2026-09-10) --
+ *  and, since 2026-09-15, under the strip that names the page: an opaque card
+ *  docked over that row would hide the surah and the juz for as long as the
+ *  chrome is up. */
+const TOP_GAP = 2 + STRIP_ROW_HEIGHT;
 
 export interface MushafChromeProps {
   visible: boolean;
@@ -40,10 +44,10 @@ export interface MushafChromeProps {
 /**
  * The mushaf's whole chrome: a jump control and a search button.
  *
- * No identity row (ruling 6). The surah name, the juz and the page number are
- * printed on the page itself now (ruling 9), so a bar that repeated them would
- * be saying twice what the page already says once -- and saying it only while
- * the bar happens to be up.
+ * No identity row (ruling 6). The page number is printed on the leaf and the
+ * surah and juz sit in the strip above it, neither of which hides on a timer --
+ * so a bar repeating them would say twice what is already said once, and say it
+ * only while the bar happens to be up.
  *
  * Opaque, not translucent. There is no backdrop-filter in React Native, and a
  * bar docked over scrollable content needs an opaque backing -- the lesson four
