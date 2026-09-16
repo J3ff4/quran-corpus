@@ -181,6 +181,19 @@ class ScraperDatabase:
                 "ALTER TABLE word_glosses ADD COLUMN gloss_group INTEGER"
             )
 
+    @property
+    def connection(self) -> sqlite3.Connection:
+        """The live connection, schema applied and migrations run.
+
+        A bulk importer that opened its own sqlite3.connect would skip
+        _apply_schema -- and so miss both the CREATE TABLEs for tables added
+        since the DB was provisioned and the ALTERs that add columns to the
+        ones already there. That is not hypothetical: the Tasnim import hit
+        "no such column: gloss_group" against the live corpus doing exactly
+        that, on a database that also had no surah_names table at all.
+        """
+        return self._conn
+
     def reseed_surahs(self, surahs: Iterable[SurahModel]) -> None:
         """Rewrite every surah row, revelation ranks included, atomically.
 
