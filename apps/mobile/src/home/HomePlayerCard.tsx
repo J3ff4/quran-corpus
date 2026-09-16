@@ -3,7 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { GlassSurface } from '@/components/GlassSurface';
 import { ReciterSheet } from '@/components/ReciterSheet';
-import { PlayerShell, SHADOW_ROOM } from '@/components/PlayerShell';
+import { PlayerShell } from '@/components/PlayerShell';
 import { RecitationBar } from '@/components/RecitationBar';
 import { Icon } from '@/components/icons/Icon';
 import { useRecitationController } from '@/audio/recitationContext';
@@ -134,15 +134,11 @@ export function HomePlayerCard({
           {t(uiLocale, audio.error)}
         </Text>
       ) : null}
-      {/* The shell reserves SHADOW_ROOM above and below its clip box so the
-          card's drop shadow survives the grow. That room is invisible but it
-          is layout, so it stacked on top of the screen's own 14dp gap and the
-          card read as dropped onto the screen rather than part of it (owner,
-          2026-09-16). Cancelled here, where the gap is, rather than inside the
-          shell -- the mushaf's player is absolutely positioned and wants the
-          room. */}
-      <View style={{ marginVertical: -SHADOW_ROOM }}>
+      {/* room={0}: no shadow gutter. This card lives in a stack of cards and
+          has to match them -- same width, same 14dp gap, same 20dp radius as
+          Continue reading (owner, 2026-09-16). See PlayerShell's `room`. */}
       <PlayerShell
+        room={0}
         expanded={sounding}
         growMs={reducedMotion ? 0 : GROW_MS}
         full={
@@ -218,7 +214,6 @@ export function HomePlayerCard({
           ) : null
         }
       />
-      </View>
       {reciterOpen ? (
         <ReciterSheet
           current={reciterId}

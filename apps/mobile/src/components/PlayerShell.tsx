@@ -20,6 +20,19 @@ export interface PlayerShellProps {
   full: ReactNode;
   /** Duration of the height curve. 0 under reduced motion. */
   growMs: number;
+  /**
+   * Room around the clip for the surface's own drop shadow, per side.
+   *
+   * SHADOW_ROOM by default, which is what a floating bar over a page wants.
+   * **0 for a player that sits IN a stack of cards**: the room is invisible
+   * but it is layout, so it inset Home's card 16dp from both screen edges and
+   * stacked on the screen's own gap -- the card was narrower than every other
+   * card on the tab and read as dropped onto the screen rather than part of it
+   * (owner, twice, 2026-09-16). With no room the clip is tight and the
+   * surface's shadow is shaved, which is the trade: a card in a stack is
+   * asked to match its neighbours, not to float above them.
+   */
+  room?: number;
 }
 
 /**
@@ -30,7 +43,7 @@ export interface PlayerShellProps {
  * Extracted from the mushaf's player so Home's card can grow the same way --
  * one motion for one idea, rather than two implementations that drift.
  */
-export function PlayerShell({ expanded, compact, full, growMs }: PlayerShellProps) {
+export function PlayerShell({ expanded, compact, full, growMs, room = SHADOW_ROOM }: PlayerShellProps) {
   // Measured, never assumed. The full bar's height depends on the reciter
   // name's line count and on the type scale, and a constant would clip the
   // transport on whichever device disagreed.
@@ -85,7 +98,8 @@ export function PlayerShell({ expanded, compact, full, growMs }: PlayerShellProp
   const boxStyle = useAnimatedStyle(() =>
     // Not a bare 0: before the first measurement the box sizes to its content,
     // which is how the content gets measured.
-    height.value > 0 ? { height: height.value + SHADOW_ROOM * 2 } : {},
+    height.value > 0 ? { height: height.value + room * 2 } : {},
+    [room],
   );
 
   function measure(set: (value: number) => void) {
@@ -105,7 +119,7 @@ export function PlayerShell({ expanded, compact, full, growMs }: PlayerShellProp
           whatever it is docked above. */}
       <View
         pointerEvents="box-none"
-        style={{ position: 'absolute', left: SHADOW_ROOM, right: SHADOW_ROOM, bottom: SHADOW_ROOM }}
+        style={{ position: 'absolute', left: room, right: room, bottom: room }}
       >
         {expanded ? (
           <View testID="player-shell-full" onLayout={measure(setFullHeight)}>

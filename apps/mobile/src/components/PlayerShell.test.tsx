@@ -38,11 +38,12 @@ afterEach(() => {
   timings.durations.length = 0;
 });
 
-function shell(expanded: boolean, growMs = 280) {
+function shell(expanded: boolean, growMs = 280, room?: number) {
   return (
     <PlayerShell
       expanded={expanded}
       growMs={growMs}
+      {...(room === undefined ? {} : { room })}
       compact={<span>one line</span>}
       full={<span>full transport</span>}
     />
@@ -78,6 +79,21 @@ describe('PlayerShell', () => {
     rerender(shell(false));
 
     expect(box().style.height).toBe(`${48 + SHADOW_ROOM * 2}px`);
+  });
+
+  it('leaves no gutter at all where the caller asked for none', () => {
+    // Home's card sits in a stack of cards. The gutter is invisible but it is
+    // layout, so it inset the card from both screen edges and stacked on the
+    // screen's own gap -- the one card narrower than its neighbours.
+    setAutoLayout({ width: 320, height: 48 });
+    const { rerender } = render(shell(false, 280, 0));
+    rerender(shell(false, 280, 0));
+
+    expect(box().style.height).toBe('48px');
+    const content = box().firstElementChild as HTMLElement;
+    expect(content.style.left).toBe('0px');
+    expect(content.style.right).toBe('0px');
+    expect(content.style.bottom).toBe('0px');
   });
 
   it('snaps to the first height it measures rather than growing into it', () => {
