@@ -67,7 +67,28 @@ CREATE TABLE IF NOT EXISTS word_glosses (
   -- 'mt-reviewed' (MT then human-checked). NULL only on pre-provenance rows
   -- until backfilled; legacy DBs backfilled to 'corpus' by db.py.
   source        TEXT,
+  -- Which phrase this word belongs to, scoped per (ayah, language_code) --
+  -- a row already belongs to exactly one language. Rows sharing a group id
+  -- are ONE gloss in that language, which is how a source that segments
+  -- differently from us (Tasnim's Uzbek: 66139 rows over our 77429 words)
+  -- keeps "shubha yo'q" attached to both لَا and رَيْبَ instead of repeating
+  -- itself. NULL = ungrouped, which is every row of every source that does
+  -- not group.
+  gloss_group   INTEGER,
   UNIQUE(word_id, language_code)
+);
+
+-- The surah's name in a translation language. Separate from surahs.name_*,
+-- which hold the Arabic, its transliteration and ONE English rendering: a
+-- language column is what lets an Uzbek UI read "Fotiha" without a column per
+-- language on the surahs table. `meaning` is NULL where a language leaves the
+-- name untranslated (Tavba is Tavba in Uzbek), never a repeat of `name`.
+CREATE TABLE IF NOT EXISTS surah_names (
+  surah_id      INTEGER NOT NULL REFERENCES surahs(id) ON DELETE CASCADE,
+  language_code TEXT    NOT NULL REFERENCES languages(code) ON DELETE CASCADE,
+  name          TEXT    NOT NULL,
+  meaning       TEXT,
+  PRIMARY KEY (surah_id, language_code)
 );
 
 CREATE TABLE IF NOT EXISTS roots (
@@ -142,6 +163,21 @@ CREATE TABLE IF NOT EXISTS root_definitions (
   UNIQUE(root_id, source)
 );
 
+-- Per-root glosses in a translation language, DERIVED from the aligned
+-- word-by-word: a root's own words' glosses, counted and ranked. Deliberately
+-- not root_definitions, which holds imported, licence-bearing lexicon articles
+-- (Lane, Hans Wehr) with prose bodies. This is regenerable output; that is
+-- source material, and conflating them would make a re-derivation look like a
+-- lexicon edit.
+CREATE TABLE IF NOT EXISTS root_glosses (
+  root_id          INTEGER NOT NULL REFERENCES roots(id) ON DELETE CASCADE,
+  language_code    TEXT    NOT NULL REFERENCES languages(code) ON DELETE CASCADE,
+  rank             INTEGER NOT NULL,
+  gloss            TEXT    NOT NULL,
+  occurrence_count INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (root_id, language_code, rank)
+);
+
 CREATE TABLE IF NOT EXISTS word_segments (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   word_id         INTEGER NOT NULL REFERENCES words(id) ON DELETE CASCADE,
@@ -189,6 +225,7 @@ CREATE INDEX IF NOT EXISTS idx_words_root_bw       ON words(root_buckwalter);
 CREATE INDEX IF NOT EXISTS idx_words_lemma_bw      ON words(lemma_buckwalter);
 CREATE INDEX IF NOT EXISTS idx_root_forms_root     ON root_forms(root_id, sort_order);
 CREATE INDEX IF NOT EXISTS idx_root_defs_root      ON root_definitions(root_id);
+CREATE INDEX IF NOT EXISTS idx_root_glosses_root  ON root_glosses(root_id, language_code, rank);
 CREATE INDEX IF NOT EXISTS idx_roots_sort_order     ON roots(sort_order);
 CREATE INDEX IF NOT EXISTS idx_word_segments_word  ON word_segments(word_id, segment_index);
 CREATE INDEX IF NOT EXISTS idx_word_segments_root  ON word_segments(root);

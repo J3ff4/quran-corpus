@@ -52,6 +52,24 @@ async function migrateAddWordColumns(db: Client): Promise<void> {
   }
 }
 
+// Same shape as the column above, and here for the same reason: a database
+// provisioned before Tasnim's grouped Uzbek glosses has a `word_glosses` that
+// `CREATE TABLE IF NOT EXISTS` will not touch.
+//
+// Inside runMigrations, not unconditional in db.ts. The DB_SKIP_MIGRATIONS
+// convention that puts normalizeArabicJoinKeys outside the guard is for
+// data-only repairs; this is DDL, and that flag exists precisely to keep DDL
+// out of the request path against a pre-provisioned database. The plan's Task 1
+// Step 4 asked for the unconditional placement -- ruled against, because it
+// would make the flag a lie for the one statement kind it names.
+async function migrateAddGlossGroup(db: Client): Promise<void> {
+  const info = await db.execute('PRAGMA table_info(word_glosses)');
+  const existing = new Set(info.rows.map((r) => r['name'] as string));
+  if (!existing.has('gloss_group')) {
+    await db.execute('ALTER TABLE word_glosses ADD COLUMN gloss_group INTEGER');
+  }
+}
+
 // Built from explicit codepoint sequences, never hand-typed literals: each of
 // these is visually indistinguishable from the alternative it is here to tell
 // apart, in an editor and in a diff. That is precisely how the mismatch below
@@ -214,4 +232,5 @@ export async function runMigrations(db: Client): Promise<void> {
   }
 
   await migrateAddWordColumns(db);
+  await migrateAddGlossGroup(db);
 }
