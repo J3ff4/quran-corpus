@@ -27,13 +27,29 @@ check downstream, where a missing one falls back to the English and is obvious.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import unicodedata
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-__all__ = ["Group", "align_ayah", "align_all", "base_form", "skeleton"]
+__all__ = [
+    "OVERRIDES_PATH",
+    "Group",
+    "Override",
+    "align_all",
+    "align_ayah",
+    "base_form",
+    "load_overrides",
+    "resolve_override",
+    "skeleton",
+]
+
+# Checked in beside this package, not read from the reference database: these
+# are editorial decisions about text a machine could not resolve, and they have
+# to survive a re-import of either side.
+OVERRIDES_PATH = Path(__file__).resolve().parent.parent / "data/tasnim_overrides.json"
 
 # The Arabic letter block we keep. Everything outside it -- spaces, Quranic
 # annotation signs, pause marks, Latin -- is dropped by the range filter, so
@@ -163,6 +179,70 @@ def align_ayah(
     return tier_one if tier_one is not None else _align_with(skeleton, corpus, tasnim)
 
 
+@dataclass(frozen=True)
+class Override:
+    """A hand mapping: 1-based positions within the ayah, and their gloss.
+
+    Positions, never global word ids -- an id changes if the corpus is
+    re-seeded, and a stale id would write the right Uzbek under the wrong
+    Arabic somewhere else entirely.
+    """
+
+    positions: tuple[int, ...]
+    gloss: str
+
+
+def load_overrides(path: Path = OVERRIDES_PATH) -> dict[str, list[Override]]:
+    """Read and validate the hand-mapped ayahs.
+
+    Validated even though the file is ours: it is hand-edited, and both
+    failures it can carry are silent downstream. A duplicated position loses
+    one of its two glosses to UNIQUE(word_id, language_code); an empty gloss
+    writes a blank row that reads as "this word has no meaning" rather than
+    falling back to the English.
+    """
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    out: dict[str, list[Override]] = {}
+    for key, entries in raw.items():
+        # Keys starting with an underscore are prose for the human editing the
+        # file, not data.
+        if key.startswith("_"):
+            continue
+        seen: set[int] = set()
+        groups: list[Override] = []
+        for entry in entries:
+            positions = tuple(int(p) for p in entry["words"])
+            gloss = entry["gloss"].strip()
+            if not positions or not gloss:
+                raise ValueError(f"{key}: an override needs a position and a gloss")
+            if any(p < 1 for p in positions):
+                raise ValueError(f"{key}: positions are 1-based, got {positions}")
+            twice = seen & set(positions)
+            if twice:
+                raise ValueError(f"{key}: position covered twice -- {sorted(twice)}")
+            seen.update(positions)
+            groups.append(Override(positions, gloss))
+        out[key] = groups
+    return out
+
+
+def resolve_override(
+    groups: Sequence[Override],
+    corpus: Sequence[tuple[int, str]],
+) -> list[Group]:
+    """Turn positions into this corpus's word ids."""
+    resolved: list[Group] = []
+    for group in groups:
+        if any(p > len(corpus) for p in group.positions):
+            raise ValueError(
+                f"override position past the end of a {len(corpus)}-word ayah: "
+                f"{group.positions}"
+            )
+        ids = tuple(corpus[p - 1][0] for p in group.positions)
+        resolved.append(Group(ids, group.gloss))
+    return resolved
+
+
 def _corpus_ayahs(db: Path) -> dict[tuple[int, int], list[tuple[int, str]]]:
     con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
     try:
@@ -201,7 +281,7 @@ def _tasnim_ayahs(db: Path) -> dict[tuple[int, int], list[tuple[str, str]]]:
 def align_all(
     corpus_db: Path,
     tasnim_db: Path,
-    overrides: Mapping[str, list[Group]] | None = None,
+    overrides: Mapping[str, list[Override]] | None = None,
 ) -> tuple[list[Group], list[tuple[int, int]]]:
     """Align every ayah. Returns (groups, unaligned ayah keys).
 
@@ -218,7 +298,7 @@ def align_all(
         words = corpus[key]
         override = overrides.get(f"{key[0]}:{key[1]}")
         if override is not None:
-            groups.extend(override)
+            groups.extend(resolve_override(override, words))
             continue
         rows = tasnim.get(key)
         if not rows:
