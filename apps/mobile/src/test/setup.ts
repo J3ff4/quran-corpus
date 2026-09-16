@@ -173,10 +173,11 @@ vi.mock('expo-navigation-bar', async () => {
 vi.mock('expo-status-bar', async () => {
   const React = await import('react');
   return {
-    StatusBar: ({ hidden }: { hidden?: boolean }) =>
+    StatusBar: ({ hidden, style }: { hidden?: boolean; style?: string }) =>
       React.createElement('div', {
         'data-testid': 'system-status-bar',
         'data-hidden': hidden ? 'true' : 'false',
+        'data-style': style ?? 'auto',
       }),
   };
 });

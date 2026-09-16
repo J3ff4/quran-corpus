@@ -18,3 +18,12 @@ export const ThemeContext = createContext<ThemeColors>(themeColors.light);
 export function useThemeColors(): ThemeColors {
   return useContext(ThemeContext);
 }
+
+/**
+ * Which palette is on screen. Derived from the colours rather than re-read
+ * from the settings store, so a subtree rendered with a fixed palette (a test,
+ * a preview) agrees with what it is actually painting.
+ */
+export function useIsDarkTheme(): boolean {
+  return useThemeColors().background === themeColors.dark.background;
+}

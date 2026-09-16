@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 import { NavigationBar } from 'expo-navigation-bar';
-import { StatusBar } from 'expo-status-bar';
 import type { MushafLine, MushafWord, Word } from '@quran-corpus/data/mobile';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 
@@ -15,6 +14,7 @@ import { MushafChrome } from '@/components/mushaf/MushafChrome';
 import { MushafReader } from '@/components/mushaf/MushafReader';
 import { MushafTopStrip } from '@/components/mushaf/MushafTopStrip';
 import { PageJumpSheet, type JumpKind } from '@/components/mushaf/PageJumpSheet';
+import { ThemedStatusBar } from '@/components/ThemedStatusBar';
 import { WordSheet } from '@/components/WordSheet';
 import { getWordsForAyah, type WordSummary } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
@@ -610,7 +610,7 @@ export function MushafScreen() {
           reason: this is a tab screen that stays mounted after a blur, and a
           standing request left behind would take the clock off every other
           tab. The page itself does not move -- see useStableInsets. */}
-      <StatusBar hidden={mushafFocused && !chromeVisible} />
+      <ThemedStatusBar hidden={mushafFocused && !chromeVisible} />
       <MushafChrome
         visible={chromeVisible}
         uiLocale={uiLocale}
