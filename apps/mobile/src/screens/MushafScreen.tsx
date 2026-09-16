@@ -592,6 +592,11 @@ export function MushafScreen() {
         onSkipPrevious={audio.skipPrevious}
         onSeek={audio.seekTo}
         onOpenReciters={() => setReciterOpen(true)}
+        // Stops whatever is sounding, whoever started it -- the bar mirrors
+        // other screens' recitations, so an X that only stopped the mushaf's
+        // own would be a control that does nothing on the track it is
+        // labelling.
+        onDismiss={audio.stop}
         bottomOffset={tabBarTop + 8}
       />
       {/* The page number is printed in a bottom corner of the leaf (ruling 8),
