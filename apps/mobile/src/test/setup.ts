@@ -129,7 +129,17 @@ vi.mock('react-native-reanimated', async () => {
     // pulse's SHAPE is asserted in motion/bookmarkReveal.test.ts, which
     // records the steps instead.
     withSequence: (...steps: number[]) => steps[steps.length - 1],
-    Easing: { bezier: () => undefined, out: (fn: unknown) => fn, ease: undefined },
+    // `in`, `out` and `inOut` all present: a component importing a curve the
+    // shim omits throws at MODULE level, which fails the whole file with "no
+    // tests" and no line pointing at the missing key.
+    Easing: {
+      bezier: () => undefined,
+      in: (fn: unknown) => fn,
+      out: (fn: unknown) => fn,
+      inOut: (fn: unknown) => fn,
+      cubic: undefined,
+      ease: undefined,
+    },
   };
 });
 

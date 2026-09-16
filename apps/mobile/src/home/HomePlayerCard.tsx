@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { GlassSurface } from '@/components/GlassSurface';
+import { ReciterSheet } from '@/components/ReciterSheet';
 import { PlayerShell } from '@/components/PlayerShell';
 import { RecitationBar } from '@/components/RecitationBar';
 import { Icon } from '@/components/icons/Icon';
@@ -10,7 +12,8 @@ import { t } from '@/i18n/uiStrings';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { useReducedMotion } from '@/motion/useReducedMotion';
 import { reciterById } from '@quran-corpus/data/mobile';
-import { touchTargets, typography } from '@/theme/tokens';
+import { useAppSettings } from '@/settings/settingsStore';
+import { fonts, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
 /** Matches the mushaf's player, so one grow means one thing across the app. */
@@ -47,9 +50,15 @@ export function HomePlayerCard({
   const theme = useThemeColors();
   const audio = useRecitationController();
   const reducedMotion = useReducedMotion();
+  const { setReciterId } = useAppSettings();
+  const [reciterOpen, setReciterOpen] = useState(false);
 
   const mine = audio.track?.owner === 'home';
-  const sounding = mine && audio.playing;
+  // Any owner's sound, not only this card's (owner, 2026-09-15). The mini-
+  // player is suppressed on this tab, so a card that stayed a resting line
+  // while the mushaf recited left the whole screen with no way to pause what
+  // it could hear.
+  const sounding = audio.playing;
   const reciterLabel = reciterById(reciterId)?.label ?? '';
   // The count is what stops continuous play at the end of the surah, and it
   // arrives with the corpus read. Starting without it would run a recitation
@@ -69,6 +78,15 @@ export function HomePlayerCard({
   // and would restart the last-read ayah instead of pausing -- jumping the
   // recitation backwards on the one control that is supposed to hold it still.
   function start() {
+    // Mirroring another screen's recitation: the control pauses THAT, rather
+    // than starting this card's own track over the top of it. Taking over is
+    // what the resting card's play control does, and this pause is what puts
+    // that control back on screen.
+    const live = audio.track;
+    if (!mine && live !== null && audio.playing && audio.ayah !== null) {
+      audio.toggle(live, audio.ayah);
+      return;
+    }
     if (ayahCount === 0) return;
     const target = mine && audio.ayah !== null ? audio.ayah : ayahNumber;
     audio.toggle(
@@ -109,6 +127,7 @@ export function HomePlayerCard({
           <RecitationBar
             dock={false}
             ayahNumber={audio.ayah}
+            surahName={audio.track?.surahName}
             playing={audio.playing}
             positionSec={audio.positionSec}
             durationSec={audio.durationSec}
@@ -118,20 +137,41 @@ export function HomePlayerCard({
             onSkipNext={audio.skipNext}
             onSkipPrevious={audio.skipPrevious}
             onSeek={audio.seekTo}
+            onOpenReciters={() => setReciterOpen(true)}
           />
         }
         compact={
-          <GlassSurface
-            docked
-            radius="pill"
-            style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14 }}
-          >
-            <Text
-              numberOfLines={1}
-              style={{ flex: 1, color: theme.mutedText, fontSize: typography.caption }}
-            >
-              {t(uiLocale, 'home.listen')} · {reciterLabel}
-            </Text>
+          // A card, not the floating pill it was: it sits in a stack of cards
+          // and the odd one out read as something dropped on the screen rather
+          // than part of it (owner, 2026-09-15). Same surface, padding and
+          // gap as ContinueCard.
+          //
+          // The surah, not the reciter. What is being recited is the fact this
+          // line exists to carry; the voice is a setting, and it is named on
+          // the transport this grows into -- where it is also the control that
+          // changes it.
+          <GlassSurface style={{ flexDirection: 'row', alignItems: 'center', padding: 16, gap: 6 }}>
+            <View style={{ flex: 1, gap: 6 }}>
+              <Text style={{ color: theme.mutedText, fontSize: typography.caption }}>
+                {t(uiLocale, 'home.listen')}
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    color: theme.text,
+                    fontFamily: fonts.displaySemiBold,
+                    fontSize: typography.body,
+                    flexShrink: 1,
+                  }}
+                >
+                  {loaded?.surah.name_translit ?? ''}
+                </Text>
+                <Text style={{ color: theme.accent, fontSize: typography.caption }}>
+                  {surahId}:{ayahNumber}
+                </Text>
+              </View>
+            </View>
             <Pressable
               testID="home-player-play"
               accessibilityRole="button"
@@ -154,6 +194,17 @@ export function HomePlayerCard({
           </GlassSurface>
         }
       />
+      {reciterOpen ? (
+        <ReciterSheet
+          current={reciterId}
+          uiLocale={uiLocale}
+          // The playhead is left alone, as on the mushaf: the engine reloads
+          // the source under the new voice at the next press, and a picker
+          // that restarted the ayah would punish browsing the list.
+          onSelect={setReciterId}
+          onClose={() => setReciterOpen(false)}
+        />
+      ) : null}
     </View>
   );
 }
