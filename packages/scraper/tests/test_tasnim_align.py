@@ -8,6 +8,7 @@ the same word, and a synthetic string cannot fail in those ways.
 from __future__ import annotations
 
 import json
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -153,6 +154,92 @@ def test_a_position_past_the_end_of_the_ayah_is_refused(tmp_path):
     )
     with pytest.raises(ValueError, match="position"):
         resolve_override(load_overrides(path)["1:1"], [(11, "بِسْمِ")])
+
+
+def test_a_run_with_no_letters_is_not_a_match():
+    # A word that empties under tier 2 is all matres and hamza, so a pair that
+    # disagrees only on the count of alefs is tier 2 working as intended --
+    # ءَاوَوا۟ against اٰوَوْا is the same word, and five live ayahs turn on it.
+    assert align_ayah(
+        [(1, "ءَاوَوا۟"), (2, "رَيْبَ")],
+        [("اٰوَوْا", "boshpana berdi"), ("رَيْبَ", "shubha")],
+    ) == [Group((1,), "boshpana berdi"), Group((2,), "shubha")]
+    # A run with no letters at all, though, is evidence in no reading -- and
+    # taking it would let the walk carry on past an ayah that should have been
+    # handed back for a human to map.
+    assert (
+        align_ayah(
+            [(1, "وَ"), (2, "رَيْبَ")],
+            [("ءَ", "WRONG"), ("رَيْبَ", "shubha")],
+        )
+        is None
+    )
+
+
+def test_a_whitespace_only_gloss_is_dropped_not_stored_blank(tmp_path):
+    # Truthy before stripping, empty after: it would be written as a blank row
+    # reading "this word has no meaning" instead of falling back to the English.
+    corpus, tasnim = tmp_path / "c.db", tmp_path / "t.db"
+    _seed_corpus(corpus, [(1, 1, 1, "رَيْبَ")])
+    _seed_tasnim(tasnim, [(1, 1, "رَيْبَ", "   ")])
+    assert align_all(corpus, tasnim) == ([], [(1, 1)])
+
+
+def test_an_override_must_reach_the_end_of_the_ayah(tmp_path):
+    # A typo shortening a hand mapping drops the ayah's tail silently; the
+    # automatic path already refuses exactly this shape.
+    path = tmp_path / "o.json"
+    path.write_text(
+        json.dumps({"1:1": [{"words": [1], "gloss": "a"}]}), encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="stops at position 1"):
+        resolve_override(load_overrides(path)["1:1"], [(11, "بِسْمِ"), (12, "ٱللَّهِ")])
+
+
+def test_an_override_key_naming_no_ayah_is_refused(tmp_path):
+    # Otherwise it never fires and never reports: the ayah just lands in
+    # `unaligned`, which reads as "Tasnim has no data here".
+    corpus, tasnim = tmp_path / "c.db", tmp_path / "t.db"
+    _seed_corpus(corpus, [(1, 1, 1, "رَيْبَ")])
+    _seed_tasnim(tasnim, [(1, 1, "رَيْبَ", "shubha")])
+    path = tmp_path / "o.json"
+    path.write_text(
+        json.dumps({"4:360": [{"words": [1], "gloss": "a"}]}), encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="4:360"):
+        align_all(corpus, tasnim, load_overrides(path))
+
+
+def _seed_corpus(path, rows):
+    con = sqlite3.connect(path)
+    con.executescript(
+        "CREATE TABLE ayahs (id INTEGER PRIMARY KEY, surah_id INT, ayah_number INT);"
+        "CREATE TABLE words (id INTEGER PRIMARY KEY, ayah_id INT, position INT,"
+        " text_arabic TEXT);"
+    )
+    for surah, ayah, position, text in rows:
+        con.execute("INSERT OR IGNORE INTO ayahs VALUES (?,?,?)", (ayah, surah, ayah))
+        con.execute(
+            "INSERT INTO words (ayah_id, position, text_arabic) VALUES (?,?,?)",
+            (ayah, position, text),
+        )
+    con.commit()
+    con.close()
+
+
+def _seed_tasnim(path, rows):
+    con = sqlite3.connect(path)
+    con.execute(
+        "CREATE TABLE bywords (id INTEGER PRIMARY KEY, surahId INT, verseId INT,"
+        " wordsAr TEXT, translateUzlat TEXT)"
+    )
+    con.executemany(
+        "INSERT INTO bywords (surahId, verseId, wordsAr, translateUzlat)"
+        " VALUES (?,?,?,?)",
+        rows,
+    )
+    con.commit()
+    con.close()
 
 
 def test_every_residue_ayah_is_covered_by_the_shipped_overrides():

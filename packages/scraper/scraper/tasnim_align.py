@@ -133,10 +133,12 @@ def _align_with(
         word_id, text = corpus[ci]
         ids = [word_id]
         acc = norm(text)
+        craw = [text]
         ci += 1
         arabic, gloss = tasnim[ti]
         glosses = [gloss]
         tacc = norm(arabic)
+        traw = [arabic]
         ti += 1
         while acc != tacc:
             # Equal length and unequal text is a real disagreement, not a
@@ -150,6 +152,7 @@ def _align_with(
                     return None
                 word_id, text = corpus[ci]
                 acc += norm(text)
+                craw.append(text)
                 ids.append(word_id)
                 ci += 1
             else:
@@ -157,8 +160,33 @@ def _align_with(
                     return None
                 arabic, gloss = tasnim[ti]
                 tacc += norm(arabic)
+                traw.append(arabic)
                 glosses.append(gloss)
                 ti += 1
+        # Both runs normalized away to nothing, which the loop above reads as
+        # agreement because '' == ''. Under tier 2 that is a match backed by no
+        # evidence: 297 corpus words skeletonize to the empty string (أَوْ alone
+        # is 263 of them), so any of them would take any gloss whose Arabic
+        # also empties -- and re-synchronize the walk past the real
+        # disagreement beside it on the way.
+        #
+        # A run that empties under tier 2 is by construction nothing but matres
+        # and hamza, so demanding it agree on the vowels tier 2 just discarded
+        # would defeat the tier: the corpus's ءَاوَوا۟ against Tasnim's اٰوَوْا is
+        # the same word spelled with a different count of alefs, which is the
+        # whole point. Five live ayahs turn on exactly that pair.
+        #
+        # What is refused is a run with NO LETTERS AT ALL -- empty under tier 1
+        # too, so a bare hamza or a stray mark. That carries zero evidence in
+        # any reading, and accepting it does more than mis-pair those two
+        # tokens: it lets the walk continue where the ayah should have been
+        # handed back as residue for a human to map.
+        #
+        # Only reachable one-to-one: the loop above exits immediately when both
+        # sides start empty, and can only grow them otherwise -- so an empty
+        # run never absorbed a neighbour, and no boundary was bridged.
+        if not base_form("".join(craw)) or not base_form("".join(traw)):
+            return None
         groups.append(Group(tuple(ids), " ".join(glosses)))
     return groups or None
 
@@ -232,14 +260,24 @@ def resolve_override(
 ) -> list[Group]:
     """Turn positions into this corpus's word ids."""
     resolved: list[Group] = []
+    highest = 0
     for group in groups:
         if any(p > len(corpus) for p in group.positions):
             raise ValueError(
                 f"override position past the end of a {len(corpus)}-word ayah: "
                 f"{group.positions}"
             )
+        highest = max((highest, *group.positions))
         ids = tuple(corpus[p - 1][0] for p in group.positions)
         resolved.append(Group(ids, group.gloss))
+    # The automatic path refuses an alignment that leaves trailing corpus words
+    # unglossed; a hand mapping gets the same floor, or a typo that shortens
+    # one silently drops the tail of an ayah. Interior gaps stay legal -- they
+    # are the positions Tasnim has no gloss for, and the file names them.
+    if highest != len(corpus):
+        raise ValueError(
+            f"override stops at position {highest} of a {len(corpus)}-word ayah"
+        )
     return resolved
 
 
@@ -272,9 +310,14 @@ def _tasnim_ayahs(db: Path) -> dict[tuple[int, int], list[tuple[str, str]]]:
         con.close()
     out: dict[tuple[int, int], list[tuple[str, str]]] = {}
     for surah, ayah, arabic, gloss in rows:
+        # Stripped BEFORE the test: a whitespace-only gloss is truthy, and
+        # would survive this guard to be stored as '' -- a blank row that
+        # reads as "this word has no meaning" instead of falling back to the
+        # English, which is the failure load_overrides guards against too.
+        gloss = (gloss or "").strip()
         if not arabic or not gloss:
             continue
-        out.setdefault((surah, ayah), []).append((arabic, gloss.strip()))
+        out.setdefault((surah, ayah), []).append((arabic, gloss))
     return out
 
 
@@ -290,6 +333,12 @@ def align_all(
     """
     overrides = overrides or {}
     corpus = _corpus_ayahs(corpus_db)
+    # A key naming no real ayah ("4:360") would never be applied and never be
+    # reported -- the ayah would simply land in `unaligned`, which reads as
+    # "Tasnim has no data here" rather than "your override never fired".
+    dead = sorted(set(overrides) - {f"{s}:{a}" for s, a in corpus})
+    if dead:
+        raise ValueError(f"override keys name no ayah: {dead}")
     tasnim = _tasnim_ayahs(tasnim_db)
 
     groups: list[Group] = []
