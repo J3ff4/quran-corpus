@@ -107,6 +107,25 @@ describe('PlayerShell', () => {
     expect(timings.durations).toEqual([280]);
   });
 
+  it('snaps when the state already showing is re-measured, rather than sagging into it', () => {
+    // A re-layout of the RESTING bar is not a state change and must not play
+    // the grow. It did, and the owner caught it on the mushaf (2026-09-15):
+    // picking a reciter re-measures the bar under the closing sheet, and a
+    // 280ms curve to a height a pixel or two away is a bar that visibly dips
+    // and comes back.
+    setAutoLayout({ width: 320, height: 48 });
+    const { rerender } = render(shell(false));
+    rerender(shell(false));
+    timings.durations.length = 0;
+
+    setAutoLayout({ width: 320, height: 44 });
+    rerender(shell(false));
+
+    expect(timings.durations).toEqual([]);
+    rerender(shell(false));
+    expect(box().style.height).toBe(`${44 + SHADOW_ROOM * 2}px`);
+  });
+
   it('crosses instantly under reduced motion', () => {
     setAutoLayout({ width: 320, height: 48 });
     const { rerender } = render(shell(false, 0));

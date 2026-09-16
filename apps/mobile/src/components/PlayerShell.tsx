@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { View, type LayoutChangeEvent } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
@@ -39,16 +39,27 @@ export function PlayerShell({ expanded, compact, full, growMs }: PlayerShellProp
   const target = expanded ? fullHeight : compactHeight;
 
   const height = useSharedValue(0);
+  // Which state the height on screen belongs to. The curve exists for the
+  // compact <-> full change and nothing else, so a new measurement of the
+  // state already showing has to SNAP.
+  //
+  // Without that, any re-layout of the resting bar played a 280ms curve to a
+  // height a pixel or two away -- which is the visible dip the owner caught
+  // after picking a reciter on the mushaf (2026-09-15): the sheet closing
+  // re-measures the bar underneath it, and the bar sagged and came back.
+  const shown = useRef<boolean | null>(null);
   useEffect(() => {
     // Nothing measured yet. Skipping rather than animating to 0 is what keeps
     // the first frame from collapsing the bar it is about to draw.
     if (target <= 0) return;
-    // The first measurement of either state snaps: there is no height to grow
-    // FROM on the frame a state first appears, and a 0 -> full curve would
-    // play an unasked-for entrance every time the player mounts.
-    if (height.value === 0) height.value = target;
+    const changed = shown.current !== expanded;
+    shown.current = expanded;
+    // The first measurement of either state snaps too: there is no height to
+    // grow FROM on the frame a state first appears, and a 0 -> full curve
+    // would play an unasked-for entrance every time the player mounts.
+    if (height.value === 0 || !changed) height.value = target;
     else height.value = withTiming(target, { duration: growMs });
-  }, [target, growMs, height]);
+  }, [target, expanded, growMs, height]);
   const boxStyle = useAnimatedStyle(() =>
     // Not a bare 0: before the first measurement the box sizes to its content,
     // which is how the content gets measured.
