@@ -855,5 +855,27 @@ def import_tasnim_cmd(db: str, tasnim: str, export: str, rejects: str) -> None:
     )
 
 
+@main.command("derive-root-glosses")
+@click.option("--db", default="quran.db", show_default=True, help="Corpus DB to write")
+@click.option(
+    "--lang",
+    "languages",
+    multiple=True,
+    default=("uz", "uz-Cyrl"),
+    show_default=True,
+    help="Language codes to derive; repeatable",
+)
+def derive_root_glosses_cmd(db: str, languages: tuple[str, ...]) -> None:
+    """Rank each root's word-by-word glosses into its dictionary entry."""
+    from .db import ScraperDatabase
+    from .root_glosses import derive_root_glosses
+
+    con = ScraperDatabase(db).connection
+    total = con.execute("SELECT COUNT(*) FROM roots").fetchone()[0]
+    for language_code in languages:
+        covered = derive_root_glosses(con, language_code)
+        click.echo(f"{language_code}: {covered} of {total} roots covered")
+
+
 if __name__ == "__main__":
     main()
