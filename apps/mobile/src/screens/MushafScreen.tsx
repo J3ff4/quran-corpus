@@ -133,6 +133,9 @@ export function MushafScreen() {
   // fetch page 1's rows on its way to the page the reader actually saved.
   const currentPage = pageInView ?? initialPage;
   const pageData = useMushafPage(currentPage === null ? null : client, currentPage ?? FIRST_PAGE);
+  // The page in view's index row: its opening surah and its juz, both known
+  // the instant the pager reports a turn.
+  const currentPageEntry = currentPage === null ? undefined : index.pages.get(currentPage);
   // The rows of the page in front of the reader, and NOTHING otherwise. The
   // render in which the pager reports a turn still carries the previous page's
   // rows -- `useMushafPage`'s effect has not run yet -- and every reader below
@@ -527,11 +530,18 @@ export function MushafScreen() {
     // transparent scene showed the app bloom there -- a green strip across the
     // top of a printed leaf.
     <View testID="mushaf-screen" style={{ flex: 1, marginTop: -insetTop }}>
+      {/* Both read off the INDEX, not off `pageLines`. The rows arrive an
+          async fetch after the pager settles, and until they do `pageLines` is
+          empty by design -- so a name taken from them blanks on every page
+          turn while the juz beside it, read from the index, updates at once.
+          The index answers both synchronously and answers the same question:
+          the surah a page opens in. */}
       <MushafTopStrip
         insetTop={insetTop}
-        surahName={index.surahNames.get(pageLines[0]?.words[0]?.surahId ?? 0) ?? ''}
-        juz={(currentPage === null ? null : index.pages.get(currentPage)?.juz) ?? 0}
+        surahName={index.surahNames.get(currentPageEntry?.startSurahId ?? 0) ?? ''}
+        juz={currentPageEntry?.juz ?? 0}
         uiLocale={uiLocale}
+        onTap={toggleChrome}
       />
       <MushafReader
         client={client}

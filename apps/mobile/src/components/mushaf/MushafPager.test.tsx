@@ -60,7 +60,6 @@ const props = {
   height: 720,
   ayahTexts: new Map<string, string>(),
   surahNames: new Map<number, string>(),
-  juzByPage: new Map<number, number>(),
   uiLocale: 'en' as const,
   onPageChange: vi.fn(),
   onWordLongPress: vi.fn(),

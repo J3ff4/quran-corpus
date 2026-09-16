@@ -1,4 +1,4 @@
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
@@ -23,6 +23,12 @@ export interface MushafTopStripProps {
   /** 0 before the index resolves, and then the row prints nothing. */
   juz: number;
   uiLocale: UiLocaleCode;
+  /** A tap on the band toggles the chrome, exactly as a tap on the leaf does.
+   *  The row this strip took over used to be inside the page's own Pressable,
+   *  so without this the top of the screen becomes a dead zone -- and with the
+   *  chrome down, a dead zone is a place the chrome cannot be brought back
+   *  from. */
+  onTap: () => void;
 }
 
 /**
@@ -38,15 +44,23 @@ export interface MushafTopStripProps {
  * above it was saying nothing with. The page number still holds a bottom
  * corner, which is the alternation a thumb learns (M7d ruling 8).
  */
-export function MushafTopStrip({ insetTop, surahName, juz, uiLocale }: MushafTopStripProps) {
+export function MushafTopStrip({
+  insetTop,
+  surahName,
+  juz,
+  uiLocale,
+  onTap,
+}: MushafTopStripProps) {
   const theme = useThemeColors();
 
   return (
-    <View
+    <Pressable
       testID="mushaf-top-strip"
-      // Nothing here takes a touch: the chrome card docks under it and the tap
-      // that brings the chrome back belongs to the page.
-      pointerEvents="none"
+      // Not one TalkBack element: the two labels inside are what a screen
+      // reader wants, and `accessible` on the wrapper would swallow both
+      // (see rn-accessible-view-collapses-children).
+      accessible={false}
+      onPress={onTap}
       style={{ paddingTop: insetTop, backgroundColor: theme.background }}
     >
       <View
@@ -66,14 +80,18 @@ export function MushafTopStrip({ insetTop, surahName, juz, uiLocale }: MushafTop
         >
           {surahName}
         </Text>
-        <Text
-          testID="page-juz"
-          accessibilityLabel={`${t(uiLocale, 'browse.juzLabel')} ${juz}`}
-          style={{ color: theme.mutedText, fontSize: typography.caption }}
-        >
-          {juz > 0 ? `${t(uiLocale, 'browse.juzLabel')} ${juz}` : ''}
-        </Text>
+        {/* Nothing at all before the index resolves, rather than an empty
+            <Text> carrying a label: gated only on the visible string, TalkBack
+            announced "Juz 0" on a row showing nothing. */}
+        {juz > 0 ? (
+          <Text
+            testID="page-juz"
+            style={{ color: theme.mutedText, fontSize: typography.caption }}
+          >
+            {`${t(uiLocale, 'browse.juzLabel')} ${juz}`}
+          </Text>
+        ) : null}
       </View>
-    </View>
+    </Pressable>
   );
 }

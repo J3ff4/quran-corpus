@@ -20,8 +20,11 @@ import { useThemeColors } from '@/theme/themeContext';
 const GROW_MS = 280;
 
 export interface HomePlayerCardProps {
-  surahId: number;
-  ayahNumber: number;
+  /** Where the reading stopped. Null on a fresh install, or once history has
+   *  been cleared -- and then this card has nothing of its own to start, but
+   *  may still be the only transport on the tab. */
+  surahId: number | null;
+  ayahNumber: number | null;
   /** Null while the corpus read is in flight. The play control waits for it --
    *  see below. */
   location: ReaderLocation | null;
@@ -53,12 +56,19 @@ export function HomePlayerCard({
   const { setReciterId } = useAppSettings();
   const [reciterOpen, setReciterOpen] = useState(false);
 
+  // Something of this screen's own to start. Without it the card is a mirror
+  // and nothing else: it is the only transport Home has -- the mini-player
+  // suppresses itself on this tab -- so a fresh install with a mushaf
+  // recitation running would otherwise have no way to pause it.
+  const resume = surahId !== null && ayahNumber !== null;
   const mine = audio.track?.owner === 'home';
   // Any owner's sound, not only this card's (owner, 2026-09-15). The mini-
   // player is suppressed on this tab, so a card that stayed a resting line
   // while the mushaf recited left the whole screen with no way to pause what
   // it could hear.
-  const sounding = audio.playing;
+  // With nothing of its own to start, there is no resting state worth drawing,
+  // so the card is either the transport or absent.
+  const sounding = audio.playing || (!resume && audio.track !== null);
   const reciterLabel = reciterById(reciterId)?.label ?? '';
   // The count is what stops continuous play at the end of the surah, and it
   // arrives with the corpus read. Starting without it would run a recitation
@@ -87,7 +97,7 @@ export function HomePlayerCard({
       audio.toggle(live, audio.ayah);
       return;
     }
-    if (ayahCount === 0) return;
+    if (ayahCount === 0 || surahId === null || ayahNumber === null) return;
     const target = mine && audio.ayah !== null ? audio.ayah : ayahNumber;
     audio.toggle(
       {
@@ -104,6 +114,10 @@ export function HomePlayerCard({
       target,
     );
   }
+
+  // Nothing saved and nothing sounding: no card at all, rather than a control
+  // pointing at a reading that has not happened yet.
+  if (!resume && audio.track === null) return null;
 
   return (
     <View testID="home-player">
@@ -150,6 +164,7 @@ export function HomePlayerCard({
           // line exists to carry; the voice is a setting, and it is named on
           // the transport this grows into -- where it is also the control that
           // changes it.
+          resume ? (
           <GlassSurface style={{ flexDirection: 'row', alignItems: 'center', padding: 16, gap: 6 }}>
             <View style={{ flex: 1, gap: 6 }}>
               <Text style={{ color: theme.mutedText, fontSize: typography.caption }}>
@@ -192,6 +207,7 @@ export function HomePlayerCard({
               <Icon name="play" color={ayahCount === 0 ? theme.mutedText : theme.accent} size={22} />
             </Pressable>
           </GlassSurface>
+          ) : null
         }
       />
       {reciterOpen ? (

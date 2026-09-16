@@ -126,6 +126,29 @@ describe('PlayerShell', () => {
     expect(box().style.height).toBe(`${44 + SHADOW_ROOM * 2}px`);
   });
 
+  it('retargets a grow whose real height lands a commit late, rather than cutting it', () => {
+    // Only the active child is mounted, so a transition is issued against the
+    // last height measured for the state it is moving TO -- and the true one
+    // arrives a commit later. Snapping there would hard-assign mid-curve and
+    // jump the bar at the end of every grow whose height had changed.
+    setAutoLayout({ width: 320, height: 48 });
+    const { rerender } = render(shell(false));
+    rerender(shell(false));
+
+    setAutoLayout({ width: 320, height: 96 });
+    rerender(shell(true));
+    expect(timings.durations).toEqual([280]);
+
+    // The late measurement, inside the curve.
+    setAutoLayout({ width: 320, height: 104 });
+    rerender(shell(true));
+
+    expect(timings.durations).toHaveLength(2);
+    // Over what is LEFT of the curve, not a fresh full one.
+    expect(timings.durations[1]).toBeGreaterThan(0);
+    expect(timings.durations[1]).toBeLessThanOrEqual(280);
+  });
+
   it('crosses instantly under reduced motion', () => {
     setAutoLayout({ width: 320, height: 48 });
     const { rerender } = render(shell(false, 0));

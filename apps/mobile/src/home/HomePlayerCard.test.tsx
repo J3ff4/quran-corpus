@@ -181,6 +181,48 @@ describe('HomePlayerCard', () => {
   });
 });
 
+describe('HomePlayerCard with no reading history', () => {
+  it('draws nothing at all when there is no position and no track', () => {
+    render(
+      <ThemeContext.Provider value={themeColors.dark}>
+        <HomePlayerCard
+          surahId={null}
+          ayahNumber={null}
+          location={null}
+          reciterId="husary"
+          uiLocale="en"
+        />
+      </ThemeContext.Provider>,
+    );
+
+    expect(screen.queryByTestId('home-player')).toBeNull();
+  });
+
+  it('is still the transport for a recitation started elsewhere', () => {
+    // Fresh install, nothing read yet, and the mushaf is reciting. The
+    // mini-player suppresses itself on this tab, so without this there is no
+    // control anywhere on Home for audible recitation.
+    mocks.track = { owner: 'mushaf' };
+    mocks.ayah = 12;
+    mocks.playing = true;
+
+    render(
+      <ThemeContext.Provider value={themeColors.dark}>
+        <HomePlayerCard
+          surahId={null}
+          ayahNumber={null}
+          location={null}
+          reciterId="husary"
+          uiLocale="en"
+        />
+      </ThemeContext.Provider>,
+    );
+
+    expect(screen.getByTestId('recitation-bar')).toBeTruthy();
+    expect(screen.getByLabelText('Pause')).toBeTruthy();
+  });
+});
+
 describe('HomePlayerCard, once it has run past where it started', () => {
   it('pauses the ayah that is sounding, not the one the reading stopped on', () => {
     // Continuous play walks past ayah 255. Passing the PROP here would miss
