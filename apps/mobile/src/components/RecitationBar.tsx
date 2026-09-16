@@ -111,6 +111,10 @@ export interface RecitationBarProps {
    *  tab pill and inside its own grow animation, so the position is not this
    *  component's to choose there. */
   dock?: boolean;
+  /** No drop shadow. For a caller that clips: Home grows this bar inside a
+   *  PlayerShell with no shadow room, and a clipped shadow leaves a square
+   *  grey wedge in each bottom corner. See GlassSurface's `flat`. */
+  flat?: boolean;
 }
 
 /**
@@ -140,6 +144,7 @@ export function RecitationBar({
   onInteract,
   onDismiss,
   dock = true,
+  flat = false,
 }: RecitationBarProps) {
   const theme = useThemeColors();
   const insets = useSafeAreaInsets();
@@ -223,7 +228,7 @@ export function RecitationBar({
       pointerEvents="box-none"
       style={dock ? { position: 'absolute', left: 16, right: 16, bottom: insets.bottom + 12 } : undefined}
     >
-      <GlassSurface docked radius="pill" style={{ paddingHorizontal: 14, paddingVertical: 10, gap: 6 }}>
+      <GlassSurface docked flat={flat} radius="pill" style={{ paddingHorizontal: 14, paddingVertical: 10, gap: 6 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <TransportButton
             icon="skipBack"

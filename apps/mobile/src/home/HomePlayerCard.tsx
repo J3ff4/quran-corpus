@@ -144,6 +144,9 @@ export function HomePlayerCard({
         full={
           <RecitationBar
             dock={false}
+            // Grown inside a clip with no shadow room. See GlassSurface's
+            // `flat`.
+            flat
             ayahNumber={audio.ayah}
             surahName={audio.track?.surahName}
             playing={audio.playing}
@@ -169,7 +172,10 @@ export function HomePlayerCard({
           // the transport this grows into -- where it is also the control that
           // changes it.
           resume ? (
-          <GlassSurface style={{ flexDirection: 'row', alignItems: 'center', padding: 16, gap: 6 }}>
+          // flat: the shell clips, and a clipped shadow leaves a square grey
+          // wedge in each bottom corner where the card's own corner curves
+          // away from it (owner, on the device, 2026-09-16).
+          <GlassSurface flat style={{ flexDirection: 'row', alignItems: 'center', padding: 16, gap: 6 }}>
             <View style={{ flex: 1, gap: 6 }}>
               <Text style={{ color: theme.mutedText, fontSize: typography.caption }}>
                 {t(uiLocale, 'home.listen')}
