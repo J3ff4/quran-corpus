@@ -253,8 +253,59 @@ def test_verse_markup_is_stripped(tmp_path):
         "SELECT language_code, translator, text FROM translations"
     ).fetchall()
     con.close()
-    assert rows == [("uz", "Tasnim", "Alloh nomi bilan")]
-    assert summary.translations == 1
+    # Both scripts: Tasnim ships the verse in two columns, and a reader on the
+    # Cyrillic toggle queries uz-Cyrl for the verse as well as the words.
+    assert rows == [
+        ("uz", "Tasnim", "Alloh nomi bilan"),
+        ("uz-Cyrl", "Tasnim", "Аллоҳ номи билан"),
+    ]
+    assert summary.translations == 2
+
+
+def test_a_rerun_does_not_destroy_the_mt_export(tmp_path):
+    # The first import moves every mt gloss out of the DB, so the export file
+    # becomes their only copy. A second run has 0 rows to write and must not
+    # open that file for writing -- the count guard cannot catch it, because
+    # both sides of `exported != expected` are then 0.
+    export = tmp_path / "mt.jsonl"
+    export.write_text('{"gloss_text": "the only copy"}\n', encoding="utf-8")
+    corpus = tmp_path / "c.db"
+    tasnim = tmp_path / "t.db"
+    _corpus(corpus, {(1, 1): ["لَا"]})
+    _tasnim(tasnim, [(1, 1, "لَا", "yo'q")])
+    summary = import_tasnim(
+        corpus, tasnim, export_path=export, rejects_path=tmp_path / "r.tsv"
+    )
+    assert summary.mt_exported == 0
+    assert export.read_text(encoding="utf-8") == '{"gloss_text": "the only copy"}\n'
+
+
+def test_a_rerun_leaves_no_stale_gloss_group(tmp_path):
+    # gloss_group restarts at 1 every run. A tasnim row surviving on a word the
+    # new run does not reach would carry a group id that now names a different
+    # phrase, so two unrelated spans would read as one gloss. The delete is
+    # what removes it -- the upsert only ever touches words the run reaches.
+    corpus = tmp_path / "c.db"
+    _corpus(corpus, {(1, 1): ["لَا"], (1, 2): ["رَيْبَ"]})
+    con = sqlite3.connect(corpus)
+    stale = con.execute("SELECT id FROM words ORDER BY id DESC LIMIT 1").fetchone()[0]
+    con.execute(
+        "INSERT INTO word_glosses (word_id, language_code, gloss_text, source,"
+        " gloss_group) VALUES (?, 'uz', 'from an older run', 'tasnim', 1)",
+        (stale,),
+    )
+    con.commit()
+    con.close()
+
+    tasnim = tmp_path / "t.db"
+    _tasnim(tasnim, [(1, 1, "لَا", "yo'q")])
+    import_tasnim(
+        corpus,
+        tasnim,
+        export_path=tmp_path / "mt.jsonl",
+        rejects_path=tmp_path / "r.tsv",
+    )
+    assert "from an older run" not in {r[2] for r in _glosses(corpus)}
 
 
 def test_a_surah_meaning_equal_to_its_name_is_stored_null(tmp_path):

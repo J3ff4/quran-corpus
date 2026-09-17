@@ -123,6 +123,12 @@ def export_mt_glosses(con: sqlite3.Connection, path: Path) -> int:
             WHERE g.language_code = 'uz' AND g.source = 'mt'
             ORDER BY a.surah_id, a.ayah_number, w.position"""
     ).fetchall()
+    if not rows and path.exists() and path.stat().st_size:
+        # Nothing left to export and a previous export is on disk. The first
+        # import already moved these rows out of the DB, so that file is their
+        # ONLY copy -- opening it "w" here would destroy it, and the caller's
+        # count guard would pass because both sides are 0.
+        return 0
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
         for surah, ayah, position, gloss in rows:
@@ -253,6 +259,13 @@ def _fold(s: str) -> str:
     return "".join(c for c in decomposed if not unicodedata.combining(c))
 
 
+# Tasnim ships the verse translation in BOTH scripts, one column each, so
+# neither is transliterated here -- unlike the word-by-word, where only Latin
+# exists. A reader on the Cyrillic toggle queries `uz-Cyrl` for everything.
+# Positional against the SELECT below: uzlat, then uzbek.
+_TRANSLATION_LANGUAGES = ("uz", "uz-Cyrl")
+
+
 def _write_translations(con: sqlite3.Connection, tasnim: sqlite3.Connection) -> int:
     written = 0
     ayah_ids = {
@@ -261,21 +274,22 @@ def _write_translations(con: sqlite3.Connection, tasnim: sqlite3.Connection) -> 
             "SELECT id, surah_id, ayah_number FROM ayahs"
         )
     }
-    for surah, ayah, text in tasnim.execute(
-        "SELECT surahId, verseId, uzlat FROM quran ORDER BY surahId, verseId"
+    for surah, ayah, *texts in tasnim.execute(
+        "SELECT surahId, verseId, uzlat, uzbek FROM quran ORDER BY surahId, verseId"
     ):
-        ayah_id = ayah_ids.get((surah, ayah))
-        cleaned = strip_markup(text or "")
-        if ayah_id is None or not cleaned:
-            continue
-        con.execute(
-            """INSERT INTO translations (ayah_id, language_code, translator, text)
-               VALUES (?, 'uz', 'Tasnim', ?)
-               ON CONFLICT(ayah_id, language_code, translator) DO UPDATE SET
-                 text = excluded.text""",
-            (ayah_id, cleaned),
-        )
-        written += 1
+        for text, language_code in zip(texts, _TRANSLATION_LANGUAGES, strict=True):
+            ayah_id = ayah_ids.get((surah, ayah))
+            cleaned = strip_markup(text or "")
+            if ayah_id is None or not cleaned:
+                continue
+            con.execute(
+                """INSERT INTO translations (ayah_id, language_code, translator, text)
+                   VALUES (?, ?, 'Tasnim', ?)
+                   ON CONFLICT(ayah_id, language_code, translator) DO UPDATE SET
+                     text = excluded.text""",
+                (ayah_id, language_code, cleaned),
+            )
+            written += 1
     return written
 
 
@@ -325,8 +339,13 @@ def import_tasnim(
             # UNIQUE(word_id, language_code) means mt and Tasnim cannot coexist
             # under 'uz'; the upsert would overwrite most of them anyway, and
             # leave a silent residue of mt rows on words Tasnim does not reach.
+            # mt, because Tasnim replaces it. tasnim/tasnim-cyrl, because
+            # `gloss_group` is renumbered from 1 on every run: a row left
+            # behind on a word this run no longer reaches keeps a group id
+            # that now belongs to an unrelated phrase.
             con.execute(
-                "DELETE FROM word_glosses WHERE language_code = 'uz' AND source = 'mt'"
+                "DELETE FROM word_glosses WHERE source IN"
+                " ('mt', 'tasnim', 'tasnim-cyrl')"
             )
             written, kept, rejected = _write_glosses(con, groups, rejects_path)
             translations = _write_translations(con, tasnim)
