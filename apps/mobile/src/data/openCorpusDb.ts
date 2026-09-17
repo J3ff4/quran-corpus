@@ -15,7 +15,14 @@ import type * as ExpoSQLite from 'expo-sqlite';
 // answered `no such table: mushaf_layout` (measured on device, 2026-09-08).
 // **Bump this whenever the bundled DB's contents change.** Older extracts are
 // deleted on the next launch, so the phone never carries two 134 MB copies.
-export const corpusDbVersion = 'm7b';
+//
+// Missed a second time in M9 (caught before the device run, 2026-09-17): the
+// bundle gained 77k Uzbek glosses, surah_names, root_glosses and the Tasnim
+// translation, and this still read 'm7b' -- so an installed phone would have
+// kept its old extract and shown none of it. Nothing can test for this: the
+// suite cannot know the DB's contents changed. Bump it in the same commit that
+// regenerates the DB.
+export const corpusDbVersion = 'm9';
 export const corpusDbFileName = `quran-corpus-${corpusDbVersion}.db`;
 
 /** Matches this app's own extracts, any version -- and nothing else in the
