@@ -138,16 +138,23 @@ def export_mt_glosses(con: sqlite3.Connection, path: Path) -> int:
     The rows carry their surah:ayah:position, not only their word_id: word ids
     are assigned by a corpus rebuild and would not survive one, which is the
     situation this export exists for.
+
+    Scoped over _REPLACED_LANGUAGES, not 'uz' alone, because that is what the
+    DELETE below is scoped over: an mt/mt-reviewed row filed under 'uz-Cyrl'
+    would otherwise be deleted with no copy here and no mismatch for the
+    caller's guard. Nothing writes one today; the point is that the guard can
+    see everything the delete can reach. language_code rides along so a
+    restore knows which side a row came from.
     """
     rows = con.execute(
-        """SELECT a.surah_id, a.ayah_number, w.position, g.gloss_text
+        """SELECT a.surah_id, a.ayah_number, w.position, g.language_code, g.gloss_text
              FROM word_glosses g
              JOIN words w ON w.id = g.word_id
              JOIN ayahs a ON a.id = w.ayah_id
-            WHERE g.language_code = 'uz'
+            WHERE g.language_code IN (?, ?)
               AND g.source IN (?, ?)
             ORDER BY a.surah_id, a.ayah_number, w.position""",
-        _REPLACED_UZ_SOURCES,
+        (*_REPLACED_LANGUAGES, *_REPLACED_UZ_SOURCES),
     ).fetchall()
     if not rows and path.exists() and path.stat().st_size:
         # Nothing left to export and a previous export is on disk. The first
@@ -157,13 +164,14 @@ def export_mt_glosses(con: sqlite3.Connection, path: Path) -> int:
         return 0
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
-        for surah, ayah, position, gloss in rows:
+        for surah, ayah, position, language, gloss in rows:
             handle.write(
                 json.dumps(
                     {
                         "surah_id": surah,
                         "ayah_number": ayah,
                         "position": position,
+                        "language_code": language,
                         "gloss_text": gloss,
                     },
                     ensure_ascii=False,
@@ -348,8 +356,8 @@ def import_tasnim(
         # counted before anything is destroyed.
         expected = con.execute(
             "SELECT COUNT(*) FROM word_glosses"
-            " WHERE language_code = 'uz' AND source IN (?, ?)",
-            _REPLACED_UZ_SOURCES,
+            " WHERE language_code IN (?, ?) AND source IN (?, ?)",
+            (*_REPLACED_LANGUAGES, *_REPLACED_UZ_SOURCES),
         ).fetchone()[0]
         try:
             exported = export_mt_glosses(con, export_path)

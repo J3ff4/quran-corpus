@@ -150,6 +150,32 @@ def test_the_mt_rows_are_exported_before_they_are_deleted(tmp_path):
     assert lines[0]["surah_id"] == 1 and lines[0]["position"] == 1
 
 
+def test_the_export_covers_every_language_the_delete_can_reach(tmp_path):
+    # The DELETE is scoped over both Uzbek codes. An mt-reviewed row filed
+    # under 'uz-Cyrl' -- nothing writes one today -- must still be exported and
+    # counted, or the guard would pass while that row is deleted with no copy.
+    corpus = tmp_path / "c.db"
+    _corpus(corpus, {(1, 1): ["لَا", "رَيْبَ"]})
+    con = sqlite3.connect(corpus)
+    con.execute(
+        "INSERT INTO word_glosses (word_id, language_code, gloss_text, source)"
+        " SELECT id, 'uz', 'eski', 'mt' FROM words"
+    )
+    con.execute(
+        "INSERT INTO word_glosses (word_id, language_code, gloss_text, source)"
+        " SELECT id, 'uz-Cyrl', 'эски', 'mt-reviewed' FROM words LIMIT 1"
+    )
+    con.commit()
+    out = tmp_path / "mt.jsonl"
+    assert export_mt_glosses(con, out) == 3
+    con.close()
+    lines = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()]
+    assert {(row["language_code"], row["gloss_text"]) for row in lines} == {
+        ("uz", "eski"),
+        ("uz-Cyrl", "эски"),
+    }
+
+
 def test_the_import_refuses_to_delete_mt_rows_it_did_not_export(tmp_path):
     # The assert the plan asks for, as code: a short export followed by a
     # delete is 75539 glosses gone with no copy anywhere.
@@ -495,7 +521,8 @@ def test_the_delete_cannot_reach_a_language_the_export_guard_never_counts(tmp_pa
 
     con = sqlite3.connect(corpus)
     survivor = con.execute(
-        "SELECT gloss_text FROM word_glosses WHERE language_code = 'en' AND source = 'mt'"
+        "SELECT gloss_text FROM word_glosses"
+        " WHERE language_code = 'en' AND source = 'mt'"
     ).fetchall()
     con.close()
     assert [row[0] for row in survivor] == ["no doubt"]
