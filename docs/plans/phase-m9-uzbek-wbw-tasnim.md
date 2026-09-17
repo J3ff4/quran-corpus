@@ -578,6 +578,18 @@ Sodik's Cyrillic**, with the Latin query matched via the
 `transliterateUzbekLatinToCyrillic` arm (search.ts:246). Search ignores the
 Lotin/Кирилл setting entirely.
 
+**The reader has the same gap, verified on device 2026-09-17.** With
+Translation = O'zbek and script = **Lotin**, the verse translation renders in
+**Cyrillic** (Muhammad Sodik). So an Uzbek reader on Lotin gets Latin
+word-by-word glosses above a Cyrillic verse translation, on the same screen.
+`getSurahReader` takes `ContentLanguageCode`, so the script never reaches it;
+and the only Latin Uzbek verse translation in the DB is Tasnim, which
+`selectedTranslators.uz` does not name.
+
+What IS wired for Latin: the word-by-word glosses (checks 360-362) and the
+surah names (`surah_names`, 114 x 2 scripts). What is not: verse translation
+and search.
+
 Two stale premises this exposed:
 
 1. That arm's comment reads "Uzbek's `uz` rows are Cyrillic-only, so a Latin
