@@ -4,14 +4,18 @@ import { BottomNav } from '../components/shell/BottomNav';
 import { SearchProvider } from '../components/search/SearchProvider';
 
 const mockPath = vi.fn(() => '/');
-vi.mock('next/navigation', () => ({ usePathname: () => mockPath() }));
+vi.mock('next/navigation', () => ({
+  usePathname: () => mockPath(),
+  // The drawer's LocaleSwitcher refreshes the router at its write site.
+  useRouter: () => ({ refresh: vi.fn() }),
+}));
 
 // BottomNav mounts DrawerMenu, which consumes useSearch(), so every render
 // is wrapped and the shared search sheet's open-time /api/surahs fetch stubbed.
 function renderNav() {
   return render(
     <SearchProvider>
-      <BottomNav />
+      <BottomNav locale="en" script="latin" />
     </SearchProvider>,
   );
 }

@@ -4,6 +4,8 @@ import { type ReactNode, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { DrawerMenu } from './DrawerMenu';
+import type { UiLocaleCode } from '@quran-corpus/config/i18n/locales';
+import type { ScriptCode } from '@quran-corpus/config/i18n/script';
 
 interface LinkItem {
   href: string;
@@ -57,7 +59,7 @@ const itemClass = 'flex h-16 flex-col items-center justify-center gap-1 text-xs'
 const activeColor = 'text-paper-900 dark:text-paper-100';
 const idleColor = 'text-paper-500 dark:text-paper-400';
 
-export function BottomNav() {
+export function BottomNav({ locale, script }: { locale: UiLocaleCode; script: ScriptCode }) {
   const pathname = usePathname() ?? '/';
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -91,7 +93,7 @@ export function BottomNav() {
           <span>Menu</span>
         </button>
       </nav>
-      <DrawerMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <DrawerMenu open={menuOpen} onClose={() => setMenuOpen(false)} locale={locale} script={script} />
     </>
   );
 }

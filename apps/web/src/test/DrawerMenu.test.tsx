@@ -6,7 +6,7 @@ import { SearchProvider } from '../components/search/SearchProvider';
 function renderDrawer(onClose = vi.fn()) {
   return render(
     <SearchProvider>
-      <DrawerMenu open onClose={onClose} />
+      <DrawerMenu open onClose={onClose} locale="en" script="latin" />
     </SearchProvider>,
   );
 }
@@ -50,7 +50,7 @@ describe('DrawerMenu', () => {
   it('renders nothing when closed', () => {
     render(
       <SearchProvider>
-        <DrawerMenu open={false} onClose={vi.fn()} />
+        <DrawerMenu open={false} onClose={vi.fn()} locale="en" script="latin" />
       </SearchProvider>,
     );
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -99,21 +99,21 @@ describe('DrawerMenu', () => {
 
     const { rerender, unmount } = render(
       <SearchProvider>
-        <DrawerMenu open={false} onClose={vi.fn()} />
+        <DrawerMenu open={false} onClose={vi.fn()} locale="en" script="latin" />
       </SearchProvider>,
     );
     expect(trigger).toHaveFocus();
 
     rerender(
       <SearchProvider>
-        <DrawerMenu open onClose={vi.fn()} />
+        <DrawerMenu open onClose={vi.fn()} locale="en" script="latin" />
       </SearchProvider>,
     );
     expect(screen.getByRole('button', { name: /close menu/i })).toHaveFocus();
 
     rerender(
       <SearchProvider>
-        <DrawerMenu open={false} onClose={vi.fn()} />
+        <DrawerMenu open={false} onClose={vi.fn()} locale="en" script="latin" />
       </SearchProvider>,
     );
     expect(trigger).toHaveFocus();

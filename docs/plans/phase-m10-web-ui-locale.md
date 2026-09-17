@@ -415,6 +415,7 @@ but there IS on `en` and `ru`, where `root_glosses` has no rows at all.
 | Locale flashes post-mount | Resolved server-side by construction; check 387 | — |
 | Chrome stays English and reads as half-done | R3 is deliberate and recorded; the follow-up is its own phase | — |
 | `uz-Cyrl` named as an `<html lang>` or a UI locale by mistake | Three distinct types, and `contentLanguage` is the only bridge | — |
+| The service worker's `navigate-pages` cache (`sw.ts:21`) is keyed by URL only, so an offline load — or any load slower than its 5s `networkTimeoutSeconds` — serves HTML rendered for the PREVIOUS locale | Harmless while the chrome is English (R3): only localized names differ. Becomes "the whole UI is in the wrong language offline" the moment R3 lands | Vary the cache key on the `ui-locale` cookie, or drop the navigate-pages cache entry on a locale write |
 
 ## Out of scope (recorded, not forgotten)
 
