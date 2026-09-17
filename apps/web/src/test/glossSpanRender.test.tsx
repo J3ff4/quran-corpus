@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { WbwAyahBlock } from '../components/wbw/WbwAyahBlock';
 import { WbwAyahListBlock } from '../components/wbw/WbwAyahListBlock';
+import { WbwGlossSpan } from '../components/wbw/WbwGlossSpan';
 import type { WbwAyah, WbwCell } from '../components/wbw/types';
 
 // Tasnim's "shubha yo'q" is ONE gloss over لَا and رَيْبَ. Rendering it under
@@ -44,5 +45,27 @@ describe('a gloss_group span', () => {
     expect(spanned).not.toBeNull();
     expect(spanned).toHaveTextContent("shubha yo'q");
     expect(container.querySelectorAll('tbody tr:nth-child(2) td')).toHaveLength(2);
+  });
+});
+
+describe('WbwGlossSpan accessibility', () => {
+  it('points every spanned word at the shared gloss', () => {
+    // The gloss sits outside the links, so without aria-describedby a screen
+    // reader tabbing the grid hears the transliteration and nothing else --
+    // losing the meaning for exactly the words whose meaning is least
+    // guessable. WbwWordCell keeps its gloss inside the link and needs none.
+    const { container } = render(
+      <WbwGlossSpan cells={[c(1, 'لَا', "shubha yo'q", 4), c(2, 'رَيْبَ', "shubha yo'q", 4)]} />,
+    );
+    const links = Array.from(container.querySelectorAll('a'));
+    expect(links).toHaveLength(2);
+    const ids = links.map((a) => a.getAttribute('aria-describedby'));
+    // One shared gloss, so one shared id -- and it must actually resolve, or
+    // the attribute points at nothing and announces nothing.
+    expect(new Set(ids).size).toBe(1);
+    expect(ids[0]).toBeTruthy();
+    const target = container.querySelector(`#${ids[0]}`);
+    expect(target).not.toBeNull();
+    expect(target!.textContent).toContain("shubha yo'q");
   });
 });
