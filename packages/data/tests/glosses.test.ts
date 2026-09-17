@@ -111,6 +111,19 @@ describe('getGlossesWithFallback', () => {
     expect(rows.every((r) => r.gloss_lang === 'en' && r.gloss_group === null)).toBe(true);
   });
 
+  it('drops a GROUPED fallback row\'s group id', async () => {
+    // The case the en-fallback test above cannot reach: ask for a language
+    // with no rows and fall back to uz, which IS grouped. Passing uz's id 7
+    // through would be worse than useless -- group ids are numbered per
+    // (ayah, language_code), so a 7 from uz sitting next to a 7 from another
+    // language names two unrelated phrases, and the renderer joins adjacent
+    // equal ids into one span. The gloss text is uz's; the grouping is not.
+    const rows = await getGlossesWithFallback(db, 1, 'ru', 'uz');
+    expect(rows).toHaveLength(2);
+    expect(rows.every((r) => r.gloss_lang === 'uz')).toBe(true);
+    expect(rows.map((r) => r.gloss_group)).toEqual([null, null]);
+  });
+
   it('lang=en yields all gloss_lang=en', async () => {
     const rows = await getGlossesWithFallback(db, 1, 'en');
     expect(rows.every((r) => r.gloss_lang === 'en')).toBe(true);

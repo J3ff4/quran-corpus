@@ -531,6 +531,7 @@ Uzbek — hide it otherwise rather than showing a dead control.
 | Bundle size past a usable APK | Measured at Task 10 Step 1, before the build. |
 | Group render looks wrong in WbW | `gloss_group` is stored either way; the render is a UI change with no re-import. |
 | `search_fts` doubles on the new translation | Expected. Counted in the size delta. |
+| Web build deployed against a DB the import has not touched | **Deploy order is load-bearing: run `import-tasnim` against the live DB BEFORE shipping the web build.** `getGlossesWithFallback` references `gloss_group` unconditionally and `apps/web` runs with `DB_SKIP_MIGRATIONS=true`, so a web build meeting an un-migrated `quran.db` throws `no such column: gloss_group` on the reader AND the WbW page — a 500 on the core reading flow, not a degraded gloss. Same shape awaits `surah_names` / `root_glosses` (`no such table`) when M10 Tasks 3-4 wire them up. |
 
 **Rollback**: restore `quran.db.bak-phase-m9`; or, surgically, delete
 `word_glosses WHERE source LIKE 'tasnim%'`, `translations WHERE

@@ -30,11 +30,19 @@ export interface GlossWithLang {
   word_id: number;
   gloss_text: string;
   gloss_lang: string;
-  /** Which phrase this word belongs to, from whichever row supplied the text.
+  /** Which phrase this word belongs to, from the preferred-language row.
    *  Words sharing a group are ONE gloss and render once across the span.
-   *  NULL for every ungrouped source, and for a fallback row -- the fallback
-   *  language does its own segmentation and never inherits the preferred
-   *  language's grouping. */
+   *  NULL for every ungrouped source, and always for a fallback row.
+   *
+   *  A fallback row's own group id is deliberately dropped rather than passed
+   *  through. Group ids are scoped per (ayah, language_code), so two languages
+   *  number their phrases independently: a word taking group 5 from `lang` next
+   *  to a word taking group 5 from `fallback` are unrelated phrases, and the
+   *  renderer -- which joins adjacent cells sharing an id -- would merge them
+   *  into one span under one language's gloss. Dropping the id costs a grouped
+   *  fallback its spans (each word renders the phrase separately); keeping it
+   *  would corrupt the reading. Inert while `fallback` is 'en', which carries
+   *  no groups at all, and that is exactly why it must be written down. */
   gloss_group: number | null;
 }
 
@@ -52,7 +60,7 @@ export async function getGlossesWithFallback(
                  COALESCE(pref.gloss_text, fb.gloss_text) AS gloss_text,
                  CASE WHEN pref.gloss_text IS NOT NULL THEN ? ELSE ? END AS gloss_lang,
                  CASE WHEN pref.gloss_text IS NOT NULL
-                      THEN pref.gloss_group ELSE fb.gloss_group END AS gloss_group
+                      THEN pref.gloss_group ELSE NULL END AS gloss_group
           FROM words w
           JOIN ayahs a ON a.id = w.ayah_id
           LEFT JOIN word_glosses pref ON pref.word_id = w.id AND pref.language_code = ?
