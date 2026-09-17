@@ -1,16 +1,19 @@
 export const dynamic = 'force-dynamic';
 
+import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import {
   getRootEntry,
   getRootConcordancePage,
   countRootConcordance,
   getRootNeighbors,
+  getRootGlosses,
   parseRootParam,
   CONCORDANCE_PAGE_SIZE,
 } from '@quran-corpus/data';
 import { getDatabase } from '../../../lib/db';
 import { RootEntry } from '../../../components/dictionary/RootEntry';
+import { resolveLocale } from '../../../lib/locale';
 
 const PAGE = CONCORDANCE_PAGE_SIZE;
 
@@ -28,10 +31,12 @@ export default async function RootPage({ params }: PageProps) {
   const db = await getDatabase();
   const entry = await getRootEntry(db, bw);
   if (!entry) notFound();
-  const [initialConcordance, total, neighbors] = await Promise.all([
+  const { content } = resolveLocale(await cookies());
+  const [initialConcordance, total, neighbors, glosses] = await Promise.all([
     getRootConcordancePage(db, bw, { limit: PAGE, offset: 0 }),
     countRootConcordance(db, bw),
     getRootNeighbors(db, bw),
+    getRootGlosses(db, entry.root.id, content),
   ]);
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
@@ -40,6 +45,7 @@ export default async function RootPage({ params }: PageProps) {
         entry={entry}
         initialConcordance={initialConcordance}
         total={total}
+        glosses={glosses}
         prevBw={neighbors.prev}
         nextBw={neighbors.next}
       />

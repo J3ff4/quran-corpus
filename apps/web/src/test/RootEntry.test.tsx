@@ -34,6 +34,68 @@ const entry: RootEntryT = {
 const concordance: ConcordanceEntry[] = [];
 
 describe('RootEntry', () => {
+  it('puts the ranked locale glosses above the lexicon article, which stays English', () => {
+    // R6: the two are not translations of each other -- the glosses are
+    // derived from how the Quran uses the root, the article is a lexicon
+    // entry. Both show; neither is merged into the other.
+    const { container } = render(
+      <RootEntry
+        entry={entry}
+        initialConcordance={concordance}
+        total={0}
+        prevBw={null}
+        nextBw={null}
+        glosses={[
+          { gloss: 'yozmoq', occurrence_count: 260 },
+          { gloss: 'kitob', occurrence_count: 59 },
+        ]}
+      />,
+    );
+    const yozmoq = screen.getByText('yozmoq');
+    const lane = screen.getByText(/To write; to prescribe\./);
+    expect(yozmoq).toBeInTheDocument();
+    expect(lane).toBeInTheDocument();
+    expect(yozmoq.compareDocumentPosition(lane) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBeTruthy();
+    expect(container.textContent).toContain('kitob');
+  });
+
+  it('keeps the ranked order it was given, rather than re-sorting', () => {
+    render(
+      <RootEntry
+        entry={entry}
+        initialConcordance={concordance}
+        total={0}
+        prevBw={null}
+        nextBw={null}
+        glosses={[
+          { gloss: 'kitob', occurrence_count: 59 },
+          { gloss: 'yozmoq', occurrence_count: 260 },
+        ]}
+      />,
+    );
+    const items = screen.getAllByRole('listitem').map((li) => li.textContent);
+    expect(items[0]).toContain('kitob');
+    expect(items[1]).toContain('yozmoq');
+  });
+
+  it('renders no gloss block at all when the locale has none', () => {
+    // en and ru have zero root_glosses rows. An empty heading would read as a
+    // broken section on every root page in those locales.
+    render(
+      <RootEntry
+        entry={entry}
+        initialConcordance={concordance}
+        total={0}
+        prevBw={null}
+        nextBw={null}
+        glosses={[]}
+      />,
+    );
+    expect(screen.queryByRole('list')).toBeNull();
+    expect(screen.getByText(/To write; to prescribe\./)).toBeInTheDocument();
+  });
+
   it('renders occurrence count', () => {
     render(<RootEntry entry={entry} initialConcordance={concordance} total={0} prevBw={null} nextBw={null} />);
     expect(screen.getByText(/319/)).toBeInTheDocument();
