@@ -599,10 +599,60 @@ Two stale premises this exposed:
 2. The plan assumed shipping the Tasnim translation made it searchable. Nothing
    selects it.
 
-**Not fixed here — the fix is the owner's open ruling** (which translator `uz`
-selects, and whether verse translation + search follow the script). Any change
-picks a translator for every Uzbek reader, which is a product decision, not a
-defect repair.
+**Ruled and fixed 2026-09-17 (`925b2c2`).** Owner's decision: **Tasnim for both
+scripts.**
+
+The choice that was actually on the table was not "route the script through" —
+that alone would have swapped the scholar on every toggle, because Sodiq has no
+Latin text. It was which Uzbek translation every Uzbek reader gets. Tasnim wins
+on one fact the other two cannot match: it is the only Uzbek work in the corpus
+carried in **both** alphabets (`uz` Latin and `uz-Cyrl`, 6,236 rows each, one
+text transliterated), so a script flip re-renders the same words. It is also
+already the source of the M9 glosses, so the verse and the word-by-word row
+above it finally agree.
+
+The rejected alternative was Cyrillic→Sodiq / Latin→Tasnim. It is coherent and
+Sodiq is the better-known translation, but it makes the script setting change
+the translator: different wording, different length, Sodiq's inline tafsir
+parentheticals appearing and vanishing, search hits that exist in one script and
+not the other, and Tasnim glosses sitting above a Sodiq verse. That argues for a
+translator picker as its own setting, not for binding the translator to an
+alphabet. No picker exists today (`selectedTranslators` is a fixed map).
+
+What changed: `selectedTranslators` gains `'uz-Cyrl': 'Tasnim'` and `uz` moves
+from Muhammad Sodik to Tasnim; `translatorByLanguage` is keyed by
+`QueryLanguageCode`; `getSurahReader`, `getAyahReaderLocation` and
+`searchCorpus` take the composed code, so the reader, the ayah of the day and
+search all follow the script. `docs/data-sources-m1.md` lists both codes.
+
+`packages/data` was deliberately **not** touched, so this is outside §5's
+triggers. In particular `search.ts:246`'s transliteration arm stays: it still
+serves the web app's unscoped search, and on mobile it now costs one FTS query
+that matches nothing (its `uzTranslatorFilter` pins `language_code='uz'` AND
+`translator='Tasnim'`, and Tasnim's `uz` rows are Latin, so a transliterated
+Cyrillic term hits none of them). Premise 1 below is still stale in that
+comment — noted, not edited.
+
+Two guards shipped with it, because the sound half of the old warning was that a
+split would be silent:
+
+- `create-m1-reader-db.ts` drives both its approval parse and its row-count
+  contract off `selectedTranslators` rather than a hardcoded `en`/`ru`/`uz`
+  list. A bundle without the `uz-Cyrl` set now fails at generation instead of on
+  a device with the toggle flipped; an approval doc naming only Latin Uzbek is
+  rejected; so is one binding the two scripts to different translators.
+- The About screen credits Tasnim once. `AboutTab`'s `getByText` throws on a
+  second match, which is what holds it.
+
+No DB regeneration and no `corpusDbVersion` bump: nothing about the bundled data
+changed, and the contract test confirms the shipped artifact already carries
+6,236 `uz-Cyrl` Tasnim rows. Verification: 1,268 mobile + 14 mobile-data + 488
+data tests green, lint and type-check clean across the workspace, and the search
+routing mutation-checked (reverting the one call site to `contentLanguage` fails
+14 SearchScreen tests).
+
+**Owed: a device re-run of 368**, plus the reader on Lotin, to confirm Latin
+verse text under Latin glosses.
 
 **Device run 2026-09-17, vc22 (`aapt2 dump badging` confirmed), APK 208.8 MiB.**
 Defect found and fixed before the run: `corpusDbVersion` still read `'m7b'`,
