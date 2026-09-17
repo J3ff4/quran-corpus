@@ -466,6 +466,21 @@ render, the dictionary root page, `apps/web/src/app/about/page.tsx`.
 
 ### Task 9: Mobile UI + script toggle
 
+**Owner rulings, 2026-09-16** (both asked because the plan could not answer
+them and the answers change the work):
+
+| # | Question | Ruling |
+|---|---|---|
+| R9-1 | A grouped pair renders one gloss, but decision 27 says "one cell per word, in every layout" | **Merge the cells.** Decision 27 is reversed for gloss spans: it was made against a mockup that merged for visual effect, with nothing in the data saying which words belonged together; `gloss_group` is that missing fact. One cell per word still holds INSIDE a span, so touch targets, POS colours and TalkBack labels are unchanged. |
+| R9-2 | Surah names follow the UI locale or the content language? | **UI locale.** A surah name is chrome; it stays put when the reader changes which translation of the verses they want. The script toggle therefore does not reach surah names. |
+
+**Open, not ruled:** the verse translation and search stay bound to the content
+language, NOT the composed query language. The corpus has three `uz` translators
+and one `uz-Cyrl` (Tasnim), so routing them through the script would change
+*which* translation is on screen rather than its alphabet. `translatorByLanguage`
+is keyed by `ContentLanguageCode` so passing a composed code is a compile error.
+
+
 **Files:** Modify `apps/mobile/src/i18n/languages.ts`,
 `src/settings/settingsStore.tsx`, `src/screens/SettingsScreen.tsx`, the WbW
 row renderer, the dictionary screen, `src/screens/AboutTab.tsx`, and every
