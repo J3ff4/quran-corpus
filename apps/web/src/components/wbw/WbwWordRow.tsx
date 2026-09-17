@@ -39,15 +39,15 @@ export function WbwWordRow({
 
   return (
     <tr className="border-b border-paper-100 align-top dark:border-night-50">
+      {/* Only the gloss spans: a span is a fact about the TRANSLATION, so the
+          transliteration and the coordinate -- both facts about one word --
+          moved into the per-word cell below rather than vanishing for words
+          2..n. Same split the grid layout makes in WbwGlossSpan. */}
       {glossSpan > 0 && (
       <td className="py-3 pr-3" rowSpan={glossSpan}>
         <div className="text-sm text-paper-900 dark:text-paper-100" dir="ltr">
           <GlossText gloss={gloss} glossLang={glossLang} pageLang={pageLang} />
         </div>
-        <div className="text-xs text-paper-500 dark:text-paper-400" dir="ltr">
-          {translit ?? '—'}
-        </div>
-        <div className="text-xs text-paper-400 tabular-nums">{`(${surahId}:${ayahNumber}:${position})`}</div>
       </td>
       )}
       <td className="px-3 py-3 text-center">
@@ -65,6 +65,10 @@ export function WbwWordRow({
           <SegmentPills segments={segments} fallbackWord={arabic} />
         </Link>
         {trailingMark}
+        <div className="text-xs text-paper-500 dark:text-paper-400" dir="ltr">
+          {translit ?? '—'}
+        </div>
+        <div className="text-xs text-paper-400 tabular-nums">{`(${surahId}:${ayahNumber}:${position})`}</div>
       </td>
       <td className="py-3 pl-3 text-sm">
         {segments.length > 0 && segments.every((seg) => seg.pos_tag) ? (

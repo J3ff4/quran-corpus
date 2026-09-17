@@ -14,11 +14,15 @@ function cell(over: Partial<WbwCell> = {}): WbwCell {
   };
 }
 
-function renderRow(cellProps: WbwCell, pageLang?: string) {
+function renderRow(cellProps: WbwCell, pageLang?: string, glossSpan?: number) {
   return render(
     <table>
       <tbody>
-        <WbwWordRow cell={cellProps} {...(pageLang ? { pageLang } : {})} />
+        <WbwWordRow
+          cell={cellProps}
+          {...(pageLang ? { pageLang } : {})}
+          {...(glossSpan === undefined ? {} : { glossSpan })}
+        />
       </tbody>
     </table>,
   );
@@ -33,6 +37,16 @@ describe('WbwWordRow', () => {
     expect(screen.getByText('P – Preposition')).toBeInTheDocument();
     expect(screen.getByText('جار ومجرور')).toBeInTheDocument();
     expect(screen.getByText('(1:1:1)')).toBeInTheDocument();
+  });
+
+  it('keeps a spanned-over word\'s own translit and coordinate, dropping only the gloss', () => {
+    // glossSpan 0 = an earlier row spans its translation over this one. The
+    // span is a fact about the translation only, so everything that describes
+    // THIS word must still render.
+    renderRow(cell({ position: 2, translit: 'lahu', gloss: 'no doubt' }), undefined, 0);
+    expect(screen.queryByText('no doubt')).toBeNull();
+    expect(screen.getByText('lahu')).toBeInTheDocument();
+    expect(screen.getByText('(1:1:2)')).toBeInTheDocument();
   });
 
   it('renders each grammar-note clause on its own line', () => {
