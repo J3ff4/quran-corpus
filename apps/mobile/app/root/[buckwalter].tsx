@@ -142,7 +142,17 @@ export default function RootRoute() {
         // only exists once getRootScreen has resolved the Buckwalter string.
         // Skipped entirely for a root the corpus does not carry -- there is no
         // id to ask with, and the screen renders NotFound regardless.
-        const glosses = found ? await getRootGlossList(client, found.root.id, queryLanguage) : [];
+        // Caught here, not by the outer catch: root_glosses is the newest
+        // table in the bundle, and a corpus built before it exists throws
+        // `no such table`. That is a missing block, not a missing root -- the
+        // outer catch publishes entry: null, which would render every root in
+        // the app as NotFound over one absent table.
+        const glosses = found
+          ? await getRootGlossList(client, found.root.id, queryLanguage).catch((cause: unknown) => {
+              console.error('[root] glosses failed', { buckwalter, cause });
+              return [];
+            })
+          : [];
         if (!cancelled) {
           setLoaded({ root: buckwalter, entry: found, neighbors: adjacent, glosses });
         }

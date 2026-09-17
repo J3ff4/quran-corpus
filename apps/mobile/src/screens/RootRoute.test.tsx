@@ -481,6 +481,18 @@ describe('RootRoute', () => {
     expect(screen.queryByTestId('root-glosses')).toBeNull();
   });
 
+  it('still renders the root when only the gloss read fails', async () => {
+    // root_glosses is the newest table in the bundle, so a corpus built before
+    // it throws `no such table` here. Sharing the entry's catch turned that one
+    // absent table into NotFound for EVERY root in the app -- the article, the
+    // concordance and the neighbours all present in the row that loaded fine.
+    mocks.getRootGlossList.mockRejectedValue(new Error('no such table: root_glosses'));
+    render(<RootRoute />);
+
+    expect(await screen.findByTestId('root-no-definition')).toBeTruthy();
+    expect(screen.queryByTestId('root-glosses')).toBeNull();
+  });
+
   it('does not ask for glosses for a root the corpus does not carry', async () => {
     // There is no id to ask with, and the screen renders NotFound either way.
     mocks.getRootScreen.mockResolvedValue(null);
