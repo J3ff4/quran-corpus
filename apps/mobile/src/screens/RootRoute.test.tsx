@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   getRootOccurrenceCount: vi.fn(),
   getRootOccurrences: vi.fn(),
   getAdjacentRoots: vi.fn(),
+  getRootGlossList: vi.fn(),
   push: vi.fn(),
   replace: vi.fn(),
   recordRootView: vi.fn(),
@@ -47,12 +48,19 @@ vi.mock('@/data/corpusRepository', () => ({
   getRootOccurrenceCount: (...args: unknown[]) => mocks.getRootOccurrenceCount(...args),
   getRootOccurrences: (...args: unknown[]) => mocks.getRootOccurrences(...args),
   getAdjacentRoots: (...args: unknown[]) => mocks.getAdjacentRoots(...args),
+  getRootGlossList: (...args: unknown[]) => mocks.getRootGlossList(...args),
 }));
 
 vi.mock('@/settings/settingsStore', () => ({
   useAppSettings: () => ({
     arabicScale: 'medium',
     contentLanguage: mocks.contentLanguage,
+    // Deliberately NOT the same as contentLanguage: the glosses are content,
+    // so they follow the composed query language (R9-2's exception -- the
+    // script reaches them, unlike surah names). Reading the picked language
+    // here instead would serve Latin Uzbek glosses to a Cyrillic reader, and
+    // with the two mocked equal that regression would pass.
+    queryLanguage: 'uz-Cyrl',
     uiLocale: 'en',
   }),
 }));
@@ -87,6 +95,21 @@ vi.mock('@/components/ConcordanceList', async () => {
   };
 });
 
+// InfoSheet has its own suite (InfoSheet.test.tsx). Stubbed to a bare
+// button/body pair, for the same reason LemmaScreen's suite stubs it: the real
+// one pulls BottomSheet's reanimated and gesture-handler dependencies into a
+// screen suite that isn't about them. Neither stub holds state -- the open
+// state is the screen's, which is why the two are separate components.
+vi.mock('@/components/InfoSheet', async () => {
+  const React = await import('react');
+  return {
+    InfoButton: ({ label, onPress }: { label: string; onPress: () => void }) =>
+      React.createElement('button', { 'data-testid': 'info-button', onClick: onPress }, label),
+    InfoSheet: ({ body }: { body: string }) =>
+      React.createElement('div', { 'data-testid': 'info-body' }, body),
+  };
+});
+
 // reactNativeTextMock, not the bare `host` factory: the header now renders
 // EntryHeader and DefinitionCard, both of which mount ClampedText, and
 // Pressable for the Previous/Next arrows -- see reactNativeTextMock's doc
@@ -115,6 +138,7 @@ describe('RootRoute', () => {
     mocks.getRootOccurrenceCount.mockReset();
     mocks.getRootOccurrences.mockReset();
     mocks.getAdjacentRoots.mockReset();
+    mocks.getRootGlossList.mockReset();
     mocks.push.mockReset();
     mocks.replace.mockReset();
     mocks.recordRootView.mockReset();
@@ -123,6 +147,7 @@ describe('RootRoute', () => {
     mocks.getRootOccurrenceCount.mockResolvedValue(1722);
     mocks.getRootOccurrences.mockResolvedValue([]);
     mocks.getAdjacentRoots.mockResolvedValue({ prev: null, next: null });
+    mocks.getRootGlossList.mockResolvedValue([]);
   });
 
   afterEach(cleanup);
@@ -412,5 +437,55 @@ describe('RootRoute', () => {
         expect.anything(), 'qwm', 'ru', 0, expect.any(Number), undefined,
       ),
     );
+  });
+  it("reads the root's glosses by id, in the composed query language", async () => {
+    render(<RootRoute />);
+
+    // The id, not the Buckwalter string: root_glosses is keyed by id, and
+    // asking by string would put the deep-link segment through a second trust
+    // boundary. 'uz-Cyrl', not 'ru': a gloss is content, so the script
+    // reaches it.
+    await waitFor(() =>
+      expect(mocks.getRootGlossList).toHaveBeenCalledWith(expect.anything(), 7, 'uz-Cyrl'),
+    );
+  });
+
+  it('shows the word-by-word glosses above the lexicon article', async () => {
+    mocks.getRootGlossList.mockResolvedValue([
+      { gloss: 'dedi', occurrence_count: 445 },
+      { gloss: 'aytgin', occurrence_count: 293 },
+    ]);
+    render(<RootRoute />);
+
+    const glosses = await screen.findByTestId('root-glosses');
+    expect(glosses.textContent).toBe('dedi · aytgin');
+    // Order matters (check 366): these are the words translators used, the
+    // article below is the scholarly account. compareDocumentPosition rather
+    // than reading the DOM by index -- the header's other blocks sit between.
+    const definitions = screen.getByTestId('root-no-definition');
+    expect(
+      glosses.compareDocumentPosition(definitions) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('omits the gloss block for a language with no word-by-word set', async () => {
+    // Every language but Uzbek returns none. An empty caption over an empty
+    // line reads as a failed query rather than as a language that has no
+    // word-by-word data at all.
+    mocks.getRootGlossList.mockResolvedValue([]);
+    render(<RootRoute />);
+
+    await waitFor(() => expect(mocks.getRootGlossList).toHaveBeenCalled());
+    expect(screen.queryByTestId('root-glosses')).toBeNull();
+  });
+
+  it('does not ask for glosses for a root the corpus does not carry', async () => {
+    // There is no id to ask with, and the screen renders NotFound either way.
+    mocks.getRootScreen.mockResolvedValue(null);
+    render(<RootRoute />);
+
+    await waitFor(() => expect(mocks.getRootScreen).toHaveBeenCalled());
+    await Promise.resolve();
+    expect(mocks.getRootGlossList).not.toHaveBeenCalled();
   });
 });

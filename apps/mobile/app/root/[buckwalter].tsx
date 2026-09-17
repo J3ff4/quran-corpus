@@ -3,15 +3,18 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
-import type { ConcordanceEntry, RootEntry } from '@quran-corpus/data/mobile';
+import type { ConcordanceEntry, RootEntry, RootGloss } from '@quran-corpus/data/mobile';
 import { AdjacentNav } from '@/components/AdjacentNav';
 import { ConcordanceList } from '@/components/ConcordanceList';
 import { DefinitionCard } from '@/components/DefinitionCard';
 import { EntryHeader } from '@/components/EntryHeader';
 import { FormFilterChips } from '@/components/FormFilterChips';
 import { useGlassSkin } from '@/components/GlassSurface';
+import { InfoSheet } from '@/components/InfoSheet';
+import { TopGlosses } from '@/components/TopGlosses';
 import {
   getAdjacentRoots,
+  getRootGlossList,
   getRootOccurrenceCount,
   getRootOccurrences,
   getRootScreen,
@@ -43,6 +46,13 @@ interface Loaded {
    *  flag. */
   entry: RootEntry | null;
   neighbors: Neighbors;
+  /** The root's commonest word-by-word glosses in the reader's content
+   *  language and script. Empty for every language without a word-by-word set
+   *  -- today all but Uzbek -- and the block is then omitted entirely. In here
+   *  rather than in its own state for the same reason the neighbours are: the
+   *  pager holds a whole entry on screen, and one root's glosses must never be
+   *  drawn under another's headword. */
+  glosses: RootGloss[];
 }
 
 /** A form filter together with the occurrence count taken for it. The two are
@@ -76,7 +86,7 @@ export default function RootRoute() {
   const params = useLocalSearchParams<{ buckwalter: string }>();
   const theme = useThemeColors();
   const skin = useGlassSkin();
-  const { contentLanguage, uiLocale } = useAppSettings();
+  const { contentLanguage, queryLanguage, uiLocale } = useAppSettings();
 
   // Untrusted: a path segment off a deep link. parseRootParam applies the same
   // charset and length cap the web root page does, and takes the raw
@@ -91,6 +101,9 @@ export default function RootRoute() {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
   const [applied, setApplied] = useState<AppliedFilter | null>(null);
+  // Owned here, not by InfoSheet: BottomSheet fills its parent, and the button
+  // that opens it sits inside the concordance list's header.
+  const [infoOpen, setInfoOpen] = useState(false);
 
   // Form ids are per-root: an id from one root's forms means a different form
   // on the next root, so carrying the selection across an in-app
@@ -125,15 +138,20 @@ export default function RootRoute() {
           getRootScreen(client, buckwalter),
           getAdjacentRoots(client, buckwalter),
         ]);
+        // After, not alongside: root_glosses is keyed by root id, and the id
+        // only exists once getRootScreen has resolved the Buckwalter string.
+        // Skipped entirely for a root the corpus does not carry -- there is no
+        // id to ask with, and the screen renders NotFound regardless.
+        const glosses = found ? await getRootGlossList(client, found.root.id, queryLanguage) : [];
         if (!cancelled) {
-          setLoaded({ root: buckwalter, entry: found, neighbors: adjacent });
+          setLoaded({ root: buckwalter, entry: found, neighbors: adjacent, glosses });
         }
       } catch (cause) {
         // Same dead end as a root the corpus does not carry: nothing the
         // reader can act on either way. Logged for logcat.
         console.error('[root] load failed', { buckwalter, cause });
         if (!cancelled) {
-          setLoaded({ root: buckwalter, entry: null, neighbors: NO_NEIGHBORS });
+          setLoaded({ root: buckwalter, entry: null, neighbors: NO_NEIGHBORS, glosses: [] });
         }
       }
     }
@@ -142,7 +160,13 @@ export default function RootRoute() {
     return () => {
       cancelled = true;
     };
-  }, [buckwalter]);
+    // queryLanguage as well as the root: the glosses are content, so switching
+    // language or script has to re-read them. The other two queries are
+    // language-independent and come along for the ride -- a language change is
+    // a rare, deliberate act, and re-running three cheap queries is cheaper
+    // than a second effect that could publish glosses for one root over
+    // another root's headword.
+  }, [buckwalter, queryLanguage]);
 
   // Keyed on the resolved entry, not on `buckwalter`: a deep link to a root the
   // corpus does not carry must not inflate the roots counter with something the
@@ -344,6 +368,20 @@ export default function RootRoute() {
             </Text>
           </EntryHeader>
 
+          {/* Above the lexicon article, not below it (check 366): these are
+              the words the translators actually used for this root, and the
+              article is the scholarly account of it. Its own caption and info
+              button are what keep the two from reading as one section -- see
+              TopGlosses. Renders nothing at all for a language with no
+              word-by-word set. */}
+          <TopGlosses
+            testID="root-glosses"
+            glosses={view.loaded.glosses.map((entry) => entry.gloss)}
+            uiLocale={uiLocale}
+            infoOpen={infoOpen}
+            onInfo={() => setInfoOpen(true)}
+          />
+
           <View style={{ gap: 10 }}>
             {definitions.length > 0 ? (
               definitions.map((definition) => (
@@ -417,21 +455,41 @@ export default function RootRoute() {
   );
 
   return (
-    // The whole screen moves, header and list together, which is what makes it
-    // read as a pager rather than as a list that reloaded.
-    //
-    // absoluteFill, not flex: reanimated keeps the outgoing entry in the native
-    // hierarchy until its exit finishes, and in a flex column that second child
-    // would halve both their heights for the length of the animation.
     <View style={{ flex: 1 }}>
-      <Animated.View
-        key={view.loaded.root}
-        entering={animation.entering}
-        exiting={animation.exiting}
-        style={StyleSheet.absoluteFill}
+      {/* accessibilityViewIsModal is iOS-only, so on Android this is what stops
+          TalkBack swiping into the list behind the sheet -- same pairing as
+          LemmaScreen and WbwScreen. */}
+      <View
+        testID="root-content"
+        style={{ flex: 1 }}
+        importantForAccessibility={infoOpen ? 'no-hide-descendants' : 'auto'}
       >
-        {body}
-      </Animated.View>
+        {/* The whole screen moves, header and list together, which is what
+            makes it read as a pager rather than as a list that reloaded.
+            Inside the a11y wrapper, not around it: the sheet's
+            no-hide-descendants has to keep covering the list.
+
+            absoluteFill, not flex: reanimated keeps the outgoing entry in the
+            native hierarchy until its exit finishes, and in a flex column that
+            second child would halve both their heights for the length of the
+            animation. */}
+        <Animated.View
+          key={view.loaded.root}
+          entering={animation.entering}
+          exiting={animation.exiting}
+          style={StyleSheet.absoluteFill}
+        >
+          {body}
+        </Animated.View>
+      </View>
+      {infoOpen ? (
+        <InfoSheet
+          uiLocale={uiLocale}
+          label={t(uiLocale, 'lemma.aboutTranslations')}
+          body={t(uiLocale, 'lemma.translationsNote')}
+          onClose={() => setInfoOpen(false)}
+        />
+      ) : null}
     </View>
   );
 }

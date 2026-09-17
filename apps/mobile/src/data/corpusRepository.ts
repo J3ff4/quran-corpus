@@ -12,6 +12,7 @@ import {
   getLemmaFrequencyNeighbors,
   getRootConcordancePage,
   getRootEntry,
+  getRootGlosses,
   getRootNeighbors,
   getRootSearchList,
   getRootsByFrequency,
@@ -30,6 +31,7 @@ import {
   type ConcordanceEntry,
   type LemmaEntry,
   type RootEntry,
+  type RootGloss,
   type RootSearchItem,
   type SearchResult,
   type Surah,
@@ -424,6 +426,26 @@ export async function getRootScreen(
   rootBuckwalter: string,
 ): Promise<RootEntry | null> {
   return getRootEntry(client, rootBuckwalter);
+}
+
+/** A root's commonest word-by-word glosses in the reader's content language.
+ *
+ *  Derived from the word-by-word set, so it is empty for every language that
+ *  has none -- today that is everything but Uzbek, and the root screen simply
+ *  omits the block. The script belongs here (unlike surah names, R9-2): a
+ *  gloss is content, so Cyrillic Uzbek must read in Cyrillic, which is why
+ *  this takes the composed query language and not the picked one.
+ *
+ *  Keyed by root id rather than by Buckwalter: the id is what `root_glosses`
+ *  stores, and the caller already holds it from getRootScreen -- resolving the
+ *  string a second time would mean a second trust boundary for the same
+ *  deep-link segment. */
+export async function getRootGlossList(
+  client: MobileDataClient,
+  rootId: number,
+  lang: QueryLanguageCode,
+): Promise<RootGloss[]> {
+  return getRootGlosses(client, rootId, lang);
 }
 
 /** Hijāʾī-adjacent roots for the root screen's Previous/Next.
