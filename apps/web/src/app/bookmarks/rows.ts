@@ -1,4 +1,4 @@
-import type { Surah } from '@quran-corpus/data';
+import type { Surah, SurahName } from '@quran-corpus/data';
 import type { Bookmark } from '../../lib/bookmarks';
 import type { BookmarkRow } from './BookmarksView';
 
@@ -12,13 +12,14 @@ import type { BookmarkRow } from './BookmarksView';
 export function toBookmarkRows(
   bookmarks: Bookmark[],
   surahs: Pick<Surah, 'id' | 'name_translit' | 'ayah_count'>[],
+  names: Map<number, SurahName>,
 ): BookmarkRow[] {
   const byId = new Map(surahs.map((s) => [s.id, s]));
   const rows: BookmarkRow[] = [];
   for (const b of bookmarks) {
     const surah = byId.get(b.surahId);
     if (!surah || b.ayahNumber > surah.ayah_count) continue;
-    rows.push({ ...b, surahName: surah.name_translit });
+    rows.push({ ...b, surahName: names.get(surah.id)?.name ?? surah.name_translit });
   }
   return rows;
 }

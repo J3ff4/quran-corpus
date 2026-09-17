@@ -1,13 +1,17 @@
 import Link from 'next/link';
-import type { Surah } from '@quran-corpus/data';
+import type { Surah, SurahName } from '@quran-corpus/data';
 import { SurahFrame } from './ornaments/SurahFrame';
 import { needsSurahNameFallback, surahNameGlyph } from './ornaments/surahNameGlyph';
 
 interface SurahHeaderProps {
   surah: Surah;
+  /** The name in the reader's locale; replaces the transliteration slot (R5).
+   *  `meaning` is NULL where a translator had none, or where it would only
+   *  echo the name -- then the line carries revelation type and length alone. */
+  name: SurahName;
 }
 
-export function SurahHeader({ surah }: SurahHeaderProps) {
+export function SurahHeader({ surah, name }: SurahHeaderProps) {
   return (
     <header className="mb-8">
       <div className="mb-4">
@@ -30,9 +34,9 @@ export function SurahHeader({ surah }: SurahHeaderProps) {
           </p>
           <span className="sr-only">{surah.name_arabic}</span>
         </SurahFrame>
-        <p className="text-paper-500 text-lg">{surah.name_translit}</p>
+        <p className="text-paper-500 text-lg">{name.name}</p>
         <p className="mt-1 text-sm text-paper-400 dark:text-paper-500">
-          {surah.name_translation} ·{' '}
+          {name.meaning ? `${name.meaning} · ` : ''}
           {surah.revelation_type.charAt(0).toUpperCase() + surah.revelation_type.slice(1)} ·{' '}
           {surah.ayah_count} ayahs
         </p>

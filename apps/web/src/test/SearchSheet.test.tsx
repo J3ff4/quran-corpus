@@ -6,7 +6,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 import { SearchSheet } from '../components/search/SearchSheet';
 
 const result = { jump: null, verses: [{ surah_id: 2, ayah_number: 255, source: 'en', snippet: 'the throne' }], roots: [] };
-const pickerSurahs = [{ id: 1, name_translit: 'Al-Fatihah', ayah_count: 7 }];
+const pickerSurahs = [{ id: 1, name: 'Al-Fatihah', ayah_count: 7 }];
 
 // Route by URL: search calls get the search result, /api/surahs gets the picker list.
 function fetchByUrl(url: string) {

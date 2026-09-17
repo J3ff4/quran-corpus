@@ -10,6 +10,7 @@ import {
   getWordsBySurah,
   getTranslationsBySurahAndLang,
   getGlossesWithFallback,
+  getSurahNames,
 } from '@quran-corpus/data';
 import type { Word, Translation } from '@quran-corpus/data';
 import { SurahHeader } from '../../../components/reader/SurahHeader';
@@ -19,6 +20,8 @@ import { RecordSurahVisit } from '../../../components/reader/RecordSurahVisit';
 import { isValidLang, type ValidLang } from '../../../components/reader/languages';
 import { parseScrollAyah } from './params';
 import { BOOKMARKS_COOKIE, bookmarkedAyahsIn } from '../../../lib/bookmarks';
+import { nameFor } from '../../../components/surah-list/nameFor';
+import { resolveLocale } from '../../../lib/locale';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -49,6 +52,7 @@ export default async function SurahPage({ params, searchParams }: PageProps) {
   // Read server-side so each ayah's bookmark icon renders saved, rather than
   // painting empty and filling in after hydration.
   const cookieStore = await cookies();
+  const surahName = nameFor(await getSurahNames(db, resolveLocale(cookieStore).content), surah);
   const bookmarkedAyahs = bookmarkedAyahsIn(
     cookieStore.get(BOOKMARKS_COOKIE)?.value,
     surahId,
@@ -76,7 +80,7 @@ export default async function SurahPage({ params, searchParams }: PageProps) {
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
       <RecordSurahVisit surahId={surahId} />
-      <SurahHeader surah={surah} />
+      <SurahHeader surah={surah} name={surahName} />
       <LanguageBar surahId={surahId} activeLang={lang} />
       <ReaderView
         ayahs={ayahs}

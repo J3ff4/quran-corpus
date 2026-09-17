@@ -1,13 +1,16 @@
 import Link from 'next/link';
-import type { Surah } from '@quran-corpus/data';
+import type { Surah, SurahName } from '@quran-corpus/data';
 import { SurahCard } from '../surah-list/SurahCard';
+import { nameFor } from '../surah-list/nameFor';
 
 interface FeaturedSurahsProps {
   surahs: Surah[];
+  /** Every surah's name in the reader's locale, from `getSurahNames`. */
+  names: Map<number, SurahName>;
   featuredIds: number[];
 }
 
-export function FeaturedSurahs({ surahs, featuredIds }: FeaturedSurahsProps) {
+export function FeaturedSurahs({ surahs, names, featuredIds }: FeaturedSurahsProps) {
   const featured = featuredIds
     .map((id) => surahs.find((s) => s.id === id))
     .filter((s): s is Surah => s != null);
@@ -22,7 +25,7 @@ export function FeaturedSurahs({ surahs, featuredIds }: FeaturedSurahsProps) {
       <ul className="space-y-2">
         {featured.map((surah) => (
           <li key={surah.id}>
-            <SurahCard surah={surah} />
+            <SurahCard surah={surah} name={nameFor(names, surah)} />
           </li>
         ))}
       </ul>

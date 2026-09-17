@@ -7,19 +7,32 @@ const surahsStub = [
 ];
 
 vi.mock('../lib/db', () => ({ getDatabase: vi.fn(async () => ({})) }));
-vi.mock('@quran-corpus/data', () => ({ getAllSurahs: vi.fn(async () => surahsStub) }));
+vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
+vi.mock('@quran-corpus/data', () => ({
+  getAllSurahs: vi.fn(async () => surahsStub),
+  getSurahNames: vi.fn(async () => new Map([[1, { name: 'Fotiha', meaning: null }]])),
+}));
 
 import { GET } from '../app/api/surahs/route';
 
 describe('GET /api/surahs', () => {
-  it('returns only {id,name_translit,ayah_count}', async () => {
+  it('returns only {id,name,ayah_count}, localized, falling back per surah', async () => {
     const res = await GET();
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual([
-      { id: 1, name_translit: 'Al-Fatihah', ayah_count: 7 },
-      { id: 2, name_translit: 'Al-Baqarah', ayah_count: 286 },
+      { id: 1, name: 'Fotiha', ayah_count: 7 },
+      { id: 2, name: 'Al-Baqarah', ayah_count: 286 },
     ]);
+  });
+
+  it('is privately cached and varies on the cookie it now reads', () => {
+    // The body carries the reader's language; a shared cache keyed by URL
+    // alone would serve it to the next reader in the wrong one.
+    return GET().then((res) => {
+      expect(res.headers.get('Cache-Control')).toBe('private, max-age=86400');
+      expect(res.headers.get('Vary')).toBe('Cookie');
+    });
   });
 
   it('returns 500 JSON when the DB throws', async () => {

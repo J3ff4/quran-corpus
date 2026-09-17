@@ -12,6 +12,8 @@ import type { WbwAyah, PickerSurah } from './types';
 
 interface WbwViewProps {
   surah: Surah;
+  /** The surah's name in the reader's locale (R5). */
+  surahName: string;
   ayahs: WbwAyah[];
   page: number;
   totalPages: number;
@@ -24,6 +26,7 @@ interface WbwViewProps {
 
 export function WbwView({
   surah,
+  surahName,
   ayahs,
   page,
   totalPages,
@@ -48,7 +51,7 @@ export function WbwView({
           <span className="sr-only">{surah.name_arabic}</span>
         </SurahFrame>
         <h1 className="text-paper-500">
-          <span>{surah.name_translit}</span> · word by word
+          <span>{surahName}</span> · word by word
         </h1>
         <Link
           href={`/surah/${surah.id}`}

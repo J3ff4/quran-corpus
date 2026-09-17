@@ -1,13 +1,23 @@
-import type { Surah, WordSegment } from '@quran-corpus/data';
+import type { Surah, SurahName, WordSegment } from '@quran-corpus/data';
 
 export interface PickerSurah {
   id: number;
-  name_translit: string;
+  /** Already localized -- the picker labels options with it verbatim. */
+  name: string;
   ayah_count: number;
 }
 
-export function toPickerSurah(s: Pick<Surah, 'id' | 'name_translit' | 'ayah_count'>): PickerSurah {
-  return { id: s.id, name_translit: s.name_translit, ayah_count: s.ayah_count };
+/** `names` comes from `getSurahNames`, which already covers all 114 with a
+ *  per-surah fallback; the `??` guards a caller that passes a partial map. */
+export function toPickerSurah(
+  s: Pick<Surah, 'id' | 'name_translit' | 'ayah_count'>,
+  names: Map<number, SurahName>,
+): PickerSurah {
+  return {
+    id: s.id,
+    name: names.get(s.id)?.name ?? s.name_translit,
+    ayah_count: s.ayah_count,
+  };
 }
 
 export interface WbwCell {
