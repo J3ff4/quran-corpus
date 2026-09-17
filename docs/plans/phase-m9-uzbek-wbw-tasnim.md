@@ -447,11 +447,16 @@ render, the dictionary root page, `apps/web/src/app/about/page.tsx`.
 - [ ] **Step 3: render the span** — group consecutive words by
       `gloss_group`, render the gloss once under the span. NULL groups are
       unchanged. The group is per language, so switching language regroups.
-- [ ] **Step 4: surah names by UI locale** (owner ruling): names follow
-      `uiLocale`, and Arabic + transliteration stay visible regardless of either
-      setting.
-- [ ] **Step 5: dictionary** — Uzbek root glosses above the English Lane /
-      Hans Wehr articles, which stay English.
+- [x] ~~**Step 4: surah names by UI locale**~~ — **MOVED to phase M10.**
+- [x] ~~**Step 5: dictionary** — Uzbek root glosses above Lane / Hans Wehr~~ —
+      **MOVED to phase M10.**
+
+  Both steps named `uiLocale`, which is an `apps/mobile` concept: `apps/web`
+  has no UI-locale layer at all. Owner ruled 2026-09-16 to build real web UI
+  i18n first rather than drive names off the `?lang=` translation picker, so
+  these two steps are Tasks 3 and 4 of
+  `docs/plans/phase-m10-web-ui-locale.md`. The queries they need
+  (`getSurahNames`, `getRootGlosses`) shipped here in Task 7 and are unaffected.
 - [ ] **Step 6: About credit** — `Word-by-word Uzbek: Tasnim`. Drop the NLLB
       credit; the mt rows are gone.
 - [ ] **Step 7: green** — lint, type-check, tests.
@@ -507,8 +512,8 @@ Uzbek — hide it otherwise rather than showing a dead control.
 | 361 | A grouped pair (2:2 لا ريب) shows ONE gloss under both words | |
 | 362 | Script toggle → Cyrillic: glosses change script, nothing else moves | |
 | 363 | Script toggle hidden while content language is English | |
-| 364 | UI locale Uzbek: headers/browse/jump read Fotiha, Baqara, Tavba | |
-| 365 | UI locale English: still Al-Fatiha. Arabic name shown in both | |
+| 364 | ~~UI locale Uzbek: headers/browse/jump read Fotiha~~ | moved to M10 (381) |
+| 365 | ~~UI locale English: still Al-Fatiha~~ | moved to M10 (380/382) |
 | 366 | Dictionary root: Uzbek gloss list above the English article | |
 | 367 | About: Tasnim credited, no NLLB credit | |
 | 368 | Search finds an Uzbek verse phrase from the Tasnim translation | |
