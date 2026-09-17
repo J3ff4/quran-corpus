@@ -59,18 +59,38 @@ def derive_root_glosses(con: sqlite3.Connection, language_code: str) -> int:
     # still has exactly one gloss, and counting it per segment would inflate it.
     rows = con.execute(
         """
-        SELECT r.id AS root_id, g.gloss_text AS gloss_text
+        SELECT r.id AS root_id, g.gloss_text AS gloss_text,
+               w.ayah_id AS ayah_id, g.gloss_group AS gloss_group
           FROM roots r
           JOIN (SELECT DISTINCT root, word_id FROM word_segments
                  WHERE root IS NOT NULL) ws ON ws.root = r.root_buckwalter
           JOIN word_glosses g ON g.word_id = ws.word_id
+          JOIN words w ON w.id = g.word_id
          WHERE g.language_code = ?
         """,
         (language_code,),
     ).fetchall()
 
+    # A grouped gloss is ONE gloss spread over a phrase's words, so a root
+    # carried by two words of the same phrase must still count it once --
+    # otherwise one occurrence of a phrase outranks a gloss that genuinely
+    # occurred twice. Group ids are scoped per (ayah, language_code), hence
+    # the ayah in the key. NULL groups are one-per-word already and each keep
+    # their own count, which is why this cannot be a SELECT DISTINCT: SQLite
+    # treats NULLs as equal and would collapse two real occurrences into one.
+    #
+    # The phrase still lands on every root in the span. That is deliberate:
+    # 108 of 1642 roots have no ungrouped Uzbek gloss at all, and for those a
+    # phrase beats an empty dictionary entry.
     by_root: dict[int, list[str]] = {}
+    seen_spans: set[tuple[int, int, int]] = set()
     for row in rows:
+        group = row["gloss_group"]
+        if group is not None:
+            span = (row["root_id"], row["ayah_id"], group)
+            if span in seen_spans:
+                continue
+            seen_spans.add(span)
         by_root.setdefault(row["root_id"], []).append(row["gloss_text"])
 
     with con:

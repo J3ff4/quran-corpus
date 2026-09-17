@@ -23,6 +23,20 @@ from .db import ScraperDatabase
 from .tasnim_align import Group, Override, align_all
 from .translit_uz_cyrl import to_cyrillic
 
+# Every Uzbek gloss source Tasnim replaces, and so every one the export below
+# has to carry out before the delete. 'mt-reviewed' is here because
+# review_glosses.py writes it: those rows are the ONLY hand-corrected data in
+# the table, and leaving them out of both the export and the count guard meant
+# the guard compared 0 against 0 and reported success while destroying them.
+_REPLACED_UZ_SOURCES = ("mt", "mt-reviewed")
+_REPLACED_SOURCES = (*_REPLACED_UZ_SOURCES, "tasnim", "tasnim-cyrl")
+# The placeholders below are written out rather than generated: interpolating
+# them trips ruff's S608 even though the values are module constants, and the
+# rule is right that SQL should not be assembled from strings. These asserts
+# are what keeps the literal `?` counts honest if either tuple grows.
+assert len(_REPLACED_UZ_SOURCES) == 2
+assert len(_REPLACED_SOURCES) == 4
+
 # A gloss is a word's meaning, not a sentence. The longest legitimate one in
 # the Tasnim data is well inside this; a row over it is a verse translation
 # that wandered into the word column.
@@ -109,7 +123,10 @@ def validate_gloss(text: str) -> str | None:
 
 
 def export_mt_glosses(con: sqlite3.Connection, path: Path) -> int:
-    """Write every machine-translated Uzbek gloss to JSONL. Returns the count.
+    """Write every Uzbek gloss Tasnim replaces to JSONL. Returns the count.
+
+    Both the machine-translated rows and the hand-corrected 'mt-reviewed'
+    ones -- the latter have no other copy anywhere.
 
     The rows carry their surah:ayah:position, not only their word_id: word ids
     are assigned by a corpus rebuild and would not survive one, which is the
@@ -120,8 +137,10 @@ def export_mt_glosses(con: sqlite3.Connection, path: Path) -> int:
              FROM word_glosses g
              JOIN words w ON w.id = g.word_id
              JOIN ayahs a ON a.id = w.ayah_id
-            WHERE g.language_code = 'uz' AND g.source = 'mt'
-            ORDER BY a.surah_id, a.ayah_number, w.position"""
+            WHERE g.language_code = 'uz'
+              AND g.source IN (?, ?)
+            ORDER BY a.surah_id, a.ayah_number, w.position""",
+        _REPLACED_UZ_SOURCES,
     ).fetchall()
     if not rows and path.exists() and path.stat().st_size:
         # Nothing left to export and a previous export is on disk. The first
@@ -322,7 +341,8 @@ def import_tasnim(
         # counted before anything is destroyed.
         expected = con.execute(
             "SELECT COUNT(*) FROM word_glosses"
-            " WHERE language_code = 'uz' AND source = 'mt'"
+            " WHERE language_code = 'uz' AND source IN (?, ?)",
+            _REPLACED_UZ_SOURCES,
         ).fetchone()[0]
         try:
             exported = export_mt_glosses(con, export_path)
@@ -336,16 +356,18 @@ def import_tasnim(
 
         with con:
             _write_languages(con)
-            # UNIQUE(word_id, language_code) means mt and Tasnim cannot coexist
-            # under 'uz'; the upsert would overwrite most of them anyway, and
-            # leave a silent residue of mt rows on words Tasnim does not reach.
-            # mt, because Tasnim replaces it. tasnim/tasnim-cyrl, because
+            # UNIQUE(word_id, language_code) means the old uz rows and
+            # Tasnim cannot coexist under 'uz'; the upsert would overwrite most
+            # of them anyway, and leave a silent residue on words Tasnim does
+            # not reach.
+            # mt/mt-reviewed, because Tasnim replaces them. tasnim/tasnim-cyrl,
+            # because
             # `gloss_group` is renumbered from 1 on every run: a row left
             # behind on a word this run no longer reaches keeps a group id
             # that now belongs to an unrelated phrase.
             con.execute(
-                "DELETE FROM word_glosses WHERE source IN"
-                " ('mt', 'tasnim', 'tasnim-cyrl')"
+                "DELETE FROM word_glosses WHERE source IN (?, ?, ?, ?)",
+                _REPLACED_SOURCES,
             )
             written, kept, rejected = _write_glosses(con, groups, rejects_path)
             translations = _write_translations(con, tasnim)

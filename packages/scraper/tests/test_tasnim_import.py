@@ -422,3 +422,46 @@ def test_only_arabic_marks_are_stripped_not_every_combining_mark():
     # unconditional strip of combining marks would silently rewrite those into
     # different letters -- so the strip is scoped to the Arabic ranges.
     assert clean_gloss("\u0438\u0306\u045e\u0493") == "\u0438\u0306\u045e\u0493"
+
+
+def test_a_hand_reviewed_gloss_is_exported_before_it_is_deleted(tmp_path):
+    # review_glosses.py writes source='mt-reviewed'. Those rows are the only
+    # hand-corrected data in the table and exist nowhere else, so an import
+    # that deletes them without carrying them out destroys them for good -- and
+    # a guard counting only 'mt' compares 0 against 0 and calls that success.
+    corpus = tmp_path / "c.db"
+    _corpus(corpus, {(1, 1): ["لَا", "رَيْبَ"], (1, 2): ["قُلْ"]})
+    con = sqlite3.connect(corpus)
+    con.execute(
+        "INSERT INTO word_glosses (word_id, language_code, gloss_text, source)"
+        " SELECT id, 'uz', 'qoʻlda tuzatilgan', 'mt-reviewed' FROM words"
+    )
+    con.commit()
+    con.close()
+    # Ayah 2 is outside Tasnim's coverage: its row is deleted, never upserted.
+    _tasnim(tmp_path / "t.db", [(1, 1, "لَا رَيْبَ", "shubha yo'q")])
+    export = tmp_path / "mt.jsonl"
+    summary = import_tasnim(
+        corpus,
+        tmp_path / "t.db",
+        export_path=export,
+        rejects_path=tmp_path / "rejects.tsv",
+    )
+
+    assert summary.mt_exported == 3
+    exported = [json.loads(line) for line in export.read_text("utf-8").splitlines()]
+    assert len(exported) == 3
+    assert {row["gloss_text"] for row in exported} == {"qoʻlda tuzatilgan"}
+    # Every one of them, including the word Tasnim never reached.
+    assert (1, 2, 1) in {
+        (r["surah_id"], r["ayah_number"], r["position"]) for r in exported
+    }
+
+    con = sqlite3.connect(corpus)
+    assert (
+        con.execute(
+            "SELECT COUNT(*) FROM word_glosses WHERE source = 'mt-reviewed'"
+        ).fetchone()[0]
+        == 0
+    )
+    con.close()

@@ -137,3 +137,38 @@ def test_a_root_with_no_glosses_writes_nothing(db):
         "INSERT INTO roots (id, root_buckwalter, root_arabic) VALUES (2, 'qwl', 'قول')"
     )
     assert derive_root_glosses(db, "uz") == 1
+
+
+def test_a_phrase_spanning_two_words_of_one_root_counts_once(db):
+    # words 2 and 3 both carry root ktb. Put them under ONE Tasnim gloss group:
+    # that is a single phrase gloss, not two occurrences of it, and counting it
+    # per word would rank it above "kitob", which genuinely occurred twice.
+    db.executescript("""
+        UPDATE word_glosses SET gloss_text = 'yozib qoldirdi', gloss_group = 7
+          WHERE word_id IN (2, 3) AND language_code = 'uz';
+    """)
+    db.commit()
+    derive_root_glosses(db, "uz")
+    rows = db.execute(
+        "SELECT rank, gloss, occurrence_count FROM root_glosses"
+        " WHERE language_code = 'uz' ORDER BY rank"
+    ).fetchall()
+    # Deduped, the phrase ties with "kitob" at 1 and loses the alphabetical
+    # tiebreak. Counted per word it would be 2, and rank 1.
+    assert [tuple(r) for r in rows] == [
+        (1, "kitob", 1),
+        (2, "yozib qoldirdi", 1),
+    ]
+
+
+def test_an_ungrouped_gloss_repeated_on_two_words_still_counts_twice(db):
+    # The other side of the same rule: NULL gloss_group is one gloss per word,
+    # so two words glossed 'kitob' are two occurrences. A SELECT DISTINCT would
+    # fold these together -- SQLite treats NULLs as equal -- and silently halve
+    # every ungrouped count in the dictionary.
+    derive_root_glosses(db, "uz")
+    top = db.execute(
+        "SELECT gloss, occurrence_count FROM root_glosses"
+        " WHERE language_code = 'uz' AND rank = 1"
+    ).fetchone()
+    assert (top["gloss"], top["occurrence_count"]) == ("kitob", 2)
