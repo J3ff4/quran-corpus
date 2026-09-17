@@ -420,7 +420,7 @@ but there IS on `en` and `ru`, where `root_glosses` has no rows at all.
 
 - Translating web chrome into uz/ru (R3). Its own phase.
 - `next-intl`, locale-prefixed routes, message formatting/pluralization (R2).
-- Mobile's Latin/Cyrillic toggle — that is M9 Task 9, and it consumes Task 1's
+- Mobile's Latin/Cyrillic toggle — shipped in M9 (`925b2c2`). It will consume Task 1's
   `contentLanguage` rather than defining its own.
 - The `?lang=` translation picker stays as it is: which TRANSLATION you read is
   a separate choice from which language the UI is in, and R1 turned down
