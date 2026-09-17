@@ -651,8 +651,23 @@ data tests green, lint and type-check clean across the workspace, and the search
 routing mutation-checked (reverting the one call site to `contentLanguage` fails
 14 SearchScreen tests).
 
-**Owed: a device re-run of 368**, plus the reader on Lotin, to confirm Latin
-verse text under Latin glosses.
+**Device re-run 2026-09-17, Expo Go** (JS-only change -- no native module, no
+DB change, no `corpusDbVersion` bump, so no APK rebuild). OnePlus 7 Pro over adb
+wifi, Metro on the LAN.
+
+| Check | Setting | Result |
+|---|---|---|
+| Reader | Tarjima O'zbek + **Lotin** | PASS. 1:1 renders `Rahmon va Rahim boʻlgan Alloh nomi bilan boshlayman.` -- Tasnim Latin. 1:2, 1:3, 1:4 Latin too. |
+| Reader | Tarjima O'zbek + **Кирилл** | PASS. 1:1 renders `Раҳмон ва Раҳим бўлган Аллоҳ номи билан бошлайман.` -- the same sentence transliterated, NOT Sodiq's `Меҳрибон ва раҳмли Аллоҳнинг номи билан бошлайман. (Аллоҳ та…)`. The toggle changes the alphabet and nothing else. |
+| **368** | **Lotin** | **PASS.** `boshlayman` returns 1:1 and 40:29 in Tasnim **Latin**. Before the fix this query returned Muhammad Sodik's Cyrillic via the transliteration arm. |
+| 368 | **Кирилл** | PASS, by artifact rather than by keyboard -- `adb shell input text` throws `NullPointerException: Attempt to get length of null array` on non-ASCII, so a Cyrillic term cannot be typed without an IME on the device. Ran `sourceFilter`'s exact SQL against the bundled `apps/mobile/assets/db/quran.db` instead: `бошлайман` with `language_code='uz-Cyrl'`, `translator='Tasnim'` returns the same two ayahs (1:1, 40:29) the Latin arm returns, in Cyrillic. Previously `source='uz-Cyrl'` was matched by no arm at all. |
+| 368 | Кирилл, on device | Supporting: the `40:29` verse-reference jump renders the `uz-Cyrl` Tasnim row character-for-character as the artifact query returned it, so the Cyrillic path renders end to end on the phone even though its FTS arm was proven off-device. |
+
+Device restored to Interface English / Translation English, the state it was found
+in.
+
+Still owed: nothing for this defect. The wider M9 device debt (the nine
+owner-driven checks) is unchanged.
 
 **Device run 2026-09-17, vc22 (`aapt2 dump badging` confirmed), APK 208.8 MiB.**
 Defect found and fixed before the run: `corpusDbVersion` still read `'m7b'`,
