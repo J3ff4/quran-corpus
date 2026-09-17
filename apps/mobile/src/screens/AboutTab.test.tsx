@@ -39,6 +39,11 @@ describe('AboutTab', () => {
     // Same rule as the reciters above: the name is read from the shared table
     // create-m1-reader-db.ts validates the DB against, so swapping a translator
     // cannot leave this screen crediting the previous one (§11).
+    //
+    // getByText and not getAllByText, deliberately: it throws on more than one
+    // match, which is what holds the two Uzbek script codes to a single Tasnim
+    // credit. Both name the same party, and crediting them twice reads as a
+    // rendering bug.
     for (const [language, translator] of Object.entries(selectedTranslators)) {
       expect(screen.getByText(translator), `missing ${language}`).toBeTruthy();
     }

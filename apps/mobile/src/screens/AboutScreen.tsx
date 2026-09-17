@@ -30,16 +30,23 @@ interface Credit {
 const TRANSLATION_BODIES: Record<SelectedTranslatorLanguage, UiStringKey> = {
   en: 'about.sourceEnglish',
   uz: 'about.sourceUzbek',
+  'uz-Cyrl': 'about.sourceUzbek',
   ru: 'about.sourceRussian',
 };
 
-const TRANSLATION_CREDITS: Credit[] = Object.entries(TRANSLATION_BODIES).map(
-  ([language, body]) => ({
-    name: selectedTranslators[language as SelectedTranslatorLanguage],
-    body,
-    pending: true,
-  }),
-);
+// Deduplicated by name, because the two Uzbek script codes are one work by one
+// party: crediting "Tasnim" twice reads as a rendering bug, not as diligence.
+// Keyed by name alone rather than name+body on purpose -- two entries that
+// shared a name but disagreed on the body would be a genuine mistake here, and
+// silently rendering both would hide it.
+const TRANSLATION_CREDITS: Credit[] = [
+  ...new Map(
+    Object.entries(TRANSLATION_BODIES).map(([language, body]) => [
+      selectedTranslators[language as SelectedTranslatorLanguage],
+      { name: selectedTranslators[language as SelectedTranslatorLanguage], body, pending: true },
+    ]),
+  ).values(),
+];
 
 const GROUPS: { title: UiStringKey; credits: Credit[] }[] = [
   {
@@ -52,13 +59,6 @@ const GROUPS: { title: UiStringKey; credits: Credit[] }[] = [
       // redistribution grant stated (ruling 9), so it is pending like the
       // rest of the uncleared set -- this row is what makes that auditable.
       { name: 'QUL', body: 'about.sourceMushafLayout', pending: true },
-      // The Uzbek word-by-word and the Uzbek surah names, both from M9. Not
-      // folded into TRANSLATION_CREDITS: those are the one verse translator
-      // per language that selectedTranslators names, and this is a different
-      // work by a different party that happens to be in the same language.
-      // Pending -- the licence has not been cleared (§11).
-      { name: 'Tasnim', body: 'about.sourceTasnim', pending: true },
-
       ...TRANSLATION_CREDITS,
     ],
   },

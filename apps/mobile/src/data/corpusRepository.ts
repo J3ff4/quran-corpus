@@ -41,7 +41,7 @@ import {
   type WordDetail,
   type WordSegment,
 } from '@quran-corpus/data/mobile';
-import type { ContentLanguageCode, QueryLanguageCode, UiLocaleCode } from '../i18n/languages';
+import type { QueryLanguageCode, UiLocaleCode } from '../i18n/languages';
 
 const M0_SURAH_ID = 1;
 
@@ -49,15 +49,15 @@ const M0_SURAH_ID = 1;
 // the UI offers -- otherwise a new language would render a permanently blank
 // translation pane instead of an error.
 //
-// Keyed by ContentLanguageCode and NOT QueryLanguageCode, deliberately. The
-// script toggle composes 'uz-Cyrl' for the gloss and concordance queries, but
-// the corpus carries only ONE uz-Cyrl translator (Tasnim) against three for
-// 'uz', so a script switch would silently change which translation of the
-// verse is on screen -- a different translator's words, not the same words in
-// another alphabet. Until that is ruled on, the verse translation and search
-// stay bound to the selected content language, and this type is what enforces
-// it: passing a composed code here is a compile error, not a blank pane.
-const translatorByLanguage: Record<ContentLanguageCode, string> = selectedTranslators;
+// Keyed by QueryLanguageCode, so the script toggle reaches the verse
+// translation and search the same way it already reaches the glosses. That is
+// only sound because both Uzbek entries name Tasnim: the composed 'uz-Cyrl'
+// and the plain 'uz' are one translator's words in two alphabets, so flipping
+// the script re-renders the same translation rather than swapping the scholar.
+// See packages/mobile-data/src/translators.ts -- if a future entry ever binds
+// the two Uzbek codes to different translators, this keying is what would make
+// a script switch silently change the text, and it must be reverted with it.
+const translatorByLanguage: Record<QueryLanguageCode, string> = selectedTranslators;
 
 export interface ReaderAyah {
   ayah: Ayah;
@@ -86,7 +86,7 @@ export interface SurahListItem {
 
 function selectedTranslationByAyah(
   translations: Translation[],
-  languageCode: ContentLanguageCode,
+  languageCode: QueryLanguageCode,
 ): Map<number, Translation> {
   const selectedTranslator = translatorByLanguage[languageCode];
   const grouped = new Map<number, Translation>();
@@ -163,7 +163,7 @@ export async function getAyahsOfSurah(client: MobileDataClient, surahId: number)
 export async function getSurahReader(
   client: MobileDataClient,
   surahId: number,
-  languageCode: ContentLanguageCode,
+  languageCode: QueryLanguageCode,
 ): Promise<SurahReaderData> {
   // Words are deliberately not fetched here. Nothing in the reader renders
   // them, and pulling every word of a surah moved 6116 rows across the bridge
@@ -209,7 +209,7 @@ export async function getAyahReaderLocation(
   client: MobileDataClient,
   surahId: number,
   ayahNumber: number,
-  languageCode: ContentLanguageCode,
+  languageCode: QueryLanguageCode,
 ): Promise<ReaderLocation | null> {
   const reader = await getSurahReader(client, surahId, languageCode);
   const found = reader.ayahs.find((item) => item.ayah.ayah_number === ayahNumber);
@@ -218,7 +218,7 @@ export async function getAyahReaderLocation(
 
 export async function getM0SurahReader(
   client: MobileDataClient,
-  languageCode: ContentLanguageCode,
+  languageCode: QueryLanguageCode,
 ): Promise<SurahReaderData> {
   return getSurahReader(client, M0_SURAH_ID, languageCode);
 }
@@ -606,7 +606,7 @@ export async function getM0WordDetail(
 export async function searchCorpus(
   client: MobileDataClient,
   query: string,
-  languageCode: ContentLanguageCode,
+  languageCode: QueryLanguageCode,
 ): Promise<SearchResult> {
   return search(client, query, {
     language: languageCode,

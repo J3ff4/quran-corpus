@@ -10,7 +10,12 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/settings/settingsStore', () => ({
-  useAppSettings: () => ({ uiLocale: 'en', contentLanguage: 'ru', reduceMotion: false }),
+  useAppSettings: () => ({
+    uiLocale: 'en',
+    contentLanguage: 'uz',
+    queryLanguage: 'uz-Cyrl',
+    reduceMotion: false,
+  }),
 }));
 vi.mock('@/data/corpusRepository', () => ({ searchCorpus: mocks.searchCorpus }));
 vi.mock('@/data/openCorpusDb', () => ({ openCorpusDb: () => Promise.resolve({}) }));
@@ -138,15 +143,18 @@ describe('SearchScreen', () => {
     expect(screen.queryByTestId('search-loading')).toBeNull();
   });
 
-  it('searches in the reader content language, not the UI locale', async () => {
+  it("searches in the reader's language AND script, not the UI locale", async () => {
     render(<SearchScreen />);
 
     fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'нет' } });
 
     await waitFor(() => expect(mocks.searchCorpus).toHaveBeenCalled());
-    // Passing the UI locale here searches Russian text for a user reading in
-    // English and returns nothing, which reads as a broken index.
-    expect(mocks.searchCorpus.mock.calls.at(-1)![2]).toBe('ru');
+    // Three different codes are in play deliberately. The UI locale ('en')
+    // searches English text for a user reading Uzbek and returns nothing.
+    // The bare content language ('uz') is Latin Uzbek, so a Cyrillic query
+    // from a reader on the Cyrillic script misses every row it should hit --
+    // that was check 368. Only the composed code is right.
+    expect(mocks.searchCorpus.mock.calls.at(-1)![2]).toBe('uz-Cyrl');
   });
 
   it('renders a verse-reference jump above the hits', async () => {

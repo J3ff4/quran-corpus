@@ -8,7 +8,8 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | Arabic Quran text | Canonical local corpus DB: sibling workspace `../quran-data/quran.db`, generated from existing PWA importer data including Tanzil Uthmani XML via `packages/scraper/scraper/sources/tanzil.py`; copied to ignored mobile asset `apps/mobile/assets/db/quran.db` by `pnpm generate:m1-db` | Needs release sign-off | Needs release sign-off | ar | Not approved | Not approved |
 | English translation | Existing PWA DB: Saheeh International | Needs release sign-off | Needs release sign-off | en | Not approved | Not approved |
-| Uzbek translation | Existing PWA DB: Muhammad Sodik Muhammad Yusuf | Needs release sign-off | Needs release sign-off | uz | Not approved | Not approved |
+| Uzbek translation (Latin) | Existing PWA DB: Tasnim | Needs release sign-off | Needs release sign-off | uz | Not approved | Not approved |
+| Uzbek translation (Cyrillic) | Existing PWA DB: Tasnim, imported in M9 | Needs release sign-off | Needs release sign-off | uz-Cyrl | Not approved | Not approved |
 | Russian translation | Existing PWA DB: Abu Adel | Needs release sign-off | Needs release sign-off | ru | Not approved | Not approved |
 | Hafs font | Existing mobile asset: `apps/mobile/assets/fonts/hafs.18.woff2` | Needs release sign-off | Needs release sign-off | hafs | Not approved | Not approved |
 | Abdul Rashid Sufi audio metadata | Not approved | Not approved | Not approved | abdul-rashid-sufi | Not approved | Not approved |
@@ -23,8 +24,14 @@
 
 ## M1 Translation Selection
 
+Uzbek is listed twice on purpose. `uz` is Latin and `uz-Cyrl` is Cyrillic, and
+both name Tasnim so the script toggle changes the alphabet and nothing else --
+the corpus's other two Uzbek translators are Cyrillic-only, so binding either
+script to one of them would make the toggle swap the translation itself.
+
 | Language | Selected translator |
 | --- | --- |
 | en | Saheeh International |
-| uz | Muhammad Sodik Muhammad Yusuf |
+| uz | Tasnim |
+| uz-Cyrl | Tasnim |
 | ru | Abu Adel |
