@@ -55,6 +55,15 @@ export async function getGlossesWithFallback(
   lang: string,
   fallback = 'en',
 ): Promise<GlossWithLang[]> {
+  // DEPLOY ORDER: `pref.gloss_group` is read unconditionally, and the column is
+  // added by runMigrations / the scraper's `_migrate_add_gloss_group`. Web runs
+  // with DB_SKIP_MIGRATIONS=true (apps/web/src/lib/db.ts) and `next build` sets
+  // it too, so pointing a build or a deploy at a DB that has not had
+  // `uv run scraper import-tasnim` (or a migration run) throws
+  // `no such column: gloss_group` on every reader and word-by-word page.
+  // Migrate the DB before shipping the build, not after. Deliberately not a
+  // runtime PRAGMA guard: that would cost a probe on every page render to
+  // cover a one-time ordering mistake.
   const result = await db.execute({
     sql: `SELECT w.id AS word_id,
                  COALESCE(pref.gloss_text, fb.gloss_text) AS gloss_text,
