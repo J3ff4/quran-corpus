@@ -515,7 +515,7 @@ describe('getWordSummary', () => {
     const client = createFakeClient();
     const [word] = await getWordsForAyah(client, 201);
 
-    const summary = await getWordSummary(client, word!, { text: 'Alif Lam Meem', lang: 'en', isFallback: false });
+    const summary = await getWordSummary(client, word!, { text: 'Alif Lam Meem', lang: 'en', isFallback: false, group: null });
 
     expect(summary.word.id).toBe(2001);
     expect(summary.segments).toHaveLength(2);

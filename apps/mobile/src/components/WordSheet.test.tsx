@@ -144,7 +144,7 @@ function summary(
     segments: overrides.segments ?? [seg(1, 'N')],
     gloss:
       overrides.gloss === undefined
-        ? { text: 'the entirely merciful', lang: 'en', isFallback: false }
+        ? { text: 'the entirely merciful', lang: 'en', isFallback: false, group: null }
         : overrides.gloss,
   };
 }
@@ -205,7 +205,7 @@ describe('WordSheet', () => {
   });
 
   it('shows the gloss when there is one', () => {
-    render(<WordSheet summary={summary({ gloss: { text: 'the most merciful', lang: 'en', isFallback: false } })} {...handlers} />);
+    render(<WordSheet summary={summary({ gloss: { text: 'the most merciful', lang: 'en', isFallback: false, group: null } })} {...handlers} />);
 
     expect(screen.getByText('the most merciful')).toBeTruthy();
   });
@@ -290,7 +290,7 @@ describe('WordSheet', () => {
   it('marks a gloss that fell back to another language', () => {
     render(
       <WordSheet
-        summary={summary({ gloss: { text: 'the Entirely Merciful', lang: 'en', isFallback: true } })}
+        summary={summary({ gloss: { text: 'the Entirely Merciful', lang: 'en', isFallback: true, group: null } })}
         {...handlers}
       />,
     );

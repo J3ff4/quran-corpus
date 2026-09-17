@@ -84,7 +84,7 @@ const word: Word = {
 const summary = {
   word,
   segments: [segment(1, 'ٱل', 'DET'), segment(2, 'لَّهُ', 'PN')],
-  gloss: { text: 'Allah', lang: 'en', isFallback: false },
+  gloss: { text: 'Allah', lang: 'en', isFallback: false, group: null },
 };
 
 describe('word detail route', () => {
@@ -181,7 +181,7 @@ describe('word detail route', () => {
     // mark could be dropped and every suite stay green.
     mocks.getWordAtLocation.mockResolvedValue({
       ...summary,
-      gloss: { text: 'Allah', lang: 'en', isFallback: true },
+      gloss: { text: 'Allah', lang: 'en', isFallback: true, group: null },
     });
 
     render(<WordDetailRoute />);

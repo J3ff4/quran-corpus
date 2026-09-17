@@ -1,6 +1,6 @@
 import React from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, type MockedFunction } from 'vitest';
 import type { Word, WordSegment } from '@quran-corpus/data/mobile';
 import type { Gloss, WbwPage } from '@/data/corpusRepository';
 
@@ -92,7 +92,7 @@ function renderHybrid({
   page: wbwPage = page(3),
   glosses = GLOSSES,
   onWordPress = vi.fn(),
-}: { page?: WbwPage; glosses?: Map<number, Gloss>; onWordPress?: (word: Word) => void } = {}) {
+}: { page?: WbwPage; glosses?: Map<number, Gloss>; onWordPress?: MockedFunction<(word: Word) => void> } = {}) {
   const result = render(
     <ThemeContext.Provider value={themeColors.dark}>
       <WbwHybrid page={wbwPage} uiLocale="en" glosses={glosses} onWordPress={onWordPress} />
