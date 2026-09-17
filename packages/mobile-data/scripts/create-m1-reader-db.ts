@@ -3,8 +3,13 @@ import { access, copyFile, mkdir, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createDatabase } from '@quran-corpus/data';
-import { selectedTranslators } from '../src/translators.js';
+import {
+  selectedTranslators,
+  type SelectedTranslatorLanguage,
+} from '../src/translators.js';
 import { checkpointWal, sealDbForBundling } from './sealDb.js';
+
+const SELECTED_TRANSLATOR_ENTRIES: [string, string][] = Object.entries(selectedTranslators);
 
 // Derived from this file's own location, not the cwd: `resolve('../..')` only
 // landed on the repo root when the script happened to be invoked from inside
@@ -14,7 +19,9 @@ const approvalPath = resolve(repoRoot, 'docs/data-sources-m1.md');
 const targetDbPath = resolve(repoRoot, 'apps/mobile/assets/db/quran.db');
 
 const incompleteSelectionMessage =
-  'M1 translation selection must contain exactly one selected translator for en, uz, and ru.';
+  `M1 translation selection must contain exactly one selected translator for ${Object.keys(
+    selectedTranslators,
+  ).join(', ')}.`;
 
 export interface TranslationContractSummary {
   translator: string;
@@ -123,9 +130,15 @@ export async function syncM1ReaderDbAsset({
   return { sourceSha256, targetSha256: await fileSha256(targetDbPath) };
 }
 
-export function parseM1TranslationSelection(approval: string): Record<keyof typeof selectedTranslators, string> {
-  const selections = new Map<keyof typeof selectedTranslators, string>();
-  const duplicates = new Set<keyof typeof selectedTranslators>();
+function isSelectedLanguage(code: string): code is SelectedTranslatorLanguage {
+  return Object.hasOwn(selectedTranslators, code);
+}
+
+export function parseM1TranslationSelection(
+  approval: string,
+): Record<SelectedTranslatorLanguage, string> {
+  const selections = new Map<SelectedTranslatorLanguage, string>();
+  const duplicates = new Set<SelectedTranslatorLanguage>();
 
   for (const line of approval.split(/\r?\n/)) {
     const columns = line
@@ -137,7 +150,10 @@ export function parseM1TranslationSelection(approval: string): Record<keyof type
     if (columns.length !== 2) continue;
 
     const [languageCode, translator] = columns;
-    if (languageCode !== 'en' && languageCode !== 'ru' && languageCode !== 'uz') continue;
+    // Driven off selectedTranslators rather than a literal list, so adding a
+    // language_code there (as 'uz-Cyrl' was) fails the approval check until
+    // the doc names a translator for it, instead of silently skipping the row.
+    if (!isSelectedLanguage(languageCode)) continue;
 
     if (selections.has(languageCode)) duplicates.add(languageCode);
     selections.set(languageCode, translator);
@@ -146,16 +162,17 @@ export function parseM1TranslationSelection(approval: string): Record<keyof type
   if (duplicates.size > 0) throw new Error(incompleteSelectionMessage);
 
   for (const [languageCode, translator] of Object.entries(selectedTranslators)) {
-    if (selections.get(languageCode as keyof typeof selectedTranslators) !== translator) {
+    if (selections.get(languageCode as SelectedTranslatorLanguage) !== translator) {
       throw new Error(incompleteSelectionMessage);
     }
   }
 
-  return {
-    en: selections.get('en') ?? '',
-    ru: selections.get('ru') ?? '',
-    uz: selections.get('uz') ?? '',
-  };
+  return Object.fromEntries(
+    Object.keys(selectedTranslators).map((languageCode) => [
+      languageCode,
+      selections.get(languageCode as SelectedTranslatorLanguage) ?? '',
+    ]),
+  ) as Record<SelectedTranslatorLanguage, string>;
 }
 
 export async function validateM1ReaderDbContract(dbPath = targetDbPath): Promise<M1ReaderDbContractSummary> {
@@ -167,21 +184,21 @@ export async function validateM1ReaderDbContract(dbPath = targetDbPath): Promise
       db.execute('SELECT count(*) AS n FROM ayahs'),
       db.execute('SELECT count(*) AS n FROM words'),
       db.execute("SELECT code FROM languages WHERE code IN ('en', 'uz', 'ru') ORDER BY code"),
+      // One OR arm per selectedTranslators entry rather than three hardcoded
+      // ones: 'uz-Cyrl' is the reader's Cyrillic Uzbek translation, and a
+      // bundle missing it would otherwise pass here and fail only on a device
+      // with the script toggle flipped.
       db.execute({
         sql: `
           SELECT language_code, translator, count(*) AS n
           FROM translations
-          WHERE (
-            language_code = 'en' AND translator = ?
-          ) OR (
-            language_code = 'ru' AND translator = ?
-          ) OR (
-            language_code = 'uz' AND translator = ?
-          )
+          WHERE ${SELECTED_TRANSLATOR_ENTRIES.map(
+            () => '(language_code = ? AND translator = ?)',
+          ).join(' OR ')}
           GROUP BY language_code, translator
           ORDER BY language_code
         `,
-        args: [selectedTranslators.en, selectedTranslators.ru, selectedTranslators.uz],
+        args: SELECTED_TRANSLATOR_ENTRIES.flat(),
       }),
     ]);
 

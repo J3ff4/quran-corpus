@@ -30,6 +30,20 @@ export interface GlossWithLang {
   word_id: number;
   gloss_text: string;
   gloss_lang: string;
+  /** Which phrase this word belongs to, from the preferred-language row.
+   *  Words sharing a group are ONE gloss and render once across the span.
+   *  NULL for every ungrouped source, and always for a fallback row.
+   *
+   *  A fallback row's own group id is deliberately dropped rather than passed
+   *  through. Group ids are scoped per (ayah, language_code), so two languages
+   *  number their phrases independently: a word taking group 5 from `lang` next
+   *  to a word taking group 5 from `fallback` are unrelated phrases, and the
+   *  renderer -- which joins adjacent cells sharing an id -- would merge them
+   *  into one span under one language's gloss. Dropping the id costs a grouped
+   *  fallback its spans (each word renders the phrase separately); keeping it
+   *  would corrupt the reading. Inert while `fallback` is 'en', which carries
+   *  no groups at all, and that is exactly why it must be written down. */
+  gloss_group: number | null;
 }
 
 /** One gloss per word for a surah: the requested lang where a row exists,
@@ -41,10 +55,21 @@ export async function getGlossesWithFallback(
   lang: string,
   fallback = 'en',
 ): Promise<GlossWithLang[]> {
+  // DEPLOY ORDER: `pref.gloss_group` is read unconditionally, and the column is
+  // added by runMigrations / the scraper's `_migrate_add_gloss_group`. Web runs
+  // with DB_SKIP_MIGRATIONS=true (apps/web/src/lib/db.ts) and `next build` sets
+  // it too, so pointing a build or a deploy at a DB that has not had
+  // `uv run scraper import-tasnim` (or a migration run) throws
+  // `no such column: gloss_group` on every reader and word-by-word page.
+  // Migrate the DB before shipping the build, not after. Deliberately not a
+  // runtime PRAGMA guard: that would cost a probe on every page render to
+  // cover a one-time ordering mistake.
   const result = await db.execute({
     sql: `SELECT w.id AS word_id,
                  COALESCE(pref.gloss_text, fb.gloss_text) AS gloss_text,
-                 CASE WHEN pref.gloss_text IS NOT NULL THEN ? ELSE ? END AS gloss_lang
+                 CASE WHEN pref.gloss_text IS NOT NULL THEN ? ELSE ? END AS gloss_lang,
+                 CASE WHEN pref.gloss_text IS NOT NULL
+                      THEN pref.gloss_group ELSE NULL END AS gloss_group
           FROM words w
           JOIN ayahs a ON a.id = w.ayah_id
           LEFT JOIN word_glosses pref ON pref.word_id = w.id AND pref.language_code = ?
@@ -57,5 +82,6 @@ export async function getGlossesWithFallback(
     word_id: r['word_id'] as number,
     gloss_text: r['gloss_text'] as string,
     gloss_lang: r['gloss_lang'] as string,
+    gloss_group: (r['gloss_group'] as number | null) ?? null,
   }));
 }

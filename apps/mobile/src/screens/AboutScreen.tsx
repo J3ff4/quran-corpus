@@ -30,16 +30,23 @@ interface Credit {
 const TRANSLATION_BODIES: Record<SelectedTranslatorLanguage, UiStringKey> = {
   en: 'about.sourceEnglish',
   uz: 'about.sourceUzbek',
+  'uz-Cyrl': 'about.sourceUzbek',
   ru: 'about.sourceRussian',
 };
 
-const TRANSLATION_CREDITS: Credit[] = Object.entries(TRANSLATION_BODIES).map(
-  ([language, body]) => ({
-    name: selectedTranslators[language as SelectedTranslatorLanguage],
-    body,
-    pending: true,
-  }),
-);
+// Deduplicated by name, because the two Uzbek script codes are one work by one
+// party: crediting "Tasnim" twice reads as a rendering bug, not as diligence.
+// Keyed by name alone rather than name+body on purpose -- two entries that
+// shared a name but disagreed on the body would be a genuine mistake here, and
+// silently rendering both would hide it.
+const TRANSLATION_CREDITS: Credit[] = [
+  ...new Map(
+    Object.entries(TRANSLATION_BODIES).map(([language, body]) => [
+      selectedTranslators[language as SelectedTranslatorLanguage],
+      { name: selectedTranslators[language as SelectedTranslatorLanguage], body, pending: true },
+    ]),
+  ).values(),
+];
 
 const GROUPS: { title: UiStringKey; credits: Credit[] }[] = [
   {

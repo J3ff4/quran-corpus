@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { SegmentPills } from '../morphology/SegmentPills';
+import { GlossText } from '../shared/GlossText';
 import type { WbwCell } from './types';
 
 /** One word in the word-by-word grid layout: segment pills stacked over the
@@ -41,12 +42,7 @@ export function WbwWordCell({ cell, pageLang }: { cell: WbwCell; pageLang?: stri
       <SegmentPills segments={segments} fallbackWord={arabic} />
       <span className="text-xs text-paper-500 dark:text-paper-400" dir="ltr">{translit ?? '—'}</span>
       <span className="text-xs text-paper-700 dark:text-paper-300" dir="ltr">
-        {gloss ?? '—'}
-        {gloss && glossLang && pageLang && glossLang !== pageLang && (
-          <span className="ml-1 text-paper-400" aria-label={`in ${glossLang}`}>
-            ({glossLang})
-          </span>
-        )}
+        <GlossText gloss={gloss} glossLang={glossLang} pageLang={pageLang} />
       </span>
     </Link>
   );

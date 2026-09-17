@@ -143,6 +143,46 @@ describe('runMigrations', () => {
     d.close();
   });
 
+  it('self-heals gloss_group onto a legacy word_glosses table missing it', async () => {
+    const d = createDatabase('file::memory:');
+    // A pre-grouping DB. `CREATE TABLE IF NOT EXISTS` is a no-op against this,
+    // so without the ALTER the column never arrives and every Tasnim gloss
+    // loses which phrase it belongs to.
+    await d.execute(`CREATE TABLE word_glosses (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      word_id       INTEGER NOT NULL,
+      language_code TEXT    NOT NULL,
+      gloss_text    TEXT    NOT NULL,
+      source        TEXT,
+      UNIQUE(word_id, language_code)
+    )`);
+    await runMigrations(d);
+    const cols = new Set(
+      (await d.execute('PRAGMA table_info(word_glosses)')).rows.map((r) => r['name'] as string),
+    );
+    expect(cols.has('gloss_group')).toBe(true);
+    d.close();
+  });
+
+  it('creates surah_names and root_glosses', async () => {
+    const d = createDatabase('file::memory:');
+    await runMigrations(d);
+    const names = new Set(
+      (await d.execute("SELECT name FROM sqlite_master WHERE type='table'")).rows.map(
+        (r) => r['name'] as string,
+      ),
+    );
+    expect(names.has('surah_names')).toBe(true);
+    expect(names.has('root_glosses')).toBe(true);
+    // Keyed per language, not per surah: two scripts of one language are two
+    // rows, and a PRIMARY KEY on surah_id alone would silently drop one.
+    const pk = (await d.execute('PRAGMA table_info(surah_names)')).rows
+      .filter((r) => Number(r['pk']) > 0)
+      .map((r) => r['name'] as string);
+    expect(pk).toEqual(['surah_id', 'language_code']);
+    d.close();
+  });
+
   // One fixture for the whole self-heal: a root whose forms reproduce each
   // case the join has to survive. `seedJoinFixture` returns the ids so a test
   // can assert on the row it cares about.

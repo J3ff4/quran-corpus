@@ -108,3 +108,12 @@ apps/mobile/scripts/dump.txt
 # M7b: 604 subset KFGQPC V2 page fonts, ~120MB. Regenerate with
 # `uv run scraper mushaf-fonts` -- never commit them (CLAUDE.md §9).
 apps/mobile/assets/fonts/mushaf/
+
+# M9: the machine-translated Uzbek glosses the Tasnim import replaces, and the
+# glosses its validation refused. The rejects file is run output. The export is
+# NOT regenerable: the first `import-tasnim` deletes the mt rows, so a re-run
+# exports 0 and deliberately leaves the file alone. It is the ONLY copy of
+# 75539 glosses, every hand-reviewed 'mt-reviewed' row among them -- back it up
+# outside the tree before deleting anything here (CLAUDE.md §9).
+packages/scraper/uz_mt_export.jsonl
+packages/scraper/uz_gloss_rejects.tsv

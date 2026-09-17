@@ -10,6 +10,8 @@ vi.mock('@/data/corpusRepository', () => ({ getPageIndex, getSurahList, getAyahs
 
 import type { MobileDataClient } from '@quran-corpus/mobile-data';
 
+import type { UiLocaleCode } from '@/i18n/languages';
+
 import {
   resetMushafReaderCachesForTest,
   useMushafAyahs,
@@ -42,7 +44,7 @@ beforeEach(() => {
 
 describe('useMushafIndex', () => {
   it('keys the pages by page number and the names by surah id', async () => {
-    const { result } = renderHook(() => useMushafIndex(client));
+    const { result } = renderHook(() => useMushafIndex(client, 'en'));
 
     await waitFor(() => expect(result.current.ready).toBe(true));
     expect(result.current.pages.get(106)?.startAyahNumber).toBe(82);
@@ -50,7 +52,7 @@ describe('useMushafIndex', () => {
   });
 
   it('asks nothing of a database that is not open yet', () => {
-    const { result } = renderHook(() => useMushafIndex(null));
+    const { result } = renderHook(() => useMushafIndex(null, 'en'));
 
     expect(result.current.ready).toBe(false);
     expect(getPageIndex).not.toHaveBeenCalled();
@@ -60,23 +62,39 @@ describe('useMushafIndex', () => {
     // Two layers mount together for the length of a mode switch, and the
     // reader remounts on every surah page-turn. 604 rows per mount would be a
     // query on the UI's critical path for data that cannot change.
-    const first = renderHook(() => useMushafIndex(client));
-    const second = renderHook(() => useMushafIndex(client));
+    const first = renderHook(() => useMushafIndex(client, 'en'));
+    const second = renderHook(() => useMushafIndex(client, 'en'));
 
     await waitFor(() => expect(first.result.current.ready).toBe(true));
     await waitFor(() => expect(second.result.current.ready).toBe(true));
     expect(getPageIndex).toHaveBeenCalledTimes(1);
   });
 
+  it('re-reads the names when the interface locale changes', async () => {
+    // surahNames is chrome, so it is localized -- and the index is cached
+    // process-wide. Cached on the bare promise it served whichever locale
+    // mounted the tab first, for the life of the process: switching to Uzbek
+    // left the mushaf header, its page band and its TalkBack labels in English
+    // while browse and bookmarks moved.
+    const { rerender } = renderHook(({ locale }) => useMushafIndex(client, locale), {
+      initialProps: { locale: 'en' as UiLocaleCode },
+    });
+    await waitFor(() => expect(getSurahList).toHaveBeenCalledWith(client, 'en'));
+
+    rerender({ locale: 'uz' });
+
+    await waitFor(() => expect(getSurahList).toHaveBeenCalledWith(client, 'uz'));
+  });
+
   it('lets the next mount retry after a failed read', async () => {
     // A cached rejection would leave every page in the session without a juz
     // and every header without a name.
     getPageIndex.mockRejectedValueOnce(new Error('database closed'));
-    const failed = renderHook(() => useMushafIndex(client));
+    const failed = renderHook(() => useMushafIndex(client, 'en'));
     await waitFor(() => expect(getPageIndex).toHaveBeenCalledTimes(1));
     expect(failed.result.current.ready).toBe(false);
 
-    const retried = renderHook(() => useMushafIndex(client));
+    const retried = renderHook(() => useMushafIndex(client, 'en'));
     await waitFor(() => expect(retried.result.current.ready).toBe(true));
   });
 });

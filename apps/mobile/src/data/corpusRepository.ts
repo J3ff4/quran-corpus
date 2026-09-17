@@ -12,6 +12,7 @@ import {
   getLemmaFrequencyNeighbors,
   getRootConcordancePage,
   getRootEntry,
+  getRootGlosses,
   getRootNeighbors,
   getRootSearchList,
   getRootsByFrequency,
@@ -23,28 +24,40 @@ import {
   getWordByLocation,
   getWordDetail,
   getWordsByAyah,
+  getSurahNames,
   getWordsBySurahAyahRange,
   search,
   type Ayah,
   type ConcordanceEntry,
   type LemmaEntry,
   type RootEntry,
+  type RootGloss,
   type RootSearchItem,
   type SearchResult,
   type Surah,
+  type SurahName,
   type Translation,
   type Word,
   type WordDetail,
   type WordSegment,
 } from '@quran-corpus/data/mobile';
-import type { ContentLanguageCode } from '../i18n/languages';
+import type { QueryLanguageCode, UiLocaleCode } from '../i18n/languages';
 
 const M0_SURAH_ID = 1;
 
 // Fails the build if the shared list ever stops covering every content language
 // the UI offers -- otherwise a new language would render a permanently blank
 // translation pane instead of an error.
-const translatorByLanguage: Record<ContentLanguageCode, string> = selectedTranslators;
+//
+// Keyed by QueryLanguageCode, so the script toggle reaches the verse
+// translation and search the same way it already reaches the glosses. That is
+// only sound because both Uzbek entries name Tasnim: the composed 'uz-Cyrl'
+// and the plain 'uz' are one translator's words in two alphabets, so flipping
+// the script re-renders the same translation rather than swapping the scholar.
+// See packages/mobile-data/src/translators.ts -- if a future entry ever binds
+// the two Uzbek codes to different translators, this keying is what would make
+// a script switch silently change the text, and it must be reverted with it.
+const translatorByLanguage: Record<QueryLanguageCode, string> = selectedTranslators;
 
 export interface ReaderAyah {
   ayah: Ayah;
@@ -73,7 +86,7 @@ export interface SurahListItem {
 
 function selectedTranslationByAyah(
   translations: Translation[],
-  languageCode: ContentLanguageCode,
+  languageCode: QueryLanguageCode,
 ): Map<number, Translation> {
   const selectedTranslator = translatorByLanguage[languageCode];
   const grouped = new Map<number, Translation>();
@@ -99,15 +112,42 @@ function selectedTranslationByAyah(
   return grouped;
 }
 
-export async function getSurahList(client: MobileDataClient): Promise<SurahListItem[]> {
-  const surahs = await getAllSurahs(client);
-  return surahs.map((surah) => ({
-    id: surah.id,
-    nameArabic: surah.name_arabic,
-    nameTranslit: surah.name_translit,
-    nameTranslation: surah.name_translation,
-    ayahCount: surah.ayah_count,
-  }));
+/** Every surah, named in `uiLocale` where a translated name exists.
+ *
+ *  The locale is the UI locale, not the content language (owner ruling
+ *  2026-09-16): a surah name is chrome, read in whatever language the app is
+ *  speaking, and it stays put when the reader changes which translation of the
+ *  VERSES they want.
+ *
+ *  Optional because three of the five callers want ayah counts and ids, not
+ *  names -- the mushaf's page index and the ayah-count hook among them -- and
+ *  handing them a locale they have no business knowing would be worse than the
+ *  branch. Omitted, this returns the `surahs` row's own English, exactly as
+ *  before. */
+export async function getSurahList(
+  client: MobileDataClient,
+  uiLocale?: UiLocaleCode,
+): Promise<SurahListItem[]> {
+  const [surahs, names] = await Promise.all([
+    getAllSurahs(client),
+    // English names live on the `surahs` row itself, so there is nothing to
+    // join for 'en' -- and no `surah_names` rows either.
+    uiLocale && uiLocale !== 'en'
+      ? getSurahNames(client, uiLocale)
+      : Promise.resolve(new Map<number, SurahName>()),
+  ]);
+  return surahs.map((surah) => {
+    const localized = names.get(surah.id);
+    return {
+      id: surah.id,
+      nameArabic: surah.name_arabic,
+      // getSurahNames already falls back per surah to name_translit, so a
+      // partial name set reads rather than showing blanks.
+      nameTranslit: localized?.name ?? surah.name_translit,
+      nameTranslation: localized?.meaning ?? surah.name_translation,
+      ayahCount: surah.ayah_count,
+    };
+  });
 }
 
 /** One surah's ayah rows, unjoined.
@@ -123,7 +163,7 @@ export async function getAyahsOfSurah(client: MobileDataClient, surahId: number)
 export async function getSurahReader(
   client: MobileDataClient,
   surahId: number,
-  languageCode: ContentLanguageCode,
+  languageCode: QueryLanguageCode,
 ): Promise<SurahReaderData> {
   // Words are deliberately not fetched here. Nothing in the reader renders
   // them, and pulling every word of a surah moved 6116 rows across the bridge
@@ -169,7 +209,7 @@ export async function getAyahReaderLocation(
   client: MobileDataClient,
   surahId: number,
   ayahNumber: number,
-  languageCode: ContentLanguageCode,
+  languageCode: QueryLanguageCode,
 ): Promise<ReaderLocation | null> {
   const reader = await getSurahReader(client, surahId, languageCode);
   const found = reader.ayahs.find((item) => item.ayah.ayah_number === ayahNumber);
@@ -178,7 +218,7 @@ export async function getAyahReaderLocation(
 
 export async function getM0SurahReader(
   client: MobileDataClient,
-  languageCode: ContentLanguageCode,
+  languageCode: QueryLanguageCode,
 ): Promise<SurahReaderData> {
   return getSurahReader(client, M0_SURAH_ID, languageCode);
 }
@@ -218,18 +258,28 @@ export interface Gloss {
   text: string;
   lang: string;
   isFallback: boolean;
+  /** Which phrase this word belongs to, or NULL when the gloss is the word's
+   *  own. Adjacent words sharing an id are ONE gloss and render under one
+   *  merged cell -- see groupByGlossSpan. Scoped per (ayah, language), so it
+   *  only ever groups within an ayah. */
+  group: number | null;
 }
 
 export async function getSurahGlosses(
   client: MobileDataClient,
   surahId: number,
-  languageCode: ContentLanguageCode,
+  languageCode: QueryLanguageCode,
 ): Promise<Map<number, Gloss>> {
   const glosses = await getGlossesWithFallback(client, surahId, languageCode);
   return new Map(
     glosses.map((gloss) => [
       gloss.word_id,
-      { text: gloss.gloss_text, lang: gloss.gloss_lang, isFallback: gloss.gloss_lang !== languageCode },
+      {
+        text: gloss.gloss_text,
+        lang: gloss.gloss_lang,
+        isFallback: gloss.gloss_lang !== languageCode,
+        group: gloss.gloss_group,
+      },
     ]),
   );
 }
@@ -264,7 +314,7 @@ export async function getWordAtLocation(
   surahId: number,
   ayahNumber: number,
   position: number,
-  languageCode: ContentLanguageCode,
+  languageCode: QueryLanguageCode,
 ): Promise<WordSummary | null> {
   const word = await getWordByLocation(client, surahId, ayahNumber, position);
   if (!word) return null;
@@ -378,6 +428,26 @@ export async function getRootScreen(
   return getRootEntry(client, rootBuckwalter);
 }
 
+/** A root's commonest word-by-word glosses in the reader's content language.
+ *
+ *  Derived from the word-by-word set, so it is empty for every language that
+ *  has none -- today that is everything but Uzbek, and the root screen simply
+ *  omits the block. The script belongs here (unlike surah names, R9-2): a
+ *  gloss is content, so Cyrillic Uzbek must read in Cyrillic, which is why
+ *  this takes the composed query language and not the picked one.
+ *
+ *  Keyed by root id rather than by Buckwalter: the id is what `root_glosses`
+ *  stores, and the caller already holds it from getRootScreen -- resolving the
+ *  string a second time would mean a second trust boundary for the same
+ *  deep-link segment. */
+export async function getRootGlossList(
+  client: MobileDataClient,
+  rootId: number,
+  lang: QueryLanguageCode,
+): Promise<RootGloss[]> {
+  return getRootGlosses(client, rootId, lang);
+}
+
 /** Hijāʾī-adjacent roots for the root screen's Previous/Next.
  *
  *  Indexed O(1) on roots.sort_order, which the bundled DB ships populated
@@ -434,7 +504,7 @@ export async function getRootOccurrenceCount(
 export async function getRootOccurrences(
   client: MobileDataClient,
   bw: string,
-  lang: ContentLanguageCode,
+  lang: QueryLanguageCode,
   offset: number,
   limit: number,
   formIds?: number[],
@@ -449,7 +519,7 @@ export async function getRootOccurrences(
 export async function getLemmaScreen(
   client: MobileDataClient,
   lemmaBw: string,
-  lang: ContentLanguageCode,
+  lang: QueryLanguageCode,
 ): Promise<{ entry: LemmaEntry | null; total: number }> {
   const [entry, total] = await Promise.all([
     getLemmaEntry(client, lemmaBw, lang),
@@ -461,7 +531,7 @@ export async function getLemmaScreen(
 export async function getLemmaOccurrences(
   client: MobileDataClient,
   lemmaBw: string,
-  lang: ContentLanguageCode,
+  lang: QueryLanguageCode,
   offset: number,
   limit: number,
 ): Promise<ConcordanceEntry[]> {
@@ -536,7 +606,7 @@ export async function getM0WordDetail(
 export async function searchCorpus(
   client: MobileDataClient,
   query: string,
-  languageCode: ContentLanguageCode,
+  languageCode: QueryLanguageCode,
 ): Promise<SearchResult> {
   return search(client, query, {
     language: languageCode,

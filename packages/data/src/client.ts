@@ -42,3 +42,4 @@ export { categorizeFormLabel, type FormCategory } from './morphology/formCategor
 // for the barrel instead, which is the exact mistake this entry point exists to
 // prevent.
 export type * from './types.js';
+export { groupByGlossSpan } from './text/glossSpans.js';

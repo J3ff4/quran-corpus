@@ -815,5 +815,67 @@ def mushaf_metrics_cmd(db: str, fonts: str, out: str) -> None:
     click.echo(f"{len(values)} pages: {min(values)}..{max(values)} em -> {out_path}")
 
 
+@main.command("import-tasnim")
+@click.option("--db", default="quran.db", show_default=True, help="Corpus DB to write")
+@click.option(
+    "--tasnim",
+    default=str(Path.home() / "quran-data/refdata/TasnimDatabase.db"),
+    show_default=True,
+    help="Read-only Tasnim reference DB",
+)
+@click.option(
+    "--export",
+    default="uz_mt_export.jsonl",
+    show_default=True,
+    help="Where the machine-translated Uzbek glosses are copied before deletion",
+)
+@click.option(
+    "--rejects",
+    default="uz_gloss_rejects.tsv",
+    show_default=True,
+    help="Glosses refused by validation, with the reason",
+)
+def import_tasnim_cmd(db: str, tasnim: str, export: str, rejects: str) -> None:
+    """Import Tasnim's Uzbek word-by-word, verse translation and surah names."""
+    from .tasnim_align import OVERRIDES_PATH, load_overrides
+    from .tasnim_import import import_tasnim
+
+    summary = import_tasnim(
+        Path(db),
+        Path(tasnim),
+        export_path=Path(export),
+        rejects_path=Path(rejects),
+        overrides=load_overrides(OVERRIDES_PATH),
+    )
+    click.echo(
+        f"glosses {summary.glosses} rows over {summary.groups} groups; "
+        f"rejected {summary.rejected}; unaligned ayahs {summary.unaligned}; "
+        f"translations {summary.translations}; surah names {summary.surah_names}; "
+        f"mt exported {summary.mt_exported}"
+    )
+
+
+@main.command("derive-root-glosses")
+@click.option("--db", default="quran.db", show_default=True, help="Corpus DB to write")
+@click.option(
+    "--lang",
+    "languages",
+    multiple=True,
+    default=("uz", "uz-Cyrl"),
+    show_default=True,
+    help="Language codes to derive; repeatable",
+)
+def derive_root_glosses_cmd(db: str, languages: tuple[str, ...]) -> None:
+    """Rank each root's word-by-word glosses into its dictionary entry."""
+    from .db import ScraperDatabase
+    from .root_glosses import derive_root_glosses
+
+    con = ScraperDatabase(db).connection
+    total = con.execute("SELECT COUNT(*) FROM roots").fetchone()[0]
+    for language_code in languages:
+        covered = derive_root_glosses(con, language_code)
+        click.echo(f"{language_code}: {covered} of {total} roots covered")
+
+
 if __name__ == "__main__":
     main()

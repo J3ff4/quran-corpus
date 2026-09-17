@@ -90,7 +90,10 @@ function keyOf(bookmark: Bookmark): string {
  *  the ayah texts have to be re-fetched anyway, because the bookmark list they
  *  key off may have changed while the tab was away.
  */
-async function loadBookmarksData(userClient: MobileDataClient): Promise<BookmarksData> {
+async function loadBookmarksData(
+  userClient: MobileDataClient,
+  uiLocale: UiLocaleCode,
+): Promise<BookmarksData> {
   const bookmarks = await getBookmarks(userClient);
   if (bookmarks.length === 0) {
     return { bookmarks, texts: new Map(), surahNames: new Map() };
@@ -101,7 +104,7 @@ async function loadBookmarksData(userClient: MobileDataClient): Promise<Bookmark
   // Parallel: neither needs the other, and both are on the same bundled file.
   const [texts, surahs] = await Promise.all([
     getBookmarkAyahTexts(corpusClient, bookmarks),
-    getSurahList(corpusClient),
+    getSurahList(corpusClient, uiLocale),
   ]);
 
   return {
@@ -140,7 +143,13 @@ export function BookmarksScreen() {
     };
   }, []);
 
-  const load = useCallback(loadBookmarksData, []);
+  // Keyed on the locale: the surah names in this payload are rendered in it,
+  // so a locale change has to re-run the load rather than reuse names in the
+  // language the reader just left.
+  const load = useCallback(
+    (userClient: MobileDataClient) => loadBookmarksData(userClient, uiLocale),
+    [uiLocale],
+  );
   const { data, loading, error, reload } = useUserDbOnFocus(
     load,
     t(uiLocale, 'bookmarks.loadFailed'),

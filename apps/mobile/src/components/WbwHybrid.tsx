@@ -1,5 +1,5 @@
 import { View } from 'react-native';
-import type { Word } from '@quran-corpus/data/mobile';
+import { groupByGlossSpan, type Word } from '@quran-corpus/data/mobile';
 import type { Gloss, WbwPage } from '@/data/corpusRepository';
 import type { UiLocaleCode } from '@/i18n/languages';
 
@@ -7,6 +7,7 @@ import { AyahMedallion } from './AyahMedallion';
 import { GlassSurface } from './GlassSurface';
 import { WbwAyahLine } from './WbwAyahLine';
 import { WbwCell } from './WbwCell';
+import { WbwSpan } from './WbwSpan';
 
 export interface WbwHybridProps {
   page: WbwPage;
@@ -30,19 +31,39 @@ export interface WbwHybridProps {
  * back from the mockup.
  */
 export function WbwHybrid({ page, uiLocale, glosses, onWordPress }: WbwHybridProps) {
-  const cells = page.words.map((word) => (
-    <WbwCell
-      key={word.id}
-      word={word}
+  // Split into the spans one Tasnim gloss covers before rendering: a phrase
+  // gloss belongs to the run, not to each word in it (owner ruling
+  // 2026-09-16, reversing decision 27 -- see WbwSpan).
+  const cells = groupByGlossSpan(page.words, (word) => glosses.get(word.id)?.group ?? null).map(
+    (span) => {
+      const first = span[0]!;
       // This word's own segments and this word's own gloss. Handing every cell
       // the whole ayah's segments or the surah's whole gloss map looks entirely
       // plausible on screen -- the grid this replaces carried the same warning.
-      segments={page.segments.get(word.id) ?? []}
-      gloss={glosses.get(word.id) ?? null}
-      uiLocale={uiLocale}
-      onPress={() => onWordPress(word)}
-    />
-  ));
+      if (span.length === 1) {
+        return (
+          <WbwCell
+            key={first.id}
+            word={first}
+            segments={page.segments.get(first.id) ?? []}
+            gloss={glosses.get(first.id) ?? null}
+            uiLocale={uiLocale}
+            onPress={() => onWordPress(first)}
+          />
+        );
+      }
+      return (
+        <WbwSpan
+          key={first.id}
+          words={span}
+          gloss={glosses.get(first.id) ?? null}
+          segmentsFor={(word) => page.segments.get(word.id) ?? []}
+          uiLocale={uiLocale}
+          onWordPress={onWordPress}
+        />
+      );
+    },
+  );
 
   return (
     <View style={{ paddingVertical: 10, gap: 12 }}>

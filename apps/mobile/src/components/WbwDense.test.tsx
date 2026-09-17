@@ -1,6 +1,6 @@
 import React from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi, type MockedFunction } from 'vitest';
 import type { Word, WordSegment } from '@quran-corpus/data/mobile';
 import type { Gloss, WbwPage } from '@/data/corpusRepository';
 
@@ -80,7 +80,8 @@ function pageWithUnanalysedWord(): WbwPage {
   };
 }
 
-const gloss = (text: string, lang = 'en', isFallback = false): Gloss => ({ text, lang, isFallback });
+const gloss = (text: string, lang = 'en', isFallback = false, group: number | null = null): Gloss =>
+  ({ text, lang, isFallback, group });
 
 const GLOSSES = new Map([
   [1, gloss('Allah')],
@@ -92,7 +93,7 @@ function renderDense({
   page: wbwPage = page(3),
   glosses = GLOSSES,
   onWordPress = vi.fn(),
-}: { page?: WbwPage; glosses?: Map<number, Gloss>; onWordPress?: (word: Word) => void } = {}) {
+}: { page?: WbwPage; glosses?: Map<number, Gloss>; onWordPress?: MockedFunction<(word: Word) => void> } = {}) {
   const result = render(
     <ThemeContext.Provider value={themeColors.dark}>
       <WbwDense page={wbwPage} uiLocale="en" glosses={glosses} onWordPress={onWordPress} />
@@ -185,5 +186,55 @@ describe('WbwDense', () => {
     renderDense({ glosses: new Map([[1, gloss('Allah', 'en', false)]]) });
 
     expect(screen.queryByTestId('gloss-lang-en')).toBeNull();
+  });
+});
+
+describe('WbwDense gloss spans', () => {
+  afterEach(cleanup);
+
+  // Tasnim glosses phrases: "shubha yo'q" is ONE gloss over two words. Printing
+  // it under each claims the source said it twice. Owner ruling 2026-09-16
+  // reversed decision 27 to allow the merge.
+  const SPANNED = new Map([
+    [1, gloss("shubha yo'q", 'uz', false, 7)],
+    [2, gloss("shubha yo'q", 'uz', false, 7)],
+    [3, gloss('unda', 'uz')],
+  ]);
+
+  it('draws a spanned phrase once, not once per word', () => {
+    renderDense({ glosses: SPANNED });
+    expect(screen.getAllByText("shubha yo'q")).toHaveLength(1);
+    expect(screen.getByText('unda')).toBeTruthy();
+  });
+
+  it('keeps every spanned word its own button', () => {
+    // The merge is the gloss and the border, never the touch targets: decision
+    // 27 protected one tappable word per word, and that part still holds.
+    const { onWordPress } = renderDense({ glosses: SPANNED });
+    const cells = screen.getAllByTestId('wbw-cell');
+    expect(cells).toHaveLength(3);
+    fireEvent.click(cells[1]!);
+    expect(onWordPress).toHaveBeenCalledTimes(1);
+    expect(onWordPress.mock.calls[0]![0].id).toBe(2);
+  });
+
+  it('does not merge two words that merely share gloss TEXT', () => {
+    // Two words glossed "and" are two glosses. Only the group id may join them,
+    // never the text -- merging on text would swallow unrelated words.
+    renderDense({
+      glosses: new Map([
+        [1, gloss('and', 'en')],
+        [2, gloss('and', 'en')],
+        [3, gloss('unda', 'uz')],
+      ]),
+    });
+    expect(screen.getAllByText('and')).toHaveLength(2);
+    expect(screen.queryAllByTestId('wbw-span')).toHaveLength(0);
+  });
+
+  it('leaves a one-word gloss out of a span entirely', () => {
+    renderDense({ glosses: GLOSSES });
+    expect(screen.queryAllByTestId('wbw-span')).toHaveLength(0);
+    expect(screen.getAllByTestId('wbw-cell')).toHaveLength(3);
   });
 });

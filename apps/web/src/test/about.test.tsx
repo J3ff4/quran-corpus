@@ -59,10 +59,12 @@ describe('About page', () => {
     expect(screen.getByText(/no dictionary in the pipeline covers/)).toBeInTheDocument();
   });
 
-  it('credits machine-assisted Uzbek glosses (NLLB)', () => {
+  it('credits Tasnim for the Uzbek word-by-word, and no longer NLLB', () => {
     render(<About />);
-    expect(screen.getAllByText(/NLLB/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/machine-assisted/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Tasnim/i).length).toBeGreaterThan(0);
+    // The machine-translated glosses were deleted from the corpus, so crediting
+    // the model that produced them would describe data the app no longer ships.
+    expect(screen.queryAllByText(/NLLB/i)).toHaveLength(0);
   });
 
   it('credits the KFGQPC Uthmanic Hafs mushaf font', () => {

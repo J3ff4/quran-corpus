@@ -13,7 +13,8 @@ import { ConcordanceList } from '@/components/ConcordanceList';
 import { DefinitionCard } from '@/components/DefinitionCard';
 import { EntryHeader } from '@/components/EntryHeader';
 import { useGlassSkin } from '@/components/GlassSurface';
-import { InfoButton, InfoSheet } from '@/components/InfoSheet';
+import { InfoSheet } from '@/components/InfoSheet';
+import { TopGlosses } from '@/components/TopGlosses';
 import { getAdjacentLemmas, getLemmaOccurrences, getLemmaScreen } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { t } from '@/i18n/uiStrings';
@@ -75,7 +76,7 @@ export interface LemmaScreenProps {
  *  full parity with web's lemma page, not deferred to the root screen this
  *  links to. */
 export function LemmaScreen({ lemmaBuckwalter, source }: LemmaScreenProps) {
-  const { uiLocale, contentLanguage } = useAppSettings();
+  const { uiLocale, queryLanguage } = useAppSettings();
   const theme = useThemeColors();
   const skin = useGlassSkin();
 
@@ -100,7 +101,7 @@ export function LemmaScreen({ lemmaBuckwalter, source }: LemmaScreenProps) {
       try {
         const db = await openCorpusDb();
         const client = createExpoSqliteClient(db as ExpoSqliteLike);
-        const found = await getLemmaScreen(client, lemmaKey, contentLanguage);
+        const found = await getLemmaScreen(client, lemmaKey, queryLanguage);
         if (!cancelled) setLoaded({ key: lemmaKey, entry: found.entry, total: found.total });
       } catch (cause) {
         // Same dead end as a lemma the corpus does not carry. Logged for logcat.
@@ -112,7 +113,7 @@ export function LemmaScreen({ lemmaBuckwalter, source }: LemmaScreenProps) {
     return () => {
       cancelled = true;
     };
-  }, [lemmaKey, contentLanguage]);
+  }, [lemmaKey, queryLanguage]);
 
   useEffect(() => {
     if (lemmaKey === null || source === null) {
@@ -150,9 +151,9 @@ export function LemmaScreen({ lemmaBuckwalter, source }: LemmaScreenProps) {
       if (lemmaKey === null) return [];
       const db = await openCorpusDb();
       const client = createExpoSqliteClient(db as ExpoSqliteLike);
-      return getLemmaOccurrences(client, lemmaKey, contentLanguage, offset, limit);
+      return getLemmaOccurrences(client, lemmaKey, queryLanguage, offset, limit);
     },
-    [lemmaKey, contentLanguage],
+    [lemmaKey, queryLanguage],
   );
 
   // What the reader sees: the previous lemma stays until its replacement is
@@ -264,26 +265,12 @@ export function LemmaScreen({ lemmaBuckwalter, source }: LemmaScreenProps) {
             : null}
         </EntryHeader>
 
-        {entry.top_glosses.length > 0 ? (
-          <View style={{ gap: 4 }}>
-            {/* Contextual word-by-word translations, not definitions -- the
-                commonest gloss for a word can be a whole clause. Unlabelled
-                these read as the lemma's meaning; see LemmaEntry.top_glosses.
-                The full caveat lives behind the info button rather than in
-                permanent body text -- see InfoSheet's own docstring. */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Text style={eyebrow}>{t(uiLocale, 'lemma.translatedAs')}</Text>
-              <InfoButton
-                label={t(uiLocale, 'lemma.aboutTranslations')}
-                expanded={infoOpen}
-                onPress={() => setInfoOpen(true)}
-              />
-            </View>
-            <Text style={{ color: theme.text, fontSize: typography.body }}>
-              {entry.top_glosses.join(' · ')}
-            </Text>
-          </View>
-        ) : null}
+        <TopGlosses
+          glosses={entry.top_glosses}
+          uiLocale={uiLocale}
+          infoOpen={infoOpen}
+          onInfo={() => setInfoOpen(true)}
+        />
 
         {entry.root_buckwalter ? (
           <View style={{ gap: 10 }}>

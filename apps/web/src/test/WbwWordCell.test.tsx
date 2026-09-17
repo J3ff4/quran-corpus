@@ -6,7 +6,7 @@ import type { WbwCell } from '../components/wbw/types';
 function cell(over: Partial<WbwCell> = {}): WbwCell {
   return {
     surahId: 1, ayahNumber: 1, position: 1,
-    arabic: 'بِسْمِ', translit: "bis'mi", gloss: 'In (the) name', glossLang: null,
+    arabic: 'بِسْمِ', translit: "bis'mi", gloss: 'In (the) name', glossLang: null, glossGroup: null,
     posTag: 'P', posLabel: 'Preposition',
     segments: [],
     grammarNote: 'جار ومجرور',
@@ -77,7 +77,7 @@ describe('WbwWordCell', () => {
 
   it('renders latin gloss/translit LTR so trailing punctuation stays trailing', () => {
     const c = { surahId: 2, ayahNumber: 2, position: 3, arabic: 'فِيهِ',
-      translit: 'fihi', gloss: 'in it,', glossLang: 'en', posTag: 'P', posLabel: 'Preposition',
+      translit: 'fihi', gloss: 'in it,', glossLang: 'en', glossGroup: null, posTag: 'P', posLabel: 'Preposition',
       segments: [],
       grammarNote: null };
     render(<WbwWordCell cell={c} pageLang="en" />);

@@ -57,8 +57,8 @@ vi.mock('@/data/corpusRepository', async (importOriginal) => {
     // against openCorpusDb's stub object.
     getSurahGlosses: async () =>
       new Map<number, CorpusRepository.Gloss>([
-        [1, { text: 'Allah', lang: 'en', isFallback: false }],
-        [2, { text: 'not', lang: 'en', isFallback: false }],
+        [1, { text: 'Allah', lang: 'en', isFallback: false, group: null }],
+        [2, { text: 'not', lang: 'en', isFallback: false, group: null }],
       ]),
     // Same reason: the jump sheet's ayah ceiling comes from this list, and the
     // real query would run SQL against openCorpusDb's stub object.

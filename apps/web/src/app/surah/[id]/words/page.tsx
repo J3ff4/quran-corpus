@@ -54,8 +54,9 @@ export default async function WbwPage({ params, searchParams }: PageProps) {
   // Server-side so bookmark icons render saved instead of filling in post-hydration.
   const bookmarkedAyahs = bookmarkedAyahsIn(cookieStore.get(BOOKMARKS_COOKIE)?.value, surahId, 'wbw');
 
-  const glossByWordId = new Map<number, { text: string; lang: string }>();
-  for (const g of glosses) glossByWordId.set(g.word_id, { text: g.gloss_text, lang: g.gloss_lang });
+  const glossByWordId = new Map<number, { text: string; lang: string; group: number | null }>();
+  for (const g of glosses)
+    glossByWordId.set(g.word_id, { text: g.gloss_text, lang: g.gloss_lang, group: g.gloss_group });
 
   const segmentsByWordId = new Map<number, WordSegment[]>();
   for (const s of segments) {
@@ -91,6 +92,7 @@ export default async function WbwPage({ params, searchParams }: PageProps) {
       translit: w.transliteration,
       gloss: glossByWordId.get(w.id)?.text ?? null,
       glossLang: glossByWordId.get(w.id)?.lang ?? null,
+      glossGroup: glossByWordId.get(w.id)?.group ?? null,
       posTag: w.pos_tag,
       posLabel: posLabelEn(w.pos_tag),
       segments: segmentsByWordId.get(w.id) ?? [],

@@ -30,7 +30,9 @@ vi.mock('@/data/corpusRepository', () => ({
 }));
 
 vi.mock('@/settings/settingsStore', () => ({
-  useAppSettings: () => ({ contentLanguage: 'en', uiLocale: 'en' }),
+  // queryLanguage deliberately unequal to contentLanguage: a route that reads
+  // the picked language instead of the composed one passes on equal fixtures.
+  useAppSettings: () => ({ contentLanguage: 'uz', queryLanguage: 'uz-Cyrl', uiLocale: 'en' }),
 }));
 
 vi.mock('react-native', async () => {
@@ -82,7 +84,7 @@ const word: Word = {
 const summary = {
   word,
   segments: [segment(1, 'ٱل', 'DET'), segment(2, 'لَّهُ', 'PN')],
-  gloss: { text: 'Allah', lang: 'en', isFallback: false },
+  gloss: { text: 'Allah', lang: 'en', isFallback: false, group: null },
 };
 
 describe('word detail route', () => {
@@ -136,7 +138,7 @@ describe('word detail route', () => {
 
     // Positionally: transposing surah and ayah here would still render a word,
     // just the wrong one.
-    expect(mocks.getWordAtLocation).toHaveBeenCalledWith({}, 2, 255, 1, 'en');
+    expect(mocks.getWordAtLocation).toHaveBeenCalledWith({}, 2, 255, 1, 'uz-Cyrl');
   });
 
   it('renders one pill per segment in order', async () => {
@@ -179,7 +181,7 @@ describe('word detail route', () => {
     // mark could be dropped and every suite stay green.
     mocks.getWordAtLocation.mockResolvedValue({
       ...summary,
-      gloss: { text: 'Allah', lang: 'en', isFallback: true },
+      gloss: { text: 'Allah', lang: 'en', isFallback: true, group: null },
     });
 
     render(<WordDetailRoute />);

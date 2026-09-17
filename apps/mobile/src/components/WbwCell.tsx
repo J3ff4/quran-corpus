@@ -20,6 +20,10 @@ export interface WbwCellProps {
   /** Dense clamps the gloss to one line -- that is the whole density mode. */
   glossLines?: number;
   compact?: boolean;
+  /** Set when the cell sits inside a WbwSpan, which draws the shared gloss
+   *  once below the whole run. Without it the span would reserve an empty
+   *  gloss line under every word and sit the shared text below the gap. */
+  hideGloss?: boolean;
   onPress: () => void;
 }
 
@@ -27,8 +31,10 @@ export interface WbwCellProps {
  * One word: its Arabic in POS colours, its tag, its gloss.
  *
  * Shared by every word-by-word layout rather than copied into each. The cell is
- * the part all of them agree on (decision 27, one cell per word); they differ
- * only in how the cells are laid out.
+ * the part all of them agree on -- one cell per word, so one touch target and
+ * one TalkBack label per word -- and they differ only in how the cells are laid
+ * out. Words that Tasnim glosses as a phrase are wrapped by WbwSpan, which
+ * merges the BORDER and the gloss but still renders one of these per word.
  */
 export function WbwCell({
   word,
@@ -38,6 +44,7 @@ export function WbwCell({
   showPos = true,
   glossLines = 2,
   compact = false,
+  hideGloss = false,
   onPress,
 }: WbwCellProps) {
   const theme = useThemeColors();
@@ -71,14 +78,18 @@ export function WbwCell({
           {word.pos_tag}
         </Text>
       ) : null}
-      <Text
-        testID={`wbw-gloss-${word.position}`}
-        numberOfLines={glossLines}
-        style={{ color: theme.text, fontSize: typography.caption - 1, textAlign: 'center' }}
-      >
-        {gloss?.text ?? ''}
-      </Text>
-      <GlossLangTag gloss={gloss} uiLocale={uiLocale} fontSize={typography.caption - 3} />
+      {hideGloss ? null : (
+        <>
+          <Text
+            testID={`wbw-gloss-${word.position}`}
+            numberOfLines={glossLines}
+            style={{ color: theme.text, fontSize: typography.caption - 1, textAlign: 'center' }}
+          >
+            {gloss?.text ?? ''}
+          </Text>
+          <GlossLangTag gloss={gloss} uiLocale={uiLocale} fontSize={typography.caption - 3} />
+        </>
+      )}
 
     </Pressable>
   );

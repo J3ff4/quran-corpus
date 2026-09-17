@@ -87,7 +87,7 @@ export const DEBOUNCE_MS = 200;
 export const SPINNER_DELAY_MS = 300;
 
 export function SearchScreen() {
-  const { uiLocale, contentLanguage } = useAppSettings();
+  const { uiLocale, queryLanguage } = useAppSettings();
   const theme = useThemeColors();
   const paddingBottom = useListBottomPadding();
 
@@ -131,7 +131,7 @@ export function SearchScreen() {
       try {
         const db = await openCorpusDb();
         const client = createExpoSqliteClient(db as ExpoSqliteLike);
-        const found = await searchCorpus(client, trimmed, contentLanguage);
+        const found = await searchCorpus(client, trimmed, queryLanguage);
         if (requestRef.current !== request) return;
         setResult(found);
         setFailed(false);
@@ -152,7 +152,7 @@ export function SearchScreen() {
     }, DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [query, contentLanguage]);
+  }, [query, queryLanguage]);
 
   const openJump = useCallback(() => {
     const jump = result.jump;

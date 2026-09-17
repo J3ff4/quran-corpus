@@ -63,7 +63,7 @@ describe('useWordSummaryLoader', () => {
     mocks.getWordSummary.mockReset();
     mocks.getSurahGlosses.mockImplementation(
       async (_client: unknown, _surahId: number, language: string) =>
-        new Map([[2001, { text: `gloss-${language}`, lang: language, isFallback: false }]]),
+        new Map([[2001, { text: `gloss-${language}`, lang: language, isFallback: false, group: null }]]),
     );
     mocks.getWordSummary.mockImplementation(
       async (_client: unknown, w: Word, gloss: Gloss | null) => ({ word: w, segments: [], gloss }),
@@ -150,7 +150,7 @@ describe('useWordSummaryLoader', () => {
     tap();
 
     expect(mocks.getSurahGlosses).toHaveBeenCalledTimes(1);
-    release(new Map([[2001, { text: 'gloss-en', lang: 'en', isFallback: false }]]));
+    release(new Map([[2001, { text: 'gloss-en', lang: 'en', isFallback: false, group: null }]]));
     await waitFor(() => expect(mocks.getWordSummary).toHaveBeenCalledTimes(2));
   });
 
@@ -169,8 +169,8 @@ describe('useWordSummaryLoader', () => {
     rerender(<Probe surahId={2} contentLanguage="ru" />);
     tap();
 
-    pending.get('ru')!(new Map([[2001, { text: 'gloss-ru', lang: 'ru', isFallback: false }]]));
-    pending.get('en')!(new Map([[2001, { text: 'gloss-en', lang: 'en', isFallback: false }]]));
+    pending.get('ru')!(new Map([[2001, { text: 'gloss-ru', lang: 'ru', isFallback: false, group: null }]]));
+    pending.get('en')!(new Map([[2001, { text: 'gloss-en', lang: 'en', isFallback: false, group: null }]]));
     await waitFor(() => expect(mocks.getWordSummary).toHaveBeenCalledTimes(2));
 
     // A third tap, after both have landed, is the one that shows which map the
@@ -204,7 +204,7 @@ describe('useWordSummaryLoader', () => {
     failing.get('ru')!(new Error('no such table'));
     await waitFor(() => expect(screen.getByTestId('gloss').textContent).toMatch(/^error:/));
 
-    pending.get('en')!(new Map([[2001, { text: 'gloss-en', lang: 'en', isFallback: false }]]));
+    pending.get('en')!(new Map([[2001, { text: 'gloss-en', lang: 'en', isFallback: false, group: null }]]));
     await waitFor(() => expect(screen.getByTestId('gloss').textContent).toBe('gloss-en'));
   });
 

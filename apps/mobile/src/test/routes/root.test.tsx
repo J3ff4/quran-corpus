@@ -45,6 +45,10 @@ vi.mock('@/data/corpusRepository', () => ({
   getRootOccurrenceCount: async () => 0,
   getRootOccurrences: async () => [],
   getAdjacentRoots: async () => ({ prev: null, next: null }),
+  // This suite renders the header for an English reader, and English has no
+  // word-by-word set -- so the empty shape here is the production one, not a
+  // convenience. RootRoute.test.tsx covers the populated case.
+  getRootGlossList: async () => [],
 }));
 
 vi.mock('@/components/ConcordanceList', () => ({
@@ -52,8 +56,21 @@ vi.mock('@/components/ConcordanceList', () => ({
 }));
 
 vi.mock('@/settings/settingsStore', () => ({
-  useAppSettings: () => ({ contentLanguage: 'en', uiLocale: 'en' }),
+  useAppSettings: () => ({ contentLanguage: 'en', queryLanguage: 'en', uiLocale: 'en' }),
 }));
+
+// Stubbed for the same reason LemmaScreen's and RootRoute's suites stub it:
+// the real InfoSheet pulls BottomSheet's reanimated and gesture-handler
+// dependencies into a suite that is about the header's content.
+vi.mock('@/components/InfoSheet', async () => {
+  const React = await import('react');
+  return {
+    InfoButton: ({ label, onPress }: { label: string; onPress: () => void }) =>
+      React.createElement('button', { 'data-testid': 'info-button', onClick: onPress }, label),
+    InfoSheet: ({ body }: { body: string }) =>
+      React.createElement('div', { 'data-testid': 'info-body' }, body),
+  };
+});
 
 // reactNativeTextMock, not the bare `host` factory: the header now renders
 // EntryHeader and DefinitionCard, both of which mount ClampedText, and

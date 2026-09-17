@@ -33,6 +33,9 @@ async function createTempDir(): Promise<string> {
 }
 
 describe('M1 reader DB contract', () => {
+  const incomplete =
+    'M1 translation selection must contain exactly one selected translator for en, ru, uz, uz-Cyrl.';
+
   it('requires exactly one selected translator row for each M1 language', () => {
     const validApproval = `
 ## M1 Translation Selection
@@ -40,14 +43,16 @@ describe('M1 reader DB contract', () => {
 | Language | Selected translator |
 | --- | --- |
 | en | Saheeh International |
-| uz | Muhammad Sodik Muhammad Yusuf |
+| uz | Tasnim |
+| uz-Cyrl | Tasnim |
 | ru | Abu Adel |
 `;
 
     expect(parseM1TranslationSelection(validApproval)).toEqual({
       en: 'Saheeh International',
       ru: 'Abu Adel',
-      uz: 'Muhammad Sodik Muhammad Yusuf',
+      uz: 'Tasnim',
+      'uz-Cyrl': 'Tasnim',
     });
 
     const duplicateRussianSelection = `
@@ -56,14 +61,13 @@ describe('M1 reader DB contract', () => {
 | Language | Selected translator |
 | --- | --- |
 | en | Saheeh International |
-| uz | Muhammad Sodik Muhammad Yusuf |
+| uz | Tasnim |
+| uz-Cyrl | Tasnim |
 | ru | Abu Adel |
 | ru | Elmir Kuliev |
 `;
 
-    expect(() => parseM1TranslationSelection(duplicateRussianSelection)).toThrow(
-      'M1 translation selection must contain exactly one selected translator for en, uz, and ru.',
-    );
+    expect(() => parseM1TranslationSelection(duplicateRussianSelection)).toThrow(incomplete);
 
     const missingUzbekSelection = `
 ## M1 Translation Selection
@@ -74,9 +78,44 @@ describe('M1 reader DB contract', () => {
 | ru | Abu Adel |
 `;
 
-    expect(() => parseM1TranslationSelection(missingUzbekSelection)).toThrow(
-      'M1 translation selection must contain exactly one selected translator for en, uz, and ru.',
-    );
+    expect(() => parseM1TranslationSelection(missingUzbekSelection)).toThrow(incomplete);
+  });
+
+  it('rejects an approval that names Latin Uzbek but not Cyrillic Uzbek', () => {
+    // The Cyrillic script is a separate `language_code` with its own licence
+    // row, and the parser used to skip any code outside a hardcoded en/ru/uz
+    // list -- so this table would have been accepted, and the reader would
+    // ship a Cyrillic translation nobody signed off on.
+    const latinOnly = `
+## M1 Translation Selection
+
+| Language | Selected translator |
+| --- | --- |
+| en | Saheeh International |
+| uz | Tasnim |
+| ru | Abu Adel |
+`;
+
+    expect(() => parseM1TranslationSelection(latinOnly)).toThrow(incomplete);
+  });
+
+  it('rejects an approval that binds the two Uzbek scripts to different translators', () => {
+    // The whole point of listing both codes: if the scripts ever named
+    // different translators, flipping the script toggle would swap the
+    // scholar rather than the alphabet. Only the shared table decides that,
+    // and the approval doc has to agree with it.
+    const splitTranslators = `
+## M1 Translation Selection
+
+| Language | Selected translator |
+| --- | --- |
+| en | Saheeh International |
+| uz | Tasnim |
+| uz-Cyrl | Muhammad Sodik Muhammad Yusuf |
+| ru | Abu Adel |
+`;
+
+    expect(() => parseM1TranslationSelection(splitTranslators)).toThrow(incomplete);
   });
 
   it('uses sibling quran-data/quran.db as the default canonical source', async () => {
@@ -164,7 +203,11 @@ describeWithDb('M1 reader DB artifact', () => {
       selectedTranslations: {
         en: { translator: 'Saheeh International', rows: 6236 },
         ru: { translator: 'Abu Adel', rows: 6236 },
-        uz: { translator: 'Muhammad Sodik Muhammad Yusuf', rows: 6236 },
+        uz: { translator: 'Tasnim', rows: 6236 },
+        // The reader's Cyrillic Uzbek translation. Absent from this contract
+        // until the script toggle reached the verse translation, so a bundle
+        // without it used to pass here and fail only on a device.
+        'uz-Cyrl': { translator: 'Tasnim', rows: 6236 },
       },
     });
   });

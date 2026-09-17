@@ -15,6 +15,10 @@ export { getLemmaFrequency, getVerbConcordance } from './queries/dictionary.js';
 export { getTranslationsByAyah, getTranslation, getTranslationsBySurahAndLang } from './queries/translations.js';
 export { getGlossesBySurahAndLang, getGlossesWithFallback } from './queries/glosses.js';
 export type { GlossWithLang } from './queries/glosses.js';
+export { getSurahNames } from './queries/surahNames.js';
+export type { SurahName } from './queries/surahNames.js';
+export { getRootGlosses } from './queries/rootGlosses.js';
+export type { RootGloss } from './queries/rootGlosses.js';
 export {
   backfillSearchIndex,
   parseVerseRef,
@@ -101,3 +105,4 @@ export type {
 } from './types.js';
 export type { Client } from './db.js';
 export type { QueryClient, QueryRow, QueryArg } from './queryClient.js';
+export { groupByGlossSpan } from './text/glossSpans.js';

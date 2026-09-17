@@ -1,7 +1,16 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 import { DEFAULT_RECITER_ID, reciterById } from '@quran-corpus/data/mobile';
-import { contentLanguages, uiLocales, type ContentLanguageCode, type UiLocaleCode } from '../i18n/languages';
+import {
+  contentLanguage as resolveContentLanguage,
+  contentLanguages,
+  isScript,
+  uiLocales,
+  type ContentLanguageCode,
+  type QueryLanguageCode,
+  type ScriptCode,
+  type UiLocaleCode,
+} from '../i18n/languages';
 import { openUserDb } from '../data/userDb';
 import { getSetting, saveSetting } from '../data/userRepository';
 import { arabicScales, type ArabicScale } from '../theme/tokens';
@@ -26,6 +35,11 @@ export type WbwDensity = 'hybrid' | 'dense';
 export interface AppSettings {
   uiLocale: UiLocaleCode;
   contentLanguage: ContentLanguageCode;
+  /** Which alphabet the Uzbek content is written in. Stored for every content
+   *  language, not only Uzbek: a reader who set Cyrillic, moved to English and
+   *  came back should find Cyrillic still chosen, and clearing it on the way
+   *  past would be a setting that silently forgets itself. */
+  script: ScriptCode;
   theme: ThemePreference;
   analyticsEnabled: boolean;
   arabicScale: ArabicScale;
@@ -47,6 +61,12 @@ export interface AppSettings {
 export interface AppSettingsContextValue extends AppSettings {
   setUiLocale: (locale: UiLocaleCode) => void;
   setContentLanguage: (language: ContentLanguageCode) => void;
+  setScript: (script: ScriptCode) => void;
+  /** The `language_code` every content query should ask for: the content
+   *  language with the script folded in. Derived here, once, rather than at
+   *  each call site -- a screen that composed it itself would be a second
+   *  place to forget that only Uzbek has two scripts. */
+  queryLanguage: QueryLanguageCode;
   setTheme: (theme: ThemePreference) => void;
   setAnalyticsEnabled: (enabled: boolean) => void;
   setArabicScale: (scale: ArabicScale) => void;
@@ -63,6 +83,10 @@ export interface AppSettingsContextValue extends AppSettings {
 const defaultSettings: AppSettings = {
   uiLocale: 'en',
   contentLanguage: 'en',
+  // Latin: Tasnim's own word-by-word is Latin, and the Cyrillic is derived
+  // from it by transliteration. Defaulting to the derived side would show
+  // every reader the generated text first.
+  script: 'latin',
   theme: 'system',
   analyticsEnabled: false,
   arabicScale: 'medium',
@@ -89,7 +113,7 @@ const AppSettingsContext = createContext<AppSettingsContextValue | null>(null);
 // change -- the owner's report was that the Arabic dominated the card at any
 // system size. System scaling still composes on top; nothing here sets
 // allowFontScaling.
-const settingKeys = ['uiLocale', 'contentLanguage', 'theme', 'analyticsEnabled', 'arabicScale', 'reduceMotion', 'showTranslation', 'wbwDensity', 'continuousPlay', 'reciterId'] as const;
+const settingKeys = ['uiLocale', 'contentLanguage', 'theme', 'analyticsEnabled', 'arabicScale', 'reduceMotion', 'showTranslation', 'wbwDensity', 'continuousPlay', 'reciterId', 'script'] as const;
 
 /** A stored boolean, or the default for anything that is not one.
  *
@@ -191,6 +215,7 @@ export async function loadPersistedAppSettings(client: MobileDataClient): Promis
   const persistedWbwDensity = await migrateWbwDensityDefault(client, persisted.wbwDensity);
   const continuousPlay = persisted.continuousPlay;
   const persistedReciterId = persisted.reciterId;
+  const persistedScript = persisted.script;
 
   return {
     uiLocale: isUiLocale(persistedUiLocale) ? persistedUiLocale : defaultSettings.uiLocale,
@@ -207,6 +232,7 @@ export async function loadPersistedAppSettings(client: MobileDataClient): Promis
     // existed -- reads as off.
     continuousPlay: continuousPlay === 'true',
     reciterId: isReciterId(persistedReciterId) ? persistedReciterId : defaultSettings.reciterId,
+    script: isScript(persistedScript) ? persistedScript : defaultSettings.script,
   };
 }
 
@@ -403,6 +429,8 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       storageError,
       setUiLocale: (uiLocale) => updateSetting('uiLocale', uiLocale),
       setContentLanguage: (contentLanguage) => updateSetting('contentLanguage', contentLanguage),
+      setScript: (script) => updateSetting('script', script),
+      queryLanguage: resolveContentLanguage(settings.contentLanguage, settings.script),
       setTheme: (theme) => updateSetting('theme', theme),
       setAnalyticsEnabled: (analyticsEnabled) => updateSetting('analyticsEnabled', analyticsEnabled),
       setArabicScale: (arabicScale) => updateSetting('arabicScale', arabicScale),

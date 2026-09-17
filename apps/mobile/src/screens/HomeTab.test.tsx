@@ -45,7 +45,13 @@ vi.mock('@/data/corpusRepository', () => ({
 }));
 
 vi.mock('@/settings/settingsStore', () => ({
-  useAppSettings: () => ({ uiLocale: 'en', contentLanguage: 'en', arabicScale: 'medium', reduceMotion: false }),
+  useAppSettings: () => ({
+    uiLocale: 'en',
+    contentLanguage: 'uz',
+    queryLanguage: 'uz-Cyrl',
+    arabicScale: 'medium',
+    reduceMotion: false,
+  }),
 }));
 
 vi.mock('expo-router', async () => {
@@ -312,7 +318,14 @@ describe('HomeTab', () => {
     render(<HomeTab />);
 
     await screen.findByTestId('home-ayah-of-day');
-    expect(mocks.getAyahReaderLocation).toHaveBeenCalledWith({}, expected.surah, expected.ayah, 'en');
+    // The composed code, not the bare content language: the ayah of the day
+    // is a verse translation like any other, so it follows the script.
+    expect(mocks.getAyahReaderLocation).toHaveBeenCalledWith(
+      {},
+      expected.surah,
+      expected.ayah,
+      'uz-Cyrl',
+    );
   });
 
   it('still renders the ayah card when the corpus read fails', async () => {

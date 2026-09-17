@@ -7,7 +7,7 @@ import { reciterById } from '@quran-corpus/data/mobile';
 import { GlassSurface } from '@/components/GlassSurface';
 import { Icon } from '@/components/icons/Icon';
 import { ReciterSheet } from '@/components/ReciterSheet';
-import { contentLanguages, uiLocales } from '@/i18n/languages';
+import { contentLanguages, scripts, uiLocales } from '@/i18n/languages';
 import { t, type UiStringKey } from '@/i18n/uiStrings';
 import { usePressScale } from '@/motion/usePressScale';
 import { useAppSettings } from '@/settings/settingsStore';
@@ -405,8 +405,24 @@ export function SettingsScreen() {
           }))}
           value={settings.contentLanguage}
           onChange={settings.setContentLanguage}
-          last
+          last={settings.contentLanguage !== 'uz'}
         />
+        {/* Only while the content language is Uzbek. Uzbek is the one language
+            in the corpus written in two alphabets; offering the choice beside
+            English or Russian would be a control that changes nothing, since
+            contentLanguage() ignores the script for every other language. */}
+        {settings.contentLanguage === 'uz' && (
+          <ChoiceRow
+            label={label('settings.script')}
+            options={scripts.map((script) => ({
+              value: script.code,
+              label: script.nativeLabel,
+            }))}
+            value={settings.script}
+            onChange={settings.setScript}
+            last
+          />
+        )}
       </SettingsGroup>
 
       <SettingsGroup title={label('settings.groupPrivacy')}>

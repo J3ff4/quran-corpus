@@ -1,7 +1,11 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
-import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
+import {
+  createExpoSqliteClient,
+  type ExpoSqliteLike,
+  type MobileDataClient,
+} from '@quran-corpus/mobile-data';
 import { surahNameGlyph } from '@quran-corpus/config/ornaments/surahName';
 
 import { BrowseList, type BrowseItem, type BrowseSection } from '@/components/BrowseList';
@@ -18,6 +22,7 @@ import {
   type SurahListItem,
 } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
+import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
 import { useThemeColors } from '@/theme/themeContext';
@@ -31,11 +36,14 @@ interface BrowseData {
   revealed: RevealedEntry[];
 }
 
+// Every loader takes the UI locale, though only the surah list has anything to
+// do with it: the two call sites below dispatch through this map by mode, and a
+// map whose members disagree on arity cannot be called generically.
 const LOADERS = {
-  surah: getSurahList,
-  juz: getJuzIndex,
-  page: getPageIndex,
-  revealed: getRevealedIndex,
+  surah: (client: MobileDataClient, uiLocale: UiLocaleCode) => getSurahList(client, uiLocale),
+  juz: (client: MobileDataClient, _uiLocale: UiLocaleCode) => getJuzIndex(client),
+  page: (client: MobileDataClient, _uiLocale: UiLocaleCode) => getPageIndex(client),
+  revealed: (client: MobileDataClient, _uiLocale: UiLocaleCode) => getRevealedIndex(client),
 } as const;
 
 /** Opens the reader at a real ayah, in every mode (decisions 18 and 20).
@@ -94,7 +102,7 @@ export function SurahsScreen() {
       try {
         const db = await openCorpusDb();
         const client = createExpoSqliteClient(db as ExpoSqliteLike);
-        const rows = await LOADERS[mode](client);
+        const rows = await LOADERS[mode](client, uiLocale);
         if (!cancelled) setData((current) => ({ ...current, [mode]: rows }));
       } catch (cause) {
         // Logged, not shown: the driver's message is the only thing that says
@@ -144,7 +152,7 @@ export function SurahsScreen() {
         if (cancelled) return;
         if (dataRef.current[next] !== undefined) continue;
         try {
-          const rows = await LOADERS[next](client);
+          const rows = await LOADERS[next](client, uiLocale);
           if (!cancelled) setData((current) => ({ ...current, [next]: rows }));
         } catch (cause) {
           console.error(`[browse] ${next} prefetch failed`, cause);

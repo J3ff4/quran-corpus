@@ -39,6 +39,11 @@ describe('AboutTab', () => {
     // Same rule as the reciters above: the name is read from the shared table
     // create-m1-reader-db.ts validates the DB against, so swapping a translator
     // cannot leave this screen crediting the previous one (§11).
+    //
+    // getByText and not getAllByText, deliberately: it throws on more than one
+    // match, which is what holds the two Uzbek script codes to a single Tasnim
+    // credit. Both name the same party, and crediting them twice reads as a
+    // rendering bug.
     for (const [language, translator] of Object.entries(selectedTranslators)) {
       expect(screen.getByText(translator), `missing ${language}`).toBeTruthy();
     }
@@ -81,6 +86,16 @@ describe('AboutTab', () => {
     expect(screen.getByText('KFGQPC')).toBeTruthy();
     expect(screen.getByTestId('pending-QUL').textContent).toBe('Source approval incomplete');
     expect(screen.getByTestId('pending-KFGQPC').textContent).toBe('Source approval incomplete');
+  });
+
+  it('credits Tasnim for the Uzbek word-by-word, with its licence marked uncleared', () => {
+    render(<AboutTab />);
+
+    // M9 put Tasnim's glosses and surah names in front of every Uzbek reader.
+    // §11 wants the source named before it ships, and the pill is what stops
+    // the credit from reading as a cleared licence -- it is not one yet.
+    expect(screen.getByText('Tasnim')).toBeTruthy();
+    expect(screen.getByTestId('pending-Tasnim').textContent).toBe('Source approval incomplete');
   });
 
   it('marks an uncleared licence as uncleared, and leaves a cleared one unmarked', () => {

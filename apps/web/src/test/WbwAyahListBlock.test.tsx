@@ -4,7 +4,7 @@ import { WbwAyahListBlock } from '../components/wbw/WbwAyahListBlock';
 import type { WbwAyah } from '../components/wbw/types';
 
 const c = (position: number, arabic: string) => ({
-  surahId: 1, ayahNumber: 3, position, arabic, translit: 't', gloss: 'g', glossLang: null,
+  surahId: 1, ayahNumber: 3, position, arabic, translit: 't', gloss: 'g', glossLang: null, glossGroup: null,
   posTag: 'N', posLabel: 'Noun',
   segments: [],
   grammarNote: 'اسم مرفوع',
