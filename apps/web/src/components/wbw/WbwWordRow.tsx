@@ -2,6 +2,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { decodeSegment } from '@quran-corpus/data/client';
 import { SegmentPills } from '../morphology/SegmentPills';
+import { GlossText } from '../shared/GlossText';
 import { posColor } from '../../lib/posColor';
 import type { WbwCell } from './types';
 
@@ -13,10 +14,14 @@ export function WbwWordRow({
   cell,
   pageLang,
   trailingMark,
+  glossSpan = 1,
 }: {
   cell: WbwCell;
   pageLang?: string;
   trailingMark?: ReactNode;
+  /** Rows this word's gloss covers. 0 means an earlier row already spans
+   *  over this one, so it renders no translation cell at all. */
+  glossSpan?: number;
 }) {
   const {
     surahId,
@@ -34,20 +39,17 @@ export function WbwWordRow({
 
   return (
     <tr className="border-b border-paper-100 align-top dark:border-night-50">
-      <td className="py-3 pr-3">
+      {glossSpan > 0 && (
+      <td className="py-3 pr-3" rowSpan={glossSpan}>
         <div className="text-sm text-paper-900 dark:text-paper-100" dir="ltr">
-          {gloss ?? '—'}
-          {gloss && glossLang && pageLang && glossLang !== pageLang && (
-            <span className="ml-1 text-paper-400" aria-label={`in ${glossLang}`}>
-              ({glossLang})
-            </span>
-          )}
+          <GlossText gloss={gloss} glossLang={glossLang} pageLang={pageLang} />
         </div>
         <div className="text-xs text-paper-500 dark:text-paper-400" dir="ltr">
           {translit ?? '—'}
         </div>
         <div className="text-xs text-paper-400 tabular-nums">{`(${surahId}:${ayahNumber}:${position})`}</div>
       </td>
+      )}
       <td className="px-3 py-3 text-center">
         <Link
           href={`/word/${surahId}/${ayahNumber}/${position}`}

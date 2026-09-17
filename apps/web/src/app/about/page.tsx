@@ -71,11 +71,11 @@ const sources: Source[] = [
     note: 'Written for the sense the Quran uses rather than a dictionary’s leading entry. Because each one is composed from the corpus’s own word-by-word glosses, the Quranic Arabic Corpus terms carry over: annotation © Kais Dukes, Language Research Group, University of Leeds, credited and linked above. Not a lexicon: these are short working glosses, and a root that later gains a real dictionary entry keeps both.',
   },
   {
-    name: 'NLLB-200 (Meta AI)',
-    href: 'https://huggingface.co/facebook/nllb-200-distilled-600M',
-    provides: 'Uzbek word-by-word glosses, machine-translated from the English glosses.',
-    license: 'CC-BY-NC 4.0 (model)',
-    note: 'Uzbek per-word glosses are machine-assisted (NLLB-200), generated from the corpus English glosses and partially human-reviewed. Marked (en) where an Uzbek gloss is not yet available.',
+    name: 'Tasnim',
+    provides:
+      'Uzbek word-by-word glosses, the Uzbek verse translation, and Uzbek surah names — in both the Latin and the Cyrillic script.',
+    license: 'Used with attribution',
+    note: 'Human translation, not machine output: it replaced the machine-translated Uzbek glosses this app shipped previously, which are gone. Tasnim glosses phrases as well as single words, so one gloss may sit under several Arabic words. The Cyrillic word-by-word is transliterated from Tasnim’s Latin; the Cyrillic verse translation is Tasnim’s own. Marked (en) where an Uzbek gloss is not available.',
   },
   {
     name: 'KFGQPC Uthmanic Hafs (King Fahd Glorious Quran Printing Complex)',

@@ -1,4 +1,6 @@
 import { WbwWordCell } from './WbwWordCell';
+import { WbwGlossSpan } from './WbwGlossSpan';
+import { groupByGloss } from './glossGroups';
 import type { WbwAyah } from './types';
 import { AyahMedallion } from '../reader/ornaments/AyahMedallion';
 import { BookmarkButton } from '../shared/BookmarkButton';
@@ -29,9 +31,21 @@ export function WbwAyahBlock({
       </div>
       {ayah.cells.length > 0 ? (
         <div className="flex flex-wrap gap-2" dir="rtl">
-          {ayah.cells.map((cell) => (
-            <WbwWordCell key={cell.position} cell={cell} {...(pageLang ? { pageLang } : {})} />
-          ))}
+          {groupByGloss(ayah.cells).map((group) =>
+            group.length === 1 ? (
+              <WbwWordCell
+                key={group[0]!.position}
+                cell={group[0]!}
+                {...(pageLang ? { pageLang } : {})}
+              />
+            ) : (
+              <WbwGlossSpan
+                key={group[0]!.position}
+                cells={group}
+                {...(pageLang ? { pageLang } : {})}
+              />
+            ),
+          )}
           {isSajdahAyah(ayah.textUthmani) && <SajdahMark />}
         </div>
       ) : (

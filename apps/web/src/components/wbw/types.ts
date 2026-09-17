@@ -18,6 +18,8 @@ export interface WbwCell {
   translit: string | null;
   gloss: string | null;
   glossLang: string | null;
+  /** The span this word's gloss covers; NULL when the gloss is its own. */
+  glossGroup: number | null;
   posTag: string | null;
   posLabel: string | null;
   segments: WordSegment[];

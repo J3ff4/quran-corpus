@@ -1,4 +1,5 @@
 import { WbwWordRow } from './WbwWordRow';
+import { groupByGloss } from './glossGroups';
 import type { WbwAyah } from './types';
 import { AyahMedallion } from '../reader/ornaments/AyahMedallion';
 import { BookmarkButton } from '../shared/BookmarkButton';
@@ -48,16 +49,22 @@ export function WbwAyahListBlock({
               </tr>
             </thead>
             <tbody>
-              {ayah.cells.map((cell, i) => (
-                <WbwWordRow
-                  key={cell.position}
-                  cell={cell}
-                  {...(pageLang ? { pageLang } : {})}
-                  {...(i === ayah.cells.length - 1 && isSajdahAyah(ayah.textUthmani)
-                    ? { trailingMark: <SajdahMark className="ml-1" /> }
-                    : {})}
-                />
-              ))}
+              {groupByGloss(ayah.cells).flatMap((group) =>
+                group.map((cell, j) => (
+                  <WbwWordRow
+                    key={cell.position}
+                    cell={cell}
+                    // The first row of a span owns the translation cell and
+                    // spans it down the rest; the rest render none at all.
+                    glossSpan={j === 0 ? group.length : 0}
+                    {...(pageLang ? { pageLang } : {})}
+                    {...(cell.position === ayah.cells[ayah.cells.length - 1]!.position &&
+                    isSajdahAyah(ayah.textUthmani)
+                      ? { trailingMark: <SajdahMark className="ml-1" /> }
+                      : {})}
+                  />
+                )),
+              )}
             </tbody>
           </table>
         </div>
