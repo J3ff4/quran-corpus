@@ -505,11 +505,11 @@ Uzbek — hide it otherwise rather than showing a dead control.
 
 **Files:** none committed — `apps/mobile/assets/db/quran.db` is generated.
 
-- [ ] **Step 1: regenerate** — `pnpm generate:m1-db`. Record the size delta;
+- [x] **Step 1: regenerate** — `pnpm generate:m1-db`. Record the size delta;
       the bundle is ~134 MB today and this adds ~150k gloss rows, 6236
       translations and their FTS entries. **A jump past ~150 MB needs a ruling
       before the APK.**
-- [ ] **Step 2: build + install** — versionCode +1,
+- [x] **Step 2: build + install** — versionCode +1,
       `taskset -c 7,8 nice -n 19 ionice -c 3 ./gradlew assembleRelease
       -PreactNativeArchitectures=arm64-v8a --max-workers=2 --no-daemon`.
       Serve a COPY named after the versionCode from `aapt2 dump badging`.
@@ -519,20 +519,54 @@ Uzbek — hide it otherwise rather than showing a dead control.
 
 ---
 
+### Step 1 result (2026-09-17)
+
+| | bytes | MiB |
+|---|---|---|
+| baseline (vc21, 2026-09-08) | 145,022,976 | 138.3 |
+| regenerated (M9) | 164,765,696 | **157.1** |
+| delta | +19,742,720 | +18.8 |
+
+**Past the ~150 MB gate. Owner ruled 2026-09-17: ship 157.1 MiB as-is.**
+
+The measured alternative, for whenever size is revisited: the bundle carries
+four translator sets no screen can reach (`ru` Rowwad / Ministry of Awqaf /
+Kuliev, `uz` Alauddin Mansour) — `selectedTranslators` picks one per language
+and `corpusRepository` renders nothing else. Pruning them, both Tasnim sets
+kept, measures **102.5 MiB — 54.7 MiB saved**, below the pre-M9 baseline; the
+FTS index blocks shrink far more than the text does. `translators.ts` already
+notes this is "a bundle-size question, not a correctness one". Not done: the
+owner ruled the gate cleared instead.
+
+Largest remaining consumers, for reference: `words` 62.0 MiB (of which
+`morphology_description` 16.4), `search_fts_content` 19.7 (a full second copy
+of every indexed body — plain FTS5, not external-content), `translations`
+19.1, `search_fts_data` 9.9.
+
+---
+
 ## Verification log (fill on the device — empty is NOT a pass)
 
 | # | Check | Result |
 |---|---|---|
-| 360 | Reader, content=Uzbek: every word has an Uzbek gloss, no `(en)` tags outside the known 314 | |
-| 361 | A grouped pair (2:2 لا ريب) shows ONE gloss under both words | |
-| 362 | Script toggle → Cyrillic: glosses change script, nothing else moves | |
-| 363 | Script toggle hidden while content language is English | |
+| 360 | Reader, content=Uzbek: every word has an Uzbek gloss, no `(en)` tags outside the known 314 | **owed** — data pre-verified: 77,424 of 77,429 words carry a `uz` gloss, so the fallback set is **5**, not 314 |
+| 361 | A grouped pair (2:2 لا ريب) shows ONE gloss under both words | **owed** — data pre-verified: 2:2 positions 3+4 share `gloss_group=31`, gloss "shubha yo’q" |
+| 362 | Script toggle → Cyrillic: glosses change script, nothing else moves | **owed** |
+| 363 | Script toggle hidden while content language is English | **owed** |
 | 364 | ~~UI locale Uzbek: headers/browse/jump read Fotiha~~ | moved to M10 (381) |
 | 365 | ~~UI locale English: still Al-Fatiha~~ | moved to M10 (380/382) |
-| 366 | Dictionary root: Uzbek gloss list above the English article | |
-| 367 | About: Tasnim credited, no NLLB credit | |
-| 368 | Search finds an Uzbek verse phrase from the Tasnim translation | |
-| 369 | Cold start after the DB grew: extract completes, no ANR | |
+| 366 | Dictionary root: Uzbek gloss list above the English article | **owed** — renderer landed `b488b23`; `root_glosses` = 14,440 rows |
+| 367 | About: Tasnim credited, no NLLB credit | **owed** — source verified: Tasnim credited, zero NLLB references. Its `pending` badge is deliberate (§11, licence uncleared) |
+| 368 | Search finds an Uzbek verse phrase from the Tasnim translation | **owed** — data pre-verified: all 6,236 Tasnim verses indexed in `search_fts` |
+| 369 | Cold start after the DB grew: extract completes, no ANR | **PASS** (2026-09-17, vc22) — cold launch 2,190 ms to first frame; app data 138 → 281.3 MiB, so the m9 extract ran; no ANR, no FATAL, process alive. 160 GB free on device |
+
+**Device run 2026-09-17, vc22 (`aapt2 dump badging` confirmed), APK 208.8 MiB.**
+Defect found and fixed before the run: `corpusDbVersion` still read `'m7b'`,
+so the extract would have skipped and the phone would have kept its vc21 DB —
+every check above would have failed for a reason that is not the feature
+(`880a913`). 369 was verified from logcat and diskstats without taking the
+screen; the phone is also this session's terminal display, so the remaining
+nine checks are owed an owner-driven pass.
 
 ---
 
