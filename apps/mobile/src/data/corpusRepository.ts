@@ -37,13 +37,22 @@ import {
   type WordDetail,
   type WordSegment,
 } from '@quran-corpus/data/mobile';
-import type { ContentLanguageCode } from '../i18n/languages';
+import type { ContentLanguageCode, QueryLanguageCode } from '../i18n/languages';
 
 const M0_SURAH_ID = 1;
 
 // Fails the build if the shared list ever stops covering every content language
 // the UI offers -- otherwise a new language would render a permanently blank
 // translation pane instead of an error.
+//
+// Keyed by ContentLanguageCode and NOT QueryLanguageCode, deliberately. The
+// script toggle composes 'uz-Cyrl' for the gloss and concordance queries, but
+// the corpus carries only ONE uz-Cyrl translator (Tasnim) against three for
+// 'uz', so a script switch would silently change which translation of the
+// verse is on screen -- a different translator's words, not the same words in
+// another alphabet. Until that is ruled on, the verse translation and search
+// stay bound to the selected content language, and this type is what enforces
+// it: passing a composed code here is a compile error, not a blank pane.
 const translatorByLanguage: Record<ContentLanguageCode, string> = selectedTranslators;
 
 export interface ReaderAyah {
@@ -223,7 +232,7 @@ export interface Gloss {
 export async function getSurahGlosses(
   client: MobileDataClient,
   surahId: number,
-  languageCode: ContentLanguageCode,
+  languageCode: QueryLanguageCode,
 ): Promise<Map<number, Gloss>> {
   const glosses = await getGlossesWithFallback(client, surahId, languageCode);
   return new Map(
@@ -264,7 +273,7 @@ export async function getWordAtLocation(
   surahId: number,
   ayahNumber: number,
   position: number,
-  languageCode: ContentLanguageCode,
+  languageCode: QueryLanguageCode,
 ): Promise<WordSummary | null> {
   const word = await getWordByLocation(client, surahId, ayahNumber, position);
   if (!word) return null;
@@ -434,7 +443,7 @@ export async function getRootOccurrenceCount(
 export async function getRootOccurrences(
   client: MobileDataClient,
   bw: string,
-  lang: ContentLanguageCode,
+  lang: QueryLanguageCode,
   offset: number,
   limit: number,
   formIds?: number[],
@@ -449,7 +458,7 @@ export async function getRootOccurrences(
 export async function getLemmaScreen(
   client: MobileDataClient,
   lemmaBw: string,
-  lang: ContentLanguageCode,
+  lang: QueryLanguageCode,
 ): Promise<{ entry: LemmaEntry | null; total: number }> {
   const [entry, total] = await Promise.all([
     getLemmaEntry(client, lemmaBw, lang),
@@ -461,7 +470,7 @@ export async function getLemmaScreen(
 export async function getLemmaOccurrences(
   client: MobileDataClient,
   lemmaBw: string,
-  lang: ContentLanguageCode,
+  lang: QueryLanguageCode,
   offset: number,
   limit: number,
 ): Promise<ConcordanceEntry[]> {

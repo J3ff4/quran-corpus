@@ -65,7 +65,7 @@ const NO_LINES: readonly MushafLine[] = [];
 export function MushafScreen() {
   const {
     uiLocale,
-    contentLanguage,
+    queryLanguage,
     reciterId,
     setReciterId,
   } = useAppSettings();
@@ -125,7 +125,7 @@ export function MushafScreen() {
   const [pageInView, setPageInView] = useState<number | null>(null);
   /** A page the reader has to be taken to without swiping there. */
   const [focusPage, setFocusPage] = useState<number | null>(null);
-  const loadWordSummary = useWordSummaryLoader(client, null, contentLanguage);
+  const loadWordSummary = useWordSummaryLoader(client, null, queryLanguage);
   // The page in view, as rows. The INDEX cannot answer what the player needs:
   // `startAyahNumber` is the ayah a page opens in, which is a tail carried over
   // from the page before on most pages. Only the layout says which ayah begins

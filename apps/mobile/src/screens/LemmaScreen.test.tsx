@@ -19,12 +19,23 @@ vi.mock('@/data/corpusRepository', () => ({
 }));
 vi.mock('@/data/openCorpusDb', () => ({ openCorpusDb: () => Promise.resolve({}) }));
 vi.mock('@quran-corpus/mobile-data', () => ({ createExpoSqliteClient: () => ({}) }));
-// contentLanguage deliberately not 'en': loadPage takes a hardcoded 'en' and
+// queryLanguage deliberately not 'en': loadPage takes a hardcoded 'en' and
 // every assertion below still passes, so this pins down that the value
 // actually came from settings. uiLocale stays 'en' -- other tests assert
 // English UI strings.
+//
+// queryLanguage, not contentLanguage: the screen reads the code the settings
+// store has already composed from (content language, script), so that a reader
+// on Uzbek + Cyrillic gets the uz-Cyrl glosses. contentLanguage is kept here
+// at a DIFFERENT value on purpose -- if the screen ever reaches for the raw
+// setting again, these assertions fail instead of quietly ignoring the script.
 vi.mock('@/settings/settingsStore', () => ({
-  useAppSettings: () => ({ uiLocale: 'en', contentLanguage: 'ru', arabicScale: 'medium' }),
+  useAppSettings: () => ({
+    uiLocale: 'en',
+    contentLanguage: 'uz',
+    queryLanguage: 'ru',
+    arabicScale: 'medium',
+  }),
 }));
 
 // Stubbed to the props LemmaScreen hands it: this suite is about what the

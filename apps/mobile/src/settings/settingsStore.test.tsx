@@ -49,6 +49,47 @@ describe('AppSettingsProvider', () => {
     vi.useRealTimers();
   });
 
+  it('composes queryLanguage from the stored language and script', async () => {
+    // The whole point of deriving it in the store: every content screen reads
+    // one code, and only this line knows the script means anything.
+    const userClient = requireSettingsClient();
+    await saveSetting(userClient, 'contentLanguage', 'uz');
+    await saveSetting(userClient, 'script', 'cyrillic');
+
+    let settings: AppSettingsContextValue | null = null;
+    render(
+      <AppSettingsProvider>
+        <SettingsProbe onSettings={(nextSettings) => { settings = nextSettings; }} />
+      </AppSettingsProvider>,
+    );
+
+    await waitFor(() => expect(requireSettings(settings).queryLanguage).toBe('uz-Cyrl'));
+
+    // And it follows the toggle without a reload.
+    act(() => {
+      requireSettings(settings).setScript('latin');
+    });
+    await waitFor(() => expect(requireSettings(settings).queryLanguage).toBe('uz'));
+  });
+
+  it('leaves queryLanguage alone for a language with one script', async () => {
+    // A stored Cyrillic from an earlier Uzbek session must not compose
+    // 'en-Cyrl' when the reader moves to English -- no table carries it.
+    const userClient = requireSettingsClient();
+    await saveSetting(userClient, 'contentLanguage', 'en');
+    await saveSetting(userClient, 'script', 'cyrillic');
+
+    let settings: AppSettingsContextValue | null = null;
+    render(
+      <AppSettingsProvider>
+        <SettingsProbe onSettings={(nextSettings) => { settings = nextSettings; }} />
+      </AppSettingsProvider>,
+    );
+
+    await waitFor(() => expect(requireSettings(settings).script).toBe('cyrillic'));
+    expect(requireSettings(settings).queryLanguage).toBe('en');
+  });
+
   it('hydrates persisted settings and writes setting changes through useAppSettings', async () => {
     const userClient = requireSettingsClient();
     await saveSetting(userClient, 'uiLocale', 'ru');
@@ -436,6 +477,41 @@ describe('loadPersistedAppSettings', () => {
     const settings = await loadPersistedAppSettings(userClient);
 
     expect(settings.arabicScale).toBe('medium');
+  });
+
+  it('round-trips a chosen script', async () => {
+    const userClient = requireSettingsClient();
+    await saveSetting(userClient, 'script', 'cyrillic');
+
+    const settings = await loadPersistedAppSettings(userClient);
+
+    expect(settings.script).toBe('cyrillic');
+  });
+
+  it('falls back to Latin for a stored script that is not one', async () => {
+    // A bad value must not reach contentLanguage(): it composes the
+    // language_code every content query asks for, and a code no table carries
+    // returns an empty screen rather than a fallback.
+    const userClient = requireSettingsClient();
+    await saveSetting(userClient, 'script', 'glagolitic');
+
+    const settings = await loadPersistedAppSettings(userClient);
+
+    expect(settings.script).toBe('latin');
+  });
+
+  it('reads every key by name, so a new key cannot shift the others', async () => {
+    // `script` was appended to settingKeys. A positional read would hand the
+    // last value to the wrong validator; this pins that two settings stored
+    // together both come back intact.
+    const userClient = requireSettingsClient();
+    await saveSetting(userClient, 'script', 'cyrillic');
+    await saveSetting(userClient, 'reciterId', 'sudais');
+
+    const settings = await loadPersistedAppSettings(userClient);
+
+    expect(settings.script).toBe('cyrillic');
+    expect(settings.reciterId).toBe('sudais');
   });
 
   it('round-trips a chosen reciter', async () => {

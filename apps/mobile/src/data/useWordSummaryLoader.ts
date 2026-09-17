@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react';
 import type { MobileDataClient } from '@quran-corpus/mobile-data';
 import type { Word } from '@quran-corpus/data/mobile';
-import type { ContentLanguageCode } from '@/i18n/languages';
+import type { QueryLanguageCode } from '@/i18n/languages';
 
 import { getSurahGlosses, getWordSummary, type Gloss, type WordSummary } from './corpusRepository';
 
@@ -19,7 +19,7 @@ import { getSurahGlosses, getWordSummary, type Gloss, type WordSummary } from '.
 export function useWordSummaryLoader(
   client: MobileDataClient | null,
   surahId: number | null,
-  contentLanguage: ContentLanguageCode,
+  contentLanguage: QueryLanguageCode,
   // The mushaf tab has no surah of its own: a page carries whatever surahs
   // print put on it, so its caller passes the tapped word's surah per call and
   // leaves this null.

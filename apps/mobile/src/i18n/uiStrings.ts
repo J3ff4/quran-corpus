@@ -212,6 +212,7 @@ export type UiStringKey =
   | 'settings.analytics'
   | 'settings.analyticsHint'
   | 'settings.interface'
+  | 'settings.script'
   | 'settings.groupReading'
   | 'settings.groupRecitation'
   | 'settings.groupAppearance'
@@ -447,6 +448,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.analytics': 'Analytics',
     'settings.analyticsHint': 'Nothing leaves the device today; this only stores the preference',
     'settings.interface': 'Interface',
+    'settings.script': 'Uzbek script',
     'settings.groupReading': 'Reading',
     'settings.groupRecitation': 'Recitation',
     'settings.groupAppearance': 'Appearance',
@@ -672,6 +674,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.analytics': 'Tahlil',
     'settings.analyticsHint': 'Hozircha qurilmadan hech narsa chiqmaydi; faqat tanlov saqlanadi',
     'settings.interface': 'Interfeys',
+    'settings.script': 'Oʻzbek yozuvi',
     'settings.groupReading': 'O‘qish',
     'settings.groupRecitation': 'Qiroat',
     'settings.groupAppearance': 'Ko‘rinish',
@@ -893,6 +896,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.analytics': 'Аналитика',
     'settings.analyticsHint': 'Сейчас ничего не покидает устройство; хранится только сама настройка',
     'settings.interface': 'Интерфейс',
+    'settings.script': 'Узбекская письменность',
     'settings.groupReading': 'Чтение',
     'settings.groupRecitation': 'Чтение вслух',
     'settings.groupAppearance': 'Оформление',

@@ -75,7 +75,7 @@ export interface LemmaScreenProps {
  *  full parity with web's lemma page, not deferred to the root screen this
  *  links to. */
 export function LemmaScreen({ lemmaBuckwalter, source }: LemmaScreenProps) {
-  const { uiLocale, contentLanguage } = useAppSettings();
+  const { uiLocale, queryLanguage } = useAppSettings();
   const theme = useThemeColors();
   const skin = useGlassSkin();
 
@@ -100,7 +100,7 @@ export function LemmaScreen({ lemmaBuckwalter, source }: LemmaScreenProps) {
       try {
         const db = await openCorpusDb();
         const client = createExpoSqliteClient(db as ExpoSqliteLike);
-        const found = await getLemmaScreen(client, lemmaKey, contentLanguage);
+        const found = await getLemmaScreen(client, lemmaKey, queryLanguage);
         if (!cancelled) setLoaded({ key: lemmaKey, entry: found.entry, total: found.total });
       } catch (cause) {
         // Same dead end as a lemma the corpus does not carry. Logged for logcat.
@@ -112,7 +112,7 @@ export function LemmaScreen({ lemmaBuckwalter, source }: LemmaScreenProps) {
     return () => {
       cancelled = true;
     };
-  }, [lemmaKey, contentLanguage]);
+  }, [lemmaKey, queryLanguage]);
 
   useEffect(() => {
     if (lemmaKey === null || source === null) {
@@ -150,9 +150,9 @@ export function LemmaScreen({ lemmaBuckwalter, source }: LemmaScreenProps) {
       if (lemmaKey === null) return [];
       const db = await openCorpusDb();
       const client = createExpoSqliteClient(db as ExpoSqliteLike);
-      return getLemmaOccurrences(client, lemmaKey, contentLanguage, offset, limit);
+      return getLemmaOccurrences(client, lemmaKey, queryLanguage, offset, limit);
     },
-    [lemmaKey, contentLanguage],
+    [lemmaKey, queryLanguage],
   );
 
   // What the reader sees: the previous lemma stays until its replacement is

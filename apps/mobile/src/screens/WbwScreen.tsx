@@ -53,7 +53,7 @@ export interface WbwScreenProps {
 }
 
 export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
-  const { contentLanguage, uiLocale, wbwDensity, setWbwDensity } = useAppSettings();
+  const { queryLanguage, uiLocale, wbwDensity, setWbwDensity } = useAppSettings();
   const theme = useThemeColors();
   const paddingBottom = useListBottomPadding();
 
@@ -154,7 +154,7 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
         const data = await getWbwScreen(client, currentSurahId, from);
         // Sequential: the gloss query is per surah and only worth issuing once
         // the range query has proved the surah exists.
-        const surahGlosses = await getSurahGlosses(client, currentSurahId, contentLanguage);
+        const surahGlosses = await getSurahGlosses(client, currentSurahId, queryLanguage);
         if (!cancelled) {
           setCorpusClient(client);
           setWbw({ surahId: currentSurahId, data });
@@ -173,9 +173,9 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
     return () => {
       cancelled = true;
     };
-  }, [contentLanguage, currentSurahId, from, uiLocale]);
+  }, [queryLanguage, currentSurahId, from, uiLocale]);
 
-  const loadWordSummary = useWordSummaryLoader(corpusClient, displayedSurahId, contentLanguage);
+  const loadWordSummary = useWordSummaryLoader(corpusClient, displayedSurahId, queryLanguage);
 
   // Taps are cheap and the grid puts ~150 of them on screen at once, so two can
   // easily be in flight together. Without the sequence check the sheet shows
