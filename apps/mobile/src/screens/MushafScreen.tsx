@@ -100,7 +100,7 @@ export function MushafScreen() {
   // inferred from where the user is.
   const [openMushafWord, setOpenMushafWord] = useState<MushafWord | null>(null);
   const bookmarkedKeys = useMemo(() => new Set(bookmarks.keys()), [bookmarks]);
-  const index = useMushafIndex(client);
+  const index = useMushafIndex(client, uiLocale);
   const chromeVisible = useChromeVisible();
   // Gated on focus, not on `chromeVisible` alone. This is a TAB screen: it
   // stays mounted after the user leaves it, so a request made from here
