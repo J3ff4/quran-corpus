@@ -30,7 +30,9 @@ vi.mock('@/data/corpusRepository', () => ({
 }));
 
 vi.mock('@/settings/settingsStore', () => ({
-  useAppSettings: () => ({ contentLanguage: 'en', uiLocale: 'en' }),
+  // queryLanguage deliberately unequal to contentLanguage: a route that reads
+  // the picked language instead of the composed one passes on equal fixtures.
+  useAppSettings: () => ({ contentLanguage: 'uz', queryLanguage: 'uz-Cyrl', uiLocale: 'en' }),
 }));
 
 vi.mock('react-native', async () => {
@@ -136,7 +138,7 @@ describe('word detail route', () => {
 
     // Positionally: transposing surah and ayah here would still render a word,
     // just the wrong one.
-    expect(mocks.getWordAtLocation).toHaveBeenCalledWith({}, 2, 255, 1, 'en');
+    expect(mocks.getWordAtLocation).toHaveBeenCalledWith({}, 2, 255, 1, 'uz-Cyrl');
   });
 
   it('renders one pill per segment in order', async () => {

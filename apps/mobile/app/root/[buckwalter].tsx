@@ -86,7 +86,7 @@ export default function RootRoute() {
   const params = useLocalSearchParams<{ buckwalter: string }>();
   const theme = useThemeColors();
   const skin = useGlassSkin();
-  const { contentLanguage, queryLanguage, uiLocale } = useAppSettings();
+  const { queryLanguage, uiLocale } = useAppSettings();
 
   // Untrusted: a path segment off a deep link. parseRootParam applies the same
   // charset and length cap the web root page does, and takes the raw
@@ -243,7 +243,7 @@ export default function RootRoute() {
       return getRootOccurrences(
         client,
         applied.root,
-        contentLanguage,
+        queryLanguage,
         offset,
         limit,
         applied.ids.length > 0 ? applied.ids : undefined,
@@ -253,7 +253,7 @@ export default function RootRoute() {
     // per settled count, in the same commit as the `total` that goes with it.
     // ConcordanceList reads a changed loadPage as "a new list" and resets to
     // page 0, which is what a filter change should do -- once.
-    [applied, contentLanguage],
+    [applied, queryLanguage],
   );
 
   const toggleForm = useCallback((formId: number) => {

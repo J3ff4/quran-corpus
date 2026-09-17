@@ -22,7 +22,7 @@ export default function WordDetailRoute() {
   const surahId = useMemo(() => parseSurahId(params.surah), [params.surah]);
   const ayahNumber = useMemo(() => parseAyahNumber(params.ayah), [params.ayah]);
   const position = useMemo(() => parsePosition(params.position), [params.position]);
-  const { contentLanguage, uiLocale } = useAppSettings();
+  const { queryLanguage, uiLocale } = useAppSettings();
   const theme = useThemeColors();
   const paddingBottom = useListBottomPadding();
   const sizes = useArabicSizes();
@@ -45,7 +45,7 @@ export default function WordDetailRoute() {
       try {
         const db = await openCorpusDb();
         const client = createExpoSqliteClient(db as ExpoSqliteLike);
-        const found = await getWordAtLocation(client, surahId, ayahNumber, position, contentLanguage);
+        const found = await getWordAtLocation(client, surahId, ayahNumber, position, queryLanguage);
         if (!cancelled) setSummary(found);
       } catch (cause) {
         // Same not-found state as a missing row: there is nothing the reader
@@ -62,7 +62,7 @@ export default function WordDetailRoute() {
     return () => {
       cancelled = true;
     };
-  }, [ayahNumber, contentLanguage, position, surahId]);
+  }, [ayahNumber, position, queryLanguage, surahId]);
 
   if (loading) {
     return (

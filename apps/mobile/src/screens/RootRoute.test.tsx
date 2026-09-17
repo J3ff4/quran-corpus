@@ -176,17 +176,19 @@ describe('RootRoute', () => {
     expect(mocks.recordRootView).not.toHaveBeenCalled();
   });
 
-  it('pages the validated root in the chosen content language', async () => {
+  it('pages the validated root in the composed query language', async () => {
     // The two silent failures here are forwarding the raw param instead of the
     // parsed one, and hardcoding 'en' instead of the reader's language. Both
-    // still render a plausible list.
+    // still render a plausible list. 'uz-Cyrl', not the 'ru' contentLanguage:
+    // the rows under the gloss block are the same word-by-word content it is,
+    // so a Cyrillic reader must not get Latin rows below Cyrillic glosses.
     render(<RootRoute />);
 
     await waitFor(() =>
       expect(mocks.getRootOccurrences).toHaveBeenCalledWith(
         expect.anything(),
         '{qwl',
-        'ru',
+        'uz-Cyrl',
         0,
         20,
         // Trailing formIds: no chip is selected in this test, so the route
@@ -315,7 +317,7 @@ describe('RootRoute', () => {
     fireEvent.click((await screen.findAllByTestId('form-chip'))[0]!);
     await waitFor(() =>
       expect(mocks.getRootOccurrences).toHaveBeenLastCalledWith(
-        expect.anything(), '{qwl', 'ru', 0, expect.any(Number), [1],
+        expect.anything(), '{qwl', 'uz-Cyrl', 0, expect.any(Number), [1],
       ),
     );
   });
@@ -338,7 +340,7 @@ describe('RootRoute', () => {
     fireEvent.click(chip);
     await waitFor(() =>
       expect(mocks.getRootOccurrences).toHaveBeenLastCalledWith(
-        expect.anything(), '{qwl', 'ru', 0, expect.any(Number), undefined,
+        expect.anything(), '{qwl', 'uz-Cyrl', 0, expect.any(Number), undefined,
       ),
     );
   });
@@ -434,7 +436,7 @@ describe('RootRoute', () => {
     rerender(<RootRoute />);
     await waitFor(() =>
       expect(mocks.getRootOccurrences).toHaveBeenLastCalledWith(
-        expect.anything(), 'qwm', 'ru', 0, expect.any(Number), undefined,
+        expect.anything(), 'qwm', 'uz-Cyrl', 0, expect.any(Number), undefined,
       ),
     );
   });

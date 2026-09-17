@@ -47,6 +47,7 @@ export default function SurahRoute() {
   const routeAyahNumber = useMemo(() => parseAyahNumber(params.ayah), [params.ayah]);
   const {
     contentLanguage,
+    queryLanguage,
     setContentLanguage,
     uiLocale,
     showTranslation,
@@ -247,7 +248,10 @@ export default function SurahRoute() {
 
   // One gloss query per surah, not per word tap. Shared with the word-by-word
   // screen, which opens the same sheet off the same database.
-  const loadWordSummary = useWordSummaryLoader(corpusClient, surahId, contentLanguage);
+  // queryLanguage, not contentLanguage: the sheet's glosses are word-by-word
+  // content, so the script reaches them. The same word tapped in the reader and
+  // in the word-by-word tab has to open the same sheet.
+  const loadWordSummary = useWordSummaryLoader(corpusClient, surahId, queryLanguage);
 
   // useCallback, not an inline closure: this prop is in the dependency array of
   // the effect that publishes the header (SurahReader), and this component
