@@ -513,9 +513,9 @@ Uzbek — hide it otherwise rather than showing a dead control.
       `taskset -c 7,8 nice -n 19 ionice -c 3 ./gradlew assembleRelease
       -PreactNativeArchitectures=arm64-v8a --max-workers=2 --no-daemon`.
       Serve a COPY named after the versionCode from `aapt2 dump badging`.
-- [ ] **Step 3: device checks** — record each in the verification log below.
+- [x] **Step 3: device checks** — record each in the verification log below.
       §10: a milestone is not complete until this runs on real hardware.
-- [ ] **Step 4: commit** — `chore(mobile): versionCode N for the M9 APK`
+- [x] **Step 4: commit** — `chore(mobile): versionCode N for the M9 APK` (`880a913`)
 
 ---
 
@@ -549,16 +549,48 @@ of every indexed body — plain FTS5, not external-content), `translations`
 
 | # | Check | Result |
 |---|---|---|
-| 360 | Reader, content=Uzbek: every word has an Uzbek gloss, no `(en)` tags outside the known 314 | **owed** — data pre-verified: 77,424 of 77,429 words carry a `uz` gloss, so the fallback set is **5**, not 314 |
-| 361 | A grouped pair (2:2 لا ريب) shows ONE gloss under both words | **owed** — data pre-verified: 2:2 positions 3+4 share `gloss_group=31`, gloss "shubha yo’q" |
-| 362 | Script toggle → Cyrillic: glosses change script, nothing else moves | **owed** |
-| 363 | Script toggle hidden while content language is English | **owed** |
+| 360 | Reader, content=Uzbek: every word has an Uzbek gloss, no `(en)` tags outside the known 314 | **PASS** — fallback set is **5**, not 314. 78:39 مَـَٔابًا renders "a return." + `(en)`; neighbours all Uzbek |
+| 361 | A grouped pair (2:2 لا ريب) shows ONE gloss under both words | **PASS** — لَا and رَيْبَ share one bordered cell, own POS tags (NEG, N), single gloss "shubha yo’q"; neighbours separate |
+| 362 | Script toggle → Cyrillic: glosses change script, nothing else moves | **PASS** — 2:1 gloss flipped "алиф лам мим" ↔ "alif lam mim"; same cell, same INL tag |
+| 363 | Script toggle hidden while content language is English | **PASS** — verified both directions: absent on English, `Oʻzbek yozuvi` appears on O'zbek |
 | 364 | ~~UI locale Uzbek: headers/browse/jump read Fotiha~~ | moved to M10 (381) |
 | 365 | ~~UI locale English: still Al-Fatiha~~ | moved to M10 (380/382) |
-| 366 | Dictionary root: Uzbek gloss list above the English article | **owed** — renderer landed `b488b23`; `root_glosses` = 14,440 rows |
-| 367 | About: Tasnim credited, no NLLB credit | **owed** — source verified: Tasnim credited, zero NLLB references. Its `pending` badge is deliberate (§11, licence uncleared) |
-| 368 | Search finds an Uzbek verse phrase from the Tasnim translation | **owed** — data pre-verified: all 6,236 Tasnim verses indexed in `search_fts` |
+| 366 | Dictionary root: Uzbek gloss list above the English article | **PASS** — قول: `TARJIMASI` + info button, 8 glosses, then Hans Wehr, then Lane's |
+| 367 | About: Tasnim credited, no NLLB credit | **PASS** — Tasnim credited with localized description; zero NLLB across the whole page |
+| 368 | Search finds an Uzbek verse phrase from the Tasnim translation | **FAIL** — see below |
 | 369 | Cold start after the DB grew: extract completes, no ANR | **PASS** (2026-09-17, vc22) — cold launch 2,190 ms to first frame; app data 138 → 281.3 MiB, so the m9 extract ran; no ANR, no FATAL, process alive. 160 GB free on device |
+
+#### Check 368 — FAIL
+
+Search cannot return a Tasnim verse in either script.
+
+`sourceFilter` (`packages/data/src/queries/search.ts:197`) builds, for
+`language='uz'` with a translator, `source='uz' AND ref_id IN (SELECT id FROM
+translations WHERE language_code='uz' AND translator=?)`. The translator is
+`selectedTranslators.uz` = **Muhammad Sodik Muhammad Yusuf**, so:
+
+- Tasnim's Latin `uz` rows are filtered out — wrong translator.
+- `source='uz-Cyrl'` is matched by **no** arm, so all **6,236** indexed Tasnim
+  Cyrillic rows are unreachable.
+
+Observed: searching `bilan boshlayman` returns 1:1 rendered in **Muhammad
+Sodik's Cyrillic**, with the Latin query matched via the
+`transliterateUzbekLatinToCyrillic` arm (search.ts:246). Search ignores the
+Lotin/Кирилл setting entirely.
+
+Two stale premises this exposed:
+
+1. That arm's comment reads "Uzbek's `uz` rows are Cyrillic-only, so a Latin
+   query never matches them". Since M9, `language_code='uz'` is **mixed**:
+   Alauddin Mansour and Muhammad Sodik are Cyrillic (6,236 each), Tasnim is
+   Latin. `uz` is not a script.
+2. The plan assumed shipping the Tasnim translation made it searchable. Nothing
+   selects it.
+
+**Not fixed here — the fix is the owner's open ruling** (which translator `uz`
+selects, and whether verse translation + search follow the script). Any change
+picks a translator for every Uzbek reader, which is a product decision, not a
+defect repair.
 
 **Device run 2026-09-17, vc22 (`aapt2 dump badging` confirmed), APK 208.8 MiB.**
 Defect found and fixed before the run: `corpusDbVersion` still read `'m7b'`,
