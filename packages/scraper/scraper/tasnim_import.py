@@ -30,12 +30,19 @@ from .translit_uz_cyrl import to_cyrillic
 # the guard compared 0 against 0 and reported success while destroying them.
 _REPLACED_UZ_SOURCES = ("mt", "mt-reviewed")
 _REPLACED_SOURCES = (*_REPLACED_UZ_SOURCES, "tasnim", "tasnim-cyrl")
+# The delete below is scoped to these, not left open across every language: the
+# export-and-count guard sees only `language_code = 'uz'`, so an 'mt' row under
+# any other language would be destroyed with no copy in the export AND no
+# mismatch for the guard to catch. Scoped, the delete cannot reach further than
+# the guard can see.
+_REPLACED_LANGUAGES = ("uz", "uz-Cyrl")
 # The placeholders below are written out rather than generated: interpolating
 # them trips ruff's S608 even though the values are module constants, and the
 # rule is right that SQL should not be assembled from strings. These asserts
 # are what keeps the literal `?` counts honest if either tuple grows.
 assert len(_REPLACED_UZ_SOURCES) == 2
 assert len(_REPLACED_SOURCES) == 4
+assert len(_REPLACED_LANGUAGES) == 2
 
 # A gloss is a word's meaning, not a sentence. The longest legitimate one in
 # the Tasnim data is well inside this; a row over it is a verse translation
@@ -366,8 +373,9 @@ def import_tasnim(
             # behind on a word this run no longer reaches keeps a group id
             # that now belongs to an unrelated phrase.
             con.execute(
-                "DELETE FROM word_glosses WHERE source IN (?, ?, ?, ?)",
-                _REPLACED_SOURCES,
+                "DELETE FROM word_glosses WHERE source IN (?, ?, ?, ?)"
+                " AND language_code IN (?, ?)",
+                (*_REPLACED_SOURCES, *_REPLACED_LANGUAGES),
             )
             written, kept, rejected = _write_glosses(con, groups, rejects_path)
             translations = _write_translations(con, tasnim)

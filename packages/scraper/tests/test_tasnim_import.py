@@ -465,3 +465,37 @@ def test_a_hand_reviewed_gloss_is_exported_before_it_is_deleted(tmp_path):
         == 0
     )
     con.close()
+
+
+def test_the_delete_cannot_reach_a_language_the_export_guard_never_counts(tmp_path):
+    # The guard above the delete counts `language_code = 'uz'` only, so an 'mt'
+    # row under any other language was destroyed with no copy in the export AND
+    # no mismatch to catch it -- a silent deletion that reported success.
+    corpus = tmp_path / "c.db"
+    _corpus(corpus, {(1, 1): ["لَا"]})
+    con = sqlite3.connect(corpus)
+    con.execute(
+        "INSERT INTO languages (code, name_native, name_english, direction)"
+        " VALUES ('en', 'English', 'English', 'ltr') ON CONFLICT(code) DO NOTHING"
+    )
+    con.execute(
+        "INSERT INTO word_glosses (word_id, language_code, gloss_text, source)"
+        " SELECT id, 'en', 'no doubt', 'mt' FROM words"
+    )
+    con.commit()
+    con.close()
+    _tasnim(tmp_path / "t.db", [(1, 1, "لَا", "yo'q")])
+
+    import_tasnim(
+        corpus,
+        tmp_path / "t.db",
+        export_path=tmp_path / "mt.jsonl",
+        rejects_path=tmp_path / "rejects.tsv",
+    )
+
+    con = sqlite3.connect(corpus)
+    survivor = con.execute(
+        "SELECT gloss_text FROM word_glosses WHERE language_code = 'en' AND source = 'mt'"
+    ).fetchall()
+    con.close()
+    assert [row[0] for row in survivor] == ["no doubt"]
