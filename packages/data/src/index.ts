@@ -105,3 +105,4 @@ export type {
 } from './types.js';
 export type { Client } from './db.js';
 export type { QueryClient, QueryRow, QueryArg } from './queryClient.js';
+export { groupByGlossSpan } from './text/glossSpans.js';

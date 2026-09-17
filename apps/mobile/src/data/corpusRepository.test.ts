@@ -268,6 +268,30 @@ function createFakeClient({
           ),
         };
       }
+      // getSurahNames: LEFT JOIN surah_names, falling back per surah to the
+      // `surahs` row -- the fallback is the query's, not the caller's, so a
+      // language with a partial name set still reads.
+      if (sql.includes('surah_names')) {
+        const [lang] = args;
+        const names: MobileRow[] =
+          lang === 'uz'
+            ? [
+                { surah_id: 1, name: 'Fotiha', meaning: 'Ochuvchi' },
+                // Surah 2 deliberately absent: the per-surah fallback is the
+                // half a complete fixture would never exercise.
+              ]
+            : [];
+        return {
+          rows: surahs.map((surah) => {
+            const localized = names.find((row) => row['surah_id'] === surah['id']);
+            return {
+              surah_id: surah['id'] as SqlValue,
+              name: (localized?.['name'] ?? surah['name_translit']) as SqlValue,
+              meaning: (localized ? localized['meaning'] : surah['name_translation']) as SqlValue,
+            };
+          }),
+        };
+      }
       // COALESCE(pref, fallback) per word, mirroring getGlossesWithFallback --
       // args are [lang, fallback, lang, fallback, surahId].
       if (sql.includes('word_glosses')) {
@@ -284,6 +308,10 @@ function createFakeClient({
             word_id: word['id'] as SqlValue,
             gloss_text: chosen['gloss_text'] as SqlValue,
             gloss_lang: (pref ? lang : fallback) as SqlValue,
+            // Null on the fallback branch, mirroring the real CASE: group ids
+            // are numbered per (ayah, language), so a fallback row's id names a
+            // different phrase than the preferred language's same number.
+            gloss_group: (pref ? (pref['gloss_group'] ?? null) : null) as SqlValue,
           });
         }
         return { rows };
@@ -446,8 +474,35 @@ describe('getSurahGlosses', () => {
     // word, or none, would satisfy a test that only looked at one of them.
     const glosses = await getSurahGlosses(createFakeClient(), 2, 'ru');
 
-    expect(glosses.get(2001)).toEqual({ text: 'Alif Lam Meem', lang: 'en', isFallback: true });
-    expect(glosses.get(2002)).toEqual({ text: 'это', lang: 'ru', isFallback: false });
+    expect(glosses.get(2001)).toEqual({
+      text: 'Alif Lam Meem',
+      lang: 'en',
+      isFallback: true,
+      group: null,
+    });
+    expect(glosses.get(2002)).toEqual({
+      text: 'это',
+      lang: 'ru',
+      isFallback: false,
+      group: null,
+    });
+  });
+
+  it('carries the phrase group through, so the UI can merge the span', async () => {
+    // Without this the group is dropped between the query and the screen, and
+    // every phrase gloss prints once per word it covers -- which is what the
+    // group exists to stop.
+    const client = createFakeClient({
+      glosses: [
+        { id: 801, word_id: 2001, language_code: 'uz', gloss_text: "shubha yo'q", gloss_group: 7 },
+        { id: 802, word_id: 2002, language_code: 'uz', gloss_text: "shubha yo'q", gloss_group: 7 },
+      ],
+    });
+
+    const glosses = await getSurahGlosses(client, 2, 'uz');
+
+    expect(glosses.get(2001)?.group).toBe(7);
+    expect(glosses.get(2002)?.group).toBe(7);
   });
 
   it('returns an empty map for a surah with no glosses at all', async () => {
@@ -659,5 +714,47 @@ describe('getRootOccurrences', () => {
     // roots.ts pushes the paging args as (limit, offset), in that order.
     expect(sql).toContain('LIMIT ? OFFSET ?');
     expect(args.slice(-2)).toEqual([20, 40]);
+  });
+});
+
+describe('getSurahList locale', () => {
+  it('names surahs in the UI locale when a translated set exists', async () => {
+    // Owner ruling 2026-09-16: a surah name follows the UI locale, not the
+    // content language -- it is chrome, and it stays put when the reader
+    // changes which translation of the VERSES they are reading.
+    const list = await getSurahList(createFakeClient(), 'uz');
+    const fatiha = list.find((surah) => surah.id === 1);
+
+    expect(fatiha?.nameTranslit).toBe('Fotiha');
+    expect(fatiha?.nameTranslation).toBe('Ochuvchi');
+  });
+
+  it('keeps the English row when no locale is asked for', async () => {
+    // Three callers want ayah counts, not names. They must get exactly what
+    // they got before the locale existed.
+    const list = await getSurahList(createFakeClient());
+
+    expect(list.find((surah) => surah.id === 1)?.nameTranslit).toBe('Al-Fatihah');
+  });
+
+  it('does not query a name set for English', async () => {
+    // English names live on the `surahs` row itself and `surah_names` has no
+    // 'en' rows at all, so a join would return nothing and blank the list.
+    const list = await getSurahList(createFakeClient(), 'en');
+
+    expect(list.find((surah) => surah.id === 1)?.nameTranslit).toBe('Al-Fatihah');
+  });
+});
+
+describe('getSurahList locale fallback', () => {
+  it('falls back per surah, not per language', async () => {
+    // Surah 2 has no Uzbek name in the fixture. The list must still show it in
+    // English rather than dropping it or blanking the row -- a partial name set
+    // is the normal state for every language but Uzbek.
+    const list = await getSurahList(createFakeClient(), 'uz');
+
+    expect(list.find((surah) => surah.id === 1)?.nameTranslit).toBe('Fotiha');
+    expect(list.find((surah) => surah.id === 2)?.nameTranslit).toBe('Al-Baqarah');
+    expect(list).toHaveLength(2);
   });
 });

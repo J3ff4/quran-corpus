@@ -23,6 +23,7 @@ import {
   getWordByLocation,
   getWordDetail,
   getWordsByAyah,
+  getSurahNames,
   getWordsBySurahAyahRange,
   search,
   type Ayah,
@@ -32,12 +33,13 @@ import {
   type RootSearchItem,
   type SearchResult,
   type Surah,
+  type SurahName,
   type Translation,
   type Word,
   type WordDetail,
   type WordSegment,
 } from '@quran-corpus/data/mobile';
-import type { ContentLanguageCode, QueryLanguageCode } from '../i18n/languages';
+import type { ContentLanguageCode, QueryLanguageCode, UiLocaleCode } from '../i18n/languages';
 
 const M0_SURAH_ID = 1;
 
@@ -108,15 +110,42 @@ function selectedTranslationByAyah(
   return grouped;
 }
 
-export async function getSurahList(client: MobileDataClient): Promise<SurahListItem[]> {
-  const surahs = await getAllSurahs(client);
-  return surahs.map((surah) => ({
-    id: surah.id,
-    nameArabic: surah.name_arabic,
-    nameTranslit: surah.name_translit,
-    nameTranslation: surah.name_translation,
-    ayahCount: surah.ayah_count,
-  }));
+/** Every surah, named in `uiLocale` where a translated name exists.
+ *
+ *  The locale is the UI locale, not the content language (owner ruling
+ *  2026-09-16): a surah name is chrome, read in whatever language the app is
+ *  speaking, and it stays put when the reader changes which translation of the
+ *  VERSES they want.
+ *
+ *  Optional because three of the five callers want ayah counts and ids, not
+ *  names -- the mushaf's page index and the ayah-count hook among them -- and
+ *  handing them a locale they have no business knowing would be worse than the
+ *  branch. Omitted, this returns the `surahs` row's own English, exactly as
+ *  before. */
+export async function getSurahList(
+  client: MobileDataClient,
+  uiLocale?: UiLocaleCode,
+): Promise<SurahListItem[]> {
+  const [surahs, names] = await Promise.all([
+    getAllSurahs(client),
+    // English names live on the `surahs` row itself, so there is nothing to
+    // join for 'en' -- and no `surah_names` rows either.
+    uiLocale && uiLocale !== 'en'
+      ? getSurahNames(client, uiLocale)
+      : Promise.resolve(new Map<number, SurahName>()),
+  ]);
+  return surahs.map((surah) => {
+    const localized = names.get(surah.id);
+    return {
+      id: surah.id,
+      nameArabic: surah.name_arabic,
+      // getSurahNames already falls back per surah to name_translit, so a
+      // partial name set reads rather than showing blanks.
+      nameTranslit: localized?.name ?? surah.name_translit,
+      nameTranslation: localized?.meaning ?? surah.name_translation,
+      ayahCount: surah.ayah_count,
+    };
+  });
 }
 
 /** One surah's ayah rows, unjoined.
@@ -227,6 +256,11 @@ export interface Gloss {
   text: string;
   lang: string;
   isFallback: boolean;
+  /** Which phrase this word belongs to, or NULL when the gloss is the word's
+   *  own. Adjacent words sharing an id are ONE gloss and render under one
+   *  merged cell -- see groupByGlossSpan. Scoped per (ayah, language), so it
+   *  only ever groups within an ayah. */
+  group: number | null;
 }
 
 export async function getSurahGlosses(
@@ -238,7 +272,12 @@ export async function getSurahGlosses(
   return new Map(
     glosses.map((gloss) => [
       gloss.word_id,
-      { text: gloss.gloss_text, lang: gloss.gloss_lang, isFallback: gloss.gloss_lang !== languageCode },
+      {
+        text: gloss.gloss_text,
+        lang: gloss.gloss_lang,
+        isFallback: gloss.gloss_lang !== languageCode,
+        group: gloss.gloss_group,
+      },
     ]),
   );
 }

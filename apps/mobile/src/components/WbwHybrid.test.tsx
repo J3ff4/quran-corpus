@@ -79,7 +79,8 @@ function pageWithUnanalysedWord(): WbwPage {
   };
 }
 
-const gloss = (text: string, lang = 'en', isFallback = false): Gloss => ({ text, lang, isFallback });
+const gloss = (text: string, lang = 'en', isFallback = false, group: number | null = null): Gloss =>
+  ({ text, lang, isFallback, group });
 
 const GLOSSES = new Map([
   [1, gloss('Allah')],
@@ -176,5 +177,43 @@ describe('WbwHybrid', () => {
     // Arabic reads RTL and flexbox lays these out, not a text engine, so
     // nothing else puts word 1 on the right.
     expect(wrap.style.flexDirection).toBe('row-reverse');
+  });
+});
+
+describe('WbwHybrid gloss spans', () => {
+  afterEach(cleanup);
+
+  // The hybrid layout merges on the same rule as the dense one: the span is a
+  // fact about the gloss, so it cannot depend on which density is showing.
+  const SPANNED = new Map([
+    [1, gloss("shubha yo'q", 'uz', false, 7)],
+    [2, gloss("shubha yo'q", 'uz', false, 7)],
+    [3, gloss('unda', 'uz')],
+  ]);
+
+  it('draws a spanned phrase once, not once per word', () => {
+    renderHybrid({ glosses: SPANNED });
+    expect(screen.getAllByText("shubha yo'q")).toHaveLength(1);
+    expect(screen.getByText('unda')).toBeTruthy();
+  });
+
+  it('keeps every spanned word its own button', () => {
+    const { onWordPress } = renderHybrid({ glosses: SPANNED });
+    const cells = screen.getAllByTestId('wbw-cell');
+    expect(cells).toHaveLength(3);
+    fireEvent.click(cells[1]!);
+    expect(onWordPress.mock.calls[0]![0].id).toBe(2);
+  });
+
+  it('does not merge two words that merely share gloss TEXT', () => {
+    renderHybrid({
+      glosses: new Map([
+        [1, gloss('and', 'en')],
+        [2, gloss('and', 'en')],
+        [3, gloss('unda', 'uz')],
+      ]),
+    });
+    expect(screen.getAllByText('and')).toHaveLength(2);
+    expect(screen.queryAllByTestId('wbw-span')).toHaveLength(0);
   });
 });

@@ -130,3 +130,4 @@ export type {
 // The client contract mobile satisfies with its expo-sqlite adapter. Exported
 // here so apps/mobile can type its repository seam without a cast.
 export type { QueryClient, QueryRow, QueryArg } from './queryClient.js';
+export { groupByGlossSpan } from './text/glossSpans.js';
