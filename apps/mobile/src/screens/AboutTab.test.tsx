@@ -83,6 +83,16 @@ describe('AboutTab', () => {
     expect(screen.getByTestId('pending-KFGQPC').textContent).toBe('Source approval incomplete');
   });
 
+  it('credits Tasnim for the Uzbek word-by-word, with its licence marked uncleared', () => {
+    render(<AboutTab />);
+
+    // M9 put Tasnim's glosses and surah names in front of every Uzbek reader.
+    // §11 wants the source named before it ships, and the pill is what stops
+    // the credit from reading as a cleared licence -- it is not one yet.
+    expect(screen.getByText('Tasnim')).toBeTruthy();
+    expect(screen.getByTestId('pending-Tasnim').textContent).toBe('Source approval incomplete');
+  });
+
   it('marks an uncleared licence as uncleared, and leaves a cleared one unmarked', () => {
     render(<AboutTab />);
 

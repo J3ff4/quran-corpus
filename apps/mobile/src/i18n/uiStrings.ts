@@ -222,6 +222,7 @@ export type UiStringKey =
   | 'about.sourceArabic'
   | 'about.sourceEnglish'
   | 'about.sourceUzbek'
+  | 'about.sourceTasnim'
   | 'about.sourceRussian'
   | 'about.sourceHafs'
   | 'about.sourceMushafLayout'
@@ -458,6 +459,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceArabic': 'Uthmani Quran text, from Tanzil.',
     'about.sourceEnglish': 'The English translation the reader shows.',
     'about.sourceUzbek': 'The Uzbek translation the reader shows.',
+    'about.sourceTasnim': 'The Uzbek word-by-word glosses and surah names, in both scripts.',
     'about.sourceRussian': 'The Russian translation the reader shows.',
     'about.sourceHafs': 'The Arabic face the Quran text itself is set in.',
     'about.sourceMushafLayout': 'Mushaf page and line layout, from the Quran.com v4 API (Quranic Universal Library). King Fahd Glorious Quran Printing Complex edition.',
@@ -684,6 +686,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceArabic': 'Usmoniy yozuvidagi Qur’on matni, Tanzil’dan.',
     'about.sourceEnglish': 'O‘quvchi ko‘rsatadigan inglizcha tarjima.',
     'about.sourceUzbek': 'O‘quvchi ko‘rsatadigan o‘zbekcha tarjima.',
+    'about.sourceTasnim': 'Har ikki yozuvda o‘zbekcha so‘zma-so‘z tarjima va sura nomlari.',
     'about.sourceRussian': 'O‘quvchi ko‘rsatadigan ruscha tarjima.',
     'about.sourceHafs': 'Qur’on matni shu arabcha shriftda teriladi.',
     'about.sourceMushafLayout': 'Mushaf sahifa va satr joylashuvi, Quran.com v4 API (Quranic Universal Library) dan. Shoh Fahd Qur’on bosmaxonasi nashri.',
@@ -906,6 +909,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceArabic': 'Текст Корана в написании усмани, из Tanzil.',
     'about.sourceEnglish': 'Английский перевод, который показывает читалка.',
     'about.sourceUzbek': 'Узбекский перевод, который показывает читалка.',
+    'about.sourceTasnim': 'Узбекский пословный перевод и названия сур, в обоих письменностях.',
     'about.sourceRussian': 'Русский перевод, который показывает читалка.',
     'about.sourceHafs': 'Арабский шрифт, которым набран сам текст Корана.',
     'about.sourceMushafLayout': 'Разметка страниц и строк мусхафа, из Quran.com v4 API (Quranic Universal Library). Издание Комплекса имени короля Фахда.',

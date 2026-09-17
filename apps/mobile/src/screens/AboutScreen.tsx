@@ -52,6 +52,13 @@ const GROUPS: { title: UiStringKey; credits: Credit[] }[] = [
       // redistribution grant stated (ruling 9), so it is pending like the
       // rest of the uncleared set -- this row is what makes that auditable.
       { name: 'QUL', body: 'about.sourceMushafLayout', pending: true },
+      // The Uzbek word-by-word and the Uzbek surah names, both from M9. Not
+      // folded into TRANSLATION_CREDITS: those are the one verse translator
+      // per language that selectedTranslators names, and this is a different
+      // work by a different party that happens to be in the same language.
+      // Pending -- the licence has not been cleared (§11).
+      { name: 'Tasnim', body: 'about.sourceTasnim', pending: true },
+
       ...TRANSLATION_CREDITS,
     ],
   },
