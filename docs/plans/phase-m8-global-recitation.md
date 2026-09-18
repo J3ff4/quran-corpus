@@ -523,19 +523,19 @@ export function MiniPlayer({ bottomOffset }: { bottomOffset: number }) {
 
 | # | Check | Pass |
 |---|---|---|
-| 340 | Mushaf, chrome down: status bar gone, page number and juz fully visible, **nothing on the page moved** | |
-| 341 | Tap: both system bars and the chrome all return together | |
-| 342 | Leave the mushaf while the chrome is down → status bar and nav buttons are back on the other tab | |
-| 343 | Play a page, touch the player repeatedly: chrome never hides while you keep touching, hides 3.5s after you stop | |
-| 344 | Drag the scrub bar for >4s: chrome stays up for the whole drag | |
-| 345 | Grow/retract at 280ms reads as motion, not a snap | |
-| 346 | Start the reader playing, walk to Surahs: mini-player is docked above the tab pill and still sounding | |
-| 347 | Mini-player X: audio stops, bar goes, nothing resumes | |
-| 348 | Open a word sheet while the mini-player is up: the sheet covers it, nothing overlaps | |
-| 349 | Start the mushaf page playing, walk to Home: **no** mini-player; Home's card is compact (reader-owned rule) | |
-| 350 | Home card play: starts the last-read ayah and **runs on** into the next with Continuous OFF in Settings | |
-| 351 | Home card grows in place while sounding; no second transport anywhere on Home | |
-| 352 | Start the reader, then start the mushaf: the reader's sound stops. One voice at a time | |
+| 340 | Mushaf, chrome down: status bar gone, page number and juz fully visible, **nothing on the page moved** |  PASS — chrome-down vs chrome-up screenshots are **pixel-identical across rows 900-2400** (mean abs diff 0.000, best alignment dy=0). Status bar absent (top-band max 20), juz and page number both fully visible. The chrome overlays; the page does not reflow. |
+| 341 | Tap: both system bars and the chrome all return together |  PASS — one tap restores status bar, Go-to bar, player line and tab bar together. |
+| 342 | Leave the mushaf while the chrome is down → status bar and nav buttons are back on the other tab |  PASS — mushaf chrome-down top-band max **20**; after an external `qurancorpus://menu` intent, max **255** and the real Menu screen. (`--/menu` is a dev-client form and lands on Expo Router's Unmatched Route in a release build — use the plain scheme.) |
+| 343 | Play a page, touch the player repeatedly: chrome never hides while you keep touching, hides 3.5s after you stop |  PASS — touched the player every 2s for 10s: status bar stayed present (max 255) at every sample; gone (max 20) ~4s after the last touch. |
+| 344 | Drag the scrub bar for >4s: chrome stays up for the whole drag |  **BLOCKED** — `adb shell input swipe` is refused on this device (`SecurityException: Injecting to another application requires INJECT_EVENTS`). Taps inject fine, drags do not. Needs a real finger. |
+| 345 | Grow/retract at 280ms reads as motion, not a snap |  NOT RUN — motion judgment, not measurable through adb. M8a already measured the 280ms grow frame by frame; left to the owner. |
+| 346 | Start the reader playing, walk to Surahs: mini-player is docked above the tab pill and still sounding |  PASS — reader playing, walked to Surahs: mini-player docked above the tab bar reading **Al-Baqara · 17 / Abu Bakr Al-Shatri / 0:05 / -0:16**, with prev/pause/next and an X, still sounding (piid active at that sample). |
+| 347 | Mini-player X: audio stops, bar goes, nothing resumes |  PASS — X cut the ayah at ~7s of 22s and the bar left; **26 further seconds sampled silent**, nothing resumed. |
+| 348 | Open a word sheet while the mini-player is up: the sheet covers it, nothing overlaps |  NOT RUN — could not open a word sheet through adb taps on the mushaf (taps toggled chrome instead), and the Morphology screen is pushed, so no player docks there. Owner-owed. |
+| 349 | Start the mushaf page playing, walk to Home: **no** mini-player; Home's card is compact (reader-owned rule) |  **FAIL** — mushaf page playing, walked to Home: Home shows a **full grown transport** for the mushaf-owned track (`Al-Baqara · 20`, scrub 0:26 / -0:05, pause, prev/next). The check requires no mini-player and a compact card. Reproduced twice. |
+| 350 | Home card play: starts the last-read ayah and **runs on** into the next with Continuous OFF in Settings |  PASS — `toggle-continuous` read `checked="false"`, then one tap on the compact Home card played **four consecutive ayahs** (19s/8s/25s/12s = 2:17→2:20) with no further input. |
+| 351 | Home card grows in place while sounding; no second transport anywhere on Home |  PASS — exactly one transport on Home while sounding; the card grows in place and no mini-player docks alongside it. |
+| 352 | Start the reader, then start the mushaf: the reader's sound stops. One voice at a time |  **FAIL (unreachable)** — with the reader sounding, the mushaf tab replaces its **"Play this page" resting line with the reader's transport**, so the page has no start control at all. Four attempts, the tap never started anything and the reader ran to its natural end. The one-voice invariant itself never broke: **no run ever sampled two concurrent piids**. |
 
 ---
 
@@ -552,3 +552,64 @@ export function MiniPlayer({ bottomOffset }: { bottomOffset: number }) {
 ## §4 Review
 
 No §5 trigger fires: no `packages/data`, no trust boundary, no on-device DB write. Ships on §4 self-review plus lint, type-check and tests. **Do not escalate on a hunch** — if the executor believes a task has drifted into one of those three classes, stop and ask rather than assuming.
+
+
+---
+
+## Device run 2026-09-18 — vc22, OnePlus 7 Pro, adb over wifi
+
+Checks 340-352, owed since the M8 merge (`2996092`) and M8a (`d0d51ab`).
+**9 PASS, 2 FAIL, 1 blocked, 2 not run.** Build under test is vc22, the M9 APK,
+which contains M8 and M8a; M10 adds only behaviour-neutral re-export shims to
+mobile.
+
+### Method
+
+Audio was sampled **on-device**, once a second, by an `adb shell` loop writing
+`dumpsys audio | grep u/pid:10355 | grep state:started` piids to a file. That
+matters: the round-trip latency between two `adb` calls from this session runs
+15-25s, which is longer than one ayah (2:17 is 21.8s), so any "is it still
+sounding" question asked across two calls answers about a track that has already
+ended. Three early runs were thrown away for exactly that reason. Chrome state
+was read from the status-bar band of a screencap (`max 20` = absent, `max 255` =
+present) rather than from a dump, because the mushaf idle-hides in 3.5s and a
+`uiautomator dump` alone takes ~2s.
+
+Two traps worth keeping: on the mushaf a tap **toggles** chrome, so a "wake" tap
+issued when the chrome is already up hides it and the next tap lands on the page
+— that silently ate three attempts at 352. And the tab bar is part of the chrome,
+so a tab-bar tap taken while the chrome is down does nothing at all. Deep links
+(`qurancorpus://mushaf`, `://menu`, `://`) navigate deterministically and are the
+better instrument.
+
+### The one defect, seen from two sides
+
+349 and 352 are the same bug: **a screen's player surface renders whatever the
+engine is playing, without consulting the track's `owner`.**
+
+- On **Home**, a mushaf-owned track grows the compact listen card into a full
+  transport — 349 requires the opposite.
+- On the **mushaf**, a reader-owned track replaces the "Play this page" resting
+  line with the reader's transport. That line is the only way to start a page,
+  so while the reader sounds the mushaf cannot be started at all — which is why
+  352 could not even be performed, rather than failing on its assertion.
+
+The one-voice invariant the checks were protecting was never violated: across
+every run, the sampler never once recorded two concurrent piids, and the mushaf
+advanced ayah to ayah one player at a time.
+
+This is the open design question the M8 review already raised — ruling 8 says the
+mini-player is suppressed on Home flatly, CodeRabbit argued for suppression
+scoped to *home-owned* tracks. The device run says the cost is larger than the
+review thought: not only does a reader-owned track have no transport on Home, a
+foreign track **takes over** the surface and, on the mushaf, removes the control
+that starts a page. **Owner ruling needed before a fix lands** — suppressing by
+owner and restoring each screen's own resting control is one shape; letting any
+screen drive the engine is another.
+
+### Still owed
+
+344 (needs a real finger — adb cannot inject drags), 345 (motion judgment), 348
+(word sheet over a docked player), and the three-button-navigation check from
+M8a, which stays blocked because `adb shell settings put` is denied and this
+phone is on gesture nav.

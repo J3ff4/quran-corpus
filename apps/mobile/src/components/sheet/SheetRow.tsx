@@ -19,6 +19,12 @@ export interface SheetRowProps {
   /** 'radio' for a picker, 'button' for a navigation action. Default 'button'. */
   role?: 'radio' | 'button';
   trailingIcon?: IconName;
+  /** Where this row sits in its group, 1-based. Announced after the label so a
+   *  screen-reader user knows how long the list is and where they are in it
+   *  (#51). React Native exposes no `CollectionItemInfo`, so the position has
+   *  to travel in the label -- a `View` with `accessibilityRole="radiogroup"`
+   *  sets no `CollectionInfo` of its own and TalkBack has nothing to count. */
+  position?: { index: number; total: number };
   testID?: string;
 }
 
@@ -28,6 +34,7 @@ export function SheetRow({
   selected = false,
   role = 'button',
   trailingIcon,
+  position,
   testID,
 }: SheetRowProps) {
   const theme = useThemeColors();
@@ -43,9 +50,12 @@ export function SheetRow({
       // depending on the role, and a radio with only `selected` announces
       // nothing about its state on some builds.
       accessibilityState={role === 'radio' ? { selected, checked: selected } : undefined}
-      // The label alone. The check is decorative here -- the state is already
-      // carried by accessibilityState, and announcing both says it twice.
-      accessibilityLabel={label}
+      // The label, plus the position where the caller gave one. The check is
+      // decorative -- the state is already carried by accessibilityState, and
+      // announcing both says it twice.
+      accessibilityLabel={
+        position ? `${label}, ${position.index} / ${position.total}` : label
+      }
       onPress={onPress}
       style={(state) => [
         {

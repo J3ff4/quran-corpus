@@ -2,6 +2,7 @@ import React from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { InfoButton, InfoSheet } from './InfoSheet';
+import { touchTargets } from '@/theme/tokens';
 
 // The shell has its own suite (BottomSheet.test.tsx). Stubbed here so this one
 // covers the wiring -- accessible name, open/close state, what body reaches
@@ -59,6 +60,20 @@ describe('InfoButton', () => {
 
     rerender(<InfoButton label="About these translations" expanded onPress={onPress} />);
     expect(screen.getByTestId('info-button').getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('gives the finger the 48dp floor the 40dp glyph does not', () => {
+    // The drawn box stays 40dp so the inline section-label row keeps its
+    // height, which means the ONLY thing carrying this control over the §8
+    // floor is hitSlop -- and `uiautomator` reports the drawn bounds, so the
+    // device check that found this (177) cannot see the fix. Asserted from the
+    // tokens rather than a literal 4, so the day `touchTargets` moves this
+    // fails instead of quietly re-breaking.
+    render(<InfoButton label="About these translations" expanded={false} onPress={vi.fn()} />);
+
+    const slop = Number(screen.getByTestId('info-button').getAttribute('data-hit-slop'));
+    expect(slop).toBeGreaterThan(0);
+    expect(touchTargets.compact + slop * 2).toBeGreaterThanOrEqual(touchTargets.minimum);
   });
 
   it('renders no sheet of its own', () => {

@@ -3,7 +3,7 @@ import { RECITERS } from '@quran-corpus/data/mobile';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
 import { BottomSheet } from './BottomSheet';
-import { SheetHeader, SheetRow } from './sheet';
+import { SheetHeader, SheetRow } from '@/components/sheet';
 
 export interface ReciterSheetProps {
   /** The active `Reciter.id`. */
@@ -34,13 +34,19 @@ export function ReciterSheet({ current, uiLocale, onSelect, onClose }: ReciterSh
   return (
     <BottomSheet onClose={onClose} closeLabel={t(uiLocale, 'word.close')}>
       <SheetHeader title={t(uiLocale, 'reader.chooseReciter')} />
+      {/* The group carries the role but deliberately no accessibilityLabel: a
+          ViewGroup with a contentDescription takes accessibility focus on
+          Android and swallows its own children, which is the same trap that
+          hid a whole row of controls once already. The sheet's heading names
+          the choice; the rows carry their own position (#51). */}
       <View accessibilityRole="radiogroup">
-        {RECITERS.map((reciter) => (
+        {RECITERS.map((reciter, index) => (
           <SheetRow
             key={reciter.id}
             testID={`reciter-${reciter.id}`}
             label={reciter.label}
             role="radio"
+            position={{ index: index + 1, total: RECITERS.length }}
             selected={reciter.id === current}
             onPress={() => {
               // Guarded: re-selecting the active reciter re-runs the

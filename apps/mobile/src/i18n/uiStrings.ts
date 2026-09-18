@@ -57,8 +57,12 @@ export type UiStringKey =
   // "on this device", never "synced": nothing leaves the phone (decision 34),
   // and a caption claiming otherwise is a promise the app does not keep.
   | 'bookmarks.onThisDevice'
-  | 'bookmarks.ayahsLabel'
-  | 'bookmarks.surahsLabel'
+  | 'bookmarks.ayahsLabel.one'
+  | 'bookmarks.ayahsLabel.few'
+  | 'bookmarks.ayahsLabel.many'
+  | 'bookmarks.surahsLabel.one'
+  | 'bookmarks.surahsLabel.few'
+  | 'bookmarks.surahsLabel.many'
   | 'bookmarks.noNotes'
   | 'bookmarks.addNote'
   | 'bookmarks.editNote'
@@ -334,8 +338,12 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'bookmarks.tabBySurah': 'By surah',
     'bookmarks.tabWithNotes': 'With notes',
     'bookmarks.onThisDevice': 'on this device',
-    'bookmarks.ayahsLabel': 'ayahs',
-    'bookmarks.surahsLabel': 'surahs',
+    'bookmarks.ayahsLabel.one': 'ayah',
+    'bookmarks.ayahsLabel.few': 'ayahs',
+    'bookmarks.ayahsLabel.many': 'ayahs',
+    'bookmarks.surahsLabel.one': 'surah',
+    'bookmarks.surahsLabel.few': 'surahs',
+    'bookmarks.surahsLabel.many': 'surahs',
     'bookmarks.noNotes': 'No notes yet',
     'bookmarks.addNote': 'Add note',
     'bookmarks.editNote': 'Edit note',
@@ -561,8 +569,12 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'bookmarks.tabBySurah': 'Sura bo‘yicha',
     'bookmarks.tabWithNotes': 'Izohli',
     'bookmarks.onThisDevice': 'shu qurilmada',
-    'bookmarks.ayahsLabel': 'oyat',
-    'bookmarks.surahsLabel': 'sura',
+    'bookmarks.ayahsLabel.one': 'oyat',
+    'bookmarks.ayahsLabel.few': 'oyat',
+    'bookmarks.ayahsLabel.many': 'oyat',
+    'bookmarks.surahsLabel.one': 'sura',
+    'bookmarks.surahsLabel.few': 'sura',
+    'bookmarks.surahsLabel.many': 'sura',
     'bookmarks.noNotes': 'Hali izoh yo‘q',
     'bookmarks.addNote': 'Izoh qo‘shish',
     'bookmarks.editNote': 'Izohni tahrirlash',
@@ -783,8 +795,12 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'bookmarks.tabBySurah': 'По сурам',
     'bookmarks.tabWithNotes': 'С заметками',
     'bookmarks.onThisDevice': 'на этом устройстве',
-    'bookmarks.ayahsLabel': 'аятов',
-    'bookmarks.surahsLabel': 'сур',
+    'bookmarks.ayahsLabel.one': 'аят',
+    'bookmarks.ayahsLabel.few': 'аята',
+    'bookmarks.ayahsLabel.many': 'аятов',
+    'bookmarks.surahsLabel.one': 'сура',
+    'bookmarks.surahsLabel.few': 'суры',
+    'bookmarks.surahsLabel.many': 'сур',
     'bookmarks.noNotes': 'Заметок пока нет',
     'bookmarks.addNote': 'Добавить заметку',
     'bookmarks.editNote': 'Изменить заметку',

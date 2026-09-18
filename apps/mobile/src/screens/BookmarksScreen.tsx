@@ -36,8 +36,9 @@ import {
   setBookmarkNote,
   type Bookmark,
 } from '@/data/userRepository';
-import type { UiLocaleCode } from '@/i18n/languages';
+import type { QueryLanguageCode, UiLocaleCode } from '@/i18n/languages';
 import { textAlignFor } from '@/i18n/textDirection';
+import { pluralCategory } from '@/i18n/plural';
 import { t } from '@/i18n/uiStrings';
 import {
   ICON_MIN_SCALE,
@@ -92,7 +93,7 @@ function keyOf(bookmark: Bookmark): string {
  */
 async function loadBookmarksData(
   userClient: MobileDataClient,
-  uiLocale: UiLocaleCode,
+  nameLang: QueryLanguageCode,
 ): Promise<BookmarksData> {
   const bookmarks = await getBookmarks(userClient);
   if (bookmarks.length === 0) {
@@ -104,7 +105,7 @@ async function loadBookmarksData(
   // Parallel: neither needs the other, and both are on the same bundled file.
   const [texts, surahs] = await Promise.all([
     getBookmarkAyahTexts(corpusClient, bookmarks),
-    getSurahList(corpusClient, uiLocale),
+    getSurahList(corpusClient, nameLang),
   ]);
 
   return {
@@ -115,7 +116,7 @@ async function loadBookmarksData(
 }
 
 export function BookmarksScreen() {
-  const { uiLocale } = useAppSettings();
+  const { uiLocale, nameLanguage } = useAppSettings();
   const theme = useThemeColors();
   const paddingBottom = useListBottomPadding();
   const [tab, setTab] = useState<BookmarkTab>('recent');
@@ -147,8 +148,8 @@ export function BookmarksScreen() {
   // so a locale change has to re-run the load rather than reuse names in the
   // language the reader just left.
   const load = useCallback(
-    (userClient: MobileDataClient) => loadBookmarksData(userClient, uiLocale),
-    [uiLocale],
+    (userClient: MobileDataClient) => loadBookmarksData(userClient, nameLanguage),
+    [nameLanguage],
   );
   const { data, loading, error, reload } = useUserDbOnFocus(
     load,
@@ -181,6 +182,16 @@ export function BookmarksScreen() {
     pendingReload.current = false;
     reload();
   }, [removing, reload]);
+
+  // A count and its noun, agreeing. Not `${n} ${t(...)}`: the labels used to be
+  // plural-only in every locale, so a single bookmark read `1 ayahs`, and
+  // Russian -- which wants three forms, with the teens as their own case --
+  // was wrong in both directions at once (#43).
+  const counted = useCallback(
+    (base: 'bookmarks.ayahsLabel' | 'bookmarks.surahsLabel', n: number) =>
+      `${n} ${t(uiLocale, `${base}.${pluralCategory(uiLocale, n)}` as const)}`,
+    [uiLocale],
+  );
 
   const bookmarks = useMemo(() => data?.bookmarks ?? [], [data]);
   const texts = data?.texts ?? new Map<string, string>();
@@ -330,9 +341,9 @@ export function BookmarksScreen() {
             the phone (decision 34), and the mockup's caption would be a promise
             the app does not keep. */}
         <Text style={{ color: theme.mutedText }}>
-          {`${bookmarks.length} ${t(uiLocale, 'bookmarks.ayahsLabel')} · ${surahCount} ${t(
-            uiLocale,
+          {`${counted('bookmarks.ayahsLabel', bookmarks.length)} · ${counted(
             'bookmarks.surahsLabel',
+            surahCount,
           )} · ${t(uiLocale, 'bookmarks.onThisDevice')}`}
         </Text>
         <SegmentedControl

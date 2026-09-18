@@ -72,6 +72,33 @@ describe('AppSettingsProvider', () => {
     await waitFor(() => expect(requireSettings(settings).queryLanguage).toBe('uz'));
   });
 
+  it('composes nameLanguage from the UI locale and the script, not the content language', async () => {
+    // Surah names are chrome, so they follow the UI locale (owner ruling
+    // 2026-09-16) -- but the script still applies, and #85 was the bug of
+    // dropping it: the browse list read `Fotiha` under Кирилл. The content
+    // language is English here precisely so the two codes have to differ.
+    const userClient = requireSettingsClient();
+    await saveSetting(userClient, 'uiLocale', 'uz');
+    await saveSetting(userClient, 'contentLanguage', 'en');
+    await saveSetting(userClient, 'script', 'cyrillic');
+
+    let settings: AppSettingsContextValue | null = null;
+    render(
+      <AppSettingsProvider>
+        <SettingsProbe onSettings={(nextSettings) => { settings = nextSettings; }} />
+      </AppSettingsProvider>,
+    );
+
+    await waitFor(() => expect(requireSettings(settings).nameLanguage).toBe('uz-Cyrl'));
+    expect(requireSettings(settings).queryLanguage).toBe('en');
+
+    // And it follows the toggle without a reload, exactly as queryLanguage does.
+    act(() => {
+      requireSettings(settings).setScript('latin');
+    });
+    await waitFor(() => expect(requireSettings(settings).nameLanguage).toBe('uz'));
+  });
+
   it('leaves queryLanguage alone for a language with one script', async () => {
     // A stored Cyrillic from an earlier Uzbek session must not compose
     // 'en-Cyrl' when the reader moves to English -- no table carries it.

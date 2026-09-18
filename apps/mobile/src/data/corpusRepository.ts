@@ -41,7 +41,7 @@ import {
   type WordDetail,
   type WordSegment,
 } from '@quran-corpus/data/mobile';
-import type { QueryLanguageCode, UiLocaleCode } from '../i18n/languages';
+import type { QueryLanguageCode } from '../i18n/languages';
 
 const M0_SURAH_ID = 1;
 
@@ -112,12 +112,18 @@ function selectedTranslationByAyah(
   return grouped;
 }
 
-/** Every surah, named in `uiLocale` where a translated name exists.
+/** Every surah, named in `nameLang` where a translated name exists.
  *
- *  The locale is the UI locale, not the content language (owner ruling
- *  2026-09-16): a surah name is chrome, read in whatever language the app is
- *  speaking, and it stays put when the reader changes which translation of the
- *  VERSES they want.
+ *  The language is derived from the UI locale, not the content language (owner
+ *  ruling 2026-09-16): a surah name is chrome, read in whatever language the
+ *  app is speaking, and it stays put when the reader changes which translation
+ *  of the VERSES they want.
+ *
+ *  It is a QueryLanguageCode rather than a UiLocaleCode because the script
+ *  belongs in it too (#85): `surah_names` carries 114 `uz-Cyrl` rows, and a
+ *  UiLocaleCode can never name them however the toggle is set, so the list read
+ *  `Fotiha` under Кирилл. Callers compose the two with `contentLanguage(uiLocale,
+ *  script)` -- the one function allowed to, since 'en-Cyrl' would empty the map.
  *
  *  Optional because three of the five callers want ayah counts and ids, not
  *  names -- the mushaf's page index and the ayah-count hook among them -- and
@@ -126,14 +132,14 @@ function selectedTranslationByAyah(
  *  before. */
 export async function getSurahList(
   client: MobileDataClient,
-  uiLocale?: UiLocaleCode,
+  nameLang?: QueryLanguageCode,
 ): Promise<SurahListItem[]> {
   const [surahs, names] = await Promise.all([
     getAllSurahs(client),
     // English names live on the `surahs` row itself, so there is nothing to
     // join for 'en' -- and no `surah_names` rows either.
-    uiLocale && uiLocale !== 'en'
-      ? getSurahNames(client, uiLocale)
+    nameLang && nameLang !== 'en'
+      ? getSurahNames(client, nameLang)
       : Promise.resolve(new Map<number, SurahName>()),
   ]);
   return surahs.map((surah) => {
@@ -160,10 +166,37 @@ export async function getAyahsOfSurah(client: MobileDataClient, surahId: number)
   return getAyahsBySurah(client, surahId);
 }
 
+/** The same surah row, named in `nameLang`.
+ *
+ *  The row's own `name_translit` is the English transliteration, and every
+ *  screen that shows a surah title reads it straight off the row -- so with the
+ *  UI in Uzbek the browse list said "Fotiha" and the screen it opened said
+ *  "Al-Fatihah" (#83). Swapping the name here rather than at each of the eight
+ *  call sites is the whole fix: a screen that renders `surah.name_translit` is
+ *  already correct, and the next one will be too.
+ *
+ *  Costs one 114-row query per load, and none at all for English, whose names
+ *  live on the `surahs` row with no `surah_names` rows to join. */
+async function nameSurah(
+  client: MobileDataClient,
+  surah: Surah,
+  nameLang: QueryLanguageCode | undefined,
+): Promise<Surah> {
+  if (!nameLang || nameLang === 'en') return surah;
+  const localized = (await getSurahNames(client, nameLang)).get(surah.id);
+  if (!localized) return surah;
+  return {
+    ...surah,
+    name_translit: localized.name,
+    name_translation: localized.meaning ?? surah.name_translation,
+  };
+}
+
 export async function getSurahReader(
   client: MobileDataClient,
   surahId: number,
   languageCode: QueryLanguageCode,
+  nameLang?: QueryLanguageCode,
 ): Promise<SurahReaderData> {
   // Words are deliberately not fetched here. Nothing in the reader renders
   // them, and pulling every word of a surah moved 6116 rows across the bridge
@@ -181,7 +214,7 @@ export async function getSurahReader(
   const translationsByAyah = selectedTranslationByAyah(translations, languageCode);
 
   return {
-    surah,
+    surah: await nameSurah(client, surah, nameLang),
     ayahs: ayahs.map((ayah) => ({
       ayah,
       translation: translationsByAyah.get(ayah.id) ?? null,
@@ -210,8 +243,9 @@ export async function getAyahReaderLocation(
   surahId: number,
   ayahNumber: number,
   languageCode: QueryLanguageCode,
+  nameLang?: QueryLanguageCode,
 ): Promise<ReaderLocation | null> {
-  const reader = await getSurahReader(client, surahId, languageCode);
+  const reader = await getSurahReader(client, surahId, languageCode, nameLang);
   const found = reader.ayahs.find((item) => item.ayah.ayah_number === ayahNumber);
   return found ? { surah: reader.surah, ...found } : null;
 }
@@ -411,6 +445,7 @@ export async function getWbwScreen(
   client: MobileDataClient,
   surahId: number,
   fromAyah: number,
+  nameLang?: QueryLanguageCode,
 ): Promise<WbwScreenData> {
   // Sequential, not Promise.all: the range query is only well-formed once
   // ayah_count has clamped it. Parallel saves one round trip on a local file
@@ -418,7 +453,12 @@ export async function getWbwScreen(
   const surah = await getSurahById(client, surahId);
   if (!surah) throw new Error(`Surah not found: ${surahId}`);
   const [from, to] = wbwPageRange(fromAyah, surah.ayah_count);
-  return { surah, from, to, pages: await getWbwRange(client, surahId, from, to) };
+  return {
+    surah: await nameSurah(client, surah, nameLang),
+    from,
+    to,
+    pages: await getWbwRange(client, surahId, from, to),
+  };
 }
 
 export async function getRootScreen(

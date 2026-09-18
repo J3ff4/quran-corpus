@@ -273,14 +273,18 @@ function createFakeClient({
       // language with a partial name set still reads.
       if (sql.includes('surah_names')) {
         const [lang] = args;
-        const names: MobileRow[] =
-          lang === 'uz'
-            ? [
-                { surah_id: 1, name: 'Fotiha', meaning: 'Ochuvchi' },
-                // Surah 2 deliberately absent: the per-surah fallback is the
-                // half a complete fixture would never exercise.
-              ]
-            : [];
+        // Two Uzbek rows for surah 1, one per script: the toggle picks a
+        // `language_code`, and a fixture with only 'uz' cannot tell a caller
+        // that composed the script in from one that dropped it (#85).
+        const byLang: Record<string, MobileRow[]> = {
+          uz: [
+            { surah_id: 1, name: 'Fotiha', meaning: 'Ochuvchi' },
+            // Surah 2 deliberately absent: the per-surah fallback is the
+            // half a complete fixture would never exercise.
+          ],
+          'uz-Cyrl': [{ surah_id: 1, name: 'Фотиҳа', meaning: 'Очувчи' }],
+        };
+        const names: MobileRow[] = byLang[String(lang)] ?? [];
         return {
           rows: surahs.map((surah) => {
             const localized = names.find((row) => row['surah_id'] === surah['id']);
@@ -717,6 +721,37 @@ describe('getRootOccurrences', () => {
   });
 });
 
+describe('the surah name the reader screens show', () => {
+  it('names the reader surah in the name language', async () => {
+    // #83: every screen the browse list opens read `name_translit` straight off
+    // the `surahs` row, so a list reading "Fotiha" opened a reader headed
+    // "Al-Fatihah". Swapped in the loader, so no screen has to remember.
+    const reader = await getSurahReader(createFakeClient(), 1, 'en', 'uz');
+
+    expect(reader.surah.name_translit).toBe('Fotiha');
+  });
+
+  it('keeps the English row when no name language is asked for', async () => {
+    const reader = await getSurahReader(createFakeClient(), 1, 'en');
+
+    expect(reader.surah.name_translit).toBe('Al-Fatihah');
+  });
+
+  it('names the word-by-word surah the same way', async () => {
+    const wbw = await getWbwScreen(createFakeClient(), 1, 1, 'uz-Cyrl');
+
+    expect(wbw.surah.name_translit).toBe('Фотиҳа');
+  });
+
+  it('falls back to the English row for a surah the name set misses', async () => {
+    // Surah 2 has no Uzbek name in the fixture. A missing name must leave the
+    // row alone, not blank the header.
+    const reader = await getSurahReader(createFakeClient(), 2, 'ru', 'uz');
+
+    expect(reader.surah.name_translit).toBe('Al-Baqarah');
+  });
+});
+
 describe('getSurahList locale', () => {
   it('names surahs in the UI locale when a translated set exists', async () => {
     // Owner ruling 2026-09-16: a surah name follows the UI locale, not the
@@ -727,6 +762,15 @@ describe('getSurahList locale', () => {
 
     expect(fatiha?.nameTranslit).toBe('Fotiha');
     expect(fatiha?.nameTranslation).toBe('Ochuvchi');
+  });
+
+  it('names surahs in the Cyrillic script when the toggle composed one in', async () => {
+    // #85: the list read `Fotiha` under Кирилл because the parameter was a
+    // UiLocaleCode, which can never hold 'uz-Cyrl' however the script is set.
+    // The 114 rows were in the DB the whole time.
+    const list = await getSurahList(createFakeClient(), 'uz-Cyrl');
+
+    expect(list.find((surah) => surah.id === 1)?.nameTranslit).toBe('Фотиҳа');
   });
 
   it('keeps the English row when no locale is asked for', async () => {

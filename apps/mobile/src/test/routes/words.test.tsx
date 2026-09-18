@@ -114,6 +114,10 @@ vi.mock('@/settings/settingsStore', () => ({
   useAppSettings: () => ({
     contentLanguage: 'en',
     uiLocale: 'en',
+    // Unequal to both on purpose: the surah name follows the UI locale with the
+    // script folded in, and a loader handed the content language instead would
+    // otherwise assert as correct (#83, #85).
+    nameLanguage: 'uz-Cyrl',
     arabicScale: 'medium',
     wbwDensity: mocks.wbwDensity,
     setWbwDensity: mocks.setWbwDensity,
@@ -278,7 +282,7 @@ describe('word-by-word route', () => {
 
     render(<WbwRoute />);
 
-    await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenCalledWith(expect.anything(), 2, 255));
+    await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenCalledWith(expect.anything(), 2, 255, 'uz-Cyrl'));
   });
 
   it('ignores a ?from= that is not an ayah coordinate', async () => {
@@ -288,7 +292,7 @@ describe('word-by-word route', () => {
 
     render(<WbwRoute />);
 
-    await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenCalledWith(expect.anything(), 2, 1));
+    await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenCalledWith(expect.anything(), 2, 1, 'uz-Cyrl'));
   });
 
   it('renders the hybrid layout by default and remembers a switch to dense', async () => {
@@ -367,7 +371,7 @@ describe('word-by-word route', () => {
 
     fireEvent.click(await screen.findByTestId('wbw-next'));
 
-    await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenLastCalledWith(expect.anything(), 2, 11));
+    await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenLastCalledWith(expect.anything(), 2, 11, 'uz-Cyrl'));
   });
 
   it('publishes the range it moves to as the shared reading position', async () => {
@@ -388,12 +392,12 @@ describe('word-by-word route', () => {
     const { rerender } = render(<WbwRoute />);
     await screen.findAllByTestId('wbw-cell');
     fireEvent.click(await screen.findByTestId('wbw-next'));
-    await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenLastCalledWith(expect.anything(), 2, 11));
+    await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenLastCalledWith(expect.anything(), 2, 11, 'uz-Cyrl'));
 
     mocks.params = { surahId: '3' };
     rerender(<WbwRoute />);
 
-    await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenLastCalledWith(expect.anything(), 3, 1));
+    await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenLastCalledWith(expect.anything(), 3, 1, 'uz-Cyrl'));
   });
 
   it('pages to the next surah and restarts at its first ayah', async () => {
@@ -405,7 +409,7 @@ describe('word-by-word route', () => {
 
     // Not 3:50: the range belongs to the surah it was read in, and a surah
     // shorter than the range would render empty.
-    await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenLastCalledWith(expect.anything(), 3, 1));
+    await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenLastCalledWith(expect.anything(), 3, 1, 'uz-Cyrl'));
   });
 
   it('keeps the outgoing surah on screen while the next one loads', async () => {
@@ -416,7 +420,7 @@ describe('word-by-word route', () => {
     mocks.getWbwScreen.mockReturnValue(pending.promise);
     fireEvent.click(screen.getByTestId('surah-next'));
     await waitFor(() =>
-      expect(mocks.getWbwScreen).toHaveBeenLastCalledWith(expect.anything(), 3, 1),
+      expect(mocks.getWbwScreen).toHaveBeenLastCalledWith(expect.anything(), 3, 1, 'uz-Cyrl'),
     );
 
     // Blanking to the spinner leaves reanimated no outgoing view, so the page
@@ -546,7 +550,7 @@ describe('word-by-word route', () => {
 
     // The range query is what proves the jump landed: the screen re-reads from
     // the requested ayah rather than from where the pager was.
-    await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenCalledWith({}, 2, 15));
+    await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenCalledWith({}, 2, 15, 'uz-Cyrl'));
     expect(screen.queryByTestId('surah-jump-input')).toBeNull();
   });
 
@@ -562,7 +566,7 @@ describe('word-by-word route', () => {
     fireEvent.change(screen.getByTestId('ayah-jump-input'), { target: { value: '5' } });
     fireEvent.click(screen.getByTestId('surah-jump-go'));
 
-    await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenCalledWith({}, 3, 5));
+    await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenCalledWith({}, 3, 5, 'uz-Cyrl'));
     // D46: the ayah carries between renderings. The in-surah arm publishes it
     // through setFrom; this arm writes the page directly, so without a write of
     // its own, going back to the reader opened surah 3 at its top.

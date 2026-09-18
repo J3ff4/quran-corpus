@@ -164,7 +164,7 @@ function weekStart(today: string): string {
  * saved position changes while the app is open.
  */
 function useCorpusAyah(surahId: number | null, ayahNumber: number | null) {
-  const { queryLanguage } = useAppSettings();
+  const { queryLanguage, nameLanguage } = useAppSettings();
   const [state, setState] = useState<{ data: ReaderLocation | null; error: boolean }>({
     data: null,
     error: false,
@@ -181,7 +181,7 @@ function useCorpusAyah(surahId: number | null, ayahNumber: number | null) {
       try {
         const db = await openCorpusDb();
         const client = createExpoSqliteClient(db as ExpoSqliteLike);
-        const found = await getAyahReaderLocation(client, surah, ayah, queryLanguage);
+        const found = await getAyahReaderLocation(client, surah, ayah, queryLanguage, nameLanguage);
         if (!cancelled) setState({ data: found, error: false });
       } catch (cause) {
         // Logged, not shown verbatim: the driver's message is untranslated
@@ -195,7 +195,7 @@ function useCorpusAyah(surahId: number | null, ayahNumber: number | null) {
     return () => {
       cancelled = true;
     };
-  }, [surahId, ayahNumber, queryLanguage]);
+  }, [surahId, ayahNumber, queryLanguage, nameLanguage]);
 
   return state;
 }

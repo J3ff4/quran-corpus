@@ -67,6 +67,12 @@ export interface AppSettingsContextValue extends AppSettings {
    *  each call site -- a screen that composed it itself would be a second
    *  place to forget that only Uzbek has two scripts. */
   queryLanguage: QueryLanguageCode;
+  /** The `language_code` to ask `surah_names` for. Surah names are chrome, so
+   *  they follow the UI locale and not the content language (owner ruling
+   *  2026-09-16) -- but the script still applies, and it is the same Uzbek
+   *  either way. Derived beside `queryLanguage` for the same reason: #85 was
+   *  exactly the bug of a call site composing this itself, badly. */
+  nameLanguage: QueryLanguageCode;
   setTheme: (theme: ThemePreference) => void;
   setAnalyticsEnabled: (enabled: boolean) => void;
   setArabicScale: (scale: ArabicScale) => void;
@@ -427,6 +433,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       setContentLanguage: (contentLanguage) => updateSetting('contentLanguage', contentLanguage),
       setScript: (script) => updateSetting('script', script),
       queryLanguage: resolveContentLanguage(settings.contentLanguage, settings.script),
+      nameLanguage: resolveContentLanguage(settings.uiLocale, settings.script),
       setTheme: (theme) => updateSetting('theme', theme),
       setAnalyticsEnabled: (analyticsEnabled) => updateSetting('analyticsEnabled', analyticsEnabled),
       setArabicScale: (arabicScale) => updateSetting('arabicScale', arabicScale),

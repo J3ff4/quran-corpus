@@ -60,6 +60,20 @@ describe('ReciterSheet', () => {
     expect(screen.getByLabelText(/As-Sudais/).getAttribute('aria-checked')).toBe('true');
   });
 
+  it('numbers every row so TalkBack can say where the reader is', () => {
+    // #51: the radiogroup View carries no CollectionInfo, so without this a
+    // screen-reader user hears ten names and no sense of how many remain.
+    render(<ReciterSheet {...props} current="sudais" />);
+
+    const labels = screen.getAllByRole('radio').map((row) => row.getAttribute('aria-label'));
+    expect(labels[0]).toMatch(new RegExp(`, 1 / ${RECITERS.length}$`));
+    expect(labels.at(-1)).toMatch(new RegExp(`, ${RECITERS.length} / ${RECITERS.length}$`));
+    // 1-based and in render order: an off-by-one reads as "0 / 10" at the top.
+    expect(labels.map((label) => label?.split(', ').at(-1))).toEqual(
+      RECITERS.map((_, index) => `${index + 1} / ${RECITERS.length}`),
+    );
+  });
+
   it('marks exactly one reciter', () => {
     // Two marked options is what a `!==` in the comparison looks like, and the
     // sheet would still render ten rows.

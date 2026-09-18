@@ -27,6 +27,22 @@ describe('SheetRow', () => {
     expect(row.getAttribute('aria-checked')).toBe('true');
   });
 
+  it('announces its position in the group when the caller gives one', () => {
+    // #51: ten reciters in a `View accessibilityRole="radiogroup"` carry no
+    // CollectionInfo, so TalkBack cannot say how long the list is or where the
+    // reader is in it. RN exposes no CollectionItemInfo, so it rides the label.
+    render(
+      <SheetRow label="Al-Husary" role="radio" position={{ index: 3, total: 10 }} onPress={() => {}} testID="r" />,
+    );
+    expect(screen.getByTestId('r').getAttribute('aria-label')).toBe('Al-Husary, 3 / 10');
+  });
+
+  it('leaves the label alone when there is no position to give', () => {
+    // Navigation rows are not a collection and must not grow a count.
+    render(<SheetRow label="About" onPress={() => {}} testID="r" />);
+    expect(screen.getByTestId('r').getAttribute('aria-label')).toBe('About');
+  });
+
   it('marks the selected row with more than colour', () => {
     // WCAG 1.4.1: accent text alone does not carry "this one is active".
     render(<SheetRow label="Abdul Basit" role="radio" selected onPress={() => {}} testID="r" />);

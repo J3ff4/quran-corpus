@@ -3,7 +3,7 @@ import type { Ayah, PageEntry } from '@quran-corpus/data/mobile';
 import type { MobileDataClient } from '@quran-corpus/mobile-data';
 
 import { getAyahsOfSurah, getPageIndex, getSurahList } from '@/data/corpusRepository';
-import type { UiLocaleCode } from '@/i18n/languages';
+import type { QueryLanguageCode } from '@/i18n/languages';
 import { ayahKey } from './highlights';
 
 /** What the pager needs to know about a page it is not rendering: which surah
@@ -31,10 +31,12 @@ const EMPTY_INDEX: MushafIndex = {
 // Process-wide, and deliberately not per reader: the index is 604 + 114 rows of
 // data that cannot change while the app runs, and the reader mounts a fresh
 // tree on every surah page-turn and every mode switch.
-// Keyed by locale, because surahNames is localized: a bare promise served the
-// names fetched under whichever locale mounted the tab first, for the life of
-// the process.
-let indexPromise: { locale: UiLocaleCode; index: Promise<Omit<MushafIndex, 'ready'>> } | null = null;
+// Keyed by name language, because surahNames is localized: a bare promise
+// served the names fetched under whichever locale mounted the tab first, for
+// the life of the process. The key carries the script too, so flipping to
+// Кирилл re-fetches rather than serving the Latin names back (#85).
+let indexPromise: { lang: QueryLanguageCode; index: Promise<Omit<MushafIndex, 'ready'>> } | null =
+  null;
 const ayahCache = new Map<number, Promise<Ayah[]>>();
 
 /** Tests only. Both caches are module state, so one suite's client would
@@ -46,11 +48,12 @@ export function resetMushafReaderCachesForTest(): void {
 
 async function loadIndex(
   client: MobileDataClient,
-  uiLocale: UiLocaleCode,
+  nameLang: QueryLanguageCode,
 ): Promise<Omit<MushafIndex, 'ready'>> {
-  // The name is chrome, so it follows uiLocale and not the content language --
-  // the same rule the browse list and the bookmarks cards already follow.
-  const [pages, surahs] = await Promise.all([getPageIndex(client), getSurahList(client, uiLocale)]);
+  // The name is chrome, so it follows the UI locale and not the content
+  // language -- the same rule the browse list and the bookmarks cards already
+  // follow. The caller folds the script in.
+  const [pages, surahs] = await Promise.all([getPageIndex(client), getSurahList(client, nameLang)]);
   return {
     pages: new Map(pages.map((entry) => [entry.page, entry])),
     surahNames: new Map(surahs.map((surah) => [surah.id, surah.nameTranslit])),
@@ -58,7 +61,10 @@ async function loadIndex(
   };
 }
 
-export function useMushafIndex(client: MobileDataClient | null, uiLocale: UiLocaleCode): MushafIndex {
+export function useMushafIndex(
+  client: MobileDataClient | null,
+  nameLang: QueryLanguageCode,
+): MushafIndex {
   const [index, setIndex] = useState<MushafIndex>(EMPTY_INDEX);
 
   useEffect(() => {
@@ -66,8 +72,8 @@ export function useMushafIndex(client: MobileDataClient | null, uiLocale: UiLoca
     let cancelled = false;
     // Cached as the promise rather than the result: two layers mount together
     // during a mode switch, and both ask on the same tick.
-    if (indexPromise?.locale !== uiLocale) {
-      indexPromise = { locale: uiLocale, index: loadIndex(client, uiLocale) };
+    if (indexPromise?.lang !== nameLang) {
+      indexPromise = { lang: nameLang, index: loadIndex(client, nameLang) };
     }
     const pending = indexPromise;
     pending.index
@@ -84,7 +90,7 @@ export function useMushafIndex(client: MobileDataClient | null, uiLocale: UiLoca
     return () => {
       cancelled = true;
     };
-  }, [client, uiLocale]);
+  }, [client, nameLang]);
 
   return index;
 }
