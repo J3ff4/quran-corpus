@@ -5,7 +5,7 @@ import {
   contentLanguage as resolveContentLanguage,
   contentLanguages,
   isScript,
-  uiLocales,
+  isUiLocale,
   type ContentLanguageCode,
   type QueryLanguageCode,
   type ScriptCode,
@@ -124,10 +124,6 @@ function storedBoolean(value: string | null, fallback: boolean): boolean {
   if (value === 'true') return true;
   if (value === 'false') return false;
   return fallback;
-}
-
-function isUiLocale(value: string | null): value is UiLocaleCode {
-  return uiLocales.some((locale) => locale.code === value);
 }
 
 function isContentLanguage(value: string | null): value is ContentLanguageCode {

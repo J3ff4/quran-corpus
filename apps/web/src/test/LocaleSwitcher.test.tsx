@@ -66,6 +66,17 @@ describe('LocaleSwitcher', () => {
     expect(open('en').queryByRole('button', { name: /Кирилл/ })).toBeNull();
   });
 
+  it('keeps the script row reachable after the UI leaves Uzbek with Cyrillic stored', () => {
+    // The script cookie reaches any `?lang=uz` page whatever the UI locale is,
+    // so an English UI can still be rendering Cyrillic content. Hiding the row
+    // on the UI locale alone would strand that reader with no control to undo
+    // it -- the switch out of Uzbek is one click, the way back would be none.
+    expect(open('en', 'cyrillic').getByRole('button', { name: /Lotin/ })).toBeInTheDocument();
+    cleanup();
+    // Still hidden at the default, where there is nothing to undo.
+    expect(open('en', 'latin').queryByRole('button', { name: /Lotin/ })).toBeNull();
+  });
+
   it('shows the server\'s locale, not an optimistic one, when the cookie write fails', () => {
     // A browser that blocks or drops the cookie leaves the server rendering
     // the old locale. An optimistic highlight would claim the switch happened

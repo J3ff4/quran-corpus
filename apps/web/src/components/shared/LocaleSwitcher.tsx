@@ -42,7 +42,13 @@ export function LocaleSwitcher({
   // elsewhere it would be a control that changes nothing (check 384). Asked of
   // the shared module rather than restated here, so a second two-script
   // language reaches this picker on its own.
-  const hasScripts = contentLanguage(locale, 'cyrillic') !== locale;
+  //
+  // The second clause is the way back. Since the script cookie reaches any
+  // `?lang=uz` page whatever the UI locale is, a reader who sets Cyrillic and
+  // then switches the UI to English still sees Cyrillic content -- and on the
+  // first clause alone the control that undoes it is no longer rendered
+  // anywhere. Keep it while a non-default script is stored.
+  const showScripts = contentLanguage(locale, 'cyrillic') !== locale || script !== 'latin';
 
   function pick(name: string, value: string) {
     writeCookie(name, value);
@@ -81,7 +87,7 @@ export function LocaleSwitcher({
           ))}
         </ul>
 
-        {hasScripts && (
+        {showScripts && (
           <ul className="mt-1 border-t border-paper-200 pt-1 dark:border-night-100">
             {scripts.map((s) => (
               <li key={s.code}>

@@ -45,19 +45,20 @@ export default async function SurahPage({ params, searchParams }: PageProps) {
   // Which language you read is `?lang=`; which alphabet it is written in is the
   // script cookie. Only their composition is a real `language_code`.
   const queryLang = contentLanguage(lang, script);
-  const [surah, ayahs, words, translations, glosses] = await Promise.all([
+  const [surah, ayahs, words, translations, glosses, names] = await Promise.all([
     getSurahById(db, surahId),
     getAyahsBySurah(db, surahId),
     getWordsBySurah(db, surahId),
     getTranslationsBySurahAndLang(db, surahId, queryLang),
     getGlossesWithFallback(db, surahId, queryLang),
+    getSurahNames(db, content),
   ]);
 
   if (!surah) notFound();
 
   const scrollAyah = parseScrollAyah(rawAyah, surah.ayah_count);
 
-  const surahName = nameFor(await getSurahNames(db, content), surah);
+  const surahName = nameFor(names, surah);
   const bookmarkedAyahs = bookmarkedAyahsIn(
     cookieStore.get(BOOKMARKS_COOKIE)?.value,
     surahId,

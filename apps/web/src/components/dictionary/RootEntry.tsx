@@ -99,9 +99,13 @@ export function RootEntry({
             Meanings in the Quran
           </h2>
           <ul className="flex flex-wrap gap-2">
-            {glosses.map((g) => (
+            {/* Keyed by position, not by `g.gloss`: root_glosses' PK is
+                (root_id, language_code, rank), so two ranks may legally carry
+                the same text. The rows arrive ORDER BY rank and are neither
+                reordered nor filtered here, so the index is stable. */}
+            {glosses.map((g, i) => (
               <li
-                key={g.gloss}
+                key={i}
                 className="flex items-baseline gap-1.5 rounded-lg bg-paper-100 px-3 py-1.5 dark:bg-night-50"
               >
                 {/* Card interior, so contrast is measured against bg-paper-100
