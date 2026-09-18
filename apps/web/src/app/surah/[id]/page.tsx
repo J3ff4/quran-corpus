@@ -22,6 +22,7 @@ import { parseScrollAyah } from './params';
 import { BOOKMARKS_COOKIE, bookmarkedAyahsIn } from '../../../lib/bookmarks';
 import { nameFor } from '../../../components/surah-list/nameFor';
 import { resolveLocale } from '../../../lib/locale';
+import { contentLanguage } from '@quran-corpus/config/i18n/script';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -37,22 +38,26 @@ export default async function SurahPage({ params, searchParams }: PageProps) {
   if (isNaN(surahId) || surahId < 1 || surahId > 114) notFound();
 
   const db = await getDatabase();
+  // Read server-side so each ayah's bookmark icon renders saved, rather than
+  // painting empty and filling in after hydration.
+  const cookieStore = await cookies();
+  const { content, script } = resolveLocale(cookieStore);
+  // Which language you read is `?lang=`; which alphabet it is written in is the
+  // script cookie. Only their composition is a real `language_code`.
+  const queryLang = contentLanguage(lang, script);
   const [surah, ayahs, words, translations, glosses] = await Promise.all([
     getSurahById(db, surahId),
     getAyahsBySurah(db, surahId),
     getWordsBySurah(db, surahId),
-    getTranslationsBySurahAndLang(db, surahId, lang),
-    getGlossesWithFallback(db, surahId, lang),
+    getTranslationsBySurahAndLang(db, surahId, queryLang),
+    getGlossesWithFallback(db, surahId, queryLang),
   ]);
 
   if (!surah) notFound();
 
   const scrollAyah = parseScrollAyah(rawAyah, surah.ayah_count);
 
-  // Read server-side so each ayah's bookmark icon renders saved, rather than
-  // painting empty and filling in after hydration.
-  const cookieStore = await cookies();
-  const surahName = nameFor(await getSurahNames(db, resolveLocale(cookieStore).content), surah);
+  const surahName = nameFor(await getSurahNames(db, content), surah);
   const bookmarkedAyahs = bookmarkedAyahsIn(
     cookieStore.get(BOOKMARKS_COOKIE)?.value,
     surahId,
@@ -87,7 +92,7 @@ export default async function SurahPage({ params, searchParams }: PageProps) {
         wordsByAyah={wordsByAyah}
         translationsByAyah={translationsByAyah}
         glossesByWordId={glossesByWordId}
-        lang={lang}
+        lang={queryLang}
         scrollAyah={scrollAyah}
         bookmarkedAyahs={bookmarkedAyahs}
       />
