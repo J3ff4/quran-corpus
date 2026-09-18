@@ -4,6 +4,7 @@ import { getDatabase } from '../../../../lib/db';
 import {
   getSurahById,
   getAllSurahs,
+  getSurahNames,
   getAyahsBySurah,
   getWordsBySurahAyahRange,
   getGlossesWithFallback,
@@ -16,6 +17,9 @@ import type { WbwCell, WbwAyah } from '../../../../components/wbw/types';
 import { toPickerSurah, type PickerSurah } from '../../../../components/wbw/types';
 import { isValidLang, type ValidLang } from '../../../../components/reader/languages';
 import { VIEW_MODE_COOKIE, isViewMode } from '../../../../components/wbw/viewMode';
+import { nameFor } from '../../../../components/surah-list/nameFor';
+import { resolveLocale } from '../../../../lib/locale';
+import { contentLanguage } from '@quran-corpus/config/i18n/script';
 import { parseSurahId, resolvePage } from './params';
 import { BOOKMARKS_COOKIE, bookmarkedAyahsIn } from '../../../../lib/bookmarks';
 
@@ -39,16 +43,21 @@ export default async function WbwPage({ params, searchParams }: PageProps) {
   const { page, lo, hi, scrollAyah, totalPages } = resolvePage(surah.ayah_count, rawPage, rawAyah);
 
   // ponytail: ayahs+glosses load the whole surah; only words are windowed. Fine at homelab scale — add getAyahsBySurahRange / getGlossesBySurahAyahRange if a large surah measures slow.
-  const [ayahRows, words, glosses, allSurahs] = await Promise.all([
+  const cookieStore = await cookies();
+  const { content, script } = resolveLocale(cookieStore);
+  // Which language you read is `?lang=`; which alphabet it is written in is the
+  // script cookie. Only their composition is a real `language_code`.
+  const queryLang = contentLanguage(lang, script);
+  const [ayahRows, words, glosses, allSurahs, names] = await Promise.all([
     getAyahsBySurah(db, surahId),
     getWordsBySurahAyahRange(db, surahId, lo, hi),
-    getGlossesWithFallback(db, surahId, lang),
+    getGlossesWithFallback(db, surahId, queryLang),
     getAllSurahs(db),
+    getSurahNames(db, content),
   ]);
   const segments = await getSegmentsByWordIds(db, words.map((w) => w.id));
-  const pickerSurahs: PickerSurah[] = allSurahs.map(toPickerSurah);
+  const pickerSurahs: PickerSurah[] = allSurahs.map((s) => toPickerSurah(s, names));
 
-  const cookieStore = await cookies();
   const storedViewMode = cookieStore.get(VIEW_MODE_COOKIE)?.value;
   const initialViewMode = isViewMode(storedViewMode) ? storedViewMode : 'card';
   // Server-side so bookmark icons render saved instead of filling in post-hydration.
@@ -113,11 +122,12 @@ export default async function WbwPage({ params, searchParams }: PageProps) {
     <main className="mx-auto max-w-2xl px-4 py-8">
       <WbwView
         surah={surah}
+        surahName={nameFor(names, surah).name}
         ayahs={ayahs}
         page={page}
         totalPages={totalPages}
         scrollAyah={scrollAyah}
-        pageLang={lang}
+        pageLang={queryLang}
         pickerSurahs={pickerSurahs}
         initialViewMode={initialViewMode}
         bookmarkedAyahs={bookmarkedAyahs}

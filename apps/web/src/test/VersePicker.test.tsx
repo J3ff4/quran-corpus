@@ -7,12 +7,17 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mockPush }) }));
 import { VersePicker } from '../components/wbw/VersePicker';
 
 const surahs = [
-  { id: 1, name_translit: 'Al-Fatihah', ayah_count: 7 },
-  { id: 2, name_translit: 'Al-Baqarah', ayah_count: 286 },
+  { id: 1, name: 'Al-Fatihah', ayah_count: 7 },
+  { id: 2, name: 'Al-Baqarah', ayah_count: 286 },
 ];
 
 describe('VersePicker', () => {
   beforeEach(() => mockPush.mockClear());
+
+  it('labels each option with the localized name it was handed', () => {
+    render(<VersePicker surahs={[{ id: 1, name: 'Fotiha', ayah_count: 7 }]} />);
+    expect(screen.getByRole('option', { name: '1. Fotiha' })).toBeInTheDocument();
+  });
 
   it('ayah options track the selected surah count', () => {
     render(<VersePicker surahs={surahs} />);

@@ -1,3 +1,4 @@
+import { makeT } from '@quran-corpus/config/i18n/t';
 import type { UiLocaleCode } from './languages';
 
 export type UiStringKey =
@@ -961,6 +962,6 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
   },
 };
 
-export function t(locale: UiLocaleCode, key: UiStringKey): string {
-  return strings[locale][key];
-}
+/** The lookup mechanism is shared (M10 R2); the TABLE above stays local,
+ *  because mobile's chrome keys (tabs.*, mushaf.*) are not web's. */
+export const t = makeT(strings);

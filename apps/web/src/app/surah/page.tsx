@@ -1,7 +1,10 @@
 import Link from 'next/link';
 import { getDatabase } from '../../lib/db';
-import { getAllSurahs } from '@quran-corpus/data';
+import { cookies } from 'next/headers';
+import { getAllSurahs, getSurahNames } from '@quran-corpus/data';
 import { SurahCard } from '../../components/surah-list/SurahCard';
+import { nameFor } from '../../components/surah-list/nameFor';
+import { resolveLocale } from '../../lib/locale';
 
 export const metadata = { title: 'Surahs — Quran Corpus' };
 
@@ -11,7 +14,8 @@ export const dynamic = 'force-dynamic';
 
 export default async function SurahListPage() {
   const db = await getDatabase();
-  const surahs = await getAllSurahs(db);
+  const { content } = resolveLocale(await cookies());
+  const [surahs, names] = await Promise.all([getAllSurahs(db), getSurahNames(db, content)]);
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
@@ -40,7 +44,7 @@ export default async function SurahListPage() {
         <ul className="space-y-2">
           {surahs.map((surah) => (
             <li key={surah.id}>
-              <SurahCard surah={surah} />
+              <SurahCard surah={surah} name={nameFor(names, surah)} />
             </li>
           ))}
         </ul>

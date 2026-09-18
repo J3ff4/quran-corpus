@@ -1,12 +1,13 @@
 import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { getDatabase } from '../lib/db';
-import { getAllSurahs } from '@quran-corpus/data';
+import { getAllSurahs, getSurahNames } from '@quran-corpus/data';
 import { VersePicker } from '../components/wbw/VersePicker';
 import { toPickerSurah, type PickerSurah } from '../components/wbw/types';
 import { SearchTrigger } from '../components/search/SearchTrigger';
 import { FeaturedSurahs } from '../components/home/FeaturedSurahs';
 import { FEATURED_SURAHS_COOKIE, getFeaturedIdsFromCookie } from '../lib/reading-history';
+import { resolveLocale } from '../lib/locale';
 
 export const metadata = { title: 'Quran Corpus' };
 
@@ -25,10 +26,11 @@ const TILES = [
 
 export default async function HomePage() {
   const db = await getDatabase();
-  const surahs = await getAllSurahs(db);
-  const pickerSurahs: PickerSurah[] = surahs.map(toPickerSurah);
-
   const cookieStore = await cookies();
+  const { content } = resolveLocale(cookieStore);
+  const [surahs, names] = await Promise.all([getAllSurahs(db), getSurahNames(db, content)]);
+  const pickerSurahs: PickerSurah[] = surahs.map((s) => toPickerSurah(s, names));
+
   const featuredIds = getFeaturedIdsFromCookie(cookieStore.get(FEATURED_SURAHS_COOKIE)?.value);
 
   return (
@@ -51,7 +53,7 @@ export default async function HomePage() {
         <VersePicker surahs={pickerSurahs} />
       </section>
 
-      <FeaturedSurahs surahs={surahs} featuredIds={featuredIds} />
+      <FeaturedSurahs surahs={surahs} names={names} featuredIds={featuredIds} />
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-paper-500 dark:text-paper-400">

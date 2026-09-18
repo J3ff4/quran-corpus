@@ -5,6 +5,9 @@ import Link from 'next/link';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { useSearch } from '../search/SearchProvider';
 import { ThemeToggle } from './ThemeToggle';
+import { LocaleSwitcher } from '../shared/LocaleSwitcher';
+import type { UiLocaleCode } from '@quran-corpus/config/i18n/locales';
+import type { ScriptCode } from '@quran-corpus/config/i18n/script';
 
 const ROW =
   'flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-paper-700 transition-colors hover:bg-paper-100 dark:text-paper-300 dark:hover:bg-night-200';
@@ -43,7 +46,17 @@ const concordanceIcon = (
   </svg>
 );
 
-export function DrawerMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function DrawerMenu({
+  open,
+  onClose,
+  locale,
+  script,
+}: {
+  open: boolean;
+  onClose: () => void;
+  locale: UiLocaleCode;
+  script: ScriptCode;
+}) {
   const { open: openSearch } = useSearch();
   const reduce = useReducedMotion();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -150,6 +163,8 @@ export function DrawerMenu({ open, onClose }: { open: boolean; onClose: () => vo
               {concordanceIcon}
               <span>Verb Concordance</span>
             </Link>
+
+            <LocaleSwitcher locale={locale} script={script} />
 
             <Link href="/about" onClick={onClose} className={ROW}>
               {infoIcon}

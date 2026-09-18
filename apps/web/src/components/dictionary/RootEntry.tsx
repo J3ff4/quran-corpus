@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import type { RootEntry as RootEntryT, ConcordanceEntry } from '@quran-corpus/data';
+import type { RootEntry as RootEntryT, ConcordanceEntry, RootGloss } from '@quran-corpus/data';
 import { ConcordanceSection } from './ConcordanceSection';
 import { EntryHeader } from './EntryHeader';
 import { ClampedText } from '../ui/ClampedText';
@@ -15,13 +15,24 @@ interface RootEntryProps {
   /** Hijāʾī-adjacent roots for prev/next nav; null at the list ends. */
   prevBw: string | null;
   nextBw: string | null;
+  /** Ranked glosses for the reader's locale, most-used first. Empty on `en`
+   *  and `ru`, which have no `root_glosses` rows at all -- the block then does
+   *  not render, rather than rendering empty. */
+  glosses?: RootGloss[];
 }
 
 /**
  * Full root entry: header, Lane's definition (or an explicit "no entry" note),
  * derived-form filter chips, and the concordance section.
  */
-export function RootEntry({ entry, initialConcordance, total, prevBw, nextBw }: RootEntryProps) {
+export function RootEntry({
+  entry,
+  initialConcordance,
+  total,
+  prevBw,
+  nextBw,
+  glosses = [],
+}: RootEntryProps) {
   const { root, forms, definitions } = entry;
   return (
     <article>
@@ -77,6 +88,38 @@ export function RootEntry({ entry, initialConcordance, total, prevBw, nextBw }: 
           </span>
         )}
       </nav>
+
+      {/* R6: these sit ABOVE Lane / Hans Wehr and the articles below stay
+          English. They are not translations of each other -- these are derived
+          from how the Quran actually uses the root, the articles are lexicon
+          entries. Rendered in the rank the query returns, not re-sorted. */}
+      {glosses.length > 0 && (
+        <section className="mb-6">
+          <h2 className="mb-2 text-sm font-medium text-paper-600 dark:text-paper-400">
+            Meanings in the Quran
+          </h2>
+          <ul className="flex flex-wrap gap-2">
+            {/* Keyed by position, not by `g.gloss`: root_glosses' PK is
+                (root_id, language_code, rank), so two ranks may legally carry
+                the same text. The rows arrive ORDER BY rank and are neither
+                reordered nor filtered here, so the index is stable. */}
+            {glosses.map((g, i) => (
+              <li
+                key={i}
+                className="flex items-baseline gap-1.5 rounded-lg bg-paper-100 px-3 py-1.5 dark:bg-night-50"
+              >
+                {/* Card interior, so contrast is measured against bg-paper-100
+                    / dark:bg-night-50: paper-800 and paper-400 both clear the
+                    4.5:1 WCAG AA floor §8 sets there (paper-500 does not). */}
+                <span className="text-sm text-paper-800 dark:text-paper-200">{g.gloss}</span>
+                <span className="text-xs tabular-nums text-paper-700 dark:text-paper-400">
+                  {g.occurrence_count}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="mb-8 space-y-3">
         {definitions.length > 0 ? (

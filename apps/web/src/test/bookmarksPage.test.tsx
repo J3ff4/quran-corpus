@@ -10,20 +10,31 @@ const surahs = [
   { id: 2, name_translit: 'Al-Baqarah', ayah_count: 286 },
 ];
 
+const names = new Map([
+  [1, { name: 'Fotiha', meaning: null }],
+  [2, { name: 'Baqara', meaning: null }],
+]);
+
 describe('toBookmarkRows', () => {
+  it('labels a row with the localized name when one exists', () => {
+    expect(
+      toBookmarkRows([{ surahId: 2, ayahNumber: 255, view: 'wbw' }], surahs, names),
+    ).toEqual([{ surahId: 2, ayahNumber: 255, view: 'wbw', surahName: 'Baqara' }]);
+  });
+
   it('joins bookmarks to their surah name', () => {
-    expect(toBookmarkRows([{ surahId: 2, ayahNumber: 255, view: 'wbw' }], surahs)).toEqual([row]);
+    expect(toBookmarkRows([{ surahId: 2, ayahNumber: 255, view: 'wbw' }], surahs, new Map())).toEqual([row]);
   });
 
   it('drops an ayah the surah does not have', () => {
     // Al-Fatihah has 7 ayahs; 8 passes the cookie's global 1..286 check but
     // would link to a scroll target the reader rejects.
-    expect(toBookmarkRows([{ surahId: 1, ayahNumber: 8, view: 'reading' }], surahs)).toEqual([]);
-    expect(toBookmarkRows([{ surahId: 1, ayahNumber: 7, view: 'reading' }], surahs)).toHaveLength(1);
+    expect(toBookmarkRows([{ surahId: 1, ayahNumber: 8, view: 'reading' }], surahs, new Map())).toEqual([]);
+    expect(toBookmarkRows([{ surahId: 1, ayahNumber: 7, view: 'reading' }], surahs, new Map())).toHaveLength(1);
   });
 
   it('drops a bookmark for a surah that is not in the list', () => {
-    expect(toBookmarkRows([{ surahId: 99, ayahNumber: 1, view: 'reading' }], surahs)).toEqual([]);
+    expect(toBookmarkRows([{ surahId: 99, ayahNumber: 1, view: 'reading' }], surahs, new Map())).toEqual([]);
   });
 
   it('preserves the given order', () => {
@@ -33,6 +44,7 @@ describe('toBookmarkRows', () => {
         { surahId: 1, ayahNumber: 1, view: 'reading' },
       ],
       surahs,
+      new Map(),
     );
     expect(rows.map((r) => r.surahId)).toEqual([2, 1]);
   });

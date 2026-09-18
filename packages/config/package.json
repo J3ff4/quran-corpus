@@ -11,7 +11,11 @@
     "./ornaments/medallion": "./ornaments/medallion.ts",
     "./prettier": "./prettier/index.js",
     "./ornaments/surahBand": "./ornaments/surahBand.ts",
-    "./ornaments/surahName": "./ornaments/surahName.ts"
+    "./ornaments/surahName": "./ornaments/surahName.ts",
+    "./i18n/locales": "./i18n/locales.ts",
+    "./i18n/script": "./i18n/script.ts",
+    "./i18n/t": "./i18n/t.ts",
+    "./i18n/textDirection": "./i18n/textDirection.ts"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.0.0",
@@ -20,6 +24,12 @@
     "eslint-config-next": "^15.0.0",
     "prettier-plugin-tailwindcss": "^0.6.0",
     "tailwindcss": "^3.4.0",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "type-check": "tsc --noEmit"
   }
 }

@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from 'next';
+import { cookies } from 'next/headers';
 import { Amiri, Inter } from 'next/font/google';
 import localFont from 'next/font/local';
 import './globals.css';
 import { BottomNav } from '../components/shell/BottomNav';
 import { SearchProvider } from '../components/search/SearchProvider';
+import { resolveLocale } from '../lib/locale';
 
 const kfgqpc = localFont({
   src: './fonts/hafs.18.woff2',
@@ -61,9 +63,20 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Resolved here, on the server, so the first paint is already in the stored
+  // language -- a post-mount correction would flash the previous one (#51-#53).
+  const { locale, script } = resolveLocale(await cookies());
+
   return (
     <html
+      // Deliberately NOT the UI locale yet. The chrome and every translation
+      // on the page are still English this phase (R3 defers translating them),
+      // so `lang="ru"` would be a WCAG 3.1.1 (Level A) violation: a screen
+      // reader would switch to a Russian voice and read English aloud with
+      // Russian phonetics -- worse than not offering the locale at all. The
+      // localized parts Task 3 adds (surah names) carry their own `lang` on
+      // the element; this attribute follows once the chrome does.
       lang="en"
       suppressHydrationWarning
       className={`${kfgqpc.variable} ${amiri.variable} ${inter.variable} ${surahNameV2.variable} ${surahNameV4.variable}`}
@@ -88,7 +101,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </noscript>
         <SearchProvider>
           {children}
-          <BottomNav />
+          <BottomNav locale={locale} script={script} />
         </SearchProvider>
       </body>
     </html>

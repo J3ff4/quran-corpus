@@ -35,7 +35,7 @@ export function VersePicker({
         >
           {surahs.map((s) => (
             <option key={s.id} value={s.id}>
-              {s.id}. {s.name_translit}
+              {s.id}. {s.name}
             </option>
           ))}
         </select>

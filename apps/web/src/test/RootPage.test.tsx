@@ -21,9 +21,16 @@ const getRootEntry = vi.fn();
 const getRootConcordancePage = vi.fn();
 const countRootConcordance = vi.fn();
 const getRootNeighbors = vi.fn();
+const getRootGlosses = vi.fn();
 const getDatabase = vi.fn(async () => ({}) as never);
 
 vi.mock('../lib/db', () => ({ getDatabase: () => getDatabase() }));
+
+// The page resolves the reader's locale from cookies to pick the gloss rows.
+const cookieJar = {
+  get: vi.fn((_name: string) => undefined as { value: string } | undefined),
+};
+vi.mock('next/headers', () => ({ cookies: async () => cookieJar }));
 
 vi.mock('@quran-corpus/data', async (importOriginal) => {
   // parseRootParam stays REAL: the point is that the page decodes and rejects
@@ -36,6 +43,7 @@ vi.mock('@quran-corpus/data', async (importOriginal) => {
     getRootConcordancePage: (...a: unknown[]) => getRootConcordancePage(...a),
     countRootConcordance: (...a: unknown[]) => countRootConcordance(...a),
     getRootNeighbors: (...a: unknown[]) => getRootNeighbors(...a),
+    getRootGlosses: (...a: unknown[]) => getRootGlosses(...a),
   };
 });
 
@@ -47,10 +55,29 @@ const page = (root: string) => RootPage({ params: Promise.resolve({ root }) });
 describe('RootPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getRootEntry.mockResolvedValue({ root_buckwalter: 'qwl' });
+    getRootEntry.mockResolvedValue({ root: { id: 42, root_buckwalter: 'qwl' } });
     getRootConcordancePage.mockResolvedValue([]);
     countRootConcordance.mockResolvedValue(0);
     getRootNeighbors.mockResolvedValue({ prev: null, next: null });
+    getRootGlosses.mockResolvedValue([]);
+    cookieJar.get.mockReturnValue(undefined);
+  });
+
+  it('asks for the gloss rows in the reader\'s composed language code', async () => {
+    cookieJar.get.mockImplementation((name: string) =>
+      name === 'ui-locale'
+        ? { value: 'uz' }
+        : name === 'ui-script'
+          ? { value: 'cyrillic' }
+          : undefined,
+    );
+    render(await page('qwl'));
+    expect(getRootGlosses).toHaveBeenCalledWith(expect.anything(), 42, 'uz-Cyrl');
+  });
+
+  it('defaults the gloss language to English when no cookie is stored', async () => {
+    render(await page('qwl'));
+    expect(getRootGlosses).toHaveBeenCalledWith(expect.anything(), 42, 'en');
   });
 
   it('renders the entry and pages the concordance from offset 0', async () => {

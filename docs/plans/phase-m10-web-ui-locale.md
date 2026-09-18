@@ -391,17 +391,73 @@ but there IS on `en` and `ru`, where `root_glosses` has no rows at all.
 
 | # | Check | Result |
 |---|---|---|
-| 380 | Locale English (default): everything reads exactly as before this phase | |
-| 381 | Locale Uzbek: headers, browse list and verse picker read Fotiha, Baqara, Tavba | |
-| 382 | Arabic surah name AND transliteration visible in every locale (R5) | |
-| 383 | Locale Uzbek, script Cyrillic: names read Фотиҳа; WbW glosses Cyrillic; verse translation Cyrillic | |
-| 384 | Script toggle with locale English or Russian: nothing changes | |
-| 385 | Dictionary root page, locale Uzbek: ranked Uzbek glosses above Lane, Lane still English | |
-| 386 | Dictionary root page, locale English: no gloss block, page as before | |
-| 387 | Switching locale updates the page with no flash of the previous language (SSR, not post-mount) | |
-| 388 | Locale survives a reload and an in-app navigation (cookie + router.refresh) | |
-| 389 | A hand-edited junk `ui-locale` cookie falls back to English, no error | |
-| 390 | Keyboard: switcher reachable, `aria-expanded` + `aria-controls` paired | |
+| 380 | Locale English (default): everything reads exactly as before this phase | PASS — Al-Fatiha / Al-Baqara / At-Tawbah, English meanings, no gloss block |
+| 381 | Locale Uzbek: headers, browse list and verse picker read Fotiha, Baqara, Tavba | PASS — Fotiha, Baqara, Tavba in header, browse list, home picker and verse picker |
+| 382 | Arabic surah name AND transliteration visible in every locale (R5) | PASS — الفاتحة renders beside Fotiha / Фотиҳа in every locale |
+| 383 | Locale Uzbek, script Cyrillic: names read Фотиҳа; WbW glosses Cyrillic; verse translation Cyrillic | PASS after a fix — names Фотиҳа; WbW glosses and verse translation were LATIN (see below), now Cyrillic |
+| 384 | Script toggle with locale English or Russian: nothing changes | PASS — script rows are only offered under Uzbek; names and chrome identical either way |
+| 385 | Dictionary root page, locale Uzbek: ranked Uzbek glosses above Lane, Lane still English | PASS — kitobni 80, kitob 39 … above Hans Wehr and Lane, both still English |
+| 386 | Dictionary root page, locale English: no gloss block, page as before | PASS — no `Meanings in the Quran` block at all; Hans Wehr and Lane render as before |
+| 387 | Switching locale updates the page with no flash of the previous language (SSR, not post-mount) | PASS — 16ms sampler saw exactly two states, Al-Fatiha → Fotiha, no third |
+| 388 | Locale survives a reload and an in-app navigation (cookie + router.refresh) | PASS — hard reload, in-app Link nav and back-nav all stay Uzbek |
+| 389 | A hand-edited junk `ui-locale` cookie falls back to English, no error | PASS — xx, en-US, uz-Cyrl, ../../etc, injection strings all fall back to English |
+| 390 | Keyboard: switcher reachable, `aria-expanded` + `aria-controls` paired | PASS — 5 tabs from the drawer trigger; Enter flips aria-expanded, aria-controls names a real panel that is `hidden` when closed |
+
+### Device run 2026-09-18
+
+OnePlus 7Pro, Chrome 153, real device over `adb reverse` to the dev server,
+driven through the Chrome DevTools Protocol (real key and click events, real
+rendering). 11 of 11 pass; one needed a fix first.
+
+**383 was a genuine miss.** Surah names and root glosses followed the script
+cookie, but the reader's verse translation and the word-by-word glosses did
+not: both pages took their `language_code` from `?lang=` alone, so Uzbek
+always rendered Latin no matter the script. The data was there all along
+(`translations` 6236 `uz-Cyrl` rows, `word_glosses` 77424). Fixed by composing
+the two in the one place that is allowed to — `contentLanguage(lang, script)`
+— in `surah/[id]/page.tsx` and `surah/[id]/words/page.tsx`, with the composed
+code also passed as `pageLang` so the popover's fallback badge does not start
+reading "(uz-Cyrl)" on every word. Covered by `readerPageLang.test.tsx` (5
+tests, mutation-checked: dropping the composition fails 2).
+
+**Open question for the owner, behind check 384.** The script cookie now
+applies to Uzbek *content* wherever it is rendered, including `?lang=uz` under
+an English or Russian UI. The toggle is not offered in those locales, so this
+only shows up for a reader who set Cyrillic under the Uzbek UI and then
+switched the UI to English. Honouring it seems right — otherwise an
+English-UI reader can never read the Cyrillic Uzbek translation — but the
+alternative (script dies with the Uzbek UI) is defensible. Shipped as the
+former; say the word to flip it.
+
+### Mobile smoke 2026-09-18 (Task 1's shims, on device)
+
+M10 defines no mobile checks, but Task 1 turned mobile's three i18n modules
+into re-export shims over `@quran-corpus/config/i18n/*`, and vitest resolves
+modules its own way — only Metro's graph proves the `exports` subpaths hold.
+Run on the OnePlus 7Pro through Expo Go, `expo start --clear`, over
+`adb reverse tcp:8081`.
+
+| What | Result |
+|---|---|
+| Bundle | PASS — `Android Bundled 13698ms … (2761 modules)`, no resolution error, clean log |
+| Tab labels through the shimmed `t` | PASS — Bosh sahifa / Suralar / Mushaf / Lug'at / Menyu under Uzbek |
+| Settings chrome | PASS — Til, Interfeys, Tarjima, Maxfiylik; About page localized too |
+| `scripts` through the shim | PASS — "Oʻzbek yozuvi" with Lotin / Кирилл appears only once the translation is Uzbek |
+| `contentLanguage` through the shim | PASS — Cyrillic gives "Раҳмон ва Раҳим бўлган Аллоҳ номи билан бошлайман." and WbW gloss Раҳмон |
+| Surah list names | PASS — Fotiha / Ochuvchi, Baqara / Sigir |
+
+Mobile suite on the branch: **1268 tests / 112 files green**, unchanged.
+Device settings were restored to English / English / Latin afterwards.
+
+Two pre-existing mobile gaps confirmed still open, neither caused by this
+branch (the shims are pure re-exports):
+
+- **Issue #83** — the reader header still reads `Al-Fatiha` / `The Opening`
+  even under the Uzbek UI, where the surah *list* correctly reads Fotiha.
+- **Surah names ignore the script toggle on mobile.** Under Uzbek + Cyrillic
+  the list still reads Fotiha where web now reads Фотиҳа. Mobile files the
+  script under Translation, so names are content and should follow it. Filed
+  as **issue #85**, alongside #83.
 
 ---
 
@@ -415,12 +471,13 @@ but there IS on `en` and `ru`, where `root_glosses` has no rows at all.
 | Locale flashes post-mount | Resolved server-side by construction; check 387 | — |
 | Chrome stays English and reads as half-done | R3 is deliberate and recorded; the follow-up is its own phase | — |
 | `uz-Cyrl` named as an `<html lang>` or a UI locale by mistake | Three distinct types, and `contentLanguage` is the only bridge | — |
+| The service worker's `navigate-pages` cache (`sw.ts:21`) is keyed by URL only, so an offline load — or any load slower than its 5s `networkTimeoutSeconds` — serves HTML rendered for the PREVIOUS locale | Harmless while the chrome is English (R3): only localized names differ. Becomes "the whole UI is in the wrong language offline" the moment R3 lands | Vary the cache key on the `ui-locale` cookie, or drop the navigate-pages cache entry on a locale write |
 
 ## Out of scope (recorded, not forgotten)
 
 - Translating web chrome into uz/ru (R3). Its own phase.
 - `next-intl`, locale-prefixed routes, message formatting/pluralization (R2).
-- Mobile's Latin/Cyrillic toggle — that is M9 Task 9, and it consumes Task 1's
+- Mobile's Latin/Cyrillic toggle — shipped in M9 (`925b2c2`). It will consume Task 1's
   `contentLanguage` rather than defining its own.
 - The `?lang=` translation picker stays as it is: which TRANSLATION you read is
   a separate choice from which language the UI is in, and R1 turned down

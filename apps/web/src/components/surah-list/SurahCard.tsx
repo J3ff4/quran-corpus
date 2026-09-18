@@ -1,11 +1,14 @@
 import Link from 'next/link';
-import type { Surah } from '@quran-corpus/data';
+import type { Surah, SurahName } from '@quran-corpus/data';
 
 interface SurahCardProps {
   surah: Surah;
+  /** The name in the reader's locale; replaces the transliteration slot (R5).
+   *  The Arabic name beside it is unchanged in every locale. */
+  name: SurahName;
 }
 
-export function SurahCard({ surah }: SurahCardProps) {
+export function SurahCard({ surah, name }: SurahCardProps) {
   return (
     <Link href={`/surah/${surah.id}`}>
       <div className="group flex items-center gap-4 rounded-xl bg-paper-100 px-4 py-3 transition-colors hover:bg-paper-200 dark:bg-night-200 dark:hover:bg-night-100">
@@ -15,7 +18,7 @@ export function SurahCard({ surah }: SurahCardProps) {
         <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
           <div>
             <p className="text-sm font-medium text-paper-500 dark:text-paper-400">
-              {surah.name_translit}
+              {name.name}
             </p>
             <p className="mt-0.5 text-xs text-paper-400 dark:text-paper-500">
               <span>{surah.revelation_type.charAt(0).toUpperCase() + surah.revelation_type.slice(1)}</span>
