@@ -191,6 +191,17 @@ describe('FrequencyList', () => {
     expect(screen.getByRole('alert').textContent).toBe('Unable to load the list');
   });
 
+  it('shows a spinner on a kind\u2019s first load, not an empty pane', async () => {
+    // #33 as reported: selecting a kind for the first time in a launch left the
+    // pane completely empty -- no rows, no header, no spinner -- for 2 to 7
+    // seconds. The query is left in flight here because that IS the state the
+    // reader was looking at; resolving it would only prove the end of it.
+    mocks.getFrequencyRows.mockImplementationOnce(() => new Promise(() => {}));
+    render(<FrequencyList kind="lemmas" />);
+
+    expect(screen.getByText('loading')).toBeTruthy();
+  });
+
   it('does not show one kind\u2019s rows under another kind\u2019s heading', async () => {
     // The defect behind #33: rows and the loading flag were separate, and the
     // flag was only raised by an effect -- which runs after paint. For that
