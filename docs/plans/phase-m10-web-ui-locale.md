@@ -456,8 +456,8 @@ branch (the shims are pure re-exports):
   even under the Uzbek UI, where the surah *list* correctly reads Fotiha.
 - **Surah names ignore the script toggle on mobile.** Under Uzbek + Cyrillic
   the list still reads Fotiha where web now reads Фотиҳа. Mobile files the
-  script under Translation, so names are content and should follow it. Worth
-  its own issue alongside #83.
+  script under Translation, so names are content and should follow it. Filed
+  as **issue #85**, alongside #83.
 
 ---
 
