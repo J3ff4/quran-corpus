@@ -12,7 +12,7 @@
     ],
     "android": {
       "package": "com.qurancorpus.mobile",
-      "versionCode": 22,
+      "versionCode": 23,
       "adaptiveIcon": {
         "foregroundImage": "./assets/icons/adaptive-icon.png",
         "backgroundColor": "#faf8f3"
