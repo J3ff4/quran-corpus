@@ -7,9 +7,113 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-09-16
+Updated: 2026-09-18
 
 ## Now
+
+**2026-09-18 — M8's device run landed, with four UI issues (PR #88, squash
+`bc66e81`).** Checks 340-352 on vc22, owed since the M8 and M8a merges:
+**9 PASS, 2 FAIL, 1 blocked, 2 not run**, written up per-check in
+`docs/plans/phase-m8-global-recitation.md`.
+
+- **342 passes** — the one that mattered most, #80's shape one window higher.
+  Status bar measurably absent in mushaf chrome-down (top-band max 20), back on
+  the sibling tab (max 255). **340 passes on a measurement, not an eyeball:**
+  the page is pixel-identical across rows 900-2400 between chrome states, so the
+  chrome overlays and nothing reflows.
+- **349 and 352 FAIL, and they are ONE defect** — a screen's player surface
+  renders whatever the engine is playing **without consulting the track's
+  `owner`**. Home: a mushaf-owned track grows the compact card into a full
+  transport. Mushaf: a reader-owned track replaces "Play this page", the only way
+  to start a page, so 352 could not be performed at all rather than failing its
+  assertion. **The one-voice invariant never broke** — no run sampled two
+  concurrent piids. This is ruling 8 from the M8 review, and the device run says
+  the cost is bigger than the review thought. **Filed as #87, needs an owner
+  ruling, no fix before it.**
+- **Method notes cost three thrown-away runs** and are in the plan: audio must be
+  sampled by an on-device `adb shell` loop (round-trip latency ~15-25s exceeds
+  one ayah at 21.8s), a mushaf tap TOGGLES chrome rather than raising it, and the
+  tab bar is part of the chrome so it cannot be tapped while the chrome is down.
+- **Blocked:** 344 — `adb shell input swipe` is refused on this device
+  (`SecurityException: INJECT_EVENTS`). Taps inject, drags do not; it needs a
+  real finger. Not run: 345 (motion judgment), 348 (no word sheet through taps).
+- UI issues in the same PR: **#43** plural agreement (hand-written
+  `pluralCategory`, NOT `Intl.PluralRules` — nothing here touches `Intl` and
+  Hermes ships it only with ICU enabled; the Russian teens exception is the
+  point), **#52** InfoButton `hitSlop` to the 48dp floor (invisible to
+  `uiautomator`, which still reports the drawn 40dp, so check 177 cannot confirm
+  it — the test can), **#53** sheet edges, **#55** import spellings.
+- **#85 + #83 — surah names, one story in two halves.** `getSurahList` took a
+  `UiLocaleCode`, which can never hold `uz-Cyrl`, so the browse list read
+  `Fotiha` under Кирилл while the translations beside it were Cyrillic; the 114
+  rows were in `surah_names` all along. Widened to `QueryLanguageCode` and
+  composed ONCE in the settings store as `nameLanguage`, beside `queryLanguage`
+  — three call sites composing it themselves IS the bug. #83 fixed in the two
+  loaders that carry a surah row, not the eight call sites that render one.
+- **#51** reciter a11y: position rides each row's label (`Al-Husary, 3 / 10`),
+  since RN exposes no `CollectionItemInfo`. **Half declined on purpose** — the
+  radiogroup stays unnamed, because a ViewGroup with a contentDescription takes
+  a11y focus on Android and swallows its children.
+- **#49 and #33 were already fixed** by `87a9439` and `dd389f3` and had simply
+  never been closed. Verified in the code, not from the issue text; closed both.
+  #33's first-uncached-load case had no test of its own, so `a17b07b` adds one.
+- Gate: 1285 tests / 113 files, lint 0, type-check 0, CI green both jobs. No §5
+  trigger. Every new branch mutation-checked.
+
+**2026-09-18 — phase M10 merged (PR #86, squash `e5834ec`).** A UI locale
+(English / Uzbek / Russian) and an Uzbek script toggle, resolved server-side from
+cookies before the first paint. The i18n mechanism moved into `packages/config`
+so web and mobile share one vocabulary instead of growing a second copy.
+
+- **Three language vocabularies stay distinct** and this is the load-bearing
+  idea: `UiLocaleCode` drives the chrome, `ContentLanguageCode` is what the
+  reader asks for, `QueryLanguageCode` is what a table row actually carries.
+  `contentLanguage()` is the ONLY bridge, and it composes `uz-Cyrl` for uz +
+  cyrillic alone — an `en-Cyrl` would empty the screen, since no table carries
+  such a row.
+- Also fixed what check 383 was written to catch: the reader and word-by-word
+  pages took `language_code` straight from `?lang=`, so an Uzbek reader set to
+  Cyrillic still got the Latin translation. Data was already imported; wiring.
+- Checks 380-390 **11/11** on the owner's phone over adb + CDP. Web 524 tests /
+  87 files, mobile 1268 / 112.
+- **Open for the owner:** the script cookie applies to Uzbek content even under
+  an English or Russian UI, where the toggle is not offered. Shipped as "yes";
+  one line to flip. The picker keeps a way back under either ruling.
+- **The merge-time `import-tasnim` caveat was too broad.** `apps/web/quran.db`
+  already carries `gloss_group` and 77424 uz/uz-Cyrl gloss rows — verified
+  2026-09-18. The warning applies only to a separate deploy-target DB that has
+  never had the import run against it.
+
+**2026-09-17 — phase M9 merged (PR #84, squash `ed10e08`).** Uzbek word-by-word
+glosses from Tasnim, both scripts.
+
+- **The alignment is deterministic — no LLM, no confidence gate, no review
+  queue.** Tasnim's own segmentation groups words (66139 rows to our 77429), but
+  a two-tier Arabic normalizer — diacritics and tatweel out, hamza/alef folded,
+  then a consonant skeleton for the Uthmani/imlai spelling split — aligns 6220 of
+  6236 ayahs and 77115 of 77429 words. **This supersedes the July 2026 design**,
+  which reached for an LLM only because Tasnim was legally out of reach; the
+  owner states a licence is now in hand.
+- Three additive objects: nullable `gloss_group` (which phrase a word belongs to
+  — repeating a grouped gloss on both rows would lose that it is one phrase),
+  `surah_names`, `root_glosses` (separate table, not a widened
+  `root_definitions`).
+- Owner rulings: both scripts as BCP-47 codes with no schema change, surah names
+  on the UI locale with Arabic always visible, mt rows deleted after an export,
+  the Tasnim verse translation imported while we are here, and a stratified
+  sample the owner reads before the live write.
+- **M9's nine owner-driven checks are still owed,** including the 368 re-run.
+
+**What is owed across M8-M10, in one place.** The #87 ruling; M8 checks 344
+(real finger), 345, 348; M8a's three-button-navigation check (this phone is on
+gesture nav and `adb shell settings put` is blocked); M9's nine; M10's mobile
+side beyond the Expo Go smoke; and the M10 script-cookie question above. **No
+full APK baseline has been run since M6** — everything since has been verified in
+Expo Go or on ad-hoc local debug-signed builds.
+
+**No phase plan exists after M10.** `docs/plans/` ends at
+`phase-m10-web-ui-locale.md`. §6 says the plan comes before the code, so the next
+phase is blocked on picking one.
 
 **2026-09-16 — phase M8a merged (PR #82, squash `d0d51ab`).** Player polish: one
 player idea across Home and the mushaf. 16 commits, 39 files, +896/-188, vc21.
@@ -4005,7 +4109,14 @@ Re-queried directly 2026-07-22 (do not trust older counts in this file's history
   check. Worth knowing before assuming an ignore rule protects anything.
 
 ## Queue
-1. Uz gloss gap (1890 words, all short function words) — in talks with Tasnim
+1. ~~Uz gloss gap (1890 words, all short function words)~~ — **SUPERSEDED by
+   phase M9, merged 2026-09-17 (`ed10e08`).** The licence came through and the
+   Tasnim glosses are imported deterministically for both scripts; 77115 of
+   77429 words aligned. The residue is the ~314 unaligned words and the 16
+   unaligned ayahs, not the old 1890-word gap. Original note kept below for the
+   spike it points at.
+
+   Uz gloss gap (1890 words, all short function words) — in talks with Tasnim
    (user's contact) as of 2026-07-24; may not need the review_glosses.py path.
    The alignment spike that informs this (`uz_text.py`, `uz_align_eval.py`,
    `tools/uz_align_spike.py` + the go/no-go report) is now on `main` — it was
@@ -4021,8 +4132,11 @@ Re-queried directly 2026-07-22 (do not trust older counts in this file's history
    feature ships (blocks Russian — and re-check the existing `en`/`uz`
    alquran.cloud-sourced rows from the same script too — same unverified-source
    gap may apply to those).
-4. Build a translation-language switcher — both `ru` translations exist in the
-   DB but are invisible in the app (reader hardcodes `en`).
+4. ~~Build a translation-language switcher~~ — **DONE.** Mobile has had a
+   content-language picker since M6i; web got the UI locale + Uzbek script
+   toggle in phase M10 (PR #86, `e5834ec`), and the reader no longer hardcodes
+   `en`. Item 3's licensing check is what still gates showing Russian
+   prominently, not the control.
 5. **Going public — next actions, in order:**
    a. Decide the #59 blocking-mode question (warning → error?), land #59.
    b. ~~Submit `~/quran-data/github-support-request.md`~~ — **DONE differently
