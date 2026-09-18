@@ -3,7 +3,7 @@ import { RECITERS } from '@quran-corpus/data/mobile';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
 import { BottomSheet } from './BottomSheet';
-import { SheetHeader, SheetRow } from './sheet';
+import { SheetHeader, SheetRow } from '@/components/sheet';
 
 export interface ReciterSheetProps {
   /** The active `Reciter.id`. */

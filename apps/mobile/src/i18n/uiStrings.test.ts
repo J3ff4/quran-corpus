@@ -62,7 +62,17 @@ describe('M1 i18n', () => {
     const sourceText =
       collectSourceText(join(MOBILE_ROOT, 'src')) + collectSourceText(join(MOBILE_ROOT, 'app'));
     const keys = Object.keys(strings.en) as UiStringKey[];
-    const deadKeys = keys.filter((key) => !sourceText.includes(`'${key}'`));
+    // A plural key is selected as `${base}.${pluralCategory(...)}`, so its own
+    // literal is never written anywhere -- only the base is. Accept the base
+    // for those, and keep the exact-literal rule for every other key rather
+    // than loosening the check into a prefix match, which would let a genuinely
+    // dead `foo.bar.baz` ride in on a live `foo.bar`.
+    const used = (key: UiStringKey) => {
+      if (sourceText.includes(`'${key}'`)) return true;
+      const base = key.replace(/\.(one|few|many)$/, '');
+      return base !== key && sourceText.includes(`'${base}'`);
+    };
+    const deadKeys = keys.filter((key) => !used(key));
     expect(deadKeys).toEqual([]);
   });
 

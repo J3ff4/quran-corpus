@@ -38,6 +38,7 @@ import {
 } from '@/data/userRepository';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { textAlignFor } from '@/i18n/textDirection';
+import { pluralCategory } from '@/i18n/plural';
 import { t } from '@/i18n/uiStrings';
 import {
   ICON_MIN_SCALE,
@@ -181,6 +182,16 @@ export function BookmarksScreen() {
     pendingReload.current = false;
     reload();
   }, [removing, reload]);
+
+  // A count and its noun, agreeing. Not `${n} ${t(...)}`: the labels used to be
+  // plural-only in every locale, so a single bookmark read `1 ayahs`, and
+  // Russian -- which wants three forms, with the teens as their own case --
+  // was wrong in both directions at once (#43).
+  const counted = useCallback(
+    (base: 'bookmarks.ayahsLabel' | 'bookmarks.surahsLabel', n: number) =>
+      `${n} ${t(uiLocale, `${base}.${pluralCategory(uiLocale, n)}` as const)}`,
+    [uiLocale],
+  );
 
   const bookmarks = useMemo(() => data?.bookmarks ?? [], [data]);
   const texts = data?.texts ?? new Map<string, string>();
@@ -330,9 +341,9 @@ export function BookmarksScreen() {
             the phone (decision 34), and the mockup's caption would be a promise
             the app does not keep. */}
         <Text style={{ color: theme.mutedText }}>
-          {`${bookmarks.length} ${t(uiLocale, 'bookmarks.ayahsLabel')} · ${surahCount} ${t(
-            uiLocale,
+          {`${counted('bookmarks.ayahsLabel', bookmarks.length)} · ${counted(
             'bookmarks.surahsLabel',
+            surahCount,
           )} · ${t(uiLocale, 'bookmarks.onThisDevice')}`}
         </Text>
         <SegmentedControl

@@ -2,7 +2,7 @@ import type { ContentLanguageCode, UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
 // Direct, not through the sheet barrel: header-only sheet, and the barrel's
 // other exports pull the settings store into its tests. See sheet/index.ts.
-import { SheetHeader } from './sheet/SheetHeader';
+import { SheetHeader } from '@/components/sheet/SheetHeader';
 import { BottomSheet } from './BottomSheet';
 import { LanguageSelector } from './LanguageSelector';
 

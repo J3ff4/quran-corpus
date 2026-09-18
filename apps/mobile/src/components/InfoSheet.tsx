@@ -44,6 +44,13 @@ export function InfoButton({ label, expanded, onPress }: InfoButtonProps) {
       accessibilityLabel={label}
       accessibilityState={{ expanded }}
       onPress={onPress}
+      // The glyph stays 40dp because this control sits inline in a section-label
+      // row (`TRANSLATED AS  (i)`) and growing the drawn box would push that
+      // row's height. `hitSlop` takes the finger to the 48dp floor (§8, and
+      // `touchTargets.minimum`) without touching layout -- 4 on each side of 40.
+      // Note it is invisible to `uiautomator`, which still reports the drawn
+      // 40dp bounds, so device check 177 cannot confirm this one; the test can.
+            hitSlop={(touchTargets.minimum - touchTargets.compact) / 2}
       style={{
         minWidth: touchTargets.compact,
         minHeight: touchTargets.compact,
