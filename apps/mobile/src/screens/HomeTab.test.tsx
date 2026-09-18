@@ -49,6 +49,9 @@ vi.mock('@/settings/settingsStore', () => ({
     uiLocale: 'en',
     contentLanguage: 'uz',
     queryLanguage: 'uz-Cyrl',
+    // Unequal to queryLanguage: the card's surah name follows the UI locale,
+    // the ayah's translation follows the content language (#83).
+    nameLanguage: 'ru',
     arabicScale: 'medium',
     reduceMotion: false,
   }),
@@ -325,6 +328,8 @@ describe('HomeTab', () => {
       expected.surah,
       expected.ayah,
       'uz-Cyrl',
+      // And the surah NAME on the card follows the UI locale, not that (#83).
+      'ru',
     );
   });
 

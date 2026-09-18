@@ -194,6 +194,10 @@ vi.mock('@/settings/settingsStore', () => ({
     // Unequal to contentLanguage on purpose: the reader's translation follows
     // the script, so an assertion against 'uz' would pass either way.
     queryLanguage: 'uz-Cyrl',
+    // Unequal to queryLanguage too: the surah NAME follows the UI locale and
+    // the translation follows the content language, so a loader that passed
+    // one where the other belongs would otherwise assert as correct (#83).
+    nameLanguage: 'ru',
     setContentLanguage: vi.fn(),
     uiLocale: mocks.uiLocale,
     // The reader reads continuous play from the settings store now rather than
@@ -492,7 +496,7 @@ describe('SurahRoute', () => {
     mocks.getSurahReader.mockReturnValue(pending.promise);
     fireEvent.click(screen.getByText('page next'));
     await waitFor(() =>
-      expect(mocks.getSurahReader).toHaveBeenLastCalledWith(expect.anything(), 3, 'uz-Cyrl'),
+      expect(mocks.getSurahReader).toHaveBeenLastCalledWith(expect.anything(), 3, 'uz-Cyrl', 'ru'),
     );
 
     // Opened DURING the turn, which is what makes this reachable: the held
@@ -542,7 +546,7 @@ describe('SurahRoute', () => {
     // grow the back stack, so leaving five surahs later would take five
     // presses.
     await waitFor(() =>
-      expect(mocks.getSurahReader).toHaveBeenLastCalledWith(expect.anything(), 3, 'uz-Cyrl'),
+      expect(mocks.getSurahReader).toHaveBeenLastCalledWith(expect.anything(), 3, 'uz-Cyrl', 'ru'),
     );
     expect(await screen.findByText('adjacent:2/4')).toBeTruthy();
   });
@@ -554,7 +558,7 @@ describe('SurahRoute', () => {
 
     fireEvent.click(screen.getByText('page next'));
     await waitFor(() =>
-      expect(mocks.getSurahReader).toHaveBeenLastCalledWith(expect.anything(), 3, 'uz-Cyrl'),
+      expect(mocks.getSurahReader).toHaveBeenLastCalledWith(expect.anything(), 3, 'uz-Cyrl', 'ru'),
     );
 
     // Paging is state, so ?ayah= does not change with the surah. Handed on, a
@@ -583,7 +587,7 @@ describe('SurahRoute', () => {
     fireEvent.click(screen.getByText('jump away'));
 
     await waitFor(() =>
-      expect(mocks.getSurahReader).toHaveBeenLastCalledWith(expect.anything(), 3, 'uz-Cyrl'),
+      expect(mocks.getSurahReader).toHaveBeenLastCalledWith(expect.anything(), 3, 'uz-Cyrl', 'ru'),
     );
     // The whole point of holding the jump out here: the reader is keyed by the
     // displayed surah, so it is remounted by this very turn.
@@ -619,11 +623,11 @@ describe('SurahRoute', () => {
 
     fireEvent.click(screen.getByText('page next'));
     await waitFor(() =>
-      expect(mocks.getSurahReader).toHaveBeenLastCalledWith(expect.anything(), 3, 'uz-Cyrl'),
+      expect(mocks.getSurahReader).toHaveBeenLastCalledWith(expect.anything(), 3, 'uz-Cyrl', 'ru'),
     );
     fireEvent.click(screen.getByText('page previous'));
     await waitFor(() =>
-      expect(mocks.getSurahReader).toHaveBeenLastCalledWith(expect.anything(), 2, 'uz-Cyrl'),
+      expect(mocks.getSurahReader).toHaveBeenLastCalledWith(expect.anything(), 2, 'uz-Cyrl', 'ru'),
     );
 
     expect(await screen.findByText('anchor:none')).toBeTruthy();
@@ -637,7 +641,7 @@ describe('SurahRoute', () => {
     mocks.getSurahReader.mockReturnValue(pending.promise);
     fireEvent.click(screen.getByText('page next'));
     await waitFor(() =>
-      expect(mocks.getSurahReader).toHaveBeenLastCalledWith(expect.anything(), 3, 'uz-Cyrl'),
+      expect(mocks.getSurahReader).toHaveBeenLastCalledWith(expect.anything(), 3, 'uz-Cyrl', 'ru'),
     );
 
     // Blanking to the spinner here leaves reanimated no outgoing view, so the

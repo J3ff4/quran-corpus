@@ -53,7 +53,7 @@ export interface WbwScreenProps {
 }
 
 export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
-  const { queryLanguage, uiLocale, wbwDensity, setWbwDensity } = useAppSettings();
+  const { queryLanguage, nameLanguage, uiLocale, wbwDensity, setWbwDensity } = useAppSettings();
   const theme = useThemeColors();
   const paddingBottom = useListBottomPadding();
 
@@ -151,7 +151,7 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
       try {
         const corpusDb = await openCorpusDb();
         const client = createExpoSqliteClient(corpusDb as ExpoSqliteLike);
-        const data = await getWbwScreen(client, currentSurahId, from);
+        const data = await getWbwScreen(client, currentSurahId, from, nameLanguage);
         // Sequential: the gloss query is per surah and only worth issuing once
         // the range query has proved the surah exists.
         const surahGlosses = await getSurahGlosses(client, currentSurahId, queryLanguage);
@@ -173,7 +173,7 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
     return () => {
       cancelled = true;
     };
-  }, [queryLanguage, currentSurahId, from, uiLocale]);
+  }, [queryLanguage, nameLanguage, currentSurahId, from, uiLocale]);
 
   const loadWordSummary = useWordSummaryLoader(corpusClient, displayedSurahId, queryLanguage);
 

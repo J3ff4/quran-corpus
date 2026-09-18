@@ -36,7 +36,7 @@ import {
   setBookmarkNote,
   type Bookmark,
 } from '@/data/userRepository';
-import type { UiLocaleCode } from '@/i18n/languages';
+import type { QueryLanguageCode, UiLocaleCode } from '@/i18n/languages';
 import { textAlignFor } from '@/i18n/textDirection';
 import { pluralCategory } from '@/i18n/plural';
 import { t } from '@/i18n/uiStrings';
@@ -93,7 +93,7 @@ function keyOf(bookmark: Bookmark): string {
  */
 async function loadBookmarksData(
   userClient: MobileDataClient,
-  uiLocale: UiLocaleCode,
+  nameLang: QueryLanguageCode,
 ): Promise<BookmarksData> {
   const bookmarks = await getBookmarks(userClient);
   if (bookmarks.length === 0) {
@@ -105,7 +105,7 @@ async function loadBookmarksData(
   // Parallel: neither needs the other, and both are on the same bundled file.
   const [texts, surahs] = await Promise.all([
     getBookmarkAyahTexts(corpusClient, bookmarks),
-    getSurahList(corpusClient, uiLocale),
+    getSurahList(corpusClient, nameLang),
   ]);
 
   return {
@@ -116,7 +116,7 @@ async function loadBookmarksData(
 }
 
 export function BookmarksScreen() {
-  const { uiLocale } = useAppSettings();
+  const { uiLocale, nameLanguage } = useAppSettings();
   const theme = useThemeColors();
   const paddingBottom = useListBottomPadding();
   const [tab, setTab] = useState<BookmarkTab>('recent');
@@ -148,8 +148,8 @@ export function BookmarksScreen() {
   // so a locale change has to re-run the load rather than reuse names in the
   // language the reader just left.
   const load = useCallback(
-    (userClient: MobileDataClient) => loadBookmarksData(userClient, uiLocale),
-    [uiLocale],
+    (userClient: MobileDataClient) => loadBookmarksData(userClient, nameLanguage),
+    [nameLanguage],
   );
   const { data, loading, error, reload } = useUserDbOnFocus(
     load,

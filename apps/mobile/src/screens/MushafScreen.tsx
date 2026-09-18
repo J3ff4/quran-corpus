@@ -65,6 +65,7 @@ const NO_LINES: readonly MushafLine[] = [];
 export function MushafScreen() {
   const {
     uiLocale,
+    nameLanguage,
     queryLanguage,
     reciterId,
     setReciterId,
@@ -100,7 +101,7 @@ export function MushafScreen() {
   // inferred from where the user is.
   const [openMushafWord, setOpenMushafWord] = useState<MushafWord | null>(null);
   const bookmarkedKeys = useMemo(() => new Set(bookmarks.keys()), [bookmarks]);
-  const index = useMushafIndex(client, uiLocale);
+  const index = useMushafIndex(client, nameLanguage);
   const chromeVisible = useChromeVisible();
   // Gated on focus, not on `chromeVisible` alone. This is a TAB screen: it
   // stays mounted after the user leaves it, so a request made from here

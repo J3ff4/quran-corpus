@@ -22,7 +22,7 @@ import {
   type SurahListItem,
 } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
-import type { UiLocaleCode } from '@/i18n/languages';
+import type { QueryLanguageCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
 import { useThemeColors } from '@/theme/themeContext';
@@ -36,14 +36,14 @@ interface BrowseData {
   revealed: RevealedEntry[];
 }
 
-// Every loader takes the UI locale, though only the surah list has anything to
-// do with it: the two call sites below dispatch through this map by mode, and a
-// map whose members disagree on arity cannot be called generically.
+// Every loader takes the name language, though only the surah list has anything
+// to do with it: the two call sites below dispatch through this map by mode, and
+// a map whose members disagree on arity cannot be called generically.
 const LOADERS = {
-  surah: (client: MobileDataClient, uiLocale: UiLocaleCode) => getSurahList(client, uiLocale),
-  juz: (client: MobileDataClient, _uiLocale: UiLocaleCode) => getJuzIndex(client),
-  page: (client: MobileDataClient, _uiLocale: UiLocaleCode) => getPageIndex(client),
-  revealed: (client: MobileDataClient, _uiLocale: UiLocaleCode) => getRevealedIndex(client),
+  surah: (client: MobileDataClient, nameLang: QueryLanguageCode) => getSurahList(client, nameLang),
+  juz: (client: MobileDataClient, _nameLang: QueryLanguageCode) => getJuzIndex(client),
+  page: (client: MobileDataClient, _nameLang: QueryLanguageCode) => getPageIndex(client),
+  revealed: (client: MobileDataClient, _nameLang: QueryLanguageCode) => getRevealedIndex(client),
 } as const;
 
 /** Opens the reader at a real ayah, in every mode (decisions 18 and 20).
@@ -69,7 +69,7 @@ function openAyah(surahId: number, ayahNumber: number) {
  * (check 61).
  */
 export function SurahsScreen() {
-  const { uiLocale } = useAppSettings();
+  const { uiLocale, nameLanguage } = useAppSettings();
   const theme = useThemeColors();
   const [mode, setMode] = useState<BrowseMode>('surah');
   // A Set, not a single open juz: an accordion that shuts one juz to open
@@ -102,7 +102,7 @@ export function SurahsScreen() {
       try {
         const db = await openCorpusDb();
         const client = createExpoSqliteClient(db as ExpoSqliteLike);
-        const rows = await LOADERS[mode](client, uiLocale);
+        const rows = await LOADERS[mode](client, nameLanguage);
         if (!cancelled) setData((current) => ({ ...current, [mode]: rows }));
       } catch (cause) {
         // Logged, not shown: the driver's message is the only thing that says
@@ -117,7 +117,7 @@ export function SurahsScreen() {
     return () => {
       cancelled = true;
     };
-  }, [mode, loaded, uiLocale]);
+  }, [mode, loaded, uiLocale, nameLanguage]);
 
   // Always the latest, so the prefetch below can skip a mode that landed while
   // it was working without taking `data` as a dependency -- which would tear
@@ -152,7 +152,7 @@ export function SurahsScreen() {
         if (cancelled) return;
         if (dataRef.current[next] !== undefined) continue;
         try {
-          const rows = await LOADERS[next](client, uiLocale);
+          const rows = await LOADERS[next](client, nameLanguage);
           if (!cancelled) setData((current) => ({ ...current, [next]: rows }));
         } catch (cause) {
           console.error(`[browse] ${next} prefetch failed`, cause);
@@ -164,14 +164,16 @@ export function SurahsScreen() {
     return () => {
       cancelled = true;
     };
-  }, [loaded, uiLocale]);
+  }, [loaded, nameLanguage]);
 
   // Language change invalidates every cached mode: the subtitles are
   // localized, and keeping them would leave three of the four lists in the
-  // previous language until the tab is remounted.
+  // previous language until the tab is remounted. `nameLanguage` is in the
+  // deps for the script toggle, which moves the surah names without moving
+  // the UI locale (#85).
   useEffect(() => {
     setData({});
-  }, [uiLocale]);
+  }, [uiLocale, nameLanguage]);
 
   // Cleared here rather than in an effect keyed on `mode`: an
   // effect would also fire on the first render and on a language change, and
