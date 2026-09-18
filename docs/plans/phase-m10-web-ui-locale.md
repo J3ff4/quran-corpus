@@ -429,6 +429,36 @@ English-UI reader can never read the Cyrillic Uzbek translation — but the
 alternative (script dies with the Uzbek UI) is defensible. Shipped as the
 former; say the word to flip it.
 
+### Mobile smoke 2026-09-18 (Task 1's shims, on device)
+
+M10 defines no mobile checks, but Task 1 turned mobile's three i18n modules
+into re-export shims over `@quran-corpus/config/i18n/*`, and vitest resolves
+modules its own way — only Metro's graph proves the `exports` subpaths hold.
+Run on the OnePlus 7Pro through Expo Go, `expo start --clear`, over
+`adb reverse tcp:8081`.
+
+| What | Result |
+|---|---|
+| Bundle | PASS — `Android Bundled 13698ms … (2761 modules)`, no resolution error, clean log |
+| Tab labels through the shimmed `t` | PASS — Bosh sahifa / Suralar / Mushaf / Lug'at / Menyu under Uzbek |
+| Settings chrome | PASS — Til, Interfeys, Tarjima, Maxfiylik; About page localized too |
+| `scripts` through the shim | PASS — "Oʻzbek yozuvi" with Lotin / Кирилл appears only once the translation is Uzbek |
+| `contentLanguage` through the shim | PASS — Cyrillic gives "Раҳмон ва Раҳим бўлган Аллоҳ номи билан бошлайман." and WbW gloss Раҳмон |
+| Surah list names | PASS — Fotiha / Ochuvchi, Baqara / Sigir |
+
+Mobile suite on the branch: **1268 tests / 112 files green**, unchanged.
+Device settings were restored to English / English / Latin afterwards.
+
+Two pre-existing mobile gaps confirmed still open, neither caused by this
+branch (the shims are pure re-exports):
+
+- **Issue #83** — the reader header still reads `Al-Fatiha` / `The Opening`
+  even under the Uzbek UI, where the surah *list* correctly reads Fotiha.
+- **Surah names ignore the script toggle on mobile.** Under Uzbek + Cyrillic
+  the list still reads Fotiha where web now reads Фотиҳа. Mobile files the
+  script under Translation, so names are content and should follow it. Worth
+  its own issue alongside #83.
+
 ---
 
 ## Risks and rollback
