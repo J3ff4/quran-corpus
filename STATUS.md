@@ -7,9 +7,53 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-09-18
+Updated: 2026-09-19
 
 ## Now
+
+**2026-09-19 — the vc23 APK baseline ran.** First full pass on a release build
+since M6. Section results written per-check into the three phase plans.
+
+- **M9 on a real APK: 360, 361, 362, 363, 366, 367, 369 PASS; 368 passes in
+  Latin.** Cold start 967ms, expo-sqlite loads, no ANR. The two known 4:36 gloss
+  gaps render an English fallback with a visible `(en)` badge, not a blank.
+- **#88's surah-name fix holds on device: C1-C4 PASS.** All 114 names Cyrillic
+  under Кирилл, across browse / reader / WbW / bookmarks / mushaf. English UI
+  keeps `Al-Fatiha`, so names follow the UI locale as ruled. **C5 passes at the
+  a11y-tree level** — RadioButton, `N / 10`, `checked` on the active row, and no
+  contentDescription on the group (#51's declined half is intact).
+- **M8 344 PASS** — chrome survives a 5s scrub drag. The earlier
+  `SecurityException: INJECT_EVENTS` note was wrong: `input swipe` works fine on
+  this device; what had actually happened is the JS thread was wedged.
+- **348 is blocked because its premise does not exist:** the WbW screen docks
+  **no player surface at all** while a reader-owned track plays (verified with
+  audio live). That is more #87 evidence — the ruling has to say what WbW's own
+  resting control is, not just Home's and the mushaf's.
+- **Three defects found, filed as #89, #90 and #91:**
+  1. **28 of 114 surah *meanings*** fall back to English under Uzbek content,
+     unbadged (Тавба · "The Repentance"). Names are complete in both scripts;
+     only the meaning line is short, and WbW badges its fallback where this does
+     not. (#89)
+  2. **The bismillah gloss stays Latin under Кирилл** — "Mehribon va rahmli
+     Alloh nomi bilan" above Cyrillic verse translations, reader and mushaf. (#90)
+  3. **Settings segmented controls expose no a11y role or state** — Interface,
+     Translation, Uzbek script and Theme all dump
+     `selected=false checked=false checkable=false`. Selection is colour-only, so
+     TalkBack cannot say which is active. `SheetRow` already does it right. (#91)
+- **Also observed once:** after ~20h backgrounded, the app's JS was wedged — the
+  tab bar and every chrome button ignored taps while the mushaf's own tap handler
+  still toggled chrome. A force-stop cleared it. Single sighting, not reproduced.
+- **Answered in passing:** the Uzbek script toggle IS offered and works under an
+  English interface when the translation is Uzbek, so M10's open cookie question
+  matches shipped behaviour. Still the owner's to confirm as intent.
+
+**Still owed after the vc23 run.** The #87 ruling (blocks any fix); M8 345
+(motion judgment — no `ffmpeg`/`cv2` here and `screencap` cannot sample 280ms);
+M8a's three-button-navigation check (`settings put` denied, phone on gesture
+nav); 368's Cyrillic arm (`input text` rejects non-ASCII, `cmd clipboard` is
+unimplemented on this device, and `app/search.tsx` takes no query param, so it
+needs the owner's keyboard); C5's spoken TalkBack output; and the M10
+script-cookie question.
 
 **2026-09-18 — M8's device run landed, with four UI issues (PR #88, squash
 `bc66e81`).** Checks 340-352 on vc22, owed since the M8 and M8a merges:
@@ -102,14 +146,9 @@ glosses from Tasnim, both scripts.
   on the UI locale with Arabic always visible, mt rows deleted after an export,
   the Tasnim verse translation imported while we are here, and a stratified
   sample the owner reads before the live write.
-- **M9's nine owner-driven checks are still owed,** including the 368 re-run.
-
-**What is owed across M8-M10, in one place.** The #87 ruling; M8 checks 344
-(real finger), 345, 348; M8a's three-button-navigation check (this phone is on
-gesture nav and `adb shell settings put` is blocked); M9's nine; M10's mobile
-side beyond the Expo Go smoke; and the M10 script-cookie question above. **No
-full APK baseline has been run since M6** — everything since has been verified in
-Expo Go or on ad-hoc local debug-signed builds.
+- **M9's checks all passed** — the table in the plan was filled from Expo Go, and
+  368 was re-run and passed after `925b2c2`. What they were owed was a pass on a
+  release build; **that run happened 2026-09-19 on vc23** (see below).
 
 **No phase plan exists after M10.** `docs/plans/` ends at
 `phase-m10-web-ui-locale.md`. §6 says the plan comes before the code, so the next

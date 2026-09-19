@@ -482,3 +482,34 @@ branch (the shims are pure re-exports):
 - The `?lang=` translation picker stays as it is: which TRANSLATION you read is
   a separate choice from which language the UI is in, and R1 turned down
   collapsing the two.
+
+---
+
+## Mobile-side device run — vc23, 2026-09-19
+
+M10's own checks (380-390) are all web. The phase's mobile surface is the surah-name
+fix shipped in #88 (`bc66e81`), which had never run on a device. Five checks written
+for it, run on a release APK. OnePlus 7Pro / GM1917.
+
+| # | Check | Result |
+|---|-------|--------|
+| C1 | Browse list reads Фотиҳа, not Fotiha, under Кирилл | PASS — all 114 names Cyrillic, scrolled end to end (Фотиҳа → Нос) |
+| C2 | Same across reader, WbW, bookmarks and mushaf headers | PASS — reader "Бақара"/"Сигир", WbW "Нисо", bookmark card "Бақара 2:2", mushaf band "Бақара" |
+| C3 | UI English + content Uzbek keeps the English name | PASS — "Al-Fatiha · The Opening", i.e. names follow the UI locale, not the content language |
+| C4 | Arabic name visible in every combination | PASS — البقرة on the reader entry header; the mushaf page is Arabic throughout |
+| C5 | TalkBack announces "Al-Husary (Mujawwad), 3 / 10" and the radiogroup does not steal focus (#51) | PASS at tree level / speech OWED — every row is a `RadioButton` with `content-desc` "…, N / 10", `checked=true` on the active one, and the group node carries **no** contentDescription, which is the #51 fix. Confirming the spoken output needs TalkBack, and `settings put` is denied. |
+
+**Answers the phase's open question in practice:** the Uzbek script toggle *is*
+shown under an English interface when the translation language is Uzbek, and it
+works there. Shipped behaviour matches the "yes" that was chosen; no flip needed
+unless the owner wants one.
+
+### Accessibility defect found by this run (#91)
+
+The settings segmented controls — Interface, Translation, Uzbek script, Theme —
+expose **no role and no state** to the accessibility tree: every option dumps as
+`selected=false checked=false checkable=false` with only its label as
+`content-desc`. Selection is carried by colour and border alone. A TalkBack user
+can read the options but cannot tell which one is active. The reciter sheet does
+this correctly (`RadioButton` + `checked` + "N / 10"), so the pattern to copy is
+already in the codebase — `SheetRow`'s `role`/`selected`/`position` props.

@@ -613,3 +613,20 @@ screen drive the engine is another.
 (word sheet over a docked player), and the three-button-navigation check from
 M8a, which stays blocked because `adb shell settings put` is denied and this
 phone is on gesture nav.
+
+### Device run on the release APK — vc23, 2026-09-19
+
+First run of these checks on a real signed build (all earlier M8 evidence came
+from Expo Go). Device OnePlus 7Pro / GM1917, gesture nav, dark theme.
+
+| # | Result | Evidence |
+|---|--------|----------|
+| 344 | PASS | `input swipe 590 2885 → 950 2885` over 5000ms. Reader top chrome and the docked player both still on screen mid-drag and after release. The player's reset to `0:00 / --:--` after the drag is not a scrub defect: logcat shows the track reached `position=14448` of a 14.4s ayah and `abandonAudioFocus`, i.e. it ended normally with Continuous play off. |
+| 345 | OWED | Motion judgment. No `ffmpeg`/`cv2` in this container, and `screencap` is far too slow to sample a 280ms curve, so there is no way to substitute a measurement for the eye. |
+| 348 | BLOCKED — premise absent | The check assumes a docked mini-player under the word sheet. **The morphology/WbW screen docks no player surface at all.** Verified with audio confirmed live: `requestAudioFocus` at 02:27:12, screenshot at 02:27:1x, word sheet open, nothing behind it. The sheet renders clean either way, but the overlap this check exists to catch cannot occur until a bar is put there. |
+| M8a three-button nav | OWED | `adb shell settings put` is denied, the phone is on gesture nav, and it is also this session's display. |
+
+348's result is direct evidence for the open #87 question above: it is not only
+Home and the mushaf that handle a foreign track oddly — WbW renders no transport
+for one at all. Whichever shape the ruling takes, "each screen keeps its own
+resting control" has to say what WbW's is.

@@ -727,3 +727,35 @@ written before Task 2 Step 6 emits the residue — Task 3 owns generating them.
 Tasks 2, 3 and 5. `gloss_group` is `INTEGER` in SQL and `number | null` in TS
 throughout. `language_code` is `'uz'` / `'uz-Cyrl'` everywhere — no bare
 `'uzc'` or `'uz_cyrl'` spelling appears in any task.
+
+---
+
+## Device run on the release APK — vc23, 2026-09-19
+
+The plan's verification table was filled in from Expo Go, and 369 was read off
+logcat without taking the screen. This is the re-run the closing note owed, on a
+signed release build. OnePlus 7Pro / GM1917.
+
+| # | Result | Evidence |
+|---|--------|----------|
+| 360 | PASS | Glosses present throughout 2:2 and 4:36. Both known gap words render with a visible fallback badge rather than a blank: `وَٱبْنِ` → "and the" and `ٱلسَّبِيلِ` → "traveler", each carrying `(en)` with `contentDescription` "Gloss tili: English". |
+| 361 | PASS | 2:2 `لَا` + `رَيْبَ` occupy one card with two POS tags (NEG, N) above a single gloss "шубҳа йўқ". Confirmed in the a11y tree and on screen. |
+| 362 | PASS | Кирилл changes the alphabet only: glosses (ҳидоят / унда / китоб), surah names, meanings and verse translations switch script; POS tags, translator and layout unchanged. |
+| 363 | PASS | With Tarjima = English the whole "Oʻzbek yozuvi" row disappears; it returns when Tarjima goes back to O'zbek, including under an English interface. |
+| 366 | PASS | Root `قول`: TARJIMASI (деди · айтгин · дедилар …) first, then Hans Wehr, then Lane's Lexicon. |
+| 367 | PASS | About credits Tanzil, corpus.quran.com, QUL, Saheeh International, **Tasnim**, Abu Adel, Hans Wehr, Lane, KFGQPC, Newsreader. **Zero** occurrences of NLLB anywhere in the scrolled screen. |
+| 368 | PASS (Latin) / OWED (Cyrillic) | `boshlayman` returns exactly 1:1 and 40:29 in Tasnim Latin. The Cyrillic arm has no injection path: `adb shell input text` rejects non-ASCII, `cmd clipboard` is not implemented on this device ("No shell command implementation"), and `app/search.tsx` reads no query param, so no deep link can carry the term. Needs the owner's keyboard. |
+| 369 | PASS | `am start -W` cold start 967ms (a second run 1008ms). logcat shows expo-modules-core and `libexpo-sqlite.so` loading, `ReactNativeJS: Running "main"`, and no ANR, no FATAL, no red box. |
+
+### Defects found by this run
+
+1. (#89) **28 of 114 surah *meanings* fall back to English under Uzbek content, with
+   no badge.** Names are fully translated in both scripts — Фотиҳа through Нос,
+   all 114 — but the meaning line beside them reads "The Repentance", "The
+   Opening"… for 28 surahs, including ones where an Uzbek form plainly exists
+   (Тавба, Ҳуд, Нуҳ, Иброҳим, Юсуф, Марям, Юнус, Луқмон, Муҳаммад, Қурайш, Тоҳа,
+   Ёсин). WbW badges its English fallback `(en)`; this surface does not, so the
+   gap reads as a translation choice rather than missing data.
+2. (#90) **The bismillah gloss stays Latin under Кирилл.** "Mehribon va rahmli Alloh
+   nomi bilan" sits directly above Cyrillic verse translations, on both the
+   reader entry header and the mushaf page.
