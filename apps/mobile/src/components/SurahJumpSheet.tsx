@@ -75,41 +75,63 @@ export function SurahJumpSheet({
     fontSize: typography.body,
   });
 
+  // Above the field, not only inside it. Two bare boxes reading "1-114" and
+  // "1-286" do not say which is which, and the placeholder -- the only thing
+  // that ever did -- is gone the moment a digit is typed (owner, 2026-09-19).
+  //
+  // importantForAccessibility="no": each field already carries its name AND
+  // its range in `accessibilityLabel`, so an announced label here would say
+  // "Surah" twice before the range.
+  const label = (text: string) => (
+    <Text
+      importantForAccessibility="no"
+      style={{ color: theme.mutedText, fontSize: typography.caption, marginBottom: 6 }}
+    >
+      {text}
+    </Text>
+  );
+
   return (
     <BottomSheet onClose={onClose} closeLabel={t(uiLocale, 'word.close')}>
       <SheetHeader title={t(uiLocale, 'jump.surahTitle')} />
       <View style={{ flexDirection: 'row', gap: 10 }}>
-        <TextInput
-          testID="surah-jump-input"
-          value={surahRaw}
-          onChangeText={(next) => {
-            setSurahRaw(next);
-            setRejected(false);
-          }}
-          onSubmitEditing={submit}
-          keyboardType="number-pad"
-          // The range as the field's own label: a reader who cannot see the
-          // placeholder should not have to trip the error to learn it.
-          accessibilityLabel={`${t(uiLocale, 'jump.surah')} 1-${SURAH_MAX}`}
-          placeholder={`1-${SURAH_MAX}`}
-          placeholderTextColor={theme.mutedText}
-          style={[field(rejected), { flex: 1 }]}
-        />
-        <TextInput
-          testID="ayah-jump-input"
-          value={ayahRaw}
-          editable={ayahKnown}
-          onChangeText={(next) => {
-            setAyahRaw(next);
-            setRejected(false);
-          }}
-          onSubmitEditing={submit}
-          keyboardType="number-pad"
-          accessibilityLabel={ayahMax === null ? t(uiLocale, 'jump.ayah') : `${t(uiLocale, 'jump.ayah')} 1-${ayahMax}`}
-          placeholder={ayahMax === null ? '1' : `1-${ayahMax}`}
-          placeholderTextColor={theme.mutedText}
-          style={[field(rejected), { flex: 1, opacity: ayahKnown ? 1 : 0.5 }]}
-        />
+        <View style={{ flex: 1 }}>
+          {label(t(uiLocale, 'jump.surah'))}
+          <TextInput
+            testID="surah-jump-input"
+            value={surahRaw}
+            onChangeText={(next) => {
+              setSurahRaw(next);
+              setRejected(false);
+            }}
+            onSubmitEditing={submit}
+            keyboardType="number-pad"
+            // The range as the field's own label: a reader who cannot see the
+            // placeholder should not have to trip the error to learn it.
+            accessibilityLabel={`${t(uiLocale, 'jump.surah')} 1-${SURAH_MAX}`}
+            placeholder={`1-${SURAH_MAX}`}
+            placeholderTextColor={theme.mutedText}
+            style={field(rejected)}
+            />
+        </View>
+        <View style={{ flex: 1 }}>
+          {label(t(uiLocale, 'jump.ayah'))}
+          <TextInput
+            testID="ayah-jump-input"
+            value={ayahRaw}
+            editable={ayahKnown}
+            onChangeText={(next) => {
+              setAyahRaw(next);
+              setRejected(false);
+            }}
+            onSubmitEditing={submit}
+            keyboardType="number-pad"
+            accessibilityLabel={ayahMax === null ? t(uiLocale, 'jump.ayah') : `${t(uiLocale, 'jump.ayah')} 1-${ayahMax}`}
+            placeholder={ayahMax === null ? '1' : `1-${ayahMax}`}
+            placeholderTextColor={theme.mutedText}
+            style={[field(rejected), { opacity: ayahKnown ? 1 : 0.5 }]}
+            />
+        </View>
       </View>
       {rejected ? (
         <Text

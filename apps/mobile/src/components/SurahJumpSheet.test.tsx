@@ -131,6 +131,14 @@ describe('SurahJumpSheet', () => {
     expect((screen.getByTestId('ayah-jump-input') as HTMLInputElement).disabled).toBe(true);
   });
 
+  it('names both fields on screen, not only in the placeholder', () => {
+    // Two bare boxes reading "1-114" and "1-286" do not say which is which,
+    // and the placeholder is gone as soon as a digit is typed.
+    renderSheet();
+    expect(screen.getByText('Surah')).toBeTruthy();
+    expect(screen.getByText('Ayah')).toBeTruthy();
+  });
+
   it('still jumps by surah alone while the counts are missing', () => {
     const onJump = renderSheet({ ayahCountOf: () => null });
     type('surah-jump-input', '9');
