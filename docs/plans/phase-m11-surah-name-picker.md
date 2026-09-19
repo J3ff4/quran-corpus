@@ -250,6 +250,8 @@ underneath are untouched.
 | 387 | Surahs tab: filter narrows, switching to Juz clears it and shows the full juz list. |
 | 388 | Search `baqara`: the go-to row sits above the text results and both work. |
 | 389 | TalkBack: each picker row announces its translit, and the filter field is labelled. |
+| 390 | Picker: one tap on a row opens the surah while the keyboard is still up -- not two. Same on the Surahs tab with the filter typed in. (keyboardShouldPersistTaps; review finding 1.) |
+| 391 | Picker: the title sits one normal gap below the status bar, not a status bar's worth of dead space. Check with the clock visible, and in dark mode. (statusBarTranslucent; review finding 2 -- the Modal shim renders a Fragment, so no unit test can defend this.) |
 
 ## Verification log
 
