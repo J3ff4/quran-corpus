@@ -13,6 +13,16 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
  */
 export const SHADOW_ROOM = 16;
 
+/**
+ * Duration of the compact <-> full grow, for every player surface.
+ *
+ * One constant, not one per caller: two screens growing the same bar at two
+ * speeds is the drift this shell was extracted to stop. 180ms read as a snap
+ * and 280ms still did (owner, 2026-09-15 and 2026-09-19) -- the bar unfolds
+ * under the thumb that pressed play, and that unfolding is worth seeing.
+ */
+export const PLAYER_GROW_MS = 400;
+
 export interface PlayerShellProps {
   /** Which child is showing. The only thing that picks a height. */
   expanded: boolean;
@@ -56,8 +66,8 @@ export function PlayerShell({ expanded, compact, full, growMs, room = SHADOW_ROO
   // compact <-> full change and nothing else, so a new measurement of the
   // state already showing has to SNAP.
   //
-  // Without that, any re-layout of the resting bar played a 280ms curve to a
-  // height a pixel or two away -- which is the visible dip the owner caught
+  // Without that, any re-layout of the resting bar played the full grow curve
+  // to a height a pixel or two away -- which is the visible dip the owner caught
   // after picking a reciter on the mushaf (2026-09-15): the sheet closing
   // re-measures the bar underneath it, and the bar sagged and came back.
   const shown = useRef<boolean | null>(null);

@@ -3,7 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { GlassSurface } from '@/components/GlassSurface';
-import { PlayerShell, SHADOW_ROOM } from '@/components/PlayerShell';
+import { PlayerShell, PLAYER_GROW_MS, SHADOW_ROOM } from '@/components/PlayerShell';
 import { RecitationBar } from '@/components/RecitationBar';
 import { Icon } from '@/components/icons/Icon';
 import type { UiLocaleCode } from '@/i18n/languages';
@@ -17,11 +17,6 @@ import { useThemeColors } from '@/theme/themeContext';
 const CHROME_FADE_MS = 220;
 /** Far enough to clear the player, the tab pill under it and both insets. */
 const BAR_TRAVEL = 220;
-/** The grow. 180ms read as a snap rather than a motion on the device (owner,
- *  2026-09-15), so it is slower than the chrome fade now: the bar unfolds
- *  under the thumb that pressed play and that unfolding is worth seeing. */
-const GROW_MS = 280;
-
 export interface MushafPlayerProps {
   /** Sound is coming out. The ONLY thing that picks compact vs full. A bar
    *  keyed on `ayahNumber` instead would never shrink: the parked ayah
@@ -142,7 +137,7 @@ export function MushafPlayer({
     >
       <PlayerShell
         expanded={playing}
-        growMs={reducedMotion ? 0 : GROW_MS}
+        growMs={reducedMotion ? 0 : PLAYER_GROW_MS}
         full={
           <View testID="mushaf-player-full">
           <RecitationBar

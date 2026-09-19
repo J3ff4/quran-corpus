@@ -3,7 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { GlassSurface } from '@/components/GlassSurface';
 import { ReciterSheet } from '@/components/ReciterSheet';
-import { PlayerShell } from '@/components/PlayerShell';
+import { PlayerShell, PLAYER_GROW_MS } from '@/components/PlayerShell';
 import { RecitationBar } from '@/components/RecitationBar';
 import { Icon } from '@/components/icons/Icon';
 import { useRecitationController } from '@/audio/recitationContext';
@@ -15,9 +15,6 @@ import { reciterById } from '@quran-corpus/data/mobile';
 import { useAppSettings } from '@/settings/settingsStore';
 import { fonts, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
-
-/** Matches the mushaf's player, so one grow means one thing across the app. */
-const GROW_MS = 280;
 
 export interface HomePlayerCardProps {
   /** Where the reading stopped. Null on a fresh install, or once history has
@@ -140,7 +137,7 @@ export function HomePlayerCard({
       <PlayerShell
         room={0}
         expanded={sounding}
-        growMs={reducedMotion ? 0 : GROW_MS}
+        growMs={reducedMotion ? 0 : PLAYER_GROW_MS}
         full={
           <RecitationBar
             dock={false}
