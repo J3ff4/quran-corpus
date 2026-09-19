@@ -314,6 +314,12 @@ export function BrowseList({ items, sections }: BrowseListProps) {
         }}
         keyExtractor={(item) => item.key}
         stickySectionHeadersEnabled={false}
+        // A row under an open keyboard: RN's default swallows the first tap to
+        // dismiss it, so the surah picker -- whose filter field autofocuses --
+        // needed two taps to open anything. Search and the dictionary already
+        // set this; the list did not, because nothing had focused a keyboard
+        // over it before.
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={contentContainerStyle}
       />
     );
@@ -324,6 +330,9 @@ export function BrowseList({ items, sections }: BrowseListProps) {
       data={items ?? []}
       renderItem={({ item }) => <Row item={item} />}
       keyExtractor={(item) => item.key}
+      // See the section list above: without this the first tap under an open
+      // keyboard only dismisses the keyboard.
+      keyboardShouldPersistTaps="handled"
       contentContainerStyle={contentContainerStyle}
     />
   );

@@ -1,6 +1,7 @@
 import React from 'react';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { listPropsOf } from '@/testing/rnHosts';
 import { BrowseList, type BrowseItem } from './BrowseList';
 
 vi.mock('react-native', async () => (await import('@/testing/rnHosts.js')).reactNativeTextMock());
@@ -189,5 +190,24 @@ describe('BrowseList collapsible sections', () => {
     render(<BrowseList sections={[{ ...section, expanded: false, onToggle: vi.fn() }]} />);
 
     expect(screen.getByTestId('browse-section-Meccan').getAttribute('aria-expanded')).toBe('false');
+  });
+});
+
+describe('BrowseList under an open keyboard', () => {
+  // RN's default is `never`: the first tap on a row dismisses the keyboard and
+  // never reaches the row. Nothing focused a keyboard over this list until the
+  // surah picker put an autofocused filter above it -- and then every pick
+  // took two taps. Asserted on both list kinds because both are reachable
+  // from a filtered screen.
+  it('lets the first tap through on a flat list', () => {
+    const result = render(<BrowseList items={[item()]} />);
+    expect(listPropsOf(result)['keyboardShouldPersistTaps']).toBe('handled');
+  });
+
+  it('lets the first tap through on a sectioned list', () => {
+    const result = render(
+      <BrowseList sections={[{ title: 'Meccan', data: [item({ key: 'a' })] }]} />,
+    );
+    expect(listPropsOf(result)['keyboardShouldPersistTaps']).toBe('handled');
   });
 });

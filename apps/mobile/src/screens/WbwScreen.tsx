@@ -8,6 +8,7 @@ import { AdjacentNavButton } from '@/components/AdjacentNav';
 import { Icon } from '@/components/icons/Icon';
 import { SegmentedControl } from '@/components/SegmentedControl';
 import { SurahJumpSheet } from '@/components/SurahJumpSheet';
+import { SurahPicker } from '@/components/SurahPicker';
 import { VersePicker } from '@/components/VersePicker';
 import { WbwDense } from '@/components/WbwDense';
 import { WbwHybrid } from '@/components/WbwHybrid';
@@ -21,7 +22,7 @@ import {
 } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { setReaderPosition } from '@/data/readerPosition';
-import { useSurahAyahCounts } from '@/data/useSurahAyahCounts';
+import { useSurahIndex } from '@/data/useSurahIndex';
 import { useWordSummaryLoader } from '@/data/useWordSummaryLoader';
 import { t } from '@/i18n/uiStrings';
 import { useEntryPager, useHeldEntry } from '@/motion/entryPager';
@@ -89,15 +90,18 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
     setPage({ key: `${target}:${initialFrom}`, from: 1 });
   };
 
-  const [jumpOpen, setJumpOpen] = useState(false);
-  const ayahCountOf = useSurahAyahCounts();
+  // One state, not two booleans: two would let the jump sheet and the picker
+  // be open at once, which is the whole failure mode of a sheet that opens
+  // another sheet.
+  const [jumpView, setJumpView] = useState<'jump' | 'picker' | null>(null);
+  const { surahs, ayahCountOf } = useSurahIndex(nameLanguage);
   const pressStyle = usePressScaleStyle();
 
   // A jump can land in this surah or in another one, and the two are different
   // moves: within the surah it is a range change, across it is a page turn the
   // pager has to animate in the direction travelled.
   const jumpTo = (targetSurah: number, ayahNumber: number) => {
-    setJumpOpen(false);
+    setJumpView(null);
     if (currentSurahId !== null && targetSurah !== currentSurahId) {
       pager.goTo(String(targetSurah), targetSurah > currentSurahId ? 'next' : 'prev');
       // Not setSurah(): that one opens a surah at its beginning, and this one
@@ -283,7 +287,7 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
               // collapses its children, so the Text below -- heading role and
               // all -- is not announced and this label is the whole utterance.
               accessibilityLabel={`${view.surah.name_translit}, ${t(uiLocale, 'jump.surahTitle')}`}
-              onPress={() => setJumpOpen(true)}
+              onPress={() => setJumpView('jump')}
               style={(state) => [
                 pressStyle(state),
                 { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -384,13 +388,36 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
           router.push(`/root/${encodeURIComponent(rootBuckwalter)}`);
         }}
       />
-      {jumpOpen && currentSurahId !== null ? (
+      {jumpView === 'jump' && currentSurahId !== null ? (
         <SurahJumpSheet
           uiLocale={uiLocale}
           surahId={currentSurahId}
           ayahCountOf={ayahCountOf}
-          onClose={() => setJumpOpen(false)}
+          onClose={() => setJumpView(null)}
           onJump={jumpTo}
+          // No rows, no row: the picker has nothing to show until the index
+          // read lands.
+          onBrowse={surahs === null ? undefined : () => setJumpView('picker')}
+        />
+      ) : null}
+      {/* The same `currentSurahId` guard the sheet above carries, and for the
+          same reason: `jumpTo` only navigates on its cross-surah arm, so with
+          no surah to compare against a pick would quietly become a range
+          change instead of opening anything.
+
+          Unreachable today -- a null id sets `reader.invalidSurah` and the
+          error branch above returns before this tree renders at all -- so no
+          test asserts it; one would pass with the condition deleted. It is
+          here so the picker and the sheet state the same precondition, not as
+          a defence that has ever fired. */}
+      {jumpView === 'picker' && surahs !== null && currentSurahId !== null ? (
+        <SurahPicker
+          surahs={surahs}
+          uiLocale={uiLocale}
+          // Ruling R3: the name goes to the head of the surah. jumpTo closes
+          // both -- it is the same move the sheet's Go makes.
+          onPick={(surahId) => jumpTo(surahId, 1)}
+          onClose={() => setJumpView(null)}
         />
       ) : null}
     </View>

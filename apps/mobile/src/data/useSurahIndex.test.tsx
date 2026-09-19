@@ -15,10 +15,10 @@ vi.mock('./corpusRepository', () => ({
   getSurahList: (...args: unknown[]) => mocks.getSurahList(...args),
 }));
 
-import { useSurahAyahCounts } from './useSurahAyahCounts';
+import { useSurahIndex } from './useSurahIndex';
 
 function Probe({ surahId }: { surahId: number }) {
-  const ayahCountOf = useSurahAyahCounts();
+  const { ayahCountOf } = useSurahIndex();
   return <span data-testid="count">{String(ayahCountOf(surahId))}</span>;
 }
 
@@ -36,7 +36,47 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('useSurahAyahCounts', () => {
+describe('useSurahIndex', () => {
+  it('hands back the rows themselves, once the read lands', async () => {
+    function Rows() {
+      const { surahs } = useSurahIndex();
+      return <span data-testid="rows">{surahs === null ? 'null' : String(surahs.length)}</span>;
+    }
+    render(<Rows />);
+    expect(screen.getByTestId('rows').textContent).toBe('null');
+    await waitFor(() => expect(screen.getByTestId('rows').textContent).toBe('2'));
+  });
+
+  it('asks for the names in the language it was given', async () => {
+    function Rows() {
+      useSurahIndex('uz-Cyrl');
+      return null;
+    }
+    render(<Rows />);
+    await waitFor(() => expect(mocks.getSurahList).toHaveBeenCalled());
+    expect(mocks.getSurahList.mock.calls[0]?.[1]).toBe('uz-Cyrl');
+  });
+
+  it('drops the old language-s rows when a re-read fails', async () => {
+    // The rows carry their names IN a language. Left standing through a failed
+    // switch they show the previous script with nothing to say the switch did
+    // not take -- "wrong", where null is only "not known yet".
+    function Rows({ lang }: { lang: 'en' | 'uz-Cyrl' }) {
+      const { surahs } = useSurahIndex(lang);
+      return <span data-testid="rows">{surahs === null ? 'null' : String(surahs.length)}</span>;
+    }
+    const { rerender } = render(<Rows lang="en" />);
+    await waitFor(() => expect(screen.getByTestId('rows').textContent).toBe('2'));
+
+    mocks.getSurahList.mockRejectedValue(new Error('no such column: name_uz'));
+    rerender(<Rows lang="uz-Cyrl" />);
+
+    await waitFor(() => expect(console.error).toHaveBeenCalled());
+    expect(screen.getByTestId('rows').textContent).toBe('null');
+  });
+});
+
+describe('useSurahIndex, projected to ayah counts', () => {
   it('answers null until the read lands, then the surah-s own count', async () => {
     render(<Probe surahId={2} />);
     expect(screen.getByTestId('count').textContent).toBe('null');

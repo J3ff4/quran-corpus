@@ -21,6 +21,10 @@ export type UiStringKey =
   | 'jump.ayah'
   | 'jump.go'
   | 'jump.outOfRange'
+  | 'jump.browse'
+  | 'surahPicker.title'
+  | 'surahPicker.filter'
+  | 'surahPicker.empty'
   | 'tabs.settings'
   | 'tabs.dictionary'
   | 'tabs.menu'
@@ -307,6 +311,10 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'jump.ayah': 'Ayah',
     'jump.go': 'Go',
     'jump.outOfRange': 'No such surah or ayah',
+    'jump.browse': 'Find a surah by name',
+    'surahPicker.title': 'Surahs',
+    'surahPicker.filter': 'Name or meaning',
+    'surahPicker.empty': 'No surah by that name',
     'tabs.surahs': 'Surahs',
     'tabs.bookmarks': 'Bookmarks',
     'tabs.mushaf': 'Mushaf',
@@ -538,6 +546,10 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'jump.ayah': 'Oyat',
     'jump.go': 'Oʻtish',
     'jump.outOfRange': 'Bunday sura yoki oyat yoʻq',
+    'jump.browse': 'Surani nomi boʻyicha topish',
+    'surahPicker.title': 'Suralar',
+    'surahPicker.filter': 'Nomi yoki maʼnosi',
+    'surahPicker.empty': 'Bunday nomli sura yoʻq',
     'tabs.surahs': 'Suralar',
     'tabs.bookmarks': 'Xatcho‘plar',
     'tabs.mushaf': 'Mushaf',
@@ -764,6 +776,10 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'jump.ayah': 'Аят',
     'jump.go': 'Перейти',
     'jump.outOfRange': 'Такой суры или аята нет',
+    'jump.browse': 'Найти суру по названию',
+    'surahPicker.title': 'Суры',
+    'surahPicker.filter': 'Название или смысл',
+    'surahPicker.empty': 'Суры с таким названием нет',
     'tabs.surahs': 'Суры',
     'tabs.bookmarks': 'Закладки',
     'tabs.mushaf': 'Мусхаф',

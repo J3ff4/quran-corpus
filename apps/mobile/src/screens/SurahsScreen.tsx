@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, Text, TextInput, View } from 'react-native';
 import {
   createExpoSqliteClient,
   type ExpoSqliteLike,
@@ -11,6 +11,7 @@ import { surahNameGlyph } from '@quran-corpus/config/ornaments/surahName';
 import { BrowseList, type BrowseItem, type BrowseSection } from '@/components/BrowseList';
 import { SegmentedControl } from '@/components/SegmentedControl';
 import { SurahList } from '@/components/SurahList';
+import { matchSurahs } from '@/surah/matchSurah';
 import {
   getJuzIndex,
   getPageIndex,
@@ -25,6 +26,7 @@ import { openCorpusDb } from '@/data/openCorpusDb';
 import type { QueryLanguageCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
+import { radii, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
 type BrowseMode = 'surah' | 'juz' | 'page' | 'revealed';
@@ -72,6 +74,9 @@ export function SurahsScreen() {
   const { uiLocale, nameLanguage } = useAppSettings();
   const theme = useThemeColors();
   const [mode, setMode] = useState<BrowseMode>('surah');
+  // Surah mode only. The other three browse by a number that IS the row's
+  // label, so there is nothing to type at them.
+  const [query, setQuery] = useState('');
   // A Set, not a single open juz: an accordion that shuts one juz to open
   // another hides a range the reader was comparing against. D44 keeps this in
   // component state and nowhere else -- leaving the mode resets it, and nothing
@@ -182,6 +187,10 @@ export function SurahsScreen() {
   const onChangeMode = useCallback((next: BrowseMode) => {
     setOpenJuz(new Set());
     setCollapsedEras(new Set());
+    // Cleared with the mode: a filter left behind would hide most of the list
+    // the user has just come back to, with the field that explains why gone
+    // from the screen.
+    setQuery('');
     setMode(next);
   }, []);
 
@@ -312,6 +321,13 @@ export function SurahsScreen() {
     [uiLocale],
   );
 
+  // 114 rows filtered in memory, per keystroke. A debounce would only make
+  // the list lag behind the field it is filtered by.
+  const filteredSurahs = useMemo(
+    () => matchSurahs(data.surah ?? [], query),
+    [data.surah, query],
+  );
+
   return (
     <View style={{ flex: 1 }}>
       <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
@@ -321,6 +337,26 @@ export function SurahsScreen() {
           onChange={onChangeMode}
           accessibilityLabel={t(uiLocale, 'browse.mode')}
         />
+        {mode === 'surah' ? (
+          <TextInput
+            testID="surah-filter"
+            value={query}
+            onChangeText={setQuery}
+            accessibilityLabel={t(uiLocale, 'surahPicker.filter')}
+            placeholder={t(uiLocale, 'surahPicker.filter')}
+            placeholderTextColor={theme.mutedText}
+            style={{
+              marginTop: 10,
+              minHeight: touchTargets.minimum,
+              borderRadius: radii.chip,
+              borderWidth: 1,
+              borderColor: theme.border,
+              paddingHorizontal: 14,
+              color: theme.text,
+              fontSize: typography.body,
+            }}
+          />
+        ) : null}
       </View>
       {error ? (
         <View style={{ flex: 1, justifyContent: 'center', padding: 20 }}>
@@ -335,7 +371,19 @@ export function SurahsScreen() {
           <ActivityIndicator />
         </View>
       ) : mode === 'surah' ? (
-        <SurahList surahs={data.surah ?? []} uiLocale={uiLocale} onOpenSurah={openSurah} />
+        filteredSurahs.length === 0 && query.trim().length > 0 ? (
+          <Text
+            testID="surah-filter-empty"
+            // Announced: it replaces a list that was there a keystroke ago,
+            // and silence reads as a frozen screen.
+            accessibilityLiveRegion="polite"
+            style={{ color: theme.mutedText, paddingHorizontal: 20, paddingTop: 24 }}
+          >
+            {t(uiLocale, 'surahPicker.empty')}
+          </Text>
+        ) : (
+          <SurahList surahs={filteredSurahs} uiLocale={uiLocale} onOpenSurah={openSurah} />
+        )
       ) : mode === 'revealed' ? (
         <BrowseList sections={revealedSections} />
       ) : (

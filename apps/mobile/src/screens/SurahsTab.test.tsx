@@ -59,6 +59,13 @@ vi.mock('react-native', async () => {
   return {
     ...rn,
     ActivityIndicator: () => React.createElement('span', null, 'loading'),
+    TextInput: ({ value, onChangeText, testID }: Record<string, unknown>) =>
+      React.createElement('input', {
+        'data-testid': testID,
+        value: value as string,
+        onChange: (event: { target: { value: string } }) =>
+          (onChangeText as (next: string) => void)(event.target.value),
+      }),
   };
 });
 
@@ -103,6 +110,14 @@ const alBaqara = {
   nameArabic: 'البقرة',
   nameTranslit: 'Al-Baqara',
 };
+
+const alBaqarahRow = {
+  id: 2,
+  nameArabic: 'البقرة',
+  nameTranslit: 'Al-Baqarah',
+  nameTranslation: 'The Cow',
+  ayahCount: 286,
+} satisfies SurahListItem;
 
 describe('SurahsTab', () => {
   beforeEach(() => {
@@ -495,5 +510,55 @@ describe('SurahsTab', () => {
     // with nothing left that could clear it.
     expect(await screen.findByText('Al-Fatihah')).toBeTruthy();
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('filters the surah list by name, and only in surah mode', async () => {
+    mocks.getSurahList.mockResolvedValue([alFatihah, alBaqarahRow]);
+    render(<SurahsTab />);
+    await screen.findByText('Al-Fatihah');
+
+    fireEvent.change(screen.getByTestId('surah-filter'), { target: { value: 'baqara' } });
+    expect(screen.getByText('Al-Baqarah')).toBeTruthy();
+    expect(screen.queryByText('Al-Fatihah')).toBeNull();
+
+    // The other three modes browse by a number that IS the row's label, so
+    // there is nothing to type at them.
+    fireEvent.click(screen.getByText('Juz'));
+    expect(screen.queryByTestId('surah-filter')).toBeNull();
+  });
+
+  it('clears the filter when the mode changes', async () => {
+    mocks.getSurahList.mockResolvedValue([alFatihah, alBaqarahRow]);
+    render(<SurahsTab />);
+    await screen.findByText('Al-Fatihah');
+    fireEvent.change(screen.getByTestId('surah-filter'), { target: { value: 'baqara' } });
+
+    fireEvent.click(screen.getByText('Juz'));
+    fireEvent.click(screen.getByText('Surah'));
+
+    // Back to the whole list, not to the filtered one with the field that
+    // explained it gone from the screen.
+    await screen.findByText('Al-Fatihah');
+    expect((screen.getByTestId('surah-filter') as HTMLInputElement).value).toBe('');
+  });
+
+  it('says so when no surah matches, rather than going blank', async () => {
+    mocks.getSurahList.mockResolvedValue([alFatihah]);
+    render(<SurahsTab />);
+    await screen.findByText('Al-Fatihah');
+
+    fireEvent.change(screen.getByTestId('surah-filter'), { target: { value: 'zzzz' } });
+
+    expect(screen.getByTestId('surah-filter-empty')).toBeTruthy();
+  });
+
+  it('does not blame the reader for an index that came back empty', async () => {
+    // No error, no rows, and nothing typed: "No surah by that name" would be
+    // telling them their name search failed when they never ran one.
+    mocks.getSurahList.mockResolvedValue([]);
+    render(<SurahsTab />);
+    await waitFor(() => expect(screen.getByTestId('surah-filter')).toBeTruthy());
+
+    expect(screen.queryByTestId('surah-filter-empty')).toBeNull();
   });
 });

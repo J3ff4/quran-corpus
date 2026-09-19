@@ -66,6 +66,22 @@ vi.mock('@/data/corpusRepository', async (importOriginal) => {
   };
 });
 
+// Captured the same way, and for the same reason: a full-screen Modal over a
+// FlatList of 114. SurahPicker.test.tsx covers the list; what matters here is
+// that the screen shows it INSTEAD of the jump sheet and lands a pick on the
+// head of the surah.
+vi.mock('@/components/SurahPicker', async () => {
+  const React = await import('react');
+  return {
+    SurahPicker: ({ onPick }: { onPick: (surahId: number) => void }) =>
+      React.createElement(
+        'button',
+        { 'data-testid': 'surah-picker', onClick: () => onPick(36) },
+        'pick',
+      ),
+  };
+});
+
 // Mocked for the reason WordSheet is: the real sheet reaches reanimated and
 // gesture-handler through BottomSheet, neither of which parses under this
 // transform. SurahJumpSheet.test.tsx covers its parsing and its rejections;
@@ -77,9 +93,11 @@ vi.mock('@/components/SurahJumpSheet', async () => {
     SurahJumpSheet: ({
       surahId,
       onJump,
+      onBrowse,
     }: {
       surahId: number;
       onJump: (surahId: number, ayahNumber: number) => void;
+      onBrowse?: () => void;
     }) => {
       const [surah, setSurah] = React.useState(String(surahId));
       const [ayah, setAyah] = React.useState('1');
@@ -101,6 +119,13 @@ vi.mock('@/components/SurahJumpSheet', async () => {
           { 'data-testid': 'surah-jump-go', onClick: () => onJump(Number(surah), Number(ayah)) },
           'go',
         ),
+        onBrowse
+          ? React.createElement(
+              'button',
+              { 'data-testid': 'surah-jump-browse', onClick: onBrowse },
+              'browse',
+            )
+          : null,
       );
     },
   };
@@ -583,5 +608,21 @@ describe('word-by-word route', () => {
     expect(screen.getByTestId('wbw-surah-jump').getAttribute('aria-label')).toBe(
       'Al-Baqarah, Go to surah',
     );
+  });
+
+  it('swaps the jump sheet for the picker, and lands a pick on ayah 1', async () => {
+    // Ruling R3, and the sheet-over-sheet risk: one state, so the jump sheet
+    // is gone while the picker is up and both are gone after a pick.
+    render(<WbwRoute />);
+    await screen.findAllByTestId('wbw-cell');
+    fireEvent.click(screen.getByTestId('wbw-surah-jump'));
+    fireEvent.click(screen.getByTestId('surah-jump-browse'));
+
+    expect(screen.queryByTestId('surah-jump-input')).toBeNull();
+    fireEvent.click(screen.getByTestId('surah-picker'));
+
+    await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenCalledWith({}, 36, 1, 'uz-Cyrl'));
+    expect(screen.queryByTestId('surah-picker')).toBeNull();
+    expect(screen.queryByTestId('surah-jump-input')).toBeNull();
   });
 });

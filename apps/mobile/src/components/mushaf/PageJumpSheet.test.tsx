@@ -32,10 +32,10 @@ import { themeColors } from '@/theme/tokens';
 
 import { PageJumpSheet, parseJumpTarget } from './PageJumpSheet';
 
-function renderSheet(onJump = vi.fn()) {
+function renderSheet(onJump = vi.fn(), onBrowse?: () => void) {
   render(
     <ThemeContext.Provider value={themeColors.light}>
-      <PageJumpSheet uiLocale="en" onClose={vi.fn()} onJump={onJump} />
+      <PageJumpSheet uiLocale="en" onClose={vi.fn()} onJump={onJump} onBrowse={onBrowse} />
     </ThemeContext.Provider>,
   );
   return onJump;
@@ -95,6 +95,30 @@ describe('PageJumpSheet', () => {
     fireEvent.click(screen.getByText('Surah'));
     fireEvent.click(screen.getByTestId('jump-go'));
 
+    expect(onJump).not.toHaveBeenCalled();
+  });
+
+  it('offers the browse row only when a caller can open the picker', () => {
+    renderSheet();
+    expect(screen.queryByTestId('jump-browse')).toBeNull();
+
+    const onBrowse = vi.fn();
+    cleanup();
+    renderSheet(vi.fn(), onBrowse);
+    fireEvent.click(screen.getByTestId('jump-browse'));
+    expect(onBrowse).toHaveBeenCalled();
+  });
+
+  it('keeps the browse row in every kind, and it never submits the field', () => {
+    // The row sets the surah and jumps by it, so hiding it on `page` would
+    // mean switching segment to reach a control that does not care.
+    const onJump = vi.fn();
+    const onBrowse = vi.fn();
+    renderSheet(onJump, onBrowse);
+    expect(screen.getByTestId('jump-browse')).toBeTruthy();
+    fireEvent.click(screen.getByText('Juz'));
+    expect(screen.getByTestId('jump-browse')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('jump-browse'));
     expect(onJump).not.toHaveBeenCalled();
   });
 });
