@@ -37,7 +37,9 @@ import { themeColors } from '@/theme/tokens';
 
 import { SurahJumpSheet, parseSurahJump } from './SurahJumpSheet';
 
-function renderSheet(options: { ayahCountOf?: (surahId: number) => number | null } = {}) {
+function renderSheet(
+  options: { ayahCountOf?: (surahId: number) => number | null; onBrowse?: () => void } = {},
+) {
   const onJump = vi.fn();
   render(
     <ThemeContext.Provider value={themeColors.light}>
@@ -47,6 +49,7 @@ function renderSheet(options: { ayahCountOf?: (surahId: number) => number | null
         ayahCountOf={options.ayahCountOf ?? (() => 7)}
         onClose={vi.fn()}
         onJump={onJump}
+        onBrowse={options.onBrowse}
       />
     </ThemeContext.Provider>,
   );
@@ -129,6 +132,17 @@ describe('SurahJumpSheet', () => {
     // would reject every real ayah for as long as the read takes.
     renderSheet({ ayahCountOf: () => null });
     expect((screen.getByTestId('ayah-jump-input') as HTMLInputElement).disabled).toBe(true);
+  });
+
+  it('offers the browse row only when a caller can open the picker', () => {
+    renderSheet();
+    expect(screen.queryByTestId('surah-jump-browse')).toBeNull();
+
+    const onBrowse = vi.fn();
+    cleanup();
+    renderSheet({ onBrowse });
+    fireEvent.click(screen.getByTestId('surah-jump-browse'));
+    expect(onBrowse).toHaveBeenCalled();
   });
 
   it('names both fields on screen, not only in the placeholder', () => {
