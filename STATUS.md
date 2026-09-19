@@ -47,15 +47,19 @@ since M6. Section results written per-check into the three phase plans.
   English interface when the translation is Uzbek, so M10's open cookie question
   matches shipped behaviour. Still the owner's to confirm as intent.
 
-**Still owed after the vc23 run** (2026-09-19, narrowed by the owner). The #87
-ruling, which blocks any fix and now has a third screen's evidence behind it:
-WbW docks no player surface at all. M8 345 — the owner watched it and 280ms
+**Still owed after the vc23 run** (2026-09-19, narrowed by the owner). M8 345 — the owner watched it and 280ms
 still reads as a snap, so `PLAYER_GROW_MS` went to 400ms (`b2fec38`) and the
 check re-runs on the next build. M8a's three-button-navigation check, which the
 owner is running by hand (`settings put` is denied to adb). C5's spoken TalkBack
 output. And the M10 script-cookie question. **368 is closed** — the owner typed
 `бошлайман` on the device keyboard and the Cyrillic arm returns its ayahs, so
-both arms pass.
+both arms pass. **#87 is closed as intended behaviour** — the owner ruled the
+player surface stays global: a foreign track grows Home's card and puts a
+transport on the mushaf on purpose, and the mushaf's X (`onDismiss={audio.stop}`)
+or Home's Pause returns the screen to its own start control in one tap. Checks
+349 and 352 asserted the opposite shape and are retired; 348 stays owed but is
+unreachable by design, since WbW is a pushed screen and never sees `MiniPlayer`.
+No code changed.
 
 **2026-09-18 — M8's device run landed, with four UI issues (PR #88, squash
 `bc66e81`).** Checks 340-352 on vc22, owed since the M8 and M8a merges:

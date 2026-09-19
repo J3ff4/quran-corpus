@@ -532,10 +532,10 @@ export function MiniPlayer({ bottomOffset }: { bottomOffset: number }) {
 | 346 | Start the reader playing, walk to Surahs: mini-player is docked above the tab pill and still sounding |  PASS — reader playing, walked to Surahs: mini-player docked above the tab bar reading **Al-Baqara · 17 / Abu Bakr Al-Shatri / 0:05 / -0:16**, with prev/pause/next and an X, still sounding (piid active at that sample). |
 | 347 | Mini-player X: audio stops, bar goes, nothing resumes |  PASS — X cut the ayah at ~7s of 22s and the bar left; **26 further seconds sampled silent**, nothing resumed. |
 | 348 | Open a word sheet while the mini-player is up: the sheet covers it, nothing overlaps |  NOT RUN — could not open a word sheet through adb taps on the mushaf (taps toggled chrome instead), and the Morphology screen is pushed, so no player docks there. Owner-owed. |
-| 349 | Start the mushaf page playing, walk to Home: **no** mini-player; Home's card is compact (reader-owned rule) |  **FAIL** — mushaf page playing, walked to Home: Home shows a **full grown transport** for the mushaf-owned track (`Al-Baqara · 20`, scrub 0:26 / -0:05, pause, prev/next). The check requires no mini-player and a compact card. Reproduced twice. |
+| 349 | ~~Start the mushaf page playing, walk to Home: **no** mini-player; Home's card is compact (reader-owned rule)~~ RETIRED — asserts shape A, which the 2026-09-19 ruling rejected |  **FAIL, and intended** — mushaf page playing, walked to Home: Home shows a **full grown transport** for the mushaf-owned track (`Al-Baqara · 20`, scrub 0:26 / -0:05, pause, prev/next). The check requires no mini-player and a compact card. Reproduced twice. |
 | 350 | Home card play: starts the last-read ayah and **runs on** into the next with Continuous OFF in Settings |  PASS — `toggle-continuous` read `checked="false"`, then one tap on the compact Home card played **four consecutive ayahs** (19s/8s/25s/12s = 2:17→2:20) with no further input. |
 | 351 | Home card grows in place while sounding; no second transport anywhere on Home |  PASS — exactly one transport on Home while sounding; the card grows in place and no mini-player docks alongside it. |
-| 352 | Start the reader, then start the mushaf: the reader's sound stops. One voice at a time |  **FAIL (unreachable)** — with the reader sounding, the mushaf tab replaces its **"Play this page" resting line with the reader's transport**, so the page has no start control at all. Four attempts, the tap never started anything and the reader ran to its natural end. The one-voice invariant itself never broke: **no run ever sampled two concurrent piids**. |
+| 352 | ~~Start the reader, then start the mushaf: the reader's sound stops. One voice at a time~~ RETIRED — the mushaf is started with X then Play per the 2026-09-19 ruling |  **FAIL (unreachable), and intended** — with the reader sounding, the mushaf tab replaces its **"Play this page" resting line with the reader's transport**, so the page has no start control at all. Four attempts, the tap never started anything and the reader ran to its natural end. The one-voice invariant itself never broke: **no run ever sampled two concurrent piids**. |
 
 ---
 
@@ -626,7 +626,42 @@ from Expo Go). Device OnePlus 7Pro / GM1917, gesture nav, dark theme.
 | 348 | BLOCKED — premise absent | The check assumes a docked mini-player under the word sheet. **The morphology/WbW screen docks no player surface at all.** Verified with audio confirmed live: `requestAudioFocus` at 02:27:12, screenshot at 02:27:1x, word sheet open, nothing behind it. The sheet renders clean either way, but the overlap this check exists to catch cannot occur until a bar is put there. |
 | M8a three-button nav | OWED | `adb shell settings put` is denied, the phone is on gesture nav, and it is also this session's display. |
 
-348's result is direct evidence for the open #87 question above: it is not only
-Home and the mushaf that handle a foreign track oddly — WbW renders no transport
-for one at all. Whichever shape the ruling takes, "each screen keeps its own
-resting control" has to say what WbW's is.
+## Ruling on #87 — owner, 2026-09-19: shape B, and it already ships
+
+**The surface is global and stays global.** A screen shows a transport for
+whatever is sounding, whoever started it. Checks 349 and 352 were written
+against shape A and are **wrong about the intended behaviour, not evidence of a
+defect** — the owner asked for exactly what the device does:
+
+> "i specifically wanted that way. started to playing in other screen, mushaf
+> shows pause button, thats fine. thats exactly what i wanted. if user wants to
+> play that page, presses x for currently playing and again clicks play. it
+> plays the page."
+
+The escape the ruling names is the transport's own **X**, and both screens
+already have it wired:
+
+- **Mushaf** (`MushafScreen.tsx:600`) passes `onDismiss={audio.stop}`, so X ends
+  the foreign track, `playing` goes false, `PlayerShell` shrinks back to the
+  "Play this page" resting line, and the next tap plays the page. The path 352
+  called "no start control at all" is two taps, by design.
+- **Home** needs no X of its own. `HomePlayerCard`'s `sounding` is
+  `playing || (!resume && track !== null)`, so pausing a foreign track already
+  collapses the card back to Continue reading — and its `start` stops a foreign
+  track before starting Home's own (`HomePlayerCard.tsx:92-99`). Same two-tap
+  shape, reached by Pause instead of X.
+
+**No code change.** #87 closed as intended behaviour.
+
+### What this means for 349, 352 and 348
+
+- **349 and 352 are retired**, not deferred. Both assert shape A. Their
+  replacements assert the ruling: a foreign track *should* grow Home's card and
+  *should* put a transport on the mushaf, and X (mushaf) or Pause (Home) *must*
+  return the screen to its own start control in one tap.
+- **348 stands as written and stays owed.** WbW is a pushed stack screen, so it
+  draws above `(tabs)/_layout` and never sees `MiniPlayer` — ruling 6, and the
+  ruling above does not disturb it: a detail screen you reached by pushing has
+  Back as its way out to the transport. The check's premise is absent by
+  design, which makes the overlap it guards against unreachable. Re-run it only
+  if a player is ever docked on a pushed screen.
