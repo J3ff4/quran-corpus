@@ -133,6 +133,17 @@ describe('matchSurahs, ranking and edges', () => {
     expect(ids('   ')).toEqual([1, 2, 10, 24, 36, 71, 112]);
   });
 
+  it('ignores a bare `the` on the way to `The Cow`', () => {
+    // Three characters clears the meaning floor, and `the` opens the English
+    // meaning of some eighty surahs -- so without the stopword the list went
+    // to almost-everything, id-ordered, at exactly the keystroke before the
+    // reader typed the word that means something.
+    expect(ids('the')).toEqual([]);
+    // And the floor still lets a real three-letter meaning through.
+    expect(ids('cow')).toEqual([2]);
+    expect(ids('the cow')).toEqual([2]);
+  });
+
   it('returns nothing rather than everything for a miss', () => {
     expect(ids('zzzz')).toEqual([]);
   });

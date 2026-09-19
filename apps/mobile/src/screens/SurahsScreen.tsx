@@ -371,7 +371,7 @@ export function SurahsScreen() {
           <ActivityIndicator />
         </View>
       ) : mode === 'surah' ? (
-        filteredSurahs.length === 0 ? (
+        filteredSurahs.length === 0 && query.trim().length > 0 ? (
           <Text
             testID="surah-filter-empty"
             // Announced: it replaces a list that was there a keystroke ago,

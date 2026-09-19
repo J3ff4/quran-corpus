@@ -400,7 +400,17 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
           onBrowse={surahs === null ? undefined : () => setJumpView('picker')}
         />
       ) : null}
-      {jumpView === 'picker' && surahs !== null ? (
+      {/* The same `currentSurahId` guard the sheet above carries, and for the
+          same reason: `jumpTo` only navigates on its cross-surah arm, so with
+          no surah to compare against a pick would quietly become a range
+          change instead of opening anything.
+
+          Unreachable today -- a null id sets `reader.invalidSurah` and the
+          error branch above returns before this tree renders at all -- so no
+          test asserts it; one would pass with the condition deleted. It is
+          here so the picker and the sheet state the same precondition, not as
+          a defence that has ever fired. */}
+      {jumpView === 'picker' && surahs !== null && currentSurahId !== null ? (
         <SurahPicker
           surahs={surahs}
           uiLocale={uiLocale}

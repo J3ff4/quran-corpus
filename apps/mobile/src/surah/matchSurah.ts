@@ -45,10 +45,17 @@ export function foldArabicName(raw: string): string {
   return folded.startsWith('ال') && folded.length > 3 ? folded.slice(2) : folded;
 }
 
-/** Below this, a meaning match is noise: `the`, `man`, `day` prefix a dozen
- *  surahs and would bury the name the user actually typed. The same 3-char
- *  floor the dictionary's meaning arm settled on (#31). */
+/** Below this, a meaning match is noise: `man`, `day` prefix a dozen surahs
+ *  and would bury the name the user actually typed. The same 3-char floor the
+ *  dictionary's meaning arm settled on (#31). */
 const MEANING_MIN = 3;
+
+/** Fragments the floor cannot catch, because they clear it and still say
+ *  nothing: `the` is three characters and opens the English meaning of some
+ *  eighty surahs -- and it is a state every reader passes through on the way
+ *  to typing `The Cow`. `surahTranslationKeys` already strips it as an
+ *  article; this is the same word arriving alone. */
+const MEANING_STOPWORDS = new Set(['the']);
 
 /** Lower sorts first. A name hit always outranks a meaning hit -- the name is
  *  what was asked for, the meaning is a convenience. */
@@ -87,7 +94,7 @@ function rankOf(item: SurahListItem, query: QueryKeys): number {
     return RANK.arabic;
   }
 
-  if (query.englishFragment.length >= MEANING_MIN) {
+  if (query.englishFragment.length >= MEANING_MIN && !MEANING_STOPWORDS.has(query.englishFragment)) {
     const meaning = surahTranslationKeys(item.nameTranslation)[0] ?? '';
     if (meaning.includes(query.englishFragment)) return RANK.meaning;
   }

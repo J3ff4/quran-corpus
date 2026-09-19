@@ -598,23 +598,27 @@ export function FlatList(props: ListHostProps) {
   );
 }
 
-export function SectionList({
-  sections,
-  renderItem,
-  renderSectionHeader,
-  keyExtractor,
-  testID,
-}: {
-  sections?: readonly { title: string; data: readonly unknown[] }[];
-  renderItem: (info: { item: unknown; index: number }) => React.ReactNode;
-  renderSectionHeader?: (info: { section: { title: string; data: readonly unknown[] } }) => React.ReactNode;
-  keyExtractor?: (item: unknown, index: number) => string;
-  /** See FlatList above. */
-  testID?: string;
-}) {
+export function SectionList(
+  props: ListHostProps & {
+    sections?: readonly { title: string; data: readonly unknown[] }[];
+    renderSectionHeader?: (info: { section: { title: string; data: readonly unknown[] } }) => React.ReactNode;
+  },
+) {
+  const { sections, renderItem, renderSectionHeader, keyExtractor, testID } = props;
+  // The whole bag, and the marker `listPropsOf` reads it back through -- same
+  // reason FlatList keeps it. Destructuring only what this mock draws with
+  // dropped every non-drawing prop, and `keyboardShouldPersistTaps` (the one
+  // whose absence made the first tap on a row under a keyboard do nothing)
+  // is exactly that kind of prop.
   return React.createElement(
     'div',
-    { 'data-testid': testID },
+    {
+      'data-testid': testID,
+      'data-rn-list': '',
+      ref: (node: object | null) => {
+        if (node) listProps.set(node, props);
+      },
+    },
     (sections ?? []).map((section, sectionIndex) =>
       React.createElement(
         'div',

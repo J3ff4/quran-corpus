@@ -48,6 +48,12 @@ export function SurahPicker({ surahs, uiLocale, onPick, onClose }: SurahPickerPr
     <Modal
       visible
       animationType="slide"
+      // Paired with the `insets.top` padding below, as on BottomSheet. Without
+      // it an Android modal window already starts below the status bar and the
+      // padding adds a second status bar's worth of dead space above the
+      // title; with it the window owns the full screen and the inset is the
+      // thing keeping the title clear of the clock.
+      statusBarTranslucent
       // Android's back button. Without it the modal is a trap: there is no
       // gesture to dismiss a full-screen one.
       onRequestClose={onClose}
@@ -112,7 +118,10 @@ export function SurahPicker({ surahs, uiLocale, onPick, onClose }: SurahPickerPr
             }}
           />
         </View>
-        {results.length === 0 ? (
+        {/* Only once something was typed. An index that came back empty is not
+            a failed name search, and telling a reader their search found
+            nothing when they never searched is a lie about their own input. */}
+        {results.length === 0 && query.trim().length > 0 ? (
           <Text
             testID="surah-picker-empty"
             // Announced when it appears: it replaces a list that was there a
@@ -129,7 +138,7 @@ export function SurahPicker({ surahs, uiLocale, onPick, onClose }: SurahPickerPr
           </Text>
         ) : (
           <SurahList
-            surahs={results as SurahListItem[]}
+            surahs={results}
             uiLocale={uiLocale}
             onOpenSurah={(surah) => onPick(surah.id)}
           />

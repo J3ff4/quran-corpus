@@ -33,6 +33,12 @@ export function useSurahIndex(nameLang?: QueryLanguageCode): SurahIndex {
   useEffect(() => {
     let cancelled = false;
 
+    // Back to "not known" before the read, not after it. These rows are named
+    // in the PREVIOUS language while a new one is in flight, and if that read
+    // throws, leaving them standing shows the old script with nothing to say
+    // the switch did not take.
+    setSurahs(null);
+
     async function load() {
       try {
         const corpusDb = await openCorpusDb();

@@ -56,6 +56,24 @@ describe('useSurahIndex', () => {
     await waitFor(() => expect(mocks.getSurahList).toHaveBeenCalled());
     expect(mocks.getSurahList.mock.calls[0]?.[1]).toBe('uz-Cyrl');
   });
+
+  it('drops the old language-s rows when a re-read fails', async () => {
+    // The rows carry their names IN a language. Left standing through a failed
+    // switch they show the previous script with nothing to say the switch did
+    // not take -- "wrong", where null is only "not known yet".
+    function Rows({ lang }: { lang: 'en' | 'uz-Cyrl' }) {
+      const { surahs } = useSurahIndex(lang);
+      return <span data-testid="rows">{surahs === null ? 'null' : String(surahs.length)}</span>;
+    }
+    const { rerender } = render(<Rows lang="en" />);
+    await waitFor(() => expect(screen.getByTestId('rows').textContent).toBe('2'));
+
+    mocks.getSurahList.mockRejectedValue(new Error('no such column: name_uz'));
+    rerender(<Rows lang="uz-Cyrl" />);
+
+    await waitFor(() => expect(console.error).toHaveBeenCalled());
+    expect(screen.getByTestId('rows').textContent).toBe('null');
+  });
 });
 
 describe('useSurahIndex, projected to ayah counts', () => {

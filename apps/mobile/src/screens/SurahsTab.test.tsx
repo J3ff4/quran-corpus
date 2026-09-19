@@ -551,4 +551,14 @@ describe('SurahsTab', () => {
 
     expect(screen.getByTestId('surah-filter-empty')).toBeTruthy();
   });
+
+  it('does not blame the reader for an index that came back empty', async () => {
+    // No error, no rows, and nothing typed: "No surah by that name" would be
+    // telling them their name search failed when they never ran one.
+    mocks.getSurahList.mockResolvedValue([]);
+    render(<SurahsTab />);
+    await waitFor(() => expect(screen.getByTestId('surah-filter')).toBeTruthy());
+
+    expect(screen.queryByTestId('surah-filter-empty')).toBeNull();
+  });
 });

@@ -76,6 +76,14 @@ describe('SurahPicker', () => {
     expect(screen.queryByText('Al-Fatihah')).toBeNull();
   });
 
+  it('stays quiet about an index that is empty for reasons of its own', () => {
+    // "No surah by that name" answers a name that was typed. An index that
+    // came back empty is not a failed search, and saying it failed tells the
+    // reader something about their own input that is not true.
+    render(<SurahPicker surahs={[]} uiLocale="en" onPick={vi.fn()} onClose={vi.fn()} />);
+    expect(screen.queryByTestId('surah-picker-empty')).toBeNull();
+  });
+
   it('closes without picking', () => {
     const { onPick, onClose } = renderPicker();
     fireEvent.click(screen.getByTestId('surah-picker-close'));
