@@ -10,6 +10,7 @@ import { searchCorpus } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { t } from '@/i18n/uiStrings';
 import { usePressScale } from '@/motion/usePressScale';
+import { useSurahIndex } from '@/data/useSurahIndex';
 import { useAppSettings } from '@/settings/settingsStore';
 import { fonts, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
@@ -87,7 +88,7 @@ export const DEBOUNCE_MS = 200;
 export const SPINNER_DELAY_MS = 300;
 
 export function SearchScreen() {
-  const { uiLocale, queryLanguage } = useAppSettings();
+  const { uiLocale, queryLanguage, nameLanguage } = useAppSettings();
   const theme = useThemeColors();
   const paddingBottom = useListBottomPadding();
 
@@ -153,6 +154,16 @@ export function SearchScreen() {
 
     return () => clearTimeout(timer);
   }, [query, queryLanguage]);
+
+  // The jump card already resolves a typed surah NAME -- search.ts has folded
+  // names since 1aca65a -- but it labelled the destination with a bare number,
+  // so a reader who searched "baqara" was answered with "2" and no sign that
+  // the name had been understood. The index is 114 rows the app reads anyway.
+  const { surahs } = useSurahIndex(nameLanguage);
+  const jumpSurahName =
+    result.jump === null
+      ? null
+      : (surahs?.find((surah) => surah.id === result.jump?.surah_id)?.nameTranslit ?? null);
 
   const openJump = useCallback(() => {
     const jump = result.jump;
@@ -227,6 +238,7 @@ export function SearchScreen() {
             <Text accessibilityRole="header" style={heading}>{t(uiLocale, 'search.jump').toUpperCase()}</Text>
             <ResultCard testID="search-jump" onPress={openJump} tinted>
               <Text
+                testID="search-jump-ref"
                 style={{
                   color: theme.accent,
                   fontSize: 20,
@@ -242,6 +254,11 @@ export function SearchScreen() {
                   ? result.jump.surah_id
                   : `${result.jump.surah_id}:${result.jump.ayah_number}`}
               </Text>
+              {jumpSurahName === null ? null : (
+                <Text testID="search-jump-name" style={{ color: theme.mutedText, fontSize: typography.caption }}>
+                  {jumpSurahName}
+                </Text>
+              )}
             </ResultCard>
           </>
         ) : null}

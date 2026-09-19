@@ -19,6 +19,14 @@ vi.mock('@/settings/settingsStore', () => ({
 }));
 vi.mock('@/data/corpusRepository', () => ({ searchCorpus: mocks.searchCorpus }));
 vi.mock('@/data/openCorpusDb', () => ({ openCorpusDb: () => Promise.resolve({}) }));
+vi.mock('@/data/useSurahIndex', () => ({
+  useSurahIndex: () => ({
+    surahs: [
+      { id: 2, nameArabic: 'البقرة', nameTranslit: 'Al-Baqarah', nameTranslation: 'The Cow', ayahCount: 286 },
+    ],
+    ayahCountOf: () => 286,
+  }),
+}));
 vi.mock('@quran-corpus/mobile-data', () => ({ createExpoSqliteClient: () => ({}) }));
 vi.mock('expo-router', () => ({ router: { push: mocks.push } }));
 
@@ -174,7 +182,7 @@ describe('SearchScreen', () => {
     fireEvent.change(screen.getByTestId('search-input'), { target: { value: '2:255' } });
 
     await waitFor(() => expect(screen.getByTestId('search-verse')).toBeTruthy());
-    expect(screen.getByTestId('search-jump').textContent).toContain('2:255');
+    expect(screen.getByTestId('search-jump-ref').textContent).toBe('2:255');
 
     // Order, not just presence -- reordering the two sections must fail this.
     const testIds = Array.from(document.querySelectorAll('[data-testid]')).map((el) =>
@@ -184,6 +192,30 @@ describe('SearchScreen', () => {
     const verseIndex = testIds.indexOf('search-verse');
     expect(jumpIndex).toBeGreaterThanOrEqual(0);
     expect(verseIndex).toBeGreaterThan(jumpIndex);
+  });
+
+  it('names the surah a typed name resolved to', async () => {
+    // search.ts folds surah names itself, so "baqara" already produced this
+    // jump -- labelled with a bare number, which never said the name had been
+    // understood. A surah-level jump has no ayah, so the number alone is all
+    // the card would otherwise carry.
+    mocks.searchCorpus.mockResolvedValue({
+      jump: {
+        surah_id: 2,
+        ayah_number: null,
+        text_uthmani: 'ٱللَّهُ',
+        words: [],
+        highlightPosition: null,
+      },
+      verses: [],
+      roots: [],
+    });
+
+    render(<SearchScreen />);
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'baqara' } });
+
+    await waitFor(() => expect(screen.getByTestId('search-jump')).toBeTruthy());
+    expect(screen.getByTestId('search-jump-name').textContent).toBe('Al-Baqarah');
   });
 
   it('opens the surah at the ayah when the jump is tapped', async () => {
@@ -228,7 +260,7 @@ describe('SearchScreen', () => {
     // Not '2:1' -- a surah-name match carries no ayah, and openJump pushes
     // the surah alone, so a fabricated ':1' would label a destination the
     // tap does not reach.
-    expect(screen.getByTestId('search-jump').textContent).toBe('2');
+    expect(screen.getByTestId('search-jump-ref').textContent).toBe('2');
 
     fireEvent.click(screen.getByTestId('search-jump'));
     expect(mocks.push).toHaveBeenCalledWith('/surah/2');
