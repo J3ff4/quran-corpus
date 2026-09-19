@@ -21,7 +21,7 @@ import {
 } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { setReaderPosition } from '@/data/readerPosition';
-import { useSurahAyahCounts } from '@/data/useSurahAyahCounts';
+import { useSurahAyahCounts } from '@/data/useSurahIndex';
 import { useWordSummaryLoader } from '@/data/useWordSummaryLoader';
 import { t } from '@/i18n/uiStrings';
 import { useEntryPager, useHeldEntry } from '@/motion/entryPager';

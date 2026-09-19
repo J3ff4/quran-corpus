@@ -23,7 +23,7 @@ import { reciterById, splitBasmala, type Word } from '@quran-corpus/data/mobile'
 import { surahNameGlyph } from '@quran-corpus/config/ornaments/surahName';
 import type { ReaderAyah, SurahReaderData, WordSummary } from '@/data/corpusRepository';
 import { getReaderPosition, setReaderPosition } from '@/data/readerPosition';
-import { useSurahAyahCounts } from '@/data/useSurahAyahCounts';
+import { useSurahAyahCounts } from '@/data/useSurahIndex';
 import type { ContentLanguageCode, UiLocaleCode } from '@/i18n/languages';
 
 import { AyahCard } from './AyahCard';

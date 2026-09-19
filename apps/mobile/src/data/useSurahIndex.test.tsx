@@ -15,7 +15,7 @@ vi.mock('./corpusRepository', () => ({
   getSurahList: (...args: unknown[]) => mocks.getSurahList(...args),
 }));
 
-import { useSurahAyahCounts } from './useSurahAyahCounts';
+import { useSurahAyahCounts, useSurahIndex } from './useSurahIndex';
 
 function Probe({ surahId }: { surahId: number }) {
   const ayahCountOf = useSurahAyahCounts();
@@ -34,6 +34,28 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+});
+
+describe('useSurahIndex', () => {
+  it('hands back the rows themselves, once the read lands', async () => {
+    function Rows() {
+      const surahs = useSurahIndex();
+      return <span data-testid="rows">{surahs === null ? 'null' : String(surahs.length)}</span>;
+    }
+    render(<Rows />);
+    expect(screen.getByTestId('rows').textContent).toBe('null');
+    await waitFor(() => expect(screen.getByTestId('rows').textContent).toBe('2'));
+  });
+
+  it('asks for the names in the language it was given', async () => {
+    function Rows() {
+      useSurahIndex('uz-Cyrl');
+      return null;
+    }
+    render(<Rows />);
+    await waitFor(() => expect(mocks.getSurahList).toHaveBeenCalled());
+    expect(mocks.getSurahList.mock.calls[0]?.[1]).toBe('uz-Cyrl');
+  });
 });
 
 describe('useSurahAyahCounts', () => {
