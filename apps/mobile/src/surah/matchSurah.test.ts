@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { SurahListItem } from '@/data/corpusRepository';
-import { matchSurahs, normalizeArabic, normalizeLatin } from './matchSurah';
+import { foldArabicName, matchSurahs } from './matchSurah';
 
 /** A slice of the real index -- the rows whose spellings actually disagree. */
 const SURAHS: SurahListItem[] = [
@@ -24,11 +24,13 @@ describe('matchSurahs, by transliteration', () => {
     },
   );
 
-  it.each(['yasin', 'ya-sin', 'yaseen', 'Ya Sin'])('finds Ya-Sin from %s', (query) => {
+  // Not `yaseen`: the shared fold has no long-vowel rule, so search does not
+  // resolve it either. One answer in both places beats a better answer in one.
+  it.each(['yasin', 'ya-sin', 'Ya Sin'])('finds Ya-Sin from %s', (query) => {
     expect(ids(query)[0]).toBe(36);
   });
 
-  it.each(['yunus', 'yoonus', 'Yūnus'])('finds Yunus from %s', (query) => {
+  it.each(['yunus', 'Yūnus'])('finds Yunus from %s', (query) => {
     expect(ids(query)[0]).toBe(10);
   });
 
@@ -37,20 +39,16 @@ describe('matchSurahs, by transliteration', () => {
   });
 
   it('drops the article, plain or assimilated', () => {
-    // Asserted on the normalizer, not through a match: without the strip the
-    // names still MATCH (`bakara` is inside `albakara`), they just stop
-    // ranking as prefixes -- so a match-only test passes either way.
-    expect(normalizeLatin('Al-Baqarah')).toBe('bakara');
-    expect(normalizeLatin('An-Nur')).toBe('nur');
-    expect(normalizeLatin('Ash-Shams')).toBe('sams');
-    // Not an article: a three-letter name that merely starts with one.
-    expect(normalizeLatin('Ali')).toBe('ali');
+    // surahName.ts's own rules, exercised through the picker: `An-Nur` and
+    // `Ash-Shams` assimilate, `Al-Baqarah` does not.
+    expect(ids('nur')).toEqual([24]);
+    expect(ids('baqara')).toEqual([2]);
   });
 
   it('does not eat the h of a name that ends in one', () => {
-    // `-ah` is trimmed to `-a`; a bare trailing h is a letter of the name.
+    // A trailing -h is a romanization choice on a long name; on `Nuh` it is a
+    // letter, and surahName.ts's MIN_H_STRIPPED is what keeps it.
     expect(ids('nuh')).toEqual([71]);
-    expect(normalizeLatin('Nuh')).toBe('nuh');
   });
 });
 
@@ -73,11 +71,12 @@ describe('matchSurahs, by meaning and number', () => {
     expect(ids('jon')).toEqual([10]);
   });
 
-  it('does not let one folded letter match most of the index', () => {
-    // `th` folds to `t`, which is inside half these names. A prefix of one
-    // letter is still honoured -- that is the list filtering, not noise.
+  it('refuses a fragment shorter than the shared prefix floor', () => {
+    // SURAH_NAME_MIN_PREFIX is 3: two letters prefix a dozen surahs, and the
+    // reader is better served by a full list than by a guess.
     expect(ids('th')).toEqual([]);
-    expect(ids('n')).toEqual([24, 71]);
+    expect(ids('n')).toEqual([]);
+    expect(ids('nur')).toEqual([24]);
   });
 
   it('still accepts a bare number', () => {
@@ -101,7 +100,7 @@ describe('matchSurahs, by Arabic name', () => {
     // all, so a name without one would assert nothing here.
     const decomposed = 'الإخلاص'.normalize('NFD');
     expect(decomposed).not.toBe('الإخلاص');
-    expect(normalizeArabic(decomposed)).toBe(normalizeArabic('الإخلاص'));
+    expect(foldArabicName(decomposed)).toBe(foldArabicName('الإخلاص'));
     expect(ids(decomposed)[0]).toBe(112);
   });
 });
@@ -118,12 +117,15 @@ describe('matchSurahs, ranking and edges', () => {
     expect(matchSurahs(rows, 'nur').map((surah) => surah.id)).toEqual([24, 1]);
   });
 
-  it('prefers a prefix over a substring', () => {
+  it('matches a name from its start, never from its middle', () => {
+    // surahName.ts's contract, kept: a fragment inside a name is a
+    // coincidence far more often than an intention.
     const rows = [
       { ...SURAHS[2], id: 99, nameTranslit: 'Abu-Yunus' },
       { ...SURAHS[2] },
     ];
-    expect(matchSurahs(rows, 'yunus').map((surah) => surah.id)).toEqual([10, 99]);
+    expect(matchSurahs(rows, 'yunus').map((surah) => surah.id)).toEqual([10]);
+    expect(matchSurahs(rows, 'abuyunus').map((surah) => surah.id)).toEqual([99]);
   });
 
   it('returns every surah, in order, for an empty query', () => {

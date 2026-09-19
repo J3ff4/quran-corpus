@@ -1,3 +1,11 @@
+import {
+  normalizeArabic,
+  surahNameExactMatch,
+  surahNameKeys,
+  surahNamePrefixMatch,
+  surahTranslationKeys,
+} from '@quran-corpus/data/mobile';
+
 import type { SurahListItem } from '@/data/corpusRepository';
 
 /**
@@ -7,101 +15,83 @@ import type { SurahListItem } from '@/data/corpusRepository';
  * already hold, so this filters what is in hand instead of asking the DB to
  * match user text (§3 OWASP -- untrusted input never reaches SQL through here).
  *
+ * The folds are `packages/data`'s own -- the ones `search.ts` resolves a typed
+ * surah name with. Not re-implemented here: the picker takes the same query
+ * text against the same 114 names, and a second fold would be a second answer
+ * to "does `bakara` name al-Baqarah", with only one of the two carrying the
+ * Uzbek `o` readings (`Rahmon`/`Rahman`), the sun-letter articles and the
+ * rule that keeps the English meanings OUT of the Arabic fold -- run `moon`
+ * through the transliteration rules and it lands on surah 76's `The Man`.
+ *
+ * What is local is the shape of the answer: search resolves ONE surah or none,
+ * refusing an ambiguous prefix on purpose. A picker wants every candidate,
+ * ranked, because the reader picks from the list.
+ *
  * Matches the names the app is SHOWING. Under an Uzbek UI `nameTranslit` is
  * already `Fotiha` and `nameTranslation` the Uzbek meaning, so the arms below
- * follow the locale for free -- and equally, typing `Al-Fatihah` under an
- * Uzbek UI is not expected to hit, because that string is nowhere on screen.
+ * follow the locale for free.
  */
 
-/** Everything a Latin query and a Latin name are compared through.
+/** The picker's extra tolerance on top of the shared Arabic fold.
  *
- *  Both sides go through this, which is the point: `baqarah`, `Al-Baqara` and
- *  `bakara` are the same word spelled by three different conventions, and
- *  folding only the query would leave the name in a fourth. */
-export function normalizeLatin(raw: string): string {
-  let s = raw
-    .toLowerCase()
-    .normalize('NFD')
-    // Combining marks: `ʿAbasa`, `Sād`, anything pasted with diacritics.
-    .replace(/[\u0300-\u036f]/g, '')
-    // Hyphens, apostrophes, the ayn/hamza letters, spaces. `Ya-Sin`, `Al-A'raf`,
-    // `Aʿla` all lose theirs.
-    .replace(/[^a-z0-9]/g, '');
-  // Digraphs that transliterate one Arabic letter, folded to one Latin one:
-  // th/dh/kh/gh and q are exactly where two spellings of the same name part
-  // company (`baqara` / `bakara`, `Ikhlas` / `Ihlas`).
-  s = s
-    .replace(/th/g, 't')
-    .replace(/dh/g, 'd')
-    .replace(/kh/g, 'h')
-    .replace(/gh/g, 'g')
-    .replace(/sh/g, 's')
-    .replace(/q/g, 'k');
-  // Long vowels: `ee`->`i`, `oo`->`u` before the doubling collapse, so
-  // `Yaseen` and `Yasin` meet.
-  s = s.replace(/e/g, 'i').replace(/o/g, 'u');
-  // The article, before the doubling collapse -- an assimilated one IS a
-  // doubled letter (`an-Nur`, `ar-Rahman`, `as-Saff`), so collapsing first
-  // would hide it and leave `nur` matching only as a substring of `anur`.
-  // Half the index carries an article and nobody types it consistently.
-  if (s.startsWith('al') && s.length > 3) s = s.slice(2);
-  else if (s.length > 3 && /^a([bcdfghjklmnprstvwyz])\1/.test(s)) s = s.slice(2);
-  // Any remaining doubled letter. `Yunus` / `Yoonus`, `Muhammad` / `Muhamad`.
-  s = s.replace(/(.)\1+/g, '$1');
-  // Final ta marbuta, romanized `-ah` by some conventions and `-a` by others.
-  // Trimmed rather than a plain trailing `h`, which would eat Nuh and Ta-Ha.
-  if (s.endsWith('ah')) s = s.slice(0, -1);
-  return s;
+ *  NFC first, because only a composed string can be compared to another: the
+ *  corpus stores `الإخلاص` composed and a keyboard may hand over the decomposed
+ *  form, and that mismatch is exactly what killed 49 form chips once. Then the
+ *  definite article and the final ta marbuta, which a typist leaves off or
+ *  writes as ha -- search can skip both because it demands an exact match on a
+ *  name the reader spelled out; a filter is typed a letter at a time. */
+export function foldArabicName(raw: string): string {
+  const folded = normalizeArabic(raw.normalize('NFC')).replace(/\s/g, '').replace(/ة/g, 'ه');
+  return folded.startsWith('ال') && folded.length > 3 ? folded.slice(2) : folded;
 }
 
-/** Arabic query against an Arabic name.
- *
- *  NFC on BOTH sides in one pass. Composed and decomposed forms of the same
- *  word are different strings to every comparison JS has, and that is exactly
- *  how 49 form chips went dead once already -- there, one side was NFC and the
- *  other was not. */
-export function normalizeArabic(raw: string): string {
-  let s = raw
-    .normalize('NFC')
-    // Harakat, sukun, shadda, the superscript alef, and tatweel. A name typed
-    // on a phone keyboard carries none of these; `surahs.name_arabic` does.
-    .replace(/[\u064b-\u0652\u0670\u0640]/g, '')
-    // Hamza seats and alef maddah all flatten to bare alef: the seat is the
-    // one thing a typist is most likely to disagree with the corpus about.
-    .replace(/[\u0622\u0623\u0625\u0671]/g, '\u0627')
-    .replace(/\u0629/g, '\u0647')
-    .replace(/\u0649/g, '\u064a')
-    .replace(/\s/g, '');
-  if (s.startsWith('ال') && s.length > 3) s = s.slice(2);
-  return s;
-}
-
-/** Below this, a substring match is noise rather than a search: one folded
- *  letter is inside most of the 114 names, so it would "match" nearly the whole
- *  index while looking like a filter. A prefix is exempt -- typing `n` and
- *  seeing the names that START with it is the list doing what it should. */
-const SUBSTRING_MIN = 2;
-
-/** Below this, a meaning match is noise: `the`, `man`, `day` hit a dozen
+/** Below this, a meaning match is noise: `the`, `man`, `day` prefix a dozen
  *  surahs and would bury the name the user actually typed. The same 3-char
  *  floor the dictionary's meaning arm settled on (#31). */
 const MEANING_MIN = 3;
 
-/** Lower sorts first. A transliteration hit always outranks a meaning hit --
- *  the name is what was asked for, the meaning is a convenience. */
-const RANK = { number: 0, prefix: 1, substring: 2, arabic: 3, meaning: 4 } as const;
+/** Lower sorts first. A name hit always outranks a meaning hit -- the name is
+ *  what was asked for, the meaning is a convenience. */
+const RANK = { number: 0, exact: 1, prefix: 2, arabic: 3, meaning: 4 } as const;
 
-function rankOf(item: SurahListItem, latin: string, arabic: string, digits: number | null): number {
-  if (digits !== null && item.id === digits) return RANK.number;
-  if (latin.length > 0) {
-    const name = normalizeLatin(item.nameTranslit);
-    if (name.startsWith(latin)) return RANK.prefix;
-    if (latin.length >= SUBSTRING_MIN && name.includes(latin)) return RANK.substring;
+interface QueryKeys {
+  latin: string[];
+  english: string[];
+  arabic: string;
+  digits: number | null;
+  /** The raw folded English, for the substring arm. The key sets above only
+   *  answer whole-name and leading-fragment questions. */
+  englishFragment: string;
+}
+
+function rankOf(item: SurahListItem, query: QueryKeys): number {
+  if (query.digits !== null && item.id === query.digits) return RANK.number;
+
+  if (query.latin.length > 0) {
+    const translit = surahNameKeys(item.nameTranslit);
+    const english = surahTranslationKeys(item.nameTranslation);
+    // Two columns, two folds, never crossed -- surahName.ts's rule, and the
+    // reason `moon` does not answer to `The Man`.
+    if (
+      surahNameExactMatch(query.latin, translit) ||
+      surahNameExactMatch(query.english, english)
+    ) {
+      return RANK.exact;
+    }
+    // Transliterations only, as in search: a prefix of an English meaning is
+    // a coincidence far more often than an intention.
+    if (surahNamePrefixMatch(query.latin, translit)) return RANK.prefix;
   }
-  if (arabic.length > 0 && normalizeArabic(item.nameArabic).includes(arabic)) return RANK.arabic;
-  if (latin.length >= MEANING_MIN && normalizeLatin(item.nameTranslation).includes(latin)) {
-    return RANK.meaning;
+
+  if (query.arabic.length > 0 && foldArabicName(item.nameArabic).includes(query.arabic)) {
+    return RANK.arabic;
   }
+
+  if (query.englishFragment.length >= MEANING_MIN) {
+    const meaning = surahTranslationKeys(item.nameTranslation)[0] ?? '';
+    if (meaning.includes(query.englishFragment)) return RANK.meaning;
+  }
+
   return Number.POSITIVE_INFINITY;
 }
 
@@ -115,14 +105,18 @@ export function matchSurahs(items: readonly SurahListItem[], query: string): Sur
   const trimmed = query.trim();
   if (trimmed.length === 0) return [...items];
 
-  const latin = normalizeLatin(trimmed);
-  const arabic = normalizeArabic(trimmed);
-  // A bare number still works inside the picker: someone who knows it should
-  // not have to close the sheet to use it.
-  const digits = /^\d{1,3}$/.test(trimmed) ? Number(trimmed) : null;
+  const keys: QueryKeys = {
+    latin: surahNameKeys(trimmed),
+    english: surahTranslationKeys(trimmed),
+    arabic: foldArabicName(trimmed),
+    // A bare number still works inside the picker: someone who knows it should
+    // not have to close the sheet to use it.
+    digits: /^\d{1,3}$/.test(trimmed) ? Number(trimmed) : null,
+    englishFragment: surahTranslationKeys(trimmed)[0] ?? '',
+  };
 
   return items
-    .map((item) => ({ item, rank: rankOf(item, latin, arabic, digits) }))
+    .map((item) => ({ item, rank: rankOf(item, keys) }))
     .filter((scored) => Number.isFinite(scored.rank))
     // Stable within a rank: mushaf order is the order the list is already in,
     // and a name match should not reshuffle it.
