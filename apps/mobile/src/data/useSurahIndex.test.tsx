@@ -15,10 +15,10 @@ vi.mock('./corpusRepository', () => ({
   getSurahList: (...args: unknown[]) => mocks.getSurahList(...args),
 }));
 
-import { useSurahAyahCounts, useSurahIndex } from './useSurahIndex';
+import { useSurahIndex } from './useSurahIndex';
 
 function Probe({ surahId }: { surahId: number }) {
-  const ayahCountOf = useSurahAyahCounts();
+  const { ayahCountOf } = useSurahIndex();
   return <span data-testid="count">{String(ayahCountOf(surahId))}</span>;
 }
 
@@ -39,7 +39,7 @@ afterEach(() => {
 describe('useSurahIndex', () => {
   it('hands back the rows themselves, once the read lands', async () => {
     function Rows() {
-      const surahs = useSurahIndex();
+      const { surahs } = useSurahIndex();
       return <span data-testid="rows">{surahs === null ? 'null' : String(surahs.length)}</span>;
     }
     render(<Rows />);
@@ -58,7 +58,7 @@ describe('useSurahIndex', () => {
   });
 });
 
-describe('useSurahAyahCounts', () => {
+describe('useSurahIndex, projected to ayah counts', () => {
   it('answers null until the read lands, then the surah-s own count', async () => {
     render(<Probe surahId={2} />);
     expect(screen.getByTestId('count').textContent).toBe('null');

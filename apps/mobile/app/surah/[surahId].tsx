@@ -432,6 +432,7 @@ export default function SurahRoute() {
           onToggleContinuous: () => setContinuousPlay(!continuousPlay),
         }}
         uiLocale={uiLocale}
+        nameLanguage={nameLanguage}
         contentLanguage={contentLanguage}
         onChangeContentLanguage={setContentLanguage}
         showTranslation={showTranslation}

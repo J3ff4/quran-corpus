@@ -23,8 +23,8 @@ import { reciterById, splitBasmala, type Word } from '@quran-corpus/data/mobile'
 import { surahNameGlyph } from '@quran-corpus/config/ornaments/surahName';
 import type { ReaderAyah, SurahReaderData, WordSummary } from '@/data/corpusRepository';
 import { getReaderPosition, setReaderPosition } from '@/data/readerPosition';
-import { useSurahAyahCounts } from '@/data/useSurahIndex';
-import type { ContentLanguageCode, UiLocaleCode } from '@/i18n/languages';
+import { useSurahIndex } from '@/data/useSurahIndex';
+import type { ContentLanguageCode, QueryLanguageCode, UiLocaleCode } from '@/i18n/languages';
 
 import { AyahCard } from './AyahCard';
 import { RecitationBar, type RecitationBarProps } from './RecitationBar';
@@ -34,6 +34,7 @@ import { LanguageSheet } from './LanguageSheet';
 import { ReciterSheet } from './ReciterSheet';
 import { AyahControls } from './AyahControls';
 import { SurahJumpSheet } from './SurahJumpSheet';
+import { SurahPicker } from './SurahPicker';
 import { WordSheet } from './WordSheet';
 import { GlassSurface } from './GlassSurface';
 import { estimateRowHeight } from './rowHeightModel';
@@ -72,6 +73,10 @@ interface SurahReaderProps {
   audioEnabled: boolean;
   recitation: ReaderRecitation;
   uiLocale: UiLocaleCode;
+  /** The language the surah PICKER names surahs in. A QueryLanguageCode, not
+   *  the UI locale: `surah_names` carries the uz-Cyrl rows and only this can
+   *  reach them (#85). Omitted, the picker lists the English names. */
+  nameLanguage?: QueryLanguageCode | undefined;
   /** The reader owns no settings state; the screen above it does. Passed down
    *  rather than read from the store so this component stays renderable in a
    *  test without the store's expo-sqlite import. */
@@ -862,12 +867,16 @@ export function SurahReader({
   nextSurahId = null,
   onPageSurah,
   onJump,
+  nameLanguage,
 }: SurahReaderProps) {
   const navigation = useNavigation();
 
   const [languageOpen, setLanguageOpen] = useState(false);
-  const [jumpOpen, setJumpOpen] = useState(false);
-  const ayahCountOf = useSurahAyahCounts();
+  // One state, not two booleans: two would let the jump sheet and the picker
+  // be open at once, which is the whole failure mode of a sheet that opens
+  // another sheet.
+  const [jumpView, setJumpView] = useState<'jump' | 'picker' | null>(null);
+  const { surahs, ayahCountOf } = useSurahIndex(nameLanguage);
   const [reciterOpen, setReciterOpen] = useState(false);
 
   // The ayah the docked bar is parked on. Not `playingAyah`: that goes null the
@@ -953,7 +962,7 @@ export function SurahReader({
           titleVisible={titleVisible}
           {...(onJump ? { onOpenJump: () => {
             closeSheet();
-            setJumpOpen(true);
+            setJumpView('jump');
           } } : {})}
           showTranslation={showTranslation}
           {...(onChangeShowTranslation ? { onChangeShowTranslation } : {})}
@@ -1236,16 +1245,31 @@ export function SurahReader({
           onClose={() => setLanguageOpen(false)}
         />
       ) : null}
-      {jumpOpen && onJump ? (
+      {jumpView === 'jump' && onJump ? (
         <SurahJumpSheet
           uiLocale={uiLocale}
           surahId={data.surah.id}
           ayahCountOf={ayahCountOf}
-          onClose={() => setJumpOpen(false)}
+          onClose={() => setJumpView(null)}
           onJump={(surahId, ayahNumber) => {
-            setJumpOpen(false);
+            setJumpView(null);
             onJump(surahId, ayahNumber);
           }}
+          // No rows, no row: the picker has nothing to show until the index
+          // read lands.
+          onBrowse={surahs === null ? undefined : () => setJumpView('picker')}
+        />
+      ) : null}
+      {jumpView === 'picker' && surahs !== null && onJump ? (
+        <SurahPicker
+          surahs={surahs}
+          uiLocale={uiLocale}
+          // Ruling R3: a name goes to the head of its surah.
+          onPick={(surahId) => {
+            setJumpView(null);
+            onJump(surahId, 1);
+          }}
+          onClose={() => setJumpView(null)}
         />
       ) : null}
     </View>

@@ -25,7 +25,6 @@ export type UiStringKey =
   | 'surahPicker.title'
   | 'surahPicker.filter'
   | 'surahPicker.empty'
-  | 'search.goToSurah'
   | 'tabs.settings'
   | 'tabs.dictionary'
   | 'tabs.menu'
@@ -495,7 +494,6 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.groupRecitation': 'Recitation',
     'about.groupTypefaces': 'Typefaces',
     'search.title': 'Search',
-    'search.goToSurah': 'Go to {name}',
     'search.placeholder': 'Verse, word or root',
     'search.jump': 'Go to',
     'search.verses': 'Verses',
@@ -729,7 +727,6 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.groupRecitation': 'Qiroat',
     'about.groupTypefaces': 'Shriftlar',
     'search.title': 'Qidiruv',
-    'search.goToSurah': '{name} surasiga oʻtish',
     'search.placeholder': 'Oyat, so‘z yoki o‘zak',
     'search.jump': 'O‘tish',
     'search.verses': 'Oyatlar',
@@ -961,7 +958,6 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.groupRecitation': 'Чтение',
     'about.groupTypefaces': 'Шрифты',
     'search.title': 'Поиск',
-    'search.goToSurah': 'Перейти к суре {name}',
     'search.placeholder': 'Аят, слово или корень',
     'search.jump': 'Перейти',
     'search.verses': 'Аяты',

@@ -53,6 +53,20 @@ export function SurahPicker({ surahs, uiLocale, onPick, onClose }: SurahPickerPr
       onRequestClose={onClose}
     >
       <View style={{ flex: 1, backgroundColor: theme.background, paddingTop: insets.top }}>
+        <Text
+          // A heading, not decoration: a full-screen modal replaces the whole
+          // view, so without one nothing says what the list is -- and TalkBack
+          // lands on the filter field with no context at all.
+          accessibilityRole="header"
+          style={{
+            color: theme.text,
+            fontSize: typography.title,
+            paddingHorizontal: 20,
+            paddingTop: 8,
+          }}
+        >
+          {t(uiLocale, 'surahPicker.title')}
+        </Text>
         <View
           style={{
             flexDirection: 'row',
