@@ -19,6 +19,7 @@
 | R1 | Number fields stay untouched. A **separate "Browse surahs by name" row** under them opens the picker. Not a combo field. |
 | R2 | Match **transliteration + meaning-in-UI-language + Arabic name**. |
 | R3 | Tapping a surah **jumps straight to ayah 1** and closes both sheets. |
+| R5 | **Label the Go-to fields.** Two bare boxes showing `1-114` and `1-286` never said which was which, and the placeholder -- the only hint -- is gone on the first keystroke. |
 | R4 | Also: **Surahs tab filter field** and **Search screen suggestion**. Not bookmarks. |
 
 **Consequence of R3, accepted:** name → a specific ayah is two passes. Browse al-Baqara, land 2:1, reopen Go-to (Sura now reads 2), type 255. Ayah-by-name in one pass was the cost of R3; R1 keeps the number path for anyone who knows it.
@@ -64,6 +65,21 @@
 Each task is one commit. The picker is additive — reverting Tasks 3-7 leaves the number fields exactly as they ship today.
 
 ---
+
+### Task 0: name the Go-to fields (R5) — DONE, `7cc1477`
+
+Landed ahead of the rest: it is a two-line fix to a defect the picker does not
+solve, and the picker's browse row goes under these same fields.
+
+- [x] Caption above each field in `SurahJumpSheet`, from the existing
+  `jump.surah` / `jump.ayah` strings (already written in en/uz/ru, so no i18n
+  work). `importantForAccessibility="no"` on the caption: each input already
+  carries its name **and** its range in `accessibilityLabel`, so an announced
+  caption would say "Surah" twice before the range.
+- [x] Test: both names render on screen. Mutation-checked — deleting the Sura
+  caption fails it.
+- [x] `PageJumpSheet` needs nothing: its segmented control names the kind its
+  single field is asking for.
 
 ### Task 1: the matcher
 
@@ -174,7 +190,7 @@ export interface SurahPickerSheetProps {
 
 1. `matchSurahs` is the only matcher in the app; no screen filters names itself.
 2. `'bakara'`, `'baqarah'`, `'al-baqara'`, `'cow'`, `'البقرة'` all reach surah 2.
-3. Every jump sheet offers the browse row; picking jumps to ayah 1 and leaves no sheet open.
+3. The Go-to fields are named on screen (R5). Every jump sheet offers the browse row; picking jumps to ayah 1 and leaves no sheet open.
 4. Surahs tab filters in `surah` mode only; Search offers the surah above its results.
 5. `packages/data` unchanged — `git diff --stat main -- packages/` is empty.
 6. tsc, eslint and vitest green.
@@ -184,6 +200,7 @@ export interface SurahPickerSheetProps {
 
 | # | Check |
 |---|---|
+| 379 | Go to, from the reader: the Sura and Ayah fields are named on screen, and the names stay visible while typing. Same under Uzbek and Russian, where "Sura"/"Oyat" and "Сура"/"Аят" must not clip at the field width. |
 | 380 | Reader → Go to → Browse: the jump sheet closes as the picker opens. No stacked scrims. |
 | 381 | Type `baqara` with the keyboard up: results visible above the keyboard, sheet not clipped (`reanimated-keyboard-blind-in-modal`). |
 | 382 | Typing is smooth across all 114 rows — no dropped frames per keystroke. |
