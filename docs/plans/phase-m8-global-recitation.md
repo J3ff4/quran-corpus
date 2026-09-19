@@ -622,7 +622,7 @@ from Expo Go). Device OnePlus 7Pro / GM1917, gesture nav, dark theme.
 | # | Result | Evidence |
 |---|--------|----------|
 | 344 | PASS | `input swipe 590 2885 → 950 2885` over 5000ms. Reader top chrome and the docked player both still on screen mid-drag and after release. The player's reset to `0:00 / --:--` after the drag is not a scrub defect: logcat shows the track reached `position=14448` of a 14.4s ayah and `abandonAudioFocus`, i.e. it ended normally with Continuous play off. |
-| 345 | OWED | Motion judgment. No `ffmpeg`/`cv2` in this container, and `screencap` is far too slow to sample a 280ms curve, so there is no way to substitute a measurement for the eye. |
+| 345 | FAIL at 280ms, re-run owed at 400ms | Motion judgment. No `ffmpeg`/`cv2` in this container, and `screencap` is far too slow to sample the curve, so there is no way to substitute a measurement for the eye. The owner watched it on 2026-09-19: 280ms still reads as a snap, the same verdict 180ms got on 2026-09-15. Raised to 400ms in `PLAYER_GROW_MS` (`b2fec38`), which also collapsed the duplicate per-caller constants into one in `PlayerShell`. The check re-runs on the next build. |
 | 348 | BLOCKED — premise absent | The check assumes a docked mini-player under the word sheet. **The morphology/WbW screen docks no player surface at all.** Verified with audio confirmed live: `requestAudioFocus` at 02:27:12, screenshot at 02:27:1x, word sheet open, nothing behind it. The sheet renders clean either way, but the overlap this check exists to catch cannot occur until a bar is put there. |
 | M8a three-button nav | OWED | `adb shell settings put` is denied, the phone is on gesture nav, and it is also this session's display. |
 

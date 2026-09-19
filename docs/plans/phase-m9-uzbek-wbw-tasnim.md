@@ -744,7 +744,7 @@ signed release build. OnePlus 7Pro / GM1917.
 | 363 | PASS | With Tarjima = English the whole "Oʻzbek yozuvi" row disappears; it returns when Tarjima goes back to O'zbek, including under an English interface. |
 | 366 | PASS | Root `قول`: TARJIMASI (деди · айтгин · дедилар …) first, then Hans Wehr, then Lane's Lexicon. |
 | 367 | PASS | About credits Tanzil, corpus.quran.com, QUL, Saheeh International, **Tasnim**, Abu Adel, Hans Wehr, Lane, KFGQPC, Newsreader. **Zero** occurrences of NLLB anywhere in the scrolled screen. |
-| 368 | PASS (Latin) / OWED (Cyrillic) | `boshlayman` returns exactly 1:1 and 40:29 in Tasnim Latin. The Cyrillic arm has no injection path: `adb shell input text` rejects non-ASCII, `cmd clipboard` is not implemented on this device ("No shell command implementation"), and `app/search.tsx` reads no query param, so no deep link can carry the term. Needs the owner's keyboard. |
+| 368 | PASS (both arms) | `boshlayman` returns exactly 1:1 and 40:29 in Tasnim Latin. The Cyrillic arm has no injection path: `adb shell input text` rejects non-ASCII, `cmd clipboard` is not implemented on this device ("No shell command implementation"), and `app/search.tsx` reads no query param, so no deep link can carry the term. The owner typed it on the device keyboard on 2026-09-19 and confirmed the Cyrillic arm returns the expected ayahs, closing the arm this run could not reach. |
 | 369 | PASS | `am start -W` cold start 967ms (a second run 1008ms). logcat shows expo-modules-core and `libexpo-sqlite.so` loading, `ReactNativeJS: Running "main"`, and no ANR, no FATAL, no red box. |
 
 ### Defects found by this run

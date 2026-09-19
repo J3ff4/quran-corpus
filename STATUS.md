@@ -47,13 +47,15 @@ since M6. Section results written per-check into the three phase plans.
   English interface when the translation is Uzbek, so M10's open cookie question
   matches shipped behaviour. Still the owner's to confirm as intent.
 
-**Still owed after the vc23 run.** The #87 ruling (blocks any fix); M8 345
-(motion judgment — no `ffmpeg`/`cv2` here and `screencap` cannot sample 280ms);
-M8a's three-button-navigation check (`settings put` denied, phone on gesture
-nav); 368's Cyrillic arm (`input text` rejects non-ASCII, `cmd clipboard` is
-unimplemented on this device, and `app/search.tsx` takes no query param, so it
-needs the owner's keyboard); C5's spoken TalkBack output; and the M10
-script-cookie question.
+**Still owed after the vc23 run** (2026-09-19, narrowed by the owner). The #87
+ruling, which blocks any fix and now has a third screen's evidence behind it:
+WbW docks no player surface at all. M8 345 — the owner watched it and 280ms
+still reads as a snap, so `PLAYER_GROW_MS` went to 400ms (`b2fec38`) and the
+check re-runs on the next build. M8a's three-button-navigation check, which the
+owner is running by hand (`settings put` is denied to adb). C5's spoken TalkBack
+output. And the M10 script-cookie question. **368 is closed** — the owner typed
+`бошлайман` on the device keyboard and the Cyrillic arm returns its ayahs, so
+both arms pass.
 
 **2026-09-18 — M8's device run landed, with four UI issues (PR #88, squash
 `bc66e81`).** Checks 340-352 on vc22, owed since the M8 and M8a merges:
