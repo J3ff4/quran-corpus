@@ -442,6 +442,33 @@ describe('SurahReader', () => {
     expect(mocks.scrollToIndex).not.toHaveBeenCalled();
   });
 
+  it('re-lands on an ayah it is already seeded with', () => {
+    // A jump names the ayah the seed already holds -- picking the surah you
+    // are reading. On the ayah alone that is indistinguishable from no jump at
+    // all, so the seed carries which request it is (issue #94).
+    const props = { ...baseProps(readerData(300)), initialAyahNumber: 100 };
+    const { rerender } = render(<SurahReader {...props} seedNonce={1} />);
+    expect(mocks.scrollToIndex).toHaveBeenCalledWith({ index: 99, animated: false });
+
+    mocks.scrollToIndex.mockClear();
+    rerender(<SurahReader {...props} seedNonce={2} />);
+
+    expect(mocks.scrollToIndex).toHaveBeenCalledWith({ index: 99, animated: false });
+  });
+
+  it('sends a scrolled reader back to the top when the first ayah is asked for again', () => {
+    // Index 0 is "no landing needed" only at mount. Once the reader has been
+    // scrolled, asking for ayah 1 is a real move, and the offset is the list's
+    // own top rather than the row's -- the surah plate sits above it.
+    const props = { ...baseProps(readerData(300)), initialAyahNumber: 1 };
+    const { rerender } = render(<SurahReader {...props} seedNonce={0} />);
+    expect(mocks.scrollToOffset).not.toHaveBeenCalled();
+
+    rerender(<SurahReader {...props} seedNonce={1} />);
+
+    expect(mocks.scrollToOffset).toHaveBeenCalledWith({ offset: 0, animated: false });
+  });
+
   it('gives FlatList a getItemLayout so it can jump without measuring', () => {
     const props = baseProps(readerData(10));
     render(<SurahReader {...props} />);

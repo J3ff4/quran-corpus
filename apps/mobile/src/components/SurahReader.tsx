@@ -90,6 +90,9 @@ interface SurahReaderProps {
   onChangeShowTranslation?: (show: boolean) => void;
   /** Ayah to open at, from a bookmark or the saved reading position. */
   initialAyahNumber?: number | null;
+  /** Which request that seed is. Bumped by the caller on every jump, so a jump
+   *  to the ayah already seeded still lands -- see the anchor note below. */
+  seedNonce?: number;
   /** Omitted leaves the reader as a plain mushaf: every ayah renders its full
    *  Uthmani text, with no tap targets. */
   loadWords?: (ayahId: number) => Promise<Word[]>;
@@ -231,6 +234,7 @@ interface AyahListProps {
   data: SurahReaderData;
   /** The ayah to land on, captured when the layer mounts. */
   seedAyah: number | null;
+  seedNonce: number;
   /** Whether this is the layer the reader is looking at. Only the live layer
    *  records the reading position and asks for words -- one laying out under a
    *  cross-fade must do neither, or a landing it has not finished overwrites
@@ -289,6 +293,7 @@ interface AyahListProps {
 function AyahList({
   data,
   seedAyah,
+  seedNonce,
   live,
   onLanded,
   arriving,
@@ -422,7 +427,10 @@ function AyahList({
   // for its page: an effect would set state *after* the landing effect had
   // already run against the seed, so every mount landed twice -- the second
   // scroll restarting a sequence the first had begun.
-  const anchorKey = `${data.surah.id}:${seedAyah ?? ''}`;
+  // `seedNonce` is in the key, not just the ayah: a jump can name the ayah the
+  // seed already holds, and on a value alone that is indistinguishable from not
+  // jumping at all. The caller counts its jumps so each one is its own key.
+  const anchorKey = `${data.surah.id}:${seedAyah ?? ''}:${seedNonce}`;
   const [anchor, setAnchor] = useState(() => ({ key: anchorKey, ayah: seedAyah, nonce: 0 }));
   if (anchor.key !== anchorKey) {
     setAnchor({
@@ -499,9 +507,21 @@ function AyahList({
   }, [onLanded, live]);
 
   useEffect(() => {
-    // -1 means the ayah is not in this surah; 0 means the list already opens
-    // on it. Neither is a landing, and both must reveal the reader at once.
+    // -1 means the ayah is not in this surah; 0 means the first row. Neither
+    // needs the measuring sequence below, and both must reveal the reader at
+    // once.
     if (initialIndex <= 0) {
+      // "The list already opens on it" holds only while the list has not been
+      // scrolled. `anchor.nonce` is 0 for the seed a mount starts with and
+      // non-zero for every request after it, so a later ask for the first ayah
+      // is a reader somewhere down the surah being sent back to the top --
+      // picking al-Baqara from inside al-Baqara used to close the sheets and
+      // leave the page where it was (issue #94). Offset rather than index 0,
+      // because a row's own top is not the top of the list: the surah plate
+      // sits above it in the header.
+      if (initialIndex === 0 && anchor.nonce > 0) {
+        listRef.current?.scrollToOffset({ offset: 0, animated: false });
+      }
       positionedRef.current = true;
       setPositioned(true);
       onLandedRef.current();
@@ -854,6 +874,7 @@ export function SurahReader({
   showTranslation = true,
   onChangeShowTranslation,
   initialAyahNumber,
+  seedNonce = 0,
   loadWords,
   loadWordSummary,
   onToggleBookmark,
@@ -1141,6 +1162,7 @@ export function SurahReader({
       <AyahList
         data={data}
         seedAyah={initialAyahNumber ?? null}
+        seedNonce={seedNonce}
         live
         onLanded={noopLanded}
         arriving={false}

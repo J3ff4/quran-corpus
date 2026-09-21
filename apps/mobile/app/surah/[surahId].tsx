@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
@@ -83,7 +83,16 @@ export default function SurahRoute() {
   // Where the jump sheet was last sent, carried HERE rather than inside
   // SurahReader: that component is keyed by the displayed surah, so a jump
   // into another surah remounts the very thing holding the ayah it asked for.
-  const [jump, setJump] = useState<{ surahId: number; ayahNumber: number } | null>(null);
+  const [jump, setJump] = useState<{ surahId: number; ayahNumber: number; nonce: number } | null>(
+    null,
+  );
+  // Asking for the ayah already seeded is still a request to land on it. The
+  // seed is a value, so `2:1` following `2:1` reads as no change at all and
+  // the reader stays where it was scrolled to -- picking al-Baqara from inside
+  // al-Baqara closed the sheets and did nothing (issue #94). The counter gives
+  // each request its own identity; it never resets, so a jump cannot collide
+  // with an earlier one that happened to carry the same number.
+  const jumpCount = useRef(0);
   // A new route target outranks a jump made under the old one. Without this the
   // jump shadows it for good: SurahReader documents an `ayah` param change on an
   // already-mounted reader as a supported path (an external deep link into the
@@ -96,12 +105,15 @@ export default function SurahRoute() {
   // The jump wins over the route while it names the surah on screen: it is the
   // more recent of the two, and the route's own ayah belongs to how the reader
   // was opened.
-  const initialAyahNumber =
-    jump && jump.surahId === displayedSurahId
-      ? jump.ayahNumber
-      : displayedSurahId === routeSurahId
-        ? routeAyahNumber
-        : null;
+  const jumpHere = jump && jump.surahId === displayedSurahId ? jump : null;
+  const initialAyahNumber = jumpHere
+    ? jumpHere.ayahNumber
+    : displayedSurahId === routeSurahId
+      ? routeAyahNumber
+      : null;
+  // 0 for a seed that came from the route: the route's own ayah is requested
+  // once, by opening the screen.
+  const seedNonce = jumpHere ? jumpHere.nonce : 0;
   // ayahCount is what stops continuous play at the end of the surah, so it
   // comes from the loaded surah rather than a constant; 0 until the reader
   // loads, which is also the window in which nothing can be tapped to play.
@@ -272,7 +284,8 @@ export default function SurahRoute() {
 
   const onJump = useCallback(
     (target: number, ayahNumber: number) => {
-      setJump({ surahId: target, ayahNumber });
+      jumpCount.current += 1;
+      setJump({ surahId: target, ayahNumber, nonce: jumpCount.current });
       // Within the surah on screen there is nothing to page: the seed above is
       // the whole move, and AyahList re-anchors on a seed change.
       if (surahId !== null && target !== surahId) {
@@ -438,6 +451,7 @@ export default function SurahRoute() {
         showTranslation={showTranslation}
         onChangeShowTranslation={setShowTranslation}
         initialAyahNumber={initialAyahNumber}
+        seedNonce={seedNonce}
         loadWords={loadWords}
         loadWordSummary={loadWordSummary}
         onToggleBookmark={toggleBookmark}
