@@ -16,6 +16,20 @@ const SURAHS: SurahListItem[] = [
 
 const ids = (query: string) => matchSurahs(SURAHS, query).map((surah) => surah.id);
 
+/** One fixture row, optionally varied. `SURAHS[1]` is `SurahListItem |
+ *  undefined` under noUncheckedIndexedAccess, and spreading that gives an
+ *  all-optional object matchSurahs will not accept -- so the index is checked
+ *  once here instead of at every call site. */
+const row = (
+  rows: readonly SurahListItem[],
+  index: number,
+  overrides: Partial<SurahListItem> = {},
+): SurahListItem => {
+  const base = rows[index];
+  if (!base) throw new Error(`no fixture row at index ${index}`);
+  return { ...base, ...overrides };
+};
+
 describe('matchSurahs, by transliteration', () => {
   it.each(['baqara', 'Baqarah', 'bakara', 'al-baqara', 'AL BAQARA', 'Al-Baqarah'])(
     'finds al-Baqarah from %s',
@@ -60,7 +74,7 @@ describe('matchSurahs, by meaning and number', () => {
   it('finds a surah by its localized meaning, whatever the language', () => {
     // The rows carry the UI language's meaning already, so the arm is
     // language-agnostic by construction.
-    const uz = [{ ...SURAHS[1], nameTranslit: 'Baqara', nameTranslation: 'Sigir' }];
+    const uz = [row(SURAHS, 1, { nameTranslit: 'Baqara', nameTranslation: 'Sigir' })];
     expect(matchSurahs(uz, 'sigir').map((surah) => surah.id)).toEqual([2]);
   });
 
@@ -111,8 +125,8 @@ describe('matchSurahs, ranking and edges', () => {
     // A query that is both a name prefix and another row's meaning has to
     // lead with the name.
     const rows = [
-      { ...SURAHS[3] },
-      { ...SURAHS[0], nameTranslation: 'The Nur of guidance' },
+      row(SURAHS, 3),
+      row(SURAHS, 0, { nameTranslation: 'The Nur of guidance' }),
     ];
     expect(matchSurahs(rows, 'nur').map((surah) => surah.id)).toEqual([24, 1]);
   });
@@ -121,8 +135,8 @@ describe('matchSurahs, ranking and edges', () => {
     // surahName.ts's contract, kept: a fragment inside a name is a
     // coincidence far more often than an intention.
     const rows = [
-      { ...SURAHS[2], id: 99, nameTranslit: 'Abu-Yunus' },
-      { ...SURAHS[2] },
+      row(SURAHS, 2, { id: 99, nameTranslit: 'Abu-Yunus' }),
+      row(SURAHS, 2),
     ];
     expect(matchSurahs(rows, 'yunus').map((surah) => surah.id)).toEqual([10]);
     expect(matchSurahs(rows, 'abuyunus').map((surah) => surah.id)).toEqual([99]);
@@ -187,7 +201,7 @@ describe('matchSurahs, under a Cyrillic name column', () => {
 
   it('matches Uzbek Cyrillic through the same letters', () => {
     // `қ` -> `q` is what makes Бақара and Baqarah one name.
-    const uzCyrl = [{ ...RU[1], nameTranslit: 'Бақара', nameTranslation: 'Сигир' }];
+    const uzCyrl = [row(RU, 1, { nameTranslit: 'Бақара', nameTranslation: 'Сигир' })];
     expect(matchSurahs(uzCyrl, 'baqara').map((s) => s.id)).toEqual([2]);
     expect(matchSurahs(uzCyrl, 'Бақара').map((s) => s.id)).toEqual([2]);
   });
