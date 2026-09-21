@@ -109,6 +109,36 @@ describe('matchSurahs, by Arabic name', () => {
     expect(ids('الاخلاص')[0]).toBe(112);
   });
 
+  it('narrows monotonically as the name is typed', () => {
+    // The dead zone: `ال` and `الف` used to keep their article while every
+    // stored name had already lost its, so the picker said "No surah by that
+    // name" for two keystrokes in the middle of a name it resolves at the
+    // fourth. Under the floor the first two are simply too short to filter
+    // with, and from three characters on the results only narrow.
+    expect(ids('ا')).toEqual([]);
+    expect(ids('ال')).toEqual([]);
+    expect(ids('الف')).toEqual([1]);
+    expect(ids('الفا')).toEqual([1]);
+    expect(ids('الفاتحة')).toEqual([1]);
+  });
+
+  it('does not let one letter filter with', () => {
+    // `ا` is inside most of the 114, and substring-matching on it returned
+    // them in id order -- a filter that filters nothing. Below the floor the
+    // arm does not run, exactly as the Latin arms have not run under three
+    // characters since #31.
+    expect(ids('ا')).toEqual([]);
+    expect(ids('ن')).toEqual([]);
+    // Same length, same silence, on the Latin side.
+    expect(ids('al')).toEqual([]);
+  });
+
+  it('matches an Arabic name from its start, never from its middle', () => {
+    // The rule the Latin prefix arm already keeps. `قرة` is inside البقرة.
+    expect(ids('بقرة')).toEqual([2]);
+    expect(ids('قرة')).toEqual([]);
+  });
+
   it('normalizes both sides to NFC', () => {
     // al-Ikhlas, not al-Baqarah: only a hamza-bearing letter decomposes at
     // all, so a name without one would assert nothing here.

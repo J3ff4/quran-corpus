@@ -41,8 +41,26 @@ import type { SurahListItem } from '@/data/corpusRepository';
  *  writes as ha -- search can skip both because it demands an exact match on a
  *  name the reader spelled out; a filter is typed a letter at a time. */
 export function foldArabicName(raw: string): string {
-  const folded = normalizeArabic(raw.normalize('NFC')).replace(/\s/g, '').replace(/ة/g, 'ه');
-  return folded.startsWith('ال') && folded.length > 3 ? folded.slice(2) : folded;
+  return stripArabicArticle(foldArabicLetters(raw));
+}
+
+/** The letter-level half of the fold, without the article. Shared so the query
+ *  can be measured before its article comes off and the stored name cannot. */
+function foldArabicLetters(raw: string): string {
+  return normalizeArabic(raw.normalize('NFC')).replace(/\s/g, '').replace(/ة/g, 'ه');
+}
+
+/** `الفاتحة` -> `فاتحه`, on a stored name and on a query alike.
+ *
+ *  Unconditional, where it used to require more than three characters left
+ *  over. That length guard only ever held for the stored names, which are all
+ *  long -- on a query typed a letter at a time it produced a dead zone: `ال`
+ *  and `الف` kept their article, no stored name had one left, and the picker
+ *  showed "No surah by that name" for two keystrokes in the middle of a name
+ *  it resolves correctly at the fourth. Below the floor the arm does not run
+ *  at all, so there is nothing left for the guard to protect. */
+function stripArabicArticle(folded: string): string {
+  return folded.startsWith('ال') ? folded.slice(2) : folded;
 }
 
 /** Cyrillic, letter by letter, in the romanization the corpus already uses
@@ -98,6 +116,15 @@ const MEANING_MIN = 3;
  *  article; this is the same word arriving alone. */
 const MEANING_STOPWORDS = new Set(['the']);
 
+/** The Arabic arm's floor, counted on what the reader typed -- before the
+ *  article comes off, because `ال` is two of the three characters and taking
+ *  it off first would let a one-letter query through.
+ *
+ *  Without this, `ا` alone substring-matched most of the 114 and returned them
+ *  in id order: a filter that filters nothing. The Latin arms have had a
+ *  3-character floor since #31; this is the same one. */
+const ARABIC_MIN = 3;
+
 /** Lower sorts first. A name hit always outranks a meaning hit -- the name is
  *  what was asked for, the meaning is a convenience. */
 const RANK = { number: 0, exact: 1, prefix: 2, arabic: 3, meaning: 4 } as const;
@@ -131,7 +158,10 @@ function rankOf(item: SurahListItem, query: QueryKeys): number {
     if (surahNamePrefixMatch(query.latin, translit)) return RANK.prefix;
   }
 
-  if (query.arabic.length > 0 && foldArabicName(item.nameArabic).includes(query.arabic)) {
+  // From the start of the name, never from its middle -- the rule the Latin
+  // prefix arm already keeps, and for the same reason: a fragment inside a
+  // name is a coincidence far more often than an intention.
+  if (query.arabic.length > 0 && foldArabicName(item.nameArabic).startsWith(query.arabic)) {
     return RANK.arabic;
   }
 
@@ -141,6 +171,14 @@ function rankOf(item: SurahListItem, query: QueryKeys): number {
   }
 
   return Number.POSITIVE_INFINITY;
+}
+
+/** The query's Arabic key, or the empty string when it is too short to filter
+ *  with. The floor is measured on the folded query BEFORE the article is
+ *  stripped, so `ال` never becomes a zero-length key that matches everything. */
+function arabicQueryKey(raw: string): string {
+  const folded = foldArabicLetters(raw);
+  return folded.length >= ARABIC_MIN ? stripArabicArticle(folded) : '';
 }
 
 /**
@@ -157,7 +195,7 @@ export function matchSurahs(items: readonly SurahListItem[], query: string): Sur
   const keys: QueryKeys = {
     latin: surahNameKeys(latinized),
     english: surahTranslationKeys(latinized),
-    arabic: foldArabicName(trimmed),
+    arabic: arabicQueryKey(trimmed),
     // A bare number still works inside the picker: someone who knows it should
     // not have to close the sheet to use it.
     digits: /^\d{1,3}$/.test(trimmed) ? Number(trimmed) : null,

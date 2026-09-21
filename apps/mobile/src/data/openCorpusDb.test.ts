@@ -191,6 +191,39 @@ describe('a rebuilt corpus reaching a device that already ran the app', () => {
     expect(files.has(`${sqliteDir}/quran-corpus-m1.db`)).toBe(false);
   });
 
+  it('takes the stale extract\'s WAL sidecars with it', async () => {
+    // expo-sqlite opens in WAL mode, so every extract leaves a -wal and a -shm
+    // beside it. A pattern that matched only the `.db` left them on the device
+    // for good, which is the space this loop exists to reclaim.
+    const { fileSystem, files } = createFileSystem({
+      [`${sqliteDir}/quran-corpus-m1.db`]: 'old corpus',
+      [`${sqliteDir}/quran-corpus-m1.db-wal`]: 'old wal',
+      [`${sqliteDir}/quran-corpus-m1.db-shm`]: 'old shm',
+    });
+
+    await ensureCorpusDbFile(fileSystem, sqliteDir, async () => assetUri);
+
+    expect(files.has(`${sqliteDir}/quran-corpus-m1.db-wal`)).toBe(false);
+    expect(files.has(`${sqliteDir}/quran-corpus-m1.db-shm`)).toBe(false);
+  });
+
+  it("leaves the user DB's own sidecars alone", async () => {
+    // `quran-corpus-user.db-wal` matches the pattern just as the DB itself
+    // does, and deleting a live WAL loses whatever has not been checkpointed.
+    const wal = `${sqliteDir}/${userDbFileName}-wal`;
+    const shm = `${sqliteDir}/${userDbFileName}-shm`;
+    const { fileSystem, files } = createFileSystem({
+      [`${sqliteDir}/${userDbFileName}`]: 'bookmarks and notes',
+      [wal]: 'uncheckpointed writes',
+      [shm]: 'shared memory',
+    });
+
+    await ensureCorpusDbFile(fileSystem, sqliteDir, async () => assetUri);
+
+    expect(files.get(wal)).toBe('uncheckpointed writes');
+    expect(files.get(shm)).toBe('shared memory');
+  });
+
   it('matches the user DB name against the pattern it has to survive', async () => {
     // Stating the trap outright: the exclusion is load-bearing precisely
     // because the name DOES look like an extract. If a future rename makes it

@@ -49,8 +49,9 @@ export const corpusDbFileName = `quran-corpus-${corpusDbVersion}.db`;
  *  them. userDb.ts imports the name back from here, so the two cannot drift. */
 export const userDbFileName = 'quran-corpus-user.db';
 
-/** Matches this app's own extracts, any version -- and nothing else in the
- *  SQLite directory.
+/** Matches this app's own extracts, any version, including the `-wal`/`-shm`
+ *  sidecars SQLite writes beside them -- and nothing else in the SQLite
+ *  directory.
  *
  *  `user` is [a-z0-9]+, so `quran-corpus-user.db` matched this pattern and the
  *  cleanup below deleted the user's database on every corpus-version bump --
@@ -60,7 +61,7 @@ export const userDbFileName = 'quran-corpus-user.db';
  *  exclusion is asserted in a test; the pattern alone cannot express it,
  *  because any tightening still has to be right about a name it was never
  *  meant to match. */
-const corpusDbPattern = /^quran-corpus-[a-z0-9]+\.db(\.partial)?$/;
+const corpusDbPattern = /^quran-corpus-[a-z0-9]+\.db(\.partial)?(-wal|-shm|-journal)?$/;
 
 // The extraction below copies ~134 MB while the user stares at a fresh install,
 // so it is the slowest thing the app ever does. Callers hold the splash screen
@@ -101,9 +102,15 @@ export async function ensureCorpusDbFile(
   // space is not asked to hold both at once. The user DB lives in this same
   // directory and is skipped by name, not by trusting the pattern: it used to
   // match, and the phone paid for it.
+  //
+  // The `-wal`/`-shm` sidecars go with it. expo-sqlite opens in WAL mode, so
+  // every extract leaves a pair of them, and a pattern that matched only the
+  // `.db` left them behind on every bump -- accumulating exactly the space
+  // this loop exists to reclaim.
+  const keep = new Set([corpusDbFileName, `${corpusDbFileName}-wal`, `${corpusDbFileName}-shm`]);
   for (const entry of await fileSystem.readDirectoryAsync(sqliteDir)) {
-    if (entry === userDbFileName) continue;
-    if (corpusDbPattern.test(entry) && entry !== corpusDbFileName) {
+    if (entry === userDbFileName || entry.startsWith(`${userDbFileName}-`)) continue;
+    if (corpusDbPattern.test(entry) && !keep.has(entry)) {
       await fileSystem.deleteAsync(`${sqliteDir}/${entry}`, { idempotent: true });
     }
   }
