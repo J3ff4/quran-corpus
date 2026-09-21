@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { SurahListItem } from '@/data/corpusRepository';
-import { foldArabicName, matchSurahs } from './matchSurah';
+import { foldArabicName, latinize, matchSurahs } from './matchSurah';
 
 /** A slice of the real index -- the rows whose spellings actually disagree. */
 const SURAHS: SurahListItem[] = [
@@ -152,5 +152,55 @@ describe('matchSurahs, ranking and edges', () => {
     const original = [...SURAHS];
     matchSurahs(SURAHS, 'cow');
     expect(SURAHS).toEqual(original);
+  });
+});
+
+describe('matchSurahs, under a Cyrillic name column', () => {
+  // What the ru rows actually store: `surah_names.name` REPLACES
+  // `surahs.name_translit`, so under a Russian UI the transliteration column
+  // is Cyrillic and the English meaning is gone.
+  const RU: SurahListItem[] = [
+    { id: 1, nameArabic: 'الفاتحة', nameTranslit: 'Фатиха', nameTranslation: 'Открывающая книгу', ayahCount: 7 },
+    { id: 2, nameArabic: 'البقرة', nameTranslit: 'Бакара', nameTranslation: 'Корова', ayahCount: 286 },
+    { id: 24, nameArabic: 'النور', nameTranslit: 'Нур', nameTranslation: 'Свет', ayahCount: 64 },
+    { id: 106, nameArabic: 'قريش', nameTranslit: 'Курайш', nameTranslation: 'Курейшиты', ayahCount: 4 },
+  ];
+  const ruIds = (query: string) => matchSurahs(RU, query).map((surah) => surah.id);
+
+  it.each(['Бакара', 'бакара', 'бакар'])('finds al-Baqara typed in Cyrillic: %s', (query) => {
+    expect(ruIds(query)[0]).toBe(2);
+  });
+
+  it('still finds it typed in Latin', () => {
+    // The regression this guards: `[^a-z0-9]` empties a Cyrillic name, so
+    // BOTH directions died at once -- the Latin query had nothing to match
+    // against once the stored name stopped being Latin.
+    expect(ruIds('baqara')[0]).toBe(2);
+    expect(ruIds('bakara')[0]).toBe(2);
+    expect(ruIds('kuraysh')[0]).toBe(106);
+  });
+
+  it('finds a surah by its Russian meaning', () => {
+    expect(ruIds('корова')).toEqual([2]);
+    expect(ruIds('свет')).toEqual([24]);
+  });
+
+  it('matches Uzbek Cyrillic through the same letters', () => {
+    // `қ` -> `q` is what makes Бақара and Baqarah one name.
+    const uzCyrl = [{ ...RU[1], nameTranslit: 'Бақара', nameTranslation: 'Сигир' }];
+    expect(matchSurahs(uzCyrl, 'baqara').map((s) => s.id)).toEqual([2]);
+    expect(matchSurahs(uzCyrl, 'Бақара').map((s) => s.id)).toEqual([2]);
+  });
+
+  it('leaves Latin text alone', () => {
+    // latinize runs on every query, including the English ones above, so it
+    // has to be the identity outside Cyrillic.
+    expect(latinize('Al-Baqarah')).toBe('Al-Baqarah');
+    expect(latinize('البقرة')).toBe('البقرة');
+    expect(ids('baqara')).toEqual([2]);
+  });
+
+  it('still returns nothing for a miss', () => {
+    expect(ruIds('ззз')).toEqual([]);
   });
 });
