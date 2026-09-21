@@ -60,6 +60,11 @@ const GROUPS: { title: UiStringKey; credits: Credit[] }[] = [
       // rest of the uncleared set -- this row is what makes that auditable.
       { name: 'QUL', body: 'about.sourceMushafLayout', pending: true },
       ...TRANSLATION_CREDITS,
+      // The surah NAMES, not the verse translation -- a different party
+      // from whoever translated the text, so it cannot ride on the
+      // translator credit above. Pending like the rest of the uncleared
+      // set: nobody has looked at the site's terms (§11).
+      { name: 'vkorane.ru', body: 'about.sourceSurahNamesRu', pending: true },
     ],
   },
   {

@@ -855,6 +855,24 @@ def import_tasnim_cmd(db: str, tasnim: str, export: str, rejects: str) -> None:
     )
 
 
+@main.command("import-ru-surah-names")
+@click.option("--db", default="quran.db", show_default=True, help="Corpus DB to write")
+@click.option(
+    "--tsv",
+    default=None,
+    help="Override the shipped tools/ru_surah_names.tsv (for a re-fetch)",
+)
+def import_ru_surah_names_cmd(db: str, tsv: str | None) -> None:
+    """Import the Russian surah names and meanings (issue #93)."""
+    from .ru_surah_names import TSV_PATH, import_ru_surah_names
+
+    summary = import_ru_surah_names(Path(db), Path(tsv) if tsv else TSV_PATH)
+    click.echo(
+        f"surah names {summary.written}; defects corrected {summary.overridden}; "
+        f"meanings dropped as name-repeats {summary.meanings_dropped}"
+    )
+
+
 @main.command("derive-root-glosses")
 @click.option("--db", default="quran.db", show_default=True, help="Corpus DB to write")
 @click.option(
