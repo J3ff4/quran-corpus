@@ -234,6 +234,21 @@ class TestImport:
         con.close()
 
 
+class TestTheWordThatIsNotAnArticle:
+    def test_keeps_aal_in_aal_imran(self) -> None:
+        # آل عمران -- `Āl` is "family of", which Russian also renders `Аль`.
+        # Stripping it leaves Imran the man, not the surah. The Uzbek rows
+        # keep it (`Oli Imron`), and the two languages share one slot.
+        rows = {row.surah_id: row for row in load_rows()}
+        assert rows[3].name == "Аль Имран"
+        assert rows[3].meaning == "Семейство Имрана"
+
+    def test_still_strips_the_real_article_either_side_of_it(self) -> None:
+        rows = {row.surah_id: row for row in load_rows()}
+        assert rows[2].name == "Бакара"
+        assert rows[4].name == "Ниса"
+
+
 class TestTheDatabaseItIsPointedAt:
     def test_refuses_a_path_that_is_not_there(self, tmp_path: Path) -> None:
         # sqlite3.connect CREATES the file, so without this guard a mistyped

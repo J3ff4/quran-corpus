@@ -124,15 +124,16 @@ def load_rows(path: Path = TSV_PATH) -> list[RuSurahName]:
                     f"mixes scripts: {stray} -- a Latin letter inside a "
                     f"Cyrillic word matches nothing"
                 )
+        stored_name = name if surah_id in _KEEP_ARTICLE else strip_article(name)
         rows.append(
             RuSurahName(
                 surah_id=surah_id,
-                name=strip_article(name),
+                name=stored_name,
                 # The name repeated is not a meaning: Худ means Худ, and storing
                 # the repeat renders as "Худ · Худ" wherever both are shown.
                 # Same rule tasnim_import.py applies to Tavba and Ixlos.
                 meaning=None
-                if not meaning or _same_word(meaning, strip_article(name))
+                if not meaning or _same_word(meaning, stored_name)
                 else meaning,
             )
         )
@@ -147,6 +148,13 @@ def load_rows(path: Path = TSV_PATH) -> list[RuSurahName]:
 # form the 114 names actually use. `Аль` first, so `Ал` can never match it
 # while a longer form is available.
 _ARTICLES = ("Аль", "Ад", "Аз", "Ан", "Ар", "Ас", "Ат", "Аш")
+
+# Surahs whose leading `Аль` is not the definite article. Surah 3 is آل عمران
+# -- `Āl`, the word for "family of", which Russian also renders `Аль`. Strip it
+# and "Family of Imran" becomes Imran the man. The Uzbek rows keep it too
+# (`Oli Imron`, `Оли Имрон`), so keeping it here is what makes the two
+# languages agree in the one slot they share.
+_KEEP_ARTICLE = {3}
 
 # Below this the remainder is not a name, it is what is left of one. Nothing in
 # the 114 comes close -- the shortest stripped name is Нур at three -- so this
