@@ -101,3 +101,65 @@ describe('openUserDb', () => {
     expect(mocks.opens).toHaveLength(2);
   });
 });
+
+describe('reportIfBrandNew', () => {
+  const sqliteDir = 'file:///data/user/0/com.qurancorpus.mobile/files/SQLite';
+
+  function fs(files: string[]) {
+    return {
+      getInfoAsync: async (uri: string) => ({
+        exists: files.some((name) => `${sqliteDir}/${name}` === uri),
+      }),
+      readDirectoryAsync: async () => files,
+    };
+  }
+
+  it('says nothing when the database is already there', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { reportIfBrandNew } = await import('./userDb.js');
+
+    await reportIfBrandNew(fs(['quran-corpus-user.db', 'quran-corpus-m11a.db']), sqliteDir);
+
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('warns, and names what else is in the directory, when it is about to create one', async () => {
+    // The signal that was missing on 2026-09-21 (#96): a brand-new user DB on
+    // a device that had been running the app for three weeks looked exactly
+    // like a first launch.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { reportIfBrandNew } = await import('./userDb.js');
+
+    await reportIfBrandNew(fs(['quran-corpus-m11a.db']), sqliteDir);
+
+    expect(warn).toHaveBeenCalledOnce();
+    const message = String(warn.mock.calls[0]?.[0]);
+    expect(message).toContain('creating a NEW quran-corpus-user.db');
+    // The listing is the half that says whether the corpus went too.
+    expect(message).toContain('quran-corpus-m11a.db');
+    warn.mockRestore();
+  });
+
+  it('never throws out of a filesystem that refuses to answer', async () => {
+    // It runs on the open path. A diagnostic that can break the open it
+    // describes is worse than the blind spot it fills.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { reportIfBrandNew } = await import('./userDb.js');
+
+    await expect(
+      reportIfBrandNew(
+        {
+          getInfoAsync: async () => {
+            throw new Error('EACCES');
+          },
+          readDirectoryAsync: async () => [],
+        },
+        sqliteDir,
+      ),
+    ).resolves.toBeUndefined();
+
+    expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
+  });
+});

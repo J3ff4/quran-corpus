@@ -57,6 +57,40 @@ describe('useSurahIndex', () => {
     expect(mocks.getSurahList.mock.calls[0]?.[1]).toBe('uz-Cyrl');
   });
 
+  it('tries the read a second time before giving up on it', async () => {
+    // A failed read used to leave the hook at null for the life of the screen,
+    // and every caller hides the browse row while it is null -- one transient
+    // failure removed a whole entry point for the session (#95).
+    mocks.getSurahList
+      .mockReset()
+      .mockRejectedValueOnce(new Error('disk hiccup'))
+      .mockResolvedValue([{ id: 1, ayahCount: 7 }]);
+
+    function Rows() {
+      const { surahs } = useSurahIndex();
+      return <span data-testid="rows">{surahs === null ? 'null' : String(surahs.length)}</span>;
+    }
+    render(<Rows />);
+
+    await waitFor(() => expect(screen.getByTestId('rows').textContent).toBe('1'));
+    expect(mocks.getSurahList).toHaveBeenCalledTimes(2);
+  });
+
+  it('gives up after the second attempt rather than retrying forever', async () => {
+    mocks.getSurahList.mockReset().mockRejectedValue(new Error('corpus is gone'));
+
+    function Rows() {
+      const { surahs } = useSurahIndex();
+      return <span data-testid="rows">{surahs === null ? 'null' : String(surahs.length)}</span>;
+    }
+    render(<Rows />);
+
+    await waitFor(() => expect(mocks.getSurahList).toHaveBeenCalledTimes(2));
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    expect(mocks.getSurahList).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId('rows').textContent).toBe('null');
+  });
+
   it('drops the old language-s rows when a re-read fails', async () => {
     // The rows carry their names IN a language. Left standing through a failed
     // switch they show the previous script with nothing to say the switch did

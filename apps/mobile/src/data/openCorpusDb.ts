@@ -111,6 +111,11 @@ export async function ensureCorpusDbFile(
   for (const entry of await fileSystem.readDirectoryAsync(sqliteDir)) {
     if (entry === userDbFileName || entry.startsWith(`${userDbFileName}-`)) continue;
     if (corpusDbPattern.test(entry) && !keep.has(entry)) {
+      // Named, not silent. This loop deleted the user's database once (#92)
+      // and the app said nothing about it either time it ran; a line per
+      // deletion is what turns the next such report from a reconstruction
+      // into a reading.
+      console.warn(`[corpus db] removing stale extract ${entry}`);
       await fileSystem.deleteAsync(`${sqliteDir}/${entry}`, { idempotent: true });
     }
   }

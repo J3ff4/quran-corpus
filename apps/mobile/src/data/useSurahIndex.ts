@@ -27,6 +27,21 @@ export interface SurahIndex {
  * name them however the toggle is set (#85). Omitted, the surahs row's own
  * English comes back, which is what the ayah-count caller below wants.
  */
+/** Two, not one: a failed read used to leave this hook at null for the life of
+ *  the screen, and every caller hides the "find a surah by name" row while it
+ *  is null -- so one transient failure removed a whole entry point for the
+ *  session, with a logcat line as its only trace (#95). `openCorpusDb` does not
+ *  cache its own failures, so a second attempt is a real second chance rather
+ *  than a replay of the first. Two is the whole budget: a read that fails twice
+ *  is a corpus the reader screen is already complaining about. */
+const READ_ATTEMPTS = 2;
+
+/** Long enough that a retry is not simply the same failing call again, short
+ *  enough that the row appears before a reader reaches for it. */
+const RETRY_DELAY_MS = 400;
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export function useSurahIndex(nameLang?: QueryLanguageCode): SurahIndex {
   const [surahs, setSurahs] = useState<SurahListItem[] | null>(null);
 
@@ -39,18 +54,25 @@ export function useSurahIndex(nameLang?: QueryLanguageCode): SurahIndex {
     // the switch did not take.
     setSurahs(null);
 
+    async function attempt() {
+      const corpusDb = await openCorpusDb();
+      const rows = await getSurahList(createExpoSqliteClient(corpusDb as ExpoSqliteLike), nameLang);
+      if (!cancelled) setSurahs(rows);
+    }
+
     async function load() {
-      try {
-        const corpusDb = await openCorpusDb();
-        const rows = await getSurahList(
-          createExpoSqliteClient(corpusDb as ExpoSqliteLike),
-          nameLang,
-        );
-        if (!cancelled) setSurahs(rows);
-      } catch (cause) {
-        // Logged for logcat, never shown: the screen this hangs off has its
-        // own content and its own error state, and neither is about this.
-        console.error('[surah index] read failed', cause);
+      for (let tries = 0; tries < READ_ATTEMPTS; tries += 1) {
+        try {
+          await attempt();
+          return;
+        } catch (cause) {
+          // Logged for logcat, never shown: the screen this hangs off has its
+          // own content and its own error state, and neither is about this.
+          console.error(`[surah index] read failed (attempt ${tries + 1})`, cause);
+          if (cancelled) return;
+          if (tries + 1 < READ_ATTEMPTS) await delay(RETRY_DELAY_MS);
+          if (cancelled) return;
+        }
       }
     }
 
