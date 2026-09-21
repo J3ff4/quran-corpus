@@ -4,6 +4,7 @@ import type { CorpusDbFileSystem } from './openCorpusDb';
 import {
   corpusDbFileName,
   corpusDbVersion,
+  userDbFileName,
   ensureCorpusDbFile,
   stagingSuffix,
 } from './openCorpusDb';
@@ -170,7 +171,14 @@ describe('a rebuilt corpus reaching a device that already ran the app', () => {
   });
 
   it('never touches the user DB in the same directory', async () => {
-    const userDb = `${sqliteDir}/quran-user.db`;
+    // The name the app actually opens, taken from the constant userDb.ts uses
+    // -- not a stand-in. This test used to write `quran-user.db`, which is not
+    // a name anything creates, and so it passed for months while the real
+    // `quran-corpus-user.db` was being deleted on every version bump: `user`
+    // is [a-z0-9]+, so it matched the extract pattern. Bookmarks, notes,
+    // reading history and settings, lost on upgrade, with a green test over
+    // it.
+    const userDb = `${sqliteDir}/${userDbFileName}`;
     const { fileSystem, files } = createFileSystem({
       [userDb]: 'bookmarks and notes',
       [`${sqliteDir}/quran-corpus-m1.db`]: 'old corpus',
@@ -179,6 +187,16 @@ describe('a rebuilt corpus reaching a device that already ran the app', () => {
     await ensureCorpusDbFile(fileSystem, sqliteDir, async () => assetUri);
 
     expect(files.get(userDb)).toBe('bookmarks and notes');
+    // And the run that spared it still did its job.
+    expect(files.has(`${sqliteDir}/quran-corpus-m1.db`)).toBe(false);
+  });
+
+  it('matches the user DB name against the pattern it has to survive', async () => {
+    // Stating the trap outright: the exclusion is load-bearing precisely
+    // because the name DOES look like an extract. If a future rename makes it
+    // stop matching, this fails and says so rather than leaving a guard that
+    // silently protects nothing.
+    expect(/^quran-corpus-[a-z0-9]+\.db$/.test(userDbFileName)).toBe(true);
   });
 
   it('still skips the copy when the current version is already extracted', async () => {

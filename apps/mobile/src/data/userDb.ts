@@ -2,7 +2,10 @@ import * as SQLite from 'expo-sqlite';
 import { USER_DB_SCHEMA, migrateUserDb } from '@quran-corpus/data/user-db';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
 
-const USER_DB_NAME = 'quran-corpus-user.db';
+// From openCorpusDb because that is where the corpus-extract cleanup lives and
+// has to know which file to leave alone. One constant, so a rename here can
+// never quietly re-arm that deletion.
+import { userDbFileName as USER_DB_NAME } from './openCorpusDb';
 
 // Memoized for the process, mirroring openCorpusDb. Every bookmark toggle and
 // every reading-position write called this, so each one reopened the database

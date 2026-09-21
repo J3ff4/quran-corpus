@@ -22,11 +22,44 @@ import type * as ExpoSQLite from 'expo-sqlite';
 // kept its old extract and shown none of it. Nothing can test for this: the
 // suite cannot know the DB's contents changed. Bump it in the same commit that
 // regenerates the DB.
-export const corpusDbVersion = 'm9';
+//
+// Missed a THIRD time in M11 (caught on device, 2026-09-21): the bundle gained
+// 114 Russian rows in surah_names and this still read 'm9'. The Russian names
+// did appear -- on a phone whose extract happened to be new -- and then the
+// row-3 correction in the next build did not, which is the same defect wearing
+// a disguise. If the DB changed and this line did not, an installed phone
+// shows the OLD data and nothing anywhere says so.
+// 'm11a' rather than 'm11': the DB's contents are unchanged from m11, and the
+// suffix exists to force one more extraction on a phone that already holds
+// m11. That extraction runs the cleanup loop above, which is the code that
+// deleted the user's database -- so this is how the fix gets proved on device
+// rather than only in vitest. Harmless to ship; the next content change bumps
+// it again.
+export const corpusDbVersion = 'm11a';
 export const corpusDbFileName = `quran-corpus-${corpusDbVersion}.db`;
 
+/** The user's own database, which lives in the same directory as the extracts
+ *  below and must NEVER be deleted -- it holds bookmarks, notes, reading
+ *  history and settings, it is the one file on the phone the app cannot
+ *  rebuild, and it is meant to survive app updates.
+ *
+ *  It lives here rather than in userDb.ts because the cleanup below is what
+ *  has to know it, and userDb.ts imports expo-sqlite at module scope -- this
+ *  file require()s its dependencies precisely so it stays testable without
+ *  them. userDb.ts imports the name back from here, so the two cannot drift. */
+export const userDbFileName = 'quran-corpus-user.db';
+
 /** Matches this app's own extracts, any version -- and nothing else in the
- *  SQLite directory, which also holds the user DB that must never be touched. */
+ *  SQLite directory.
+ *
+ *  `user` is [a-z0-9]+, so `quran-corpus-user.db` matched this pattern and the
+ *  cleanup below deleted the user's database on every corpus-version bump --
+ *  bookmarks, notes, history and settings, gone, on exactly the upgrade path
+ *  the version bump exists to serve. Reproduced on device 2026-09-21 going
+ *  from m9 to m11: the app came back up in English with no history. The
+ *  exclusion is asserted in a test; the pattern alone cannot express it,
+ *  because any tightening still has to be right about a name it was never
+ *  meant to match. */
 const corpusDbPattern = /^quran-corpus-[a-z0-9]+\.db(\.partial)?$/;
 
 // The extraction below copies ~134 MB while the user stares at a fresh install,
@@ -65,9 +98,11 @@ export async function ensureCorpusDbFile(
 
   // A previous version's extract is dead weight the moment this one lands --
   // 134 MB of it -- and deleting it before the copy also means a phone low on
-  // space is not asked to hold both at once. Only this app's own corpus files
-  // match; the user DB lives in the same directory and is never touched.
+  // space is not asked to hold both at once. The user DB lives in this same
+  // directory and is skipped by name, not by trusting the pattern: it used to
+  // match, and the phone paid for it.
   for (const entry of await fileSystem.readDirectoryAsync(sqliteDir)) {
+    if (entry === userDbFileName) continue;
     if (corpusDbPattern.test(entry) && entry !== corpusDbFileName) {
       await fileSystem.deleteAsync(`${sqliteDir}/${entry}`, { idempotent: true });
     }
