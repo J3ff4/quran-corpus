@@ -255,4 +255,29 @@ underneath are untouched.
 
 ## Verification log
 
-_Empty until the device run. "Implementation complete, verification pending" is not a pass (§10)._
+### Run 1 — 2026-09-21, vc24 release APK, OnePlus 7Pro (GM1917), Android 13, dark mode
+
+11 pass, 1 partial, 1 blocked.
+
+| # | Result | Evidence |
+|---|---|---|
+| 379 | PASS | English `Surah`/`Ayah`, Uzbek `Sura`/`Oyat`, Russian `Сура`/`Аят` — all named above their fields, none clipped. Labels stay visible while typing: the sheet lifts above the keyboard and the row keeps both label and field on screen. |
+| 380 | PASS | Reader → title → `Find a surah by name`: the jump sheet is gone when the picker paints. One surface, no stacked scrim. |
+| 381 | PASS | `baqara` typed with the keyboard up — the single result sits well clear of the keyboard, nothing clipped. |
+| 382 | PASS | `dumpsys gfxinfo framestats`, 3 passes of 6 keystrokes over the full 114-row list: frame duration median 11.8/12.2/12.0 ms, deadline misses 3/0/5 of ~27 frames, worst frame 32.1 ms. One late frame in the worst pass, no per-keystroke stutter. (Vsync *gaps* are the 350 ms typing cadence, not jank — duration is the measure here.) |
+| 383 | PASS | From surah 2, picked Ya-Sin → reader opens at 36:1, both sheets gone. See the defect note below for the same-surah case. |
+| 384 | PASS | WbW (Ya-Sin → `nuh` → Nuh 1-10, ayah 1) and mushaf (Go to → `ikhlas` → page 604, which holds 112:1). |
+| 385 | BLOCKED | `adb shell input text 'البقرة'` → `java.lang.NullPointerException: Attempt to get length of null array`. adb cannot inject non-ASCII; needs an Arabic keyboard typed by hand. Owed. |
+| 386 | PASS | Uzbek UI: rows read `Baqara / Sigir · 286 oyat`, `sigir` matches surah 2, glyph column renders throughout. |
+| 387 | PASS | `light` narrows to An-Nur; switching to Juz drops the filter field and shows Juz 1-30 in full. |
+| 388 | PASS | `cow`: `GO TO → 2 Al-Baqara` above `VERSES → 2:69, 2:67`. Both arms live; the go-to row opens 2:1 on one tap. (`baqara` alone returns the go-to row and no verses — correct, no translation contains the word.) |
+| 389 | PARTIAL | Machine half verified from the a11y tree: every row is a Button with `content-desc` = translit + ayah count (`Al-Baqara, 286 аятов`), the filter is an EditText labelled `Название или смысл`, the close button is `Закрыть`. Spoken output not verified — enabling TalkBack needs `settings put secure`, which is blocked in this session. Same standing gap as issue #34. |
+| 390 | PASS | Both halves. Picker: one tap on `Al-Baqara` under the open keyboard opened the reader. Surahs tab: one tap on the `light` → An-Nur row under the open keyboard opened An-Nur. The review's two-tap defect is gone. |
+| 391 | PASS | Measured on the raw screenshot: status-bar clock spans y 48-92 px, the `Surahs` title starts at y 200 px — a 108 px (~27 dp) gap at density 640. A doubled inset would have put the title near y 300. Dark mode, clock visible. |
+
+### Findings from the run (neither blocks M11)
+
+1. **Russian surah names fall back to English.** Under a Russian UI the rows read `Al-Fatiha / The Opening · 7 аятов` — only the ayah-count unit localizes. Not a picker bug: `surah_names` holds `uz` (114) and `uz-Cyrl` (114) and nothing else, so `nameLang='ru'` has no rows to find and the surahs table's own English is what comes back. A data gap, tracked separately.
+2. **Picking the surah you are already reading does nothing.** From surah 2 at ayah 5, picking al-Baqara in the picker closed both sheets and left the scroll position untouched, rather than landing on 2:1. `jumpTo` only navigates on its cross-surah arm. Check 383 is written for the cross-surah case and passes there; this is the same-surah case the check does not cover.
+
+No stray writes to the user DB: a mis-tap landed on ayah 2:6's bookmark control mid-run, and the bookmarks screen afterwards read `0 oyat · 0 sura`.
