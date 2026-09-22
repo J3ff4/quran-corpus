@@ -355,3 +355,65 @@ the held offset — and one swipe did not recover it. Not reproducible at a
 shallower offset, and ruling R2 puts the translation toggle outside the
 re-anchor deliberately. Filed as a candidate, not an M12 failure.
 
+
+## Device checks 404–408 — the six owner-reported bugs (vc36)
+
+Continues the series. Each check names the commit it exists to falsify.
+
+| # | Check |
+|---|---|
+| 404 | Translation off, deep in Al-Baqara: fast-fling up and down repeatedly. No blank stretch, no flicker (`264f65a`). |
+| 405 | Translation off: jump to a deep ayah. Lands on that ayah, top-aligned (`264f65a` + `5d6541f`). |
+| 406 | Scroll across many ayah boundaries. No jolt at the boundary, up or down (`9b2d7cd`). |
+| 407 | Morphology header is the reader's header: one card, no navigator strip, centred display-face name, kebab holds search + globe + density (`445b4b6`). |
+| 408 | Search: the GO TO card arrives instead of appearing (`cfff8a1`). |
+| 401b | The half 401 never reached on vc35 — the morphology kebab closes on its `✕`. |
+
+### Verification log — vc36, device run 2026-09-22
+
+| # | Result | Notes |
+|---|---|---|
+| 404 | **PASS** | Al-Baqara ~2:200, translation off. Ten frames captured *during* continuous fast flinging: 2968–4347 bright pixels in the content band every frame, where a blank card region reads near zero. A settled frame two seconds later measured 3617, so nothing filled in late either. Not reproducible. |
+| 405 | **PASS** | Jump sheet to 2:200 with translation off: landed on 2:200 with the medallion at the top of the content area. This is the offset table the `translationChars` fix corrects, exercised at depth. |
+| 406 | **PASS (no regression; improvement marginal)** | `gfxinfo framestats`, three runs of six 220ms swipes each, 90Hz (11.1ms frame interval), gaps between `Vsync` — the only measure that sees a UI-thread stall. vc36: 1 dropped frame across 360 frames (one 22.3ms gap), p95 frame duration 15.5–15.9ms. vc35, downgraded and re-measured the same way: 4 dropped frames, p95 14.8–18.9ms, one 31.4ms frame. Directionally better, but the two builds were not at the same scroll position or translation state, so the delta is not controlled. The absence of stalls on vc36 is solid; the size of the win is not. |
+| 407 | **PASS** | Morphology draws one `HeaderCard`: back chevron, centred `Al-Baqara` in the display face with its caret, kebab. No navigator strip above it. Pager row reads `‹ 280–286 ›` between the two chevrons, where the reader carries its mode pill. |
+| 408 | **PARTIAL** | The section is present and correct, and it closes when the query stops resolving to a verse. The *animation* could not be verified: this device has no `screenrecord` and the host has no `ffmpeg`, and `exec-out screencap` over wifi samples at ~400ms against a 220ms unroll — ten burst captures went straight from absent to fully open. Needs the owner's eye. |
+| 401b | **PASS** | Kebab opens (search + globe + Dense/Verse), `✕` replaces the kebab glyph, and tapping it closes the curtain and restores the glyph. |
+| 405-lang | **FAIL** | See below. |
+
+### 405-lang — the deep language switch is still off (`5d6541f` did not fix it)
+
+The owner's first bug. Reproduced on vc36, with the same shape they described:
+
+- **2:10, English → Uzbek:** lands exactly. Medallion at the top of the
+  content area, same position as before the switch.
+- **2:210, English → Uzbek, → Russian, → English:** the *row* is held every
+  time — 2:210 is on screen and is the card the reader is anchored to — but it
+  lands roughly one card low, with 2:209's translation block occupying the top
+  of the viewport. Three switches in a row, three times low; the size of the
+  drop tracked the length of 2:209's translation in the language being
+  switched *to*.
+
+So `5d6541f` (settle within 1dp instead of exact float equality) was not the
+cause. The residual error is the cumulative estimate error of the rows *above*
+the target: the loop corrects the target's own measured `y`, but everything
+above it is still `getItemLayout`'s estimate, and at ayah 210 that error is
+about one card tall. Shallow ayahs land exactly because there is almost nothing
+above them to be wrong about. Widening the settle tolerance plausibly makes it
+reveal *sooner*, which would not help.
+
+Not fixed in this run — the next fix has to reconcile the rows above the
+target, not the target itself.
+
+### Out of scope, observed again
+
+- **Translation toggle at depth:** `A✕` at 2:255 jumped the reader to 2:286,
+  the end of the surah. Ruling R2 leaves the toggle outside the re-anchor, so
+  this is the known candidate from the vc35 run, now with a clean repro.
+- **First launch after an install shows "No reading history yet".** The data
+  was intact — downgrading to vc35 immediately after showed `Continue reading
+  2:270` and a 1-day streak, and vc36 has shown the card on every launch
+  since. A normal cold start (force-stop, relaunch) draws a black splash and
+  then the populated card, with no empty state in between, so this is
+  first-run-after-install only: the empty state renders while the history query
+  is still in flight. Same class as the bookmark `loading` gotcha.
