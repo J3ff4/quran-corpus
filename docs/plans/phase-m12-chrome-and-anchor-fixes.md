@@ -331,4 +331,27 @@ strand the new component.
 
 ## Verification log
 
-_(empty — filled at the device run)_
+**2026-09-22, device run, vc35 (local release APK, OnePlus 7Pro / GM1917,
+Android 16, gesture navigation).** Built with the branch tip at `f239ca8`.
+
+| # | Result | Notes |
+|---|--------|-------|
+| 392 | **PASS** | 2:10 Uzbek → English → still 2:10, not 2:11. Repeated from 2:255 (mid-surah, an ayah taller than the viewport): uz → en → uz, held 2:255 both ways. |
+| 393 | **PASS (by remount)** | Lotin → Кирилл in Settings, reopened at 2:10 via Continue reading: Cyrillic rows, correct ayah. The *live* switch this check asks for is not reachable — the script control lives only in Settings, so the reader unmounts. Same `queryLanguage` value as 392, which covers the re-anchor itself. |
+| 394 | **PASS** | Magnifier + pill, no accent border; reads as Home's pill and the Surahs filter. `✕` cleared and the keyboard stayed up with the caret in the field. |
+| 395 | **PASS** | Surahs filter, Surah picker sheet ("Find a surah by name") and Dictionary all cleared and kept the keyboard. |
+| 396 | **PASS** | Search → `2:255` → GO TO card → reader opened at 2:255. |
+| 397 | **PASS** | Measured, not eyeballed: sheet top row 1813 px before and after the auto-hide (word sheet), 824 px (reciter picker). Chrome genuinely hid in both — status-bar band 63.8 → 12.0 and 63.7 → 12.0 — so the assertion is not vacuous. |
+| 398 | **BLOCKED** | Needs three-button navigation. `adb shell settings put` is blocked on this device, so the mode can only be changed by hand in system settings. |
+| 399 | **PASS** | Uzbek (Cyrillic), 2:10 and 2:11, both densities. Spans and single words share a baseline — Dense: "бас уларга зиёда қилди" beside "Аллоҳ"/"касалликни"; Verse/2c: the 2-word span فِى قُلُوبِهِم beside مَرَضٞ. This is the check `a10b40a` existed for. |
+| 400 | **PASS** | English, 63:1: no spans exist, every cell keeps its own border, nothing moved. |
+| 401 | **PARTIAL** | Opens and holds search + globe + density; density switched Dense ↔ Verse; search pushed `/search` with an empty focused field. The "closes on the ✕" half was not reached — the phone locked. |
+| 402 | **PASS** | `Al-Munafiqun` drawn in full, no clamp; pager `1–10` and both chevrons reachable; resting chrome no taller than before the kebab (`a78e1e1`). |
+| 403 | **BLOCKED** | Spoken TalkBack output needs a human, same standing gap as #34. |
+
+Out of scope, observed: with a deep scroll offset, hiding the translation
+(`A✕`) once left the reader blank — the shortened content sits entirely above
+the held offset — and one swipe did not recover it. Not reproducible at a
+shallower offset, and ruling R2 puts the translation toggle outside the
+re-anchor deliberately. Filed as a candidate, not an M12 failure.
+
