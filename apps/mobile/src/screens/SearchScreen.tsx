@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
 import { EMPTY_SEARCH_RESULT, type SearchResult } from '@quran-corpus/data/mobile';
 import { GlassSurface } from '@/components/GlassSurface';
+import { SearchField } from '@/components/SearchField';
 import { SnippetText } from '@/components/SnippetText';
 import { searchCorpus } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
@@ -195,25 +196,16 @@ export function SearchScreen() {
   return (
     <View style={{ flex: 1 }}>
       <View style={{ padding: 16 }}>
-        {/* Glass, and accent-bordered rather than hairline-bordered: the field
-            is autofocused, so it is always the focused control on this screen
-            and drawing it as one is honest (mockup 1i). */}
-        <GlassSurface style={{ borderColor: theme.accent, paddingHorizontal: 4 }}>
-          <TextInput
-            testID="search-input"
-            value={query}
-            onChangeText={setQuery}
-            placeholder={t(uiLocale, 'search.placeholder')}
-            placeholderTextColor={theme.mutedText}
-            autoFocus
-            accessibilityLabel={t(uiLocale, 'search.title')}
-            style={{
-              color: theme.text,
-              paddingHorizontal: 14,
-              minHeight: touchTargets.minimum,
-            }}
-          />
-        </GlassSurface>
+        <SearchField
+          testID="search-input"
+          clearTestID="search-input-clear"
+          value={query}
+          onChangeText={setQuery}
+          placeholder={t(uiLocale, 'search.placeholder')}
+          accessibilityLabel={t(uiLocale, 'search.title')}
+          clearAccessibilityLabel={t(uiLocale, 'search.clearSearch')}
+          autoFocus
+        />
       </View>
 
       <ScrollView

@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
 import {
@@ -12,7 +12,8 @@ import {
 import { AlphabetGrid } from '@/components/AlphabetGrid';
 import { DictionaryRow } from '@/components/DictionaryRow';
 import { FrequencyList } from '@/components/FrequencyList';
-import { GlassSurface, useGlassSkin } from '@/components/GlassSurface';
+import { useGlassSkin } from '@/components/GlassSurface';
+import { SearchField } from '@/components/SearchField';
 import { SegmentedControl } from '@/components/SegmentedControl';
 import { getAllRootsForBrowse } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
@@ -362,49 +363,15 @@ export function DictionaryScreen() {
               render, so the input remounts. This has to be a sibling of the
               list, not inside it. */}
           <View style={{ paddingHorizontal: 16 }}>
-            {/* The glass sits on the row, not on the input, so the clear button
-                reads as being inside the field. clearButtonMode is not an
-                option -- it is iOS-only and this app ships Android first. */}
-            <GlassSurface
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingRight: 4,
-              }}
-            >
-              <TextInput
-                testID="dictionary-search"
-                value={query}
-                onChangeText={setQuery}
-                placeholder={t(uiLocale, 'dictionary.searchPlaceholder')}
-                placeholderTextColor={theme.mutedText}
-                accessibilityLabel={t(uiLocale, 'dictionary.searchLabel')}
-                style={{
-                  flex: 1,
-                  color: theme.text,
-                  paddingHorizontal: 14,
-                  minHeight: touchTargets.minimum,
-                }}
-              />
-              {query.length > 0 ? (
-                <Pressable
-                  testID="dictionary-search-clear"
-                  accessibilityRole="button"
-                  accessibilityLabel={t(uiLocale, 'dictionary.clearSearch')}
-                  onPress={() => setQuery('')}
-                  // A bare ✕ glyph is a ~14pt target; the minimums are what
-                  // keep it above the 48dp floor the rest of the app holds to.
-                  style={{
-                    minHeight: touchTargets.minimum,
-                    minWidth: touchTargets.minimum,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Text style={{ color: theme.mutedText, fontSize: typography.body }}>✕</Text>
-                </Pressable>
-              ) : null}
-            </GlassSurface>
+            <SearchField
+              testID="dictionary-search"
+              clearTestID="dictionary-search-clear"
+              value={query}
+              onChangeText={setQuery}
+              placeholder={t(uiLocale, 'dictionary.searchPlaceholder')}
+              accessibilityLabel={t(uiLocale, 'dictionary.searchLabel')}
+              clearAccessibilityLabel={t(uiLocale, 'dictionary.clearSearch')}
+            />
           </View>
 
           {rootsFailed ? (

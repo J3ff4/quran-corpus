@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { Pressable, TextInput } from 'react-native';
 
 import { GlassSurface } from './GlassSurface';
 import { Icon } from './icons/Icon';
