@@ -673,6 +673,15 @@ describe('WbwRoute actions curtain', () => {
     expect(screen.queryByTestId('segment-dense')).toBeNull();
     expect(screen.queryByTestId('open-search')).toBeNull();
     expect(screen.getByTestId('wbw-actions')).toBeTruthy();
+    // And costs no height while it holds nothing. A container `gap` spaces a
+    // zero-height child like any other, so the shut curtain would push the
+    // first word 10dp down the screen -- the header is taller WITH the fix
+    // than without it, which is the opposite of ruling R1.
+    expect(screen.getByTestId('wbw-header').style.gap || '0px').toBe('0px');
+    expect(screen.getByTestId('wbw-actions-row').style.marginTop || '0px').toBe('0px');
+    // The spacing the gap used to provide has to survive somewhere, or the two
+    // rows collide.
+    expect(screen.getByTestId('wbw-pager-row').style.marginTop).toBe('10px');
   });
 
   it('reveals all three behind the kebab', async () => {

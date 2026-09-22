@@ -284,7 +284,13 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
             this and carries its own bottom inset, so 10 on top of two stacked
             rows read as a band of dead chrome before the first word (owner,
             device, 2026-09-11). */}
-        <View style={{ paddingHorizontal: 14, paddingTop: 2, gap: 10 }}>
+        {/* Rows space themselves with marginTop, NOT a container `gap`: the
+            actions curtain below is a mounted zero-height view when shut, and
+            flex gap still spaces a zero-height child -- so a container gap
+            would make the resting chrome 10dp taller than it was before the
+            curtain existed. ReaderHeader spaces its rows the same way, for the
+            same reason. */}
+        <View testID="wbw-header" style={{ paddingHorizontal: 14, paddingTop: 2 }}>
           <View
             testID="wbw-title-row"
             style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
@@ -346,7 +352,7 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
               nested (D49). */}
           <View
             testID="wbw-pager-row"
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}
           >
             <AdjacentNavButton
               side="prev"
