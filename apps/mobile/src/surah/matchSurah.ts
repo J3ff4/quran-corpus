@@ -1,5 +1,6 @@
 import {
   normalizeArabic,
+  romanizeCyrillic,
   surahNameExactMatch,
   surahNameKeys,
   surahNamePrefixMatch,
@@ -63,46 +64,13 @@ function stripArabicArticle(folded: string): string {
   return folded.startsWith('ال') ? folded.slice(2) : folded;
 }
 
-/** Cyrillic, letter by letter, in the romanization the corpus already uses
- *  for these names -- `Бакара` -> `bakara`, which the Latin fold below then
- *  reads as `baqara`. The Uzbek Cyrillic letters are here too: `қ` -> `q` is
- *  what makes `Бақара` and `Baqarah` the same name.
- *
- *  `ь` and `ъ` map to nothing on purpose; they are not sounds a reader types. */
-const CYRILLIC_TO_LATIN: Record<string, string> = {
-  а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'j', з: 'z',
-  и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r',
-  с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sh',
-  ъ: '', ы: 'i', ь: '', э: 'e', ю: 'yu', я: 'ya',
-  ў: 'o', қ: 'q', ғ: 'g', ҳ: 'h', ҷ: 'j', ӣ: 'i', ӯ: 'u',
-};
-
-/**
- * Cyrillic romanized, everything else untouched.
- *
- * `packages/data`'s folds strip every character outside `[a-z0-9]`, so a
- * Cyrillic name folds to the empty string and matches nothing -- and once
- * `surah_names` carries a Russian row, `nameTranslit` IS Cyrillic, so under a
- * Russian UI the picker went to number-only matching in both directions:
- * `Бакара` found nothing, and so did `baqara`. Romanizing here rather than
- * adding a Cyrillic arm keeps ONE answer to "does this name the surah": the
- * article rules, the Uzbek `o` readings and the trailing-h rule all still
- * apply, to a Russian query as much as an English one.
- *
- * Applied to the stored name and the query by the same function, so it cannot
- * improve one side into something the other cannot reach.
- */
-export function latinize(raw: string): string {
-  return raw
-    .normalize('NFC')
-    .replace(/[\u0400-\u04ff]/g, (ch) => {
-      const lower = ch.toLowerCase();
-      const mapped = CYRILLIC_TO_LATIN[lower];
-      // An unmapped Cyrillic letter drops out rather than surviving to be
-      // stripped by the fold anyway -- same result, one less surprise.
-      return mapped ?? '';
-    });
-}
+/** Re-exported, not re-implemented. The romanization moved down into
+ *  `packages/data`, because the fold there is what strips a name to
+ *  `[a-z0-9]` and a Cyrillic name folded to nothing -- which broke Search as
+ *  well as this picker, and broke it in a place this module could not reach.
+ *  Kept under this name so the tests that pin the letter mappings keep one
+ *  place to import from. */
+export { romanizeCyrillic as latinize };
 
 /** Below this, a meaning match is noise: `man`, `day` prefix a dozen surahs
  *  and would bury the name the user actually typed. The same 3-char floor the
@@ -143,8 +111,8 @@ function rankOf(item: SurahListItem, query: QueryKeys): number {
   if (query.digits !== null && item.id === query.digits) return RANK.number;
 
   if (query.latin.length > 0) {
-    const translit = surahNameKeys(latinize(item.nameTranslit));
-    const english = surahTranslationKeys(latinize(item.nameTranslation));
+    const translit = surahNameKeys(item.nameTranslit);
+    const english = surahTranslationKeys(item.nameTranslation ?? '');
     // Two columns, two folds, never crossed -- surahName.ts's rule, and the
     // reason `moon` does not answer to `The Man`.
     if (
@@ -166,7 +134,7 @@ function rankOf(item: SurahListItem, query: QueryKeys): number {
   }
 
   if (query.englishFragment.length >= MEANING_MIN && !MEANING_STOPWORDS.has(query.englishFragment)) {
-    const meaning = surahTranslationKeys(latinize(item.nameTranslation))[0] ?? '';
+    const meaning = surahTranslationKeys(item.nameTranslation ?? '')[0] ?? '';
     if (meaning.includes(query.englishFragment)) return RANK.meaning;
   }
 
@@ -191,15 +159,14 @@ export function matchSurahs(items: readonly SurahListItem[], query: string): Sur
   const trimmed = query.trim();
   if (trimmed.length === 0) return [...items];
 
-  const latinized = latinize(trimmed);
   const keys: QueryKeys = {
-    latin: surahNameKeys(latinized),
-    english: surahTranslationKeys(latinized),
+    latin: surahNameKeys(trimmed),
+    english: surahTranslationKeys(trimmed),
     arabic: arabicQueryKey(trimmed),
     // A bare number still works inside the picker: someone who knows it should
     // not have to close the sheet to use it.
     digits: /^\d{1,3}$/.test(trimmed) ? Number(trimmed) : null,
-    englishFragment: surahTranslationKeys(latinized)[0] ?? '',
+    englishFragment: surahTranslationKeys(trimmed)[0] ?? '',
   };
 
   return items

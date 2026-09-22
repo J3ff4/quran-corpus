@@ -94,6 +94,7 @@ export {
   surahTranslationKeys,
   SURAH_NAME_MIN_PREFIX,
 } from './text/surahName.js';
+export { romanizeCyrillic, hasCyrillic } from './text/cyrillic.js';
 // The same Arabic fold the search index and the search query go through, so an
 // Arabic surah name typed at the picker is folded exactly as one typed at
 // search.

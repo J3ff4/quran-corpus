@@ -13,8 +13,11 @@
  * the stored name and to the query by the same function, so it can never
  * "improve" one side into something the other cannot reach.
  *
- * Pure string work, no imports: safe for the client and mobile entry points.
+ * Pure string work, one pure import: safe for the client and mobile entry
+ * points.
  */
+
+import { hasCyrillic, romanizeCyrillic } from './cyrillic.js';
 
 /** Article prefixes that assimilate to the following sun letter. Longest
  *  first, so "ash" is tried before "as" and never leaves a stray "h". */
@@ -31,6 +34,29 @@ export const SURAH_NAME_MIN_PREFIX = 3;
  *  matches on any stray typing, and "allah" (-> "alah" -> "ala") would answer
  *  to Al-A'la. */
 const MIN_H_STRIPPED = 4;
+
+/**
+ * The bare `[a-z0-9]` form both key builders compare on.
+ *
+ * Romanizes Cyrillic BEFORE the strip. The strip is what the fold has always
+ * ended with, and on a Cyrillic name it left the empty string -- so a Russian
+ * or `uz-Cyrl` name matched nothing, in either direction, however it was
+ * typed. Doing it here rather than at each call site means every consumer of
+ * these keys is fixed at once: the pickers, and `search.ts`, which resolves a
+ * typed surah name and is where the owner actually hit it.
+ */
+function latinLetters(name: string): string {
+  const roman = hasCyrillic(name) ? romanizeCyrillic(name) : name;
+  return (
+    roman
+      // ā/ṭ/ʿ decompose, then the combining marks go: the corpus is plain
+      // ASCII today, but a future translit column need not be.
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+  );
+}
 
 function collapse(key: string): string {
   // Assimilated articles double the sun letter ("Ar-Rahman"), and only some
@@ -73,13 +99,7 @@ function foldLatin(key: string): string[] {
  * name, handled separately by the caller).
  */
 export function surahNameKeys(name: string): string[] {
-  const bare = name
-    // ā/ṭ/ʿ decompose, then the combining marks go: the corpus is plain ASCII
-    // today, but a future translit column need not be.
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '');
+  const bare = latinLetters(name);
   if (bare.length === 0) return [];
 
   const keys = foldLatin(bare);
@@ -120,11 +140,7 @@ export function surahNamePrefixMatch(queryKeys: string[], nameKeys: string[]): b
  * leading "the" are the only things an English name should forgive.
  */
 export function surahTranslationKeys(name: string): string[] {
-  const bare = name
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '');
+  const bare = latinLetters(name);
   if (bare.length === 0) return [];
 
   const keys = [bare];
