@@ -817,6 +817,63 @@ describe('SurahReader', () => {
     }
   });
 
+  it('does not spend a correction on the layout the last landing measured', async () => {
+    // A translation-language switch re-lands on the ayah already on screen and
+    // changes every row's height underneath it. The stamped measurement from
+    // the landing before still carries the right index, so it looks current --
+    // but it is a position in a layout that no longer exists, and correcting to
+    // it burns one of the three passes before the new content has reported
+    // anything. On the owner's device (2026-09-22, 2:210, uz -> en) that left
+    // two passes for a correction that needed three, and the reader revealed
+    // 115dp short. The second landing has to start from the model, exactly as
+    // a fresh one does.
+    vi.useFakeTimers();
+    try {
+      const props = { ...baseProps(readerData(300)), initialAyahNumber: 255 };
+      const { rerender } = render(<SurahReader {...props} seedNonce={1} />);
+
+      act(() => {
+        mocks.targetRowLayout?.(40000);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
+      act(() => {
+        mocks.targetRowLayout?.(40000.5);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
+      expect(screen.queryByTestId('reader-positioning')).toBeNull();
+
+      mocks.scrollToOffset.mockClear();
+      mocks.scrollToIndex.mockClear();
+
+      // The switch: same ayah, new nonce, and every row's translation -- and so
+      // every row's height -- replaced. No row has reported a layout in the new
+      // content yet.
+      const switched = readerData(300);
+      switched.ayahs = switched.ayahs.map((item) => ({
+        ...item,
+        translation: {
+          ...item.translation,
+          language_code: 'uz',
+          language: 'uz',
+          text: 'Ularning qalblarida munofiqlik illati bolgan manaviy kasallik bordir.',
+        },
+      }));
+      rerender(<SurahReader {...props} data={switched} seedNonce={2} />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(mocks.scrollToIndex).toHaveBeenCalledTimes(1);
+      expect(mocks.scrollToOffset).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('gives up after the cap rather than hiding the reader forever', async () => {
     vi.useFakeTimers();
     try {

@@ -350,7 +350,31 @@ function AyahList({
   // put 2:4 at the top (owner device, 2026-09-07: 80 attempts, 8033ms, not one
   // measurement). The index is what the clear was really for; carrying it
   // keeps a measurement that is still about the right row.
-  const targetOffsetRef = useRef<{ index: number; y: number } | null>(null);
+  // Stamped with the offset table it was measured against, not just the row.
+  //
+  // An index says the measurement describes the row this landing wants. It
+  // does not say it describes the content on screen now. A translation-language
+  // switch keeps every index and changes every row's height, so the y stamped
+  // for the target is a position in a layout that no longer exists -- and the
+  // first attempt spends a correction scrolling to it. Instrumented on the
+  // owner's device (2026-09-22, 2:210, uz -> en):
+  //
+  //   t=0    measured 108119     <- the pre-switch layout
+  //   t=512  measured 97488.75   <- the real one, 10k dp lower
+  //   t=667  measured 97604.25   passes=3, cap, revealed 115dp off
+  //
+  // Three passes is enough when all three correct against the current layout --
+  // the same target reached by deep link settles in two -- so the fix is to
+  // stop spending one of them on the previous layout, not to raise the cap.
+  // The table is rebuilt whenever a row's height can have changed, so its
+  // identity is exactly the question being asked, and it is the one stamp that
+  // still lets a first-paint measurement through: that row measures against the
+  // table the landing is about to use.
+  const targetOffsetRef = useRef<{ index: number; y: number; layout: unknown } | null>(null);
+  // The table, readable from the cell's onLayout without making the renderer
+  // depend on it -- CellRendererComponent is memoised on the target index, and
+  // rebuilding it per table would remount the row it is trying to measure.
+  const layoutRef = useRef<unknown>(null);
   const lastMeasuredRef = useRef<number | null>(null);
   // Called by the target row's onLayout. A ref because renderItem builds the
   // handler fresh on every render, and the landing effect must not re-run for
@@ -422,6 +446,11 @@ function AyahList({
     }
     return { lengths, offsets };
   }, [data.ayahs, arabicSizes.reader, listWidth, headerOffset, showTranslation]);
+
+  // In render, not an effect: the first paint's onLayout runs before effects
+  // do, and a measurement stamped with a null table would be read as stale by
+  // the landing that is about to use it.
+  layoutRef.current = layout;
 
   const getItemLayout = useCallback(
     (_: unknown, index: number) => ({
@@ -512,7 +541,11 @@ function AyahList({
               // onLayout in the modes that measure, and swallowing it there
               // would break its bookkeeping.
               onLayout?.(event);
-              targetOffsetRef.current = { index, y: event.nativeEvent.layout.y };
+              targetOffsetRef.current = {
+                index,
+                y: event.nativeEvent.layout.y,
+                layout: layoutRef.current,
+              };
               onTargetMeasuredRef.current();
             }}
           />
@@ -564,10 +597,10 @@ function AyahList({
     const startedAt = Date.now();
     passesRef.current = 0;
     // Only the previous pass's offset is cleared. A measurement stamped with
-    // the target this landing is aiming at is still true, and the reason the
-    // clear existed -- comparing a new target's first measurement against the
-    // old target's last one and calling it settled on the spot -- is handled
-    // by the stamp instead.
+    // the target this landing is aiming at, taken in the layout now on screen,
+    // is still true -- and a row inside the initial render window reports its
+    // only layout in the same commit that runs this effect, so clearing here
+    // outright throws away the one measurement the landing will ever get.
     lastMeasuredRef.current = null;
 
     const reveal = () => {
@@ -610,7 +643,10 @@ function AyahList({
     const attempt = () => {
       if (cancelled) return;
       const entry = targetOffsetRef.current;
-      const measured = entry !== null && entry.index === initialIndex ? entry.y : null;
+      const measured =
+        entry !== null && entry.index === initialIndex && entry.layout === layoutRef.current
+          ? entry.y
+          : null;
       if (measured === null) {
         // Nothing measured yet. Jump on the model: it does not have to be
         // right, only close enough to bring the target into the render window,

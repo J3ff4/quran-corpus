@@ -195,7 +195,12 @@ describe('SearchScreen', () => {
     fireEvent.change(screen.getByTestId('search-input'), { target: { value: '2:255' } });
 
     await waitFor(() => expect(screen.getByTestId('search-verse')).toBeTruthy());
-    expect(screen.getByTestId('search-jump-ref').textContent).toBe('2:255');
+    // Awaited separately, because the two no longer arrive together: the GO TO
+    // section is a curtain now, and a curtain mounts its children when it
+    // opens -- one commit after the results it sits above. Asserting it in the
+    // same tick as the verse list passed most runs and failed about one in
+    // six.
+    expect((await screen.findByTestId('search-jump-ref')).textContent).toBe('2:255');
 
     // Order, not just presence -- reordering the two sections must fail this.
     const testIds = Array.from(document.querySelectorAll('[data-testid]')).map((el) =>
