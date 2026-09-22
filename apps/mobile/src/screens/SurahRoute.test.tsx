@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import SurahRoute from '../../app/surah/[surahId]';
 import { deferred } from '../testing/deferred';
+import { clearReaderPosition, setReaderPosition } from '@/data/readerPosition';
 
 const mocks = vi.hoisted(() => ({
   setContinuousPlay: vi.fn(),
@@ -11,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   recordReadingPosition: vi.fn(),
   recordReadingDay: vi.fn(),
   uiLocale: 'en',
+  queryLanguage: 'uz-Cyrl',
   getSurahReader: vi.fn(),
   getWordsForAyah: vi.fn(),
   getBookmarks: vi.fn(),
@@ -58,7 +60,7 @@ vi.mock('@/components/SurahReader', async () => {
     // `loadWords` is destructured and driven, not dropped: a function prop a
     // mock omits renders nothing, so no assertion in this file could ever see
     // it and the route's own loader would sit unexercised (F1).
-    SurahReader: ({ onToggleBookmark, onEditNote, notesByAyah, onReadingAyah, bookmarkedAyahs, loadWords, prevSurahId, nextSurahId, onPageSurah, onJump, initialAyahNumber, playingAyah, onToggleAudio }: {
+    SurahReader: ({ onToggleBookmark, onEditNote, notesByAyah, onReadingAyah, bookmarkedAyahs, loadWords, prevSurahId, nextSurahId, onPageSurah, onJump, initialAyahNumber, seedNonce, playingAyah, onToggleAudio }: {
       onToggleBookmark: (ayahNumber: number) => void;
       onEditNote?: (ayahNumber: number) => void;
       notesByAyah?: Map<number, string | null>;
@@ -70,6 +72,7 @@ vi.mock('@/components/SurahReader', async () => {
       onPageSurah?: (surahId: number, side: 'prev' | 'next') => void;
       onJump?: (surahId: number, ayahNumber: number) => void;
       initialAyahNumber?: number | null;
+      seedNonce?: number;
       playingAyah?: number | null;
       onToggleAudio?: (ayahNumber: number) => void;
     }) => {
@@ -82,6 +85,7 @@ vi.mock('@/components/SurahReader', async () => {
         null,
         React.createElement('span', null, 'reader-content'),
         React.createElement('span', null, `anchor:${initialAyahNumber ?? 'none'}`),
+        React.createElement('span', null, `nonce:${seedNonce ?? 0}`),
         React.createElement('span', null, `playing:${playingAyah ?? 'none'}`),
         React.createElement('button', { onClick: () => onToggleAudio?.(255) }, 'play ayah'),
         React.createElement('span', null, `adjacent:${prevSurahId ?? 'none'}/${nextSurahId ?? 'none'}`),
@@ -193,7 +197,7 @@ vi.mock('@/settings/settingsStore', () => ({
     contentLanguage: 'uz',
     // Unequal to contentLanguage on purpose: the reader's translation follows
     // the script, so an assertion against 'uz' would pass either way.
-    queryLanguage: 'uz-Cyrl',
+    queryLanguage: mocks.queryLanguage,
     // Unequal to queryLanguage too: the surah NAME follows the UI locale and
     // the translation follows the content language, so a loader that passed
     // one where the other belongs would otherwise assert as correct (#83).
@@ -260,6 +264,8 @@ describe('SurahRoute', () => {
     mocks.getBookmarks.mockResolvedValue([]);
     mocks.setBookmarkNote.mockReset();
     mocks.params = { surahId: '2' };
+    mocks.queryLanguage = 'uz-Cyrl';
+    clearReaderPosition();
     mocks.pageSurahProps.length = 0;
     audioMocks.ayah = null;
     audioMocks.playing = false;
@@ -568,6 +574,8 @@ describe('SurahRoute', () => {
 
   it('anchors a jump inside the surah on screen', async () => {
     mocks.params = { surahId: '2' };
+    mocks.queryLanguage = 'uz-Cyrl';
+    clearReaderPosition();
     render(<SurahRoute />);
     await screen.findByText('anchor:none');
 
@@ -581,6 +589,8 @@ describe('SurahRoute', () => {
 
   it('carries the ayah into the surah a jump pages to', async () => {
     mocks.params = { surahId: '2' };
+    mocks.queryLanguage = 'uz-Cyrl';
+    clearReaderPosition();
     render(<SurahRoute />);
     await screen.findByText('reader-content');
 
@@ -600,6 +610,8 @@ describe('SurahRoute', () => {
     // matched displayedSurahId, so it won over that param -- and, never being
     // cleared, over every later deep link into the surah too.
     mocks.params = { surahId: '2' };
+    mocks.queryLanguage = 'uz-Cyrl';
+    clearReaderPosition();
     const { rerender } = render(<SurahRoute />);
     await screen.findByText('reader-content');
     fireEvent.click(screen.getByText('jump here'));
@@ -616,6 +628,8 @@ describe('SurahRoute', () => {
     // is still there when the reader is paged BACK into the surah it was made
     // in, and 2 -> 3 -> 2 re-lands on the jumped-to ayah for ever.
     mocks.params = { surahId: '2' };
+    mocks.queryLanguage = 'uz-Cyrl';
+    clearReaderPosition();
     render(<SurahRoute />);
     await screen.findByText('reader-content');
     fireEvent.click(screen.getByText('jump here'));
@@ -814,5 +828,54 @@ describe('SurahRoute', () => {
     // effect opened, and a route that hands the sheet a loader with no client
     // returns an empty word list on every tap -- an ayah that opens to nothing.
     await waitFor(() => expect(mocks.getWordsForAyah).toHaveBeenCalledWith({}, 8));
+  });
+});
+
+// A language switch re-queries the surah and re-renders it with different row
+// heights under an unchanged scroll offset, so the reader silently drifted --
+// al-Baqarah 2:10 came back as 2:11 (owner, device, 2026-09-22).
+describe('SurahRoute language switch', () => {
+  afterEach(() => {
+    cleanup();
+    clearReaderPosition();
+  });
+
+  beforeEach(() => {
+    mocks.getSurahReader.mockReset();
+    mocks.getSurahReader.mockResolvedValue(readerFixture);
+    mocks.getBookmarks.mockReset();
+    mocks.getBookmarks.mockResolvedValue([]);
+    mocks.getWordsForAyah.mockReset();
+    mocks.getWordsForAyah.mockResolvedValue([]);
+    mocks.params = { surahId: '2' };
+    mocks.queryLanguage = 'uz-Cyrl';
+    clearReaderPosition();
+  });
+
+  it('re-anchors on the ayah that was on screen', async () => {
+    const view = render(<SurahRoute />);
+    await screen.findByText('reader-content');
+    // What onViewableItemsChanged holds: the topmost visible ayah (ruling R1).
+    setReaderPosition(2, 10);
+
+    mocks.queryLanguage = 'uz';
+    view.rerender(<SurahRoute />);
+
+    await waitFor(() => expect(screen.getByText('anchor:10')).toBeTruthy());
+    // The nonce moves too: the anchor is usually the ayah already seeded, and
+    // on a value alone that reads as no request at all.
+    expect(screen.queryByText('nonce:0')).toBeNull();
+  });
+
+  it('does not scroll when nothing has been on screen yet', async () => {
+    const view = render(<SurahRoute />);
+    await screen.findByText('reader-content');
+
+    mocks.queryLanguage = 'uz';
+    view.rerender(<SurahRoute />);
+
+    await waitFor(() => expect(mocks.getSurahReader).toHaveBeenCalledTimes(2));
+    expect(screen.getByText('anchor:none')).toBeTruthy();
+    expect(screen.getByText('nonce:0')).toBeTruthy();
   });
 });

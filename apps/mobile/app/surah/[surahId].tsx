@@ -10,6 +10,7 @@ import { SurahReader } from '@/components/SurahReader';
 import { getSurahReader, getWordsForAyah, type SurahReaderData } from '@/data/corpusRepository';
 import { createLatestReadingPositionRecorder } from '@/data/latestReadingPositionRecorder';
 import { openCorpusDb } from '@/data/openCorpusDb';
+import { getReaderPosition } from '@/data/readerPosition';
 import { parseAyahNumber, parseSurahId } from '@/data/routeParams';
 import { openUserDb } from '@/data/userDb';
 import { useWordSummaryLoader } from '@/data/useWordSummaryLoader';
@@ -93,6 +94,9 @@ export default function SurahRoute() {
   // each request its own identity; it never resets, so a jump cannot collide
   // with an earlier one that happened to carry the same number.
   const jumpCount = useRef(0);
+  // The language the rows on screen were loaded in. Assigned only on a
+  // successful load, so a failed switch does not count as one having happened.
+  const loadedLanguage = useRef(queryLanguage);
   // A new route target outranks a jump made under the old one. Without this the
   // jump shadows it for good: SurahReader documents an `ayah` param change on an
   // already-mounted reader as a supported path (an external deep link into the
@@ -231,6 +235,26 @@ export default function SurahRoute() {
         ]);
 
         if (!cancelled) {
+          // Re-anchor when the switch is what caused this load. Nothing else
+          // does: a language change re-queries the surah and re-renders it with
+          // different row heights under an unchanged scroll offset, so the
+          // reader drifted -- 2:10 came back as 2:11 (owner, device,
+          // 2026-09-22). Here rather than on the queryLanguage change itself,
+          // because a re-anchor asked for before the new rows exist lands on
+          // the OLD heights and moves nothing.
+          //
+          // The live position, which is the topmost visible ayah (ruling R1).
+          // Null means nothing has been on screen yet -- a mount still landing
+          // -- and re-anchoring then would overwrite the seed with an ayah
+          // nobody has read.
+          if (loadedLanguage.current !== queryLanguage) {
+            loadedLanguage.current = queryLanguage;
+            const held = getReaderPosition(surahId);
+            if (held !== null) {
+              jumpCount.current += 1;
+              setJump({ surahId, ayahNumber: held, nonce: jumpCount.current });
+            }
+          }
           setCorpusClient(client);
           setReader({ surahId, data });
           setBookmarks(
