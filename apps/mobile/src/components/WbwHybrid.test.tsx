@@ -213,6 +213,12 @@ describe('WbwHybrid gloss spans', () => {
       px(cells[2]!.style.paddingTop),
     );
     expect(span.style.gap || '0px').toBe(cells[2]!.style.gap || '0px');
+    // And no height floor inside the span. A 48dp minimum on a cell whose
+    // content comes to about 42 makes the BOX, not the content, decide where
+    // the shared gloss starts -- the same misalignment by another route.
+    expect(px(cells[0]!.style.minHeight)).toBe(0);
+    expect(px(cells[1]!.style.minHeight)).toBe(0);
+    expect(px(cells[2]!.style.minHeight)).toBeGreaterThan(0);
   });
 
   it('keeps every spanned word its own button', () => {

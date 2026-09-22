@@ -80,8 +80,17 @@ export function WbwCell({
       // sheet is where the detail lives.
       accessibilityLabel={word.text_arabic}
       onPress={onPress}
+      // A span holds the rhythm for its whole phrase, so a cell inside one
+      // must hold no height of its own either: the floor is 48 and the Arabic,
+      // tag and no gloss come to about 42, so the floor -- not the content --
+      // set the row's height and pushed the shared gloss ~6dp below its
+      // single-word neighbours'. Padding parity alone does not give rhythm
+      // parity while the box has a floor its content never reaches. The touch
+      // target the floor was there for survives as hitSlop, which grows the
+      // press area without growing the box.
+      hitSlop={inSpan ? 8 : undefined}
       style={{
-        minHeight: touchTargets.minimum,
+        minHeight: inSpan ? 0 : touchTargets.minimum,
         alignItems: 'center',
         gap: rhythm.gap,
         paddingHorizontal: compact || inSpan ? 4 : 8,
