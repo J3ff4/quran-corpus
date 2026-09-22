@@ -109,7 +109,16 @@ export async function ensureCorpusDbFile(
   // this loop exists to reclaim.
   const keep = new Set([corpusDbFileName, `${corpusDbFileName}-wal`, `${corpusDbFileName}-shm`]);
   for (const entry of await fileSystem.readDirectoryAsync(sqliteDir)) {
-    if (entry === userDbFileName || entry.startsWith(`${userDbFileName}-`)) continue;
+    // `startsWith`, not an equality plus a `-` arm: the user DB's own
+    // siblings include `quran-corpus-user.db.partial`, the staging name the
+    // restore in userDb.ts copies to -- and `user` is [a-z0-9]+, so that name
+    // matches the pattern below just as the `.db` did. Both run unsequenced at
+    // launch, and this loop only runs on the launch where the extract is
+    // missing, which is exactly the upgrade launch a restore happens on: a
+    // sweep landing mid-copy would delete the staging file, the move would
+    // throw, and the app would open an empty user DB having just declined to
+    // restore the only backup of it.
+    if (entry.startsWith(userDbFileName)) continue;
     if (corpusDbPattern.test(entry) && !keep.has(entry)) {
       // Named, not silent. This loop deleted the user's database once (#92)
       // and the app said nothing about it either time it ran; a line per

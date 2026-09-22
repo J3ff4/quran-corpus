@@ -43,11 +43,12 @@ async function createUserDb() {
   return db;
 }
 
-/** Resolved at call time, and never fatally: the diagnostic below is the only
- *  caller, and a module that fails to load must cost a log line rather than
- *  the database open it was describing. (It also keeps expo-file-system out of
- *  this module's import graph, which is what lets the existing tests open a
- *  user DB without a filesystem at all.) */
+/** Resolved at call time, and never fatally: the restore, the backup and the
+ *  brand-new diagnostic all route through this, and a module that fails to
+ *  load must cost a log line rather than the database open those three exist
+ *  to protect. (It also keeps expo-file-system out of this module's import
+ *  graph, which is what lets the existing tests open a user DB without a
+ *  filesystem at all.) */
 function resolveFileSystem(): {
   fileSystem: UserDbFileSystem;
   sqliteDir: string;
@@ -169,6 +170,16 @@ export async function restoreIfMissing(
     const staging = `${live}${STAGING_SUFFIX}`;
     await fileSystem.deleteAsync(staging, { idempotent: true });
     await fileSystem.copyAsync({ from: backup, to: staging });
+    // The old WAL sidecars go before the restored file lands. The wipe this
+    // restores from was the extract-cleanup loop, whose pattern had no sidecar
+    // arm -- so it deleted `quran-corpus-user.db` and left
+    // `quran-corpus-user.db-wal` sitting beside it. SQLite binds a WAL to its
+    // database by nothing stronger than the header, so the next open would
+    // replay frames belonging to the deleted database over the backup we just
+    // restored: rows from a database that no longer exists, written into the
+    // one file the app cannot rebuild.
+    await fileSystem.deleteAsync(`${live}-wal`, { idempotent: true });
+    await fileSystem.deleteAsync(`${live}-shm`, { idempotent: true });
     await fileSystem.moveAsync({ from: staging, to: live });
     console.warn(
       `[user db] ${USER_DB_NAME} was missing and has been RESTORED from ${backup}. ` +
@@ -234,11 +245,19 @@ export async function backUp(
 }
 
 /** Rows a reader would miss if they vanished. `settings` is in here on
- *  purpose: a reading language and a reciter are choices someone made. */
+ *  purpose: a reading language and a reciter are choices someone made.
+ *
+ *  Every user table, not the three obvious ones. This count is the whole
+ *  empty-guard: a device whose only content is a reading streak counted zero,
+ *  so `backUp` declined to refresh the backup and the streak was never part of
+ *  the "worth keeping" judgement the guard is built on. A table added to
+ *  `USER_DB_MIGRATIONS` belongs in this list in the same commit. */
 async function countUserRows(db: CheckpointableDb): Promise<number> {
   const rows = (await db.getAllAsync(
     `SELECT (SELECT count(*) FROM bookmarks)
           + (SELECT count(*) FROM reading_history)
+          + (SELECT count(*) FROM reading_days)
+          + (SELECT count(*) FROM root_views)
           + (SELECT count(*) FROM settings) AS total`,
   )) as Array<{ total?: number }>;
   return rows[0]?.total ?? 0;

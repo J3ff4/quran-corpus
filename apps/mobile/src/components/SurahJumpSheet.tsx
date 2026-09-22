@@ -26,7 +26,7 @@ export interface SurahJumpSheetProps {
   uiLocale: UiLocaleCode;
   /** Where the reader is now -- seeds the field. */
   surahId: number;
-  /** Null = not loaded yet, never "no ayahs". See useSurahAyahCounts. */
+  /** Null = not loaded yet, never "no ayahs". See useSurahIndex. */
   ayahCountOf: (surahId: number) => number | null;
   onClose: () => void;
   onJump: (surahId: number, ayahNumber: number) => void;

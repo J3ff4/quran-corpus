@@ -29,6 +29,23 @@ describe('SurahList', () => {
     expect(screen.getByText('The Opener · 7 ayahs')).toBeTruthy();
   });
 
+  it('drops the meaning from the subtitle when there is none', () => {
+    // A localized name whose meaning is deliberately NULL -- 8 of the 114
+    // Russian rows. The template over it printed `null · 7 ayahs`.
+    render(
+      <SurahList
+        surahs={[
+          { id: 15, nameArabic: 'الحجر', nameTranslit: 'Хиджр', nameTranslation: null, ayahCount: 99 },
+        ]}
+        uiLocale="en"
+        onOpenSurah={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('99 ayahs')).toBeTruthy();
+    expect(screen.queryByText(/null/)).toBeNull();
+  });
+
   it('draws the surah name in the calligraphic face', () => {
     // Ruling S1. The face is the point: in the reading face this row shows
     // the same string every other Arabic run uses, and the surah index is the

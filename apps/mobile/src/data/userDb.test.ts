@@ -228,6 +228,51 @@ describe('the user DB backup', () => {
     warn.mockRestore();
   });
 
+  it("clears the dead WAL sidecars the wipe left behind", async () => {
+    // The wipe this restores from was the extract-cleanup loop, whose pattern
+    // had no sidecar arm: it deleted the `.db` and left `-wal` beside it.
+    // SQLite binds a WAL to its database by the header alone, so leaving them
+    // means the next open replays frames from the deleted database over the
+    // file we just restored.
+    const { files, fs } = fakeFs({
+      [backup]: 'three weeks of bookmarks',
+      [`${live}-wal`]: 'frames from the database that was deleted',
+      [`${live}-shm`]: 'shared memory',
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { restoreIfMissing } = await import('./userDb.js');
+
+    await expect(restoreIfMissing(fs, sqliteDir, backupDir)).resolves.toBe(true);
+
+    expect(files.get(live)).toBe('three weeks of bookmarks');
+    expect(files.has(`${live}-wal`)).toBe(false);
+    expect(files.has(`${live}-shm`)).toBe(false);
+    warn.mockRestore();
+  });
+
+  it('counts every user table, not the three obvious ones', async () => {
+    // A device whose only content is a reading streak counted zero, so the
+    // empty-guard read it as a fresh install and declined to back it up.
+    const { fs } = fakeFs({ [live]: 'a reading streak and nothing else' });
+    const asked: string[] = [];
+    const db = {
+      execAsync: async () => {},
+      getAllAsync: async (sql: string) => {
+        asked.push(sql);
+        return [{ total: 3 }];
+      },
+    };
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const { backUp } = await import('./userDb.js');
+
+    await expect(backUp(db, fs, sqliteDir, backupDir)).resolves.toBe(true);
+
+    for (const table of ['bookmarks', 'reading_history', 'reading_days', 'root_views', 'settings']) {
+      expect(asked[0]).toContain(table);
+    }
+    log.mockRestore();
+  });
+
   it('leaves a database that is already there alone', async () => {
     const { files, fs } = fakeFs({ [live]: 'the real thing', [backup]: 'older copy' });
     const { restoreIfMissing } = await import('./userDb.js');

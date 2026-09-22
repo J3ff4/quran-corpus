@@ -29,7 +29,12 @@ export function SurahList({ surahs, uiLocale, onOpenSurah }: SurahListProps) {
         testID: `browse-surah-${surah.id}`,
         leading: String(surah.id),
         title: surah.nameTranslit,
-        subtitle: `${surah.nameTranslation} · ${surah.ayahCount} ${ayahsSuffix}`,
+        // The meaning is dropped, not rendered empty, when there is none: a
+        // template over a null printed `null · 7 oyat`, and the separator
+        // alone printed ` · 7 oyat`.
+        subtitle: surah.nameTranslation
+          ? `${surah.nameTranslation} · ${surah.ayahCount} ${ayahsSuffix}`
+          : `${surah.ayahCount} ${ayahsSuffix}`,
         // The calligraphic glyph, not `nameArabic` (ruling S1). This is the
         // one list where the Arabic is a title rather than text to be read,
         // and the plain name is already carried by the translit beside it.

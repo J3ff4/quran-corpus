@@ -224,6 +224,28 @@ describe('a rebuilt corpus reaching a device that already ran the app', () => {
     expect(files.get(shm)).toBe('shared memory');
   });
 
+  it("leaves the user DB restore's staging file alone", async () => {
+    // `quran-corpus-user.db.partial` is what restoreIfMissing in userDb.ts
+    // copies the backup to before renaming it into place, and it matches this
+    // pattern for the same reason the `.db` did. Both run unsequenced at
+    // launch, and this loop runs only on the launch where the extract is
+    // missing -- the upgrade launch a restore actually happens on. Sweeping it
+    // mid-copy would make the move throw and the restore decline, leaving an
+    // empty user DB with a perfectly good backup sitting next to it.
+    const staging = `${sqliteDir}/${userDbFileName}.partial`;
+    const { fileSystem, files } = createFileSystem({ [staging]: 'a restore in flight' });
+
+    await ensureCorpusDbFile(fileSystem, sqliteDir, async () => assetUri);
+
+    expect(files.get(staging)).toBe('a restore in flight');
+  });
+
+  it("matches the restore's staging name against the pattern too", async () => {
+    // Same statement as the test below, for the name that was missed: the
+    // guard is load-bearing only while the name keeps matching.
+    expect(/^quran-corpus-[a-z0-9]+\.db\.partial$/.test(`${userDbFileName}.partial`)).toBe(true);
+  });
+
   it('matches the user DB name against the pattern it has to survive', async () => {
     // Stating the trap outright: the exclusion is load-bearing precisely
     // because the name DOES look like an extract. If a future rename makes it

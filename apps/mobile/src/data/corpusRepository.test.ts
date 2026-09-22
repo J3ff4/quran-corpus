@@ -283,6 +283,10 @@ function createFakeClient({
             // half a complete fixture would never exercise.
           ],
           'uz-Cyrl': [{ surah_id: 1, name: 'Фотиҳа', meaning: 'Очувчи' }],
+          // A localized name whose meaning is deliberately NULL -- the
+          // importer drops a meaning that only repeats the name. 8 of the 114
+          // Russian rows are this shape.
+          ru: [{ surah_id: 1, name: 'Фатиха', meaning: null }],
         };
         const names: MobileRow[] = byLang[String(lang)] ?? [];
         return {
@@ -779,6 +783,19 @@ describe('getSurahList locale', () => {
     const list = await getSurahList(createFakeClient());
 
     expect(list.find((surah) => surah.id === 1)?.nameTranslit).toBe('Al-Fatihah');
+  });
+
+  it('leaves a deliberately absent meaning absent', async () => {
+    // A NULL `meaning` on a localized row is a decision, not a gap: the
+    // importer drops a meaning that only repeats the name, and the query
+    // already resolved the per-surah fallback. `??` read it as missing and put
+    // the ENGLISH meaning back, so a Russian UI showed `Хиджр` subtitled `The
+    // Rocky Tract` -- the name-echo the importer strips, in another language.
+    const list = await getSurahList(createFakeClient(), 'ru');
+    const fatiha = list.find((surah) => surah.id === 1);
+
+    expect(fatiha?.nameTranslit).toBe('Фатиха');
+    expect(fatiha?.nameTranslation).toBeNull();
   });
 
   it('does not query a name set for English', async () => {
