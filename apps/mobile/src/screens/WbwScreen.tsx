@@ -5,7 +5,10 @@ import Animated from 'react-native-reanimated';
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 import type { Word } from '@quran-corpus/data/mobile';
 import { AdjacentNavButton } from '@/components/AdjacentNav';
+import { Collapsible } from '@/components/Collapsible';
 import { Icon } from '@/components/icons/Icon';
+import { LanguageSheet } from '@/components/LanguageSheet';
+import { SearchHeaderButton } from '@/components/SearchHeaderButton';
 import { SegmentedControl } from '@/components/SegmentedControl';
 import { SurahJumpSheet } from '@/components/SurahJumpSheet';
 import { SurahPicker } from '@/components/SurahPicker';
@@ -28,7 +31,7 @@ import { t } from '@/i18n/uiStrings';
 import { useEntryPager, useHeldEntry } from '@/motion/entryPager';
 import { usePressScaleStyle } from '@/motion/usePressScale';
 import { useAppSettings, type WbwDensity } from '@/settings/settingsStore';
-import { typography } from '@/theme/tokens';
+import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
@@ -54,7 +57,15 @@ export interface WbwScreenProps {
 }
 
 export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
-  const { queryLanguage, nameLanguage, uiLocale, wbwDensity, setWbwDensity } = useAppSettings();
+  const {
+    queryLanguage,
+    nameLanguage,
+    uiLocale,
+    wbwDensity,
+    setWbwDensity,
+    contentLanguage,
+    setContentLanguage,
+  } = useAppSettings();
   const theme = useThemeColors();
   const paddingBottom = useListBottomPadding();
 
@@ -94,6 +105,10 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
   // be open at once, which is the whole failure mode of a sheet that opens
   // another sheet.
   const [jumpView, setJumpView] = useState<'jump' | 'picker' | null>(null);
+  // Mirrors the reader's header (ruling R4): one kebab over a curtain, rather
+  // than a second pattern for the same three controls.
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [languageOpen, setLanguageOpen] = useState(false);
   const { surahs, ayahCountOf } = useSurahIndex(nameLanguage);
   const pressStyle = usePressScaleStyle();
 
@@ -305,16 +320,32 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
               </Text>
               <Icon name="chevronDown" size={14} color={theme.mutedText} />
             </Pressable>
-            <VersePicker
-              from={view.from}
-              to={view.to}
-              ayahCount={view.surah.ayah_count}
-              uiLocale={uiLocale}
-              onRange={(nextFrom) => setFrom(nextFrom)}
-            />
+            {/* One button for three controls, the reader's own (R1 there, R4
+                here). A kebab, not a gear: Settings is a real screen and a
+                gear would promise it. */}
+            <Pressable
+              testID="wbw-actions"
+              accessibilityRole="button"
+              accessibilityState={{ expanded: actionsOpen }}
+              accessibilityLabel={t(uiLocale, actionsOpen ? 'reader.hideActions' : 'reader.showActions')}
+              onPress={() => setActionsOpen((open) => !open)}
+              style={{
+                minHeight: touchTargets.minimum,
+                minWidth: touchTargets.minimum,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Icon name={actionsOpen ? 'close' : 'kebab'} color={theme.text} />
+            </Pressable>
           </View>
+          {/* The ayah pager, flanked by the surah chevrons (R4). The name kept
+              its own row when it stopped clamping (R5, 2026-09-11); the pager
+              joins the surah arrows here so the two orders of movement -- within
+              a surah and between surahs -- sit on one line, bounded rather than
+              nested (D49). */}
           <View
-            testID="wbw-density-row"
+            testID="wbw-pager-row"
             style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
           >
             <AdjacentNavButton
@@ -327,14 +358,12 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
               testIDPrefix="surah"
             />
             <View style={{ flex: 1 }}>
-              <SegmentedControl
-                options={DENSITY_OPTIONS.map((option) => ({
-                  value: option.value,
-                  label: t(uiLocale, option.labelKey),
-                }))}
-                value={wbwDensity}
-                onChange={setWbwDensity}
-                accessibilityLabel={t(uiLocale, 'wbw.density')}
+              <VersePicker
+                from={view.from}
+                to={view.to}
+                ayahCount={view.surah.ayah_count}
+                uiLocale={uiLocale}
+                onRange={(nextFrom) => setFrom(nextFrom)}
               />
             </View>
             <AdjacentNavButton
@@ -347,6 +376,50 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
               testIDPrefix="surah"
             />
           </View>
+          {/* Search, gloss language, density (R5). No translation toggle --
+              this screen has nothing to toggle -- and no Uzbek script switch:
+              that is a global setting and a screen-scoped copy of it would read
+              as a screen-scoped setting. */}
+          <Collapsible open={actionsOpen} testID="wbw-actions-row">
+            <View style={{ gap: 10, paddingTop: 4 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 24,
+                }}
+              >
+                {/* Global search, the same push the reader's magnifier makes
+                    (R6). A morphology-scoped search would be a second search
+                    with a smaller corpus and no way to say so. */}
+                <SearchHeaderButton uiLocale={uiLocale} onPress={() => router.push('/search')} />
+                <Pressable
+                  testID="open-language"
+                  accessibilityRole="button"
+                  accessibilityLabel={t(uiLocale, 'reader.chooseLanguage')}
+                  onPress={() => setLanguageOpen(true)}
+                  style={{
+                    minHeight: touchTargets.minimum,
+                    minWidth: touchTargets.minimum,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Icon name="globe" color={theme.accent} />
+                </Pressable>
+              </View>
+              <SegmentedControl
+                options={DENSITY_OPTIONS.map((option) => ({
+                  value: option.value,
+                  label: t(uiLocale, option.labelKey),
+                }))}
+                value={wbwDensity}
+                onChange={setWbwDensity}
+                accessibilityLabel={t(uiLocale, 'wbw.density')}
+              />
+            </View>
+          </Collapsible>
         </View>
         <FlatList
           // Held across a range change now that the screen no longer blanks,
@@ -388,6 +461,14 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
           router.push(`/root/${encodeURIComponent(rootBuckwalter)}`);
         }}
       />
+      {languageOpen ? (
+        <LanguageSheet
+          value={contentLanguage}
+          uiLocale={uiLocale}
+          onChange={setContentLanguage}
+          onClose={() => setLanguageOpen(false)}
+        />
+      ) : null}
       {jumpView === 'jump' && currentSurahId !== null ? (
         <SurahJumpSheet
           uiLocale={uiLocale}
