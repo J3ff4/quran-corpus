@@ -204,7 +204,8 @@ export async function backUp(
 ): Promise<boolean> {
   const backup = `${backupDir}/${BACKUP_NAME}`;
   try {
-    if ((await countUserRows(db)) === 0) {
+    const rows = await countUserRows(db);
+    if (rows === 0) {
       if ((await fileSystem.getInfoAsync(backup)).exists) {
         console.warn(
           '[user db] the database is empty and a backup exists -- keeping the backup. ' +
@@ -220,6 +221,11 @@ export async function backUp(
     await fileSystem.deleteAsync(staging, { idempotent: true });
     await fileSystem.copyAsync({ from: `${sqliteDir}/${USER_DB_NAME}`, to: staging });
     await fileSystem.moveAsync({ from: staging, to: backup });
+    // Logged on success, which a backup would not normally bother with. The
+    // whole reason this exists is that a silent mechanism cost the owner three
+    // weeks of data (#96) -- and a safety net nobody can see deploy is a claim,
+    // not a net. The count also dates the last known-good copy in logcat.
+    console.log(`[user db] backed up ${rows} rows to ${backup}`);
     return true;
   } catch (cause) {
     console.warn('[user db] could not refresh the backup', cause);

@@ -251,15 +251,19 @@ describe('the user DB backup', () => {
   it('refreshes the backup from a database that has rows', async () => {
     const { files, fs, copiedTo } = fakeFs({ [live]: 'bookmarks and notes' });
     const { db, ran } = fakeDb(4);
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     const { backUp } = await import('./userDb.js');
 
     await expect(backUp(db, fs, sqliteDir, backupDir)).resolves.toBe(true);
 
     expect(files.get(backup)).toBe('bookmarks and notes');
     expect(copiedTo).toEqual([`${backup}.partial`]);
+    // Announced, so the net can be seen deploying on a device (#96).
+    expect(String(log.mock.calls[0]?.[0])).toContain('backed up 4 rows');
     // WAL first: expo-sqlite writes in WAL mode, so the newest bookmarks live
     // in -wal until a checkpoint folds them into the file being copied.
     expect(ran).toContain('PRAGMA wal_checkpoint(TRUNCATE)');
+    log.mockRestore();
   });
 
   it('never overwrites a backup with an empty database', async () => {
