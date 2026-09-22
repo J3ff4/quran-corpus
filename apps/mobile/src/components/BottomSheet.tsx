@@ -9,8 +9,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReducedMotion } from '@/motion/useReducedMotion';
+import { useStableInsets } from '@/theme/useStableInsets';
 import { useThemeColors } from '@/theme/themeContext';
 
 // No spring. Owner ruling 2026-08-17, after the third device run: "i dont like
@@ -91,7 +91,12 @@ export function BottomSheet({ onClose, closeLabel, bottomPadding = 16, children 
   // navigation bar, which the keyboard also covers. Without the inset the
   // sheet stops a navigation bar short and its last row stays buried.
   const keyboardLift = useSharedValue(0);
-  const bottomInset = useSafeAreaInsets().bottom;
+  // Stable, not live: the mushaf hides the navigation bar with its chrome,
+  // which collapses the live inset to 0 -- so a sheet already open lost this
+  // padding, got shorter, and its top edge slid down mid-read (owner, device,
+  // 2026-09-22). The hook holds the last non-zero inset, which is the one that
+  // was there when the sheet opened (ruling R3).
+  const bottomInset = useStableInsets().bottom;
 
   useEffect(() => {
     // Seeded from the metrics rather than starting at 0: a sheet opened while
