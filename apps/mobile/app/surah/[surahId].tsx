@@ -303,6 +303,12 @@ export default function SurahRoute() {
   // re-renders on every playback tick. A fresh closure per render rebuilt the
   // whole header and dispatched setOptions into the navigator several times a
   // second while audio played.
+  // Stable, because it reaches the ayah cards and they are memoised now: a
+  // fresh closure per render is a changed prop on every card, which undoes
+  // the memo exactly when it matters most -- this component re-renders on
+  // every playback tick.
+  const openNoteEditor = useCallback((ayahNumber: number) => setEditingNote(ayahNumber), []);
+
   const onPageSurah = useCallback(
     (target: number, side: 'prev' | 'next') => {
       // A chevron is not a jump: without this, paging back into the surah a
@@ -487,7 +493,7 @@ export default function SurahRoute() {
         loadWords={loadWords}
         loadWordSummary={loadWordSummary}
         onToggleBookmark={toggleBookmark}
-        onEditNote={(ayahNumber) => setEditingNote(ayahNumber)}
+        onEditNote={openNoteEditor}
         onToggleAudio={toggleAyah}
         onReadingAyah={(ayahNumber) => {
           // Fired on the landing itself and on every viewable change after it,

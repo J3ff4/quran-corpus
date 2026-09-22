@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { Text, View } from 'react-native';
 import type { Word } from '@quran-corpus/data/mobile';
 import type { UiLocaleCode } from '@/i18n/languages';
@@ -34,7 +34,7 @@ export interface AyahCardProps {
   onWordPress: (word: Word) => void;
 }
 
-export function AyahCard({
+function AyahCardBody({
   surahId,
   ayahNumber,
   arabicText,
@@ -130,3 +130,22 @@ export function AyahCard({
     <ThemeContext.Provider value={playing ? playingTheme : theme}>{card}</ThemeContext.Provider>
   );
 }
+
+/**
+ * Memoised, and that is load-bearing rather than a precaution.
+ *
+ * The reader prefetches an ayah's words as it scrolls past, four ayahs at a
+ * time (WORD_LOOKAHEAD), and each query that lands replaces the whole
+ * `wordsByAyah` map -- so crossing one ayah boundary commits up to four new
+ * map identities. Unmemoised, every card in the render window re-rendered on
+ * each of them: twenty cards' worth of Arabic re-laid-out, four times, in the
+ * middle of a scroll. That is the jolt the owner reported at the same point in
+ * every ayah, upward and downward (2026-09-22).
+ *
+ * What makes the memo work is that `words` is read out of the map per card --
+ * `wordsByAyah.get(id)` returns the same array for every ayah but the one that
+ * just loaded -- and that the reader's handler props come from the route,
+ * which does not re-render on a prefetch. So the card whose words arrived is
+ * the only one whose props actually changed.
+ */
+export const AyahCard = memo(AyahCardBody);

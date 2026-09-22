@@ -335,4 +335,21 @@ describe('AyahCard', () => {
 
     expect(screen.getByText('In the name of God')).toBeTruthy();
   });
+
+  it('is memoised, because the reader re-renders the list under a scroll', () => {
+    // The reader prefetches words four ayahs at a time and each query that
+    // lands replaces the whole map, so crossing ONE ayah boundary commits up
+    // to four new map identities. Unmemoised, every card in the render window
+    // re-rendered on each of them -- twenty cards of Arabic re-laid-out, four
+    // times, mid-scroll. That is the jolt at the same point in every ayah,
+    // upward and downward (owner, device, 2026-09-22).
+    //
+    // A structural assertion, deliberately: what the memo buys is a render
+    // that does NOT happen, and a skipped render leaves nothing in the DOM to
+    // check -- React keeps the same host nodes across a re-render either way.
+    // The behaviour this protects is measured on the device, not here.
+    expect((AyahCard as unknown as { $$typeof?: symbol }).$$typeof).toBe(
+      Symbol.for('react.memo'),
+    );
+  });
 });
