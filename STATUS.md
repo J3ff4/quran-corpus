@@ -7,9 +7,71 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-09-19
+Updated: 2026-09-22
 
 ## Now
+
+**2026-09-22 — M11 merged (PR #92, squash `4729366`). #93, #94, #95 CLOSED.
+#96 stays open.** 31 commits: the surah-name picker, the Russian surah-name
+import, and — after the vc24 run — a Cyrillic search fix, five defects an
+independent read found, and a second device run.
+
+- **Cyrillic search was dead corpus-wide, not just in the picker** (`2c0380c`).
+  Both key builders in `packages/data/src/text/surahName.ts` ended with
+  `.replace(/[^a-z0-9]/g, '')`, so every Cyrillic string folded to `''` and
+  produced no keys. `бакара` matched nothing in any language. The owner hit it
+  in **Search**, which resolves against the corpus's Latin transliteration
+  regardless of UI language — so `Baqara` worked in Russian and `Бакара` never
+  did. New `text/cyrillic.ts` romanizes BEFORE the strip, inside the shared
+  fold, so pickers and `search.ts` were fixed in one place. apps/mobile's own
+  `latinize` (written for the picker, could never reach Search) is **deleted** —
+  two romanizers are two answers to "does this name that surah".
+  **Owner-confirmed on device: `бакара` finds al-Baqara.**
+- **`/code-review` found five defects, three of them inside the user-DB safety
+  net itself** (`33fea40`). All five failed a mutation check before the fix and
+  pass after:
+  1. The extract-cleanup skip guard missed the restore's staging file.
+     `quran-corpus-user.db.partial` matches `corpusDbPattern` for the same
+     reason the `.db` did, and the guard tested `=== name` plus a `-` arm, so a
+     dot matched neither. The loop runs ONLY on a version-bump launch — exactly
+     when a restore happens. Now `startsWith(userDbFileName)`.
+  2. The restore left the old `-wal`/`-shm` behind. The wipe it restores from
+     deleted only the `.db`, and SQLite binds a WAL to its database by the
+     header alone — so the next open replays frames from the deleted database
+     over the file just restored. Both sidecars now go before the rename.
+  3. `countUserRows` omitted `reading_days` and `root_views`. A device holding
+     only a reading streak counted 0, so `backUp` read it as a fresh install
+     and declined to protect it.
+  4. `getSurahList` re-added the English meaning with `??` over a NULL the SQL
+     had deliberately resolved: a Russian UI showed `Хиджр · The Rocky Tract`.
+  5. Fixing (4) honestly (`nameTranslation: string | null`) exposed a fifth —
+     `SurahList` would have printed `null · 7 ayahs`. That is the bug the `??`
+     had been hiding.
+- **Device run 2 (vc33/vc34, OnePlus 7 Pro), logged in the M11 plan.** The
+  cleanup loop — the code that emptied the user DB in #92 — ran on hardware for
+  the first time since the guard was fixed:
+  `[corpus db] removing stale extract quran-corpus-m11a.db`, then one second
+  later `[user db] backed up 7 rows`. It swept the old 134 MB extract and the
+  user DB came through it. **7 rows, where vc33 logged 6** — the two extra are
+  `reading_days` and `root_views`, so defect (3) is confirmed on device too.
+  `m11b` exists only to force that extraction; vc32 already held `m11a`, so
+  vc33's launch took the `if (info.exists)` early return and the loop never ran.
+- **Still owed, and not closeable from a dev session:** the `.partial` staging
+  collision is a *race*, so run 2 exercised the loop's normal path, not the
+  collision — test-verified only. The restore path (`... has been RESTORED
+  from ...`) has **never** printed on hardware; provoking it means deleting the
+  live user DB and a non-debuggable release build gives no route into app
+  storage. And **#96's cause remains unestablished** — install, cleanup loop,
+  storage pressure and the write path were each ruled out with evidence, and
+  the owner did not clear the data. What changed is containment, not diagnosis.
+
+**Queue correction (2026-09-22).** The post-M6 queue called phase M7 "Android
+Release Hardening". M7 was spent on the paged mushaf (M7a-M7g, all merged), so
+**the hardening phase has no number and no plan** — accessibility pass, perf on
+target hardware, crash/error handling, Play Store assets + privacy disclosures,
+attribution review, RC QA. Issue #39 (GPL licence text + source offer on About)
+belongs inside it, not as a loose fix; it blocks any public release. Nearest
+cheap work is the #89/#90/#91 cluster — same screens, one shared device run.
 
 **2026-09-19 — the vc23 APK baseline ran.** First full pass on a release build
 since M6. Section results written per-check into the three phase plans.
