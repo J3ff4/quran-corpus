@@ -29,13 +29,13 @@ import type * as ExpoSQLite from 'expo-sqlite';
 // row-3 correction in the next build did not, which is the same defect wearing
 // a disguise. If the DB changed and this line did not, an installed phone
 // shows the OLD data and nothing anywhere says so.
-// 'm11a' rather than 'm11': the DB's contents are unchanged from m11, and the
-// suffix exists to force one more extraction on a phone that already holds
-// m11. That extraction runs the cleanup loop above, which is the code that
-// deleted the user's database -- so this is how the fix gets proved on device
-// rather than only in vitest. Harmless to ship; the next content change bumps
-// it again.
-export const corpusDbVersion = 'm11a';
+// 'm11b' rather than 'm11a': same reasoning, one build later. m11a shipped in
+// vc32 and was already extracted, so vc33's launch took the `if (info.exists)`
+// early return and the cleanup loop -- the code that deleted the user's
+// database -- never ran. A version a phone does not hold is the only thing
+// that makes it run. The DB's contents are unchanged; the next real content
+// change bumps this again.
+export const corpusDbVersion = 'm11b';
 export const corpusDbFileName = `quran-corpus-${corpusDbVersion}.db`;
 
 /** The user's own database, which lives in the same directory as the extracts
