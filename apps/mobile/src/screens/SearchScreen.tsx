@@ -5,12 +5,15 @@ import { router } from 'expo-router';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
 import { EMPTY_SEARCH_RESULT, type SearchResult } from '@quran-corpus/data/mobile';
 import { GlassSurface } from '@/components/GlassSurface';
+import { Icon } from '@/components/icons/Icon';
 import { SearchField } from '@/components/SearchField';
+import { SurahJumpSheet } from '@/components/SurahJumpSheet';
 import { SnippetText } from '@/components/SnippetText';
 import { searchCorpus } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { t } from '@/i18n/uiStrings';
 import { usePressScale } from '@/motion/usePressScale';
+import { getReaderSurah } from '@/data/readerPosition';
 import { useSurahIndex } from '@/data/useSurahIndex';
 import { useAppSettings } from '@/settings/settingsStore';
 import { fonts, touchTargets, typography } from '@/theme/tokens';
@@ -160,7 +163,8 @@ export function SearchScreen() {
   // names since 1aca65a -- but it labelled the destination with a bare number,
   // so a reader who searched "baqara" was answered with "2" and no sign that
   // the name had been understood. The index is 114 rows the app reads anyway.
-  const { surahs } = useSurahIndex(nameLanguage);
+  const { surahs, ayahCountOf } = useSurahIndex(nameLanguage);
+  const [jumpOpen, setJumpOpen] = useState(false);
   const jumpSurahName =
     result.jump === null
       ? null
@@ -206,7 +210,44 @@ export function SearchScreen() {
           clearAccessibilityLabel={t(uiLocale, 'search.clearSearch')}
           autoFocus
         />
+        {/* A reference is not a search: someone who already knows they want
+            2:255 should not have to spell it, and the app has exactly one
+            go-to control -- the same sheet the reader and morphology headers
+            open (owner ruling R10). */}
+        <Pressable
+          testID="search-goto"
+          accessibilityRole="button"
+          accessibilityLabel={t(uiLocale, 'search.goToVerse')}
+          onPress={() => setJumpOpen(true)}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            minHeight: touchTargets.minimum,
+            paddingHorizontal: 4,
+          }}
+        >
+          <Icon name="book" color={theme.accent} size={18} />
+          <Text style={{ color: theme.accent, fontSize: typography.body }}>
+            {t(uiLocale, 'search.goToVerse')}
+          </Text>
+        </Pressable>
       </View>
+
+      {jumpOpen ? (
+        <SurahJumpSheet
+          uiLocale={uiLocale}
+          // Where the reader was left, not al-Fatihah: a sheet that always
+          // opened at 1 would make the reader's own position invisible.
+          surahId={getReaderSurah() ?? 1}
+          ayahCountOf={ayahCountOf}
+          onClose={() => setJumpOpen(false)}
+          onJump={(surahId, ayahNumber) => {
+            setJumpOpen(false);
+            router.push(`/surah/${surahId}?ayah=${ayahNumber}`);
+          }}
+        />
+      ) : null}
 
       <ScrollView
         style={{ flex: 1 }}

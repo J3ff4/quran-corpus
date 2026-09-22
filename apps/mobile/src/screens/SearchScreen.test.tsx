@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEBOUNCE_MS, SearchScreen, SPINNER_DELAY_MS } from './SearchScreen';
 import { deferred } from '../testing/deferred';
+import { clearReaderPosition, setReaderPosition } from '@/data/readerPosition';
 
 const mocks = vi.hoisted(() => ({
   searchCorpus: vi.fn(),
@@ -29,6 +30,18 @@ vi.mock('@/data/useSurahIndex', () => ({
 }));
 vi.mock('@quran-corpus/mobile-data', () => ({ createExpoSqliteClient: () => ({}) }));
 vi.mock('expo-router', () => ({ router: { push: mocks.push } }));
+// Stubbed, not rendered: the real sheet is a BottomSheet over a Modal with
+// reanimated inside, none of which this screen's host mock provides. What is
+// this screen's to get right is that the sheet is mounted when asked and that
+// its jump routes -- which is exactly what the stub exposes.
+vi.mock('@/components/SurahJumpSheet', () => ({
+  SurahJumpSheet: ({ surahId, onJump }: { surahId: number; onJump: (s: number, a: number) => void }) =>
+    React.createElement(
+      'button',
+      { 'data-testid': 'jump-sheet', 'data-surah': String(surahId), onClick: () => onJump(2, 255) },
+      'jump',
+    ),
+}));
 
 vi.mock('react-native', async () => {
   const React = await import('react');
@@ -398,5 +411,34 @@ describe('SearchScreen', () => {
     // reference. Neither used to show anything but the headword.
     expect(screen.getByTestId('search-root').textContent).toContain('339');
     expect(screen.getByTestId('search-verse').textContent).toContain('1:1');
+  });
+});
+
+describe('SearchScreen go-to-verse', () => {
+  beforeEach(() => {
+    mocks.push.mockReset();
+    mocks.searchCorpus.mockReset();
+    mocks.searchCorpus.mockResolvedValue(EMPTY);
+  });
+  afterEach(cleanup);
+
+  it('keeps the jump sheet closed until the button is pressed', () => {
+    render(<SearchScreen />);
+    expect(screen.queryByTestId('jump-sheet')).toBeNull();
+  });
+
+  it('opens the jump sheet and routes to the ayah it returns', () => {
+    render(<SearchScreen />);
+    fireEvent.click(screen.getByTestId('search-goto'));
+    fireEvent.click(screen.getByTestId('jump-sheet'));
+    expect(mocks.push).toHaveBeenCalledWith('/surah/2?ayah=255');
+  });
+
+  it('seeds the sheet with the surah the reader was left in', () => {
+    setReaderPosition(36, 12);
+    render(<SearchScreen />);
+    fireEvent.click(screen.getByTestId('search-goto'));
+    expect(screen.getByTestId('jump-sheet').getAttribute('data-surah')).toBe('36');
+    clearReaderPosition();
   });
 });

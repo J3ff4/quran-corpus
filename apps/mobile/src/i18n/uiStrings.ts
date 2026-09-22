@@ -251,6 +251,7 @@ export type UiStringKey =
   | 'search.title'
   | 'search.placeholder'
   | 'search.clearSearch'
+  | 'search.goToVerse'
   | 'search.jump'
   | 'search.verses'
   | 'search.roots'
@@ -502,6 +503,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'search.title': 'Search',
     'search.placeholder': 'Verse, word or root',
     'search.clearSearch': 'Clear search',
+    'search.goToVerse': 'Go to verse',
     'search.jump': 'Go to',
     'search.verses': 'Verses',
     'search.roots': 'Roots',
@@ -739,6 +741,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'search.title': 'Qidiruv',
     'search.placeholder': 'Oyat, so‘z yoki o‘zak',
     'search.clearSearch': 'Qidiruvni tozalash',
+    'search.goToVerse': 'Oyatga oʻtish',
     'search.jump': 'O‘tish',
     'search.verses': 'Oyatlar',
     'search.roots': 'O‘zaklar',
@@ -974,6 +977,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'search.title': 'Поиск',
     'search.placeholder': 'Аят, слово или корень',
     'search.clearSearch': 'Очистить поиск',
+    'search.goToVerse': 'Перейти к аяту',
     'search.jump': 'Перейти',
     'search.verses': 'Аяты',
     'search.roots': 'Корни',

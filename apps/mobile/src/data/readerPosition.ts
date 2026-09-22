@@ -30,6 +30,13 @@ export function getReaderPosition(surahId: number): number | null {
   return current?.surahId === surahId ? current.ayahNumber : null;
 }
 
+/** Which surah the reader is in, or null when no reader has opened one this
+ *  process. Seeds the search screen's jump sheet: a sheet that always opened
+ *  at al-Fatihah would make the reader's own position invisible. */
+export function getReaderSurah(): number | null {
+  return current?.surahId ?? null;
+}
+
 /** Tests only. The app has no reason to forget where the reader is. */
 export function clearReaderPosition(): void {
   current = null;
