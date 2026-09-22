@@ -163,3 +163,145 @@ describe('reportIfBrandNew', () => {
     warn.mockRestore();
   });
 });
+
+describe('the user DB backup', () => {
+  const sqliteDir = 'file:///documents/SQLite';
+  const backupDir = 'file:///documents/backups';
+  const live = `${sqliteDir}/quran-corpus-user.db`;
+  const backup = `${backupDir}/quran-corpus-user.db.backup`;
+
+  function fakeFs(initial: Record<string, string>) {
+    const files = new Map(Object.entries(initial));
+    const copiedTo: string[] = [];
+    return {
+      files,
+      copiedTo,
+      fs: {
+        getInfoAsync: async (uri: string) => ({ exists: files.has(uri) }),
+        readDirectoryAsync: async () => [...files.keys()],
+        makeDirectoryAsync: async () => {},
+        copyAsync: async ({ from, to }: { from: string; to: string }) => {
+          copiedTo.push(to);
+          const data = files.get(from);
+          if (data === undefined) throw new Error(`no such file: ${from}`);
+          files.set(to, data);
+        },
+        moveAsync: async ({ from, to }: { from: string; to: string }) => {
+          const data = files.get(from);
+          if (data === undefined) throw new Error(`no such file: ${from}`);
+          files.set(to, data);
+          files.delete(from);
+        },
+        deleteAsync: async (uri: string) => {
+          files.delete(uri);
+        },
+      },
+    };
+  }
+
+  function fakeDb(total: number) {
+    const ran: string[] = [];
+    return {
+      ran,
+      db: {
+        execAsync: async (sql: string) => {
+          ran.push(sql);
+        },
+        getAllAsync: async () => [{ total }],
+      },
+    };
+  }
+
+  it('puts the backup back when the live database has gone missing', async () => {
+    const { files, fs, copiedTo } = fakeFs({ [backup]: 'three weeks of bookmarks' });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { restoreIfMissing } = await import('./userDb.js');
+
+    await expect(restoreIfMissing(fs, sqliteDir, backupDir)).resolves.toBe(true);
+
+    expect(files.get(live)).toBe('three weeks of bookmarks');
+    // Staged and renamed, never copied straight to the live path: a copy that
+    // dies halfway leaves a truncated file every later launch reads as whole.
+    expect(copiedTo).toEqual([`${live}.partial`]);
+    expect(files.has(`${live}.partial`)).toBe(false);
+    expect(String(warn.mock.calls[0]?.[0])).toContain('RESTORED');
+    warn.mockRestore();
+  });
+
+  it('leaves a database that is already there alone', async () => {
+    const { files, fs } = fakeFs({ [live]: 'the real thing', [backup]: 'older copy' });
+    const { restoreIfMissing } = await import('./userDb.js');
+
+    await expect(restoreIfMissing(fs, sqliteDir, backupDir)).resolves.toBe(false);
+
+    expect(files.get(live)).toBe('the real thing');
+  });
+
+  it('does not invent a database on a first-ever launch', async () => {
+    const { files, fs } = fakeFs({});
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { restoreIfMissing } = await import('./userDb.js');
+
+    await expect(restoreIfMissing(fs, sqliteDir, backupDir)).resolves.toBe(false);
+
+    expect(files.has(live)).toBe(false);
+    warn.mockRestore();
+  });
+
+  it('refreshes the backup from a database that has rows', async () => {
+    const { files, fs, copiedTo } = fakeFs({ [live]: 'bookmarks and notes' });
+    const { db, ran } = fakeDb(4);
+    const { backUp } = await import('./userDb.js');
+
+    await expect(backUp(db, fs, sqliteDir, backupDir)).resolves.toBe(true);
+
+    expect(files.get(backup)).toBe('bookmarks and notes');
+    expect(copiedTo).toEqual([`${backup}.partial`]);
+    // WAL first: expo-sqlite writes in WAL mode, so the newest bookmarks live
+    // in -wal until a checkpoint folds them into the file being copied.
+    expect(ran).toContain('PRAGMA wal_checkpoint(TRUNCATE)');
+  });
+
+  it('never overwrites a backup with an empty database', async () => {
+    // The guard the whole design rests on. A faithful mirror would have copied
+    // the 2026-09-21 wipe over the only good copy on the next launch --
+    // protection that guarantees the loss it is there to prevent (#96).
+    const { files, fs } = fakeFs({ [live]: 'empty shell', [backup]: 'three weeks of bookmarks' });
+    const { db } = fakeDb(0);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { backUp } = await import('./userDb.js');
+
+    await expect(backUp(db, fs, sqliteDir, backupDir)).resolves.toBe(false);
+
+    expect(files.get(backup)).toBe('three weeks of bookmarks');
+    expect(String(warn.mock.calls[0]?.[0])).toContain('keeping the backup');
+    warn.mockRestore();
+  });
+
+  it('says nothing when an empty database is simply a fresh install', async () => {
+    const { fs } = fakeFs({ [live]: 'empty shell' });
+    const { db } = fakeDb(0);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { backUp } = await import('./userDb.js');
+
+    await expect(backUp(db, fs, sqliteDir, backupDir)).resolves.toBe(false);
+
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('survives a filesystem that refuses to copy', async () => {
+    // Insurance must never take down the open it is insuring.
+    const { fs } = fakeFs({ [live]: 'rows' });
+    const { db } = fakeDb(2);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { backUp } = await import('./userDb.js');
+
+    await expect(
+      backUp(db, { ...fs, copyAsync: async () => { throw new Error('ENOSPC'); } }, sqliteDir, backupDir),
+    ).resolves.toBe(false);
+
+    expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
+  });
+});
