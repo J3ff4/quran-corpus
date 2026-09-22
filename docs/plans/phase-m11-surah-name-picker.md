@@ -281,3 +281,40 @@ underneath are untouched.
 2. **Picking the surah you are already reading does nothing.** From surah 2 at ayah 5, picking al-Baqara in the picker closed both sheets and left the scroll position untouched, rather than landing on 2:1. `jumpTo` only navigates on its cross-surah arm. Check 383 is written for the cross-surah case and passes there; this is the same-surah case the check does not cover.
 
 No stray writes to the user DB: a mis-tap landed on ayah 2:6's bookmark control mid-run, and the bookmarks screen afterwards read `0 oyat · 0 sura`.
+
+### Run 2 — 2026-09-21, vc33/vc34 release APKs, OnePlus 7Pro (GM1917), Android 12
+
+Ran against the three commits after Run 1: `2c0380c` (Cyrillic fold),
+`33fea40` (the five defects the independent read found), `2d1f538` (m11b).
+Bundle contents probed from the Hermes string table before each install, not
+assumed from a timestamp — `[Ѐ-ӿ]` present **once** (shared romanizer in,
+mobile's duplicate gone), `FROM reading_days`/`FROM root_views` present,
+`m11b` present and `m11a` absent.
+
+| # | Result | Evidence |
+|---|--------|----------|
+| Cyrillic search (Run 1 finding, and the defect the owner reported) | PASS | `бакара` typed by hand in Search finds al-Baqara. Owner-confirmed. adb cannot inject non-ASCII (check 385's blocker), so this half is human-only and stays that way. |
+| Cleanup loop vs the user DB (#92/#96) | PASS | vc34, 23:13:13 `[corpus db] removing stale extract quran-corpus-m11a.db`, then 23:13:14 `[user db] backed up 7 rows to .../backups/quran-corpus-user.db.backup`. First time that loop has run on hardware since the guard was fixed; it swept the old 134 MB extract and the user DB came through it. |
+| Widened empty-guard count | PASS | 7 rows, where vc33 logged 6. The two extra are `reading_days` and `root_views` — the tables `countUserRows` omitted, so a device holding only a reading streak counted zero and `backUp` declined to protect it. |
+| Install retains data | PASS | `adb install -r --user 0`, `update=1`, `firstInstallTime` unchanged at 2026-08-31 across both installs. |
+| No crash / no schema miss | PASS | Zero `FATAL`, zero `AndroidRuntime` for the package, no `no such table` after the re-extract. (`SQLiteLog` double-quoted-literal warnings in the same log are pid 4052, another app.) |
+
+**Still owed, and why.**
+
+1. **The `.partial` staging race is test-verified only.** `restoreIfMissing`
+   stages to `quran-corpus-user.db.partial`, which matched the extract
+   pattern while the skip guard tested `=== name` plus a `-` arm — a dot
+   matched neither. Both run unsequenced at launch and the loop only runs on
+   a version-bump launch, which is exactly when a restore happens. It is a
+   race, so Run 2 could not reproduce the collision either way; what it
+   proves is the loop's normal path.
+2. **The restore path has never run on hardware.** Provoking it means
+   deleting the live user DB, and a non-debuggable release build gives no
+   route into app storage. `[user db] ... has been RESTORED from ...` has
+   never printed on device.
+3. **#96's original cause is still unexplained.** The install, the cleanup
+   loop, storage pressure and the app's own write path were each ruled out
+   with evidence, and the owner did not clear the data. What changed is
+   containment, not diagnosis: a recurrence now has a copy to come back from.
+4. Check 385 (Arabic typed by hand) and check 389's spoken TalkBack output
+   (issue #34) remain owed from Run 1.
