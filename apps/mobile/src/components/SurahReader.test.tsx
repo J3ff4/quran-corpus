@@ -780,6 +780,43 @@ describe('SurahReader', () => {
     }
   });
 
+  it('counts a row that moved half a pixel as settled', async () => {
+    // A layout `y` is a float, and the corrections are arithmetic on offsets
+    // in the tens of thousands. A row that comes back half a device pixel from
+    // where it was is not moving in any sense a reader can see -- but under an
+    // exact `===` it was never settled, so the landing spent its whole budget
+    // chasing it and revealed on the cap, a little short of the target. Deeper
+    // in the surah, where more rows above have swapped estimates for measured
+    // heights, that is where the numbers have the most room to disagree
+    // (owner, device, 2026-09-22: a language switch lands close but not on).
+    vi.useFakeTimers();
+    try {
+      render(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />);
+
+      act(() => {
+        mocks.targetRowLayout?.(40000);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
+      expect(screen.queryByTestId('reader-positioning')).not.toBeNull();
+
+      act(() => {
+        mocks.targetRowLayout?.(40000.5);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
+
+      expect(screen.queryByTestId('reader-positioning')).toBeNull();
+      // And it did not spend a correction on the half pixel: one scroll, to
+      // the first measurement.
+      expect(mocks.scrollToOffset).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('gives up after the cap rather than hiding the reader forever', async () => {
     vi.useFakeTimers();
     try {

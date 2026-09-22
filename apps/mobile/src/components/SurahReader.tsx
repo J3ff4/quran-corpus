@@ -142,6 +142,21 @@ interface SurahReaderProps {
 // row or proves it settled -- and the model's error, worst measured at 512dp,
 // is corrected against a real measurement rather than ground down by retries.
 const MAX_LANDING_PASSES = 3;
+// How still a row has to be before the landing calls it landed.
+//
+// Exact equality was the test, and a layout `y` is a float. A row whose
+// corrected position lands half a device pixel from where it was is not
+// moving in any sense a reader can see, but it never satisfies `===` -- so the
+// landing spent all three passes chasing it and revealed on the cap instead of
+// on the settle. Deep in a surah, where more rows above have swapped model
+// estimates for real heights and the numbers are bigger, that is where the
+// arithmetic has the most room to disagree with itself: the owner's report is
+// a language switch landing "a little bit off", and further off the deeper it
+// is (device, 2026-09-22).
+//
+// One dp: below what the reader can see, and far above float noise on offsets
+// in the thousands.
+const SETTLED_DP = 1;
 const SCROLL_RETRY_DELAY_MS = 100;
 // The budget for a row that never reports at all. Separate from the pass cap
 // because the two failures are different: the cap bounds how many times we
@@ -603,7 +618,10 @@ function AyahList({
         // -- it is the same jump every time, and spending the correction
         // budget on it is what stopped the settle test from ever running.
         listRef.current?.scrollToIndex({ index: initialIndex, animated: false });
-      } else if (measured === lastMeasuredRef.current) {
+      } else if (
+        lastMeasuredRef.current !== null &&
+        Math.abs(measured - lastMeasuredRef.current) < SETTLED_DP
+      ) {
         // The row did not move under the last correction. That is the landing,
         // and unlike the content-height check this replaces, it is evidence
         // about the target itself rather than about the list around it.
