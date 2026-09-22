@@ -504,6 +504,30 @@ describe('SurahReader', () => {
     expect(mocks.getItemLayout!(props.data.ayahs, 0).offset).toBe(356);
   });
 
+  it('drops the translation from its offsets when no translation is drawn', () => {
+    // The offset table is the reader's whole scroll geometry, so it has to
+    // describe the cards actually on screen. With the translation hidden the
+    // cards lose their translation block, and an estimate that still counts
+    // 0.72dp per translation character overstates every row by most of a card.
+    // The error accumulates down the table, so the deeper the ayah the further
+    // FlatList's idea of where it is sits from where it is -- blank stretches
+    // and flicker on a fast scroll (owner, device, 2026-09-22).
+    const props = baseProps(readerData(10));
+    const { rerender } = render(<SurahReader {...props} showTranslation />);
+    const withTranslation = mocks.getItemLayout!(props.data.ayahs, 9).offset;
+
+    rerender(<SurahReader {...props} showTranslation={false} />);
+    const without = mocks.getItemLayout!(props.data.ayahs, 9).offset;
+
+    expect(without).toBeLessThan(withTranslation);
+    // And by the translation's whole contribution, not a fraction of it: the
+    // nine rows above index 9, at 0.72dp per character of each one's text.
+    const dropped = props.data.ayahs
+      .slice(0, 9)
+      .reduce((sum, item) => sum + (item.translation?.text.length ?? 0), 0);
+    expect(withTranslation - without).toBeCloseTo(0.72 * dropped, 5);
+  });
+
   it('stops widening initialNumToRender to cover a deep target', () => {
     // The old landing needed the target rendered on the first commit to be
     // measurable. getItemLayout removes that, and with it the cost of laying

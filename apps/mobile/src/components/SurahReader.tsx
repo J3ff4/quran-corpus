@@ -390,14 +390,23 @@ function AyahList({
         arabicSize: arabicSizes.reader,
         listWidth,
         arabicChars: item.ayah.text_uthmani?.length ?? 0,
-        translationChars: item.translation?.text.length ?? 0,
+        // Zero when the reader is drawing no translation, which is what
+        // rowHeightModel documents the field to mean. Taken straight off the
+        // row before, so with the translation hidden every row was estimated
+        // with a block that is not on screen -- 0.72dp per character, which on
+        // a long ayah is most of the card. The error is cumulative, so the
+        // deeper the ayah the further the table sat from the real content:
+        // fast scrolling drew blank stretches and flickered, because the
+        // offsets FlatList windows on named rows that were nowhere near there
+        // (owner, device, 2026-09-22).
+        translationChars: showTranslation ? (item.translation?.text.length ?? 0) : 0,
       });
       offsets[index] = running;
       lengths[index] = height;
       running += height;
     }
     return { lengths, offsets };
-  }, [data.ayahs, arabicSizes.reader, listWidth, headerOffset]);
+  }, [data.ayahs, arabicSizes.reader, listWidth, headerOffset, showTranslation]);
 
   const getItemLayout = useCallback(
     (_: unknown, index: number) => ({
