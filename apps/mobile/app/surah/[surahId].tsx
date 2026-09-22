@@ -94,6 +94,14 @@ export default function SurahRoute() {
   // each request its own identity; it never resets, so a jump cannot collide
   // with an earlier one that happened to carry the same number.
   const jumpCount = useRef(0);
+  // The surah THIS mount has actually shown an ayah of. getReaderPosition is a
+  // process-wide singleton that outlives the screen and is written by the
+  // morphology screen too, so "it holds a number for this surah" is not the
+  // same claim as "this reader has been somewhere". Open a bookmark for 2:5
+  // after reading 2:150 earlier in the session and switch language while the
+  // landing is still in flight, and the store still answers 150 -- the
+  // re-anchor would then throw away the ayah the bookmark asked for.
+  const landedSurah = useRef<number | null>(null);
   // The language the rows on screen were loaded in. Assigned only on a
   // successful load, so a failed switch does not count as one having happened.
   const loadedLanguage = useRef(queryLanguage);
@@ -249,7 +257,7 @@ export default function SurahRoute() {
           // nobody has read.
           if (loadedLanguage.current !== queryLanguage) {
             loadedLanguage.current = queryLanguage;
-            const held = getReaderPosition(surahId);
+            const held = landedSurah.current === surahId ? getReaderPosition(surahId) : null;
             if (held !== null) {
               jumpCount.current += 1;
               setJump({ surahId, ayahNumber: held, nonce: jumpCount.current });
@@ -482,6 +490,10 @@ export default function SurahRoute() {
         onEditNote={(ayahNumber) => setEditingNote(ayahNumber)}
         onToggleAudio={toggleAyah}
         onReadingAyah={(ayahNumber) => {
+          // Fired on the landing itself and on every viewable change after it,
+          // and never during one -- so this is the reader saying it has shown
+          // an ayah of this surah.
+          landedSurah.current = displayedSurahId;
           // No page: this reader scrolls by ayah, and a null page clears
           // whatever page a mushaf session left in the shared row (ruling 13).
           if (displayedSurahId) readingRecorder?.record({ surahId: displayedSurahId, ayahNumber, page: null });

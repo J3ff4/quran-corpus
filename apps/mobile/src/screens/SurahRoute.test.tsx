@@ -855,6 +855,9 @@ describe('SurahRoute language switch', () => {
   it('re-anchors on the ayah that was on screen', async () => {
     const view = render(<SurahRoute />);
     await screen.findByText('reader-content');
+    // The reader reporting an ayah is what says the landing is over; the store
+    // alone does not, since it outlives the screen.
+    fireEvent.click(screen.getByText('read ayah'));
     // What onViewableItemsChanged holds: the topmost visible ayah (ruling R1).
     setReaderPosition(2, 10);
 
@@ -865,6 +868,24 @@ describe('SurahRoute language switch', () => {
     // The nonce moves too: the anchor is usually the ayah already seeded, and
     // on a value alone that reads as no request at all.
     expect(screen.queryByText('nonce:0')).toBeNull();
+  });
+
+  it('ignores a position this mount has not been to', async () => {
+    // The store is a process-wide singleton the morphology screen writes too,
+    // so it can hold a number for this surah before this reader has shown
+    // anything -- read 2:150, back out, open a bookmark for 2:5, switch
+    // language while it is still landing. Re-anchoring on 150 there discards
+    // the ayah the bookmark asked for.
+    setReaderPosition(2, 150);
+    const view = render(<SurahRoute />);
+    await screen.findByText('reader-content');
+
+    mocks.queryLanguage = 'uz';
+    view.rerender(<SurahRoute />);
+
+    await waitFor(() => expect(mocks.getSurahReader).toHaveBeenCalledTimes(2));
+    expect(screen.getByText('anchor:none')).toBeTruthy();
+    expect(screen.getByText('nonce:0')).toBeTruthy();
   });
 
   it('does not scroll when nothing has been on screen yet', async () => {
