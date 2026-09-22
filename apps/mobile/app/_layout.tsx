@@ -161,6 +161,15 @@ function AppStack() {
       >
         {/* The tab group draws its own chrome via app/(tabs)/_layout. */}
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        {/* Morphology draws its own HeaderCard, back button included -- the
+            same card the reader publishes as its header. Left on, the
+            navigator's back arrow sat in a strip above that card and the
+            screen carried two of them. The reader reaches the same place by
+            replacing `header` rather than hiding it, because its bar has to
+            fade a title against the list's scroll and so must live where the
+            scroll does. */}
+        <Stack.Screen name="morphology" options={{ headerShown: false }} />
+        <Stack.Screen name="surah/[surahId]/words" options={{ headerShown: false }} />
       </Stack>
     </View>
   );

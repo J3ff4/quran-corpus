@@ -389,7 +389,11 @@ describe('word-by-word route', () => {
     render(<WbwRoute />);
     await screen.findAllByTestId('wbw-cell');
 
-    expect(screen.getByRole('header').textContent).toBe('Al-Baqarah');
+    // By testID, not by role: the name sits inside a Pressable (it IS the
+    // jump control), and a Pressable is `accessible` by default, which
+    // collapses its descendants -- so a `header` role on the Text was never
+    // announced on the device. The jump button's own label carries the name.
+    expect(screen.getByTestId('wbw-title').textContent).toBe('Al-Baqarah');
     expect(screen.getByTestId('wbw-next')).toBeTruthy();
   });
 
