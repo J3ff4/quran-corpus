@@ -173,14 +173,47 @@ vi.mock('./LanguageSheet', async () => {
 vi.mock('./SurahJumpSheet', async () => {
   const React = await import('react');
   return {
-    SurahJumpSheet: ({ onJump }: { onJump: (surahId: number, ayahNumber: number) => void }) =>
+    SurahJumpSheet: ({
+      onJump,
+      onBrowse,
+    }: {
+      onJump: (surahId: number, ayahNumber: number) => void;
+      onBrowse?: () => void;
+    }) =>
       React.createElement(
         'div',
         { 'data-testid': 'surah-jump-sheet' },
         React.createElement('button', { 'data-testid': 'do-jump', onClick: () => onJump(3, 12) }),
+        onBrowse
+          ? React.createElement('button', { 'data-testid': 'do-browse', onClick: onBrowse })
+          : null,
       ),
   };
 });
+
+// The picker is a full-screen Modal over a FlatList of 114; what matters here
+// is that the reader opens it INSTEAD of the jump sheet and sends a pick to
+// the head of the surah. SurahPicker.test.tsx covers the list itself.
+vi.mock('./SurahPicker', async () => {
+  const React = await import('react');
+  return {
+    SurahPicker: ({ onPick }: { onPick: (surahId: number) => void }) =>
+      React.createElement(
+        'div',
+        { 'data-testid': 'surah-picker' },
+        React.createElement('button', { 'data-testid': 'do-pick', onClick: () => onPick(36) }),
+      ),
+  };
+});
+
+vi.mock('@/data/useSurahIndex', () => ({
+  useSurahIndex: () => ({
+    surahs: [
+      { id: 36, nameArabic: 'يس', nameTranslit: 'Ya-Sin', nameTranslation: 'Ya Sin', ayahCount: 83 },
+    ],
+    ayahCountOf: () => 83,
+  }),
+}));
 
 vi.mock('./ReciterSheet', async () => {
   const React = await import('react');
@@ -407,6 +440,33 @@ describe('SurahReader', () => {
     render(<SurahReader {...baseProps(readerData(10))} initialAyahNumber={999} />);
 
     expect(mocks.scrollToIndex).not.toHaveBeenCalled();
+  });
+
+  it('re-lands on an ayah it is already seeded with', () => {
+    // A jump names the ayah the seed already holds -- picking the surah you
+    // are reading. On the ayah alone that is indistinguishable from no jump at
+    // all, so the seed carries which request it is (issue #94).
+    const props = { ...baseProps(readerData(300)), initialAyahNumber: 100 };
+    const { rerender } = render(<SurahReader {...props} seedNonce={1} />);
+    expect(mocks.scrollToIndex).toHaveBeenCalledWith({ index: 99, animated: false });
+
+    mocks.scrollToIndex.mockClear();
+    rerender(<SurahReader {...props} seedNonce={2} />);
+
+    expect(mocks.scrollToIndex).toHaveBeenCalledWith({ index: 99, animated: false });
+  });
+
+  it('sends a scrolled reader back to the top when the first ayah is asked for again', () => {
+    // Index 0 is "no landing needed" only at mount. Once the reader has been
+    // scrolled, asking for ayah 1 is a real move, and the offset is the list's
+    // own top rather than the row's -- the surah plate sits above it.
+    const props = { ...baseProps(readerData(300)), initialAyahNumber: 1 };
+    const { rerender } = render(<SurahReader {...props} seedNonce={0} />);
+    expect(mocks.scrollToOffset).not.toHaveBeenCalled();
+
+    rerender(<SurahReader {...props} seedNonce={1} />);
+
+    expect(mocks.scrollToOffset).toHaveBeenCalledWith({ offset: 0, animated: false });
   });
 
   it('gives FlatList a getItemLayout so it can jump without measuring', () => {
@@ -1486,6 +1546,28 @@ describe('SurahReader', () => {
     // Handed up, not applied here: this component is keyed by the displayed
     // surah, so it is remounted by the very jump it would be holding.
     expect(onJump).toHaveBeenCalledWith(3, 12);
+  });
+
+  it('swaps the jump sheet for the picker, and sends a pick to ayah 1', async () => {
+    // Ruling R3, and the sheet-over-sheet risk in one test: the jump sheet has
+    // to be GONE while the picker is up, and both gone after a pick.
+    const onJump = vi.fn();
+    render(<SurahReader {...baseProps(readerData(30))} onJump={onJump} />);
+    scrollTo(180, 400);
+    renderReaderHeader();
+
+    fireEvent.click(screen.getByTestId('reader-surah-jump'));
+    await screen.findByTestId('surah-jump-sheet');
+    fireEvent.click(screen.getByTestId('do-browse'));
+
+    expect(screen.queryByTestId('surah-jump-sheet')).toBeNull();
+    expect(screen.getByTestId('surah-picker')).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId('do-pick'));
+
+    expect(onJump).toHaveBeenCalledWith(36, 1);
+    expect(screen.queryByTestId('surah-picker')).toBeNull();
+    expect(screen.queryByTestId('surah-jump-sheet')).toBeNull();
   });
 
   it('leaves the name dead to the touch while it is faded out', () => {

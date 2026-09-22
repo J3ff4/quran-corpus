@@ -21,6 +21,10 @@ export type UiStringKey =
   | 'jump.ayah'
   | 'jump.go'
   | 'jump.outOfRange'
+  | 'jump.browse'
+  | 'surahPicker.title'
+  | 'surahPicker.filter'
+  | 'surahPicker.empty'
   | 'tabs.settings'
   | 'tabs.dictionary'
   | 'tabs.menu'
@@ -228,6 +232,7 @@ export type UiStringKey =
   | 'about.sourceEnglish'
   | 'about.sourceUzbek'
   | 'about.sourceRussian'
+  | 'about.sourceSurahNamesRu'
   | 'about.sourceHafs'
   | 'about.sourceMushafLayout'
   | 'about.sourceMushafFont'
@@ -307,6 +312,10 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'jump.ayah': 'Ayah',
     'jump.go': 'Go',
     'jump.outOfRange': 'No such surah or ayah',
+    'jump.browse': 'Find a surah by name',
+    'surahPicker.title': 'Surahs',
+    'surahPicker.filter': 'Name or meaning',
+    'surahPicker.empty': 'No surah by that name',
     'tabs.surahs': 'Surahs',
     'tabs.bookmarks': 'Bookmarks',
     'tabs.mushaf': 'Mushaf',
@@ -469,6 +478,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceUzbek':
       'The Uzbek translation the reader shows, plus the Uzbek word-by-word glosses and surah names, in both scripts.',
     'about.sourceRussian': 'The Russian translation the reader shows.',
+    'about.sourceSurahNamesRu':
+      'The Russian name and meaning of each surah. Licence not yet cleared.',
     'about.sourceHafs': 'The Arabic face the Quran text itself is set in.',
     'about.sourceMushafLayout': 'Mushaf page and line layout, from the Quran.com v4 API (Quranic Universal Library). King Fahd Glorious Quran Printing Complex edition.',
     'about.sourceMushafFont': 'The page fonts the mushaf pages are printed with, one per page. King Fahd Glorious Quran Printing Complex, via the Quranic Universal Library.',
@@ -538,6 +549,10 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'jump.ayah': 'Oyat',
     'jump.go': 'Oʻtish',
     'jump.outOfRange': 'Bunday sura yoki oyat yoʻq',
+    'jump.browse': 'Surani nomi boʻyicha topish',
+    'surahPicker.title': 'Suralar',
+    'surahPicker.filter': 'Nomi yoki maʼnosi',
+    'surahPicker.empty': 'Bunday nomli sura yoʻq',
     'tabs.surahs': 'Suralar',
     'tabs.bookmarks': 'Xatcho‘plar',
     'tabs.mushaf': 'Mushaf',
@@ -700,6 +715,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceUzbek':
       'O‘quvchi ko‘rsatadigan o‘zbekcha tarjima, shuningdek har ikki yozuvda o‘zbekcha so‘zma-so‘z tarjima va sura nomlari.',
     'about.sourceRussian': 'O‘quvchi ko‘rsatadigan ruscha tarjima.',
+    'about.sourceSurahNamesRu':
+      'Har bir suraning ruscha nomi va ma’nosi. Litsenziya hali tekshirilmagan.',
     'about.sourceHafs': 'Qur’on matni shu arabcha shriftda teriladi.',
     'about.sourceMushafLayout': 'Mushaf sahifa va satr joylashuvi, Quran.com v4 API (Quranic Universal Library) dan. Shoh Fahd Qur’on bosmaxonasi nashri.',
     'about.sourceMushafFont': 'Mushaf sahifalari teriladigan shriftlar, har sahifaga bittadan. Shoh Fahd Qur’on bosmaxonasi, Quranic Universal Library orqali.',
@@ -764,6 +781,10 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'jump.ayah': 'Аят',
     'jump.go': 'Перейти',
     'jump.outOfRange': 'Такой суры или аята нет',
+    'jump.browse': 'Найти суру по названию',
+    'surahPicker.title': 'Суры',
+    'surahPicker.filter': 'Название или смысл',
+    'surahPicker.empty': 'Суры с таким названием нет',
     'tabs.surahs': 'Суры',
     'tabs.bookmarks': 'Закладки',
     'tabs.mushaf': 'Мусхаф',
@@ -927,6 +948,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceUzbek':
       'Узбекский перевод, который показывает читалка, а также узбекский пословный перевод и названия сур в обоих письменностях.',
     'about.sourceRussian': 'Русский перевод, который показывает читалка.',
+    'about.sourceSurahNamesRu':
+      'Русское название и значение каждой суры. Лицензия ещё не проверена.',
     'about.sourceHafs': 'Арабский шрифт, которым набран сам текст Корана.',
     'about.sourceMushafLayout': 'Разметка страниц и строк мусхафа, из Quran.com v4 API (Quranic Universal Library). Издание Комплекса имени короля Фахда.',
     'about.sourceMushafFont': 'Постраничные шрифты, которыми набраны страницы мусхафа, по одному на страницу. Комплекс имени короля Фахда, через Quranic Universal Library.',

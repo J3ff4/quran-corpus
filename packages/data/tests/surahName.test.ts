@@ -111,3 +111,61 @@ describe('surahTranslationKeys', () => {
     expect(surahTranslationKeys('the')).toEqual(['the']);
   });
 });
+
+describe('a name or a query written in Cyrillic', () => {
+  // The bug the owner hit on 2026-09-21: Search resolves a typed surah name
+  // through these keys, both builders ended with `.replace(/[^a-z0-9]/g, '')`,
+  // and a Cyrillic string folds to the empty string. `Бакара` found nothing,
+  // and so did `бакара` -- in a UI where every surah name on screen was
+  // Cyrillic. The 114 `uz-Cyrl` rows had been broken the same way all along.
+
+  it('reduces a Cyrillic name to keys at all', () => {
+    expect(surahNameKeys('Бакара')).not.toEqual([]);
+    expect(surahNameKeys('Фатиха')).not.toEqual([]);
+  });
+
+  it('matches a Cyrillic query against a Cyrillic name', () => {
+    expect(surahNameExactMatch(surahNameKeys('Бакара'), surahNameKeys('Бакара'))).toBe(true);
+    expect(surahNameExactMatch(surahNameKeys('бакара'), surahNameKeys('Бакара'))).toBe(true);
+  });
+
+  it('matches a Cyrillic query against the stored Latin name, and back', () => {
+    // The direction that actually failed in Search: the app resolves against
+    // the corpus's own Latin transliteration whatever language is on screen.
+    expect(surahNameExactMatch(surahNameKeys('Бакара'), surahNameKeys('Al-Baqara'))).toBe(true);
+    expect(surahNameExactMatch(surahNameKeys('Baqara'), surahNameKeys('Бакара'))).toBe(true);
+    expect(surahNameExactMatch(surahNameKeys('Фатиха'), surahNameKeys('Al-Fatiha'))).toBe(true);
+    expect(surahNameExactMatch(surahNameKeys('Нур'), surahNameKeys('An-Nur'))).toBe(true);
+  });
+
+  it('carries the Uzbek Cyrillic letters through the same readings', () => {
+    // `қ` -> `q` is what makes Бақара and Baqarah one name.
+    expect(surahNameExactMatch(surahNameKeys('Бақара'), surahNameKeys('Baqarah'))).toBe(true);
+    expect(surahNameExactMatch(surahNameKeys('Ихлос'), surahNameKeys('Al-Ikhlas'))).toBe(true);
+  });
+
+  it('strips a Cyrillic-written article like any other', () => {
+    expect(surahNameExactMatch(surahNameKeys('Аль-Бакара'), surahNameKeys('Baqara'))).toBe(true);
+  });
+
+  it('matches a Russian meaning through the translation keys', () => {
+    expect(surahTranslationKeys('Корова')).not.toEqual([]);
+    expect(surahTranslationKeys('корова')).toEqual(surahTranslationKeys('Корова'));
+  });
+
+  it('does not let a Cyrillic name collapse onto an unrelated surah', () => {
+    // The fold is lossy on purpose, but it still has to keep names apart.
+    expect(surahNameExactMatch(surahNameKeys('Бакара'), surahNameKeys('An-Nur'))).toBe(false);
+    expect(surahNameExactMatch(surahNameKeys('Нур'), surahNameKeys('Al-Baqara'))).toBe(false);
+  });
+
+  it('leaves a Latin name exactly as it was', () => {
+    // Romanization runs only when there is Cyrillic to romanize, so every
+    // existing key has to come out unchanged. Spelled out rather than compared
+    // to another call of the same function -- that asserts nothing.
+    expect(surahNameKeys('Al-Baqara')).toEqual(['albakara', 'bakara']);
+    expect(surahNameKeys('Ar-Rahman')).toEqual(['arahman', 'rahman']);
+    expect(surahNameKeys('Nuh')).toEqual(['nuh']);
+    expect(surahTranslationKeys('The Cow')).toEqual(['thecow', 'cow']);
+  });
+});

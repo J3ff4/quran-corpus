@@ -22,12 +22,46 @@ import type * as ExpoSQLite from 'expo-sqlite';
 // kept its old extract and shown none of it. Nothing can test for this: the
 // suite cannot know the DB's contents changed. Bump it in the same commit that
 // regenerates the DB.
-export const corpusDbVersion = 'm9';
+//
+// Missed a THIRD time in M11 (caught on device, 2026-09-21): the bundle gained
+// 114 Russian rows in surah_names and this still read 'm9'. The Russian names
+// did appear -- on a phone whose extract happened to be new -- and then the
+// row-3 correction in the next build did not, which is the same defect wearing
+// a disguise. If the DB changed and this line did not, an installed phone
+// shows the OLD data and nothing anywhere says so.
+// 'm11b' rather than 'm11a': same reasoning, one build later. m11a shipped in
+// vc32 and was already extracted, so vc33's launch took the `if (info.exists)`
+// early return and the cleanup loop -- the code that deleted the user's
+// database -- never ran. A version a phone does not hold is the only thing
+// that makes it run. The DB's contents are unchanged; the next real content
+// change bumps this again.
+export const corpusDbVersion = 'm11b';
 export const corpusDbFileName = `quran-corpus-${corpusDbVersion}.db`;
 
-/** Matches this app's own extracts, any version -- and nothing else in the
- *  SQLite directory, which also holds the user DB that must never be touched. */
-const corpusDbPattern = /^quran-corpus-[a-z0-9]+\.db(\.partial)?$/;
+/** The user's own database, which lives in the same directory as the extracts
+ *  below and must NEVER be deleted -- it holds bookmarks, notes, reading
+ *  history and settings, it is the one file on the phone the app cannot
+ *  rebuild, and it is meant to survive app updates.
+ *
+ *  It lives here rather than in userDb.ts because the cleanup below is what
+ *  has to know it, and userDb.ts imports expo-sqlite at module scope -- this
+ *  file require()s its dependencies precisely so it stays testable without
+ *  them. userDb.ts imports the name back from here, so the two cannot drift. */
+export const userDbFileName = 'quran-corpus-user.db';
+
+/** Matches this app's own extracts, any version, including the `-wal`/`-shm`
+ *  sidecars SQLite writes beside them -- and nothing else in the SQLite
+ *  directory.
+ *
+ *  `user` is [a-z0-9]+, so `quran-corpus-user.db` matched this pattern and the
+ *  cleanup below deleted the user's database on every corpus-version bump --
+ *  bookmarks, notes, history and settings, gone, on exactly the upgrade path
+ *  the version bump exists to serve. Reproduced on device 2026-09-21 going
+ *  from m9 to m11: the app came back up in English with no history. The
+ *  exclusion is asserted in a test; the pattern alone cannot express it,
+ *  because any tightening still has to be right about a name it was never
+ *  meant to match. */
+const corpusDbPattern = /^quran-corpus-[a-z0-9]+\.db(\.partial)?(-wal|-shm|-journal)?$/;
 
 // The extraction below copies ~134 MB while the user stares at a fresh install,
 // so it is the slowest thing the app ever does. Callers hold the splash screen
@@ -65,10 +99,32 @@ export async function ensureCorpusDbFile(
 
   // A previous version's extract is dead weight the moment this one lands --
   // 134 MB of it -- and deleting it before the copy also means a phone low on
-  // space is not asked to hold both at once. Only this app's own corpus files
-  // match; the user DB lives in the same directory and is never touched.
+  // space is not asked to hold both at once. The user DB lives in this same
+  // directory and is skipped by name, not by trusting the pattern: it used to
+  // match, and the phone paid for it.
+  //
+  // The `-wal`/`-shm` sidecars go with it. expo-sqlite opens in WAL mode, so
+  // every extract leaves a pair of them, and a pattern that matched only the
+  // `.db` left them behind on every bump -- accumulating exactly the space
+  // this loop exists to reclaim.
+  const keep = new Set([corpusDbFileName, `${corpusDbFileName}-wal`, `${corpusDbFileName}-shm`]);
   for (const entry of await fileSystem.readDirectoryAsync(sqliteDir)) {
-    if (corpusDbPattern.test(entry) && entry !== corpusDbFileName) {
+    // `startsWith`, not an equality plus a `-` arm: the user DB's own
+    // siblings include `quran-corpus-user.db.partial`, the staging name the
+    // restore in userDb.ts copies to -- and `user` is [a-z0-9]+, so that name
+    // matches the pattern below just as the `.db` did. Both run unsequenced at
+    // launch, and this loop only runs on the launch where the extract is
+    // missing, which is exactly the upgrade launch a restore happens on: a
+    // sweep landing mid-copy would delete the staging file, the move would
+    // throw, and the app would open an empty user DB having just declined to
+    // restore the only backup of it.
+    if (entry.startsWith(userDbFileName)) continue;
+    if (corpusDbPattern.test(entry) && !keep.has(entry)) {
+      // Named, not silent. This loop deleted the user's database once (#92)
+      // and the app said nothing about it either time it ran; a line per
+      // deletion is what turns the next such report from a reconstruction
+      // into a reading.
+      console.warn(`[corpus db] removing stale extract ${entry}`);
       await fileSystem.deleteAsync(`${sqliteDir}/${entry}`, { idempotent: true });
     }
   }

@@ -81,6 +81,24 @@ export {
   matchesRootQuery,
   type RootSearchKeys,
 } from './text/rootSearch.js';
+// The surah-name folds search.ts resolves a typed name with. Re-exported, not
+// re-implemented: the picker in apps/mobile filters the same 114 names with the
+// same query text, and a second fold there would be a second answer to "does
+// `bakara` name al-Baqarah" -- with only one of the two carrying the Uzbek
+// `o` readings and the sun-letter articles. Pure string work, no runtime
+// imports, so this adds no edge to the Metro graph.
+export {
+  surahNameKeys,
+  surahNameExactMatch,
+  surahNamePrefixMatch,
+  surahTranslationKeys,
+  SURAH_NAME_MIN_PREFIX,
+} from './text/surahName.js';
+export { romanizeCyrillic, hasCyrillic } from './text/cyrillic.js';
+// The same Arabic fold the search index and the search query go through, so an
+// Arabic surah name typed at the picker is folded exactly as one typed at
+// search.
+export { normalizeArabic } from './text/normalize.js';
 // The root and lemma routes take a Buckwalter identifier straight off a deep
 // link, so they need the same charset and length caps the web routes use.
 // buckwalter.ts has no runtime imports, so this adds no edge to the Metro graph.

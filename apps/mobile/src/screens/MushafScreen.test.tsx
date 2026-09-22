@@ -22,6 +22,9 @@ vi.mock('react-native', async () => {
 
 const mocks = vi.hoisted(() => ({
   readerProps: [] as Array<Record<string, unknown>>,
+  chromeProps: [] as Array<Record<string, unknown>>,
+  jumpProps: [] as Array<Record<string, unknown>>,
+  pickerProps: [] as Array<Record<string, unknown>>,
   playerProps: [] as Array<Record<string, unknown>>,
   stripProps: [] as Array<Record<string, unknown>>,
   // The layout rows of whichever page is asked for. The index cannot say which
@@ -96,7 +99,12 @@ vi.mock('expo-router', async () => {
     },
   };
 });
-vi.mock('@/components/mushaf/MushafChrome', () => ({ MushafChrome: () => null }));
+vi.mock('@/components/mushaf/MushafChrome', () => ({
+  MushafChrome: (props: Record<string, unknown>) => {
+    mocks.chromeProps.push(props);
+    return null;
+  },
+}));
 vi.mock('@/components/mushaf/MushafTopStrip', () => ({
   MushafTopStrip: (props: Record<string, unknown>) => {
     mocks.stripProps.push(props);
@@ -111,7 +119,21 @@ vi.mock('@/mushaf/chromeVisibility', () => ({
   toggleChrome: vi.fn(),
   useChromeVisible: () => mocks.chromeVisible,
 }));
-vi.mock('@/components/mushaf/PageJumpSheet', () => ({ PageJumpSheet: () => null }));
+vi.mock('@/components/mushaf/PageJumpSheet', () => ({
+  PageJumpSheet: (props: Record<string, unknown>) => {
+    mocks.jumpProps.push(props);
+    return null;
+  },
+}));
+// Captured, not rendered: the picker is a full-screen Modal over 114 rows and
+// has its own suite. What this screen decides is what a PICK means here --
+// the mushaf's unit is a page, so a surah becomes the page it opens on.
+vi.mock('@/components/SurahPicker', () => ({
+  SurahPicker: (props: Record<string, unknown>) => {
+    mocks.pickerProps.push(props);
+    return null;
+  },
+}));
 vi.mock('@/components/ReciterSheet', () => ({ ReciterSheet: () => null }));
 // Lagged, exactly like the real hook, and the lag is the point: rows are
 // fetched in an effect, so the render in which the pager reports a turn still
@@ -188,6 +210,10 @@ vi.mock('@/components/AyahControls', () => ({ AyahControls: () => null }));
 vi.mock('@/components/NoteEditor', () => ({ NoteEditor: () => null }));
 vi.mock('@/data/corpusRepository', () => ({
   getWordsForAyah: () => Promise.resolve([{ id: 91, ayah_id: 9, position: 1 }]),
+  getSurahList: () =>
+    Promise.resolve([
+      { id: 112, nameArabic: 'الإخلاص', nameTranslit: 'Al-Ikhlas', nameTranslation: 'Sincerity', ayahCount: 4 },
+    ]),
 }));
 vi.mock('@/data/useWordSummaryLoader', () => ({
   useWordSummaryLoader: () => (word: unknown, surahId: number) => {
@@ -223,6 +249,9 @@ import { MushafScreen } from './MushafScreen';
 
 beforeEach(() => {
   mocks.readerProps = [];
+  mocks.chromeProps = [];
+  mocks.jumpProps = [];
+  mocks.pickerProps = [];
   mocks.playerProps = [];
   mocks.stripProps = [];
   mocks.pageLines = new Map();
@@ -876,5 +905,25 @@ describe('MushafScreen', () => {
     const keys = props()['bookmarkedKeys'] as ReadonlySet<string>;
     expect(keys.has('4:176')).toBe(true);
     expect(keys.has('5:1')).toBe(true);
+  });
+
+  it('turns a picked surah into the page it opens on', async () => {
+    // Ruling R3 in the mushaf's own unit. The picker hands back an id; a page
+    // is what this screen can show, and surah 112 opens on 604.
+    const props = await renderScreen();
+    act(() => {
+      (mocks.chromeProps.at(-1)?.['onOpenJump'] as () => void)();
+    });
+    act(() => {
+      (mocks.jumpProps.at(-1)?.['onBrowse'] as () => void)();
+    });
+    // The jump sheet is gone while the picker is up: one state, not two
+    // booleans, so there is no arrangement where both are mounted.
+    expect(mocks.jumpProps.at(-1)?.['onBrowse']).toBeTypeOf('function');
+    act(() => {
+      (mocks.pickerProps.at(-1)?.['onPick'] as (surahId: number) => void)(112);
+    });
+
+    await waitFor(() => expect(props()['focusPage']).toBe(604));
   });
 });

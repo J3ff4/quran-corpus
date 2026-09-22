@@ -81,7 +81,7 @@ solve, and the picker's browse row goes under these same fields.
 - [x] `PageJumpSheet` needs nothing: its segmented control names the kind its
   single field is asking for.
 
-### Task 1: the matcher
+### Task 1: the matcher — DONE, `38a236e`, reworked in `5c170fd`
 
 **Files:** Create `src/surah/matchSurah.ts`, `src/surah/matchSurah.test.ts`.
 
@@ -106,7 +106,7 @@ Empty/whitespace query → `items` unchanged (the picker shows all 114 at rest).
 - [ ] **Step 5: mutation-check (§4.4).** Delete the leading-`al` strip → `'al-baqara'` case must fail. Delete the NFC in `normalizeArabic` → the Arabic case must fail. Restore **by re-editing**, never `git checkout` (`never-git-stash-for-a-baseline`).
 - [ ] **Step 6: commit.** `feat(mobile): match a surah by transliteration, meaning or Arabic name`
 
-### Task 2: the picker sheet
+### Task 2: the picker sheet — DONE, `d611a4d`
 
 **Files:** Create `src/components/SurahPickerSheet.tsx`, `.test.tsx`.
 
@@ -126,7 +126,7 @@ export interface SurahPickerSheetProps {
 - [ ] **Step 4:** tests PASS.
 - [ ] **Step 5: commit.** `feat(mobile): a surah picker sheet, filtered by name`
 
-### Task 3: surah list, once
+### Task 3: surah list, once — DONE, `0aaf2c5`
 
 **Files:** Modify whichever call sites need it; create `src/data/surahNames.ts` only if two or more screens would otherwise each load the list.
 
@@ -135,7 +135,7 @@ export interface SurahPickerSheetProps {
 - [ ] **Step 3:** tests for whatever you added. No cache → no test, nothing new to break.
 - [ ] **Step 4: commit.** `refactor(mobile): one surah-name read for the picker's call sites` (skip the commit entirely if nothing was extracted)
 
-### Task 4: the three jump sheets
+### Task 4: the three jump sheets — DONE, `ea14dbb`
 
 **Files:** Modify `SurahJumpSheet.tsx`, `mushaf/PageJumpSheet.tsx` and their tests.
 
@@ -145,7 +145,7 @@ export interface SurahPickerSheetProps {
 - [ ] **Step 4:** tests PASS.
 - [ ] **Step 5: commit.** `feat(mobile): a browse-by-name row on the jump sheets`
 
-### Task 5: wire the three screens
+### Task 5: wire the three screens — DONE, `fe56f6f`
 
 **Files:** Modify `SurahReader.tsx`, `WbwScreen.tsx`, `MushafScreen.tsx` + their tests.
 
@@ -156,7 +156,7 @@ export interface SurahPickerSheetProps {
 - [ ] **Step 5: mutation-check.** Make the pick handler leave the jump sheet open → the "both closed" assertion must fail.
 - [ ] **Step 6: commit.** `feat(mobile): browse to a surah from the reader, WbW and mushaf`
 
-### Task 6: Surahs tab filter (R4)
+### Task 6: Surahs tab filter (R4) — DONE, `0ef55ba`
 
 **Files:** Modify `src/screens/SurahsScreen.tsx` + `SurahsTab.test.tsx`.
 
@@ -166,7 +166,7 @@ export interface SurahPickerSheetProps {
 - [ ] **Step 4:** tests PASS.
 - [ ] **Step 5: commit.** `feat(mobile): filter the surah index by name`
 
-### Task 7: Search suggestion (R4)
+### Task 7: Search suggestion (R4) — DONE, `0f0d1fa`, mostly pre-existing
 
 **Files:** Modify `src/screens/SearchScreen.tsx` + `SearchScreen.test.tsx`.
 
@@ -176,7 +176,7 @@ export interface SurahPickerSheetProps {
 - [ ] **Step 4:** tests PASS.
 - [ ] **Step 5: commit.** `feat(mobile): offer the matching surah above search results`
 
-### Task 8: strings + full gate
+### Task 8: strings + full gate — DONE, folded into `d611a4d`
 
 **Files:** `src/i18n/uiStrings.ts`, any test asserting key completeness.
 
@@ -186,13 +186,52 @@ export interface SurahPickerSheetProps {
 
 ---
 
+## What the build actually did, and why it differs
+
+Three things the plan did not know. Each is a deviation from the text above;
+the text above is left as written so the difference is visible.
+
+**1. The picker is a full-screen Modal, not a BottomSheet.** `BottomSheet`'s pan
+gesture wraps its whole children tree with no `simultaneousWithExternalGesture`
+composition, so a scrolling list inside it fights the sheet's own drag -- the
+same reason `ReciterSheet` has no ScrollView. Ten reciter rows fit without one;
+114 surahs and a keyboard do not. Composing those gestures is surgery on a
+component every sheet in the app depends on, for a list that wants the whole
+screen anyway. File is `SurahPicker.tsx`, not `SurahPickerSheet.tsx`.
+
+**2. The fold was already written, in `packages/data`.** Task 1 shipped its own
+normalizer; `packages/data/src/text/surahName.ts` has existed since `1aca65a`,
+where `search.ts` resolves typed surah names with it, and it is strictly better:
+Uzbek `o` dual readings (`Rahmon`/`Rahman`), a sun-letter article table, and the
+rule that keeps English meanings out of the Arabic fold -- which my meaning arm
+was violating in exactly the way its comment warns about (`moon` folds onto
+surah 76's `The Man`). `5c170fd` deletes the duplicate and re-exports the shared
+functions through `mobile.ts`. Two behaviours moved to match search rather than
+beat it: `yaseen` no longer resolves, and a two-letter fragment no longer
+matches (`SURAH_NAME_MIN_PREFIX` is 3). One answer in both places beats a better
+answer in one.
+
+**This is the plan's own Global Constraint being broken deliberately**: it said
+`packages/data` untouched. What landed there is five re-export lines of pure
+string modules with no runtime imports -- no schema, no query, no validation --
+and the entry-point guards (`mobile-entry.test.ts`, `client-entry.test.ts`) pass
+unchanged. Under §5 that is not a trigger; it is named here so the call is
+visible rather than buried.
+
+**3. Task 7 was mostly already shipped.** `search.ts` has folded surah names
+since `1aca65a`, so `baqara` always produced a jump card -- labelled with a bare
+number, which for a surah-level jump is the entire label. What Task 7 added is
+the name beside it. No new query, no second matcher, and the verse results
+underneath are untouched.
+
 ## Acceptance criteria
 
 1. `matchSurahs` is the only matcher in the app; no screen filters names itself.
 2. `'bakara'`, `'baqarah'`, `'al-baqara'`, `'cow'`, `'البقرة'` all reach surah 2.
 3. The Go-to fields are named on screen (R5). Every jump sheet offers the browse row; picking jumps to ayah 1 and leaves no sheet open.
 4. Surahs tab filters in `surah` mode only; Search offers the surah above its results.
-5. `packages/data` unchanged — `git diff --stat main -- packages/` is empty.
+5. ~~`packages/data` unchanged~~ — superseded, see deviation 2: five re-export
+   lines, no schema, no query, no validation, entry-point guards green.
 6. tsc, eslint and vitest green.
 7. Device checks below all pass on a release APK (§10).
 
@@ -211,7 +250,71 @@ export interface SurahPickerSheetProps {
 | 387 | Surahs tab: filter narrows, switching to Juz clears it and shows the full juz list. |
 | 388 | Search `baqara`: the go-to row sits above the text results and both work. |
 | 389 | TalkBack: each picker row announces its translit, and the filter field is labelled. |
+| 390 | Picker: one tap on a row opens the surah while the keyboard is still up -- not two. Same on the Surahs tab with the filter typed in. (keyboardShouldPersistTaps; review finding 1.) |
+| 391 | Picker: the title sits one normal gap below the status bar, not a status bar's worth of dead space. Check with the clock visible, and in dark mode. (statusBarTranslucent; review finding 2 -- the Modal shim renders a Fragment, so no unit test can defend this.) |
 
 ## Verification log
 
-_Empty until the device run. "Implementation complete, verification pending" is not a pass (§10)._
+### Run 1 — 2026-09-21, vc24 release APK, OnePlus 7Pro (GM1917), Android 13, dark mode
+
+11 pass, 1 partial, 1 blocked.
+
+| # | Result | Evidence |
+|---|---|---|
+| 379 | PASS | English `Surah`/`Ayah`, Uzbek `Sura`/`Oyat`, Russian `Сура`/`Аят` — all named above their fields, none clipped. Labels stay visible while typing: the sheet lifts above the keyboard and the row keeps both label and field on screen. |
+| 380 | PASS | Reader → title → `Find a surah by name`: the jump sheet is gone when the picker paints. One surface, no stacked scrim. |
+| 381 | PASS | `baqara` typed with the keyboard up — the single result sits well clear of the keyboard, nothing clipped. |
+| 382 | PASS | `dumpsys gfxinfo framestats`, 3 passes of 6 keystrokes over the full 114-row list: frame duration median 11.8/12.2/12.0 ms, deadline misses 3/0/5 of ~27 frames, worst frame 32.1 ms. One late frame in the worst pass, no per-keystroke stutter. (Vsync *gaps* are the 350 ms typing cadence, not jank — duration is the measure here.) |
+| 383 | PASS | From surah 2, picked Ya-Sin → reader opens at 36:1, both sheets gone. See the defect note below for the same-surah case. |
+| 384 | PASS | WbW (Ya-Sin → `nuh` → Nuh 1-10, ayah 1) and mushaf (Go to → `ikhlas` → page 604, which holds 112:1). |
+| 385 | BLOCKED | `adb shell input text 'البقرة'` → `java.lang.NullPointerException: Attempt to get length of null array`. adb cannot inject non-ASCII; needs an Arabic keyboard typed by hand. Owed. |
+| 386 | PASS | Uzbek UI: rows read `Baqara / Sigir · 286 oyat`, `sigir` matches surah 2, glyph column renders throughout. |
+| 387 | PASS | `light` narrows to An-Nur; switching to Juz drops the filter field and shows Juz 1-30 in full. |
+| 388 | PASS | `cow`: `GO TO → 2 Al-Baqara` above `VERSES → 2:69, 2:67`. Both arms live; the go-to row opens 2:1 on one tap. (`baqara` alone returns the go-to row and no verses — correct, no translation contains the word.) |
+| 389 | PARTIAL | Machine half verified from the a11y tree: every row is a Button with `content-desc` = translit + ayah count (`Al-Baqara, 286 аятов`), the filter is an EditText labelled `Название или смысл`, the close button is `Закрыть`. Spoken output not verified — enabling TalkBack needs `settings put secure`, which is blocked in this session. Same standing gap as issue #34. |
+| 390 | PASS | Both halves. Picker: one tap on `Al-Baqara` under the open keyboard opened the reader. Surahs tab: one tap on the `light` → An-Nur row under the open keyboard opened An-Nur. The review's two-tap defect is gone. |
+| 391 | PASS | Measured on the raw screenshot: status-bar clock spans y 48-92 px, the `Surahs` title starts at y 200 px — a 108 px (~27 dp) gap at density 640. A doubled inset would have put the title near y 300. Dark mode, clock visible. |
+
+### Findings from the run (neither blocks M11)
+
+1. **Russian surah names fall back to English.** Under a Russian UI the rows read `Al-Fatiha / The Opening · 7 аятов` — only the ayah-count unit localizes. Not a picker bug: `surah_names` holds `uz` (114) and `uz-Cyrl` (114) and nothing else, so `nameLang='ru'` has no rows to find and the surahs table's own English is what comes back. A data gap, tracked separately.
+2. **Picking the surah you are already reading does nothing.** From surah 2 at ayah 5, picking al-Baqara in the picker closed both sheets and left the scroll position untouched, rather than landing on 2:1. `jumpTo` only navigates on its cross-surah arm. Check 383 is written for the cross-surah case and passes there; this is the same-surah case the check does not cover.
+
+No stray writes to the user DB: a mis-tap landed on ayah 2:6's bookmark control mid-run, and the bookmarks screen afterwards read `0 oyat · 0 sura`.
+
+### Run 2 — 2026-09-21, vc33/vc34 release APKs, OnePlus 7Pro (GM1917), Android 12
+
+Ran against the three commits after Run 1: `2c0380c` (Cyrillic fold),
+`33fea40` (the five defects the independent read found), `2d1f538` (m11b).
+Bundle contents probed from the Hermes string table before each install, not
+assumed from a timestamp — `[Ѐ-ӿ]` present **once** (shared romanizer in,
+mobile's duplicate gone), `FROM reading_days`/`FROM root_views` present,
+`m11b` present and `m11a` absent.
+
+| # | Result | Evidence |
+|---|--------|----------|
+| Cyrillic search (Run 1 finding, and the defect the owner reported) | PASS | `бакара` typed by hand in Search finds al-Baqara. Owner-confirmed. adb cannot inject non-ASCII (check 385's blocker), so this half is human-only and stays that way. |
+| Cleanup loop vs the user DB (#92/#96) | PASS | vc34, 23:13:13 `[corpus db] removing stale extract quran-corpus-m11a.db`, then 23:13:14 `[user db] backed up 7 rows to .../backups/quran-corpus-user.db.backup`. First time that loop has run on hardware since the guard was fixed; it swept the old 134 MB extract and the user DB came through it. |
+| Widened empty-guard count | PASS | 7 rows, where vc33 logged 6. The two extra are `reading_days` and `root_views` — the tables `countUserRows` omitted, so a device holding only a reading streak counted zero and `backUp` declined to protect it. |
+| Install retains data | PASS | `adb install -r --user 0`, `update=1`, `firstInstallTime` unchanged at 2026-08-31 across both installs. |
+| No crash / no schema miss | PASS | Zero `FATAL`, zero `AndroidRuntime` for the package, no `no such table` after the re-extract. (`SQLiteLog` double-quoted-literal warnings in the same log are pid 4052, another app.) |
+
+**Still owed, and why.**
+
+1. **The `.partial` staging race is test-verified only.** `restoreIfMissing`
+   stages to `quran-corpus-user.db.partial`, which matched the extract
+   pattern while the skip guard tested `=== name` plus a `-` arm — a dot
+   matched neither. Both run unsequenced at launch and the loop only runs on
+   a version-bump launch, which is exactly when a restore happens. It is a
+   race, so Run 2 could not reproduce the collision either way; what it
+   proves is the loop's normal path.
+2. **The restore path has never run on hardware.** Provoking it means
+   deleting the live user DB, and a non-debuggable release build gives no
+   route into app storage. `[user db] ... has been RESTORED from ...` has
+   never printed on device.
+3. **#96's original cause is still unexplained.** The install, the cleanup
+   loop, storage pressure and the app's own write path were each ruled out
+   with evidence, and the owner did not clear the data. What changed is
+   containment, not diagnosis: a recurrence now has a copy to come back from.
+4. Check 385 (Arabic typed by hand) and check 389's spoken TalkBack output
+   (issue #34) remain owed from Run 1.

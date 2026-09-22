@@ -80,7 +80,11 @@ export interface SurahListItem {
   id: number;
   nameArabic: string;
   nameTranslit: string;
-  nameTranslation: string;
+  /** NULL where the name has no separate meaning -- the translator had none,
+   *  or it only repeated the name. A real state, not a gap: 8 of the 114
+   *  Russian rows are this shape, and rendering it as a string once put
+   *  `Хиджр · The Rocky Tract` on screen. */
+  nameTranslation: string | null;
   ayahCount: number;
 }
 
@@ -150,7 +154,14 @@ export async function getSurahList(
       // getSurahNames already falls back per surah to name_translit, so a
       // partial name set reads rather than showing blanks.
       nameTranslit: localized?.name ?? surah.name_translit,
-      nameTranslation: localized?.meaning ?? surah.name_translation,
+      // A ternary, not `??`: getSurahNames returns a row for all 114 and
+      // already resolves the fallback in SQL, so a NULL `meaning` here is a
+      // decision -- the translator had none, or it only repeated the name. `??`
+      // read that decision as "missing" and put the ENGLISH meaning back, so a
+      // Russian UI showed `Хиджр` subtitled `The Rocky Tract` and `Худ`
+      // subtitled `Hud` -- the name-echo the importer strips, in the wrong
+      // language.
+      nameTranslation: localized ? localized.meaning : surah.name_translation,
       ayahCount: surah.ayah_count,
     };
   });

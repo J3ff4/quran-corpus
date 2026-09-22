@@ -14,6 +14,8 @@ import { MushafChrome } from '@/components/mushaf/MushafChrome';
 import { MushafReader } from '@/components/mushaf/MushafReader';
 import { MushafTopStrip } from '@/components/mushaf/MushafTopStrip';
 import { PageJumpSheet, type JumpKind } from '@/components/mushaf/PageJumpSheet';
+import { SurahPicker } from '@/components/SurahPicker';
+import { useSurahIndex } from '@/data/useSurahIndex';
 import { ThemedStatusBar } from '@/components/ThemedStatusBar';
 import { WordSheet } from '@/components/WordSheet';
 import { getWordsForAyah, type WordSummary } from '@/data/corpusRepository';
@@ -118,7 +120,13 @@ export function MushafScreen() {
   // Stable, not live: hiding the status bar collapses this to 0, and the strip
   // painted off it would vanish and take the page up with it.
   const { top: insetTop } = useStableInsets();
-  const [jumpOpen, setJumpOpen] = useState(false);
+  // One state, not two booleans: two would let the jump sheet and the picker
+  // be open at once, which is the whole failure mode of a sheet that opens
+  // another sheet.
+  const [jumpView, setJumpView] = useState<'jump' | 'picker' | null>(null);
+  // Names only -- the mushaf has no use for the ayah counts, and the read is
+  // the same one either way.
+  const { surahs } = useSurahIndex(nameLanguage);
   const [reciterOpen, setReciterOpen] = useState(false);
   // The page the pager is actually on. Null until it reports its first turn:
   // the reader takes `initialPage` at mount and never announces it, so
@@ -502,7 +510,7 @@ export function MushafScreen() {
 
   const onJump = useCallback(
     (kind: JumpKind, value: number) => {
-      setJumpOpen(false);
+      setJumpView(null);
       const page = pageForJump(index.pages, kind, value);
       // Null only if the index cannot name the target -- the sheet has already
       // refused anything outside the mushaf's own ranges. Nothing moves.
@@ -615,11 +623,28 @@ export function MushafScreen() {
       <MushafChrome
         visible={chromeVisible}
         uiLocale={uiLocale}
-        onOpenJump={() => setJumpOpen(true)}
+        onOpenJump={() => setJumpView('jump')}
         onOpenSearch={() => router.push('/search')}
       />
-      {jumpOpen ? (
-        <PageJumpSheet uiLocale={uiLocale} onClose={() => setJumpOpen(false)} onJump={onJump} />
+      {jumpView === 'jump' ? (
+        <PageJumpSheet
+          uiLocale={uiLocale}
+          onClose={() => setJumpView(null)}
+          onJump={onJump}
+          // No rows, no row: the picker has nothing to show until the index
+          // read lands.
+          onBrowse={surahs === null ? undefined : () => setJumpView('picker')}
+        />
+      ) : null}
+      {jumpView === 'picker' && surahs !== null ? (
+        <SurahPicker
+          surahs={surahs}
+          uiLocale={uiLocale}
+          // R3 through the mushaf's own unit: onJump turns the surah into the
+          // page it opens on, which is where its first ayah is.
+          onPick={(surahId) => onJump('surah', surahId)}
+          onClose={() => setJumpView(null)}
+        />
       ) : null}
       {reciterOpen ? (
         <ReciterSheet

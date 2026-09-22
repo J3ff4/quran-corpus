@@ -23,8 +23,8 @@ import { reciterById, splitBasmala, type Word } from '@quran-corpus/data/mobile'
 import { surahNameGlyph } from '@quran-corpus/config/ornaments/surahName';
 import type { ReaderAyah, SurahReaderData, WordSummary } from '@/data/corpusRepository';
 import { getReaderPosition, setReaderPosition } from '@/data/readerPosition';
-import { useSurahAyahCounts } from '@/data/useSurahAyahCounts';
-import type { ContentLanguageCode, UiLocaleCode } from '@/i18n/languages';
+import { useSurahIndex } from '@/data/useSurahIndex';
+import type { ContentLanguageCode, QueryLanguageCode, UiLocaleCode } from '@/i18n/languages';
 
 import { AyahCard } from './AyahCard';
 import { RecitationBar, type RecitationBarProps } from './RecitationBar';
@@ -34,6 +34,7 @@ import { LanguageSheet } from './LanguageSheet';
 import { ReciterSheet } from './ReciterSheet';
 import { AyahControls } from './AyahControls';
 import { SurahJumpSheet } from './SurahJumpSheet';
+import { SurahPicker } from './SurahPicker';
 import { WordSheet } from './WordSheet';
 import { GlassSurface } from './GlassSurface';
 import { estimateRowHeight } from './rowHeightModel';
@@ -72,6 +73,10 @@ interface SurahReaderProps {
   audioEnabled: boolean;
   recitation: ReaderRecitation;
   uiLocale: UiLocaleCode;
+  /** The language the surah PICKER names surahs in. A QueryLanguageCode, not
+   *  the UI locale: `surah_names` carries the uz-Cyrl rows and only this can
+   *  reach them (#85). Omitted, the picker lists the English names. */
+  nameLanguage?: QueryLanguageCode | undefined;
   /** The reader owns no settings state; the screen above it does. Passed down
    *  rather than read from the store so this component stays renderable in a
    *  test without the store's expo-sqlite import. */
@@ -85,6 +90,9 @@ interface SurahReaderProps {
   onChangeShowTranslation?: (show: boolean) => void;
   /** Ayah to open at, from a bookmark or the saved reading position. */
   initialAyahNumber?: number | null;
+  /** Which request that seed is. Bumped by the caller on every jump, so a jump
+   *  to the ayah already seeded still lands -- see the anchor note below. */
+  seedNonce?: number;
   /** Omitted leaves the reader as a plain mushaf: every ayah renders its full
    *  Uthmani text, with no tap targets. */
   loadWords?: (ayahId: number) => Promise<Word[]>;
@@ -226,6 +234,7 @@ interface AyahListProps {
   data: SurahReaderData;
   /** The ayah to land on, captured when the layer mounts. */
   seedAyah: number | null;
+  seedNonce: number;
   /** Whether this is the layer the reader is looking at. Only the live layer
    *  records the reading position and asks for words -- one laying out under a
    *  cross-fade must do neither, or a landing it has not finished overwrites
@@ -284,6 +293,7 @@ interface AyahListProps {
 function AyahList({
   data,
   seedAyah,
+  seedNonce,
   live,
   onLanded,
   arriving,
@@ -417,7 +427,10 @@ function AyahList({
   // for its page: an effect would set state *after* the landing effect had
   // already run against the seed, so every mount landed twice -- the second
   // scroll restarting a sequence the first had begun.
-  const anchorKey = `${data.surah.id}:${seedAyah ?? ''}`;
+  // `seedNonce` is in the key, not just the ayah: a jump can name the ayah the
+  // seed already holds, and on a value alone that is indistinguishable from not
+  // jumping at all. The caller counts its jumps so each one is its own key.
+  const anchorKey = `${data.surah.id}:${seedAyah ?? ''}:${seedNonce}`;
   const [anchor, setAnchor] = useState(() => ({ key: anchorKey, ayah: seedAyah, nonce: 0 }));
   if (anchor.key !== anchorKey) {
     setAnchor({
@@ -494,9 +507,21 @@ function AyahList({
   }, [onLanded, live]);
 
   useEffect(() => {
-    // -1 means the ayah is not in this surah; 0 means the list already opens
-    // on it. Neither is a landing, and both must reveal the reader at once.
+    // -1 means the ayah is not in this surah; 0 means the first row. Neither
+    // needs the measuring sequence below, and both must reveal the reader at
+    // once.
     if (initialIndex <= 0) {
+      // "The list already opens on it" holds only while the list has not been
+      // scrolled. `anchor.nonce` is 0 for the seed a mount starts with and
+      // non-zero for every request after it, so a later ask for the first ayah
+      // is a reader somewhere down the surah being sent back to the top --
+      // picking al-Baqara from inside al-Baqara used to close the sheets and
+      // leave the page where it was (issue #94). Offset rather than index 0,
+      // because a row's own top is not the top of the list: the surah plate
+      // sits above it in the header.
+      if (initialIndex === 0 && anchor.nonce > 0) {
+        listRef.current?.scrollToOffset({ offset: 0, animated: false });
+      }
       positionedRef.current = true;
       setPositioned(true);
       onLandedRef.current();
@@ -849,6 +874,7 @@ export function SurahReader({
   showTranslation = true,
   onChangeShowTranslation,
   initialAyahNumber,
+  seedNonce = 0,
   loadWords,
   loadWordSummary,
   onToggleBookmark,
@@ -862,12 +888,16 @@ export function SurahReader({
   nextSurahId = null,
   onPageSurah,
   onJump,
+  nameLanguage,
 }: SurahReaderProps) {
   const navigation = useNavigation();
 
   const [languageOpen, setLanguageOpen] = useState(false);
-  const [jumpOpen, setJumpOpen] = useState(false);
-  const ayahCountOf = useSurahAyahCounts();
+  // One state, not two booleans: two would let the jump sheet and the picker
+  // be open at once, which is the whole failure mode of a sheet that opens
+  // another sheet.
+  const [jumpView, setJumpView] = useState<'jump' | 'picker' | null>(null);
+  const { surahs, ayahCountOf } = useSurahIndex(nameLanguage);
   const [reciterOpen, setReciterOpen] = useState(false);
 
   // The ayah the docked bar is parked on. Not `playingAyah`: that goes null the
@@ -953,7 +983,7 @@ export function SurahReader({
           titleVisible={titleVisible}
           {...(onJump ? { onOpenJump: () => {
             closeSheet();
-            setJumpOpen(true);
+            setJumpView('jump');
           } } : {})}
           showTranslation={showTranslation}
           {...(onChangeShowTranslation ? { onChangeShowTranslation } : {})}
@@ -1132,6 +1162,7 @@ export function SurahReader({
       <AyahList
         data={data}
         seedAyah={initialAyahNumber ?? null}
+        seedNonce={seedNonce}
         live
         onLanded={noopLanded}
         arriving={false}
@@ -1236,16 +1267,31 @@ export function SurahReader({
           onClose={() => setLanguageOpen(false)}
         />
       ) : null}
-      {jumpOpen && onJump ? (
+      {jumpView === 'jump' && onJump ? (
         <SurahJumpSheet
           uiLocale={uiLocale}
           surahId={data.surah.id}
           ayahCountOf={ayahCountOf}
-          onClose={() => setJumpOpen(false)}
+          onClose={() => setJumpView(null)}
           onJump={(surahId, ayahNumber) => {
-            setJumpOpen(false);
+            setJumpView(null);
             onJump(surahId, ayahNumber);
           }}
+          // No rows, no row: the picker has nothing to show until the index
+          // read lands.
+          onBrowse={surahs === null ? undefined : () => setJumpView('picker')}
+        />
+      ) : null}
+      {jumpView === 'picker' && surahs !== null && onJump ? (
+        <SurahPicker
+          surahs={surahs}
+          uiLocale={uiLocale}
+          // Ruling R3: a name goes to the head of its surah.
+          onPick={(surahId) => {
+            setJumpView(null);
+            onJump(surahId, 1);
+          }}
+          onClose={() => setJumpView(null)}
         />
       ) : null}
     </View>

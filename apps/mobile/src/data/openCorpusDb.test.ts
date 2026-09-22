@@ -4,6 +4,7 @@ import type { CorpusDbFileSystem } from './openCorpusDb';
 import {
   corpusDbFileName,
   corpusDbVersion,
+  userDbFileName,
   ensureCorpusDbFile,
   stagingSuffix,
 } from './openCorpusDb';
@@ -170,7 +171,14 @@ describe('a rebuilt corpus reaching a device that already ran the app', () => {
   });
 
   it('never touches the user DB in the same directory', async () => {
-    const userDb = `${sqliteDir}/quran-user.db`;
+    // The name the app actually opens, taken from the constant userDb.ts uses
+    // -- not a stand-in. This test used to write `quran-user.db`, which is not
+    // a name anything creates, and so it passed for months while the real
+    // `quran-corpus-user.db` was being deleted on every version bump: `user`
+    // is [a-z0-9]+, so it matched the extract pattern. Bookmarks, notes,
+    // reading history and settings, lost on upgrade, with a green test over
+    // it.
+    const userDb = `${sqliteDir}/${userDbFileName}`;
     const { fileSystem, files } = createFileSystem({
       [userDb]: 'bookmarks and notes',
       [`${sqliteDir}/quran-corpus-m1.db`]: 'old corpus',
@@ -179,6 +187,71 @@ describe('a rebuilt corpus reaching a device that already ran the app', () => {
     await ensureCorpusDbFile(fileSystem, sqliteDir, async () => assetUri);
 
     expect(files.get(userDb)).toBe('bookmarks and notes');
+    // And the run that spared it still did its job.
+    expect(files.has(`${sqliteDir}/quran-corpus-m1.db`)).toBe(false);
+  });
+
+  it('takes the stale extract\'s WAL sidecars with it', async () => {
+    // expo-sqlite opens in WAL mode, so every extract leaves a -wal and a -shm
+    // beside it. A pattern that matched only the `.db` left them on the device
+    // for good, which is the space this loop exists to reclaim.
+    const { fileSystem, files } = createFileSystem({
+      [`${sqliteDir}/quran-corpus-m1.db`]: 'old corpus',
+      [`${sqliteDir}/quran-corpus-m1.db-wal`]: 'old wal',
+      [`${sqliteDir}/quran-corpus-m1.db-shm`]: 'old shm',
+    });
+
+    await ensureCorpusDbFile(fileSystem, sqliteDir, async () => assetUri);
+
+    expect(files.has(`${sqliteDir}/quran-corpus-m1.db-wal`)).toBe(false);
+    expect(files.has(`${sqliteDir}/quran-corpus-m1.db-shm`)).toBe(false);
+  });
+
+  it("leaves the user DB's own sidecars alone", async () => {
+    // `quran-corpus-user.db-wal` matches the pattern just as the DB itself
+    // does, and deleting a live WAL loses whatever has not been checkpointed.
+    const wal = `${sqliteDir}/${userDbFileName}-wal`;
+    const shm = `${sqliteDir}/${userDbFileName}-shm`;
+    const { fileSystem, files } = createFileSystem({
+      [`${sqliteDir}/${userDbFileName}`]: 'bookmarks and notes',
+      [wal]: 'uncheckpointed writes',
+      [shm]: 'shared memory',
+    });
+
+    await ensureCorpusDbFile(fileSystem, sqliteDir, async () => assetUri);
+
+    expect(files.get(wal)).toBe('uncheckpointed writes');
+    expect(files.get(shm)).toBe('shared memory');
+  });
+
+  it("leaves the user DB restore's staging file alone", async () => {
+    // `quran-corpus-user.db.partial` is what restoreIfMissing in userDb.ts
+    // copies the backup to before renaming it into place, and it matches this
+    // pattern for the same reason the `.db` did. Both run unsequenced at
+    // launch, and this loop runs only on the launch where the extract is
+    // missing -- the upgrade launch a restore actually happens on. Sweeping it
+    // mid-copy would make the move throw and the restore decline, leaving an
+    // empty user DB with a perfectly good backup sitting next to it.
+    const staging = `${sqliteDir}/${userDbFileName}.partial`;
+    const { fileSystem, files } = createFileSystem({ [staging]: 'a restore in flight' });
+
+    await ensureCorpusDbFile(fileSystem, sqliteDir, async () => assetUri);
+
+    expect(files.get(staging)).toBe('a restore in flight');
+  });
+
+  it("matches the restore's staging name against the pattern too", async () => {
+    // Same statement as the test below, for the name that was missed: the
+    // guard is load-bearing only while the name keeps matching.
+    expect(/^quran-corpus-[a-z0-9]+\.db\.partial$/.test(`${userDbFileName}.partial`)).toBe(true);
+  });
+
+  it('matches the user DB name against the pattern it has to survive', async () => {
+    // Stating the trap outright: the exclusion is load-bearing precisely
+    // because the name DOES look like an extract. If a future rename makes it
+    // stop matching, this fails and says so rather than leaving a guard that
+    // silently protects nothing.
+    expect(/^quran-corpus-[a-z0-9]+\.db$/.test(userDbFileName)).toBe(true);
   });
 
   it('still skips the copy when the current version is already extracted', async () => {

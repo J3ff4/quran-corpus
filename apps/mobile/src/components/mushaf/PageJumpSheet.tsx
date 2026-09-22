@@ -4,7 +4,7 @@ import { MUSHAF_PAGE_MAX, MUSHAF_PAGE_MIN } from '@quran-corpus/data/mobile';
 
 import { BottomSheet } from '@/components/BottomSheet';
 import { SegmentedControl } from '@/components/SegmentedControl';
-import { SheetActions, SheetHeader } from '@/components/sheet';
+import { SheetActions, SheetHeader, SheetRow } from '@/components/sheet';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t, type UiStringKey } from '@/i18n/uiStrings';
 import { radii, touchTargets, typography } from '@/theme/tokens';
@@ -28,6 +28,9 @@ export type JumpKind = keyof typeof KINDS;
 export interface PageJumpSheetProps {
   uiLocale: UiLocaleCode;
   onClose: () => void;
+  /** Opens the surah picker. Optional for the same reason as the reader's:
+   *  no picker mounted, no row. */
+  onBrowse?: (() => void) | undefined;
   /** A validated target. The screen turns it into a page from the loaded
    *  index -- no new query. */
   onJump: (kind: JumpKind, value: number) => void;
@@ -44,7 +47,7 @@ export function parseJumpTarget(kind: JumpKind, raw: string): number | null {
 }
 
 /** The mushaf's jump control (M7d ruling 6): page, surah or juz. */
-export function PageJumpSheet({ uiLocale, onClose, onJump }: PageJumpSheetProps) {
+export function PageJumpSheet({ uiLocale, onClose, onJump, onBrowse }: PageJumpSheetProps) {
   const theme = useThemeColors();
   const [kind, setKind] = useState<JumpKind>('page');
   const [raw, setRaw] = useState('');
@@ -101,6 +104,17 @@ export function PageJumpSheet({ uiLocale, onClose, onJump }: PageJumpSheetProps)
           fontSize: typography.body,
         }}
       />
+      {onBrowse ? (
+        // In every kind, not only `surah`: the row sets the surah and jumps by
+        // it, so hiding it on `page` would mean switching segment first to
+        // reach a control that does not care which one is selected.
+        <SheetRow
+          testID="jump-browse"
+          label={t(uiLocale, 'jump.browse')}
+          trailingIcon="chevronRight"
+          onPress={onBrowse}
+        />
+      ) : null}
       {rejected ? (
         <Text
           testID="jump-error"

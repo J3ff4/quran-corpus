@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 
 import { BottomSheet } from '@/components/BottomSheet';
-import { SheetActions, SheetHeader } from '@/components/sheet';
+import { SheetActions, SheetHeader, SheetRow } from '@/components/sheet';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
 import { radii, touchTargets, typography } from '@/theme/tokens';
@@ -26,10 +26,13 @@ export interface SurahJumpSheetProps {
   uiLocale: UiLocaleCode;
   /** Where the reader is now -- seeds the field. */
   surahId: number;
-  /** Null = not loaded yet, never "no ayahs". See useSurahAyahCounts. */
+  /** Null = not loaded yet, never "no ayahs". See useSurahIndex. */
   ayahCountOf: (surahId: number) => number | null;
   onClose: () => void;
   onJump: (surahId: number, ayahNumber: number) => void;
+  /** Opens the surah picker. Optional, and absent means no row at all: a
+   *  caller with no picker mounted would otherwise draw a dead control. */
+  onBrowse?: (() => void) | undefined;
 }
 
 /** Go to any surah and ayah (owner rulings S2-S4). Opened by tapping the surah
@@ -40,6 +43,7 @@ export function SurahJumpSheet({
   ayahCountOf,
   onClose,
   onJump,
+  onBrowse,
 }: SurahJumpSheetProps) {
   const theme = useThemeColors();
   const [surahRaw, setSurahRaw] = useState(String(surahId));
@@ -133,6 +137,17 @@ export function SurahJumpSheet({
             />
         </View>
       </View>
+      {onBrowse ? (
+        // Under the fields, not instead of them (ruling R1). Someone who knows
+        // the number is two taps from the ayah they want and should not be
+        // routed through a list of 114 to get there.
+        <SheetRow
+          testID="surah-jump-browse"
+          label={t(uiLocale, 'jump.browse')}
+          trailingIcon="chevronRight"
+          onPress={onBrowse}
+        />
+      ) : null}
       {rejected ? (
         <Text
           testID="surah-jump-error"
