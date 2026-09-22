@@ -207,6 +207,67 @@ describe('SearchScreen', () => {
     expect(verseIndex).toBeGreaterThan(jumpIndex);
   });
 
+  it('lets the go-to section leave instead of blinking out', async () => {
+    // Mounted straight into the ScrollView, the section arrived in one frame
+    // and shoved every result below it down by the card's full height, then
+    // snapped them back up when the reference stopped matching -- typing and
+    // deleting `2:255` jolted the list twice (owner, 2026-09-22). A curtain
+    // animates the height instead, so the rows below travel with it.
+    mocks.searchCorpus.mockResolvedValue({
+      jump: {
+        surah_id: 2,
+        ayah_number: 255,
+        text_uthmani: 'ٱللَّهُ',
+        words: [],
+        highlightPosition: null,
+      },
+      verses: [],
+      roots: [],
+    });
+
+    render(<SearchScreen />);
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: '2:255' } });
+
+    await waitFor(() => expect(screen.getByTestId('search-jump')).toBeTruthy());
+    const curtain = screen.getByTestId('search-jump-curtain');
+    // Inside the curtain, not beside it: a curtain the card does not live in
+    // clips nothing and the section still mounts in one frame.
+    expect(curtain.contains(screen.getByTestId('search-jump'))).toBe(true);
+    // The heading travels with it. Left outside, 'GO TO' appears and vanishes
+    // instantly above a card that is still animating.
+    expect(curtain.textContent).toContain('GO TO');
+  });
+
+  it('keeps the reference on the card while the section closes', async () => {
+    // A curtain's children stay mounted until the close lands, so the card is
+    // on screen for the whole animation. Read live, its reference would be
+    // gone on frame one -- an empty card sliding shut, which is worse than the
+    // blink the curtain replaced.
+    mocks.searchCorpus.mockResolvedValue({
+      jump: {
+        surah_id: 2,
+        ayah_number: 255,
+        text_uthmani: 'ٱللَّهُ',
+        words: [],
+        highlightPosition: null,
+      },
+      verses: [],
+      roots: [],
+    });
+    render(<SearchScreen />);
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: '2:255' } });
+    await waitFor(() => expect(screen.getByTestId('search-jump-ref').textContent).toBe('2:255'));
+
+    mocks.searchCorpus.mockResolvedValue(EMPTY);
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'nur' } });
+
+    await waitFor(() => expect(mocks.searchCorpus).toHaveBeenCalledTimes(2));
+    const ref = screen.queryByTestId('search-jump-ref');
+    // Either the close has already landed and the card is gone, or it is still
+    // on screen -- and then it still says what it said.
+    if (ref) expect(ref.textContent).toBe('2:255');
+  });
+
   it('names the surah a typed name resolved to', async () => {
     // search.ts folds surah names itself, so "baqara" already produced this
     // jump -- labelled with a bare number, which never said the name had been

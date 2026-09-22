@@ -4,6 +4,7 @@ import Animated from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
 import { EMPTY_SEARCH_RESULT, type SearchResult } from '@quran-corpus/data/mobile';
+import { Collapsible } from '@/components/Collapsible';
 import { GlassSurface } from '@/components/GlassSurface';
 import { Icon } from '@/components/icons/Icon';
 import { SearchField } from '@/components/SearchField';
@@ -12,6 +13,7 @@ import { SnippetText } from '@/components/SnippetText';
 import { searchCorpus } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { t } from '@/i18n/uiStrings';
+import { useHeldEntry } from '@/motion/entryPager';
 import { usePressScale } from '@/motion/usePressScale';
 import { getReaderSurah } from '@/data/readerPosition';
 import { useSurahIndex } from '@/data/useSurahIndex';
@@ -165,16 +167,27 @@ export function SearchScreen() {
   // the name had been understood. The index is 114 rows the app reads anyway.
   const { surahs, ayahCountOf } = useSurahIndex(nameLanguage);
   const [jumpOpen, setJumpOpen] = useState(false);
+  // Held across the close, not read live. The GO TO section is a curtain now,
+  // and a curtain's children stay mounted until the close lands -- reading
+  // `result.jump` there would blank the card on the first frame of the very
+  // animation that exists to stop it blinking out.
+  const jump = useHeldEntry(result.jump);
+
+  // Off the held reference too, for the same reason: the name dropping out
+  // mid-close is the card rearranging itself while it leaves.
   const jumpSurahName =
-    result.jump === null
+    jump === null
       ? null
-      : (surahs?.find((surah) => surah.id === result.jump?.surah_id)?.nameTranslit ?? null);
+      : (surahs?.find((surah) => surah.id === jump.surah_id)?.nameTranslit ?? null);
 
   const openJump = useCallback(() => {
-    const jump = result.jump;
-    if (!jump) return;
-    const suffix = jump.ayah_number === null ? '' : `?ayah=${jump.ayah_number}`;
-    router.push(`/surah/${jump.surah_id}${suffix}`);
+    // The live one, not the held one: the card is still on screen through the
+    // close, and a press landing on it then must not push the reference the
+    // query has already moved off.
+    const target = result.jump;
+    if (!target) return;
+    const suffix = target.ayah_number === null ? '' : `?ayah=${target.ayah_number}`;
+    router.push(`/surah/${target.surah_id}${suffix}`);
   }, [result.jump]);
 
   const heading = {
@@ -266,35 +279,44 @@ export function SearchScreen() {
         {empty ? <Text style={{ color: theme.mutedText }}>{t(uiLocale, 'search.empty')}</Text> : null}
         {nothing ? <Text style={{ color: theme.mutedText }}>{t(uiLocale, 'search.noResults')}</Text> : null}
 
-        {result.jump ? (
-          <>
-            <Text accessibilityRole="header" style={heading}>{t(uiLocale, 'search.jump').toUpperCase()}</Text>
-            <ResultCard testID="search-jump" onPress={openJump} tinted>
-              <Text
-                testID="search-jump-ref"
-                style={{
-                  color: theme.accent,
-                  fontSize: 20,
-                  fontWeight: '700',
-                  fontVariant: ['tabular-nums'],
-                }}
-              >
-                {/* A surah-name-only reference ("Al-Baqarah") has no ayah at
-                    all -- openJump pushes the surah with no `?ayah=`, so
-                    faking one here (the old `?? 1`) labelled a destination
-                    the tap would not actually land on. */}
-                {result.jump.ayah_number === null
-                  ? result.jump.surah_id
-                  : `${result.jump.surah_id}:${result.jump.ayah_number}`}
-              </Text>
-              {jumpSurahName === null ? null : (
-                <Text testID="search-jump-name" style={{ color: theme.mutedText, fontSize: typography.caption }}>
-                  {jumpSurahName}
+        {/* A curtain, not a mount (owner, 2026-09-22). Typing the second
+            character of `2:255` used to put the whole section on screen in one
+            frame, which shoved every result below it down by the card's full
+            height; deleting it snapped them back up. Height, not opacity: a
+            fade leaves the card occupying its space from frame one and the
+            rows below still jump -- the same ruling the header's curtain was
+            made under (R7). */}
+        <Collapsible open={result.jump !== null} testID="search-jump-curtain">
+          {jump === null ? null : (
+            <>
+              <Text accessibilityRole="header" style={heading}>{t(uiLocale, 'search.jump').toUpperCase()}</Text>
+              <ResultCard testID="search-jump" onPress={openJump} tinted>
+                <Text
+                  testID="search-jump-ref"
+                  style={{
+                    color: theme.accent,
+                    fontSize: 20,
+                    fontWeight: '700',
+                    fontVariant: ['tabular-nums'],
+                  }}
+                >
+                  {/* A surah-name-only reference ("Al-Baqarah") has no ayah at
+                      all -- openJump pushes the surah with no `?ayah=`, so
+                      faking one here (the old `?? 1`) labelled a destination
+                      the tap would not actually land on. */}
+                  {jump.ayah_number === null
+                    ? jump.surah_id
+                    : `${jump.surah_id}:${jump.ayah_number}`}
                 </Text>
-              )}
-            </ResultCard>
-          </>
-        ) : null}
+                {jumpSurahName === null ? null : (
+                  <Text testID="search-jump-name" style={{ color: theme.mutedText, fontSize: typography.caption }}>
+                    {jumpSurahName}
+                  </Text>
+                )}
+              </ResultCard>
+            </>
+          )}
+        </Collapsible>
 
         {result.verses.length > 0 ? (
           <>
