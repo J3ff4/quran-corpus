@@ -6,7 +6,7 @@ import { useThemeColors } from '@/theme/themeContext';
 import type { Gloss } from '@/data/corpusRepository';
 import type { UiLocaleCode } from '@/i18n/languages';
 
-import { WbwCell } from './WbwCell';
+import { WbwCell, wbwRhythm } from './WbwCell';
 import { WbwSpanGloss } from './WbwSpanGloss';
 
 export interface WbwSpanProps {
@@ -50,6 +50,10 @@ export function WbwSpan({
   onWordPress,
 }: WbwSpanProps) {
   const theme = useThemeColors();
+  // One rhythm for a phrase and for a single word. The span holds ALL of it --
+  // its cells keep none of their own -- so a shared gloss lands on the same
+  // line as its neighbours' (ruling R7).
+  const rhythm = wbwRhythm(compact);
 
   return (
     <View
@@ -59,7 +63,8 @@ export function WbwSpan({
       style={{
         alignItems: 'center',
         paddingHorizontal: compact ? 4 : 6,
-        paddingVertical: compact ? 2 : 4,
+        paddingVertical: rhythm.paddingVertical,
+        gap: rhythm.gap,
         borderRadius: radii.chip,
         borderWidth: compact ? 0 : 1,
         borderColor: compact ? 'transparent' : theme.border,
@@ -79,7 +84,8 @@ export function WbwSpan({
             uiLocale={uiLocale}
             showPos={showPos}
             glossLines={glossLines}
-            compact
+            compact={compact}
+            inSpan
             hideGloss
             onPress={() => onWordPress(word)}
           />
