@@ -97,7 +97,8 @@ function flattenStyle(style: unknown): Record<string, unknown> | undefined {
 }
 
 /**
- * RN's `paddingVertical` / `marginHorizontal` family as the CSS longhands.
+ * RN's `paddingVertical` / `marginHorizontal` family -- and the all-sides
+ * `padding` / `margin` -- as the CSS longhands.
  *
  * Same blindness as the shadow props and `includeFontPadding`: React assigns
  * the style object onto `node.style`, where a property CSS has never heard of
@@ -107,8 +108,8 @@ function flattenStyle(style: unknown): Record<string, unknown> | undefined {
  * span's gloss sat 4dp below its neighbours' for a phase (owner screenshot,
  * 2026-09-22).
  *
- * The longhand wins where both are set, which is RN's own rule and not an
- * ordering accident.
+ * The longhand wins over the axis shorthand, which wins over the all-sides
+ * one. That is RN's own precedence and not an ordering accident.
  */
 function withSpacing(
   flat: Record<string, unknown> | undefined,
@@ -119,6 +120,11 @@ function withSpacing(
     ['padding', 'Horizontal', ['Left', 'Right']],
     ['margin', 'Vertical', ['Top', 'Bottom']],
     ['margin', 'Horizontal', ['Left', 'Right']],
+    // Last, so the axis shorthands above have already claimed their sides:
+    // RN resolves `padding` under `paddingVertical` under `paddingTop`, and
+    // the `??=` below is what encodes the second half of that.
+    ['padding', '', ['Top', 'Bottom', 'Left', 'Right']],
+    ['margin', '', ['Top', 'Bottom', 'Left', 'Right']],
   ] as const;
   let next = flat;
   for (const [box, axis, sides] of axes) {

@@ -1162,6 +1162,17 @@ export function SurahReader({
   screenReaderRef.current = screenReader;
   const bumpWordsRef = useRef(bumpWords);
   bumpWordsRef.current = bumpWords;
+  // Turning TalkBack on mid-session has to reach the ayahs already fetched.
+  // Their rows landed while the gate below was shut, so their accessors were
+  // never dropped and every one of those cards is memoised on an identity
+  // that will now never change again -- their words would announce as raw
+  // Arabic, spelled letter by letter, for the rest of the session. Dropping
+  // the whole map is the same wake as the per-ayah one, applied at once.
+  useEffect(() => {
+    if (!screenReader) return;
+    wordAccessorsRef.current.clear();
+    bumpWords((n) => n + 1);
+  }, [screenReader]);
   // Separate from the state map, and written before the await:
   // onViewableItemsChanged fires on every scroll frame that changes the set,
   // so a check against state alone would issue a fresh query per frame for as

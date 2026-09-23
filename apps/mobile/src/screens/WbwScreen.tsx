@@ -216,22 +216,47 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
     setOpen(null);
   }
 
+  // Every sheet that covers the screen, not just the word one: on Android
+  // `accessibilityViewIsModal` does nothing, so a sheet left out of this is a
+  // sheet TalkBack can swipe straight behind.
+  const sheetsOpen = Boolean(open) || languageOpen || jumpView !== null;
+
+  // Both branches below carry the chrome, and they have to: the route runs
+  // `headerShown: false` (app/_layout.tsx), so the only back button on this
+  // screen is HeaderCard's. Rendered without it, a failed load -- a bad deep
+  // link like /surah/999/words, or any DB error -- left the reader with no way
+  // out but the OS gesture, and its text drawn under the status bar.
+  const chrome = (
+    <HeaderCard
+      title={view?.surah.name_translit ?? t(uiLocale, 'wbw.title')}
+      onBack={() => router.back()}
+      uiLocale={uiLocale}
+      testIDPrefix="wbw"
+    />
+  );
+
   // Only with nothing to hold -- the screen's first load. A page turn keeps
   // the outgoing surah up, which is the half that slides out.
   if (loading && !view) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator />
+      <View style={{ flex: 1 }}>
+        {chrome}
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator />
+        </View>
       </View>
     );
   }
 
   if (error || !view) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', padding: 20 }}>
-        <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ color: theme.danger }}>
-          {error ?? t(uiLocale, 'reader.loadFailed')}
-        </Text>
+      <View style={{ flex: 1 }}>
+        {chrome}
+        <View style={{ flex: 1, justifyContent: 'center', padding: 20 }}>
+          <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ color: theme.danger }}>
+            {error ?? t(uiLocale, 'reader.loadFailed')}
+          </Text>
+        </View>
       </View>
     );
   }
@@ -250,7 +275,7 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
         entering={pager.animation.entering}
         exiting={pager.animation.exiting}
         style={{ flex: 1 }}
-        importantForAccessibility={open ? 'no-hide-descendants' : 'auto'}
+        importantForAccessibility={sheetsOpen ? 'no-hide-descendants' : 'auto'}
       >
         {/* The reader's own chrome, not a second styling of it (owner,
             2026-09-22). HeaderCard carries the glass, the centred display-face

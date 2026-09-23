@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   error: null as string | null,
   redirect: vi.fn(),
   getWbwScreen: vi.fn(),
+  back: vi.fn(),
 }));
 
 // The hook has its own suite; stubbed here so this one covers the decision the
@@ -46,12 +47,25 @@ vi.mock('@/screens/WbwScreen', async () => {
 vi.mock('expo-router', async () => {
   const React = await import('react');
   return {
+    router: { back: () => mocks.back() },
     Redirect: (props: { href: string }) => {
       mocks.redirect(props);
       return React.createElement('span', { 'data-testid': 'redirect' });
     },
     Link: ({ href, children }: { href: string; children?: React.ReactNode }) =>
       React.createElement('a', { href, 'data-testid': 'link' }, children),
+  };
+});
+
+vi.mock('@/components/HeaderCard', async () => {
+  const React = await import('react');
+  return {
+    HeaderCard: ({ title, onBack }: { title: string; onBack: () => void }) =>
+      React.createElement(
+        'button',
+        { 'data-testid': 'header-card', onClick: onBack },
+        title,
+      ),
   };
 });
 
@@ -79,6 +93,7 @@ describe('morphology tab', () => {
     mocks.error = null;
     mocks.redirect.mockReset();
     mocks.getWbwScreen.mockReset();
+    mocks.back.mockReset();
   });
 
   it('renders the word-by-word screen inside the tab, not a redirect away from it', async () => {
@@ -124,6 +139,20 @@ describe('morphology tab', () => {
     expect(screen.getByTestId('loading')).toBeTruthy();
     expect(screen.queryByText(/no reading history/i)).toBeNull();
     expect(screen.queryByTestId('wbw-screen')).toBeNull();
+  });
+
+  it('draws the chrome on every branch that is not the screen itself', () => {
+    // The route runs headerShown: false so WbwScreen's own HeaderCard is the
+    // only back button -- which leaves this branch, the one a fresh install
+    // lands on, owing its own. Without it there was no way back at all.
+    mocks.position = null;
+
+    render(<MorphologyRoute />);
+
+    const header = screen.getByTestId('header-card');
+    expect(header.textContent).toBe('Word by word');
+    header.click();
+    expect(mocks.back).toHaveBeenCalled();
   });
 
   it('shows the read failure rather than a false empty state', () => {

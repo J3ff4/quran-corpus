@@ -541,6 +541,52 @@ describe('word-by-word route', () => {
     expect(screen.getByTestId('wbw-next')).toBeTruthy();
   });
 
+  it('keeps the way back when the screen has nothing to show', async () => {
+    // The route runs headerShown: false, so HeaderCard's is the only back
+    // button there is. Rendered below the branch switch it was absent from
+    // exactly the two states a reader is most likely to be stuck in -- a bad
+    // deep link and a failed load.
+    mocks.getWbwScreen.mockRejectedValue(new Error('no such table: words'));
+
+    render(<WbwRoute />);
+
+    expect((await screen.findByRole('alert')).textContent).toBeTruthy();
+    expect(screen.getByTestId('wbw-back')).toBeTruthy();
+  });
+
+  it('keeps the way back while the first load is still in flight', async () => {
+    const pending = deferred<WbwScreenData>();
+    mocks.getWbwScreen.mockReturnValue(pending.promise);
+
+    render(<WbwRoute />);
+
+    expect(screen.queryByTestId('wbw-cell')).toBeNull();
+    expect(screen.getByTestId('wbw-back')).toBeTruthy();
+  });
+
+  it('hides the screen from TalkBack while the language sheet is open', async () => {
+    // Same reason as the word sheet above, and the gate has to name every
+    // sheet that covers the screen -- not just the first one written.
+    render(<WbwRoute />);
+    await screen.findAllByTestId('wbw-cell');
+    const wrapper = () => screen.getByTestId('wbw-screen');
+
+    fireEvent.click(screen.getByTestId('wbw-actions'));
+    fireEvent.click(screen.getByTestId('open-language'));
+
+    expect(wrapper().getAttribute('data-hidden-from-a11y')).toBe('true');
+  });
+
+  it('hides the screen from TalkBack while the jump sheet is open', async () => {
+    render(<WbwRoute />);
+    await screen.findAllByTestId('wbw-cell');
+    const wrapper = () => screen.getByTestId('wbw-screen');
+
+    fireEvent.click(screen.getByTestId('wbw-title'));
+
+    expect(wrapper().getAttribute('data-hidden-from-a11y')).toBe('true');
+  });
+
   it('carries the tapped word\'s own ayah into the word-detail route', async () => {
     // `Word` holds ayah_id, not the ayah number the route is addressed by, so
     // the number has to come from the page the cell belongs to. Taking it from

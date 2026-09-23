@@ -1082,6 +1082,29 @@ describe('SurahReader', () => {
     await waitFor(() => expect(screen.getAllByLabelText('translit-1').length).toBeGreaterThan(0));
   });
 
+  it('announces the ayahs it already had when a screen reader starts mid-session', async () => {
+    // The rows for these ayahs landed while the gate was shut, so their
+    // accessors were never dropped -- and AyahCard is memoised on them, so
+    // without clearing the whole map those cards can never re-render again.
+    // Every word already on screen would announce as raw Arabic, spelled
+    // letter by letter, for the rest of the session.
+    const data = readerData(2);
+    const props = { ...baseProps(data), loadWords: async (ayahId: number) => surahWords(ayahId) };
+    const { rerender } = render(<SurahReader {...props} />);
+
+    await act(async () => {
+      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
+    });
+    expect(screen.queryByLabelText('translit-1')).toBeNull();
+
+    screenReaderOn = true;
+    await act(async () => {
+      rerender(<SurahReader {...props} />);
+    });
+
+    await waitFor(() => expect(screen.getAllByLabelText('translit-1').length).toBeGreaterThan(0));
+  });
+
   it('does not refetch an ayah it already has', async () => {
     // onViewableItemsChanged fires on every scroll frame that changes the set.
     // Without the cache check this is a query per frame.
