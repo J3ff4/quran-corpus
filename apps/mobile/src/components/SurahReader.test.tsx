@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { deferred } from '@/testing/deferred';
 import { SurahReader } from './SurahReader';
@@ -267,6 +267,15 @@ vi.mock('./WordSheet', async () => {
   };
 });
 
+// The hook itself is module state that reads the device once per process, so
+// a suite cannot flip it between tests -- it is covered in its own file. What
+// the reader owes is the branch, so the branch is what is mocked.
+let screenReaderOn = false;
+
+vi.mock('@/a11y/useScreenReaderEnabled', () => ({
+  useScreenReaderEnabled: () => screenReaderOn,
+}));
+
 vi.mock('react-native', async () => {
   const React = await import('react');
   const { host } = await import('@/testing/rnHosts.js');
@@ -367,32 +376,31 @@ vi.mock('react-native', async () => {
     useWindowDimensions: () => ({ width: 400, height: 800, scale: 2, fontScale: 1 }),
     // The docked recitation bar's layer stretches over the reader.
     StyleSheet: (await import('@/testing/rnHosts.js')).StyleSheet,
-    // useReducedMotion reads the OS flag. Off here, so the in-app setting is
-    // the only thing these tests vary.
+    // useReducedMotion reads the OS flag, and useScreenReaderEnabled reads
+    // the screen-reader one. Both off here, so the in-app setting is the only
+    // thing these tests vary.
     AccessibilityInfo: {
       isReduceMotionEnabled: () => Promise.resolve(false),
+      isScreenReaderEnabled: () => Promise.resolve(false),
       addEventListener: () => ({ remove: () => {} }),
     },
   };
 });
 
-/** Scrolls into view AND waits out the reader's word-idle hold.
+/** Scrolls an ayah into view and lets its word query resolve.
  *
- *  Loaded word rows are buffered until the list has been still for
- *  WORDS_IDLE_MS, so an ayah that has just become viewable has no tap targets
- *  yet -- see SurahReader's pendingWordsRef. Every test that presses a word
- *  goes through here. */
+ *  The rows land in a ref and render nothing, so there is no commit to wait
+ *  for -- but a press before the query resolves finds no word, which is the
+ *  reader's real behaviour and not what these tests are about. */
 async function viewAndSettleWords(item: unknown) {
   await act(async () => {
     mocks.onViewableItemsChanged?.({ viewableItems: [{ item }] });
-  });
-  await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 160));
   });
 }
 
 describe('SurahReader', () => {
   beforeEach(() => {
+    screenReaderOn = false;
     mocks.scrollToIndex.mockClear();
     mocks.scrollToOffset.mockClear();
     mocks.push.mockClear();
@@ -999,44 +1007,64 @@ describe('SurahReader', () => {
     expect(loadWords).toHaveBeenCalledTimes(4);
   });
 
-  it('holds loaded words back while the list is still moving', async () => {
-    // A card that gains its word rows re-renders, and AyahText rebuilds the
-    // Arabic run as one <Text> per word -- which Android re-records whole, not
-    // just the part on screen. Al-Baqara 2:282 is a 2467dp card with 128 of
-    // those spans, and its second record cost 18.7ms inside a 29.3ms frame on
-    // the owner's device, against an 11.1ms budget at 90Hz (framestats over a
-    // fling from 2:260, 2026-09-23). Across three repeats each, holding the
-    // commit until the list stops took the worst in-motion record from
-    // 15.1/17.2/17.0ms to 11.2/11.4/11.7 and over-budget frames from
-    // 46/46/61% to 46/38/36%.
-    //
-    // Nothing is lost by waiting: the words are tap targets, a tap cannot
-    // land mid-fling, and the Uthmani text on screen is identical either way.
+  it('draws the same run before and after an ayah word rows land', async () => {
+    // The stutter, and the reason the rows are held in a ref: a card that
+    // re-rendered into one <Text> per word made Android re-record the whole
+    // view -- 2:282 is a 2467dp card with 128 of those spans, and its second
+    // record cost 18.7ms inside a 29.3ms frame against an 11.1ms budget at
+    // 90Hz (framestats over a fling from 2:260, 2026-09-23). Holding the
+    // commit until the list stopped only moved the cost to the flush, which
+    // the owner still felt between two ayahs. So the rows must not reach
+    // render at all: identical markup before and after the query resolves.
+    const data = readerData(2);
+    const { container } = render(
+      <SurahReader {...baseProps(data)} loadWords={async (ayahId) => surahWords(ayahId)} />,
+    );
+    const before = container.innerHTML;
+
+    await act(async () => {
+      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
+    });
+
+    // The query has resolved -- the next assertion is that it changed nothing
+    // about what is drawn.
+    expect(container.innerHTML).toBe(before);
+    // And the tokens were there from the first paint, so this is not passing
+    // by way of an empty run.
+    expect(screen.getAllByTestId('word-token').length).toBeGreaterThan(0);
+  });
+
+  it('leaves the word rows out of render unless a screen reader is listening', async () => {
+    // The gate on the whole fix. TalkBack announces a word by its
+    // transliteration, so with a screen reader running the rows have to reach
+    // render and the labels have to update. With none -- the scrolling case --
+    // a load that re-rendered every card is the fan-out this removed, so the
+    // labels stay on the Arabic token until something else wakes the card.
     const data = readerData(2);
     render(<SurahReader {...baseProps(data)} loadWords={async (ayahId) => surahWords(ayahId)} />);
 
     await act(async () => {
       mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
     });
-    // The query has resolved by now -- what must not have happened is the
-    // commit that re-renders the card.
-    expect(screen.queryAllByTestId('word-token')).toHaveLength(0);
 
-    // A fling keeps firing scroll events after the finger is gone, and each
-    // one re-arms the hold.
-    for (let frame = 0; frame < 6; frame += 1) {
-      await act(async () => {
-        mocks.onScroll?.({ nativeEvent: { contentOffset: { y: 100 * frame } } });
-        await new Promise((resolve) => setTimeout(resolve, 80));
-      });
-    }
-    expect(screen.queryAllByTestId('word-token')).toHaveLength(0);
+    expect(screen.queryByLabelText('translit-1')).toBeNull();
+  });
 
-    // The list stops.
+  it('announces a loaded word by transliteration when one is', async () => {
+    // The other half of the gate. Waking the card is not a parent re-render:
+    // AyahCard is memoised, so the accessor identity has to change or the
+    // labels never arrive and TalkBack spells the Arabic out letter by letter
+    // for the whole surah.
+    screenReaderOn = true;
+    const data = readerData(2);
+    render(<SurahReader {...baseProps(data)} loadWords={async (ayahId) => surahWords(ayahId)} />);
+
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 160));
+      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
     });
-    expect(screen.queryAllByTestId('word-token').length).toBeGreaterThan(0);
+
+    // Both ayahs: the prefetch takes a lookahead window, not one ayah.
+    await waitFor(() => expect(screen.getAllByLabelText('translit-1').length).toBeGreaterThan(0));
   });
 
   it('does not refetch an ayah it already has', async () => {
@@ -1279,9 +1307,12 @@ describe('SurahReader', () => {
 
     await viewAndSettleWords(data.ayahs[1]);
     await act(async () => {
-      // Ayah 1 was never in view, so it has no words and no tokens: the first
-      // token on screen is ayah 2's first word.
-      fireEvent.click(screen.getAllByTestId('word-token')[0]!);
+      // Scoped to ayah 2's card. Every ayah draws its tokens whether or not
+      // its rows have loaded, so the first token on screen belongs to ayah 1
+      // -- which was never in view and has nothing to open.
+      fireEvent.click(
+        within(screen.getByTestId('ayah-1-2-card')).getAllByTestId('word-token')[0]!,
+      );
     });
     fireEvent.click(screen.getByTestId('open-detail'));
 
@@ -1817,6 +1848,7 @@ describe('SurahReader shared reading position', () => {
   // does not reach it, and a scroll from the previous test leaks into the next
   // assertion.
   beforeEach(() => {
+    screenReaderOn = false;
     mocks.scrollToIndex.mockClear();
     mocks.getReaderPosition.mockReset().mockReturnValue(null);
     mocks.setReaderPosition.mockReset();
@@ -1964,7 +1996,7 @@ function surahWords(ayahId: number) {
     ayah_id: ayahId,
     position: index + 1,
     text_arabic: textArabic,
-    transliteration: null,
+    transliteration: `translit-${index + 1}`,
     root: null,
     lemma: null,
     root_buckwalter: null,

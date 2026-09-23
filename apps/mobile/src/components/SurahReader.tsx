@@ -42,6 +42,7 @@ import { useReducedMotion } from '@/motion/useReducedMotion';
 import { t } from '@/i18n/uiStrings';
 import { fonts, typography } from '@/theme/tokens';
 import { useArabicSizes } from '@/theme/useArabicSizes';
+import { useScreenReaderEnabled } from '@/a11y/useScreenReaderEnabled';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
@@ -186,12 +187,6 @@ const DEFAULT_INITIAL_RENDER = 10;
 // a local SQLite file, lands before the ayah reaches the middle of the screen.
 const WORD_LOOKAHEAD = 3;
 
-// How still the list has to be before loaded word rows are handed to the
-// cards. Long enough that a fling's trailing scroll events keep re-arming it,
-// short enough that the tap targets are there by the time a finger could
-// reach one.
-const WORDS_IDLE_MS = 120;
-
 // The nav title's fade, in dp of scroll. It finishes just before the list
 // header's last pixel leaves, so the name has arrived by the time the heading
 // it replaces is gone rather than starting from nothing at that moment.
@@ -274,7 +269,7 @@ interface AyahListProps {
   audioEnabled: boolean;
   showTranslation: boolean;
   uiLocale: UiLocaleCode;
-  wordsByAyah: Map<number, Word[]>;
+  getWordsFor: (ayahId: number) => () => Word[];
   /** An ayah has come into view; the caller may want its words. Held in a ref
    *  here, so the caller is free to rebuild it every render. */
   onVisibleAyah: (ayahId: number) => void;
@@ -324,7 +319,7 @@ function AyahList({
   audioEnabled,
   showTranslation,
   uiLocale,
-  wordsByAyah,
+  getWordsFor,
   onVisibleAyah,
   onReadingAyah,
   onToggleBookmark,
@@ -853,7 +848,7 @@ function AyahList({
             surahId: data.surah.id,
             ayahNumber: item.ayah.ayah_number,
             arabicText: item.ayah.text_uthmani,
-            words: wordsByAyah.get(item.ayah.id) ?? EMPTY_WORDS,
+            getWords: getWordsFor(item.ayah.id),
             bookmarked: bookmarkedAyahs.has(item.ayah.ayah_number),
             note: notesByAyah?.get(item.ayah.ayah_number) ?? null,
             playing: playingAyah === item.ayah.ayah_number,
@@ -1107,51 +1102,12 @@ export function SurahReader({
     onPageSurah,
   ]);
 
-  // Loaded words wait here while the list is moving.
-  //
-  // A card that gains its word rows re-renders, and an Arabic run rebuilt as
-  // one <Text> per word is re-recorded whole -- not the visible slice, the
-  // whole view. Al-Baqara 2:282 is a card 2467dp tall carrying 128 of those
-  // spans, and its second record cost 18.7ms inside a 29.3ms frame on the
-  // owner's device, against an 11.1ms budget at 90Hz (2026-09-23, framestats
-  // across a fling from 2:260). That is the stutter, and it is the long ayahs
-  // that have it: the same fling through short rows never spends more than a
-  // couple of ms recording one.
-  //
-  // Nothing is lost by waiting. The words are tap targets, and a tap cannot
-  // land while the finger is still flinging the list; the text on screen is
-  // the same either way, since AyahText draws the full Uthmani run with or
-  // without them.
-  const pendingWordsRef = useRef<Map<number, Word[]> | null>(null);
-  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const flushWordsRef = useRef(() => {
-    const pending = pendingWordsRef.current;
-    pendingWordsRef.current = null;
-    flushTimerRef.current = null;
-    if (pending) setWordsByAyah(pending);
-  });
-  // Re-armed by every scroll frame, so the flush lands WORDS_IDLE_MS after the
-  // list actually stops -- including the end of a fling, which fires scroll
-  // events long after the finger is gone.
-  const holdWordsRef = useRef(() => {
-    if (flushTimerRef.current === null) return;
-    clearTimeout(flushTimerRef.current);
-    flushTimerRef.current = setTimeout(flushWordsRef.current, WORDS_IDLE_MS);
-  });
-  useEffect(
-    () => () => {
-      if (flushTimerRef.current !== null) clearTimeout(flushTimerRef.current);
-    },
-    [],
-  );
-
   const onScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       // A shared value, not state: this runs on every scroll frame and setting
       // state here re-rendered the whole navigator.
       scrollY.value = event.nativeEvent.contentOffset.y;
       syncTitleVisible();
-      holdWordsRef.current();
     },
     [scrollY, syncTitleVisible],
   );
@@ -1166,14 +1122,46 @@ export function SurahReader({
     ayahsRef.current = data.ayahs;
   }, [loadWords, data.ayahs]);
 
-  const [wordsByAyah, setWordsByAyah] = useState<Map<number, Word[]>>(new Map());
-  // The committed map, readable from fetchWordsRef -- which is built once and
-  // so cannot close over state. What the buffer starts from on the first load
-  // after a flush.
-  const wordsRef = useRef(wordsByAyah);
-  useEffect(() => {
-    wordsRef.current = wordsByAyah;
-  }, [wordsByAyah]);
+  // A ref, not state, and that is the whole stutter fix.
+  //
+  // A card that gained its word rows used to re-render, and an Arabic run
+  // rebuilt from one flat <Text> into one <Text> per word is re-recorded
+  // whole by Android -- not the visible slice, the whole view. 2:282 is a card
+  // 2467dp tall carrying 128 of those spans, and its second record cost 18.7ms
+  // inside a 29.3ms frame against an 11.1ms budget at 90Hz (device framestats,
+  // 2026-09-23). The prefetch is driven by viewability, so that record landed
+  // mid-fling, on exactly the long ayahs the owner reported.
+  //
+  // Holding the commit until the list stopped only moved the cost to the
+  // moment it flushed, which is still a stutter if the reader is between two
+  // ayahs when it lands (owner, 2026-09-23). The rows had to leave render
+  // altogether: AyahText now draws its spans from the Uthmani text alone and
+  // resolves a word only when one is pressed, so nothing about the run
+  // changes when a query returns.
+  const wordsRef = useRef(new Map<number, Word[]>());
+  // Stable per ayah, so a card's props do not change identity on every render
+  // of the list -- AyahCard is memoised on them.
+  const wordAccessorsRef = useRef(new Map<number, () => Word[]>());
+  const getWordsFor = useCallback((ayahId: number) => {
+    let accessor = wordAccessorsRef.current.get(ayahId);
+    if (!accessor) {
+      accessor = () => wordsRef.current.get(ayahId) ?? EMPTY_WORDS;
+      wordAccessorsRef.current.set(ayahId, accessor);
+    }
+    return accessor;
+  }, []);
+
+  // The one case where the rows DO belong in render: TalkBack announces a word
+  // by its transliteration, and without a re-render the labels stay on the
+  // Arabic token until something else wakes the card. Nothing to pay when no
+  // screen reader is running, which is the scrolling case.
+  const screenReader = useScreenReaderEnabled();
+  const [, bumpWords] = useState(0);
+  // Read from fetchWordsRef, which is built once and cannot close over either.
+  const screenReaderRef = useRef(screenReader);
+  screenReaderRef.current = screenReader;
+  const bumpWordsRef = useRef(bumpWords);
+  bumpWordsRef.current = bumpWords;
   // Separate from the state map, and written before the await:
   // onViewableItemsChanged fires on every scroll frame that changes the set,
   // so a check against state alone would issue a fresh query per frame for as
@@ -1194,15 +1182,18 @@ export function SurahReader({
         requestedRef.current.add(id);
         try {
           const words = await load(id);
-          // Into the buffer, never straight into state. The timer is armed
-          // here and re-armed by every scroll frame, so a load that lands
-          // while the list is still is committed one tick later and one that
-          // lands mid-fling waits for the list to stop.
-          const pending = pendingWordsRef.current ?? new Map(wordsRef.current);
-          pending.set(id, words);
-          pendingWordsRef.current = pending;
-          if (flushTimerRef.current !== null) clearTimeout(flushTimerRef.current);
-          flushTimerRef.current = setTimeout(flushWordsRef.current, WORDS_IDLE_MS);
+          // Mutated in place: nothing renders off this map, so a fresh
+          // identity would buy nothing and cost every card a re-render.
+          wordsRef.current.set(id, words);
+          if (screenReaderRef.current) {
+            // Dropping the accessor is what actually reaches the card: it is
+            // memoised, and a parent re-render alone leaves its props -- this
+            // accessor among them -- identical, so nothing below re-renders.
+            // Only this ayah's card is woken, and only while a screen reader
+            // is listening.
+            wordAccessorsRef.current.delete(id);
+            bumpWordsRef.current((n) => n + 1);
+          }
         } catch (cause) {
           // Cleared so the next scroll past this ayah tries again, rather than
           // leaving it permanently untappable. Logged for logcat, never shown:
@@ -1295,7 +1286,7 @@ export function SurahReader({
         audioEnabled={audioEnabled}
         showTranslation={showTranslation}
         uiLocale={uiLocale}
-        wordsByAyah={wordsByAyah}
+        getWordsFor={getWordsFor}
         onVisibleAyah={onVisibleAyah}
         {...(onReadingAyah ? { onReadingAyah } : {})}
         onToggleBookmark={onToggleBookmark}

@@ -682,6 +682,10 @@ export function SectionList(
  */
 export const AccessibilityInfo = {
   isReduceMotionEnabled: async () => false,
+  // The reader asks, to decide whether an ayah's word rows are worth a
+  // re-render (useScreenReaderEnabled). Off, like reduce motion and for the
+  // same reason: the branch under test is the one users get.
+  isScreenReaderEnabled: async () => false,
   addEventListener: () => ({ remove: () => {} }),
 };
 

@@ -30,8 +30,8 @@ vi.mock('react-native', async () => {
 const baseProps = {
   surahId: 2,
   // Empty is the reader's own starting state: words are fetched per ayah as
-  // the list scrolls.
-  words: [],
+  // the list scrolls, and they never reach render -- see AyahText.
+  getWords: () => [],
   onWordPress: () => {},
 };
 
@@ -292,7 +292,7 @@ describe('AyahCard', () => {
       />,
     );
 
-    expect(screen.getByText('Arabic text')).toBeTruthy();
+    expect(screen.getByTestId('ayah-run').textContent).toBe('Arabic text');
   });
 
   it('renders no translation block when the reader has switched it off', () => {
@@ -313,7 +313,7 @@ describe('AyahCard', () => {
 
     expect(container.textContent).not.toContain('In the name of God');
     // The Arabic is the point of the card; only the translation goes.
-    expect(screen.getByText('Arabic text')).toBeTruthy();
+    expect(screen.getByTestId('ayah-run').textContent).toBe('Arabic text');
   });
 
   it('draws the translation by default, so a caller that knows nothing of the switch still shows it', () => {
@@ -337,12 +337,12 @@ describe('AyahCard', () => {
   });
 
   it('is memoised, because the reader re-renders the list under a scroll', () => {
-    // The reader prefetches words four ayahs at a time and each query that
-    // lands replaces the whole map, so crossing ONE ayah boundary commits up
-    // to four new map identities. Unmemoised, every card in the render window
-    // re-rendered on each of them -- twenty cards of Arabic re-laid-out, four
-    // times, mid-scroll. That is the jolt at the same point in every ayah,
-    // upward and downward (owner, device, 2026-09-22).
+    // A prefetch no longer re-renders anything (the map left render entirely
+    // on 2026-09-23), but the reader re-renders this list on a bookmark
+    // toggle, an audio state change and a scroll-driven header update, and
+    // each of those reaches every mounted card. Unmemoised that is twenty
+    // cards of Arabic re-laid-out per event -- the same jolt, from a
+    // different source (owner, device, 2026-09-22).
     //
     // A structural assertion, deliberately: what the memo buys is a render
     // that does NOT happen, and a skipped render leaves nothing in the DOM to

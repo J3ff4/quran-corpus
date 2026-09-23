@@ -13,8 +13,9 @@ export interface AyahCardProps {
   surahId: number;
   ayahNumber: number;
   arabicText: string;
-  /** Empty until the reader has fetched this ayah's words; see AyahText. */
-  words: Word[];
+  /** This ayah's word rows, read at press time rather than passed as data --
+   *  see AyahText. Returns an empty array until they are fetched. */
+  getWords: () => Word[];
   translationText: string | null;
   /** Whether to draw it. Separate from `translationText` being null, which
    *  means the ayah has no translation in the chosen language at all: this one
@@ -38,7 +39,7 @@ function AyahCardBody({
   surahId,
   ayahNumber,
   arabicText,
-  words,
+  getWords,
   translationText,
   showTranslation = true,
   bookmarked,
@@ -95,7 +96,7 @@ function AyahCardBody({
           actually pulled the basmala out of the ayah's run. */}
       <AyahText
         textUthmani={arabicText}
-        words={words}
+        getWords={getWords}
         surahId={surahId}
         ayahNumber={ayahNumber}
         onWordPress={onWordPress}
@@ -135,17 +136,17 @@ function AyahCardBody({
  * Memoised, and that is load-bearing rather than a precaution.
  *
  * The reader prefetches an ayah's words as it scrolls past, four ayahs at a
- * time (WORD_LOOKAHEAD), and each query that lands replaces the whole
- * `wordsByAyah` map -- so crossing one ayah boundary commits up to four new
- * map identities. Unmemoised, every card in the render window re-rendered on
- * each of them: twenty cards' worth of Arabic re-laid-out, four times, in the
- * middle of a scroll. That is the jolt the owner reported at the same point in
+ * time (WORD_LOOKAHEAD). While that map was a render prop, each query that
+ * landed replaced the whole map, so crossing one ayah boundary committed up
+ * to four new map identities and -- unmemoised -- re-rendered every card in
+ * the window on each of them: twenty cards' worth of Arabic re-laid-out, four
+ * times, mid-scroll. That was the jolt the owner reported at the same point in
  * every ayah, upward and downward (2026-09-22).
  *
- * What makes the memo work is that `words` is read out of the map per card --
- * `wordsByAyah.get(id)` returns the same array for every ayah but the one that
- * just loaded -- and that the reader's handler props come from the route,
- * which does not re-render on a prefetch. So the card whose words arrived is
- * the only one whose props actually changed.
+ * The map is no longer a render prop at all (`getWords`, 2026-09-23), so a
+ * prefetch now re-renders nothing. The memo still earns its place for every
+ * other reason a parent re-renders -- a bookmark toggle, an audio state
+ * change, a scroll-driven header update -- which are frequent and reach every
+ * mounted card.
  */
 export const AyahCard = memo(AyahCardBody);
