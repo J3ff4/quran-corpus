@@ -213,11 +213,10 @@ describe('SearchScreen', () => {
   });
 
   it('lets the go-to section leave instead of blinking out', async () => {
-    // Mounted straight into the ScrollView, the section arrived in one frame
-    // and shoved every result below it down by the card's full height, then
-    // snapped them back up when the reference stopped matching -- typing and
-    // deleting `2:255` jolted the list twice (owner, 2026-09-22). A curtain
-    // animates the height instead, so the rows below travel with it.
+    // Mounted straight into the ScrollView, the section arrived and vanished
+    // in one frame (owner, 2026-09-22). It rises in and drops out on the
+    // sheets' own curve now, and the heading has to be inside the animated
+    // block or 'GO TO' blinks above a card that is still moving.
     mocks.searchCorpus.mockResolvedValue({
       jump: {
         surah_id: 2,
@@ -234,18 +233,14 @@ describe('SearchScreen', () => {
     fireEvent.change(screen.getByTestId('search-input'), { target: { value: '2:255' } });
 
     await waitFor(() => expect(screen.getByTestId('search-jump')).toBeTruthy());
-    const curtain = screen.getByTestId('search-jump-curtain');
-    // Inside the curtain, not beside it: a curtain the card does not live in
-    // clips nothing and the section still mounts in one frame.
-    expect(curtain.contains(screen.getByTestId('search-jump'))).toBe(true);
-    // The heading travels with it. Left outside, 'GO TO' appears and vanishes
-    // instantly above a card that is still animating.
-    expect(curtain.textContent).toContain('GO TO');
+    const rise = screen.getByTestId('search-jump-rise');
+    expect(rise.contains(screen.getByTestId('search-jump'))).toBe(true);
+    expect(rise.textContent).toContain('GO TO');
   });
 
   it('keeps the reference on the card while the section closes', async () => {
-    // A curtain's children stay mounted until the close lands, so the card is
-    // on screen for the whole animation. Read live, its reference would be
+    // Children stay mounted until the exit lands, so the card is on screen for
+    // the whole animation. Read live, its reference would be
     // gone on frame one -- an empty card sliding shut, which is worse than the
     // blink the curtain replaced.
     mocks.searchCorpus.mockResolvedValue({

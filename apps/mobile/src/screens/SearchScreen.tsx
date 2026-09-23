@@ -4,7 +4,7 @@ import Animated from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
 import { EMPTY_SEARCH_RESULT, type SearchResult } from '@quran-corpus/data/mobile';
-import { Collapsible } from '@/components/Collapsible';
+import { RiseIn } from '@/components/RiseIn';
 import { GlassSurface } from '@/components/GlassSurface';
 import { Icon } from '@/components/icons/Icon';
 import { SearchField } from '@/components/SearchField';
@@ -279,14 +279,14 @@ export function SearchScreen() {
         {empty ? <Text style={{ color: theme.mutedText }}>{t(uiLocale, 'search.empty')}</Text> : null}
         {nothing ? <Text style={{ color: theme.mutedText }}>{t(uiLocale, 'search.noResults')}</Text> : null}
 
-        {/* A curtain, not a mount (owner, 2026-09-22). Typing the second
-            character of `2:255` used to put the whole section on screen in one
-            frame, which shoved every result below it down by the card's full
-            height; deleting it snapped them back up. Height, not opacity: a
-            fade leaves the card occupying its space from frame one and the
-            rows below still jump -- the same ruling the header's curtain was
-            made under (R7). */}
-        <Collapsible open={result.jump !== null} testID="search-jump-curtain">
+        {/* It rises into place, the way the reader's word sheet does (owner,
+            2026-09-23). This was a Collapsible for a day: animating the clip's
+            height carried the rows below along with the card, which stopped
+            them snapping but made the whole list breathe in and out while the
+            reference was still being typed. The owner watched both on the
+            device and ruled for the sheet's motion -- the card arrives, the
+            rows below simply take their places. */}
+        <RiseIn open={result.jump !== null} testID="search-jump-rise">
           {jump === null ? null : (
             <>
               <Text accessibilityRole="header" style={heading}>{t(uiLocale, 'search.jump').toUpperCase()}</Text>
@@ -316,7 +316,7 @@ export function SearchScreen() {
               </ResultCard>
             </>
           )}
-        </Collapsible>
+        </RiseIn>
 
         {result.verses.length > 0 ? (
           <>
