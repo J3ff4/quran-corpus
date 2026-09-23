@@ -39,6 +39,17 @@ export interface AyahTextProps {
  * tree never changes shape and the card is recorded once. Anything added here
  * that reads the word rows during render puts that stutter back.
  *
+ * **Every child of the run costs, and the cost is per FRAGMENT, not per
+ * character.** Fabric serialises this run as an attributed string and
+ * `ReactTextViewManager.updateState` rebuilds the Spannable from it on the UI
+ * thread, as part of the mount, inside a scroll frame. Measured on the device
+ * (atrace, 20 scrolls through al-Baqara's tail, three repeats, 2026-09-23):
+ * the same 2:282 card drawn as one flat `<Text>` costs 0.4-0.9ms there; drawn
+ * as one `<Text>` per word it costs 13.0 / 15.9 / 16.1ms, against an 11.1ms
+ * budget at 90Hz. Text volume is not the driver -- the flat run carries every
+ * one of those characters. So keep the child count down: a token is ONE string
+ * child, never a separator child plus a text child, which doubled it.
+ *
  * The basmala banner is NOT rendered here. It belongs above the whole ayah 1
  * card as the surah's opening (owner ruling 2026-08-17: inside the card it
  * still reads as part of ayah 1), so SurahReader owns it. What this owes that
@@ -95,8 +106,11 @@ export function AyahText({
       {tokens.map((token, index) => {
         const word = labels?.[index] ?? null;
         // The split dropped the whitespace; without this the ayah renders as
-        // one unbroken string.
-        const separator = index === 0 ? '' : ' ';
+        // one unbroken string. Concatenated into ONE string rather than left
+        // as a sibling child: two children of a <Text> are two fragments of
+        // the attributed string, and Fabric's cost here is per fragment --
+        // see the note on this component above.
+        const text = index === 0 ? token.text : ` ${token.text}`;
         return (
           <Text
             key={index}
@@ -121,8 +135,7 @@ export function AyahText({
                   }
             }
           >
-            {separator}
-            {token.text}
+            {text}
           </Text>
         );
       })}

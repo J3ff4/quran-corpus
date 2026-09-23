@@ -106,6 +106,22 @@ describe('AyahText', () => {
     expect(container.textContent).toBe('أ ب ج');
   });
 
+  it('gives each token exactly one text child', () => {
+    // Fabric serialises this run as an attributed string and rebuilds the
+    // Spannable from it on the UI thread, inside a scroll frame, every time a
+    // card mounts -- and the cost is per FRAGMENT. Every child of a token is
+    // one more fragment, so a separator left as its own child doubles them.
+    // On the device that difference is the whole stutter: 2:282 costs 0.4ms
+    // flat and 16.1ms at one <Text> per word (atrace, 2026-09-23).
+    render(
+      <AyahText textUthmani="أ ب ج" getWords={() => threeWords} surahId={2} ayahNumber={2} onWordPress={noop} />,
+    );
+
+    for (const token of screen.getAllByTestId('word-token')) {
+      expect(token.childNodes).toHaveLength(1);
+    }
+  });
+
   it('passes the word the token maps to, not the token index', () => {
     // 96:1 is prefixed with a basmala that has no word rows, so token 4 is
     // word 0. Passing the token index here shifts every word's morphology by
