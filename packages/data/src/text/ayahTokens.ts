@@ -52,6 +52,14 @@ export function splitBasmala(
   };
 }
 
+export interface AyahRunToken {
+  /** Uthmani text exactly as it appears, including any merged trailing mark. */
+  text: string;
+  /** True for a standalone mark that stands before the ayah's first word and
+   *  so can never have one. */
+  isMark: boolean;
+}
+
 export interface AyahToken {
   /** Uthmani text exactly as it appears, including any merged trailing mark. */
   text: string;
@@ -64,6 +72,80 @@ export interface AyahToken {
    *  for itself, because `hasBasmala` below is settled by token arithmetic
    *  that has to run after the mark merge. */
   isBasmala?: true;
+}
+
+/**
+ * The whitespace split every caller here shares: leading standalone marks,
+ * which have nothing to attach backwards to, and the remaining tokens with
+ * each following mark merged onto the word it follows. A mark left standing
+ * alone would be counted as a word and offset every index after it.
+ */
+function tokenizeRun(textUthmani: string): { leading: string[]; merged: string[] } {
+  const raw = textUthmani.replace(/\uFEFF/g, '').split(/\s+/).filter(Boolean);
+
+  const leading: string[] = [];
+  let i = 0;
+  while (i < raw.length && STANDALONE_MARK.test(raw[i]!)) {
+    leading.push(raw[i]!);
+    i += 1;
+  }
+
+  const merged: string[] = [];
+  for (; i < raw.length; i += 1) {
+    const token = raw[i]!;
+    if (STANDALONE_MARK.test(token) && merged.length > 0) {
+      merged[merged.length - 1] += ` ${token}`;
+    } else {
+      merged.push(token);
+    }
+  }
+
+  return { leading, merged };
+}
+
+/**
+ * The tokens an ayah's run renders, WITHOUT the `words` rows.
+ *
+ * Same texts, in the same order, as `alignAyahTokens(...)` with its basmala
+ * tokens filtered out -- verified against all 6,236 ayahs. What it cannot
+ * supply is `wordIndex`, which is the only thing the word rows decide.
+ *
+ * This split is what lets the reader draw the run once. Building the run from
+ * `alignAyahTokens` means an ayah renders as one flat `<Text>` until its words
+ * arrive and as N nested `<Text>` spans afterwards, and Android re-records the
+ * whole card's RenderNode on that change -- 18.7ms on 2:282, landing mid-fling
+ * because the prefetch is driven by viewability (device measurement,
+ * 2026-09-22/23). Rendering from this instead, and resolving the word only
+ * when a token is actually pressed, means the word rows never reach a render.
+ *
+ * Basmala detection here is positional -- every ayah 1 but al-Fatiha's and
+ * at-Tawba's carries the prefix -- rather than `alignAyahTokens`'s token
+ * arithmetic, which needs a word count. Same fail-closed guard as
+ * `splitBasmala`: an ayah 1 that is nothing but the prefix keeps it, because
+ * an empty run is worse than a duplicated banner.
+ */
+export function splitAyahRunTokens(
+  textUthmani: string,
+  ref: { surahId: number; ayahNumber: number },
+): AyahRunToken[] {
+  const { leading, merged } = tokenizeRun(textUthmani);
+  const hasBasmala =
+    ref.ayahNumber === 1 &&
+    ref.surahId !== 1 &&
+    ref.surahId !== 9 &&
+    merged.length > BASMALA_TOKENS;
+  return [
+    // A leading mark is the only token that can never carry a word row: every
+    // other mark was merged onto the word before it. The caller needs that
+    // without the rows, or it cannot decide which spans are tap targets
+    // until the rows land -- which is the render dependency this exists to
+    // remove.
+    ...leading.map((text) => ({ text, isMark: true })),
+    ...(hasBasmala ? merged.slice(BASMALA_TOKENS) : merged).map((text) => ({
+      text,
+      isMark: false,
+    })),
+  ];
 }
 
 /**
@@ -83,27 +165,8 @@ export function alignAyahTokens(
   const spans = wordTexts.map((text) => text.trim().split(/\s+/).filter(Boolean).length || 1);
   const tokenCount = spans.reduce((sum, span) => sum + span, 0);
 
-  const raw = textUthmani.replace(/\uFEFF/g, '').split(/\s+/).filter(Boolean);
-
-  // Leading marks have nothing to attach backwards to, so they stand alone.
-  const leading: AyahToken[] = [];
-  let i = 0;
-  while (i < raw.length && STANDALONE_MARK.test(raw[i]!)) {
-    leading.push({ text: raw[i]!, wordIndex: null });
-    i += 1;
-  }
-
-  // Every remaining mark attaches to the word it follows. Left standing alone
-  // it would be counted as a word and offset every index after it.
-  const merged: string[] = [];
-  for (; i < raw.length; i += 1) {
-    const token = raw[i]!;
-    if (STANDALONE_MARK.test(token) && merged.length > 0) {
-      merged[merged.length - 1] += ` ${token}`;
-    } else {
-      merged.push(token);
-    }
-  }
+  const { leading: leadingTexts, merged } = tokenizeRun(textUthmani);
+  const leading: AyahToken[] = leadingTexts.map((text) => ({ text, wordIndex: null }));
 
   // Must run AFTER the merge. Checked before it, an ayah 1 that also carries a
   // waqf mark has more raw tokens than tokenCount + 4, so its basmala goes

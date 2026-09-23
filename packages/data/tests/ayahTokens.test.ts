@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { alignAyahTokens, splitBasmala } from '../src/text/ayahTokens.js';
+import { alignAyahTokens, splitAyahRunTokens, splitBasmala } from '../src/text/ayahTokens.js';
 
 // 1:1 in the DB is prefixed with a byte-order mark. Written as an escape, not
 // pasted: an editor or a reformat that silently drops the invisible U+FEFF
@@ -181,6 +181,66 @@ describe('alignAyahTokens', () => {
     );
 
     expect(tokens?.some((token) => token.isBasmala)).toBe(false);
+  });
+});
+
+describe('splitAyahRunTokens', () => {
+  /** The texts alignAyahTokens would produce for the same run. The reader
+   *  drops the basmala tokens, so the comparison drops them too. */
+  const aligned = (
+    text: string,
+    wordTexts: readonly string[],
+    ref: { surahId: number; ayahNumber: number },
+  ) =>
+    alignAyahTokens(text, wordTexts, ref)
+      ?.filter((token) => !token.isBasmala)
+      .map((token) => token.text) ?? null;
+
+  it('matches the aligned run exactly, without the word rows', () => {
+    // The whole point: the run drawn before the words arrive has to be the
+    // run drawn after them, token for token, or the card is re-recorded
+    // mid-scroll. Every shape that makes alignment hard is here -- a leading
+    // rub-el-hizb, a mid-ayah waqf mark, a basmala prefix, and both at once.
+    const cases: Array<[string, string[], { surahId: number; ayahNumber: number }]> = [
+      [AL_BAQARAH_44, words(10), { surahId: 2, ayahNumber: 44 }],
+      [AL_ALAQ_1, words(5), { surahId: 96, ayahNumber: 1 }],
+      [AL_ANAM_1, words(14), { surahId: 6, ayahNumber: 1 }],
+      [AT_TAWBA_1, words(9), { surahId: 9, ayahNumber: 1 }],
+      [AL_FATIHA_1, words(4), { surahId: 1, ayahNumber: 1 }],
+    ];
+
+    for (const [text, wordTexts, ref] of cases) {
+      expect(aligned(text, wordTexts, ref)).toEqual(
+        splitAyahRunTokens(text, ref).map((token) => token.text),
+      );
+    }
+  });
+
+  it('merges a trailing mark onto the word it follows', () => {
+    // Standing alone the mark would be one more token than the aligned run
+    // has, so the two runs would differ by a span and the card would be
+    // re-recorded on exactly the ayahs that carry marks.
+    const tokens = splitAyahRunTokens(AL_BAQARAH_44, { surahId: 2, ayahNumber: 44 });
+
+    expect(tokens[0]).toEqual({ text: '۞', isMark: true });
+    expect(tokens.some((token) => token.text.includes(' ۚ'))).toBe(true);
+    expect(tokens.some((token) => token.text === 'ۚ')).toBe(false);
+    // Only the leading one. A merged mark rides on a word and is a tap target.
+    expect(tokens.filter((token) => token.isMark)).toHaveLength(1);
+  });
+
+  it('takes the basmala prefix off ayah 1 but leaves al-Fatiha and at-Tawba whole', () => {
+    expect(splitAyahRunTokens(AL_ALAQ_1, { surahId: 96, ayahNumber: 1 })[0]?.text).toBe('ٱقْرَأْ');
+    expect(splitAyahRunTokens(AL_FATIHA_1, { surahId: 1, ayahNumber: 1 })).toHaveLength(4);
+    expect(splitAyahRunTokens(AT_TAWBA_1, { surahId: 9, ayahNumber: 1 })[0]?.text).toBe('بَرَآءَةٌۭ');
+  });
+
+  it('keeps the prefix on an ayah 1 that is nothing but the prefix', () => {
+    // Fail closed, as splitBasmala does: an empty run is worse than a
+    // duplicated banner.
+    const bare = 'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ';
+
+    expect(splitAyahRunTokens(bare, { surahId: 96, ayahNumber: 1 })).toHaveLength(4);
   });
 });
 
