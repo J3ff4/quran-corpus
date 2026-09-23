@@ -376,6 +376,21 @@ vi.mock('react-native', async () => {
   };
 });
 
+/** Scrolls into view AND waits out the reader's word-idle hold.
+ *
+ *  Loaded word rows are buffered until the list has been still for
+ *  WORDS_IDLE_MS, so an ayah that has just become viewable has no tap targets
+ *  yet -- see SurahReader's pendingWordsRef. Every test that presses a word
+ *  goes through here. */
+async function viewAndSettleWords(item: unknown) {
+  await act(async () => {
+    mocks.onViewableItemsChanged?.({ viewableItems: [{ item }] });
+  });
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 160));
+  });
+}
+
 describe('SurahReader', () => {
   beforeEach(() => {
     mocks.scrollToIndex.mockClear();
@@ -976,14 +991,52 @@ describe('SurahReader', () => {
     const loadWords = vi.fn(async (ayahId: number) => surahWords(ayahId));
     render(<SurahReader {...baseProps(readerData(10))} loadWords={loadWords} />);
 
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: readerData(10).ayahs[0] }] });
-    });
+    await viewAndSettleWords(readerData(10).ayahs[0]);
 
     expect(loadWords).toHaveBeenCalledWith(100);
     // The ayah in view plus WORD_LOOKAHEAD: a reader who taps a word the
     // instant an ayah lands otherwise waits on a query.
     expect(loadWords).toHaveBeenCalledTimes(4);
+  });
+
+  it('holds loaded words back while the list is still moving', async () => {
+    // A card that gains its word rows re-renders, and AyahText rebuilds the
+    // Arabic run as one <Text> per word -- which Android re-records whole, not
+    // just the part on screen. Al-Baqara 2:282 is a 2467dp card with 128 of
+    // those spans, and its second record cost 18.7ms inside a 29.3ms frame on
+    // the owner's device, against an 11.1ms budget at 90Hz (framestats over a
+    // fling from 2:260, 2026-09-23). Across three repeats each, holding the
+    // commit until the list stops took the worst in-motion record from
+    // 15.1/17.2/17.0ms to 11.2/11.4/11.7 and over-budget frames from
+    // 46/46/61% to 46/38/36%.
+    //
+    // Nothing is lost by waiting: the words are tap targets, a tap cannot
+    // land mid-fling, and the Uthmani text on screen is identical either way.
+    const data = readerData(2);
+    render(<SurahReader {...baseProps(data)} loadWords={async (ayahId) => surahWords(ayahId)} />);
+
+    await act(async () => {
+      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
+    });
+    // The query has resolved by now -- what must not have happened is the
+    // commit that re-renders the card.
+    expect(screen.queryAllByTestId('word-token')).toHaveLength(0);
+
+    // A fling keeps firing scroll events after the finger is gone, and each
+    // one re-arms the hold.
+    for (let frame = 0; frame < 6; frame += 1) {
+      await act(async () => {
+        mocks.onScroll?.({ nativeEvent: { contentOffset: { y: 100 * frame } } });
+        await new Promise((resolve) => setTimeout(resolve, 80));
+      });
+    }
+    expect(screen.queryAllByTestId('word-token')).toHaveLength(0);
+
+    // The list stops.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 160));
+    });
+    expect(screen.queryAllByTestId('word-token').length).toBeGreaterThan(0);
   });
 
   it('does not refetch an ayah it already has', async () => {
@@ -993,12 +1046,8 @@ describe('SurahReader', () => {
     const data = readerData(10);
     render(<SurahReader {...baseProps(data)} loadWords={loadWords} />);
 
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
+    await viewAndSettleWords(data.ayahs[0]);
+    await viewAndSettleWords(data.ayahs[0]);
 
     expect(loadWords).toHaveBeenCalledTimes(4);
   });
@@ -1012,12 +1061,8 @@ describe('SurahReader', () => {
     const data = readerData(1);
     render(<SurahReader {...baseProps(data)} loadWords={loadWords} />);
 
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
+    await viewAndSettleWords(data.ayahs[0]);
+    await viewAndSettleWords(data.ayahs[0]);
 
     expect(loadWords).toHaveBeenCalledTimes(2);
   });
@@ -1038,9 +1083,7 @@ describe('SurahReader', () => {
 
     expect(list()?.getAttribute('data-important-for-accessibility')).toBe('auto');
 
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
+    await viewAndSettleWords(data.ayahs[0]);
     await act(async () => {
       fireEvent.click(screen.getAllByTestId('word-token')[0]!);
     });
@@ -1081,9 +1124,7 @@ describe('SurahReader', () => {
       />,
     );
 
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
+    await viewAndSettleWords(data.ayahs[0]);
     await act(async () => {
       fireEvent.click(screen.getAllByTestId('word-token')[1]!);
     });
@@ -1109,9 +1150,7 @@ describe('SurahReader', () => {
       />,
     );
 
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
+    await viewAndSettleWords(data.ayahs[0]);
     await act(async () => {
       fireEvent.click(screen.getAllByTestId('word-token')[0]!);
     });
@@ -1140,9 +1179,7 @@ describe('SurahReader', () => {
       />,
     );
 
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
+    await viewAndSettleWords(data.ayahs[0]);
     await act(async () => {
       fireEvent.click(screen.getAllByTestId('word-token')[0]!);
     });
@@ -1170,9 +1207,7 @@ describe('SurahReader', () => {
       />,
     );
 
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
+    await viewAndSettleWords(data.ayahs[0]);
     await act(async () => {
       fireEvent.click(screen.getAllByTestId('word-token')[0]!);
       fireEvent.click(screen.getAllByTestId('word-token')[1]!);
@@ -1205,9 +1240,7 @@ describe('SurahReader', () => {
       />,
     );
 
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
+    await viewAndSettleWords(data.ayahs[0]);
 
     // First tap resolves, so there is a sheet on screen to dismiss.
     await act(async () => {
@@ -1244,9 +1277,7 @@ describe('SurahReader', () => {
       />,
     );
 
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[1] }] });
-    });
+    await viewAndSettleWords(data.ayahs[1]);
     await act(async () => {
       // Ayah 1 was never in view, so it has no words and no tokens: the first
       // token on screen is ayah 2's first word.
@@ -1270,9 +1301,7 @@ describe('SurahReader', () => {
       />,
     );
 
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
+    await viewAndSettleWords(data.ayahs[0]);
     await act(async () => {
       fireEvent.click(screen.getAllByTestId('word-token')[0]!);
     });
@@ -1416,9 +1445,7 @@ describe('SurahReader', () => {
     const barLayer = () => screen.getByTestId('recitation-bar').parentElement;
     expect(barLayer()?.getAttribute('data-hidden-from-a11y')).toBeNull();
 
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
+    await viewAndSettleWords(data.ayahs[0]);
     await act(async () => {
       fireEvent.click(screen.getAllByTestId('word-token')[0]!);
     });
@@ -1551,9 +1578,7 @@ describe('SurahReader', () => {
       />,
     );
 
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
+    await viewAndSettleWords(data.ayahs[0]);
     await act(async () => {
       fireEvent.click(screen.getAllByTestId('word-token')[0]!);
     });
@@ -1581,9 +1606,7 @@ describe('SurahReader', () => {
       />,
     );
 
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
+    await viewAndSettleWords(data.ayahs[0]);
     await act(async () => {
       fireEvent.click(screen.getAllByTestId('word-token')[0]!);
     });

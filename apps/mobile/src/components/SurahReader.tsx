@@ -186,6 +186,12 @@ const DEFAULT_INITIAL_RENDER = 10;
 // a local SQLite file, lands before the ayah reaches the middle of the screen.
 const WORD_LOOKAHEAD = 3;
 
+// How still the list has to be before loaded word rows are handed to the
+// cards. Long enough that a fling's trailing scroll events keep re-arming it,
+// short enough that the tap targets are there by the time a finger could
+// reach one.
+const WORDS_IDLE_MS = 120;
+
 // The nav title's fade, in dp of scroll. It finishes just before the list
 // header's last pixel leaves, so the name has arrived by the time the heading
 // it replaces is gone rather than starting from nothing at that moment.
@@ -1101,12 +1107,51 @@ export function SurahReader({
     onPageSurah,
   ]);
 
+  // Loaded words wait here while the list is moving.
+  //
+  // A card that gains its word rows re-renders, and an Arabic run rebuilt as
+  // one <Text> per word is re-recorded whole -- not the visible slice, the
+  // whole view. Al-Baqara 2:282 is a card 2467dp tall carrying 128 of those
+  // spans, and its second record cost 18.7ms inside a 29.3ms frame on the
+  // owner's device, against an 11.1ms budget at 90Hz (2026-09-23, framestats
+  // across a fling from 2:260). That is the stutter, and it is the long ayahs
+  // that have it: the same fling through short rows never spends more than a
+  // couple of ms recording one.
+  //
+  // Nothing is lost by waiting. The words are tap targets, and a tap cannot
+  // land while the finger is still flinging the list; the text on screen is
+  // the same either way, since AyahText draws the full Uthmani run with or
+  // without them.
+  const pendingWordsRef = useRef<Map<number, Word[]> | null>(null);
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flushWordsRef = useRef(() => {
+    const pending = pendingWordsRef.current;
+    pendingWordsRef.current = null;
+    flushTimerRef.current = null;
+    if (pending) setWordsByAyah(pending);
+  });
+  // Re-armed by every scroll frame, so the flush lands WORDS_IDLE_MS after the
+  // list actually stops -- including the end of a fling, which fires scroll
+  // events long after the finger is gone.
+  const holdWordsRef = useRef(() => {
+    if (flushTimerRef.current === null) return;
+    clearTimeout(flushTimerRef.current);
+    flushTimerRef.current = setTimeout(flushWordsRef.current, WORDS_IDLE_MS);
+  });
+  useEffect(
+    () => () => {
+      if (flushTimerRef.current !== null) clearTimeout(flushTimerRef.current);
+    },
+    [],
+  );
+
   const onScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       // A shared value, not state: this runs on every scroll frame and setting
       // state here re-rendered the whole navigator.
       scrollY.value = event.nativeEvent.contentOffset.y;
       syncTitleVisible();
+      holdWordsRef.current();
     },
     [scrollY, syncTitleVisible],
   );
@@ -1122,6 +1167,13 @@ export function SurahReader({
   }, [loadWords, data.ayahs]);
 
   const [wordsByAyah, setWordsByAyah] = useState<Map<number, Word[]>>(new Map());
+  // The committed map, readable from fetchWordsRef -- which is built once and
+  // so cannot close over state. What the buffer starts from on the first load
+  // after a flush.
+  const wordsRef = useRef(wordsByAyah);
+  useEffect(() => {
+    wordsRef.current = wordsByAyah;
+  }, [wordsByAyah]);
   // Separate from the state map, and written before the await:
   // onViewableItemsChanged fires on every scroll frame that changes the set,
   // so a check against state alone would issue a fresh query per frame for as
@@ -1142,7 +1194,15 @@ export function SurahReader({
         requestedRef.current.add(id);
         try {
           const words = await load(id);
-          setWordsByAyah((current) => new Map(current).set(id, words));
+          // Into the buffer, never straight into state. The timer is armed
+          // here and re-armed by every scroll frame, so a load that lands
+          // while the list is still is committed one tick later and one that
+          // lands mid-fling waits for the list to stop.
+          const pending = pendingWordsRef.current ?? new Map(wordsRef.current);
+          pending.set(id, words);
+          pendingWordsRef.current = pending;
+          if (flushTimerRef.current !== null) clearTimeout(flushTimerRef.current);
+          flushTimerRef.current = setTimeout(flushWordsRef.current, WORDS_IDLE_MS);
         } catch (cause) {
           // Cleared so the next scroll past this ayah tries again, rather than
           // leaving it permanently untappable. Logged for logcat, never shown:
