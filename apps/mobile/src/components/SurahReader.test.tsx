@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { deferred } from '@/testing/deferred';
 import { SurahReader } from './SurahReader';
+import { estimateRowHeight } from './rowHeightModel';
 
 const mocks = vi.hoisted(() => ({
   onViewableItemsChanged: null as ((info: { viewableItems: Array<{ item: unknown }> }) => void) | null,
@@ -531,7 +532,8 @@ describe('SurahReader', () => {
     // The offset table is the reader's whole scroll geometry, so it has to
     // describe the cards actually on screen. With the translation hidden the
     // cards lose their translation block, and an estimate that still counts
-    // 0.72dp per translation character overstates every row by most of a card.
+    // the translation's dp per character overstates every row by most of a
+    // card.
     // The error accumulates down the table, so the deeper the ayah the further
     // FlatList's idea of where it is sits from where it is -- blank stretches
     // and flicker on a fast scroll (owner, device, 2026-09-22).
@@ -544,11 +546,24 @@ describe('SurahReader', () => {
 
     expect(without).toBeLessThan(withTranslation);
     // And by the translation's whole contribution, not a fraction of it: the
-    // nine rows above index 9, at 0.72dp per character of each one's text.
-    const dropped = props.data.ayahs
-      .slice(0, 9)
-      .reduce((sum, item) => sum + (item.translation?.text.length ?? 0), 0);
-    expect(withTranslation - without).toBeCloseTo(0.72 * dropped, 5);
+    // nine rows above index 9, each re-estimated with no translation at all.
+    // Taken from the model rather than written out, so a re-fit of the
+    // coefficients does not silently turn this into a test of a stale number.
+    // listWidth 0: the mock list never reports a layout, so the reader's own
+    // estimates run with the unmeasured-width guard, and these must match.
+    const shared = { arabicSize: 28, listWidth: 0 };
+    const dropped = props.data.ayahs.slice(0, 9).reduce(
+      (sum, item) =>
+        sum +
+        estimateRowHeight({
+          ...shared,
+          arabicChars: item.ayah.text_uthmani.length,
+          translationChars: item.translation?.text.length ?? 0,
+        }) -
+        estimateRowHeight({ ...shared, arabicChars: item.ayah.text_uthmani.length, translationChars: 0 }),
+      0,
+    );
+    expect(withTranslation - without).toBeCloseTo(dropped, 5);
   });
 
   it('stops widening initialNumToRender to cover a deep target', () => {

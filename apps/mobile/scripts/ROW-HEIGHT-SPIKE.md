@@ -126,3 +126,54 @@ A model can drive `getItemLayout`, but it cannot be the thing that lands the
 scroll. Land in two bounded steps instead of 25 unbounded ones: jump on the
 model, then correct once against the target row's real measured offset, which
 is exact regardless of model error.
+
+---
+
+## Re-fit — device run 2026-09-23 (same phone, vc45)
+
+The 2026-09-06 coefficients had gone stale, and not gently: measured against
+216 fresh rows they underran **every single row**, by a mean of 82dp and by
+117dp at Arabic size 42. rms was 118.8dp against the ~36dp the model was
+fitted to. A biased model is worse than an imprecise one, because
+`scrollToIndex` sums a few hundred of those errors and they all point the
+same way.
+
+Two things had changed under it. The card gained the amber bookmark band, and
+the Arabic run took an explicit `lineHeight` with `includeFontPadding: false`
+(see `docs/` notes on the dead line box). The second is the larger: the
+per-character Arabic coefficient moved 27%, the translation one 17%, while the
+chrome constant barely moved at all.
+
+### What was measured
+
+216 rows, all `translation` mode, listWidth 360dp, at Arabic sizes 22/28/35/42
+-- surah 73 top to bottom plus al-Baqara from 2:255 into the long ayahs, driven
+over adb. The instrumentation hangs off the FlatList **cell**, not a View
+nested inside it: the cell is what `getItemLayout` predicts, and the 2026-09-06
+run measured the inner view. `src/components/rowHeightFixture.ts` is the
+derived artifact and what the tests read; the raw logs are not versioned.
+
+### Result
+
+| coefficient                   | 2026-09-06 | 2026-09-23 |
+|-------------------------------|------------|------------|
+| `CHROME_DP`                   | 170        | 174        |
+| `ARABIC_DP_PER_CHAR_PER_SQ_DP`| 0.00108    | 0.001371   |
+| `TRANSLATION_DP_PER_CHAR`     | 0.72       | 0.8447     |
+
+| metric        | old coefficients | re-fitted |
+|---------------|------------------|-----------|
+| rms           | 118.8dp          |  39.2dp   |
+| mean bias     | -81.6dp          |  +0.0dp   |
+| worst row     | 516.9dp          | 117.1dp   |
+
+Per size, the re-fit's bias is +0.7 / -0.0 / +0.7 / -1.5dp at 22/28/35/42 --
+so the size² law itself still holds; only its constant moved. The width law
+is still unverified (one width in this run, two in the last), and still safe
+for the same reason: the landing loop corrects against a real measurement
+before the list is revealed.
+
+**Re-run this whenever the ayah card's furniture or the Arabic run's line
+metrics change.** Nothing fails when the model goes stale -- the landing still
+lands, it just has further to correct -- so the drift is invisible until
+someone measures.
