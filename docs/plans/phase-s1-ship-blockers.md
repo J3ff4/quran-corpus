@@ -4,7 +4,7 @@
 
 **Goal:** Clear the two things that must not ship unresolved — unexplained user-DB loss (#96) and the corpus GPL obligation (#39).
 
-**Architecture:** No new subsystems. #96 is already defended in code (`restoreIfMissing` / `backUp` / `reportIfBrandNew` landed in `src/data/userDb.ts`); what is missing is *evidence* about the cause, so T1 is a device experiment, not a feature. #39 adds one licence screen fed by a bundled text file plus a written source offer pointing at the public repo.
+**Architecture:** No new subsystems. #96 is already defended in code (`restoreIfMissing` / `backUp` / `reportIfBrandNew` landed in `src/data/userDb.ts`, and `createUserDb` wires all three into the open path); what is missing is *evidence* about the cause, so T1 is a device experiment, not a feature. #39 adds one licence screen fed by a generated string module plus a written source offer pointing at the public repo.
 
 **Tech Stack:** Expo RN (`apps/mobile`), expo-sqlite, expo-file-system/legacy, vitest + the project's rnHosts shim, `adb`.
 
@@ -27,9 +27,10 @@
 
 | File | Responsibility |
 | --- | --- |
-| `apps/mobile/assets/licenses/gpl-2.0.txt` (create) | Verbatim GPLv2 text, bundled. Read at runtime, never re-typed into a string table. |
-| `apps/mobile/src/screens/LicenseScreen.tsx` (create) | Renders one bundled licence file. Scrollable, selectable, no chrome of its own beyond `HeaderCard`. |
-| `apps/mobile/app/license.tsx` (create) | Route for the above. `headerShown: false`, matching `app/about.tsx`. |
+| `apps/mobile/src/licenses/gpl-2.0.ts` (create, generated) | The GPLv2 as one exported string constant. Generated from the FSF's text, never hand-typed. See Step 1 for why it is a `.ts` module and not a bundled asset. |
+| `apps/mobile/src/screens/LicenseScreen.tsx` (create) | Renders that constant. Scrollable, selectable, its own heading — the navigator draws the back arrow, exactly as `AboutScreen` has it. |
+| `apps/mobile/app/license.tsx` (create) | Route for the above, matching `app/about.tsx`: a route file and nothing else. No `_layout.tsx` entry — see Task 2 Step 8. |
+| `apps/mobile/src/testing/rnHosts.ts` (modify) | Forwards `selectable` as `data-selectable`. Today it lands in the raw prop spread and React drops it, so the assertion on it would be vacuous. |
 | `apps/mobile/src/screens/AboutScreen.tsx` (modify) | Adds the source-offer block and the link into the licence route. |
 | `apps/mobile/src/i18n/uiStrings.ts` (modify) | New keys `about.sourceOffer`, `about.viewLicense`, `license.title`. EN/UZ/RU. |
 | `docs/plans/phase-s1-ship-blockers.md` (this file) | Verification log for T1 (§10: a milestone is not complete until the device result is recorded here). |
@@ -68,21 +69,33 @@ without their word.
 
 ```bash
 adb logcat -c
-adb logcat -v time | grep -i "user db" > "$CLAUDE_JOB_DIR/tmp/s1-userdb.log" &
 ```
 
 Then, on device, with the owner driving or watching: bookmark 2:1, add a note
 to it, set Arabic size to Large, set UI language to Russian. Four different
 tables touched on purpose — `bookmarks`, `reading_history`, `settings` and
-(via the read) `reading_days`, which is the set `countUserRows` guards on.
+(via the read) `reading_days`, which is part of the set `countUserRows` sums.
 
-- [ ] **Step 2: Confirm the backup was written**
+Do not background a `logcat | grep > file &` pipe to collect this. A
+background shell started inside an agent turn is killed at the turn boundary,
+silently, and the log it was writing simply stops. Read the buffer with
+`logcat -d` at each step instead, as below.
+
+- [ ] **Step 2: Relaunch, THEN confirm the backup was written**
 
 ```bash
+adb shell am force-stop com.qurancorpus.mobile
+# relaunch from the launcher, or: adb shell am start -n com.qurancorpus.mobile/.MainActivity
 adb logcat -d | grep "backed up"
 ```
 
-Expected: `[user db] backed up N rows to <documentDirectory>backups/…`, N ≥ 4.
+The force-stop is load-bearing. `backUp` runs inside `createUserDb`, which is
+memoized per process (`userDb.ts:21`, `:42`) — so the backup this session's
+app took happened at *open*, before Step 1 seeded anything. Grepping without
+a relaunch reads the previous state's backup and calls it evidence.
+
+Expected: `[user db] backed up N rows to <documentDirectory>backups/quran-corpus-user.db.backup`,
+N ≥ 4.
 
 If it does not appear, STOP — `backUp` is not running, and that is a defect
 that outranks the rest of this task. Report it and re-scope.
@@ -124,8 +137,17 @@ This arm is the one that proves the shipped defence works at all. It needs a
 debuggable build, because `run-as` is refused on the release APK
 (`run-as: package not debuggable` — recorded in #96).
 
+One exists already: `apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk`
+(90 MB, built 2026-09-01). It is far behind head, so it is only good for this
+arm if the DB and backup layout it ships still match — check its versionCode
+with `aapt2 dump badging` before trusting it, and rebuild debuggable from
+`build-dbg.sh` if it does not. It is debug-signed, so it cannot install over
+the release build: uninstall first, which means Arm C runs *after* Arm B.
+
 ```bash
-# with a debuggable variant installed
+# with a debuggable variant installed, and re-seeded: Arm B took the backup
+# with it, so this arm starts from an empty user DB. Re-do Step 1's four
+# values, then force-stop and relaunch once so backUp has written them.
 adb shell run-as com.qurancorpus.mobile ls files/SQLite files/backups
 adb shell run-as com.qurancorpus.mobile rm files/SQLite/quran-corpus-user.db
 adb shell am force-stop com.qurancorpus.mobile
@@ -191,20 +213,22 @@ Arm B without one of the two.
 ### Task 2: Ship the GPL licence text and the written source offer (#39)
 
 **Files:**
-- Create: `apps/mobile/assets/licenses/gpl-2.0.txt`
+- Create: `apps/mobile/src/licenses/gpl-2.0.ts` (generated)
 - Create: `apps/mobile/src/screens/LicenseScreen.tsx`
 - Create: `apps/mobile/src/screens/LicenseScreen.test.tsx`
 - Create: `apps/mobile/app/license.tsx`
+- Modify: `apps/mobile/src/testing/rnHosts.ts`
 - Modify: `apps/mobile/src/screens/AboutScreen.tsx`
 - Modify: `apps/mobile/src/i18n/uiStrings.ts`
 - Modify: `apps/mobile/src/screens/AboutTab.test.tsx`
 
 **Interfaces:**
-- Consumes: `HeaderCard` from `@/components/HeaderCard` (props
-  `title: string`, `onBack: () => void`, `uiLocale: UiLocaleCode`,
-  `testIDPrefix: string`); `t(uiLocale, key)` from `@/i18n/uiStrings`;
+- Consumes: `t(uiLocale, key)` from `@/i18n/uiStrings`;
+  `useAppSettings()` from `@/settings/settingsStore`;
   `useThemeColors()` from `@/theme/themeContext`;
+  `typography` from `@/theme/tokens`;
   `useListBottomPadding()` from `@/theme/useListBottomPadding`.
+  **Not** `HeaderCard` — see Step 8.
 - Produces: `export function LicenseScreen(): JSX.Element` — no props, it
   renders the one licence the app is obliged to ship. Route `/license`.
 
@@ -216,48 +240,94 @@ not meet it. §11 requires attribution *per each source's licence terms*.
 
 **Scope note:** the obligation attaches to **distribution** — the Android APK.
 `apps/web` serves the corpus over a network, which GPLv2 does not treat as
-distribution, so no web-side change is in this task. Do not add one.
+distribution (no §13-style network clause; that is the AGPL), so no web-side
+change is in this task. Do not add one. If the web app ever offers the corpus
+DB as a download, that *is* conveying and this scope note stops applying.
 
-- [ ] **Step 1: Fetch the licence text**
+- [ ] **Step 1: Generate the licence module**
 
 The corpus (corpus.quran.com / Quranic Arabic Corpus) is GPLv2.
 
 ```bash
-mkdir -p apps/mobile/assets/licenses
+mkdir -p apps/mobile/src/licenses
 curl -fsSL https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt \
-  -o apps/mobile/assets/licenses/gpl-2.0.txt
-wc -l apps/mobile/assets/licenses/gpl-2.0.txt
+  -o "$CLAUDE_JOB_DIR/tmp/gpl-2.0.txt"
+wc -l < "$CLAUDE_JOB_DIR/tmp/gpl-2.0.txt"      # 338
+sha256sum "$CLAUDE_JOB_DIR/tmp/gpl-2.0.txt"    # edaef632cbb643e4e7a221717a6c441a4c1a7c918e6e4d56debc3d8739b233f6
+
+python3 - "$CLAUDE_JOB_DIR/tmp/gpl-2.0.txt" > apps/mobile/src/licenses/gpl-2.0.ts <<'PY'
+import hashlib, json, sys
+text = open(sys.argv[1], encoding='utf-8').read()
+print('// GENERATED. Do not edit -- a reformatted GPL is not the GPL.')
+print('// Source: https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt')
+print(f'// sha256(text) = {hashlib.sha256(text.encode()).hexdigest()}')
+print('// Regenerate with the python block in docs/plans/phase-s1-ship-blockers.md, Task 2 Step 1.')
+print('export const GPL_2_0_TEXT = ' + json.dumps(text) + ';')
+PY
 ```
 
-Expected: 339 lines. Verbatim, unedited — a reformatted GPL is not the GPL.
+**Why a `.ts` module and not a bundled asset.** The obvious move —
+`assets/licenses/gpl-2.0.txt` plus `assetExts.push('txt')` — does not work.
+Metro's `assetExts` does not inline file *contents*: an `import x from
+'./a.txt'` under it yields an asset handle, not a string, so the screen would
+render a module id and the fix would be a runtime `Asset.downloadAsync` +
+`FileSystem.readAsStringAsync` — a file read that can fail on device, which is
+precisely what this avoids. Vitest cannot resolve a bare `.txt` import either,
+so the test would never run. A JSON asset would need `resolveJsonModule`,
+which `packages/config/tsconfig/base.json` does not set. A generated `.ts`
+needs no config anywhere and behaves identically under Metro and vitest.
+
+`json.dumps` rather than a template literal: the GPL contains five backticks
+(its ASCII `like this' quoting), and a template literal would need them
+escaped by hand. A JSON string literal is a valid TS string literal, so the
+generator cannot get the escaping wrong.
 
 - [ ] **Step 2: Write the failing test**
 
 Create `apps/mobile/src/screens/LicenseScreen.test.tsx`:
 
 ```tsx
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { createHash } from 'node:crypto';
+import React from 'react';
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { GPL_2_0_TEXT } from '../licenses/gpl-2.0';
 import { LicenseScreen } from './LicenseScreen';
 
-vi.mock('expo-router', () => ({ router: { back: vi.fn() } }));
+// The store opens the user DB through expo-sqlite; every screen suite stubs
+// it the same way (see AboutTab.test.tsx).
+vi.mock('@/settings/settingsStore', () => ({
+  useAppSettings: () => ({ uiLocale: 'en' }),
+}));
+
+vi.mock('react-native', async () => (await import('@/testing/rnHosts.js')).reactNativeTextMock());
 
 describe('LicenseScreen', () => {
-  it('renders the licence body verbatim, not a summary of it', () => {
+  afterEach(cleanup);
+
+  it('carries the FSF text byte for byte', () => {
+    // A hash, not a phrase. "Verbatim" is the whole legal requirement and a
+    // phrase check passes on a text with a clause deleted -- which is the
+    // shape of failure a generated file actually has.
+    expect(createHash('sha256').update(GPL_2_0_TEXT, 'utf8').digest('hex')).toBe(
+      'edaef632cbb643e4e7a221717a6c441a4c1a7c918e6e4d56debc3d8739b233f6',
+    );
+  });
+
+  it('renders the licence body, not a summary of it', () => {
     render(<LicenseScreen />);
     // The operative clause. A screen that paraphrases the GPL does not
     // discharge the obligation, so assert on text only the real licence has.
-    expect(screen.getByTestId('license-body').textContent).toContain(
-      'GNU GENERAL PUBLIC LICENSE',
-    );
-    expect(screen.getByTestId('license-body').textContent).toContain(
-      'you must give the recipients all the rights that you have',
-    );
+    const body = screen.getByTestId('license-body').textContent ?? '';
+    expect(body).toContain('GNU GENERAL PUBLIC LICENSE');
+    expect(body).toContain('you must give the recipients all the rights that');
   });
 
   it('is selectable, so the text can be copied off the device', () => {
     render(<LicenseScreen />);
-    expect(screen.getByTestId('license-body')).toHaveAttribute('data-selectable', 'true');
+    // .getAttribute, not the jest-dom toHaveAttribute matcher: jest-dom is not
+    // installed in this app (see the same note in DictionaryRow.test.tsx).
+    expect(screen.getByTestId('license-body').getAttribute('data-selectable')).toBe('true');
   });
 });
 ```
@@ -270,30 +340,35 @@ cd apps/mobile && npx vitest run src/screens/LicenseScreen.test.tsx
 
 Expected: FAIL — `Failed to resolve import "./LicenseScreen"`.
 
-- [ ] **Step 4: Implement the screen**
+- [ ] **Step 4: Teach the test shim about `selectable`**
 
-The licence is imported as a module so Metro bundles it; there is no runtime
-file read and therefore nothing to fail on a device.
+`rnHosts.ts`'s `host()` destructures every RN-only prop it maps and spreads
+the rest; `selectable` falls into the spread, where React DOM drops a
+`true`-valued unknown attribute outright. The assertion in Step 2 would
+therefore fail whether or not the screen sets the prop — which is not a
+failing test, it is an untestable one. Add it to `HostProps` and map it beside
+`data-pointer-events`:
 
-Add to `apps/mobile/metro.config.js` (assetExts already carries `ttf`/`db`;
-`txt` must join it) — check first, and only add if absent:
-
-```js
-config.resolver.assetExts.push('txt');
+```ts
+  // Mapped, not spread: React DOM drops a boolean-valued unknown attribute, so
+  // a suite could never tell a selectable Text from a non-selectable one. It
+  // is the practical half of "we gave you the licence" -- the user has to be
+  // able to copy the terms off the device.
+  'data-selectable': selectable ? 'true' : undefined,
 ```
+
+- [ ] **Step 5: Implement the screen**
 
 Create `apps/mobile/src/screens/LicenseScreen.tsx`:
 
 ```tsx
-import { router } from 'expo-router';
 import { ScrollView, Text } from 'react-native';
-import { HeaderCard } from '@/components/HeaderCard';
 import { t } from '@/i18n/uiStrings';
 import { typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
 import { useAppSettings } from '@/settings/settingsStore';
-import GPL_TEXT from '../../assets/licenses/gpl-2.0.txt';
+import { GPL_2_0_TEXT } from '@/licenses/gpl-2.0';
 
 /**
  * The GPLv2, verbatim.
@@ -304,6 +379,9 @@ import GPL_TEXT from '../../assets/licenses/gpl-2.0.txt';
  *
  * Monospace because the GPL is laid out with hard line breaks -- set in a
  * proportional face its section numbering stops lining up.
+ *
+ * Shaped like AboutScreen, down to the heading: a plain ScrollView under the
+ * navigator's own header. See Step 8 for why it does not wear a HeaderCard.
  */
 export function LicenseScreen() {
   const { uiLocale } = useAppSettings();
@@ -311,89 +389,96 @@ export function LicenseScreen() {
   const paddingBottom = useListBottomPadding();
 
   return (
-    <>
-      <HeaderCard
-        title={t(uiLocale, 'license.title')}
-        onBack={() => router.back()}
-        uiLocale={uiLocale}
-        testIDPrefix="license"
-      />
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom }}>
-        <Text
-          testID="license-body"
-          // Selectable so a user can copy the terms off the device, which is
-          // the practical half of "we gave you the licence".
-          selectable
-          style={{
-            color: theme.text,
-            fontFamily: 'monospace',
-            fontSize: typography.caption,
-          }}
-        >
-          {GPL_TEXT}
-        </Text>
-      </ScrollView>
-    </>
+    <ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={{ paddingBottom, paddingHorizontal: 16, paddingTop: 12, gap: 12 }}
+    >
+      <Text
+        accessibilityRole="header"
+        style={{ color: theme.text, fontSize: typography.title, fontWeight: '700' }}
+      >
+        {t(uiLocale, 'license.title')}
+      </Text>
+      <Text
+        testID="license-body"
+        // Selectable so a user can copy the terms off the device, which is
+        // the practical half of "we gave you the licence".
+        selectable
+        style={{
+          color: theme.text,
+          fontFamily: 'monospace',
+          fontSize: typography.caption,
+          lineHeight: 18,
+        }}
+      >
+        {GPL_2_0_TEXT}
+      </Text>
+    </ScrollView>
   );
 }
 ```
 
-Declare the asset type once, in `apps/mobile/src/types/assets.d.ts` (create if
-absent):
+One `<Text>` holding 18 KB is the whole screen; device check 420 below is what
+says whether it scrolls acceptably, and it is the reason 420 asks for the end
+of the document rather than the top.
 
-```ts
-declare module '*.txt' {
-  const content: string;
-  export default content;
-}
-```
-
-- [ ] **Step 5: Run the test to verify it passes**
+- [ ] **Step 6: Run the test to verify it passes**
 
 ```bash
 cd apps/mobile && npx vitest run src/screens/LicenseScreen.test.tsx
 ```
 
-Expected: PASS, 2 tests.
+Expected: PASS, 3 tests.
 
-If the shim does not forward `selectable` as `data-selectable`, fix the shim
-in `apps/mobile/src/test/rnHosts.ts` rather than deleting the assertion — a
-mock that drops a prop makes every test on that prop vacuous, which is exactly
-how the shadow props went unasserted for a phase.
-
-- [ ] **Step 6: Mutation-check the first assertion**
+- [ ] **Step 7: Mutation-check both assertions**
 
 ```bash
 cp apps/mobile/src/screens/LicenseScreen.tsx "$CLAUDE_JOB_DIR/tmp/mut-license.tsx"
-# replace {GPL_TEXT} with the string "GNU General Public License v2"
+# (a) replace {GPL_2_0_TEXT} with the string "GNU General Public License v2"
+# (b) separately, delete the `selectable` prop
 cd apps/mobile && npx vitest run src/screens/LicenseScreen.test.tsx
 ```
 
-Expected: FAIL on the `you must give the recipients` assertion — proving the
-test discriminates the real text from a name-check. Restore by copying the
-scratch file back. **Never `git checkout` to undo a mutation edit.**
+Expected: (a) FAILS on `you must give the recipients`, proving the test
+discriminates the real text from a name-check; (b) FAILS on `data-selectable`,
+proving Step 4's shim change is what makes that assertion mean anything.
+
+Also mutate the *generated* file: delete one clause from `gpl-2.0.ts`'s string
+and confirm the sha256 test fails. A checksum assertion is the easiest kind to
+write vacuously — against a hash computed from the file it is checking.
+
+Restore by copying the scratch files back. **Never `git checkout` to undo a
+mutation edit.**
 
 ```bash
 cp "$CLAUDE_JOB_DIR/tmp/mut-license.tsx" apps/mobile/src/screens/LicenseScreen.tsx
 ```
 
-- [ ] **Step 7: Add the route**
+- [ ] **Step 8: Add the route**
 
-Create `apps/mobile/app/license.tsx`:
+Create `apps/mobile/app/license.tsx`, exactly as `app/about.tsx` is written:
 
 ```tsx
 import { LicenseScreen } from '@/screens/LicenseScreen';
 
-export default LicenseScreen;
+// A route file, nothing else -- see app/about.tsx.
+export default function LicenseRoute() {
+  return <LicenseScreen />;
+}
 ```
 
-Register it in `apps/mobile/app/_layout.tsx` beside the `about` entry, with
-the same options — `headerShown: false`, because `LicenseScreen` draws its own
-`HeaderCard` and two back buttons on one screen is the M6e defect (issue #25).
+**No `_layout.tsx` entry.** There is no `about` entry to sit beside: only
+`(tabs)`, `morphology` and `surah/[surahId]/words` are declared, and every
+other stacked screen (about, settings, bookmarks, search) runs on the root
+`Stack`'s default options — header shown, `title: ''`, so the navigator draws
+the back arrow and nothing else. A screen only needs `headerShown: false` when
+it draws its own `HeaderCard`, which is the two-back-buttons defect from M6e
+(#25). This screen deliberately does not, so it needs no entry and gets the
+one back button for free.
 
-- [ ] **Step 8: Add the strings**
+- [ ] **Step 9: Add the strings**
 
-In `apps/mobile/src/i18n/uiStrings.ts`, add to the key union:
+In `apps/mobile/src/i18n/uiStrings.ts`, add to the `UiStringKey` union:
 
 ```ts
   | 'about.sourceOffer'
@@ -433,26 +518,39 @@ RU:
 ```
 
 The licence *name* stays untranslated in all three — it is the title of a
-specific document, like a book.
+specific document, like a book. `strings` is typed
+`Record<UiLocaleCode, Record<UiStringKey, string>>`, so a key missing from one
+of the three is a type error, not a runtime blank.
 
-- [ ] **Step 9: Write the failing About test**
+- [ ] **Step 10: Write the failing About test**
 
-Append to `apps/mobile/src/screens/AboutTab.test.tsx`:
+Append to the `describe('AboutTab')` block in
+`apps/mobile/src/screens/AboutTab.test.tsx`:
 
 ```tsx
   it('states where the source is and links to the licence', () => {
-    renderAbout();
+    render(<AboutTab />);
     expect(screen.getByText(/github\.com\/J3ff4\/quran-corpus/)).toBeTruthy();
     expect(screen.getByTestId('about-license-link')).toBeTruthy();
   });
 ```
 
+`render(<AboutTab />)` is how every case in that file renders — there is no
+`renderAbout` helper. The suite has no `expo-router` mock today and
+`AboutScreen` is about to import `router`, so add one beside the existing
+mocks, in the shape `SettingsTab.test.tsx` uses:
+
+```tsx
+const mocks = vi.hoisted(() => ({ push: vi.fn() }));
+vi.mock('expo-router', () => ({ router: { push: mocks.push } }));
+```
+
 Run it: expected FAIL, `Unable to find an element by: [data-testid="about-license-link"]`.
 
-- [ ] **Step 10: Add the block to AboutScreen**
+- [ ] **Step 11: Add the block to AboutScreen**
 
-In `apps/mobile/src/screens/AboutScreen.tsx`, after the credits groups and
-before the typefaces block, render:
+In `apps/mobile/src/screens/AboutScreen.tsx`, after the `GROUPS` loop and
+before the recitation group, render:
 
 ```tsx
       {/* GPLv2 obligations, discharged where the licence is named. The corpus
@@ -460,7 +558,7 @@ before the typefaces block, render:
           licence and then shipping neither its text nor an offer of source is
           the non-compliant state (#39). The offer points at the public repo
           rather than an address (owner ruling, 2026-09-24). */}
-      <GlassSurface style={{ padding: 16, borderRadius: radii.card, gap: 12 }}>
+      <GlassSurface style={{ padding: 16, gap: 12, marginTop: 10 }}>
         <Text style={{ color: theme.mutedText, fontSize: typography.body }}>
           {t(uiLocale, 'about.sourceOffer')}
         </Text>
@@ -476,24 +574,28 @@ before the typefaces block, render:
       </GlassSurface>
 ```
 
-Add `Pressable` to the `react-native` import and `import { router } from 'expo-router';` at the top.
+No `borderRadius` in the style: `GlassSurface` owns its own corner and border
+(`radius?: keyof typeof radii`, default `card`), and passing one through
+`style` forks the rule it exists to hold. Add `Pressable` to the
+`react-native` import and `import { router } from 'expo-router';` at the top.
 
-- [ ] **Step 11: Run the suite**
+- [ ] **Step 12: Run the suite**
 
 ```bash
-cd apps/mobile && npx vitest run && npx tsc --noEmit && npx eslint src app
+pnpm --filter @quran-corpus/mobile test
+pnpm --filter @quran-corpus/mobile type-check   # both tsconfigs; plain `tsc --noEmit` misses the test one
+pnpm --filter @quran-corpus/mobile lint
 ```
 
 Expected: all green. No `@ts-ignore`, no disabled rules.
 
-- [ ] **Step 12: Commit**
+- [ ] **Step 13: Commit**
 
 ```bash
-git add apps/mobile/assets/licenses apps/mobile/src/screens/LicenseScreen.tsx \
+git add apps/mobile/src/licenses/gpl-2.0.ts apps/mobile/src/screens/LicenseScreen.tsx \
   apps/mobile/src/screens/LicenseScreen.test.tsx apps/mobile/app/license.tsx \
-  apps/mobile/app/_layout.tsx apps/mobile/src/screens/AboutScreen.tsx \
-  apps/mobile/src/screens/AboutTab.test.tsx apps/mobile/src/i18n/uiStrings.ts \
-  apps/mobile/src/types/assets.d.ts apps/mobile/metro.config.js
+  apps/mobile/src/testing/rnHosts.ts apps/mobile/src/screens/AboutScreen.tsx \
+  apps/mobile/src/screens/AboutTab.test.tsx apps/mobile/src/i18n/uiStrings.ts
 git commit -m "feat(mobile/about): ship the GPL text and a written source offer
 
 About has named the corpus GPL since M6i while shipping neither the licence
@@ -503,21 +605,26 @@ repository instead of a postal or email address: an address in a shipped app
 is a personal contact detail distributed to every user.
 
 The licence body is verbatim and untranslated -- its own terms are the thing
-being conveyed, and a translation of them conveys something else.
+being conveyed, and a translation of them conveys something else. It ships as
+a generated .ts constant rather than a Metro asset: assetExts hands back an
+asset handle, not a string, so a .txt would have meant a runtime file read
+that can fail on device and an import vitest cannot resolve.
 
 Closes #39"
 ```
 
 **Acceptance criteria:**
-- `assets/licenses/gpl-2.0.txt` is byte-identical to the FSF's published text.
+- `sha256(GPL_2_0_TEXT)` is `edaef632…b233f6`, asserted in the suite rather
+  than checked by eye.
 - About shows the source offer; the link opens a scrollable, selectable, full
   licence with one back button.
-- Tests green, type-check clean, lint clean, and the mutation-check in Step 6
-  actually failed.
+- Tests green, type-check clean (both tsconfigs), lint clean, and every
+  mutation in Step 7 actually failed.
 
-**Risk:** `metro.config.js` `assetExts` change affects the whole bundle graph.
-**Rollback:** `git revert` the commit; no data, schema or persisted state is
-touched, so the revert is total.
+**Risk:** an 18 KB string in one `<Text>` scrolls badly on a low-end device.
+**Mitigation:** device check 420 reads to the end of the document, not the top.
+**Rollback:** `git revert` the commit; no data, schema, persisted state or
+build configuration is touched, so the revert is total.
 
 ---
 
@@ -539,6 +646,9 @@ bash "$CLAUDE_JOB_DIR/tmp/build55.sh"   # copy of build54.sh, versionCode bumped
 `taskset -c 7,8` is mandatory. Never build while `expo start` runs.
 
 - [ ] **Step 2: Run these checks and record each verbatim**
+
+Numbering starts at 419 because 409-418 were spent on the vc54 run
+(2026-09-24, PR #98) — the gap above 408 in `phase-m12` is allocated, not free.
 
 | # | Check | Pass |
 | --- | --- | --- |
@@ -567,8 +677,8 @@ reason. No row left blank.
 | --- | --- | --- |
 | Arm B of T1 destroys the owner's real reading data | Pull a copy off-device first, or get the owner's explicit "expendable" | None — irreversible by design, which is why the copy is a precondition |
 | T1 finds Arm A also loses data | Stop the phase, open a blocker issue | n/a — this is a discovery, not a change |
-| `assetExts` change breaks the bundle | Full `vitest` + a device launch before commit | `git revert` |
-| GPL text fetched from a mirror rather than the FSF | `wc -l` = 339 and the URL is pinned in Step 1 | Re-fetch |
+| Arm C's debug APK is too old to be evidence | Check its versionCode before trusting it; rebuild from `build-dbg.sh` otherwise | Mark Arm C blocked with the reason |
+| GPL text fetched from a mirror rather than the FSF | `sha256` = `edaef632…b233f6` (338 lines, 17,984 chars), asserted in the suite, and the URL is pinned in Step 1 | Re-fetch and regenerate |
 
 ## Verification Log
 
