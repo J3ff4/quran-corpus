@@ -88,7 +88,14 @@ export function WbwCell({
       // parity while the box has a floor its content never reaches. The touch
       // target the floor was there for survives as hitSlop, which grows the
       // press area without growing the box.
-      hitSlop={inSpan ? 8 : undefined}
+      //
+      // Vertical only. The cells of a span sit edge to edge in a row with 4dp
+      // of horizontal padding, so 8dp of slop on the sides overlaps the
+      // neighbour by up to 16dp -- and where two targets overlap Android hits
+      // the later sibling, so a tap near one word's leading edge opens the
+      // word beside it. The floor this replaced was a height; the slop that
+      // replaces it is one too.
+      hitSlop={inSpan ? { top: 8, bottom: 8 } : undefined}
       style={{
         minHeight: inSpan ? 0 : touchTargets.minimum,
         alignItems: 'center',

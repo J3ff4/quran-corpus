@@ -40,4 +40,29 @@ describe('useScreenReaderEnabled', () => {
     expect(addEventListener).toHaveBeenCalledTimes(1);
     expect(addEventListener).toHaveBeenCalledWith('screenReaderChanged', expect.any(Function));
   });
+
+  it('does not let the initial read overwrite an event that already landed', async () => {
+    // TalkBack switched on between subscribe() and the initial read resolving:
+    // the event says true, then the stale promise says false LAST. Reported
+    // off with a screen reader running, the reader never wakes its cards and
+    // every word announces as raw Arabic until TalkBack is toggled again.
+    vi.resetModules();
+    let resolveRead: (value: boolean) => void = () => {};
+    isScreenReaderEnabled.mockImplementationOnce(
+      () => new Promise<boolean>((resolve) => { resolveRead = resolve; }),
+    );
+
+    const { useScreenReaderEnabled: fresh } = await import('./useScreenReaderEnabled.js');
+    const { result } = renderHook(() => fresh());
+    const handler = addEventListener.mock.calls.at(-1)?.[1] as (value: boolean) => void;
+
+    handler(true);
+    await waitFor(() => expect(result.current).toBe(true));
+
+    // The read was in flight the whole time and answers with what was true
+    // before the switch. It is older than the event, so it loses.
+    resolveRead(false);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(result.current).toBe(true);
+  });
 });

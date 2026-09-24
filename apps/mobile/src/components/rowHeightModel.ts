@@ -20,7 +20,22 @@ export interface RowHeightInput {
 // The fit had a second value for the mushaf's plate rows, dropped in M7d along
 // with the mode itself: the mushaf is a pager of fixed-height pages now and
 // nothing estimates its rows.
-const CHROME_DP = 174;
+const CHROME_DP = 145;
+
+// The translation block's own fixed furniture, on top of CHROME_DP: the card's
+// 14dp gap above it, its own 14dp paddingTop, and the 1dp rule between the two
+// scripts (AyahCard). Split out of CHROME_DP rather than folded into the
+// per-character term, because it is there in full for a one-word translation
+// and gone entirely when there is none.
+//
+// 145 + 29 is the 174 the fixture was fitted at, so every row that draws a
+// translation estimates exactly as before. What changes is the rows that do
+// not: the fixture contains no row with translationChars 0 -- the fit never
+// saw one -- so with the translation switched off every row carried 29dp of
+// furniture that is not on screen, one-directionally and cumulatively. That is
+// the same bias class the 2026-09-23 re-fit exists to remove: over 286 rows of
+// al-Baqara it ran the offset table ~8000dp long.
+const TRANSLATION_BLOCK_DP = 29;
 
 // dp per Arabic character, at REFERENCE_WIDTH. Scales with size^2: line height
 // grows with the size while characters per line fall as 1/size, so the
@@ -64,7 +79,12 @@ export function estimateRowHeight({
 
   const arabic =
     ARABIC_DP_PER_CHAR_PER_SQ_DP * arabicSize * arabicSize * arabicChars * widthFactor;
-  const translation = TRANSLATION_DP_PER_CHAR * translationChars * widthFactor;
+  // The block is drawn or it is not; there is no half of it. AyahCard renders
+  // it on a non-empty translation, which is exactly translationChars > 0.
+  const translation =
+    translationChars > 0
+      ? TRANSLATION_BLOCK_DP + TRANSLATION_DP_PER_CHAR * translationChars * widthFactor
+      : 0;
 
   return CHROME_DP + arabic + translation;
 }

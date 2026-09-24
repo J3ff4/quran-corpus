@@ -98,4 +98,14 @@ describe('HeaderCard', () => {
 
     expect(screen.getByTestId('x-title-row').textContent).toBe('Al-Baqarah');
   });
+
+  it('does not announce the name as a button when there is nothing to open', () => {
+    // Two callers mount this header with no onTitlePress -- morphology's
+    // no-history branch and WbwScreen's loading and error chrome. The caret is
+    // already dropped for them; the ROLE was not, so TalkBack offered the
+    // screen's own name as a disabled button for a control those screens do
+    // not have. Same rule as the caret: the affordance rides with the handler.
+    renderCard();
+    expect(screen.getByTestId('x-surah-jump').getAttribute('role')).toBeNull();
+  });
 });

@@ -79,8 +79,9 @@ export function AyahText({
   const words = getWords();
 
   const labels = useMemo(
-    () => (words.length > 0 ? alignedWords(textUthmani, words, surahId, ayahNumber) : null),
-    [textUthmani, words, surahId, ayahNumber],
+    () =>
+      words.length > 0 ? alignedWords(textUthmani, words, surahId, ayahNumber, tokens.length) : null,
+    [textUthmani, words, surahId, ayahNumber, tokens.length],
   );
 
   const style = {
@@ -130,7 +131,13 @@ export function AyahText({
                     // serve -- the first one after a prefetch returns.
                     const rows = getWords();
                     if (rows.length === 0) return;
-                    const word = alignedWords(textUthmani, rows, surahId, ayahNumber)?.[index];
+                    const word = alignedWords(
+                      textUthmani,
+                      rows,
+                      surahId,
+                      ayahNumber,
+                      tokens.length,
+                    )?.[index];
                     if (word) onWordPress(word);
                   }
             }
@@ -151,12 +158,23 @@ export function AyahText({
  * them -- so the result indexes straight off the rendered token list. Null
  * when the rows and the text cannot be reconciled; the run still draws, it
  * just has nothing to open.
+ *
+ * `runTokenCount` is what makes that indexing safe rather than assumed. The
+ * two halves of the split decide the basmala differently -- the run
+ * positionally, `alignAyahTokens` by token arithmetic against the word count
+ * -- and they agree on all 6,236 ayahs of the shipped corpus but are not the
+ * same test. Should they ever disagree, one side drops four tokens the other
+ * keeps and every label and every tap lands four words off, silently, which is
+ * worse than no word detail at all. So the lengths are checked and the whole
+ * alignment fails closed, exactly as `alignAyahTokens` already does when it
+ * cannot reconcile the rows itself.
  */
 function alignedWords(
   textUthmani: string,
   words: Word[],
   surahId: number,
   ayahNumber: number,
+  runTokenCount: number,
 ): Array<Word | null> | null {
   const aligned = alignAyahTokens(
     textUthmani,
@@ -164,7 +182,8 @@ function alignedWords(
     { surahId, ayahNumber },
   );
   if (!aligned) return null;
-  return aligned
+  const drawn = aligned
     .filter((token) => !token.isBasmala)
     .map((token) => (token.wordIndex === null ? null : (words[token.wordIndex] ?? null)));
+  return drawn.length === runTokenCount ? drawn : null;
 }

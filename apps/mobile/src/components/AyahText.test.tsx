@@ -256,6 +256,31 @@ describe('AyahText', () => {
     expect(container.textContent).toContain('أ ب ج د ه');
   });
 
+  it('opens nothing when the two halves of the split disagree about the basmala', () => {
+    // The run decides the basmala positionally (ayah 1, not al-Fatiha or
+    // at-Tawba, more than four tokens) while alignAyahTokens decides it by
+    // arithmetic against the word count. They agree on all 6,236 ayahs of the
+    // shipped corpus, so this is a text no edition has today -- an ayah 1 of
+    // five tokens carrying no prefix. Feed it one and they split: the run
+    // drops four tokens the alignment keeps, so the one token still drawn
+    // indexes onto the FIRST word row and a tap opens a word four positions
+    // away with nothing on screen saying so. Fail closed instead, the way
+    // alignAyahTokens already does when it cannot reconcile the rows.
+    const onWordPress = vi.fn();
+    render(
+      <AyahText
+        textUthmani="أ ب ج د ه"
+        getWords={() => wordsFrom(['أ', 'ب', 'ج', 'د', 'ه'])}
+        surahId={2}
+        ayahNumber={1}
+        onWordPress={onWordPress}
+      />,
+    );
+
+    fireEvent.click(screen.getAllByTestId('word-token')[0]!);
+    expect(onWordPress).not.toHaveBeenCalled();
+  });
+
   it('does not colour words by part of speech', () => {
     // D7: colour lives on the WbW screen and the sheet. Colouring every word
     // in the reading flow turns a mushaf into a syntax highlighter, and it

@@ -149,10 +149,18 @@ export default function SurahRoute() {
   // Switching reciter mid-surah changes the voice from the NEXT ayah, not this
   // one: the engine reads reciterId when it starts an ayah, and the one already
   // sounding keeps its source (device check 87).
+  // Through a ref rather than the dependency array: the recitation context
+  // rebuilds its value object on every playback tick, so `audio` is a new
+  // identity several times a second, and this callback reaches every memoised
+  // ayah card as onToggleAudio. Depending on it directly undid AyahCard's memo
+  // at exactly the moment it has to hold -- while audio is playing.
+  const audioRef = useRef(audio);
+  audioRef.current = audio;
+
   const toggleAyah = useCallback(
     (ayahNumber: number) => {
       if (surahId === null) return;
-      audio.toggle(
+      audioRef.current.toggle(
         {
           owner: 'reader',
           surahId,
@@ -163,7 +171,7 @@ export default function SurahRoute() {
         ayahNumber,
       );
     },
-    [audio, surahId, reader?.data.surah.ayah_count, reader?.data.surah.name_translit, continuousPlay],
+    [surahId, reader?.data.surah.ayah_count, reader?.data.surah.name_translit, continuousPlay],
   );
   // Kept so the reader can query words for the ayahs scrolling into view,
   // rather than reopening the database on every tap.
@@ -348,55 +356,69 @@ export default function SurahRoute() {
    *  calls back into. `previousNote` is passed rather than re-read, because by
    *  then the confirmation has been on screen and the map may have moved on.
    */
-  async function applyToggle(ayahNumber: number, nextBookmarked: boolean, previousNote: string | null) {
-    if (!displayedSurahId) return;
+  const applyToggle = useCallback(
+    async (ayahNumber: number, nextBookmarked: boolean, previousNote: string | null) => {
+      if (!displayedSurahId) return;
 
-    setBookmarks((current) => {
-      const next = new Map(current);
-      if (nextBookmarked) next.set(ayahNumber, null);
-      else next.delete(ayahNumber);
-      return next;
-    });
-
-    try {
-      setBookmarkError(null);
-      const userDb = await openUserDb();
-      const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
-      await setBookmark(userClient, displayedSurahId, ayahNumber, nextBookmarked);
-    } catch (cause) {
-      console.error('[reader] bookmark write failed', { surahId: displayedSurahId, ayahNumber, cause });
-      // Undo this ayah only, off the current set. Restoring a snapshot taken
-      // before the write would also revert any toggle that landed while this
-      // one was in flight, leaving the list disagreeing with SQLite until the
-      // next focus reload.
       setBookmarks((current) => {
         const next = new Map(current);
-        if (nextBookmarked) next.delete(ayahNumber);
-        // previousNote, not null: the DELETE failed, so the row and its note
-        // are still in SQLite. Restoring the pen to its empty state would have
-        // the editor seed a blank draft over a note that was never lost.
-        else next.set(ayahNumber, previousNote);
+        if (nextBookmarked) next.set(ayahNumber, null);
+        else next.delete(ayahNumber);
         return next;
       });
-      setBookmarkError(t(uiLocale, 'reader.bookmarkFailed'));
-    }
-  }
 
-  function toggleBookmark(ayahNumber: number) {
-    if (!displayedSurahId) return;
-    const nextBookmarked = !bookmarks.has(ayahNumber);
-    const previousNote = bookmarks.get(ayahNumber) ?? null;
+      try {
+        setBookmarkError(null);
+        const userDb = await openUserDb();
+        const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
+        await setBookmark(userClient, displayedSurahId, ayahNumber, nextBookmarked);
+      } catch (cause) {
+        console.error('[reader] bookmark write failed', { surahId: displayedSurahId, ayahNumber, cause });
+        // Undo this ayah only, off the current set. Restoring a snapshot taken
+        // before the write would also revert any toggle that landed while this
+        // one was in flight, leaving the list disagreeing with SQLite until the
+        // next focus reload.
+        setBookmarks((current) => {
+          const next = new Map(current);
+          if (nextBookmarked) next.delete(ayahNumber);
+          // previousNote, not null: the DELETE failed, so the row and its note
+          // are still in SQLite. Restoring the pen to its empty state would have
+          // the editor seed a blank draft over a note that was never lost.
+          else next.set(ayahNumber, previousNote);
+          return next;
+        });
+        setBookmarkError(t(uiLocale, 'reader.bookmarkFailed'));
+      }
+    },
+    [displayedSurahId, uiLocale],
+  );
 
-    // The row is the note's only home, so un-bookmarking deletes hand-written
-    // text with one tap and the device DB has no undo (CLAUDE.md §5). Asked
-    // before the optimistic update, so a cancel leaves the screen untouched.
-    if (!nextBookmarked && previousNote !== null) {
-      setDiscarding(ayahNumber);
-      return;
-    }
+  // The map through a ref, so a bookmark landing anywhere on the screen does
+  // not hand every memoised card a new onToggleBookmark. Stable for the same
+  // reason openNoteEditor is: this component re-renders on every playback
+  // tick, and a fresh closure per render is a changed prop on every card.
+  const bookmarksRef = useRef(bookmarks);
+  bookmarksRef.current = bookmarks;
 
-    void applyToggle(ayahNumber, nextBookmarked, previousNote);
-  }
+  const toggleBookmark = useCallback(
+    (ayahNumber: number) => {
+      if (!displayedSurahId) return;
+      const current = bookmarksRef.current;
+      const nextBookmarked = !current.has(ayahNumber);
+      const previousNote = current.get(ayahNumber) ?? null;
+
+      // The row is the note's only home, so un-bookmarking deletes hand-written
+      // text with one tap and the device DB has no undo (CLAUDE.md §5). Asked
+      // before the optimistic update, so a cancel leaves the screen untouched.
+      if (!nextBookmarked && previousNote !== null) {
+        setDiscarding(ayahNumber);
+        return;
+      }
+
+      void applyToggle(ayahNumber, nextBookmarked, previousNote);
+    },
+    [displayedSurahId, applyToggle],
+  );
 
   async function saveNote(ayahNumber: number, note: string) {
     // displayedSurahId, like every other write here: during a page turn the

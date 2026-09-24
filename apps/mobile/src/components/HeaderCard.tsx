@@ -124,7 +124,14 @@ export function HeaderCard({
               a caption rather than as the screen's subject. */}
           <Pressable
             testID={`${testIDPrefix}-surah-jump`}
-            accessibilityRole="button"
+            // The role rides with the handler, the way the caret does. Two
+            // callers mount this header with no onTitlePress at all --
+            // morphology's no-history branch and WbwScreen's loading and error
+            // chrome -- and unconditionally it announced the screen's own name
+            // to TalkBack as a disabled button, for a control those screens do
+            // not have. The testID stays put either way: it is how the tests
+            // reach this row, not something TalkBack ever sees.
+            {...(onTitlePress ? { accessibilityRole: 'button' as const } : {})}
             accessibilityLabel={titleAccessibilityLabel ?? title}
             disabled={!titleVisible || !onTitlePress}
             accessibilityElementsHidden={!titleVisible}

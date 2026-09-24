@@ -18,6 +18,13 @@ import { AccessibilityInfo } from 'react-native';
  */
 let enabled = false;
 let started = false;
+// The initial read is a promise and the listener is an event, and they race:
+// switch TalkBack on between `subscribe()` and that promise resolving and the
+// event publishes true, then the stale promise publishes false LAST. The hook
+// then reports off with a screen reader running, so the reader never wakes its
+// cards and every word announces as raw Arabic until TalkBack is toggled
+// again. An event is always newer than the read that was already in flight.
+let live = false;
 const subscribers = new Set<() => void>();
 
 function publish(value: boolean) {
@@ -30,8 +37,13 @@ function subscribe(notify: () => void): () => void {
   subscribers.add(notify);
   if (!started) {
     started = true;
-    void AccessibilityInfo.isScreenReaderEnabled().then(publish);
-    AccessibilityInfo.addEventListener('screenReaderChanged', publish);
+    void AccessibilityInfo.isScreenReaderEnabled().then((value) => {
+      if (!live) publish(value);
+    });
+    AccessibilityInfo.addEventListener('screenReaderChanged', (value) => {
+      live = true;
+      publish(value);
+    });
   }
   return () => {
     subscribers.delete(notify);

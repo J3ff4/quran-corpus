@@ -85,6 +85,25 @@ describe('estimateRowHeight', () => {
     expect(at(600)).toBeLessThan(at(TRANSLATION_W));
   });
 
+  it('drops the translation block whole when there is no translation', () => {
+    // The bias the fixture cannot catch: every measured row HAS a translation,
+    // so the fit folded that block's own furniture -- the card gap, the
+    // paddingTop and the rule -- into the chrome constant. With the
+    // translation switched off it was still being charged for, on every row,
+    // in the same direction, and the offset table ran long by the sum of it.
+    const withNone = estimateRowHeight({
+      arabicSize: 28, listWidth: TRANSLATION_W,
+      arabicChars: 500, translationChars: 0,
+    });
+    const withOne = estimateRowHeight({
+      arabicSize: 28, listWidth: TRANSLATION_W,
+      arabicChars: 500, translationChars: 1,
+    });
+    // A one-character translation costs a whole block plus one character, so
+    // the step at zero is the furniture itself -- not a rounding difference.
+    expect(withOne - withNone).toBeGreaterThan(20);
+  });
+
   it('is finite and positive for degenerate input', () => {
     // listWidth is 0 on the first commit, before the list has laid out.
     const h = estimateRowHeight({
