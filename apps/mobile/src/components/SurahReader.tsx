@@ -873,6 +873,30 @@ function AyahList({
         CellRendererComponent={CellRenderer}
         onViewableItemsChanged={onViewableItemsChanged.current}
         onScrollToIndexFailed={onScrollToIndexFailed}
+        // The whole reason a deep scroll stopped jumping.
+        //
+        // VirtualizedList fills its render window outward as the reader
+        // scrolls, so rows *above* the viewport keep mounting for the first
+        // time -- windowSize 21 means it reaches ten viewports up, some 6000dp
+        // back. Until a row mounts, the leading spacer is holding space for it
+        // out of getItemLayout, which is the fitted estimate; the moment it
+        // mounts, its real height takes that space instead. The two differ by
+        // whatever the model got wrong, and React Native does not adjust the
+        // scroll offset to compensate -- so the difference pushes everything
+        // below down, including the ayah under the reader's finger.
+        //
+        // Measured on device, al-Baqara 24 onward, 2026-09-23: three rows
+        // mounting 6000dp above the viewport moved every mounted cell by
+        // +32dp at once and the content jumped 128px backwards mid-drag;
+        // a second fill 16s later moved it 12dp/49px, a third 50dp/202px. The
+        // scroll offset itself was monotonic throughout -- nothing scrolled,
+        // the content grew above. Deterministic to the pixel across three
+        // runs, and invisible to framestats because every one of those frames
+        // rendered inside budget at 90Hz.
+        //
+        // This anchors the topmost visible row instead: content appearing
+        // above it moves the offset, not the reader.
+        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
         getItemLayout={getItemLayout}
         onLayout={onListLayout}
         onScroll={onScroll}
