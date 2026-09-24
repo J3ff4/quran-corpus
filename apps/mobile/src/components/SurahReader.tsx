@@ -42,6 +42,7 @@ import { useReducedMotion } from '@/motion/useReducedMotion';
 import { t } from '@/i18n/uiStrings';
 import { fonts, typography } from '@/theme/tokens';
 import { useArabicSizes } from '@/theme/useArabicSizes';
+import { useScreenReaderEnabled } from '@/a11y/useScreenReaderEnabled';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
@@ -142,6 +143,21 @@ interface SurahReaderProps {
 // row or proves it settled -- and the model's error, worst measured at 512dp,
 // is corrected against a real measurement rather than ground down by retries.
 const MAX_LANDING_PASSES = 3;
+// How still a row has to be before the landing calls it landed.
+//
+// Exact equality was the test, and a layout `y` is a float. A row whose
+// corrected position lands half a device pixel from where it was is not
+// moving in any sense a reader can see, but it never satisfies `===` -- so the
+// landing spent all three passes chasing it and revealed on the cap instead of
+// on the settle. Deep in a surah, where more rows above have swapped model
+// estimates for real heights and the numbers are bigger, that is where the
+// arithmetic has the most room to disagree with itself: the owner's report is
+// a language switch landing "a little bit off", and further off the deeper it
+// is (device, 2026-09-22).
+//
+// One dp: below what the reader can see, and far above float noise on offsets
+// in the thousands.
+const SETTLED_DP = 1;
 const SCROLL_RETRY_DELAY_MS = 100;
 // The budget for a row that never reports at all. Separate from the pass cap
 // because the two failures are different: the cap bounds how many times we
@@ -253,7 +269,7 @@ interface AyahListProps {
   audioEnabled: boolean;
   showTranslation: boolean;
   uiLocale: UiLocaleCode;
-  wordsByAyah: Map<number, Word[]>;
+  getWordsFor: (ayahId: number) => () => Word[];
   /** An ayah has come into view; the caller may want its words. Held in a ref
    *  here, so the caller is free to rebuild it every render. */
   onVisibleAyah: (ayahId: number) => void;
@@ -303,7 +319,7 @@ function AyahList({
   audioEnabled,
   showTranslation,
   uiLocale,
-  wordsByAyah,
+  getWordsFor,
   onVisibleAyah,
   onReadingAyah,
   onToggleBookmark,
@@ -335,7 +351,31 @@ function AyahList({
   // put 2:4 at the top (owner device, 2026-09-07: 80 attempts, 8033ms, not one
   // measurement). The index is what the clear was really for; carrying it
   // keeps a measurement that is still about the right row.
-  const targetOffsetRef = useRef<{ index: number; y: number } | null>(null);
+  // Stamped with the offset table it was measured against, not just the row.
+  //
+  // An index says the measurement describes the row this landing wants. It
+  // does not say it describes the content on screen now. A translation-language
+  // switch keeps every index and changes every row's height, so the y stamped
+  // for the target is a position in a layout that no longer exists -- and the
+  // first attempt spends a correction scrolling to it. Instrumented on the
+  // owner's device (2026-09-22, 2:210, uz -> en):
+  //
+  //   t=0    measured 108119     <- the pre-switch layout
+  //   t=512  measured 97488.75   <- the real one, 10k dp lower
+  //   t=667  measured 97604.25   passes=3, cap, revealed 115dp off
+  //
+  // Three passes is enough when all three correct against the current layout --
+  // the same target reached by deep link settles in two -- so the fix is to
+  // stop spending one of them on the previous layout, not to raise the cap.
+  // The table is rebuilt whenever a row's height can have changed, so its
+  // identity is exactly the question being asked, and it is the one stamp that
+  // still lets a first-paint measurement through: that row measures against the
+  // table the landing is about to use.
+  const targetOffsetRef = useRef<{ index: number; y: number; layout: unknown } | null>(null);
+  // The table, readable from the cell's onLayout without making the renderer
+  // depend on it -- CellRendererComponent is memoised on the target index, and
+  // rebuilding it per table would remount the row it is trying to measure.
+  const layoutRef = useRef<unknown>(null);
   const lastMeasuredRef = useRef<number | null>(null);
   // Called by the target row's onLayout. A ref because renderItem builds the
   // handler fresh on every render, and the landing effect must not re-run for
@@ -390,14 +430,28 @@ function AyahList({
         arabicSize: arabicSizes.reader,
         listWidth,
         arabicChars: item.ayah.text_uthmani?.length ?? 0,
-        translationChars: item.translation?.text.length ?? 0,
+        // Zero when the reader is drawing no translation, which is what
+        // rowHeightModel documents the field to mean. Taken straight off the
+        // row before, so with the translation hidden every row was estimated
+        // with a block that is not on screen -- 0.72dp per character, which on
+        // a long ayah is most of the card. The error is cumulative, so the
+        // deeper the ayah the further the table sat from the real content:
+        // fast scrolling drew blank stretches and flickered, because the
+        // offsets FlatList windows on named rows that were nowhere near there
+        // (owner, device, 2026-09-22).
+        translationChars: showTranslation ? (item.translation?.text.length ?? 0) : 0,
       });
       offsets[index] = running;
       lengths[index] = height;
       running += height;
     }
     return { lengths, offsets };
-  }, [data.ayahs, arabicSizes.reader, listWidth, headerOffset]);
+  }, [data.ayahs, arabicSizes.reader, listWidth, headerOffset, showTranslation]);
+
+  // In render, not an effect: the first paint's onLayout runs before effects
+  // do, and a measurement stamped with a null table would be read as stale by
+  // the landing that is about to use it.
+  layoutRef.current = layout;
 
   const getItemLayout = useCallback(
     (_: unknown, index: number) => ({
@@ -488,7 +542,11 @@ function AyahList({
               // onLayout in the modes that measure, and swallowing it there
               // would break its bookkeeping.
               onLayout?.(event);
-              targetOffsetRef.current = { index, y: event.nativeEvent.layout.y };
+              targetOffsetRef.current = {
+                index,
+                y: event.nativeEvent.layout.y,
+                layout: layoutRef.current,
+              };
               onTargetMeasuredRef.current();
             }}
           />
@@ -540,10 +598,10 @@ function AyahList({
     const startedAt = Date.now();
     passesRef.current = 0;
     // Only the previous pass's offset is cleared. A measurement stamped with
-    // the target this landing is aiming at is still true, and the reason the
-    // clear existed -- comparing a new target's first measurement against the
-    // old target's last one and calling it settled on the spot -- is handled
-    // by the stamp instead.
+    // the target this landing is aiming at, taken in the layout now on screen,
+    // is still true -- and a row inside the initial render window reports its
+    // only layout in the same commit that runs this effect, so clearing here
+    // outright throws away the one measurement the landing will ever get.
     lastMeasuredRef.current = null;
 
     const reveal = () => {
@@ -586,7 +644,10 @@ function AyahList({
     const attempt = () => {
       if (cancelled) return;
       const entry = targetOffsetRef.current;
-      const measured = entry !== null && entry.index === initialIndex ? entry.y : null;
+      const measured =
+        entry !== null && entry.index === initialIndex && entry.layout === layoutRef.current
+          ? entry.y
+          : null;
       if (measured === null) {
         // Nothing measured yet. Jump on the model: it does not have to be
         // right, only close enough to bring the target into the render window,
@@ -594,7 +655,10 @@ function AyahList({
         // -- it is the same jump every time, and spending the correction
         // budget on it is what stopped the settle test from ever running.
         listRef.current?.scrollToIndex({ index: initialIndex, animated: false });
-      } else if (measured === lastMeasuredRef.current) {
+      } else if (
+        lastMeasuredRef.current !== null &&
+        Math.abs(measured - lastMeasuredRef.current) < SETTLED_DP
+      ) {
         // The row did not move under the last correction. That is the landing,
         // and unlike the content-height check this replaces, it is evidence
         // about the target itself rather than about the list around it.
@@ -784,7 +848,7 @@ function AyahList({
             surahId: data.surah.id,
             ayahNumber: item.ayah.ayah_number,
             arabicText: item.ayah.text_uthmani,
-            words: wordsByAyah.get(item.ayah.id) ?? EMPTY_WORDS,
+            getWords: getWordsFor(item.ayah.id),
             bookmarked: bookmarkedAyahs.has(item.ayah.ayah_number),
             note: notesByAyah?.get(item.ayah.ayah_number) ?? null,
             playing: playingAyah === item.ayah.ayah_number,
@@ -809,6 +873,30 @@ function AyahList({
         CellRendererComponent={CellRenderer}
         onViewableItemsChanged={onViewableItemsChanged.current}
         onScrollToIndexFailed={onScrollToIndexFailed}
+        // The whole reason a deep scroll stopped jumping.
+        //
+        // VirtualizedList fills its render window outward as the reader
+        // scrolls, so rows *above* the viewport keep mounting for the first
+        // time -- windowSize 21 means it reaches ten viewports up, some 6000dp
+        // back. Until a row mounts, the leading spacer is holding space for it
+        // out of getItemLayout, which is the fitted estimate; the moment it
+        // mounts, its real height takes that space instead. The two differ by
+        // whatever the model got wrong, and React Native does not adjust the
+        // scroll offset to compensate -- so the difference pushes everything
+        // below down, including the ayah under the reader's finger.
+        //
+        // Measured on device, al-Baqara 24 onward, 2026-09-23: three rows
+        // mounting 6000dp above the viewport moved every mounted cell by
+        // +32dp at once and the content jumped 128px backwards mid-drag;
+        // a second fill 16s later moved it 12dp/49px, a third 50dp/202px. The
+        // scroll offset itself was monotonic throughout -- nothing scrolled,
+        // the content grew above. Deterministic to the pixel across three
+        // runs, and invisible to framestats because every one of those frames
+        // rendered inside budget at 90Hz.
+        //
+        // This anchors the topmost visible row instead: content appearing
+        // above it moves the offset, not the reader.
+        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
         getItemLayout={getItemLayout}
         onLayout={onListLayout}
         onScroll={onScroll}
@@ -1058,7 +1146,57 @@ export function SurahReader({
     ayahsRef.current = data.ayahs;
   }, [loadWords, data.ayahs]);
 
-  const [wordsByAyah, setWordsByAyah] = useState<Map<number, Word[]>>(new Map());
+  // A ref, not state, and that is the whole stutter fix.
+  //
+  // A card that gained its word rows used to re-render, and an Arabic run
+  // rebuilt from one flat <Text> into one <Text> per word is re-recorded
+  // whole by Android -- not the visible slice, the whole view. 2:282 is a card
+  // 2467dp tall carrying 128 of those spans, and its second record cost 18.7ms
+  // inside a 29.3ms frame against an 11.1ms budget at 90Hz (device framestats,
+  // 2026-09-23). The prefetch is driven by viewability, so that record landed
+  // mid-fling, on exactly the long ayahs the owner reported.
+  //
+  // Holding the commit until the list stopped only moved the cost to the
+  // moment it flushed, which is still a stutter if the reader is between two
+  // ayahs when it lands (owner, 2026-09-23). The rows had to leave render
+  // altogether: AyahText now draws its spans from the Uthmani text alone and
+  // resolves a word only when one is pressed, so nothing about the run
+  // changes when a query returns.
+  const wordsRef = useRef(new Map<number, Word[]>());
+  // Stable per ayah, so a card's props do not change identity on every render
+  // of the list -- AyahCard is memoised on them.
+  const wordAccessorsRef = useRef(new Map<number, () => Word[]>());
+  const getWordsFor = useCallback((ayahId: number) => {
+    let accessor = wordAccessorsRef.current.get(ayahId);
+    if (!accessor) {
+      accessor = () => wordsRef.current.get(ayahId) ?? EMPTY_WORDS;
+      wordAccessorsRef.current.set(ayahId, accessor);
+    }
+    return accessor;
+  }, []);
+
+  // The one case where the rows DO belong in render: TalkBack announces a word
+  // by its transliteration, and without a re-render the labels stay on the
+  // Arabic token until something else wakes the card. Nothing to pay when no
+  // screen reader is running, which is the scrolling case.
+  const screenReader = useScreenReaderEnabled();
+  const [, bumpWords] = useState(0);
+  // Read from fetchWordsRef, which is built once and cannot close over either.
+  const screenReaderRef = useRef(screenReader);
+  screenReaderRef.current = screenReader;
+  const bumpWordsRef = useRef(bumpWords);
+  bumpWordsRef.current = bumpWords;
+  // Turning TalkBack on mid-session has to reach the ayahs already fetched.
+  // Their rows landed while the gate below was shut, so their accessors were
+  // never dropped and every one of those cards is memoised on an identity
+  // that will now never change again -- their words would announce as raw
+  // Arabic, spelled letter by letter, for the rest of the session. Dropping
+  // the whole map is the same wake as the per-ayah one, applied at once.
+  useEffect(() => {
+    if (!screenReader) return;
+    wordAccessorsRef.current.clear();
+    bumpWords((n) => n + 1);
+  }, [screenReader]);
   // Separate from the state map, and written before the await:
   // onViewableItemsChanged fires on every scroll frame that changes the set,
   // so a check against state alone would issue a fresh query per frame for as
@@ -1079,7 +1217,18 @@ export function SurahReader({
         requestedRef.current.add(id);
         try {
           const words = await load(id);
-          setWordsByAyah((current) => new Map(current).set(id, words));
+          // Mutated in place: nothing renders off this map, so a fresh
+          // identity would buy nothing and cost every card a re-render.
+          wordsRef.current.set(id, words);
+          if (screenReaderRef.current) {
+            // Dropping the accessor is what actually reaches the card: it is
+            // memoised, and a parent re-render alone leaves its props -- this
+            // accessor among them -- identical, so nothing below re-renders.
+            // Only this ayah's card is woken, and only while a screen reader
+            // is listening.
+            wordAccessorsRef.current.delete(id);
+            bumpWordsRef.current((n) => n + 1);
+          }
         } catch (cause) {
           // Cleared so the next scroll past this ayah tries again, rather than
           // leaving it permanently untappable. Logged for logcat, never shown:
@@ -1172,7 +1321,7 @@ export function SurahReader({
         audioEnabled={audioEnabled}
         showTranslation={showTranslation}
         uiLocale={uiLocale}
-        wordsByAyah={wordsByAyah}
+        getWordsFor={getWordsFor}
         onVisibleAyah={onVisibleAyah}
         {...(onReadingAyah ? { onReadingAyah } : {})}
         onToggleBookmark={onToggleBookmark}

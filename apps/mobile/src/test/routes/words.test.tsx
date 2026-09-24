@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   params: { surahId: '2' } as Record<string, string>,
   getWbwScreen: vi.fn(),
   setWbwDensity: vi.fn(),
+  setContentLanguage: vi.fn(),
   /** The persisted layout the screen renders. Reassigned per test. */
   wbwDensity: 'hybrid' as 'hybrid' | 'dense',
   loadWordSummary: vi.fn(),
@@ -131,6 +132,20 @@ vi.mock('@/components/SurahJumpSheet', async () => {
   };
 });
 
+// Stubbed for the reason WordSheet and SurahJumpSheet are: it is a
+// BottomSheet, which reaches reanimated and gesture-handler.
+vi.mock('@/components/LanguageSheet', async () => {
+  const React = await import('react');
+  return {
+    LanguageSheet: ({ value, onChange }: { value: string; onChange: (code: string) => void }) =>
+      React.createElement(
+        'button',
+        { 'data-testid': 'language-sheet', 'data-value': value, onClick: () => onChange('uz') },
+        'language',
+      ),
+  };
+});
+
 vi.mock('@/data/useWordSummaryLoader', () => ({
   useWordSummaryLoader: () => mocks.loadWordSummary,
 }));
@@ -146,6 +161,7 @@ vi.mock('@/settings/settingsStore', () => ({
     arabicScale: 'medium',
     wbwDensity: mocks.wbwDensity,
     setWbwDensity: mocks.setWbwDensity,
+    setContentLanguage: mocks.setContentLanguage,
   }),
 }));
 
@@ -328,6 +344,9 @@ describe('word-by-word route', () => {
 
     // One container per ayah in range, so all-queries throughout.
     expect(screen.getAllByTestId('wbw-wrap').length).toBeGreaterThan(0);
+    // Behind the kebab since M12 (R4): the resting chrome is the name, the
+    // pager and nothing else.
+    fireEvent.click(screen.getByTestId('wbw-actions'));
     fireEvent.click(screen.getByTestId('segment-dense'));
 
     // Decision 26: the chip writes the setting, it does not hold local state --
@@ -370,7 +389,11 @@ describe('word-by-word route', () => {
     render(<WbwRoute />);
     await screen.findAllByTestId('wbw-cell');
 
-    expect(screen.getByRole('header').textContent).toBe('Al-Baqarah');
+    // By testID, not by role: the name sits inside a Pressable (it IS the
+    // jump control), and a Pressable is `accessible` by default, which
+    // collapses its descendants -- so a `header` role on the Text was never
+    // announced on the device. The jump button's own label carries the name.
+    expect(screen.getByTestId('wbw-title').textContent).toBe('Al-Baqarah');
     expect(screen.getByTestId('wbw-next')).toBeTruthy();
   });
 
@@ -482,11 +505,13 @@ describe('word-by-word route', () => {
     const title = screen.getByTestId('wbw-title-row');
     expect(within(title).queryByTestId('surah-previous')).toBeNull();
     expect(within(title).queryByTestId('surah-next')).toBeNull();
-    expect(within(title).queryByTestId('wbw-next')).not.toBeNull();
 
-    const density = screen.getByTestId('wbw-density-row');
-    expect(within(density).queryByTestId('surah-previous')).not.toBeNull();
-    expect(within(density).queryByTestId('surah-next')).not.toBeNull();
+    // The ayah pager moved off the name's row with M12 (R4): the kebab took
+    // its place, and the pager now sits between the surah arrows.
+    const pager = screen.getByTestId('wbw-pager-row');
+    expect(within(pager).queryByTestId('wbw-next')).not.toBeNull();
+    expect(within(pager).queryByTestId('surah-previous')).not.toBeNull();
+    expect(within(pager).queryByTestId('surah-next')).not.toBeNull();
   });
 
   it('opens the sheet on the word that was tapped', async () => {
@@ -514,6 +539,52 @@ describe('word-by-word route', () => {
 
     expect(wrapper().getAttribute('data-hidden-from-a11y')).toBe('true');
     expect(screen.getByTestId('wbw-next')).toBeTruthy();
+  });
+
+  it('keeps the way back when the screen has nothing to show', async () => {
+    // The route runs headerShown: false, so HeaderCard's is the only back
+    // button there is. Rendered below the branch switch it was absent from
+    // exactly the two states a reader is most likely to be stuck in -- a bad
+    // deep link and a failed load.
+    mocks.getWbwScreen.mockRejectedValue(new Error('no such table: words'));
+
+    render(<WbwRoute />);
+
+    expect((await screen.findByRole('alert')).textContent).toBeTruthy();
+    expect(screen.getByTestId('wbw-back')).toBeTruthy();
+  });
+
+  it('keeps the way back while the first load is still in flight', async () => {
+    const pending = deferred<WbwScreenData>();
+    mocks.getWbwScreen.mockReturnValue(pending.promise);
+
+    render(<WbwRoute />);
+
+    expect(screen.queryByTestId('wbw-cell')).toBeNull();
+    expect(screen.getByTestId('wbw-back')).toBeTruthy();
+  });
+
+  it('hides the screen from TalkBack while the language sheet is open', async () => {
+    // Same reason as the word sheet above, and the gate has to name every
+    // sheet that covers the screen -- not just the first one written.
+    render(<WbwRoute />);
+    await screen.findAllByTestId('wbw-cell');
+    const wrapper = () => screen.getByTestId('wbw-screen');
+
+    fireEvent.click(screen.getByTestId('wbw-actions'));
+    fireEvent.click(screen.getByTestId('open-language'));
+
+    expect(wrapper().getAttribute('data-hidden-from-a11y')).toBe('true');
+  });
+
+  it('hides the screen from TalkBack while the jump sheet is open', async () => {
+    render(<WbwRoute />);
+    await screen.findAllByTestId('wbw-cell');
+    const wrapper = () => screen.getByTestId('wbw-screen');
+
+    fireEvent.click(screen.getByTestId('wbw-title'));
+
+    expect(wrapper().getAttribute('data-hidden-from-a11y')).toBe('true');
   });
 
   it('carries the tapped word\'s own ayah into the word-detail route', async () => {
@@ -624,5 +695,79 @@ describe('word-by-word route', () => {
     await waitFor(() => expect(mocks.getWbwScreen).toHaveBeenCalledWith({}, 36, 1, 'uz-Cyrl'));
     expect(screen.queryByTestId('surah-picker')).toBeNull();
     expect(screen.queryByTestId('surah-jump-input')).toBeNull();
+  });
+});
+
+describe('WbwRoute actions curtain', () => {
+  afterEach(cleanup);
+
+  beforeEach(() => {
+    mocks.params = { surahId: '2' };
+    mocks.wbwDensity = 'hybrid';
+    mocks.push.mockReset();
+    mocks.setContentLanguage.mockReset();
+    mocks.getWbwScreen.mockReset();
+    mocks.getWbwScreen.mockResolvedValue(screenData());
+  });
+
+  it('keeps search, language and density out of the resting chrome', async () => {
+    // The morphology header had no kebab at all: the density chip took a whole
+    // row of every screenful, and there was no way to search or change the
+    // gloss language from here (owner, 2026-09-22).
+    render(<WbwRoute />);
+    await screen.findAllByTestId('wbw-cell');
+
+    // The curtain's clip is always mounted; what matters is that it holds
+    // nothing until it is opened.
+    expect(screen.getByTestId('wbw-actions-row').children.length).toBe(0);
+    expect(screen.queryByTestId('segment-dense')).toBeNull();
+    expect(screen.queryByTestId('open-search')).toBeNull();
+    expect(screen.getByTestId('wbw-actions')).toBeTruthy();
+    // And costs no height while it holds nothing. A container `gap` spaces a
+    // zero-height child like any other, so the shut curtain would push the
+    // first word 10dp down the screen -- the header is taller WITH the fix
+    // than without it, which is the opposite of ruling R1.
+    expect(screen.getByTestId('wbw-header').style.gap || '0px').toBe('0px');
+    expect(screen.getByTestId('wbw-actions-row').style.marginTop || '0px').toBe('0px');
+    // The spacing the gap used to provide has to survive somewhere, or the two
+    // rows collide.
+    expect(screen.getByTestId('wbw-pager-row').style.marginTop).toBe('10px');
+  });
+
+  it('reveals all three behind the kebab', async () => {
+    render(<WbwRoute />);
+    await screen.findAllByTestId('wbw-cell');
+
+    fireEvent.click(screen.getByTestId('wbw-actions'));
+
+    const curtain = screen.getByTestId('wbw-actions-row');
+    expect(within(curtain).queryByTestId('open-search')).not.toBeNull();
+    expect(within(curtain).queryByTestId('open-language')).not.toBeNull();
+    expect(within(curtain).queryByTestId('segment-dense')).not.toBeNull();
+    expect(screen.getByTestId('wbw-actions').getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('searches the whole corpus, not this screen', async () => {
+    // R6: the same push the reader's magnifier makes. A morphology-scoped
+    // search would be a second search over a smaller corpus with no way to say
+    // so.
+    render(<WbwRoute />);
+    await screen.findAllByTestId('wbw-cell');
+
+    fireEvent.click(screen.getByTestId('wbw-actions'));
+    fireEvent.click(screen.getByTestId('open-search'));
+
+    expect(mocks.push).toHaveBeenCalledWith('/search');
+  });
+
+  it('changes the gloss language from the globe', async () => {
+    render(<WbwRoute />);
+    await screen.findAllByTestId('wbw-cell');
+
+    fireEvent.click(screen.getByTestId('wbw-actions'));
+    fireEvent.click(screen.getByTestId('open-language'));
+    fireEvent.click(screen.getByTestId('language-sheet'));
+
+    expect(mocks.setContentLanguage).toHaveBeenCalledWith('uz');
   });
 });

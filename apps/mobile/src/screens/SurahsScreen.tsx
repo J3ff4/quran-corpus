@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 import {
   createExpoSqliteClient,
   type ExpoSqliteLike,
@@ -9,6 +9,7 @@ import {
 import { surahNameGlyph } from '@quran-corpus/config/ornaments/surahName';
 
 import { BrowseList, type BrowseItem, type BrowseSection } from '@/components/BrowseList';
+import { SearchField } from '@/components/SearchField';
 import { SegmentedControl } from '@/components/SegmentedControl';
 import { SurahList } from '@/components/SurahList';
 import { matchSurahs } from '@/surah/matchSurah';
@@ -26,7 +27,6 @@ import { openCorpusDb } from '@/data/openCorpusDb';
 import type { QueryLanguageCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
 import { useAppSettings } from '@/settings/settingsStore';
-import { radii, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
 type BrowseMode = 'surah' | 'juz' | 'page' | 'revealed';
@@ -338,24 +338,17 @@ export function SurahsScreen() {
           accessibilityLabel={t(uiLocale, 'browse.mode')}
         />
         {mode === 'surah' ? (
-          <TextInput
-            testID="surah-filter"
-            value={query}
-            onChangeText={setQuery}
-            accessibilityLabel={t(uiLocale, 'surahPicker.filter')}
-            placeholder={t(uiLocale, 'surahPicker.filter')}
-            placeholderTextColor={theme.mutedText}
-            style={{
-              marginTop: 10,
-              minHeight: touchTargets.minimum,
-              borderRadius: radii.chip,
-              borderWidth: 1,
-              borderColor: theme.border,
-              paddingHorizontal: 14,
-              color: theme.text,
-              fontSize: typography.body,
-            }}
-          />
+          <View style={{ marginTop: 10 }}>
+            <SearchField
+              testID="surah-filter"
+              clearTestID="surah-filter-clear"
+              value={query}
+              onChangeText={setQuery}
+              placeholder={t(uiLocale, 'surahPicker.filter')}
+              accessibilityLabel={t(uiLocale, 'surahPicker.filter')}
+              clearAccessibilityLabel={t(uiLocale, 'surahPicker.clearFilter')}
+            />
+          </View>
         ) : null}
       </View>
       {error ? (

@@ -1,5 +1,6 @@
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { ActivityIndicator, Text, View } from 'react-native';
+import { HeaderCard } from '@/components/HeaderCard';
 import { getLastReadingPosition } from '@/data/userRepository';
 import { useUserDbOnFocus } from '@/data/useUserDbOnFocus';
 import { t } from '@/i18n/uiStrings';
@@ -38,27 +39,37 @@ export default function MorphologyRoute() {
     return <WbwScreen surahId={position.surahId} from={position.ayahNumber} />;
   }
 
+  // The route runs `headerShown: false` so that WbwScreen's own HeaderCard is
+  // the only back button on the screen -- which leaves every branch that is
+  // NOT WbwScreen owing its own. On a fresh install there is no position to
+  // open, so this is the first thing the Menu row shows: without the card it
+  // had no way back at all and drew its heading under the status bar.
   return (
-    <View style={{ flex: 1, padding: 20, gap: 12 }}>
-      <Text accessibilityRole="header" style={{ color: theme.text, fontSize: typography.title, fontWeight: '700' }}>
-        {t(uiLocale, 'wbw.title')}
-      </Text>
-      {loading ? <ActivityIndicator /> : null}
-      {!loading && error ? (
-        <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ color: theme.danger }}>
-          {error}
-        </Text>
-      ) : null}
-      {!loading && !error ? (
-        <>
-          <Text style={{ color: theme.mutedText }}>{t(uiLocale, 'morphology.noHistory')}</Text>
-          {/* The tab is reachable before anything has been read, so it needs a
-              way forward rather than a dead end. */}
-          <Link href="/surahs" accessibilityRole="link" style={{ color: theme.accent, fontSize: typography.body }}>
-            {t(uiLocale, 'tabs.surahs')}
-          </Link>
-        </>
-      ) : null}
+    <View style={{ flex: 1 }}>
+      <HeaderCard
+        title={t(uiLocale, 'wbw.title')}
+        onBack={() => router.back()}
+        uiLocale={uiLocale}
+        testIDPrefix="wbw"
+      />
+      <View style={{ flex: 1, padding: 20, gap: 12 }}>
+        {loading ? <ActivityIndicator /> : null}
+        {!loading && error ? (
+          <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ color: theme.danger }}>
+            {error}
+          </Text>
+        ) : null}
+        {!loading && !error ? (
+          <>
+            <Text style={{ color: theme.mutedText }}>{t(uiLocale, 'morphology.noHistory')}</Text>
+            {/* The Menu row is reachable before anything has been read, so it
+                needs a way forward rather than a dead end. */}
+            <Link href="/surahs" accessibilityRole="link" style={{ color: theme.accent, fontSize: typography.body }}>
+              {t(uiLocale, 'tabs.surahs')}
+            </Link>
+          </>
+        ) : null}
+      </View>
     </View>
   );
 }

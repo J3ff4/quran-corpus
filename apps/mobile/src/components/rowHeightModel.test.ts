@@ -7,22 +7,33 @@ const TRANSLATION_W = 360;
 
 describe('estimateRowHeight', () => {
   it('matches the measured device rows within the spike error bound', () => {
-    // The translation rows alone. The spike measured mushaf plate rows too,
-    // but M7d left the model with nothing to estimate for them -- the mushaf
-    // is a pager of fixed-height pages now -- so scoring against them would be
-    // scoring a model against rows it no longer claims to describe.
-    const rows = measuredRows.filter((row) => row.mode === 'translation');
-    const errors = rows.map((row) => estimateRowHeight(row) - row.height);
-    const rms = Math.sqrt(
-      errors.reduce((sum, e) => sum + e * e, 0) / errors.length,
-    );
-    // 36.2dp as measured over the translation rows alone. The old bound of 35
-    // held only because the mushaf's plate rows -- shorter, and easier to
-    // predict -- were averaged in with them; dropping them in M7d is what
-    // exposed the real figure for the rows the model still estimates. The
-    // coefficients are unchanged, and the landing loop corrects against a real
-    // measurement before the list is ever revealed.
-    expect(rms).toBeLessThan(40);
+    const errors = measuredRows.map((row) => estimateRowHeight(row) - row.height);
+    const rms = Math.sqrt(errors.reduce((sum, e) => sum + e * e, 0) / errors.length);
+
+    // 39.2dp over the 2026-09-23 rows. The landing loop corrects against a
+    // real measurement before the list is ever revealed, so what the model
+    // owes is a starting point close enough to window the right rows.
+    expect(rms).toBeLessThan(45);
+  });
+
+  it('does not lean one way', () => {
+    // The defect that made the re-fit necessary, and the one an rms bound
+    // cannot see. The 2026-09-06 coefficients underran EVERY row -- mean
+    // error -82dp, and -117dp at Arabic size 42 -- so a scrollToIndex deep in
+    // a surah summed hundreds of rows of error all pointing the same way. A
+    // model with the same rms and no bias lands far closer.
+    const bias = (rows: typeof measuredRows) =>
+      rows.reduce((sum, row) => sum + (estimateRowHeight(row) - row.height), 0) / rows.length;
+
+    expect(Math.abs(bias(measuredRows))).toBeLessThan(10);
+    // Per size too: one size-squared coefficient has to serve all four, so a
+    // bias that cancels overall while leaning one way at each end would mean
+    // the square law itself is wrong.
+    for (const arabicSize of [22, 28, 35, 42]) {
+      const rows = measuredRows.filter((row) => row.arabicSize === arabicSize);
+      expect(rows.length).toBeGreaterThan(20);
+      expect(Math.abs(bias(rows))).toBeLessThan(15);
+    }
   });
 
   it('never returns a height below the empty-card chrome', () => {
@@ -72,6 +83,25 @@ describe('estimateRowHeight', () => {
         arabicChars: 500, translationChars: 0,
       });
     expect(at(600)).toBeLessThan(at(TRANSLATION_W));
+  });
+
+  it('drops the translation block whole when there is no translation', () => {
+    // The bias the fixture cannot catch: every measured row HAS a translation,
+    // so the fit folded that block's own furniture -- the card gap, the
+    // paddingTop and the rule -- into the chrome constant. With the
+    // translation switched off it was still being charged for, on every row,
+    // in the same direction, and the offset table ran long by the sum of it.
+    const withNone = estimateRowHeight({
+      arabicSize: 28, listWidth: TRANSLATION_W,
+      arabicChars: 500, translationChars: 0,
+    });
+    const withOne = estimateRowHeight({
+      arabicSize: 28, listWidth: TRANSLATION_W,
+      arabicChars: 500, translationChars: 1,
+    });
+    // A one-character translation costs a whole block plus one character, so
+    // the step at zero is the furniture itself -- not a rounding difference.
+    expect(withOne - withNone).toBeGreaterThan(20);
   });
 
   it('is finite and positive for degenerate input', () => {

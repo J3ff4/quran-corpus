@@ -1,15 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
 import { EMPTY_SEARCH_RESULT, type SearchResult } from '@quran-corpus/data/mobile';
+import { RiseIn } from '@/components/RiseIn';
 import { GlassSurface } from '@/components/GlassSurface';
+import { Icon } from '@/components/icons/Icon';
+import { SearchField } from '@/components/SearchField';
+import { SurahJumpSheet } from '@/components/SurahJumpSheet';
 import { SnippetText } from '@/components/SnippetText';
 import { searchCorpus } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { t } from '@/i18n/uiStrings';
+import { useHeldEntry } from '@/motion/entryPager';
 import { usePressScale } from '@/motion/usePressScale';
+import { getReaderSurah } from '@/data/readerPosition';
 import { useSurahIndex } from '@/data/useSurahIndex';
 import { useAppSettings } from '@/settings/settingsStore';
 import { fonts, touchTargets, typography } from '@/theme/tokens';
@@ -159,17 +165,29 @@ export function SearchScreen() {
   // names since 1aca65a -- but it labelled the destination with a bare number,
   // so a reader who searched "baqara" was answered with "2" and no sign that
   // the name had been understood. The index is 114 rows the app reads anyway.
-  const { surahs } = useSurahIndex(nameLanguage);
+  const { surahs, ayahCountOf } = useSurahIndex(nameLanguage);
+  const [jumpOpen, setJumpOpen] = useState(false);
+  // Held across the close, not read live. The GO TO section is a curtain now,
+  // and a curtain's children stay mounted until the close lands -- reading
+  // `result.jump` there would blank the card on the first frame of the very
+  // animation that exists to stop it blinking out.
+  const jump = useHeldEntry(result.jump);
+
+  // Off the held reference too, for the same reason: the name dropping out
+  // mid-close is the card rearranging itself while it leaves.
   const jumpSurahName =
-    result.jump === null
+    jump === null
       ? null
-      : (surahs?.find((surah) => surah.id === result.jump?.surah_id)?.nameTranslit ?? null);
+      : (surahs?.find((surah) => surah.id === jump.surah_id)?.nameTranslit ?? null);
 
   const openJump = useCallback(() => {
-    const jump = result.jump;
-    if (!jump) return;
-    const suffix = jump.ayah_number === null ? '' : `?ayah=${jump.ayah_number}`;
-    router.push(`/surah/${jump.surah_id}${suffix}`);
+    // The live one, not the held one: the card is still on screen through the
+    // close, and a press landing on it then must not push the reference the
+    // query has already moved off.
+    const target = result.jump;
+    if (!target) return;
+    const suffix = target.ayah_number === null ? '' : `?ayah=${target.ayah_number}`;
+    router.push(`/surah/${target.surah_id}${suffix}`);
   }, [result.jump]);
 
   const heading = {
@@ -195,26 +213,54 @@ export function SearchScreen() {
   return (
     <View style={{ flex: 1 }}>
       <View style={{ padding: 16 }}>
-        {/* Glass, and accent-bordered rather than hairline-bordered: the field
-            is autofocused, so it is always the focused control on this screen
-            and drawing it as one is honest (mockup 1i). */}
-        <GlassSurface style={{ borderColor: theme.accent, paddingHorizontal: 4 }}>
-          <TextInput
-            testID="search-input"
-            value={query}
-            onChangeText={setQuery}
-            placeholder={t(uiLocale, 'search.placeholder')}
-            placeholderTextColor={theme.mutedText}
-            autoFocus
-            accessibilityLabel={t(uiLocale, 'search.title')}
-            style={{
-              color: theme.text,
-              paddingHorizontal: 14,
-              minHeight: touchTargets.minimum,
-            }}
-          />
-        </GlassSurface>
+        <SearchField
+          testID="search-input"
+          clearTestID="search-input-clear"
+          value={query}
+          onChangeText={setQuery}
+          placeholder={t(uiLocale, 'search.placeholder')}
+          accessibilityLabel={t(uiLocale, 'search.title')}
+          clearAccessibilityLabel={t(uiLocale, 'search.clearSearch')}
+          autoFocus
+        />
+        {/* A reference is not a search: someone who already knows they want
+            2:255 should not have to spell it, and the app has exactly one
+            go-to control -- the same sheet the reader and morphology headers
+            open (owner ruling R10). */}
+        <Pressable
+          testID="search-goto"
+          accessibilityRole="button"
+          accessibilityLabel={t(uiLocale, 'search.goToVerse')}
+          onPress={() => setJumpOpen(true)}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            minHeight: touchTargets.minimum,
+            paddingHorizontal: 4,
+          }}
+        >
+          <Icon name="book" color={theme.accent} size={18} />
+          <Text style={{ color: theme.accent, fontSize: typography.body }}>
+            {t(uiLocale, 'search.goToVerse')}
+          </Text>
+        </Pressable>
       </View>
+
+      {jumpOpen ? (
+        <SurahJumpSheet
+          uiLocale={uiLocale}
+          // Where the reader was left, not al-Fatihah: a sheet that always
+          // opened at 1 would make the reader's own position invisible.
+          surahId={getReaderSurah() ?? 1}
+          ayahCountOf={ayahCountOf}
+          onClose={() => setJumpOpen(false)}
+          onJump={(surahId, ayahNumber) => {
+            setJumpOpen(false);
+            router.push(`/surah/${surahId}?ayah=${ayahNumber}`);
+          }}
+        />
+      ) : null}
 
       <ScrollView
         style={{ flex: 1 }}
@@ -233,35 +279,44 @@ export function SearchScreen() {
         {empty ? <Text style={{ color: theme.mutedText }}>{t(uiLocale, 'search.empty')}</Text> : null}
         {nothing ? <Text style={{ color: theme.mutedText }}>{t(uiLocale, 'search.noResults')}</Text> : null}
 
-        {result.jump ? (
-          <>
-            <Text accessibilityRole="header" style={heading}>{t(uiLocale, 'search.jump').toUpperCase()}</Text>
-            <ResultCard testID="search-jump" onPress={openJump} tinted>
-              <Text
-                testID="search-jump-ref"
-                style={{
-                  color: theme.accent,
-                  fontSize: 20,
-                  fontWeight: '700',
-                  fontVariant: ['tabular-nums'],
-                }}
-              >
-                {/* A surah-name-only reference ("Al-Baqarah") has no ayah at
-                    all -- openJump pushes the surah with no `?ayah=`, so
-                    faking one here (the old `?? 1`) labelled a destination
-                    the tap would not actually land on. */}
-                {result.jump.ayah_number === null
-                  ? result.jump.surah_id
-                  : `${result.jump.surah_id}:${result.jump.ayah_number}`}
-              </Text>
-              {jumpSurahName === null ? null : (
-                <Text testID="search-jump-name" style={{ color: theme.mutedText, fontSize: typography.caption }}>
-                  {jumpSurahName}
+        {/* It rises into place, the way the reader's word sheet does (owner,
+            2026-09-23). This was a Collapsible for a day: animating the clip's
+            height carried the rows below along with the card, which stopped
+            them snapping but made the whole list breathe in and out while the
+            reference was still being typed. The owner watched both on the
+            device and ruled for the sheet's motion -- the card arrives, the
+            rows below simply take their places. */}
+        <RiseIn open={result.jump !== null} testID="search-jump-rise">
+          {jump === null ? null : (
+            <>
+              <Text accessibilityRole="header" style={heading}>{t(uiLocale, 'search.jump').toUpperCase()}</Text>
+              <ResultCard testID="search-jump" onPress={openJump} tinted>
+                <Text
+                  testID="search-jump-ref"
+                  style={{
+                    color: theme.accent,
+                    fontSize: 20,
+                    fontWeight: '700',
+                    fontVariant: ['tabular-nums'],
+                  }}
+                >
+                  {/* A surah-name-only reference ("Al-Baqarah") has no ayah at
+                      all -- openJump pushes the surah with no `?ayah=`, so
+                      faking one here (the old `?? 1`) labelled a destination
+                      the tap would not actually land on. */}
+                  {jump.ayah_number === null
+                    ? jump.surah_id
+                    : `${jump.surah_id}:${jump.ayah_number}`}
                 </Text>
-              )}
-            </ResultCard>
-          </>
-        ) : null}
+                {jumpSurahName === null ? null : (
+                  <Text testID="search-jump-name" style={{ color: theme.mutedText, fontSize: typography.caption }}>
+                    {jumpSurahName}
+                  </Text>
+                )}
+              </ResultCard>
+            </>
+          )}
+        </RiseIn>
 
         {result.verses.length > 0 ? (
           <>

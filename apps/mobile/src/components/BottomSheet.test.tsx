@@ -115,8 +115,9 @@ vi.mock('react-native-reanimated', async () => {
 
 // A device with gesture navigation: the sheet is anchored behind that bar and
 // the keyboard covers it too, so the lift has to include it.
+const insets = vi.hoisted(() => ({ bottom: 24 }));
 vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 24, bottom: 24, left: 0, right: 0 }),
+  useSafeAreaInsets: () => ({ top: 24, bottom: insets.bottom, left: 0, right: 0 }),
 }));
 
 vi.mock('react-native-gesture-handler', async () => {
@@ -371,5 +372,29 @@ describe('BottomSheet', () => {
     render(<BottomSheet onClose={() => {}} closeLabel="Close"><span>the body</span></BottomSheet>);
 
     expect(screen.getByRole('dialog').textContent).toContain('the body');
+  });
+});
+
+describe('BottomSheet and the disappearing navigation bar', () => {
+  afterEach(() => {
+    cleanup();
+    insets.bottom = 24;
+  });
+
+  it('keeps its height when the navigation bar hides underneath it', () => {
+    // The mushaf hides the nav bar with its chrome, which collapses
+    // insets.bottom to 0 -- so an open word sheet or reciter picker lost 24dp
+    // of padding, got shorter, and its top edge slid down while the reader was
+    // looking at it (owner, device, 2026-09-22). The inset the sheet is padded
+    // past is the one that was there when it opened (ruling R3).
+    const { rerender } = render(
+      <BottomSheet onClose={() => {}} closeLabel="Close"><span>body</span></BottomSheet>,
+    );
+    expect(screen.getByTestId('sheet-surface').style.paddingBottom).toBe('40px');
+
+    insets.bottom = 0;
+    rerender(<BottomSheet onClose={() => {}} closeLabel="Close"><span>body</span></BottomSheet>);
+
+    expect(screen.getByTestId('sheet-surface').style.paddingBottom).toBe('40px');
   });
 });

@@ -68,21 +68,58 @@ const noop = () => {};
 describe('AyahText', () => {
   afterEach(cleanup);
 
-  it('renders the plain Uthmani text when words have not loaded', () => {
-    render(<AyahText textUthmani="أ ب ج" words={[]} surahId={2} ayahNumber={2} onWordPress={noop} />);
+  it('renders the same run before and after the words load', () => {
+    // The whole stutter fix. A run that is one flat <Text> until the query
+    // lands and N spans afterwards makes Android re-record the card whole,
+    // mid-scroll, and on a long ayah that record is 18.7ms (device,
+    // 2026-09-23). Structure and text both have to be identical.
+    const { container: before } = render(
+      <AyahText textUthmani="أ ب ج" getWords={() => []} surahId={2} ayahNumber={2} onWordPress={noop} />,
+    );
+    const loading = before.innerHTML;
+    cleanup();
+    const { container: after } = render(
+      <AyahText
+        textUthmani="أ ب ج"
+        getWords={() => threeWords}
+        surahId={2}
+        ayahNumber={2}
+        onWordPress={noop}
+      />,
+    );
 
-    expect(screen.getByText('أ ب ج')).toBeTruthy();
+    expect(after.textContent).toBe('أ ب ج');
+    expect(screen.getAllByTestId('word-token')).toHaveLength(3);
+    // innerHTML, not a token count: a prop the rows add -- a label, a style --
+    // changes the recorded node just as surely as a new span would.
+    expect(after.innerHTML).toBe(loading);
   });
 
   it('renders one pressable token per word once they load', () => {
     const { container } = render(
-      <AyahText textUthmani="أ ب ج" words={threeWords} surahId={2} ayahNumber={2} onWordPress={noop} />,
+      <AyahText textUthmani="أ ب ج" getWords={() => threeWords} surahId={2} ayahNumber={2} onWordPress={noop} />,
     );
 
     expect(screen.getAllByTestId('word-token')).toHaveLength(3);
     // The split dropped the whitespace, so the tokens have to put it back --
     // otherwise the ayah renders as one unbroken run of Arabic.
     expect(container.textContent).toBe('أ ب ج');
+  });
+
+  it('gives each token exactly one text child', () => {
+    // Fabric serialises this run as an attributed string and rebuilds the
+    // Spannable from it on the UI thread, inside a scroll frame, every time a
+    // card mounts -- and the cost is per FRAGMENT. Every child of a token is
+    // one more fragment, so a separator left as its own child doubles them.
+    // On the device that difference is the whole stutter: 2:282 costs 0.4ms
+    // flat and 16.1ms at one <Text> per word (atrace, 2026-09-23).
+    render(
+      <AyahText textUthmani="أ ب ج" getWords={() => threeWords} surahId={2} ayahNumber={2} onWordPress={noop} />,
+    );
+
+    for (const token of screen.getAllByTestId('word-token')) {
+      expect(token.childNodes).toHaveLength(1);
+    }
   });
 
   it('passes the word the token maps to, not the token index', () => {
@@ -93,7 +130,7 @@ describe('AyahText', () => {
     render(
       <AyahText
         textUthmani={AL_ALAQ_1}
-        words={alAlaq1Words}
+        getWords={() => alAlaq1Words}
         surahId={96}
         ayahNumber={1}
         onWordPress={onWordPress}
@@ -112,7 +149,7 @@ describe('AyahText', () => {
     render(
       <AyahText
         textUthmani={AL_ALAQ_1}
-        words={alAlaq1Words}
+        getWords={() => alAlaq1Words}
         surahId={96}
         ayahNumber={1}
         onWordPress={noop}
@@ -134,7 +171,7 @@ describe('AyahText', () => {
     // wait for the words, so an unaligned run that keeps the prefix shows the
     // basmala twice until the query lands.
     const { container } = render(
-      <AyahText textUthmani={AL_ALAQ_1} words={[]} surahId={96} ayahNumber={1} onWordPress={noop} />,
+      <AyahText textUthmani={AL_ALAQ_1} getWords={() => []} surahId={96} ayahNumber={1} onWordPress={noop} />,
     );
 
     expect(container.textContent).not.toContain('ٱلرَّحِيمِ');
@@ -147,14 +184,16 @@ describe('AyahText', () => {
     const { container } = render(
       <AyahText
         textUthmani={AL_ALAQ_1}
-        words={threeWords}
+        getWords={() => threeWords}
         surahId={96}
         ayahNumber={1}
         onWordPress={noop}
       />,
     );
 
-    expect(screen.queryAllByTestId('word-token')).toHaveLength(0);
+    // The run still draws every token -- it is built from the text, not the
+    // rows -- it just has nothing to open.
+    expect(screen.getAllByTestId('word-token').length).toBeGreaterThan(0);
     expect(container.textContent).not.toContain('ٱلرَّحِيمِ');
     expect(container.textContent).toContain('ٱقْرَأْ');
   });
@@ -164,7 +203,7 @@ describe('AyahText', () => {
     const { container } = render(
       <AyahText
         textUthmani="بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ"
-        words={[]}
+        getWords={() => []}
         surahId={1}
         ayahNumber={1}
         onWordPress={noop}
@@ -181,7 +220,7 @@ describe('AyahText', () => {
     const { container } = render(
       <AyahText
         textUthmani={AL_BAQARAH_255}
-        words={baqarah255Words}
+        getWords={() => baqarah255Words}
         surahId={2}
         ayahNumber={255}
         onWordPress={noop}
@@ -196,21 +235,50 @@ describe('AyahText', () => {
     expect(container.textContent).toContain('ۗ');
   });
 
-  it('falls back to the plain blob when alignment fails', () => {
-    // Wrong word count for the text. Rendering a partial alignment would
-    // attach the wrong morphology to real words.
+  it('opens nothing when alignment fails, and still shows the text', () => {
+    // Wrong word count for the text. A partial alignment would attach the
+    // wrong morphology to real words, so a press has to do nothing at all --
+    // but the reading surface still owes the reader the complete ayah.
+    const onWordPress = vi.fn();
     const { container } = render(
       <AyahText
         textUthmani="أ ب ج د ه"
-        words={threeWords}
+        getWords={() => threeWords}
         surahId={2}
         ayahNumber={2}
-        onWordPress={noop}
+        onWordPress={onWordPress}
       />,
     );
 
-    expect(screen.queryAllByTestId('word-token')).toHaveLength(0);
+    fireEvent.click(screen.getAllByTestId('word-token')[0]!);
+
+    expect(onWordPress).not.toHaveBeenCalled();
     expect(container.textContent).toContain('أ ب ج د ه');
+  });
+
+  it('opens nothing when the two halves of the split disagree about the basmala', () => {
+    // The run decides the basmala positionally (ayah 1, not al-Fatiha or
+    // at-Tawba, more than four tokens) while alignAyahTokens decides it by
+    // arithmetic against the word count. They agree on all 6,236 ayahs of the
+    // shipped corpus, so this is a text no edition has today -- an ayah 1 of
+    // five tokens carrying no prefix. Feed it one and they split: the run
+    // drops four tokens the alignment keeps, so the one token still drawn
+    // indexes onto the FIRST word row and a tap opens a word four positions
+    // away with nothing on screen saying so. Fail closed instead, the way
+    // alignAyahTokens already does when it cannot reconcile the rows.
+    const onWordPress = vi.fn();
+    render(
+      <AyahText
+        textUthmani="أ ب ج د ه"
+        getWords={() => wordsFrom(['أ', 'ب', 'ج', 'د', 'ه'])}
+        surahId={2}
+        ayahNumber={1}
+        onWordPress={onWordPress}
+      />,
+    );
+
+    fireEvent.click(screen.getAllByTestId('word-token')[0]!);
+    expect(onWordPress).not.toHaveBeenCalled();
   });
 
   it('does not colour words by part of speech', () => {
@@ -219,7 +287,7 @@ describe('AyahText', () => {
     // removes the reason to open the WbW screen at all. Web's WordToken does
     // not colour either.
     render(
-      <AyahText textUthmani="أ ب ج" words={threeWords} surahId={2} ayahNumber={2} onWordPress={noop} />,
+      <AyahText textUthmani="أ ب ج" getWords={() => threeWords} surahId={2} ayahNumber={2} onWordPress={noop} />,
     );
 
     for (const token of screen.getAllByTestId('word-token')) {
@@ -232,10 +300,36 @@ describe('AyahText', () => {
     // the row loses native Arabic line breaking and justified mushaf flow,
     // which is the reading surface's whole point (CLAUDE.md §8).
     const { container } = render(
-      <AyahText textUthmani="أ ب ج" words={threeWords} surahId={2} ayahNumber={2} onWordPress={noop} />,
+      <AyahText textUthmani="أ ب ج" getWords={() => threeWords} surahId={2} ayahNumber={2} onWordPress={noop} />,
     );
 
     expect(container.querySelector('[data-testid="ayah-run"] [data-testid="word-token"]')).toBeTruthy();
+  });
+
+  it('opens a word whose rows arrived without a re-render', () => {
+    // The rows are fetched into a ref precisely so their arrival renders
+    // nothing, so the press handler cannot read a render-time snapshot: the
+    // very first tap after a prefetch returns is the one it would miss.
+    // A NEW array, as the reader hands back: before the query lands its map
+    // has no entry and the accessor returns a shared empty constant, so a
+    // snapshot taken in render is a different object from the rows that
+    // arrive.
+    let rows: Word[] = [];
+    const onWordPress = vi.fn();
+    render(
+      <AyahText
+        textUthmani="أ ب ج"
+        getWords={() => rows}
+        surahId={2}
+        ayahNumber={2}
+        onWordPress={onWordPress}
+      />,
+    );
+
+    rows = threeWords;
+    fireEvent.click(screen.getAllByTestId('word-token')[1]!);
+
+    expect(onWordPress).toHaveBeenCalledWith(expect.objectContaining({ position: 2 }));
   });
 
   it('announces each word by its transliteration', () => {
@@ -244,7 +338,7 @@ describe('AyahText', () => {
     render(
       <AyahText
         textUthmani="أ ب"
-        words={[word(1, 'أ', 'alif'), word(2, 'ب', 'ba')]}
+        getWords={() => [word(1, 'أ', 'alif'), word(2, 'ب', 'ba')]}
         surahId={2}
         ayahNumber={2}
         onWordPress={noop}

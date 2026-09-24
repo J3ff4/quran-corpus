@@ -112,7 +112,13 @@ export { isRootBuckwalter, isLemmaBuckwalter, ROOT_BUCKWALTER_MAX } from './text
 export { trimConcordanceVerse } from './text/concordanceTrim.js';
 export { definitionSourceLabel } from './definitionSources.js';
 export { isSajdahAyah } from './text/sajdah.js';
-export { alignAyahTokens, splitBasmala, type AyahToken } from './text/ayahTokens.js';
+export {
+  alignAyahTokens,
+  splitAyahRunTokens,
+  splitBasmala,
+  type AyahRunToken,
+  type AyahToken,
+} from './text/ayahTokens.js';
 export { posBucket, type PosBucket } from './morphology/buckets.js';
 export { decodeSegment, posLabelEn } from './morphology/decode.js';
 export { categorizeFormLabel, type FormCategory } from './morphology/formCategory.js';

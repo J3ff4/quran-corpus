@@ -10,6 +10,7 @@ import { SurahReader } from '@/components/SurahReader';
 import { getSurahReader, getWordsForAyah, type SurahReaderData } from '@/data/corpusRepository';
 import { createLatestReadingPositionRecorder } from '@/data/latestReadingPositionRecorder';
 import { openCorpusDb } from '@/data/openCorpusDb';
+import { getReaderPosition } from '@/data/readerPosition';
 import { parseAyahNumber, parseSurahId } from '@/data/routeParams';
 import { openUserDb } from '@/data/userDb';
 import { useWordSummaryLoader } from '@/data/useWordSummaryLoader';
@@ -93,6 +94,17 @@ export default function SurahRoute() {
   // each request its own identity; it never resets, so a jump cannot collide
   // with an earlier one that happened to carry the same number.
   const jumpCount = useRef(0);
+  // The surah THIS mount has actually shown an ayah of. getReaderPosition is a
+  // process-wide singleton that outlives the screen and is written by the
+  // morphology screen too, so "it holds a number for this surah" is not the
+  // same claim as "this reader has been somewhere". Open a bookmark for 2:5
+  // after reading 2:150 earlier in the session and switch language while the
+  // landing is still in flight, and the store still answers 150 -- the
+  // re-anchor would then throw away the ayah the bookmark asked for.
+  const landedSurah = useRef<number | null>(null);
+  // The language the rows on screen were loaded in. Assigned only on a
+  // successful load, so a failed switch does not count as one having happened.
+  const loadedLanguage = useRef(queryLanguage);
   // A new route target outranks a jump made under the old one. Without this the
   // jump shadows it for good: SurahReader documents an `ayah` param change on an
   // already-mounted reader as a supported path (an external deep link into the
@@ -137,10 +149,18 @@ export default function SurahRoute() {
   // Switching reciter mid-surah changes the voice from the NEXT ayah, not this
   // one: the engine reads reciterId when it starts an ayah, and the one already
   // sounding keeps its source (device check 87).
+  // Through a ref rather than the dependency array: the recitation context
+  // rebuilds its value object on every playback tick, so `audio` is a new
+  // identity several times a second, and this callback reaches every memoised
+  // ayah card as onToggleAudio. Depending on it directly undid AyahCard's memo
+  // at exactly the moment it has to hold -- while audio is playing.
+  const audioRef = useRef(audio);
+  audioRef.current = audio;
+
   const toggleAyah = useCallback(
     (ayahNumber: number) => {
       if (surahId === null) return;
-      audio.toggle(
+      audioRef.current.toggle(
         {
           owner: 'reader',
           surahId,
@@ -151,7 +171,7 @@ export default function SurahRoute() {
         ayahNumber,
       );
     },
-    [audio, surahId, reader?.data.surah.ayah_count, reader?.data.surah.name_translit, continuousPlay],
+    [surahId, reader?.data.surah.ayah_count, reader?.data.surah.name_translit, continuousPlay],
   );
   // Kept so the reader can query words for the ayahs scrolling into view,
   // rather than reopening the database on every tap.
@@ -231,6 +251,26 @@ export default function SurahRoute() {
         ]);
 
         if (!cancelled) {
+          // Re-anchor when the switch is what caused this load. Nothing else
+          // does: a language change re-queries the surah and re-renders it with
+          // different row heights under an unchanged scroll offset, so the
+          // reader drifted -- 2:10 came back as 2:11 (owner, device,
+          // 2026-09-22). Here rather than on the queryLanguage change itself,
+          // because a re-anchor asked for before the new rows exist lands on
+          // the OLD heights and moves nothing.
+          //
+          // The live position, which is the topmost visible ayah (ruling R1).
+          // Null means nothing has been on screen yet -- a mount still landing
+          // -- and re-anchoring then would overwrite the seed with an ayah
+          // nobody has read.
+          if (loadedLanguage.current !== queryLanguage) {
+            loadedLanguage.current = queryLanguage;
+            const held = landedSurah.current === surahId ? getReaderPosition(surahId) : null;
+            if (held !== null) {
+              jumpCount.current += 1;
+              setJump({ surahId, ayahNumber: held, nonce: jumpCount.current });
+            }
+          }
           setCorpusClient(client);
           setReader({ surahId, data });
           setBookmarks(
@@ -271,6 +311,12 @@ export default function SurahRoute() {
   // re-renders on every playback tick. A fresh closure per render rebuilt the
   // whole header and dispatched setOptions into the navigator several times a
   // second while audio played.
+  // Stable, because it reaches the ayah cards and they are memoised now: a
+  // fresh closure per render is a changed prop on every card, which undoes
+  // the memo exactly when it matters most -- this component re-renders on
+  // every playback tick.
+  const openNoteEditor = useCallback((ayahNumber: number) => setEditingNote(ayahNumber), []);
+
   const onPageSurah = useCallback(
     (target: number, side: 'prev' | 'next') => {
       // A chevron is not a jump: without this, paging back into the surah a
@@ -310,55 +356,69 @@ export default function SurahRoute() {
    *  calls back into. `previousNote` is passed rather than re-read, because by
    *  then the confirmation has been on screen and the map may have moved on.
    */
-  async function applyToggle(ayahNumber: number, nextBookmarked: boolean, previousNote: string | null) {
-    if (!displayedSurahId) return;
+  const applyToggle = useCallback(
+    async (ayahNumber: number, nextBookmarked: boolean, previousNote: string | null) => {
+      if (!displayedSurahId) return;
 
-    setBookmarks((current) => {
-      const next = new Map(current);
-      if (nextBookmarked) next.set(ayahNumber, null);
-      else next.delete(ayahNumber);
-      return next;
-    });
-
-    try {
-      setBookmarkError(null);
-      const userDb = await openUserDb();
-      const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
-      await setBookmark(userClient, displayedSurahId, ayahNumber, nextBookmarked);
-    } catch (cause) {
-      console.error('[reader] bookmark write failed', { surahId: displayedSurahId, ayahNumber, cause });
-      // Undo this ayah only, off the current set. Restoring a snapshot taken
-      // before the write would also revert any toggle that landed while this
-      // one was in flight, leaving the list disagreeing with SQLite until the
-      // next focus reload.
       setBookmarks((current) => {
         const next = new Map(current);
-        if (nextBookmarked) next.delete(ayahNumber);
-        // previousNote, not null: the DELETE failed, so the row and its note
-        // are still in SQLite. Restoring the pen to its empty state would have
-        // the editor seed a blank draft over a note that was never lost.
-        else next.set(ayahNumber, previousNote);
+        if (nextBookmarked) next.set(ayahNumber, null);
+        else next.delete(ayahNumber);
         return next;
       });
-      setBookmarkError(t(uiLocale, 'reader.bookmarkFailed'));
-    }
-  }
 
-  function toggleBookmark(ayahNumber: number) {
-    if (!displayedSurahId) return;
-    const nextBookmarked = !bookmarks.has(ayahNumber);
-    const previousNote = bookmarks.get(ayahNumber) ?? null;
+      try {
+        setBookmarkError(null);
+        const userDb = await openUserDb();
+        const userClient = createExpoSqliteClient(userDb as ExpoSqliteLike);
+        await setBookmark(userClient, displayedSurahId, ayahNumber, nextBookmarked);
+      } catch (cause) {
+        console.error('[reader] bookmark write failed', { surahId: displayedSurahId, ayahNumber, cause });
+        // Undo this ayah only, off the current set. Restoring a snapshot taken
+        // before the write would also revert any toggle that landed while this
+        // one was in flight, leaving the list disagreeing with SQLite until the
+        // next focus reload.
+        setBookmarks((current) => {
+          const next = new Map(current);
+          if (nextBookmarked) next.delete(ayahNumber);
+          // previousNote, not null: the DELETE failed, so the row and its note
+          // are still in SQLite. Restoring the pen to its empty state would have
+          // the editor seed a blank draft over a note that was never lost.
+          else next.set(ayahNumber, previousNote);
+          return next;
+        });
+        setBookmarkError(t(uiLocale, 'reader.bookmarkFailed'));
+      }
+    },
+    [displayedSurahId, uiLocale],
+  );
 
-    // The row is the note's only home, so un-bookmarking deletes hand-written
-    // text with one tap and the device DB has no undo (CLAUDE.md §5). Asked
-    // before the optimistic update, so a cancel leaves the screen untouched.
-    if (!nextBookmarked && previousNote !== null) {
-      setDiscarding(ayahNumber);
-      return;
-    }
+  // The map through a ref, so a bookmark landing anywhere on the screen does
+  // not hand every memoised card a new onToggleBookmark. Stable for the same
+  // reason openNoteEditor is: this component re-renders on every playback
+  // tick, and a fresh closure per render is a changed prop on every card.
+  const bookmarksRef = useRef(bookmarks);
+  bookmarksRef.current = bookmarks;
 
-    void applyToggle(ayahNumber, nextBookmarked, previousNote);
-  }
+  const toggleBookmark = useCallback(
+    (ayahNumber: number) => {
+      if (!displayedSurahId) return;
+      const current = bookmarksRef.current;
+      const nextBookmarked = !current.has(ayahNumber);
+      const previousNote = current.get(ayahNumber) ?? null;
+
+      // The row is the note's only home, so un-bookmarking deletes hand-written
+      // text with one tap and the device DB has no undo (CLAUDE.md §5). Asked
+      // before the optimistic update, so a cancel leaves the screen untouched.
+      if (!nextBookmarked && previousNote !== null) {
+        setDiscarding(ayahNumber);
+        return;
+      }
+
+      void applyToggle(ayahNumber, nextBookmarked, previousNote);
+    },
+    [displayedSurahId, applyToggle],
+  );
 
   async function saveNote(ayahNumber: number, note: string) {
     // displayedSurahId, like every other write here: during a page turn the
@@ -455,9 +515,13 @@ export default function SurahRoute() {
         loadWords={loadWords}
         loadWordSummary={loadWordSummary}
         onToggleBookmark={toggleBookmark}
-        onEditNote={(ayahNumber) => setEditingNote(ayahNumber)}
+        onEditNote={openNoteEditor}
         onToggleAudio={toggleAyah}
         onReadingAyah={(ayahNumber) => {
+          // Fired on the landing itself and on every viewable change after it,
+          // and never during one -- so this is the reader saying it has shown
+          // an ayah of this surah.
+          landedSurah.current = displayedSurahId;
           // No page: this reader scrolls by ayah, and a null page clears
           // whatever page a mushaf session left in the shared row (ruling 13).
           if (displayedSurahId) readingRecorder?.record({ surahId: displayedSurahId, ayahNumber, page: null });

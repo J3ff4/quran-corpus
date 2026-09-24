@@ -6,6 +6,9 @@ import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } fr
 import type { Word } from '@quran-corpus/data/mobile';
 import { AdjacentNavButton } from '@/components/AdjacentNav';
 import { Icon } from '@/components/icons/Icon';
+import { HeaderCard } from '@/components/HeaderCard';
+import { LanguageSheet } from '@/components/LanguageSheet';
+import { SearchHeaderButton } from '@/components/SearchHeaderButton';
 import { SegmentedControl } from '@/components/SegmentedControl';
 import { SurahJumpSheet } from '@/components/SurahJumpSheet';
 import { SurahPicker } from '@/components/SurahPicker';
@@ -26,9 +29,8 @@ import { useSurahIndex } from '@/data/useSurahIndex';
 import { useWordSummaryLoader } from '@/data/useWordSummaryLoader';
 import { t } from '@/i18n/uiStrings';
 import { useEntryPager, useHeldEntry } from '@/motion/entryPager';
-import { usePressScaleStyle } from '@/motion/usePressScale';
 import { useAppSettings, type WbwDensity } from '@/settings/settingsStore';
-import { typography } from '@/theme/tokens';
+import { touchTargets } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
@@ -54,7 +56,15 @@ export interface WbwScreenProps {
 }
 
 export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
-  const { queryLanguage, nameLanguage, uiLocale, wbwDensity, setWbwDensity } = useAppSettings();
+  const {
+    queryLanguage,
+    nameLanguage,
+    uiLocale,
+    wbwDensity,
+    setWbwDensity,
+    contentLanguage,
+    setContentLanguage,
+  } = useAppSettings();
   const theme = useThemeColors();
   const paddingBottom = useListBottomPadding();
 
@@ -94,8 +104,8 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
   // be open at once, which is the whole failure mode of a sheet that opens
   // another sheet.
   const [jumpView, setJumpView] = useState<'jump' | 'picker' | null>(null);
+  const [languageOpen, setLanguageOpen] = useState(false);
   const { surahs, ayahCountOf } = useSurahIndex(nameLanguage);
-  const pressStyle = usePressScaleStyle();
 
   // A jump can land in this surah or in another one, and the two are different
   // moves: within the surah it is a range change, across it is a page turn the
@@ -206,22 +216,47 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
     setOpen(null);
   }
 
+  // Every sheet that covers the screen, not just the word one: on Android
+  // `accessibilityViewIsModal` does nothing, so a sheet left out of this is a
+  // sheet TalkBack can swipe straight behind.
+  const sheetsOpen = Boolean(open) || languageOpen || jumpView !== null;
+
+  // Both branches below carry the chrome, and they have to: the route runs
+  // `headerShown: false` (app/_layout.tsx), so the only back button on this
+  // screen is HeaderCard's. Rendered without it, a failed load -- a bad deep
+  // link like /surah/999/words, or any DB error -- left the reader with no way
+  // out but the OS gesture, and its text drawn under the status bar.
+  const chrome = (
+    <HeaderCard
+      title={view?.surah.name_translit ?? t(uiLocale, 'wbw.title')}
+      onBack={() => router.back()}
+      uiLocale={uiLocale}
+      testIDPrefix="wbw"
+    />
+  );
+
   // Only with nothing to hold -- the screen's first load. A page turn keeps
   // the outgoing surah up, which is the half that slides out.
   if (loading && !view) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator />
+      <View style={{ flex: 1 }}>
+        {chrome}
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator />
+        </View>
       </View>
     );
   }
 
   if (error || !view) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', padding: 20 }}>
-        <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ color: theme.danger }}>
-          {error ?? t(uiLocale, 'reader.loadFailed')}
-        </Text>
+      <View style={{ flex: 1 }}>
+        {chrome}
+        <View style={{ flex: 1, justifyContent: 'center', padding: 20 }}>
+          <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ color: theme.danger }}>
+            {error ?? t(uiLocale, 'reader.loadFailed')}
+          </Text>
+        </View>
       </View>
     );
   }
@@ -240,93 +275,102 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
         entering={pager.animation.entering}
         exiting={pager.animation.exiting}
         style={{ flex: 1 }}
-        importantForAccessibility={open ? 'no-hide-descendants' : 'auto'}
+        importantForAccessibility={sheetsOpen ? 'no-hide-descendants' : 'auto'}
       >
-        {/* Drawn in the screen rather than pushed to the nav header with
-            setOptions. Morphology was a tab until M7d and tabs run
-            headerShown: false since M6a, because a native header strip cuts
-            across the bloom -- so on that entry point the surah name and the
-            pager were both silently absent, leaving no way to change the ayah
-            range at all (issue #25, found on the M6e device run). Drawing them
-            here reaches every entry point, and it is what every other screen
-            already does: app/_layout.tsx sets `title: ''` on the Stack so the nav
-            header carries the back affordance and nothing else.
+        {/* The reader's own chrome, not a second styling of it (owner,
+            2026-09-22). HeaderCard carries the glass, the centred display-face
+            name and the kebab curtain -- every ruling behind those was made
+            for the reader's header and is documented there. What this screen
+            supplies is the row it pages with.
 
-            **The name owns its row** (owner ruling R5, device screenshot
-            2026-09-11). It shared one with four controls -- both surah
-            chevrons and the ayah pager -- and 'Al-Munafiqoon' clamped to
-            'Al-Munafi...' between them. The earlier argument here was that
-            stacking them ate roughly a third of the screen before the first
-            word; that was measured against a full header above a full pager
-            row, and what this costs now is about 40pt. A name the reader
-            cannot read is the worse trade.
-
-            The ayah pager stays beside the name, because that is what it
-            pages WITHIN. Surah paging moves down to the density row, still
-            bounding the ayah pager rather than sitting inside it (D49), so
-            the two orders of movement do not read as one control. */}
-        {/* paddingTop 2, not 10: the Stack's own header sits directly above
-            this and carries its own bottom inset, so 10 on top of two stacked
-            rows read as a band of dead chrome before the first word (owner,
-            device, 2026-09-11). */}
-        <View style={{ paddingHorizontal: 14, paddingTop: 2, gap: 10 }}>
-          <View
-            testID="wbw-title-row"
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
-          >
-            {/* The name IS the jump control (ruling S3): no button of its own,
-                because the row has no width to spend on one. The chevron is
-                the only affordance -- a tappable name with nothing to say so
-                is a control nobody finds -- and the press scale is the other
-                half of that, since a name that does not react to a press reads
-                as a rendering bug. */}
-            <Pressable
-              testID="wbw-surah-jump"
-              accessibilityRole="button"
-              // The name first: a Pressable is `accessible` by default and
-              // collapses its children, so the Text below -- heading role and
-              // all -- is not announced and this label is the whole utterance.
-              accessibilityLabel={`${view.surah.name_translit}, ${t(uiLocale, 'jump.surahTitle')}`}
-              onPress={() => setJumpView('jump')}
-              style={(state) => [
-                pressStyle(state),
-                { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
-              ]}
+            Drawn in the screen, not pushed to the navigator with setOptions:
+            morphology was a tab until M7d and tabs run headerShown: false, so
+            on that entry point the surah name and the pager were both silently
+            absent and there was no way to change the range at all (issue #25,
+            M6e device run). The route hides the navigator's own header instead,
+            so this card's back button is the only one. */}
+        <HeaderCard
+          title={view.surah.name_translit}
+          // The name IS the jump control (ruling S3), and here it never fades:
+          // there is no list heading below it to hand the name to.
+          onTitlePress={() => setJumpView('jump')}
+          titleAccessibilityLabel={`${view.surah.name_translit}, ${t(uiLocale, 'jump.surahTitle')}`}
+          onBack={() => router.back()}
+          uiLocale={uiLocale}
+          testIDPrefix="wbw"
+          middleRow={
+            /* The ayah pager, flanked by the surah chevrons (R4): the two
+               orders of movement -- within a surah and between surahs -- sit
+               on one line, bounded rather than nested (D49). This is the row
+               the reader spends on its mode pill. */
+            <View
+              testID="wbw-pager-row"
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}
             >
-              <Text
-                accessibilityRole="header"
-                // Clamped still, but `flex: 1` rather than `flexShrink: 1`: the
-                // name has a row to fill now, and shrink-only leaves it hugging
-                // its own text with the pager floating at the far edge.
-                numberOfLines={1}
-                style={{ color: theme.text, fontSize: typography.title, fontWeight: '700', flexShrink: 1 }}
+              <AdjacentNavButton
+                side="prev"
+                target={
+                  currentSurahId !== null && currentSurahId > 1 ? String(currentSurahId - 1) : null
+                }
+                onNavigate={(target, side) => setSurah(Number(target), side)}
+                uiLocale={uiLocale}
+                testIDPrefix="surah"
+              />
+              <View style={{ flex: 1 }}>
+                <VersePicker
+                  from={view.from}
+                  to={view.to}
+                  ayahCount={view.surah.ayah_count}
+                  uiLocale={uiLocale}
+                  onRange={(nextFrom) => setFrom(nextFrom)}
+                />
+              </View>
+              <AdjacentNavButton
+                side="next"
+                target={
+                  currentSurahId !== null && currentSurahId < 114
+                    ? String(currentSurahId + 1)
+                    : null
+                }
+                onNavigate={(target, side) => setSurah(Number(target), side)}
+                uiLocale={uiLocale}
+                testIDPrefix="surah"
+              />
+            </View>
+          }
+          actions={
+            /* Search, gloss language, density (R5). No translation toggle --
+               this screen has nothing to toggle -- and no Uzbek script switch:
+               that is a global setting and a screen-scoped copy of it would
+               read as a screen-scoped setting. */
+            <View style={{ gap: 10, paddingTop: 4 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 24,
+                }}
               >
-                {view.surah.name_translit}
-              </Text>
-              <Icon name="chevronDown" size={14} color={theme.mutedText} />
-            </Pressable>
-            <VersePicker
-              from={view.from}
-              to={view.to}
-              ayahCount={view.surah.ayah_count}
-              uiLocale={uiLocale}
-              onRange={(nextFrom) => setFrom(nextFrom)}
-            />
-          </View>
-          <View
-            testID="wbw-density-row"
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
-          >
-            <AdjacentNavButton
-              side="prev"
-              target={
-                currentSurahId !== null && currentSurahId > 1 ? String(currentSurahId - 1) : null
-              }
-              onNavigate={(target, side) => setSurah(Number(target), side)}
-              uiLocale={uiLocale}
-              testIDPrefix="surah"
-            />
-            <View style={{ flex: 1 }}>
+                {/* Global search, the same push the reader's magnifier makes
+                    (R6). A morphology-scoped search would be a second search
+                    with a smaller corpus and no way to say so. */}
+                <SearchHeaderButton uiLocale={uiLocale} onPress={() => router.push('/search')} />
+                <Pressable
+                  testID="open-language"
+                  accessibilityRole="button"
+                  accessibilityLabel={t(uiLocale, 'reader.chooseLanguage')}
+                  onPress={() => setLanguageOpen(true)}
+                  style={{
+                    minHeight: touchTargets.minimum,
+                    minWidth: touchTargets.minimum,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Icon name="globe" color={theme.accent} />
+                </Pressable>
+              </View>
               <SegmentedControl
                 options={DENSITY_OPTIONS.map((option) => ({
                   value: option.value,
@@ -337,17 +381,8 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
                 accessibilityLabel={t(uiLocale, 'wbw.density')}
               />
             </View>
-            <AdjacentNavButton
-              side="next"
-              target={
-                currentSurahId !== null && currentSurahId < 114 ? String(currentSurahId + 1) : null
-              }
-              onNavigate={(target, side) => setSurah(Number(target), side)}
-              uiLocale={uiLocale}
-              testIDPrefix="surah"
-            />
-          </View>
-        </View>
+          }
+        />
         <FlatList
           // Held across a range change now that the screen no longer blanks,
           // so without this the new range opens at the old one's scroll offset.
@@ -388,6 +423,14 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
           router.push(`/root/${encodeURIComponent(rootBuckwalter)}`);
         }}
       />
+      {languageOpen ? (
+        <LanguageSheet
+          value={contentLanguage}
+          uiLocale={uiLocale}
+          onChange={setContentLanguage}
+          onClose={() => setLanguageOpen(false)}
+        />
+      ) : null}
       {jumpView === 'jump' && currentSurahId !== null ? (
         <SurahJumpSheet
           uiLocale={uiLocale}

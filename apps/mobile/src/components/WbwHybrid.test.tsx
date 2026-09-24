@@ -197,6 +197,30 @@ describe('WbwHybrid gloss spans', () => {
     expect(screen.getByText('unda')).toBeTruthy();
   });
 
+  it('starts a spanned word at the same height as a single one', () => {
+    // The 2c layout is where the two rhythms differed most: a plain cell pads
+    // 9 above its Arabic, and a span used to pad 4 with a compact cell's 2
+    // inside it -- so a shared gloss sat 3dp off its neighbours'. The dense
+    // suite cannot see this one: at compact spacing the old numbers happened
+    // to agree.
+    renderHybrid({ glosses: SPANNED });
+
+    const span = screen.getByTestId('wbw-span');
+    const cells = screen.getAllByTestId('wbw-cell');
+    const px = (value: string) => Number(value.replace('px', '') || '0');
+
+    expect(px(span.style.paddingTop) + px(cells[0]!.style.paddingTop)).toBe(
+      px(cells[2]!.style.paddingTop),
+    );
+    expect(span.style.gap || '0px').toBe(cells[2]!.style.gap || '0px');
+    // And no height floor inside the span. A 48dp minimum on a cell whose
+    // content comes to about 42 makes the BOX, not the content, decide where
+    // the shared gloss starts -- the same misalignment by another route.
+    expect(px(cells[0]!.style.minHeight)).toBe(0);
+    expect(px(cells[1]!.style.minHeight)).toBe(0);
+    expect(px(cells[2]!.style.minHeight)).toBeGreaterThan(0);
+  });
+
   it('keeps every spanned word its own button', () => {
     const { onWordPress } = renderHybrid({ glosses: SPANNED });
     const cells = screen.getAllByTestId('wbw-cell');

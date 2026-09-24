@@ -238,3 +238,34 @@ describe('WbwDense gloss spans', () => {
     expect(screen.getAllByTestId('wbw-cell')).toHaveLength(3);
   });
 });
+
+describe('WbwDense span alignment', () => {
+  afterEach(cleanup);
+
+  const SPANNED = new Map([
+    [1, gloss("shubha yo'q", 'uz', false, 7)],
+    [2, gloss("shubha yo'q", 'uz', false, 7)],
+    [3, gloss('unda', 'uz')],
+  ]);
+
+  it('starts a spanned word at the same height as a single one', () => {
+    // Uzbek glosses sat visibly lower than their neighbours in a wrapped run
+    // (owner, device screenshot, 2026-09-22), because a span laid its words
+    // out on its own vertical rhythm: its own padding, plus a compact cell's
+    // padding inside it, against one plain cell's. English never showed it --
+    // English has no gloss_group, so it has no spans at all.
+    renderDense({ glosses: SPANNED });
+    const span = screen.getByTestId('wbw-span');
+    const cells = screen.getAllByTestId('wbw-cell');
+    // Cells 1 and 2 are inside the span; cell 3 stands alone.
+    const inSpan = cells[0]!;
+    const alone = cells[2]!;
+
+    const px = (value: string) => Number(value.replace('px', '') || '0');
+
+    expect(px(span.style.paddingTop) + px(inSpan.style.paddingTop)).toBe(px(alone.style.paddingTop));
+    // The gap matters as much as the padding: it is what sits between a word
+    // and the gloss under it, and the span draws that gloss itself.
+    expect(span.style.gap || '0px').toBe(alone.style.gap || '0px');
+  });
+});

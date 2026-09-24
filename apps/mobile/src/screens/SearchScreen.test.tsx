@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEBOUNCE_MS, SearchScreen, SPINNER_DELAY_MS } from './SearchScreen';
 import { deferred } from '../testing/deferred';
+import { clearReaderPosition, setReaderPosition } from '@/data/readerPosition';
 
 const mocks = vi.hoisted(() => ({
   searchCorpus: vi.fn(),
@@ -29,6 +30,18 @@ vi.mock('@/data/useSurahIndex', () => ({
 }));
 vi.mock('@quran-corpus/mobile-data', () => ({ createExpoSqliteClient: () => ({}) }));
 vi.mock('expo-router', () => ({ router: { push: mocks.push } }));
+// Stubbed, not rendered: the real sheet is a BottomSheet over a Modal with
+// reanimated inside, none of which this screen's host mock provides. What is
+// this screen's to get right is that the sheet is mounted when asked and that
+// its jump routes -- which is exactly what the stub exposes.
+vi.mock('@/components/SurahJumpSheet', () => ({
+  SurahJumpSheet: ({ surahId, onJump }: { surahId: number; onJump: (s: number, a: number) => void }) =>
+    React.createElement(
+      'button',
+      { 'data-testid': 'jump-sheet', 'data-surah': String(surahId), onClick: () => onJump(2, 255) },
+      'jump',
+    ),
+}));
 
 vi.mock('react-native', async () => {
   const React = await import('react');
@@ -182,7 +195,12 @@ describe('SearchScreen', () => {
     fireEvent.change(screen.getByTestId('search-input'), { target: { value: '2:255' } });
 
     await waitFor(() => expect(screen.getByTestId('search-verse')).toBeTruthy());
-    expect(screen.getByTestId('search-jump-ref').textContent).toBe('2:255');
+    // Awaited separately, because the two no longer arrive together: the GO TO
+    // section is a curtain now, and a curtain mounts its children when it
+    // opens -- one commit after the results it sits above. Asserting it in the
+    // same tick as the verse list passed most runs and failed about one in
+    // six.
+    expect((await screen.findByTestId('search-jump-ref')).textContent).toBe('2:255');
 
     // Order, not just presence -- reordering the two sections must fail this.
     const testIds = Array.from(document.querySelectorAll('[data-testid]')).map((el) =>
@@ -192,6 +210,62 @@ describe('SearchScreen', () => {
     const verseIndex = testIds.indexOf('search-verse');
     expect(jumpIndex).toBeGreaterThanOrEqual(0);
     expect(verseIndex).toBeGreaterThan(jumpIndex);
+  });
+
+  it('lets the go-to section leave instead of blinking out', async () => {
+    // Mounted straight into the ScrollView, the section arrived and vanished
+    // in one frame (owner, 2026-09-22). It rises in and drops out on the
+    // sheets' own curve now, and the heading has to be inside the animated
+    // block or 'GO TO' blinks above a card that is still moving.
+    mocks.searchCorpus.mockResolvedValue({
+      jump: {
+        surah_id: 2,
+        ayah_number: 255,
+        text_uthmani: 'ٱللَّهُ',
+        words: [],
+        highlightPosition: null,
+      },
+      verses: [],
+      roots: [],
+    });
+
+    render(<SearchScreen />);
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: '2:255' } });
+
+    await waitFor(() => expect(screen.getByTestId('search-jump')).toBeTruthy());
+    const rise = screen.getByTestId('search-jump-rise');
+    expect(rise.contains(screen.getByTestId('search-jump'))).toBe(true);
+    expect(rise.textContent).toContain('GO TO');
+  });
+
+  it('keeps the reference on the card while the section closes', async () => {
+    // Children stay mounted until the exit lands, so the card is on screen for
+    // the whole animation. Read live, its reference would be
+    // gone on frame one -- an empty card sliding shut, which is worse than the
+    // blink the curtain replaced.
+    mocks.searchCorpus.mockResolvedValue({
+      jump: {
+        surah_id: 2,
+        ayah_number: 255,
+        text_uthmani: 'ٱللَّهُ',
+        words: [],
+        highlightPosition: null,
+      },
+      verses: [],
+      roots: [],
+    });
+    render(<SearchScreen />);
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: '2:255' } });
+    await waitFor(() => expect(screen.getByTestId('search-jump-ref').textContent).toBe('2:255'));
+
+    mocks.searchCorpus.mockResolvedValue(EMPTY);
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'nur' } });
+
+    await waitFor(() => expect(mocks.searchCorpus).toHaveBeenCalledTimes(2));
+    const ref = screen.queryByTestId('search-jump-ref');
+    // Either the close has already landed and the card is gone, or it is still
+    // on screen -- and then it still says what it said.
+    if (ref) expect(ref.textContent).toBe('2:255');
   });
 
   it('names the surah a typed name resolved to', async () => {
@@ -398,5 +472,34 @@ describe('SearchScreen', () => {
     // reference. Neither used to show anything but the headword.
     expect(screen.getByTestId('search-root').textContent).toContain('339');
     expect(screen.getByTestId('search-verse').textContent).toContain('1:1');
+  });
+});
+
+describe('SearchScreen go-to-verse', () => {
+  beforeEach(() => {
+    mocks.push.mockReset();
+    mocks.searchCorpus.mockReset();
+    mocks.searchCorpus.mockResolvedValue(EMPTY);
+  });
+  afterEach(cleanup);
+
+  it('keeps the jump sheet closed until the button is pressed', () => {
+    render(<SearchScreen />);
+    expect(screen.queryByTestId('jump-sheet')).toBeNull();
+  });
+
+  it('opens the jump sheet and routes to the ayah it returns', () => {
+    render(<SearchScreen />);
+    fireEvent.click(screen.getByTestId('search-goto'));
+    fireEvent.click(screen.getByTestId('jump-sheet'));
+    expect(mocks.push).toHaveBeenCalledWith('/surah/2?ayah=255');
+  });
+
+  it('seeds the sheet with the surah the reader was left in', () => {
+    setReaderPosition(36, 12);
+    render(<SearchScreen />);
+    fireEvent.click(screen.getByTestId('search-goto'));
+    expect(screen.getByTestId('jump-sheet').getAttribute('data-surah')).toBe('36');
+    clearReaderPosition();
   });
 });

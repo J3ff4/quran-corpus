@@ -93,7 +93,51 @@ function flattenStyle(style: unknown): Record<string, unknown> | undefined {
       ? Object.assign({}, ...resolved.flat(Infinity).filter(Boolean))
       : resolved
   ) as Record<string, unknown> | undefined;
-  return withTransform(withBoxShadow(flat));
+  return withTransform(withBoxShadow(withSpacing(flat)));
+}
+
+/**
+ * RN's `paddingVertical` / `marginHorizontal` family -- and the all-sides
+ * `padding` / `margin` -- as the CSS longhands.
+ *
+ * Same blindness as the shadow props and `includeFontPadding`: React assigns
+ * the style object onto `node.style`, where a property CSS has never heard of
+ * simply vanishes. Every padding in the app is written in RN's axis shorthand,
+ * so a suite reading `style.paddingTop` read `''` for all of them -- a cell
+ * padded 9 and a cell padded 2 were the same element to a test. That is how a
+ * span's gloss sat 4dp below its neighbours' for a phase (owner screenshot,
+ * 2026-09-22).
+ *
+ * The longhand wins over the axis shorthand, which wins over the all-sides
+ * one. That is RN's own precedence and not an ordering accident.
+ */
+function withSpacing(
+  flat: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  if (!flat) return flat;
+  const axes = [
+    ['padding', 'Vertical', ['Top', 'Bottom']],
+    ['padding', 'Horizontal', ['Left', 'Right']],
+    ['margin', 'Vertical', ['Top', 'Bottom']],
+    ['margin', 'Horizontal', ['Left', 'Right']],
+    // Last, so the axis shorthands above have already claimed their sides:
+    // RN resolves `padding` under `paddingVertical` under `paddingTop`, and
+    // the `??=` below is what encodes the second half of that.
+    ['padding', '', ['Top', 'Bottom', 'Left', 'Right']],
+    ['margin', '', ['Top', 'Bottom', 'Left', 'Right']],
+  ] as const;
+  let next = flat;
+  for (const [box, axis, sides] of axes) {
+    const shorthand = `${box}${axis}`;
+    if (!(shorthand in next)) continue;
+    const value = next[shorthand];
+    next = { ...next };
+    delete next[shorthand];
+    for (const side of sides) {
+      next[`${box}${side}`] ??= value;
+    }
+  }
+  return next;
 }
 
 /**
@@ -644,6 +688,10 @@ export function SectionList(
  */
 export const AccessibilityInfo = {
   isReduceMotionEnabled: async () => false,
+  // The reader asks, to decide whether an ayah's word rows are worth a
+  // re-render (useScreenReaderEnabled). Off, like reduce motion and for the
+  // same reason: the branch under test is the one users get.
+  isScreenReaderEnabled: async () => false,
   addEventListener: () => ({ remove: () => {} }),
 };
 

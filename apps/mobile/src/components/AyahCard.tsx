@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { Text, View } from 'react-native';
 import type { Word } from '@quran-corpus/data/mobile';
 import type { UiLocaleCode } from '@/i18n/languages';
@@ -13,8 +13,9 @@ export interface AyahCardProps {
   surahId: number;
   ayahNumber: number;
   arabicText: string;
-  /** Empty until the reader has fetched this ayah's words; see AyahText. */
-  words: Word[];
+  /** This ayah's word rows, read at press time rather than passed as data --
+   *  see AyahText. Returns an empty array until they are fetched. */
+  getWords: () => Word[];
   translationText: string | null;
   /** Whether to draw it. Separate from `translationText` being null, which
    *  means the ayah has no translation in the chosen language at all: this one
@@ -34,11 +35,11 @@ export interface AyahCardProps {
   onWordPress: (word: Word) => void;
 }
 
-export function AyahCard({
+function AyahCardBody({
   surahId,
   ayahNumber,
   arabicText,
-  words,
+  getWords,
   translationText,
   showTranslation = true,
   bookmarked,
@@ -95,7 +96,7 @@ export function AyahCard({
           actually pulled the basmala out of the ayah's run. */}
       <AyahText
         textUthmani={arabicText}
-        words={words}
+        getWords={getWords}
         surahId={surahId}
         ayahNumber={ayahNumber}
         onWordPress={onWordPress}
@@ -130,3 +131,22 @@ export function AyahCard({
     <ThemeContext.Provider value={playing ? playingTheme : theme}>{card}</ThemeContext.Provider>
   );
 }
+
+/**
+ * Memoised, and that is load-bearing rather than a precaution.
+ *
+ * The reader prefetches an ayah's words as it scrolls past, four ayahs at a
+ * time (WORD_LOOKAHEAD). While that map was a render prop, each query that
+ * landed replaced the whole map, so crossing one ayah boundary committed up
+ * to four new map identities and -- unmemoised -- re-rendered every card in
+ * the window on each of them: twenty cards' worth of Arabic re-laid-out, four
+ * times, mid-scroll. That was the jolt the owner reported at the same point in
+ * every ayah, upward and downward (2026-09-22).
+ *
+ * The map is no longer a render prop at all (`getWords`, 2026-09-23), so a
+ * prefetch now re-renders nothing. The memo still earns its place for every
+ * other reason a parent re-renders -- a bookmark toggle, an audio state
+ * change, a scroll-driven header update -- which are frequent and reach every
+ * mounted card.
+ */
+export const AyahCard = memo(AyahCardBody);

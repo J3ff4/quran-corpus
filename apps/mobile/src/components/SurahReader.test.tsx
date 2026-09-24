@@ -1,8 +1,9 @@
 import React from 'react';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { deferred } from '@/testing/deferred';
 import { SurahReader } from './SurahReader';
+import { estimateRowHeight } from './rowHeightModel';
 
 const mocks = vi.hoisted(() => ({
   onViewableItemsChanged: null as ((info: { viewableItems: Array<{ item: unknown }> }) => void) | null,
@@ -267,6 +268,15 @@ vi.mock('./WordSheet', async () => {
   };
 });
 
+// The hook itself is module state that reads the device once per process, so
+// a suite cannot flip it between tests -- it is covered in its own file. What
+// the reader owes is the branch, so the branch is what is mocked.
+let screenReaderOn = false;
+
+vi.mock('@/a11y/useScreenReaderEnabled', () => ({
+  useScreenReaderEnabled: () => screenReaderOn,
+}));
+
 vi.mock('react-native', async () => {
   const React = await import('react');
   const { host } = await import('@/testing/rnHosts.js');
@@ -367,17 +377,31 @@ vi.mock('react-native', async () => {
     useWindowDimensions: () => ({ width: 400, height: 800, scale: 2, fontScale: 1 }),
     // The docked recitation bar's layer stretches over the reader.
     StyleSheet: (await import('@/testing/rnHosts.js')).StyleSheet,
-    // useReducedMotion reads the OS flag. Off here, so the in-app setting is
-    // the only thing these tests vary.
+    // useReducedMotion reads the OS flag, and useScreenReaderEnabled reads
+    // the screen-reader one. Both off here, so the in-app setting is the only
+    // thing these tests vary.
     AccessibilityInfo: {
       isReduceMotionEnabled: () => Promise.resolve(false),
+      isScreenReaderEnabled: () => Promise.resolve(false),
       addEventListener: () => ({ remove: () => {} }),
     },
   };
 });
 
+/** Scrolls an ayah into view and lets its word query resolve.
+ *
+ *  The rows land in a ref and render nothing, so there is no commit to wait
+ *  for -- but a press before the query resolves finds no word, which is the
+ *  reader's real behaviour and not what these tests are about. */
+async function viewAndSettleWords(item: unknown) {
+  await act(async () => {
+    mocks.onViewableItemsChanged?.({ viewableItems: [{ item }] });
+  });
+}
+
 describe('SurahReader', () => {
   beforeEach(() => {
+    screenReaderOn = false;
     mocks.scrollToIndex.mockClear();
     mocks.scrollToOffset.mockClear();
     mocks.push.mockClear();
@@ -502,6 +526,44 @@ describe('SurahReader', () => {
     expect(after).toBe(before + 356);
     // Index 0 too: the first ayah sits below the header like every other one.
     expect(mocks.getItemLayout!(props.data.ayahs, 0).offset).toBe(356);
+  });
+
+  it('drops the translation from its offsets when no translation is drawn', () => {
+    // The offset table is the reader's whole scroll geometry, so it has to
+    // describe the cards actually on screen. With the translation hidden the
+    // cards lose their translation block, and an estimate that still counts
+    // the translation's dp per character overstates every row by most of a
+    // card.
+    // The error accumulates down the table, so the deeper the ayah the further
+    // FlatList's idea of where it is sits from where it is -- blank stretches
+    // and flicker on a fast scroll (owner, device, 2026-09-22).
+    const props = baseProps(readerData(10));
+    const { rerender } = render(<SurahReader {...props} showTranslation />);
+    const withTranslation = mocks.getItemLayout!(props.data.ayahs, 9).offset;
+
+    rerender(<SurahReader {...props} showTranslation={false} />);
+    const without = mocks.getItemLayout!(props.data.ayahs, 9).offset;
+
+    expect(without).toBeLessThan(withTranslation);
+    // And by the translation's whole contribution, not a fraction of it: the
+    // nine rows above index 9, each re-estimated with no translation at all.
+    // Taken from the model rather than written out, so a re-fit of the
+    // coefficients does not silently turn this into a test of a stale number.
+    // listWidth 0: the mock list never reports a layout, so the reader's own
+    // estimates run with the unmeasured-width guard, and these must match.
+    const shared = { arabicSize: 28, listWidth: 0 };
+    const dropped = props.data.ayahs.slice(0, 9).reduce(
+      (sum, item) =>
+        sum +
+        estimateRowHeight({
+          ...shared,
+          arabicChars: item.ayah.text_uthmani.length,
+          translationChars: item.translation?.text.length ?? 0,
+        }) -
+        estimateRowHeight({ ...shared, arabicChars: item.ayah.text_uthmani.length, translationChars: 0 }),
+      0,
+    );
+    expect(withTranslation - without).toBeCloseTo(dropped, 5);
   });
 
   it('stops widening initialNumToRender to cover a deep target', () => {
@@ -756,6 +818,100 @@ describe('SurahReader', () => {
     }
   });
 
+  it('counts a row that moved half a pixel as settled', async () => {
+    // A layout `y` is a float, and the corrections are arithmetic on offsets
+    // in the tens of thousands. A row that comes back half a device pixel from
+    // where it was is not moving in any sense a reader can see -- but under an
+    // exact `===` it was never settled, so the landing spent its whole budget
+    // chasing it and revealed on the cap, a little short of the target. Deeper
+    // in the surah, where more rows above have swapped estimates for measured
+    // heights, that is where the numbers have the most room to disagree
+    // (owner, device, 2026-09-22: a language switch lands close but not on).
+    vi.useFakeTimers();
+    try {
+      render(<SurahReader {...baseProps(readerData(300))} initialAyahNumber={255} />);
+
+      act(() => {
+        mocks.targetRowLayout?.(40000);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
+      expect(screen.queryByTestId('reader-positioning')).not.toBeNull();
+
+      act(() => {
+        mocks.targetRowLayout?.(40000.5);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
+
+      expect(screen.queryByTestId('reader-positioning')).toBeNull();
+      // And it did not spend a correction on the half pixel: one scroll, to
+      // the first measurement.
+      expect(mocks.scrollToOffset).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not spend a correction on the layout the last landing measured', async () => {
+    // A translation-language switch re-lands on the ayah already on screen and
+    // changes every row's height underneath it. The stamped measurement from
+    // the landing before still carries the right index, so it looks current --
+    // but it is a position in a layout that no longer exists, and correcting to
+    // it burns one of the three passes before the new content has reported
+    // anything. On the owner's device (2026-09-22, 2:210, uz -> en) that left
+    // two passes for a correction that needed three, and the reader revealed
+    // 115dp short. The second landing has to start from the model, exactly as
+    // a fresh one does.
+    vi.useFakeTimers();
+    try {
+      const props = { ...baseProps(readerData(300)), initialAyahNumber: 255 };
+      const { rerender } = render(<SurahReader {...props} seedNonce={1} />);
+
+      act(() => {
+        mocks.targetRowLayout?.(40000);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
+      act(() => {
+        mocks.targetRowLayout?.(40000.5);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100);
+      });
+      expect(screen.queryByTestId('reader-positioning')).toBeNull();
+
+      mocks.scrollToOffset.mockClear();
+      mocks.scrollToIndex.mockClear();
+
+      // The switch: same ayah, new nonce, and every row's translation -- and so
+      // every row's height -- replaced. No row has reported a layout in the new
+      // content yet.
+      const switched = readerData(300);
+      switched.ayahs = switched.ayahs.map((item) => ({
+        ...item,
+        translation: {
+          ...item.translation,
+          language_code: 'uz',
+          language: 'uz',
+          text: 'Ularning qalblarida munofiqlik illati bolgan manaviy kasallik bordir.',
+        },
+      }));
+      rerender(<SurahReader {...props} data={switched} seedNonce={2} />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(mocks.scrollToIndex).toHaveBeenCalledTimes(1);
+      expect(mocks.scrollToOffset).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('gives up after the cap rather than hiding the reader forever', async () => {
     vi.useFakeTimers();
     try {
@@ -858,14 +1014,95 @@ describe('SurahReader', () => {
     const loadWords = vi.fn(async (ayahId: number) => surahWords(ayahId));
     render(<SurahReader {...baseProps(readerData(10))} loadWords={loadWords} />);
 
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: readerData(10).ayahs[0] }] });
-    });
+    await viewAndSettleWords(readerData(10).ayahs[0]);
 
     expect(loadWords).toHaveBeenCalledWith(100);
     // The ayah in view plus WORD_LOOKAHEAD: a reader who taps a word the
     // instant an ayah lands otherwise waits on a query.
     expect(loadWords).toHaveBeenCalledTimes(4);
+  });
+
+  it('draws the same run before and after an ayah word rows land', async () => {
+    // The stutter, and the reason the rows are held in a ref: a card that
+    // re-rendered into one <Text> per word made Android re-record the whole
+    // view -- 2:282 is a 2467dp card with 128 of those spans, and its second
+    // record cost 18.7ms inside a 29.3ms frame against an 11.1ms budget at
+    // 90Hz (framestats over a fling from 2:260, 2026-09-23). Holding the
+    // commit until the list stopped only moved the cost to the flush, which
+    // the owner still felt between two ayahs. So the rows must not reach
+    // render at all: identical markup before and after the query resolves.
+    const data = readerData(2);
+    const { container } = render(
+      <SurahReader {...baseProps(data)} loadWords={async (ayahId) => surahWords(ayahId)} />,
+    );
+    const before = container.innerHTML;
+
+    await act(async () => {
+      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
+    });
+
+    // The query has resolved -- the next assertion is that it changed nothing
+    // about what is drawn.
+    expect(container.innerHTML).toBe(before);
+    // And the tokens were there from the first paint, so this is not passing
+    // by way of an empty run.
+    expect(screen.getAllByTestId('word-token').length).toBeGreaterThan(0);
+  });
+
+  it('leaves the word rows out of render unless a screen reader is listening', async () => {
+    // The gate on the whole fix. TalkBack announces a word by its
+    // transliteration, so with a screen reader running the rows have to reach
+    // render and the labels have to update. With none -- the scrolling case --
+    // a load that re-rendered every card is the fan-out this removed, so the
+    // labels stay on the Arabic token until something else wakes the card.
+    const data = readerData(2);
+    render(<SurahReader {...baseProps(data)} loadWords={async (ayahId) => surahWords(ayahId)} />);
+
+    await act(async () => {
+      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
+    });
+
+    expect(screen.queryByLabelText('translit-1')).toBeNull();
+  });
+
+  it('announces a loaded word by transliteration when one is', async () => {
+    // The other half of the gate. Waking the card is not a parent re-render:
+    // AyahCard is memoised, so the accessor identity has to change or the
+    // labels never arrive and TalkBack spells the Arabic out letter by letter
+    // for the whole surah.
+    screenReaderOn = true;
+    const data = readerData(2);
+    render(<SurahReader {...baseProps(data)} loadWords={async (ayahId) => surahWords(ayahId)} />);
+
+    await act(async () => {
+      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
+    });
+
+    // Both ayahs: the prefetch takes a lookahead window, not one ayah.
+    await waitFor(() => expect(screen.getAllByLabelText('translit-1').length).toBeGreaterThan(0));
+  });
+
+  it('announces the ayahs it already had when a screen reader starts mid-session', async () => {
+    // The rows for these ayahs landed while the gate was shut, so their
+    // accessors were never dropped -- and AyahCard is memoised on them, so
+    // without clearing the whole map those cards can never re-render again.
+    // Every word already on screen would announce as raw Arabic, spelled
+    // letter by letter, for the rest of the session.
+    const data = readerData(2);
+    const props = { ...baseProps(data), loadWords: async (ayahId: number) => surahWords(ayahId) };
+    const { rerender } = render(<SurahReader {...props} />);
+
+    await act(async () => {
+      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
+    });
+    expect(screen.queryByLabelText('translit-1')).toBeNull();
+
+    screenReaderOn = true;
+    await act(async () => {
+      rerender(<SurahReader {...props} />);
+    });
+
+    await waitFor(() => expect(screen.getAllByLabelText('translit-1').length).toBeGreaterThan(0));
   });
 
   it('does not refetch an ayah it already has', async () => {
@@ -875,12 +1112,8 @@ describe('SurahReader', () => {
     const data = readerData(10);
     render(<SurahReader {...baseProps(data)} loadWords={loadWords} />);
 
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
+    await viewAndSettleWords(data.ayahs[0]);
+    await viewAndSettleWords(data.ayahs[0]);
 
     expect(loadWords).toHaveBeenCalledTimes(4);
   });
@@ -894,12 +1127,8 @@ describe('SurahReader', () => {
     const data = readerData(1);
     render(<SurahReader {...baseProps(data)} loadWords={loadWords} />);
 
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
+    await viewAndSettleWords(data.ayahs[0]);
+    await viewAndSettleWords(data.ayahs[0]);
 
     expect(loadWords).toHaveBeenCalledTimes(2);
   });
@@ -920,9 +1149,7 @@ describe('SurahReader', () => {
 
     expect(list()?.getAttribute('data-important-for-accessibility')).toBe('auto');
 
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
+    await viewAndSettleWords(data.ayahs[0]);
     await act(async () => {
       fireEvent.click(screen.getAllByTestId('word-token')[0]!);
     });
@@ -963,9 +1190,7 @@ describe('SurahReader', () => {
       />,
     );
 
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
+    await viewAndSettleWords(data.ayahs[0]);
     await act(async () => {
       fireEvent.click(screen.getAllByTestId('word-token')[1]!);
     });
@@ -991,9 +1216,7 @@ describe('SurahReader', () => {
       />,
     );
 
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
+    await viewAndSettleWords(data.ayahs[0]);
     await act(async () => {
       fireEvent.click(screen.getAllByTestId('word-token')[0]!);
     });
@@ -1022,9 +1245,7 @@ describe('SurahReader', () => {
       />,
     );
 
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
+    await viewAndSettleWords(data.ayahs[0]);
     await act(async () => {
       fireEvent.click(screen.getAllByTestId('word-token')[0]!);
     });
@@ -1052,9 +1273,7 @@ describe('SurahReader', () => {
       />,
     );
 
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
+    await viewAndSettleWords(data.ayahs[0]);
     await act(async () => {
       fireEvent.click(screen.getAllByTestId('word-token')[0]!);
       fireEvent.click(screen.getAllByTestId('word-token')[1]!);
@@ -1087,9 +1306,7 @@ describe('SurahReader', () => {
       />,
     );
 
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
+    await viewAndSettleWords(data.ayahs[0]);
 
     // First tap resolves, so there is a sheet on screen to dismiss.
     await act(async () => {
@@ -1126,13 +1343,14 @@ describe('SurahReader', () => {
       />,
     );
 
+    await viewAndSettleWords(data.ayahs[1]);
     await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[1] }] });
-    });
-    await act(async () => {
-      // Ayah 1 was never in view, so it has no words and no tokens: the first
-      // token on screen is ayah 2's first word.
-      fireEvent.click(screen.getAllByTestId('word-token')[0]!);
+      // Scoped to ayah 2's card. Every ayah draws its tokens whether or not
+      // its rows have loaded, so the first token on screen belongs to ayah 1
+      // -- which was never in view and has nothing to open.
+      fireEvent.click(
+        within(screen.getByTestId('ayah-1-2-card')).getAllByTestId('word-token')[0]!,
+      );
     });
     fireEvent.click(screen.getByTestId('open-detail'));
 
@@ -1152,9 +1370,7 @@ describe('SurahReader', () => {
       />,
     );
 
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
+    await viewAndSettleWords(data.ayahs[0]);
     await act(async () => {
       fireEvent.click(screen.getAllByTestId('word-token')[0]!);
     });
@@ -1298,9 +1514,7 @@ describe('SurahReader', () => {
     const barLayer = () => screen.getByTestId('recitation-bar').parentElement;
     expect(barLayer()?.getAttribute('data-hidden-from-a11y')).toBeNull();
 
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
+    await viewAndSettleWords(data.ayahs[0]);
     await act(async () => {
       fireEvent.click(screen.getAllByTestId('word-token')[0]!);
     });
@@ -1433,9 +1647,7 @@ describe('SurahReader', () => {
       />,
     );
 
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
+    await viewAndSettleWords(data.ayahs[0]);
     await act(async () => {
       fireEvent.click(screen.getAllByTestId('word-token')[0]!);
     });
@@ -1463,9 +1675,7 @@ describe('SurahReader', () => {
       />,
     );
 
-    await act(async () => {
-      mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[0] }] });
-    });
+    await viewAndSettleWords(data.ayahs[0]);
     await act(async () => {
       fireEvent.click(screen.getAllByTestId('word-token')[0]!);
     });
@@ -1676,6 +1886,7 @@ describe('SurahReader shared reading position', () => {
   // does not reach it, and a scroll from the previous test leaks into the next
   // assertion.
   beforeEach(() => {
+    screenReaderOn = false;
     mocks.scrollToIndex.mockClear();
     mocks.getReaderPosition.mockReset().mockReturnValue(null);
     mocks.setReaderPosition.mockReset();
@@ -1823,7 +2034,7 @@ function surahWords(ayahId: number) {
     ayah_id: ayahId,
     position: index + 1,
     text_arabic: textArabic,
-    transliteration: null,
+    transliteration: `translit-${index + 1}`,
     root: null,
     lemma: null,
     root_buckwalter: null,

@@ -30,8 +30,8 @@ vi.mock('react-native', async () => {
 const baseProps = {
   surahId: 2,
   // Empty is the reader's own starting state: words are fetched per ayah as
-  // the list scrolls.
-  words: [],
+  // the list scrolls, and they never reach render -- see AyahText.
+  getWords: () => [],
   onWordPress: () => {},
 };
 
@@ -292,7 +292,7 @@ describe('AyahCard', () => {
       />,
     );
 
-    expect(screen.getByText('Arabic text')).toBeTruthy();
+    expect(screen.getByTestId('ayah-run').textContent).toBe('Arabic text');
   });
 
   it('renders no translation block when the reader has switched it off', () => {
@@ -313,7 +313,7 @@ describe('AyahCard', () => {
 
     expect(container.textContent).not.toContain('In the name of God');
     // The Arabic is the point of the card; only the translation goes.
-    expect(screen.getByText('Arabic text')).toBeTruthy();
+    expect(screen.getByTestId('ayah-run').textContent).toBe('Arabic text');
   });
 
   it('draws the translation by default, so a caller that knows nothing of the switch still shows it', () => {
@@ -334,5 +334,22 @@ describe('AyahCard', () => {
     );
 
     expect(screen.getByText('In the name of God')).toBeTruthy();
+  });
+
+  it('is memoised, because the reader re-renders the list under a scroll', () => {
+    // A prefetch no longer re-renders anything (the map left render entirely
+    // on 2026-09-23), but the reader re-renders this list on a bookmark
+    // toggle, an audio state change and a scroll-driven header update, and
+    // each of those reaches every mounted card. Unmemoised that is twenty
+    // cards of Arabic re-laid-out per event -- the same jolt, from a
+    // different source (owner, device, 2026-09-22).
+    //
+    // A structural assertion, deliberately: what the memo buys is a render
+    // that does NOT happen, and a skipped render leaves nothing in the DOM to
+    // check -- React keeps the same host nodes across a re-render either way.
+    // The behaviour this protects is measured on the device, not here.
+    expect((AyahCard as unknown as { $$typeof?: symbol }).$$typeof).toBe(
+      Symbol.for('react.memo'),
+    );
   });
 });

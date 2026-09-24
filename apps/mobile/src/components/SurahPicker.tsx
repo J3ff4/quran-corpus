@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react';
-import { Modal, Pressable, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icons/Icon';
+import { SearchField } from '@/components/SearchField';
 import { SurahList } from '@/components/SurahList';
 import type { SurahListItem } from '@/data/corpusRepository';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
 import { matchSurahs } from '@/surah/matchSurah';
-import { radii, touchTargets, typography } from '@/theme/tokens';
+import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useStableInsets } from '@/theme/useStableInsets';
 
@@ -96,27 +97,20 @@ export function SurahPicker({ surahs, uiLocale, onPick, onClose }: SurahPickerPr
           >
             <Icon name="close" color={theme.text} />
           </Pressable>
-          <TextInput
-            testID="surah-picker-filter"
-            value={query}
-            onChangeText={setQuery}
-            // The field IS the screen's purpose, so it takes focus with the
-            // keyboard rather than making the user tap once more to type.
-            autoFocus
-            accessibilityLabel={t(uiLocale, 'surahPicker.filter')}
-            placeholder={t(uiLocale, 'surahPicker.filter')}
-            placeholderTextColor={theme.mutedText}
-            style={{
-              flex: 1,
-              minHeight: touchTargets.minimum,
-              borderRadius: radii.chip,
-              borderWidth: 1,
-              borderColor: theme.border,
-              paddingHorizontal: 14,
-              color: theme.text,
-              fontSize: typography.body,
-            }}
-          />
+          <View style={{ flex: 1 }}>
+            <SearchField
+              testID="surah-picker-filter"
+              clearTestID="surah-picker-filter-clear"
+              value={query}
+              onChangeText={setQuery}
+              placeholder={t(uiLocale, 'surahPicker.filter')}
+              accessibilityLabel={t(uiLocale, 'surahPicker.filter')}
+              clearAccessibilityLabel={t(uiLocale, 'surahPicker.clearFilter')}
+              // The field IS the screen's purpose, so it takes focus with the
+              // keyboard rather than making the user tap once more to type.
+              autoFocus
+            />
+          </View>
         </View>
         {/* Only once something was typed. An index that came back empty is not
             a failed name search, and telling a reader their search found
