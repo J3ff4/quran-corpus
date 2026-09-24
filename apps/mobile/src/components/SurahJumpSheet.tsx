@@ -131,6 +131,14 @@ export function SurahJumpSheet({
             onSubmitEditing={submit}
             keyboardType="number-pad"
             accessibilityLabel={ayahMax === null ? t(uiLocale, 'jump.ayah') : `${t(uiLocale, 'jump.ayah')} 1-${ayahMax}`}
+            // Only while the field is dead. Announced, TalkBack says "Ayah,
+            // edit box, disabled" and gives no reason -- and the range, the
+            // one thing that would have explained it, is exactly what is
+            // missing. The enabled field needs no hint: its label names it,
+            // carries the range, and the role already says it takes input, so
+            // a hint there is three ways of saying the same thing on every
+            // pass through the sheet (owner, 2026-09-24).
+            {...(ayahKnown ? {} : { accessibilityHint: t(uiLocale, 'jump.ayahLoading') })}
             placeholder={ayahMax === null ? '1' : `1-${ayahMax}`}
             placeholderTextColor={theme.mutedText}
             style={[field(rejected), { opacity: ayahKnown ? 1 : 0.5 }]}

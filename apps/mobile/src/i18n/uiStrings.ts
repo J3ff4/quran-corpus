@@ -22,6 +22,7 @@ export type UiStringKey =
   | 'jump.go'
   | 'jump.outOfRange'
   | 'jump.browse'
+  | 'jump.ayahLoading'
   | 'surahPicker.title'
   | 'surahPicker.filter'
   | 'surahPicker.clearFilter'
@@ -319,6 +320,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'jump.go': 'Go',
     'jump.outOfRange': 'No such surah or ayah',
     'jump.browse': 'Find a surah by name',
+    'jump.ayahLoading': 'Loading surah lengths',
     'surahPicker.title': 'Surahs',
     'surahPicker.filter': 'Name or meaning',
     'surahPicker.clearFilter': 'Clear filter',
@@ -557,6 +559,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'jump.go': 'Oʻtish',
     'jump.outOfRange': 'Bunday sura yoki oyat yoʻq',
     'jump.browse': 'Surani nomi boʻyicha topish',
+    'jump.ayahLoading': 'Sura uzunliklari yuklanmoqda',
     'surahPicker.title': 'Suralar',
     'surahPicker.filter': 'Nomi yoki maʼnosi',
     'surahPicker.clearFilter': 'Filtrni tozalash',
@@ -790,6 +793,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'jump.go': 'Перейти',
     'jump.outOfRange': 'Такой суры или аята нет',
     'jump.browse': 'Найти суру по названию',
+    'jump.ayahLoading': 'Загружаются длины сур',
     'surahPicker.title': 'Суры',
     'surahPicker.filter': 'Название или смысл',
     'surahPicker.clearFilter': 'Очистить фильтр',
