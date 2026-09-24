@@ -7,7 +7,6 @@ export type UiStringKey =
   | 'tabs.bookmarks'
   | 'tabs.mushaf'
   | 'mushaf.jump'
-  | 'mushaf.jumpTitle'
   | 'mushaf.jumpPage'
   | 'mushaf.jumpSurah'
   | 'mushaf.jumpJuz'
@@ -16,6 +15,7 @@ export type UiStringKey =
   // The compact player's play button. Not "Play": it starts the page, which
   // on 15 lines of glyphs is the fact worth announcing.
   | 'mushaf.playPage'
+  | 'jump.title'
   | 'jump.surahTitle'
   | 'jump.surah'
   | 'jump.ayah'
@@ -251,8 +251,6 @@ export type UiStringKey =
   | 'search.title'
   | 'search.placeholder'
   | 'search.clearSearch'
-  | 'search.goToVerse'
-  | 'search.jump'
   | 'search.verses'
   | 'search.roots'
   | 'search.empty'
@@ -303,13 +301,18 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
   en: {
     'tabs.home': 'Home',
     'mushaf.jump': 'Go to page, surah or juz',
-    'mushaf.jumpTitle': 'Go to',
     'mushaf.jumpPage': 'Page',
     'mushaf.jumpSurah': 'Surah',
     'mushaf.jumpJuz': 'Juz',
     'mushaf.jumpGo': 'Go',
     'mushaf.jumpOutOfRange': 'Nothing there. Page 1-604, surah 1-114, juz 1-30.',
     'mushaf.playPage': 'Play this page',
+    // Every go-to control and every go-to sheet, the mushaf's included: one
+    // move, one word (owner, 2026-09-24).
+    'jump.title': 'Go to',
+    // Spoken only. The reader's surah name IS the jump control, and
+    // "Al-Baqara, Go to" says nothing about where -- so TalkBack keeps the
+    // long form the visible title dropped.
     'jump.surahTitle': 'Go to surah',
     'jump.surah': 'Surah',
     'jump.ayah': 'Ayah',
@@ -503,8 +506,6 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'search.title': 'Search',
     'search.placeholder': 'Verse, word or root',
     'search.clearSearch': 'Clear search',
-    'search.goToVerse': 'Go to verse',
-    'search.jump': 'Go to',
     'search.verses': 'Verses',
     'search.roots': 'Roots',
     'search.empty': 'Type a verse reference, a word, or a root',
@@ -543,13 +544,13 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
   uz: {
     'tabs.home': 'Bosh sahifa',
     'mushaf.jump': 'Sahifa, sura yoki juzga oʻtish',
-    'mushaf.jumpTitle': 'Oʻtish',
     'mushaf.jumpPage': 'Sahifa',
     'mushaf.jumpSurah': 'Sura',
     'mushaf.jumpJuz': 'Juz',
     'mushaf.jumpGo': 'Oʻtish',
     'mushaf.jumpOutOfRange': 'Bunday joy yoʻq. Sahifa 1-604, sura 1-114, juz 1-30.',
     'mushaf.playPage': 'Sahifani tinglash',
+    'jump.title': 'Oʻtish',
     'jump.surahTitle': 'Suraga oʻtish',
     'jump.surah': 'Sura',
     'jump.ayah': 'Oyat',
@@ -741,8 +742,6 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'search.title': 'Qidiruv',
     'search.placeholder': 'Oyat, so‘z yoki o‘zak',
     'search.clearSearch': 'Qidiruvni tozalash',
-    'search.goToVerse': 'Oyatga oʻtish',
-    'search.jump': 'O‘tish',
     'search.verses': 'Oyatlar',
     'search.roots': 'O‘zaklar',
     'search.empty': 'Oyat raqami, so‘z yoki o‘zak kiriting',
@@ -778,13 +777,13 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
   ru: {
     'tabs.home': 'Главная',
     'mushaf.jump': 'Перейти к странице, суре или джузу',
-    'mushaf.jumpTitle': 'Перейти',
     'mushaf.jumpPage': 'Страница',
     'mushaf.jumpSurah': 'Сура',
     'mushaf.jumpJuz': 'Джуз',
     'mushaf.jumpGo': 'Перейти',
     'mushaf.jumpOutOfRange': 'Такого нет. Страница 1-604, сура 1-114, джуз 1-30.',
     'mushaf.playPage': 'Слушать страницу',
+    'jump.title': 'Перейти',
     'jump.surahTitle': 'Перейти к суре',
     'jump.surah': 'Сура',
     'jump.ayah': 'Аят',
@@ -977,8 +976,6 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'search.title': 'Поиск',
     'search.placeholder': 'Аят, слово или корень',
     'search.clearSearch': 'Очистить поиск',
-    'search.goToVerse': 'Перейти к аяту',
-    'search.jump': 'Перейти',
     'search.verses': 'Аяты',
     'search.roots': 'Корни',
     'search.empty': 'Введите номер аята, слово или корень',

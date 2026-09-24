@@ -97,7 +97,7 @@ export function SurahJumpSheet({
 
   return (
     <BottomSheet onClose={onClose} closeLabel={t(uiLocale, 'word.close')}>
-      <SheetHeader title={t(uiLocale, 'jump.surahTitle')} />
+      <SheetHeader title={t(uiLocale, 'jump.title')} />
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <View style={{ flex: 1 }}>
           {label(t(uiLocale, 'jump.surah'))}

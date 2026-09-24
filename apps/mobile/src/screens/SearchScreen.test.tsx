@@ -8,6 +8,7 @@ import { clearReaderPosition, setReaderPosition } from '@/data/readerPosition';
 const mocks = vi.hoisted(() => ({
   searchCorpus: vi.fn(),
   push: vi.fn(),
+  setOptions: vi.fn(),
 }));
 
 vi.mock('@/settings/settingsStore', () => ({
@@ -29,18 +30,42 @@ vi.mock('@/data/useSurahIndex', () => ({
   }),
 }));
 vi.mock('@quran-corpus/mobile-data', () => ({ createExpoSqliteClient: () => ({}) }));
-vi.mock('expo-router', () => ({ router: { push: mocks.push } }));
+vi.mock('expo-router', () => ({
+  router: { push: mocks.push },
+  useNavigation: () => ({ setOptions: mocks.setOptions }),
+}));
 // Stubbed, not rendered: the real sheet is a BottomSheet over a Modal with
 // reanimated inside, none of which this screen's host mock provides. What is
 // this screen's to get right is that the sheet is mounted when asked and that
 // its jump routes -- which is exactly what the stub exposes.
 vi.mock('@/components/SurahJumpSheet', () => ({
-  SurahJumpSheet: ({ surahId, onJump }: { surahId: number; onJump: (s: number, a: number) => void }) =>
+  SurahJumpSheet: ({
+    surahId,
+    onJump,
+    onBrowse,
+  }: {
+    surahId: number;
+    onJump: (s: number, a: number) => void;
+    onBrowse?: (() => void) | undefined;
+  }) =>
     React.createElement(
-      'button',
-      { 'data-testid': 'jump-sheet', 'data-surah': String(surahId), onClick: () => onJump(2, 255) },
-      'jump',
+      'div',
+      null,
+      React.createElement(
+        'button',
+        { 'data-testid': 'jump-sheet', 'data-surah': String(surahId), onClick: () => onJump(2, 255) },
+        'jump',
+      ),
+      onBrowse
+        ? React.createElement('button', { 'data-testid': 'jump-browse', onClick: onBrowse }, 'browse')
+        : null,
     ),
+}));
+// Same reasoning as the sheet above: a Modal over reanimated, stubbed down to
+// the one thing this screen owns -- what a picked name does.
+vi.mock('@/components/SurahPicker', () => ({
+  SurahPicker: ({ onPick }: { onPick: (s: number) => void }) =>
+    React.createElement('button', { 'data-testid': 'surah-picker', onClick: () => onPick(36) }, 'pick'),
 }));
 
 vi.mock('react-native', async () => {
@@ -215,8 +240,10 @@ describe('SearchScreen', () => {
   it('lets the go-to section leave instead of blinking out', async () => {
     // Mounted straight into the ScrollView, the section arrived and vanished
     // in one frame (owner, 2026-09-22). It rises in and drops out on the
-    // sheets' own curve now, and the heading has to be inside the animated
-    // block or 'GO TO' blinks above a card that is still moving.
+    // sheets' own curve now. It carries no heading of its own since
+    // 2026-09-24 -- the tinted card is the only one of its kind on the screen
+    // and the header control already says "Go to" -- so what the curtain has
+    // to hold is the card itself.
     mocks.searchCorpus.mockResolvedValue({
       jump: {
         surah_id: 2,
@@ -235,7 +262,9 @@ describe('SearchScreen', () => {
     await waitFor(() => expect(screen.getByTestId('search-jump')).toBeTruthy());
     const rise = screen.getByTestId('search-jump-rise');
     expect(rise.contains(screen.getByTestId('search-jump'))).toBe(true);
-    expect(rise.textContent).toContain('GO TO');
+    // And no heading above it: two "Go to"s on one screen was the duplication
+    // this dropped.
+    expect(rise.textContent).not.toContain('GO TO');
   });
 
   it('keeps the reference on the card while the section closes', async () => {
@@ -458,8 +487,10 @@ describe('SearchScreen', () => {
       await settle();
     });
 
+    // Two headings, not three: the reference card is tinted and alone in its
+    // section, and its "GO TO" heading repeated the header control (owner,
+    // 2026-09-24).
     expect(screen.getAllByRole('header').map((header) => header.textContent)).toEqual([
-      'GO TO',
       'VERSES',
       'ROOTS',
     ]);
@@ -475,13 +506,35 @@ describe('SearchScreen', () => {
   });
 });
 
-describe('SearchScreen go-to-verse', () => {
+describe('SearchScreen go-to', () => {
   beforeEach(() => {
     mocks.push.mockReset();
+    mocks.setOptions.mockClear();
     mocks.searchCorpus.mockReset();
     mocks.searchCorpus.mockResolvedValue(EMPTY);
   });
   afterEach(cleanup);
+
+  /** The control lives in the navigator's header strip, so it is reached the
+   *  way the reader's own bar is: through the factory setOptions was handed. */
+  function pressGoTo() {
+    const headerRight = mocks.setOptions.mock.calls
+      .map(([options]) => options.headerRight)
+      .filter((factory: unknown) => factory !== undefined)
+      .at(-1) as (() => React.ReactElement) | undefined;
+    if (!headerRight) throw new Error('the search screen never set a headerRight');
+    const header = render(<div>{headerRight()}</div>);
+    fireEvent.click(header.getByTestId('search-goto'));
+  }
+
+  it('puts the go-to control in the header, not in a row of its own', () => {
+    // Under the field it pushed the results down for a control that is not
+    // part of the search (owner, 2026-09-24).
+    render(<SearchScreen />);
+    expect(screen.queryByTestId('search-goto')).toBeNull();
+    pressGoTo();
+    expect(screen.getByTestId('jump-sheet')).toBeTruthy();
+  });
 
   it('keeps the jump sheet closed until the button is pressed', () => {
     render(<SearchScreen />);
@@ -490,7 +543,7 @@ describe('SearchScreen go-to-verse', () => {
 
   it('opens the jump sheet and routes to the ayah it returns', () => {
     render(<SearchScreen />);
-    fireEvent.click(screen.getByTestId('search-goto'));
+    pressGoTo();
     fireEvent.click(screen.getByTestId('jump-sheet'));
     expect(mocks.push).toHaveBeenCalledWith('/surah/2?ayah=255');
   });
@@ -498,8 +551,22 @@ describe('SearchScreen go-to-verse', () => {
   it('seeds the sheet with the surah the reader was left in', () => {
     setReaderPosition(36, 12);
     render(<SearchScreen />);
-    fireEvent.click(screen.getByTestId('search-goto'));
+    pressGoTo();
     expect(screen.getByTestId('jump-sheet').getAttribute('data-surah')).toBe('36');
     clearReaderPosition();
+  });
+
+  it('offers the surah browser the reader and morphology already have', () => {
+    // This screen opens the same sheet and was the one entry point without the
+    // row (owner, 2026-09-24).
+    render(<SearchScreen />);
+    pressGoTo();
+    fireEvent.click(screen.getByTestId('jump-browse'));
+    // One sheet at a time: the jump sheet goes as the picker arrives.
+    expect(screen.queryByTestId('jump-sheet')).toBeNull();
+    fireEvent.click(screen.getByTestId('surah-picker'));
+    // Ruling R3: a name goes to the head of its surah.
+    expect(mocks.push).toHaveBeenCalledWith('/surah/36?ayah=1');
+    expect(screen.queryByTestId('surah-picker')).toBeNull();
   });
 });

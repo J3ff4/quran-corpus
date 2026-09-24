@@ -111,7 +111,7 @@ export function MushafChrome({ visible, uiLocale, onOpenJump, onOpenSearch }: Mu
         >
           <Icon name="book" color={theme.mutedText} size={18} />
           <Text numberOfLines={1} style={{ color: theme.mutedText, fontSize: typography.caption }}>
-            {t(uiLocale, 'mushaf.jumpTitle')}
+            {t(uiLocale, 'jump.title')}
           </Text>
         </Pressable>
         <SearchHeaderButton uiLocale={uiLocale} onPress={onOpenSearch} />

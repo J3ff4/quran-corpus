@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { router } from 'expo-router';
+import { router, useNavigation } from 'expo-router';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
 import { EMPTY_SEARCH_RESULT, type SearchResult } from '@quran-corpus/data/mobile';
 import { RiseIn } from '@/components/RiseIn';
@@ -9,6 +9,7 @@ import { GlassSurface } from '@/components/GlassSurface';
 import { Icon } from '@/components/icons/Icon';
 import { SearchField } from '@/components/SearchField';
 import { SurahJumpSheet } from '@/components/SurahJumpSheet';
+import { SurahPicker } from '@/components/SurahPicker';
 import { SnippetText } from '@/components/SnippetText';
 import { searchCorpus } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
@@ -166,7 +167,10 @@ export function SearchScreen() {
   // so a reader who searched "baqara" was answered with "2" and no sign that
   // the name had been understood. The index is 114 rows the app reads anyway.
   const { surahs, ayahCountOf } = useSurahIndex(nameLanguage);
-  const [jumpOpen, setJumpOpen] = useState(false);
+  // One state, not two booleans: two would let the jump sheet and the picker
+  // be open at once, which is the whole failure mode of a sheet that opens
+  // another sheet. Same shape as the reader's and WbwScreen's.
+  const [jumpView, setJumpView] = useState<'jump' | 'picker' | null>(null);
   // Held across the close, not read live. The GO TO section is a curtain now,
   // and a curtain's children stay mounted until the close lands -- reading
   // `result.jump` there would blank the card on the first frame of the very
@@ -179,6 +183,52 @@ export function SearchScreen() {
     jump === null
       ? null
       : (surahs?.find((surah) => surah.id === jump.surah_id)?.nameTranslit ?? null);
+
+  // Both sheets land here: the jump sheet's Go, and a name picked out of the
+  // browser. Closing before the push, so a back into this screen does not find
+  // a sheet still standing over it.
+  const openSurah = useCallback((surahId: number, ayahNumber: number) => {
+    setJumpView(null);
+    router.push(`/surah/${surahId}?ayah=${ayahNumber}`);
+  }, []);
+
+  // In the header strip beside the back arrow, not under the field (owner,
+  // 2026-09-24): this screen's header carries nothing but the back
+  // affordance, and the row it used to sit on pushed the results down for a
+  // control that is not part of the search.
+  //
+  // setOptions publishes into a real header here -- search is a Stack screen
+  // with the navigator's own header, not a tab (SearchHeaderButton's docstring
+  // is about the tab case, where it publishes into nothing).
+  const navigation = useNavigation();
+  const headerRight = useCallback(
+    () => (
+      <Pressable
+        testID="search-goto"
+        accessibilityRole="button"
+        // Spoken long, drawn short: "Go to" alone gives TalkBack nothing to go
+        // on. Same split as the reader's surah name.
+        accessibilityLabel={t(uiLocale, 'jump.surahTitle')}
+        onPress={() => setJumpView('jump')}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          minHeight: touchTargets.minimum,
+          paddingHorizontal: 4,
+        }}
+      >
+        <Icon name="book" color={theme.accent} size={18} />
+        <Text style={{ color: theme.accent, fontSize: typography.body }}>
+          {t(uiLocale, 'jump.title')}
+        </Text>
+      </Pressable>
+    ),
+    [uiLocale, theme.accent],
+  );
+  useEffect(() => {
+    navigation.setOptions({ headerRight });
+  }, [navigation, headerRight]);
 
   const openJump = useCallback(() => {
     // The live one, not the held one: the card is still on screen through the
@@ -223,42 +273,31 @@ export function SearchScreen() {
           clearAccessibilityLabel={t(uiLocale, 'search.clearSearch')}
           autoFocus
         />
-        {/* A reference is not a search: someone who already knows they want
-            2:255 should not have to spell it, and the app has exactly one
-            go-to control -- the same sheet the reader and morphology headers
-            open (owner ruling R10). */}
-        <Pressable
-          testID="search-goto"
-          accessibilityRole="button"
-          accessibilityLabel={t(uiLocale, 'search.goToVerse')}
-          onPress={() => setJumpOpen(true)}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 8,
-            minHeight: touchTargets.minimum,
-            paddingHorizontal: 4,
-          }}
-        >
-          <Icon name="book" color={theme.accent} size={18} />
-          <Text style={{ color: theme.accent, fontSize: typography.body }}>
-            {t(uiLocale, 'search.goToVerse')}
-          </Text>
-        </Pressable>
       </View>
 
-      {jumpOpen ? (
+      {jumpView === 'jump' ? (
         <SurahJumpSheet
           uiLocale={uiLocale}
           // Where the reader was left, not al-Fatihah: a sheet that always
           // opened at 1 would make the reader's own position invisible.
           surahId={getReaderSurah() ?? 1}
           ayahCountOf={ayahCountOf}
-          onClose={() => setJumpOpen(false)}
-          onJump={(surahId, ayahNumber) => {
-            setJumpOpen(false);
-            router.push(`/surah/${surahId}?ayah=${ayahNumber}`);
-          }}
+          onClose={() => setJumpView(null)}
+          onJump={openSurah}
+          // No rows, no row: the picker has nothing to show until the index
+          // read lands. The reader and morphology have had this row since
+          // M12; this screen opens the same sheet and was the one entry point
+          // without it (owner, 2026-09-24).
+          onBrowse={surahs === null ? undefined : () => setJumpView('picker')}
+        />
+      ) : null}
+      {jumpView === 'picker' && surahs !== null ? (
+        <SurahPicker
+          surahs={surahs}
+          uiLocale={uiLocale}
+          // Ruling R3: a name goes to the head of its surah.
+          onPick={(surahId) => openSurah(surahId, 1)}
+          onClose={() => setJumpView(null)}
         />
       ) : null}
 
@@ -289,7 +328,6 @@ export function SearchScreen() {
         <RiseIn open={result.jump !== null} testID="search-jump-rise">
           {jump === null ? null : (
             <>
-              <Text accessibilityRole="header" style={heading}>{t(uiLocale, 'search.jump').toUpperCase()}</Text>
               <ResultCard testID="search-jump" onPress={openJump} tinted>
                 <Text
                   testID="search-jump-ref"

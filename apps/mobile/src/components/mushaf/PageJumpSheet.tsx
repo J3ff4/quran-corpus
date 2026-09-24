@@ -64,14 +64,14 @@ export function PageJumpSheet({ uiLocale, onClose, onJump, onBrowse }: PageJumpS
 
   return (
     <BottomSheet onClose={onClose} closeLabel={t(uiLocale, 'word.close')}>
-      <SheetHeader title={t(uiLocale, 'mushaf.jumpTitle')} />
+      <SheetHeader title={t(uiLocale, 'jump.title')} />
       <SegmentedControl
         options={(Object.keys(KINDS) as JumpKind[]).map((value) => ({
           value,
           label: t(uiLocale, KINDS[value].label),
         }))}
         value={kind}
-        accessibilityLabel={t(uiLocale, 'mushaf.jumpTitle')}
+        accessibilityLabel={t(uiLocale, 'jump.title')}
         onChange={(next) => {
           setKind(next);
           // The number means something else now. Keeping it would let "5"
