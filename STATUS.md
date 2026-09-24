@@ -11,6 +11,73 @@ Updated: 2026-09-24
 
 ## Now
 
+**2026-09-24 — PR #98 merged (squash `8003814`).** Four owner-reported UI
+defects found on vc53, fixed and verified on vc54.
+
+- **One header per screen entry** (`a6914ee`). Opening Morphology painted a full
+  `HeaderCard` titled "Word by word" while the last-reading-position read was in
+  flight, then replaced it with `WbwScreen`'s own card when the position landed.
+  Two cards for one entry, which the owner saw as a flash. It was new in M12
+  (`1cc47df`): before that refactor the branch drew a bare heading, so the swap
+  was invisible — the card made it visible. The card belongs to the empty state,
+  and a reader who has a position never lands there, so it now waits for the
+  read to settle.
+- **The ayah pager sits in the middle** (`91f28e4`). `WbwScreen` hands
+  `VersePicker` a `flex: 1` track between the two surah chevrons and the
+  picker's row had no `justifyContent`, so it packed to the start and leaned a
+  further 4dp on a one-sided `paddingRight` while the chevrons around it stayed
+  symmetric. Measured after: arrows at x=530.5 and 909.5, both exactly 189.5px
+  from the 720px screen centre.
+- **One "Go to"** (`92a95eb`). Three names for one move — "Go to verse" on the
+  search screen, "Go to surah" on the sheet it opened, "Go to" on the mushaf's.
+  One `jump.title` now, shared by all three; `mushaf.jumpTitle` and
+  `search.goToVerse` retired. `jump.surahTitle` survives as a **spoken-only**
+  string: the reader's surah name IS its jump control, and "Al-Baqara, Go to"
+  tells TalkBack nothing about where. The control moved into the navigator's
+  header strip beside the back arrow, and its "GO TO" results heading went with
+  it — it repeated the control a thumb's width above a card that is tinted and
+  alone in its section. The sheet also gained "Find a surah by name", which the
+  reader and morphology have had since M12 and this screen, opening the same
+  sheet, did not.
+- **An accessibility hint that says something** (`39165f4`), out of the TalkBack
+  run. The Go-to sheet announces "Ayah, edit box, disabled" while the surah
+  index loads and gives no reason — the range that would explain it is exactly
+  what is missing. Hinted, and only while disabled. The owner proposed hints on
+  both fields; the enabled ones deliberately get none, because label + range +
+  role already say what a hint would repeat, and redundancy costs a blind user
+  time on every pass through the sheet.
+
+**Device run, vc54** (OnePlus 7Pro, Android 16, gesture nav). 11 checks pass,
+including the three vc53 owed: translation off + jump to 2:282 lands
+top-aligned; audio playing through a controlled 16-step walk reads residual 0 on
+16/16; span-edge word taps 40px apart each open their own word, where the old
+8dp horizontal `hitSlop` handed the tap to the neighbour. Check 403 passed on
+the owner's own TalkBack — kebab announces collapsed/expanded, the header
+control speaks "Go to surah".
+
+**Two things worth carrying forward from the run:**
+
+- **A uniform text block aliases the shift correlator.** Al-Baqara 282 with
+  translation off is Arabic at a ~197px line pitch, so the unconstrained FFT
+  reads −97 for a commanded +100 — a whole line off, silently. The search has to
+  be constrained to ±70 of the commanded delta. A jump larger than the window
+  saturates the residual, so it is still detected, just not sized.
+- **A drag that starts on the player bar measures nothing.** The first run of
+  that walk read dy=0 for every step. That is also what makes the instrument
+  non-vacuous: it flagged all 16.
+
+**CI flake, first sighting.** The node job failed once on `SurahReader.test.tsx`
+— "Unable to find an element by: word-token", with the container empty, so the
+`container.innerHTML` assertion just above it had passed vacuously against the
+same emptiness. The component had rendered nothing at all. Not reproducible: 4
+local runs of that file and the full 1432-test suite green, and a re-run of the
+same commit with no changes went green. Watch for a second occurrence before
+spending time on it; if it recurs, that vacuous-on-empty assertion is where to
+start.
+
+**Owed:** check 398 (three-button navigation) — the inset differs and
+`adb shell settings put` is blocked on this device.
+
 **2026-09-24 — M12 merged (PR #97, squash `1cc47df`). 34 commits.** The
 branch's headline is that **the reader "stutter" the owner has reported since
 M6 was never a frame problem**, and five rounds of perf work had been aimed at
@@ -97,11 +164,9 @@ a defect that was not there.
   stutter this branch removed — so making the role conditional would put the
   re-render back to describe a state that is normal and transient. Every new
   test was mutation-checked; each fails with its fix reverted.
-- **Owed:** vc53 is built and installed but the **device re-check has not been
-  run** — the row-height split changes offsets for translation-off scrolling
-  and the memo fix changes render behaviour under playback. Also still owed
-  from this branch: check 398 (three-button navigation), check 403 (TalkBack
-  spoken output), and check E (TalkBack on the language and jump sheets).
+- **Owed — settled 2026-09-24 on vc54** (see the #98 entry above): the device
+  re-check ran and passed, as did check 403. Only check 398 (three-button
+  navigation) is still owed.
 - **Known residue, deliberately not fixed:** the row-height model still leans
   ~7dp/row on short rows. `maintainVisibleContentPosition` makes that bias
   invisible rather than absent; tightening the model is separate work.
