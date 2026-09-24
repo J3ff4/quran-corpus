@@ -7,9 +7,104 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-09-22
+Updated: 2026-09-24
 
 ## Now
+
+**2026-09-24 — M12 merged (PR #97, squash `1cc47df`). 34 commits.** The
+branch's headline is that **the reader "stutter" the owner has reported since
+M6 was never a frame problem**, and five rounds of perf work had been aimed at
+a defect that was not there.
+
+- **Root cause: content growing ABOVE the viewport** (`3aafbe5`).
+  VirtualizedList fills its render window outward, so rows *above* the screen
+  keep mounting for the first time — `windowSize` 21 reaches ten viewports
+  back, some 6000dp. Until a row mounts, the leading spacer holds its space out
+  of `getItemLayout`, which is the fitted estimate; the moment it mounts, its
+  real height takes that space instead. React Native does not adjust the scroll
+  offset for the difference, so it pushes everything below down — including the
+  ayah under the reader's finger. Fixed with one first-party prop,
+  `maintainVisibleContentPosition={{ minIndexForVisible: 0 }}`: 24 lines, 23 of
+  them comment. No dependency, no schema change.
+- **Why every previous round missed it: a position teleport renders at a clean
+  90Hz.** framestats, gfxinfo percentiles and frame duration are all
+  structurally blind to it. The instrument that did find it was the owner's
+  idea — scroll slowly, snapshot, diff consecutive frames. Held drag stepped in
+  exactly-known increments (`adb shell input motionevent DOWN/MOVE/UP` keeps
+  the pointer down across separate adb invocations, so there is no fling and no
+  momentum), screenshot between steps, cross-correlate a mean row-profile of a
+  centre band. Expected shift == commanded delta; any residual is the defect.
+  Residual read **0 on 34/34 and 93/96** steps on healthy runs, so a nonzero
+  reading is real. Scripts and the full recipe are in the memory note
+  `reader-jump-is-content-growth-above`.
+- **A/B on hardware, al-Baqara 24 onward, three runs before and one after:**
+
+  |            | step 50 | step 62 | step 84 | worst |
+  |------------|---------|---------|---------|-------|
+  | before     | −128px  | −49px   | −202px  | 202px |
+  | after      | 0       | 0       | 0       | 0     |
+
+  86/86 steps at residual 0. The app's own numbers corroborate: `contentOffset.y`
+  was **monotonic throughout** while `contentSize.height` grew +32/+12/+50dp at
+  exactly those steps, and a per-cell probe caught rows 11-13 mounting for the
+  first time ~6000dp above the viewport while every mounted cell 14-35 shifted
+  +32dp at once, heights unchanged. Nothing scrolled; the content grew above.
+  **Owner-confirmed on device: "no jump. its smooth now."**
+- **The rest of the branch**, in short: one search field for every search
+  (`b7c6d12`, `89f6045`) and go-to-verse without typing (`e6a04ea`); reader
+  anchoring that holds your place across a language switch (`bfa53fb`) and
+  corrects a landing against the layout actually on screen (`9a52a9c`); WbW
+  span heights and the reader's kebab on morphology; and the perf work that
+  did land — the card drawn once instead of twice (`b84ab1e`), a token as one
+  text fragment instead of two (`5d43f4a`), and the row-height model re-fitted
+  against the card as it is now (`a9ee3aa`).
+- **`/code-review` after the PR opened found six real defects** (`46fb902`),
+  and the first two are the interesting ones:
+  1. **The memo this branch added was being undone by its own callers.**
+     `toggleAyah` depended on the recitation context value, which is rebuilt on
+     every playback tick, and `toggleBookmark` was a plain `function`
+     declaration — so both reached every `AyahCard` as a fresh prop several
+     times a second while audio played, which is exactly the case the memo's
+     own docstring names. `openNoteEditor` had been stabilised for this reason
+     in the same commit; these two were missed.
+  2. **The row-height model charged every row for a translation block that is
+     not on screen.** `CHROME_DP` was fitted entirely on rows that HAVE a
+     translation — `rowHeightFixture` contains no row with `translationChars:
+     0` — so the block's own 29dp of furniture rode inside the constant. With
+     the translation switched off that is a one-directional, cumulative error,
+     the same class the 2026-09-23 re-fit exists to remove; over al-Baqara's
+     286 rows it ran the offset table ~8000dp long. Split into its own term:
+     145 + 29 is the 174 the fixture was fitted at, so translation-on rows
+     estimate exactly as before.
+  3. `splitAyahRunTokens` and `alignAyahTokens` decide the basmala differently
+     — positionally vs. arithmetic against the word count. They agree on all
+     6,236 ayahs of the shipped corpus, so this is latent, but one re-import
+     apart the run drops four tokens the alignment keeps and every tap opens a
+     word four positions away, silently. Lengths are checked; the alignment
+     fails closed.
+  4. A screen reader switched on between `subscribe()` and the initial read
+     resolving lost to the stale promise, so the hook reported off with
+     TalkBack running.
+  5. `HeaderCard` announced the screen's own name as a disabled button on the
+     two screens that mount it with no `onTitlePress`.
+  6. 8dp of `hitSlop` on a WbW span's edge-to-edge cells overlapped the
+     neighbour by up to 16dp, and Android hits the later sibling — so a tap
+     near one word's leading edge opened the word beside it.
+
+  One finding declined: a word token dropping its button role while the word
+  rows have not landed. The rows arrive asynchronously by design and the run
+  deliberately does not re-render when they do — that is the 18.7ms RenderNode
+  stutter this branch removed — so making the role conditional would put the
+  re-render back to describe a state that is normal and transient. Every new
+  test was mutation-checked; each fails with its fix reverted.
+- **Owed:** vc53 is built and installed but the **device re-check has not been
+  run** — the row-height split changes offsets for translation-off scrolling
+  and the memo fix changes render behaviour under playback. Also still owed
+  from this branch: check 398 (three-button navigation), check 403 (TalkBack
+  spoken output), and check E (TalkBack on the language and jump sheets).
+- **Known residue, deliberately not fixed:** the row-height model still leans
+  ~7dp/row on short rows. `maintainVisibleContentPosition` makes that bias
+  invisible rather than absent; tightening the model is separate work.
 
 **2026-09-22 — M11 merged (PR #92, squash `4729366`). #93, #94, #95 CLOSED.
 #96 stays open.** 31 commits: the surah-name picker, the Russian surah-name
