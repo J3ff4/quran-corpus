@@ -141,6 +141,19 @@ describe('morphology tab', () => {
     expect(screen.queryByTestId('wbw-screen')).toBeNull();
   });
 
+  it('draws no header of its own while the read is in flight', () => {
+    // The empty state's card is not this screen's header -- WbwScreen's is, and
+    // it arrives one async gate later. Drawn here too, a reader with a position
+    // saw a full card titled "Word by word" replaced by a different card a
+    // moment after (owner, 2026-09-24). One entry, one header.
+    mocks.position = null;
+    mocks.loading = true;
+
+    render(<MorphologyRoute />);
+
+    expect(screen.queryByTestId('header-card')).toBeNull();
+  });
+
   it('draws the chrome on every branch that is not the screen itself', () => {
     // The route runs headerShown: false so WbwScreen's own HeaderCard is the
     // only back button -- which leaves this branch, the one a fresh install

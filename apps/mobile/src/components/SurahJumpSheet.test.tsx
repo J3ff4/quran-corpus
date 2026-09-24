@@ -12,11 +12,15 @@ vi.mock('react-native', async () => {
       onChangeText,
       testID,
       accessibilityLabel,
+      // Forwarded, because a prop the mock drops is a prop no test can ever
+      // catch -- the lesson the rnHosts shim learned about shadows.
+      accessibilityHint,
       editable,
     }: Record<string, unknown>) =>
       React.createElement('input', {
         'data-testid': testID,
         'aria-label': accessibilityLabel,
+        'aria-description': accessibilityHint,
         disabled: editable === false,
         value: value as string,
         onChange: (event: { target: { value: string } }) =>
@@ -132,6 +136,21 @@ describe('SurahJumpSheet', () => {
     // would reject every real ayah for as long as the read takes.
     renderSheet({ ayahCountOf: () => null });
     expect((screen.getByTestId('ayah-jump-input') as HTMLInputElement).disabled).toBe(true);
+  });
+
+  it('says why the ayah field is dead, and only while it is', () => {
+    // Announced without it, TalkBack says "Ayah, edit box, disabled" and gives
+    // no reason -- the range that would have explained it is the very thing
+    // still missing. The loaded field gets no hint: label, range and role
+    // already say everything a hint would repeat (owner, 2026-09-24).
+    renderSheet({ ayahCountOf: () => null });
+    expect(screen.getByTestId('ayah-jump-input').getAttribute('aria-description')).toBe(
+      'Loading surah lengths',
+    );
+
+    cleanup();
+    renderSheet({ ayahCountOf: () => 286 });
+    expect(screen.getByTestId('ayah-jump-input').getAttribute('aria-description')).toBeNull();
   });
 
   it('offers the browse row only when a caller can open the picker', () => {

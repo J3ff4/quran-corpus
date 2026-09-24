@@ -54,7 +54,13 @@ export function VersePicker({ from, to, ayahCount, uiLocale, onRange }: VersePic
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        paddingRight: 4,
+        // Centred, because the only caller hands this a `flex: 1` track
+        // between the two surah chevrons. Packed to the start, the whole
+        // group -- both arrows and the range -- sat left of the row's centre
+        // while the chevrons flanking it were symmetric about it (owner
+        // device report, 2026-09-24). No paddingRight either: an odd 4dp on
+        // one side is the same lean, smaller.
+        justifyContent: 'center',
       }}
     >
       <Pressable
