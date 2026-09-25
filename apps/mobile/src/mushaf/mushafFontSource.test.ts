@@ -36,7 +36,7 @@ describe('mushafFontSource', () => {
       MUSHAF_FONTS_INLINE: true,
       MUSHAF_FONT_ASSETS: { 1: 42 },
     }));
-    const { mushafFontSource: withGap } = await import('./mushafFontSource');
+    const { mushafFontSource: withGap } = await import('./mushafFontSource.js');
     // Not "return a pack path": in an inline build a gap means the generator
     // did not run, and turning that into a path the device cannot find reports
     // it as a download failure three layers from the cause.
@@ -49,7 +49,7 @@ describe('mushafFontSource', () => {
         MUSHAF_FONTS_INLINE: false,
         MUSHAF_FONT_ASSETS: {},
       }));
-      const { mushafFontSource: fromPack } = await import('./mushafFontSource');
+      const { mushafFontSource: fromPack } = await import('./mushafFontSource.js');
 
       expect(fromPack(1)).toBe('mushaf_fonts/p001.ttf');
       expect(fromPack(604)).toBe('mushaf_fonts/p604.ttf');
@@ -60,7 +60,7 @@ describe('mushafFontSource', () => {
         MUSHAF_FONTS_INLINE: false,
         MUSHAF_FONT_ASSETS: {},
       }));
-      const { mushafFontSource: fromPack } = await import('./mushafFontSource');
+      const { mushafFontSource: fromPack } = await import('./mushafFontSource.js');
 
       // Load-bearing, not cosmetic. expo-asset's Android downloadAsync routes a
       // colon-free string to the AssetManager and anything else (bar
@@ -86,7 +86,7 @@ describe('an older manifest with no delivery flag', () => {
       MUSHAF_FONTS_INLINE: undefined,
       MUSHAF_FONT_ASSETS: { 7: 107 },
     }));
-    const { mushafFontSource: legacy } = await import('./mushafFontSource');
+    const { mushafFontSource: legacy } = await import('./mushafFontSource.js');
 
     expect(legacy(7)).toBe(107);
   });
