@@ -1391,6 +1391,45 @@ The artifact test `is a single self-contained file` caught the broken asset
 the aborted run left behind (header `[2, 2]`), which is what kept it from
 reaching a build.
 
+### The Play download, measured with bundletool
+
+The baseline log recorded the AAB's own 206,349,349 B as an **upper bound**,
+because Play's 200 MB cap is on the per-device compressed download it
+generates, not on the bundle. bundletool 1.18.1 (`build-apks --mode=default`
+then `get-size total`) settles it:
+
+| Artefact | AAB on disk | Real download (MIN-MAX) | Margin under 200 MB |
+| --- | --- | --- | --- |
+| baseline, vc55 pre-S2 | 206,349,349 B | 196,960,597 - 197,145,089 B | **2.9 MB (1.4%)** |
+| after Tasks 2 + 3 | 194,905,825 B | 183,953,121 - 184,137,954 B | **15.9 MB (7.9%)** |
+
+**The baseline was never over the cap.** The AAB overstated the download by
+~9.2 MB, so the "6.3 MB over" figure the Task 1 log flagged as unverified was
+an artefact of measuring the wrong thing -- exactly the reason it was written
+down as a bound rather than a number. The app shipped under the cap with a
+1.4% margin, which is thin enough that any content addition would have
+breached it without warning.
+
+Tasks 2 and 3 took **13.0 MB** off the real download (more than the 11.35 MB
+the deflated DB predicted, because Play's split compression differs from a raw
+deflate), and moved the margin from 1.4% to 7.9%.
+
+**What this does to Task 5.** The install-time font pack was scoped as the
+thing that gets the app *under* the cap. It never was that. It is now
+headroom: 604 TTFs are 127.3 MB of the download, and moving them into an
+asset pack takes the base download to roughly 57 MB. That is still worth
+doing -- a 1.4% margin was one content addition from a blocked release, and
+7.9% is not much better against a corpus that grows -- but it is no longer a
+ship blocker, and it can be sequenced behind the web work in Task 6 rather
+than ahead of it.
+
+Reproduce: `java -jar bundletool-all-1.18.1.jar build-apks --bundle=<aab>
+--output=x.apks --mode=default` then `get-size total --apks=x.apks`. The
+Gradle cache's `bundletool-1.18.1.jar` is the library jar and has no main
+manifest; `bundletool-all` from the GitHub release is the runnable one. JDK 17
+is at `/home/claude/tools/jdk-17.0.20.1+1` and is not on PATH. Each `.apks` is
+~444 MB, so delete it after reading the size -- this box runs at 92% full.
+
 ### After (Task 7)
 
 | Metric | Baseline | After | Delta |
