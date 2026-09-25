@@ -1,5 +1,6 @@
 import Constants from 'expo-constants';
-import { ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
+import { router } from 'expo-router';
 import { RECITERS } from '@quran-corpus/data/mobile';
 import { selectedTranslators, type SelectedTranslatorLanguage } from '@quran-corpus/mobile-data';
 
@@ -121,6 +122,26 @@ export function AboutScreen() {
           ))}
         </CreditGroup>
       ))}
+
+      {/* GPLv2 obligations, discharged where the licence is named. The corpus
+          credit above says "GNU General Public License"; naming a copyleft
+          licence and then shipping neither its text nor an offer of source is
+          the non-compliant state (#39). The offer points at the public repo
+          rather than an address (owner ruling, 2026-09-24). */}
+      <GlassSurface style={{ padding: 16, gap: 12, marginTop: 10 }}>
+        <Text style={{ color: theme.mutedText, fontSize: typography.body }}>
+          {t(uiLocale, 'about.sourceOffer')}
+        </Text>
+        <Pressable
+          testID="about-license-link"
+          accessibilityRole="link"
+          onPress={() => router.push('/license')}
+        >
+          <Text style={{ color: theme.accent, fontSize: typography.body }}>
+            {t(uiLocale, 'about.viewLicense')}
+          </Text>
+        </Pressable>
+      </GlassSurface>
 
       <CreditGroup title={t(uiLocale, 'about.groupRecitation')}>
         <CreditRow

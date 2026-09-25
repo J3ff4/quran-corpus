@@ -19,6 +19,11 @@ const ALLOWED_COLLISIONS: Partial<Record<UiStringKey, readonly ('uz' | 'ru')[]>>
   // English wording -- a translated licence notice is not the notice. The
   // sentence around it is the credit; this string IS the legal text.
   'about.sourceNewsreader': ['uz', 'ru'],
+  // The title of one specific document, like a book title. "GNU General Public
+  // License" names the thing the app is obliged to ship; a translated name
+  // points at a document that does not exist. The screen's chrome around it is
+  // localised -- see about.viewLicense, which is translated in both.
+  'license.title': ['uz', 'ru'],
 };
 
 // Concatenate every .ts/.tsx source file under src/ and app/, except the

@@ -75,6 +75,7 @@ interface HostProps {
   onTextLayout?: unknown;
   pointerEvents?: 'auto' | 'none' | 'box-none' | 'box-only';
   renderToHardwareTextureAndroid?: boolean;
+  selectable?: boolean;
 }
 
 /** RN accepts `style={[a, b]}`; the DOM does not.
@@ -396,6 +397,7 @@ export function host(tag: string) {
     pointerEvents,
     hitSlop,
     renderToHardwareTextureAndroid,
+    selectable,
     onStartShouldSetResponderCapture,
     ...props
   }: HostProps) {
@@ -451,6 +453,11 @@ export function host(tag: string) {
         // Mapped rather than spread, same reason again: React warns about the
         // camelCase prop on a DOM node, and dropping it would make the one
         // assertion that the mushaf page is held as GPU pixels decorative.
+        // Mapped, not spread: React DOM drops a boolean-valued unknown attribute, so
+        // a suite could never tell a selectable Text from a non-selectable one. It
+        // is the practical half of "we gave you the licence" -- the user has to be
+        // able to copy the terms off the device.
+        'data-selectable': selectable ? 'true' : undefined,
         'data-hardware-layer': renderToHardwareTextureAndroid ? 'true' : undefined,
         // React DOM has no responder system, so this RN-only prop would be
         // rendered as an unknown attribute and warn. Mapped onto `touchstart`

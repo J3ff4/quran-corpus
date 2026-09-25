@@ -13,6 +13,11 @@ vi.mock('expo-constants', () => ({
   default: { expoConfig: { version: '1.2.3' } },
 }));
 
+// AboutScreen pushes /license; this suite had no expo-router mock because
+// nothing in it navigated until the licence link.
+const mocks = vi.hoisted(() => ({ push: vi.fn() }));
+vi.mock('expo-router', () => ({ router: { push: mocks.push } }));
+
 vi.mock('react-native', async () => (await import('@/testing/rnHosts.js')).reactNativeTextMock());
 
 describe('AboutTab', () => {
@@ -112,5 +117,11 @@ describe('AboutTab', () => {
     render(<AboutTab />);
 
     expect(screen.getByTestId('app-version').textContent).toBe('Quran Corpus 1.2.3');
+  });
+
+  it('states where the source is and links to the licence', () => {
+    render(<AboutTab />);
+    expect(screen.getByText(/github\.com\/J3ff4\/quran-corpus/)).toBeTruthy();
+    expect(screen.getByTestId('about-license-link')).toBeTruthy();
   });
 });

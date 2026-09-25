@@ -240,6 +240,9 @@ export type UiStringKey =
   | 'about.sourceMushafFont'
   | 'about.sourceAudio'
   | 'about.sourceCorpus'
+  | 'about.sourceOffer'
+  | 'about.viewLicense'
+  | 'license.title'
   | 'about.sourceLane'
   | 'about.sourceHansWehr'
   | 'about.sourceEditorial'
@@ -496,6 +499,18 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     // single hard-coded name would be wrong for nine of the choices.
     'about.sourceAudio': 'Streamed per-ayah audio. The voice is chosen in Settings; every reciter the app can play is listed below.',
     'about.sourceCorpus': 'Word-by-word morphology and grammar. GNU General Public License.',
+    'license.title': 'GNU General Public License',
+    'about.viewLicense': 'Read the GNU General Public License',
+    // GPLv2 3 discharged the 3(a) way, not the 3(b) way: the corresponding
+    // source is published and reachable, so there is no written offer to make.
+    // 3(b) is the fallback for when it is not, and it carries a three-year
+    // commitment plus an address -- and an address in a shipped app is a
+    // personal contact detail distributed to every user (owner ruling,
+    // 2026-09-24). What is published is the app source and the scraper,
+    // importers and schema that build the corpus DB; the built DB itself is
+    // gitignored, which is also why F-Droid cannot build this repo yet.
+    'about.sourceOffer':
+      'The complete corresponding source for this app, and for the corpus data it uses, is published at github.com/J3ff4/quran-corpus.',
     'about.sourceLane': 'Root definitions, via qurandev/roots. Public domain.',
     'about.sourceHansWehr': 'Concise modern glosses, shown first on a root entry.',
     'about.sourceEditorial': 'Roots written for this app, where no source covered them.',
@@ -733,6 +748,10 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceMushafFont': 'Mushaf sahifalari teriladigan shriftlar, har sahifaga bittadan. Shoh Fahd Qur’on bosmaxonasi, Quranic Universal Library orqali.',
     'about.sourceAudio': 'Har bir oyat uchun oqim orqali audio. Qori Sozlamalarda tanlanadi; ilova ijro eta oladigan barcha qorilar quyida.',
     'about.sourceCorpus': 'So‘zma-so‘z morfologiya va grammatika. GNU General Public License.',
+    'license.title': 'GNU General Public License',
+    'about.viewLicense': 'GNU General Public License bilan tanishing',
+    'about.sourceOffer':
+      'Ushbu ilova va u ishlatadigan korpus maʼlumotlarining toʻliq manba kodi github.com/J3ff4/quran-corpus manzilida chop etilgan.',
     'about.sourceLane': 'O‘zak ta’riflari, qurandev/roots orqali. Jamoat mulki.',
     'about.sourceHansWehr': 'Qisqa zamonaviy ma’nolar, o‘zak sahifasida birinchi ko‘rsatiladi.',
     'about.sourceEditorial': 'Hech bir manba qamrab olmagan o‘zaklar shu ilova uchun yozilgan.',
@@ -968,6 +987,10 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceMushafFont': 'Постраничные шрифты, которыми набраны страницы мусхафа, по одному на страницу. Комплекс имени короля Фахда, через Quranic Universal Library.',
     'about.sourceAudio': 'Потоковое аудио по аятам. Чтец выбирается в настройках; ниже перечислены все, кого приложение может воспроизвести.',
     'about.sourceCorpus': 'Пословная морфология и грамматика. GNU General Public License.',
+    'license.title': 'GNU General Public License',
+    'about.viewLicense': 'Открыть GNU General Public License',
+    'about.sourceOffer':
+      'Полный исходный код этого приложения и используемых им данных корпуса опубликован по адресу github.com/J3ff4/quran-corpus.',
     'about.sourceLane': 'Определения корней, через qurandev/roots. Общественное достояние.',
     'about.sourceHansWehr': 'Краткие современные значения, показываются первыми на странице корня.',
     'about.sourceEditorial': 'Корни, написанные для этого приложения там, где их не покрыл ни один источник.',
