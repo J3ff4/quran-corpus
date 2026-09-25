@@ -1219,7 +1219,33 @@ human walked to the phone between `reset` and the first touch (arm A carries
 record; neither is an acceptance criterion, because a human-timed window
 sets them.
 
-**AAB download size (Task 1 Step 4), or the reason it was declined:**
+**AAB download size (Task 1 Step 4), or the reason it was declined:** built
+2026-09-25 (owner chose to take it now). `bundleRelease -x lint
+-PreactNativeArchitectures=arm64-v8a`, and it took **1 m 21 s**, not the ~40 min
+budgeted — 544 of 573 tasks were up-to-date from the vc55 APK build.
+
+`app-release.aab` = **206,349,349 B (206.3 MB)**.
+
+| Entry class | Raw | Compressed |
+| --- | --- | --- |
+| `.db` | 164.8 MB | 42.2 MB |
+| `.ttf` | 192.6 MB | 127.5 MB |
+| everything else (lib, dex, res, JS bundle) | 110.2 MB | 36.3 MB |
+| **total** | 467.6 MB | **206.0 MB** |
+
+**This is an upper bound on the download, not the download.** `bundletool` was
+not run (the owner chose the build-only option), and Play's cap applies to the
+per-device split it generates from this bundle, which is smaller than the
+bundle itself. So 206.3 MB is the number to beat, and the true figure is some
+unknown amount below it.
+
+That matters more than it looks: the cap is 200 MB and the bound is 206.3 MB,
+**6.3 MB over**. Task 2 alone has already taken 5.4 MB off the compressed
+download. So the question of whether the font pack in Task 5 is *required* —
+as opposed to merely worthwhile — now turns on a margin narrower than the
+measurement error, and `bundletool get-size total` is the only instrument that
+settles it. Flagged for the owner rather than assumed in either direction.
+
 
 **Web baseline, and which instrument took it:** Lighthouse **12.8.2**,
 `--preset=desktop`, against `next start -p 3000` on the production build of
@@ -1279,6 +1305,27 @@ flight payload, not markup, so it is not addressable by trimming the DOM.
 Gzip takes it to 537 kB, so as with the APK the raw number overstates the
 prize by roughly 9x. CLS is already 0 and the score is 93; the lever here is
 payload, not rendering.
+
+### Task 2 — VACUUM at seal time
+
+| Metric | Baseline | After | Delta |
+| --- | --- | --- | --- |
+| bundled `quran.db` on disk | 164,765,696 B | 126,955,520 B | **−37.8 MB** |
+| bundled `quran.db` deflated | 41,614,227 B | 36,224,881 B | **−5.4 MB of download** |
+
+The plan predicted ~127 MB on disk and 6.0 MB of download; on-disk landed
+exactly, download came in at 5.4 MB. Regeneration took 4.5 s total.
+
+Content gate (Step 7), all matching the plan's expected values: 6236 ayahs,
+77,429 words, 128,219 segments, FTS hits **1663 / 172 / 65** for the Arabic,
+English and Russian probes, 36 mushaf lines on page 1. `PRAGMA
+integrity_check` = ok, `journal_mode` = delete, no `-wal`/`-shm` sidecars.
+Canonical `/home/claude/quran-data/quran.db` unchanged at 164,765,696 B.
+
+Mutation-check (Step 5): commenting out the `VACUUM` made the repack test fail
+(`expected 16429056 to be less than 13143244.8`); restoring it by re-edit
+produced a file byte-identical to the pre-mutation copy, and both tests pass
+again. Full `packages/mobile-data` suite 16/16, `tsc --noEmit` clean.
 
 ### After (Task 7)
 
