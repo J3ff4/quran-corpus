@@ -57,6 +57,18 @@ export async function sealOpenDb(db: SealableDb): Promise<void> {
   if (String(mode).toLowerCase() !== 'delete') {
     throw new Error(`journal_mode is still ${String(mode)} after requesting DELETE; the file would ship expecting a -wal sidecar`);
   }
+
+  // Repack. 36 of the corpus DB's 65 MB `words` table is unused space inside
+  // allocated pages -- rows grown by the morphology_description, grammar_note
+  // and pos_tag backfills -- and a bundled asset pays for every hole it ships.
+  // Measured 2026-09-24: 164.8 MB -> 127.0 MB in 2.3 s (6.0 MB of download).
+  //
+  // Last, because VACUUM cannot run inside a transaction and must own the
+  // file: this is the one point in sealing where both hold. (The ORDER does
+  // not decide the journal mode -- vacuum-then-seal and seal-then-vacuum were
+  // both measured to end in DELETE, because the mode switch rewrites the
+  // header either way. Do not justify the placement on that.)
+  await db.execute('VACUUM');
 }
 
 /**
