@@ -1158,14 +1158,127 @@ beside the baseline; no metric regressed without a recorded reason.
 
 ### Baseline (Task 1)
 
+Taken 2026-09-25 on the vc55 release APK (the S1 build), OnePlus 7 Pro /
+Android 12, via `$CLAUDE_JOB_DIR/tmp/s2-measure.sh baseline`.
+
 | Metric | Value | Unit |
 | --- | --- | --- |
+| `apk_bytes` | 219,036,359 | bytes |
+| `db_bytes` | 164,765,696 | bytes |
+| `fonts_bytes` | 190,990,690 | bytes |
+| `apk_db_zip_bytes` | 41,614,227 | bytes |
+| `apk_fonts_zip_bytes` | 127,322,246 | bytes |
+| `cold_start_run1` | 964 | ms |
+| `cold_start_run2` | 877 | ms |
+| `cold_start_run3` | 851 | ms |
+| `frame_gap_p50` | 11.1 | ms |
+| `frame_gap_p95` | 22.3 | ms |
+| `frame_gap_max` | 1137.9 | ms |
+| `frames_over_32ms` | 4 | count |
+| `frames_total` | 118 | count |
 
-**Instrument non-vacuity check (Task 1 Step 2):**
+Cold-start median **877 ms**. The compressed columns reproduce the
+2026-09-24 table, so the baseline and the plan's premise agree.
+
+`frame_gap_p50` is **11.1 ms, not 16.7** — this panel runs at 90 Hz, so the
+frame budget on this device is 11.1 ms. A later task must not read 16.7 as
+"on budget" here.
+
+**Instrument non-vacuity check (Task 1 Step 2):** RUN, and it **found the
+instrument broken**.
+
+*Defect 1 — the parser read the wrong column.* The plan's script hardcodes
+`parts[1]` as `IntendedVsync` on a stated 19-column `PROFILEDATA` layout.
+Android 12 emits **22 columns with `FrameTimelineVsyncId` inserted at index
+1**, so `parts[1]` was a vsync *id*; consecutive ids differ by 2, and
+`2 / 1e6` rounds to 0.0 ms. First run reported `p50 0.0 / p95 0.0 /
+max 0.0` across 118 frames — an instrument that could never move. Fixed by
+locating the column by name from the header line
+(`$CLAUDE_JOB_DIR/tmp/s2-gaps.py`); the script now shells out to that file
+rather than carrying its own copy.
+
+*Arms, after the fix:*
+
+| Arm | n | p50 | **p95** | max | over-32 ms | over-32 ms, idle gaps removed |
+| --- | --- | --- | --- | --- | --- | --- |
+| A — mushaf, 3-page swipe | 118 | 11.1 | **22.3** | 1137.9 | 4 | **1** |
+| B — About, scrolled | 119 | 11.1 | **11.2** | 1525.8 | 3 | **2** |
+
+*Ruling — arm B is a scroll, not a still screen.* The plan asked for the
+control arm to sit still on About. A still screen redraws nothing, so
+`frames_total` would be 0, and the plan's own criterion ("`frames_total`
+non-zero on both") could not be met by the interaction it specified. Arm B
+scrolls About instead: same interaction shape, lighter content.
+
+*Ruling — `frame_gap_p95` is this phase's jank metric.* p95 doubles between
+the arms (22.3 vs 11.2 ms), so the instrument discriminates. `frame_gap_max`
+and `frames_over_32ms` do **not**: their values are the idle gaps while a
+human walked to the phone between `reset` and the first touch (arm A carries
+423 / 1103 / 1138 ms, arm B 1526 ms). Strip gaps >=200 ms and the counts are
+1 and 2 — noise, and in the wrong direction. Both stay in the TSV for the
+record; neither is an acceptance criterion, because a human-timed window
+sets them.
 
 **AAB download size (Task 1 Step 4), or the reason it was declined:**
 
-**Web baseline, and which instrument took it:**
+**Web baseline, and which instrument took it:** Lighthouse **12.8.2**,
+`--preset=desktop`, against `next start -p 3000` on the production build of
+`6d566fb`. Lighthouse is not a repo dependency and `npx` could not find a
+browser (`CHROME_PATH must be set`); it was pointed at the Chromium
+Playwright already has at
+`~/.cache/ms-playwright/chromium-1232/chrome-linux64/chrome`. **Task 6's
+"after" must use the same version, preset and browser.** TTFB figures are
+`curl -w %{time_starttransfer}`, warmed once then three reads.
+
+Per-route First Load JS, from the build output:
+
+| Route | Size | First Load JS | Render |
+| --- | --- | --- | --- |
+| `/` | 627 B | 151 kB | dynamic |
+| `/surah/[id]` | 6.19 kB | **154 kB** | dynamic |
+| `/word/[surah]/[ayah]/[position]` | 828 B | 145 kB | dynamic |
+| `/surah/[id]/words` | 5.39 kB | 116 kB | dynamic |
+| `/dictionary/[root]` | 875 B | 115 kB | dynamic |
+| `/dictionary` | 2.23 kB | 113 kB | dynamic |
+| `/bookmarks` | 1.21 kB | 108 kB | dynamic |
+| `/about`, `/surah`, `/offline`, `/dictionary/lemma-frequency`, `/dictionary/verb-concordance` | <=170 B | 107 kB | dynamic (`/offline` static) |
+| shared by all | — | **104 kB** | — |
+| middleware | — | 34.2 kB | — |
+
+Only `/manifest.webmanifest` and `/offline` are static. Everything else is
+`force-dynamic`, which is the CSP-nonce decision from PR #25 and is
+**architectural** — see the plan's own note; do not "fix" the TTFB by
+removing it.
+
+Lighthouse on `/surah/2` (286 ayahs, the worst real page) — **performance 93**:
+
+| Audit | Value |
+| --- | --- |
+| First Contentful Paint | 0.7 s |
+| Speed Index | 0.7 s |
+| Largest Contentful Paint | 1.5 s |
+| Time to Interactive | 1.5 s |
+| Total Blocking Time | 120 ms |
+| Cumulative Layout Shift | 0 |
+| Server response time | 270 ms |
+| Total byte weight | 1,389 KiB |
+| DOM size | 633 elements |
+
+TTFB by route (three reads each, after one warm-up):
+
+| Route | TTFB | HTML on the wire |
+| --- | --- | --- |
+| `/` | 9.8 / 10.0 / 9.0 ms | 42.6 kB |
+| `/surah/2` | 234 / 221 / 251 ms | **4.82 MB raw, 537 kB gzipped** |
+| `/surah/2/words` | 51.9 / 51.5 / 49.5 ms | 392 kB |
+| `/dictionary` | 32.3 / 28.9 / 28.8 ms | 657 kB |
+
+**The web finding Task 6 should argue from.** `/surah/2` serves **4.82 MB of
+HTML** while rendering only 633 DOM elements — the bulk is the inline RSC
+flight payload, not markup, so it is not addressable by trimming the DOM.
+Gzip takes it to 537 kB, so as with the APK the raw number overstates the
+prize by roughly 9x. CLS is already 0 and the score is 93; the lever here is
+payload, not rendering.
 
 ### After (Task 7)
 
