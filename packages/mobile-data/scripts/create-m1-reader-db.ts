@@ -7,7 +7,8 @@ import {
   selectedTranslators,
   type SelectedTranslatorLanguage,
 } from '../src/translators.js';
-import { checkpointWal, sealDbForBundling } from './sealDb.js';
+import { pruneOpenDb } from './pruneForMobile.js';
+import { checkpointWal, removeJournalSidecars, sealOpenDb } from './sealDb.js';
 
 const SELECTED_TRANSLATOR_ENTRIES: [string, string][] = Object.entries(selectedTranslators);
 
@@ -121,7 +122,26 @@ export async function syncM1ReaderDbAsset({
 
   await mkdir(dirname(targetDbPath), { recursive: true });
   await copyFile(sourceDbPath, targetDbPath);
-  await sealDbForBundling(targetDbPath);
+  // One connection for both, not sealDbForBundling's by-path reopen: libsql
+  // keeps the WAL lock past close(), and this copy is in WAL because the
+  // database it was copied from is. Pruning by path then sealing by path threw
+  // SQLITE_BUSY after the delete had already run (measured 2026-09-25).
+  //
+  // Prune BEFORE the seal, because sealOpenDb vacuums and pages freed after
+  // the repack would ship as holes -- measured at 25.6 MB: prune-then-vacuum
+  // lands at 101.3 MB, vacuum-then-prune at 127.0 MB. The prune takes ~7.5
+  // minutes on its own; the FTS delete trigger fires once per row, 31k times.
+  const target = createDatabase(`file:${targetDbPath}`);
+  try {
+    const pruned = await pruneOpenDb(target);
+    console.log(
+      `[m1] pruned ${pruned.translationsDeleted} translation rows the app cannot display`,
+    );
+    await sealOpenDb(target);
+  } finally {
+    target.close();
+  }
+  await removeJournalSidecars(targetDbPath);
 
   // Unconditional, where this used to skip when the shas matched. Sealing
   // rewrites the copy's header, so a sealed target is never byte-identical to

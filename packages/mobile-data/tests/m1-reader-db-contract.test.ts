@@ -156,6 +156,12 @@ describe('M1 reader DB contract', () => {
     await source.execute('PRAGMA journal_mode = WAL');
     await source.execute('CREATE TABLE marker (n INTEGER)');
     await source.execute('INSERT INTO marker (n) VALUES (7)');
+    // syncM1ReaderDbAsset prunes the copy before sealing it, so the fixture
+    // needs the table it prunes. No search_fts here: trg_translations_ad only
+    // exists in schema.sql, and this case is about the seal, not the prune.
+    await source.execute(
+      'CREATE TABLE translations (id INTEGER PRIMARY KEY, ayah_id INTEGER, language_code TEXT, translator TEXT, text TEXT)',
+    );
     source.close();
     // Guards the premise of the case: with a source that is not in WAL mode
     // there is nothing to seal and the assertions below would pass vacuously.

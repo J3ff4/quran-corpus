@@ -1327,6 +1327,70 @@ Mutation-check (Step 5): commenting out the `VACUUM` made the repack test fail
 produced a file byte-identical to the pre-mutation copy, and both tests pass
 again. Full `packages/mobile-data` suite 16/16, `tsc --noEmit` clean.
 
+### Task 3 — prune the unreachable translator sets
+
+**Ordering, measured rather than assumed (Step 6).** Two copies of the
+already-vacuumed bundled DB, the same two operations, opposite order:
+
+| Order | Final size |
+| --- | --- |
+| A — prune, then VACUUM | 101,306,368 B |
+| B — VACUUM, then prune | 126,955,520 B |
+
+**25.6 MB.** Order B ends at exactly the size it started, because the pages the
+delete frees are inside a file nothing repacks afterwards — they ship in the
+APK as holes. So the comment in `create-m1-reader-db.ts` is a measured fact,
+not a belief, and `pruneForMobile` must stay above `sealDbForBundling`. Each
+order took ~452 s, which also confirms the plan's ~7.5 min estimate for the
+delete: the FTS delete trigger fires once per row.
+
+Mutation-check (Step 4): flipping `WHERE NOT (…)` to `WHERE (…)` failed both
+tests, the first naming the three sets left alive
+(`expected [ 'ru/Elmir Kuliev', …(2) ]`) rather than passing on an empty list
+both ways. Restored by re-edit, verified byte-identical by `diff`.
+
+**Result (Step 7).**
+
+| Metric | After Task 2 | After Task 3 | Delta |
+| --- | --- | --- | --- |
+| bundled `quran.db` on disk | 126,955,520 B | 101,486,592 B | **-25.5 MB** |
+| bundled `quran.db` deflated | 36,224,881 B | 30,260,155 B | **-6.0 MB of download** |
+
+Cumulative against the Task 1 baseline: **164.77 -> 101.49 MB on disk**
+(-63.3 MB) and **41.61 -> 30.26 MB of download** (-11.35 MB). The plan
+predicted 101.3 MB and 5.7 MB; both landed slightly better.
+
+Content gate, every value as predicted: the four selected sets at 6236 rows
+each and no others, 6236 ayahs, 77,429 words, 128,219 segments, 6236 FTS rows
+across five sources, 36 layout rows on mushaf page 1, `integrity_check` ok,
+`journal_mode` delete, no sidecars, header bytes 18/19 = 1/1. FTS probes
+**1663 / 172 / 23**: Russian falls 65 -> 23 because the other three Russian
+sets are gone, and Arabic and English unchanged says the prune did nothing
+else. Canonical `/home/claude/quran-data/quran.db` untouched at 164,765,696 B,
+mtime still 2026-09-21.
+
+**A defect the plan's Step 5 walked into.** Pruning by path and then sealing by
+path is two connections, and libsql holds the WAL lock past `close()` -- the
+copy is in WAL because `schema.sql:2` puts the database it was copied from
+there. The first regeneration ran the whole 31,180-row delete and then threw
+`SQLITE_BUSY` at `journal_mode = DELETE`, six minutes in, leaving an
+unvacuumed 164.8 MB asset on disk. `sealDb.ts` already documents exactly this
+and answers it with the `sealOpenDb` split; `pruneForMobile` now carries the
+same split (`pruneOpenDb`), and the generator prunes and seals on one
+connection.
+
+`m1-reader-db-contract.test.ts`'s "overwrites a stale mobile DB and seals the
+copy out of WAL mode" case *should* have caught it in 57 ms -- its fixture
+source is WAL, which is the whole premise of the case -- and did not, because
+that fixture had no `translations` table, so the prune threw `no such table`
+before reaching the seal. With the table added it now fails with `database is
+locked` when the generator is reverted to the by-path seal. Mutation-checked
+in both directions.
+
+The artifact test `is a single self-contained file` caught the broken asset
+the aborted run left behind (header `[2, 2]`), which is what kept it from
+reaching a build.
+
 ### After (Task 7)
 
 | Metric | Baseline | After | Delta |
