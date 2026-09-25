@@ -29,10 +29,22 @@ const PACK = 'mushaf_fonts';
  * routing that makes that the one loadable form.
  *
  * NOT APPLIED FOR F-DROID. F-Droid has no pack mechanism and no size cap, so
- * its artefact is the inline build: leave EXPO_MUSHAF_ASSET_PACK unset and the
- * next prebuild is that build.
+ * its artefact is the inline build. Leaving this in app.json is safe: the
+ * plugin no-ops unless EXPO_MUSHAF_ASSET_PACK=1, the same switch
+ * metro.config.js reads, so one variable decides both halves and they cannot
+ * disagree.
  */
 const withMushafAssetPack = (config) => {
+  // Gated on the SAME env var as metro.config.js's manifest alias, and that
+  // pairing is the whole safety property. Metro decides whether the 604
+  // require() calls exist; this plugin decides whether the pack exists. If the
+  // two ever disagree the build ships the fonts TWICE -- 189.7 MB of pack on
+  // top of 192.6 MB of res/raw -- which is the regression the plan's Step 3
+  // point 5 is written to catch, and it fails silently.
+  //
+  // Unset is the F-Droid build: no pack, fonts inline, prebuild untouched.
+  if (process.env.EXPO_MUSHAF_ASSET_PACK !== '1') return config;
+
   config = withSettingsGradle(config, (cfg) => {
     if (!cfg.modResults.contents.includes(`include ':${PACK}'`)) {
       cfg.modResults.contents += `\ninclude ':${PACK}'\n`;

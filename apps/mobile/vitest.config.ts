@@ -15,6 +15,10 @@ export default defineConfig({
     // module, which ships vitest and react-dom to the device and breaks
     // `expo export` outright. Route tests live in src/test/routes/ and import
     // the route by relative path. Kept in step with tsconfig.test.json.
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    // plugins/ is outside src/ for the same reason app/ is excluded -- it is
+    // build tooling, not shipped code, and Metro must never see it -- but its
+    // test still has to run: the env gate it covers is what keeps the 604
+    // fonts from shipping twice.
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'plugins/**/*.test.mjs'],
   },
 });
