@@ -587,7 +587,7 @@ freed pages ship as holes. `sealDbForBundling` is called after
 `pruneForMobile`, so the call order in Step 5 gives that — Step 6 proves it
 rather than assuming it.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `packages/mobile-data/tests/pruneForMobile.test.ts`. It seeds from the
 **real** `packages/data/schema.sql`, the way `create-m0-fixture-db.ts` does —
@@ -683,7 +683,7 @@ it('lets the delete trigger take the search rows with them', async () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 ```bash
 cd packages/mobile-data && npx vitest run tests/pruneForMobile.test.ts
@@ -691,7 +691,7 @@ cd packages/mobile-data && npx vitest run tests/pruneForMobile.test.ts
 
 Expected: FAIL — `Failed to resolve import "../scripts/pruneForMobile.js"`.
 
-- [ ] **Step 3: Implement the prune**
+- [x] **Step 3: Implement the prune**
 
 Create `packages/mobile-data/scripts/pruneForMobile.ts`:
 
@@ -745,7 +745,7 @@ export async function pruneForMobile(
 }
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 ```bash
 cd packages/mobile-data && npx vitest run tests/pruneForMobile.test.ts
@@ -755,7 +755,7 @@ Expected: PASS, 2 tests. Then mutation-check the first one: change `NOT (…)`
 to `(…)` and confirm it fails naming the surviving set, rather than passing
 because `.toEqual` was handed an empty list both ways.
 
-- [ ] **Step 5: Wire it into the export, before sealing**
+- [x] **Step 5: Wire it into the export, before sealing**
 
 In `packages/mobile-data/scripts/create-m1-reader-db.ts`, inside
 `syncM1ReaderDbAsset`, between `copyFile` and `sealDbForBundling`:
@@ -778,7 +778,7 @@ Add `import { pruneForMobile } from './pruneForMobile.js';` at the top.
 each of the four selected translators, so a prune that took one of them out
 fails the generator rather than reaching a device.
 
-- [ ] **Step 6: Mutation-check the ordering claim**
+- [x] **Step 6: Mutation-check the ordering claim**
 
 Move the `pruneForMobile` call to *after* `sealDbForBundling`, regenerate, and
 record the resulting file size. Expected: materially larger than the
@@ -789,7 +789,7 @@ rather than a belief. Restore the order by re-editing.
 same experiment on a copy of the bundled DB with a short script and record
 *that* — the claim needs a number, not necessarily a full pipeline run.)
 
-- [ ] **Step 7: Regenerate and verify**
+- [x] **Step 7: Regenerate and verify**
 
 ```bash
 cd /home/claude/projects/quran-corpus-pwa && pnpm generate:m1-db
@@ -810,7 +810,7 @@ drops from 65 to 23 *because* the other three Russian sets are gone — that is
 the assertion that the prune did anything, and 172 and 1663 unchanged is the
 assertion that it did nothing else. DB ≈ 101 MB.
 
-- [ ] **Step 8: Run the whole suite and commit**
+- [x] **Step 8: Run the whole suite and commit**
 
 ```bash
 pnpm test && pnpm type-check && pnpm lint   # root scripts are turbo tasks; there is no `typecheck`
