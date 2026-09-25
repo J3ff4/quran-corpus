@@ -1,7 +1,7 @@
 import * as Font from 'expo-font';
 import { useEffect, useState } from 'react';
 
-import { MUSHAF_FONT_ASSETS } from './fontManifest.generated';
+import { mushafFontSource } from './mushafFontSource';
 
 export const MUSHAF_PAGE_MIN = 1;
 export const MUSHAF_PAGE_MAX = 604;
@@ -41,15 +41,10 @@ export async function loadMushafPageFont(page: number): Promise<string> {
   const family = mushafFontFamily(page);
   if (loaded.has(family)) return family;
 
-  const asset = MUSHAF_FONT_ASSETS[page];
-  if (asset === undefined) {
-    // Every page 1..604 is in the generated manifest, so a gap means the
-    // manifest is stale. Saying so beats handing expo-font `undefined`, which
-    // it accepts and then registers nothing for.
-    throw new Error(
-      `no bundled font for mushaf page ${page}; run \`pnpm generate:mushaf-manifest\``,
-    );
-  }
+  // A Metro handle in the inline build, an asset-pack path in the Play build.
+  // mushafFontSource owns that difference and throws on a stale manifest --
+  // handing expo-font `undefined` is accepted and registers nothing.
+  const asset = mushafFontSource(page);
 
   // Marked loaded only after the await resolves: a failure must be retryable,
   // not poison the page for the life of the process.

@@ -5,6 +5,10 @@ vi.mock('expo-font', () => ({ loadAsync }));
 // The manifest's 604 requires resolve to gitignored .ttf files that a test run
 // has no reason to build, so it is mocked rather than imported.
 vi.mock('./fontManifest.generated', () => ({
+  // Explicit, though mushafFontSource treats an absent flag as inline too:
+  // this fixture stands for the F-Droid build, and saying so beats relying on
+  // a default.
+  MUSHAF_FONTS_INLINE: true,
   MUSHAF_FONT_ASSETS: { 1: 101, 2: 102, 604: 1604 },
 }));
 

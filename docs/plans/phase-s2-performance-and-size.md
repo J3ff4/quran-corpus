@@ -1624,6 +1624,123 @@ meaning filter runs without a round-trip. The lever is documented in
 network round-trip -- and belongs in its own task with its own UX call, not in
 a size phase.
 
+### Task 5 -- the font pack (partial: size proven, device owed)
+
+**Step 1 was answered by reading the installed modules, not on device.** The
+spike asked whether `Font.loadAsync` can load a TTF from an install-time pack.
+Traced 2026-09-25 through `expo-font` and `expo-asset`:
+
+- `expo-font`'s Android `FontLoaderModule.loadAsync` branches on an `asset://`
+  prefix and calls `Typeface.createFromAsset(context.assets, ...)`. So the
+  AssetManager *is* a supported source.
+- Getting there from JS is the catch. `loadAsync` routes its source through
+  `Asset.fromURI(...).downloadAsync()`, and expo-asset's Android
+  `downloadAsync` returns early **only** for `file://`. Everything else goes
+  to `URI.toInputStream()`, which sends a string **with no colon in it** to
+  `openAssetResourceStream(context, ...)` -- the app's own AssetManager --
+  copying it to a cache file returned as `file://`. Anything else containing a
+  `:` that is not `file:///android_res/` falls through to `openRemoteStream`.
+
+So the one loadable form is a **scheme-less, asset-relative path**:
+`mushaf_fonts/p001.ttf` is read from the pack, while `asset://mushaf_fonts/p001.ttf`
+would be fetched over the network and fail -- in airplane mode, which is
+precisely what check 435 tests. That is asserted in
+`mushafFontSource.test.ts` ("never yields a path containing a colon").
+
+One assumption survives that reading and source cannot settle: **install-time
+pack assets are merged into the app's AssetManager namespace.** Checks 433-436
+are what settle it. No conclusion is recorded here that they work.
+
+**The plan's Step 3 point 5 was wrong, and measuring found it.** It said to
+exclude the fonts from "the main APK's assets". They are not in `assets/`:
+React Native's asset pipeline puts non-image assets in `res/raw/` with
+flattened names. Counted on the vc55 bundle: **613 `.ttf` entries under
+`base/res/raw/`, 192,600,256 bytes.** aapt's `ignoreAssetsPattern` cannot
+reach `res/raw`, so nothing downstream of Metro can remove them.
+
+The exclusion therefore happens upstream: `metro.config.js` resolves
+`fontManifest.generated` to `fontManifest.pack.ts` -- an empty map -- when
+`EXPO_MUSHAF_ASSET_PACK=1`. Metro bundles what it can see, so the 604
+`require()` calls have to never exist rather than be stripped later.
+
+**Design notes worth keeping:**
+
+- `MUSHAF_FONTS_INLINE` is checked with `=== false`, not `!`. An absent flag
+  (an older manifest, a fixture predating it) must mean the *inline* build:
+  falling to the pack branch on `undefined` renders a mushaf of tofu in the
+  one build that has no pack to read. Mutation-checked -- swapping to `!`
+  fails "an older manifest with no delivery flag".
+- The existing `pageFont.test.ts` manifest mock had to gain the flag. Same
+  shape as the m1 contract fixture in Task 3: a fixture that does not carry
+  what the new code reads.
+
+### Task 5 Step 5 -- the measurement that reopens the owner's ruling
+
+The pack mechanism works. Verified on the built bundle, not assumed:
+
+| Module | `.ttf` entries | Bytes |
+|---|---|---|
+| `base/` | 7 (the UI faces) | 2,235,684 |
+| `mushaf_fonts/` | **604** | **189,691,644** |
+
+So Step 3's point 5 -- the one the plan flagged as the silent failure -- took
+effect: the fonts **moved** rather than duplicated. The pack's asset root also
+puts them at `mushaf_fonts/p001.ttf` in the AssetManager, which is exactly the
+string `mushafFontSource` returns.
+
+**And the download barely moved.** `get-size total`:
+
+| `--modules` | Download (MIN-MAX) |
+|---|---|
+| `base` alone | **53,245,398 - 53,426,566** |
+| `base,mushaf_fonts` | 179,117,098 - 179,298,266 |
+| *(default: the modules of the first download)* | **179,117,098 - 179,298,266** |
+
+The default equals base+pack, and that is not a bundletool quirk -- it is what
+**install-time** means. An install-time pack is delivered with the app, so it
+is part of the initial download and counts against the 200 MB cap the same as
+the base. The task moved 189.7 MB out of the base module and Play still
+downloads it first.
+
+Against the post-Task-3 build: **183.95-184.14 MB -> 179.12-179.30 MB**, a gain
+of **4.9 MB** -- real (pack assets store better than `res/raw` entries) but not
+the ~127 MB this task was scoped to win. Margin under the cap: 15.9 MB -> 20.7 MB.
+
+**Re-measured with `deliveryType = "fast-follow"`**, the generated gradle only,
+the plugin left on the owner's ruling:
+
+| deliveryType | First download | Margin under 200 MB |
+|---|---|---|
+| install-time | 179,117,098 - 179,298,266 | 20.7 MB (10.4%) |
+| **fast-follow** | **53,245,398 - 53,426,566** | **146.6 MB (73%)** |
+
+Fast-follow's first download *is* the base, to the byte. That is the 130.6 MB.
+
+**This is an owner's ruling to revisit, not a decision to take here.** The
+2026-09-24 ruling chose install-time explicitly for what it buys -- present
+before first launch, no progress UI, no resumption, no integrity checking for
+us to write. That reasoning is intact; what has changed is the price, which is
+now known to be 125.7 MB of first download rather than the nothing the plan
+assumed.
+
+Fast-follow is not a one-line change:
+
+- Its files land in app file storage, reached via
+  `AssetPackManager.getPackLocation(...).assetsPath()`, **not** the
+  AssetManager. So the whole Step 1 finding above inverts: `mushafFontSource`
+  would return a `file://` path, which is the one form expo-asset short-
+  circuits, rather than a scheme-less asset path.
+- That needs the Play Asset Delivery library and native glue to call it from
+  JS -- a new dependency, so §12 applies.
+- The pack downloads *after* install, so the mushaf can be unavailable on a
+  first run with no network. Check 435 (airplane mode) becomes a real risk
+  rather than a formality, and the tab needs a state for "fonts still
+  arriving".
+
+**Recorded as unverified:** the Play upload (no Console listing exists) and
+device checks 433-436. Nothing here claims the fonts load on device -- only
+that the bundle is shaped correctly and what each delivery type costs.
+
 ### After (Task 7)
 
 | Metric | Baseline | After | Delta |

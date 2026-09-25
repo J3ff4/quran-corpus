@@ -2,6 +2,10 @@
 // Run `pnpm generate:mushaf-manifest` to regenerate.
 //
 // The .ttf files are gitignored and produced by `uv run scraper mushaf-fonts`.
+
+/** This build carries the fonts inline. See fontManifest.pack.ts for the other. */
+export const MUSHAF_FONTS_INLINE: boolean = true;
+
 export const MUSHAF_FONT_ASSETS: Record<number, number> = {
   1: require('../../assets/fonts/mushaf/p001.ttf'),
   2: require('../../assets/fonts/mushaf/p002.ttf'),
