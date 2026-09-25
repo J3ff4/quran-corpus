@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { Ayah, Word, Translation } from '@quran-corpus/data/client';
+import type { Ayah, Translation } from '@quran-corpus/data/client';
+import type { ReaderWord } from '../../lib/readerWord';
 import { AyahView } from './AyahView';
 import { Bismillah } from './ornaments/Bismillah';
 import { WordPopover } from './WordPopover';
@@ -18,7 +19,7 @@ const STEP = 20;
 
 interface ReaderViewProps {
   ayahs: Ayah[];
-  wordsByAyah: Record<number, Word[]>;
+  wordsByAyah: Record<number, ReaderWord[]>;
   translationsByAyah: Record<number, Translation>;
   glossesByWordId: Record<number, { text: string; lang: string }>;
   lang: string;
@@ -37,7 +38,7 @@ export function ReaderView({
   bookmarkedAyahs,
 }: ReaderViewProps) {
   const bookmarked = new Set(bookmarkedAyahs);
-  const [selectedWord, setSelectedWord] = useState<Word | null>(null);
+  const [selectedWord, setSelectedWord] = useState<ReaderWord | null>(null);
   const { playingAyahId, isPlaying, isRepeat, play, pause, toggleRepeat } = useAyahAudio(ayahs);
   const paginate = ayahs.length > THRESHOLD;
   const { visibleCount, sentinelRef, done, revealTo } = useIncrementalReveal<HTMLButtonElement>(

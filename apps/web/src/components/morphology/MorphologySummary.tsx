@@ -1,7 +1,7 @@
-import type { Word } from '@quran-corpus/data';
+import type { ReaderWord } from '../../lib/readerWord';
 
 interface MorphologySummaryProps {
-  word: Word;
+  word: ReaderWord;
   gloss?: string;
 }
 
@@ -9,6 +9,12 @@ const chip =
   'rounded-full bg-paper-200 px-3 py-0.5 text-sm text-paper-700 dark:bg-night-100 dark:text-paper-300';
 
 /**
+ * Takes ReaderWord, not Word, and that is the narrower of the two on purpose:
+ * these four fields are the whole of what this renders, and typing the prop to
+ * the row would let the reader page go on serializing 1.74 MB of columns no
+ * one reads. A full `Word` is still assignable, so the word-detail page passes
+ * its own row unchanged.
+ *
  * Shared, non-interactive header presenter for a word: transliteration, gloss,
  * and POS/root/lemma chips. Verbatim prose + Arabic grammar now live in the
  * FullAnalysis collapsible on the word page (kept out of here so the reader

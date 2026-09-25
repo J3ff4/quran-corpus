@@ -2,11 +2,11 @@
 
 import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
-import type { Word } from '@quran-corpus/data/client';
+import type { ReaderWord } from '../../lib/readerWord';
 import { MorphologySummary } from '../morphology/MorphologySummary';
 
 interface WordPopoverProps {
-  word: Word | null;
+  word: ReaderWord | null;
   gloss?: string;
   glossLang?: string;
   pageLang?: string;

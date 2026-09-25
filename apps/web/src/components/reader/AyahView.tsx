@@ -1,4 +1,5 @@
-import type { Ayah, Word, Translation } from '@quran-corpus/data';
+import type { Ayah, Translation } from '@quran-corpus/data';
+import type { ReaderWord } from '../../lib/readerWord';
 import { isSajdahAyah } from '@quran-corpus/data/client';
 import { SajdahMark } from './ornaments/SajdahMark';
 import { WordToken } from './WordToken';
@@ -8,9 +9,9 @@ import { BookmarkButton } from '../shared/BookmarkButton';
 
 interface AyahViewProps {
   ayah: Ayah;
-  words: Word[];
+  words: ReaderWord[];
   translation?: Translation;
-  onWordClick: (word: Word) => void;
+  onWordClick: (word: ReaderWord) => void;
   isThisPlaying: boolean;
   isPlaying: boolean;
   isRepeat: boolean;

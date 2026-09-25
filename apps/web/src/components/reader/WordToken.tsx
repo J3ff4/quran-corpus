@@ -1,8 +1,8 @@
-import type { Word } from '@quran-corpus/data';
+import type { ReaderWord } from '../../lib/readerWord';
 
 interface WordTokenProps {
-  word: Word;
-  onClick: (word: Word) => void;
+  word: ReaderWord;
+  onClick: (word: ReaderWord) => void;
 }
 
 export function WordToken({ word, onClick }: WordTokenProps) {

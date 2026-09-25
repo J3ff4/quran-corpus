@@ -12,7 +12,8 @@ import {
   getGlossesWithFallback,
   getSurahNames,
 } from '@quran-corpus/data';
-import type { Word, Translation } from '@quran-corpus/data';
+import type { Translation } from '@quran-corpus/data';
+import { toReaderWord, type ReaderWord } from '../../../lib/readerWord';
 import { SurahHeader } from '../../../components/reader/SurahHeader';
 import { ReaderView } from '../../../components/reader/ReaderView';
 import { LanguageBar } from '../../../components/reader/LanguageBar';
@@ -65,10 +66,14 @@ export default async function SurahPage({ params, searchParams }: PageProps) {
     'reading',
   );
 
-  // Group words by ayah_id
-  const wordsByAyah: Record<number, Word[]> = {};
+  // Group words by ayah_id, projected to what the reader renders. ReaderView is
+  // a client component, so whatever lands in this record is serialized into the
+  // RSC flight payload -- and `getWordsBySurah` selects `w.*`. On surah 2 that
+  // was 2.00 MB of JSON for 6116 words, 1.74 MB of it columns nothing on the
+  // page reads. See lib/readerWord.ts.
+  const wordsByAyah: Record<number, ReaderWord[]> = {};
   for (const word of words) {
-    (wordsByAyah[word.ayah_id] ??= []).push(word);
+    (wordsByAyah[word.ayah_id] ??= []).push(toReaderWord(word));
   }
 
   // One translation per ayah for this language; last writer wins if multiple translators exist.

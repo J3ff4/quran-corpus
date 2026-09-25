@@ -116,16 +116,6 @@ describe('WordPopover', () => {
     expect(link).toHaveAttribute('href', '/word/1/1/1');
   });
 
-  it('does not render verbatim description (moved to the full word page)', () => {
-    render(
-      <WordPopover
-        word={{ ...word, morphology_description: 'prefixed preposition bi + noun' }}
-        onClose={vi.fn()}
-      />,
-    );
-    expect(screen.queryByText(/prefixed preposition bi/)).not.toBeInTheDocument();
-  });
-
   it('shows (en) hint when gloss language differs from page lang', () => {
     render(
       <WordPopover word={word} gloss="Allah" glossLang="en" pageLang="uz" onClose={vi.fn()} />,

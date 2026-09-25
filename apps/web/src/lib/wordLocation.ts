@@ -1,4 +1,4 @@
-import type { Ayah, Word } from '@quran-corpus/data';
+import type { Ayah } from '@quran-corpus/data';
 
 export interface WordLoc {
   surah: number;
@@ -6,7 +6,7 @@ export interface WordLoc {
   position: number;
 }
 
-export function wordLocation(ayah: Ayah, word: Word): WordLoc {
+export function wordLocation(ayah: Ayah, word: { position: number }): WordLoc {
   return { surah: ayah.surah_id, ayah: ayah.ayah_number, position: word.position };
 }
 
