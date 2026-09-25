@@ -1430,6 +1430,38 @@ manifest; `bundletool-all` from the GitHub release is the runnable one. JDK 17
 is at `/home/claude/tools/jdk-17.0.20.1+1` and is not on PATH. Each `.apks` is
 ~444 MB, so delete it after reading the size -- this box runs at 92% full.
 
+### §5 review of Tasks 2+3 (2026-09-25)
+
+Plain `/code-review`, one pass. Five findings, all acted on.
+
+**Fixed (`c29cc99`):**
+
+1. *The contract could not tell a pruned DB from an unpruned one.* It counted
+   only the four SELECTED sets, so every assertion held on a 164.8 MB unpruned
+   file, on one where the prune ran after the VACUUM, and on one where the
+   DELETE matched nothing -- and the prune's own row count went to a
+   `console.log` and nowhere else. The exact failure the reviewer named is one
+   this plan describes doing on purpose at line 783 as a mutation-check. Now
+   checks total rows against `6236 x selected sets`. Mutation-checked: set to
+   an unpruned count (`6236 * 9`), it rejects the real asset.
+2. *"ships every alternative translator" asserted a guarantee the bundle no
+   longer makes.* Those alternatives are exactly what the prune deletes; the
+   case still passed only by iterating the same four sets the case above it
+   checks. Rewritten to assert the pair list -- four sets summing to 24944 can
+   still be four *wrong* sets.
+3. *`pruneForMobile(dbPath)` deleted, not guarded.* No production caller (the
+   pipeline cannot use it -- libsql's WAL lock is why `pruneOpenDb` exists),
+   and an exported irreversible 31,180-row delete taking any path has nothing
+   between it and the canonical DB `apps/web` reads.
+
+**Checked, and the reviewer was right (no code change):** the `quran-m0.db`
+growth in `1821974` is not the VACUUM. Verified here: the old fixture is 44
+pages with `freelist_count = 0` and VACUUMing it leaves it at 180,224 B
+exactly. The committed 208,896 B file is 51 pages because regenerating it
+picked up three tables it was missing -- `mushaf_layout`, `root_glosses`,
+`surah_names`. A real staleness fix, but an unrelated one, and the commit body
+does not say so; recorded here instead of amending a landed commit.
+
 ### After (Task 7)
 
 | Metric | Baseline | After | Delta |
