@@ -51,24 +51,28 @@ export async function sealOpenDb(db: SealableDb): Promise<void> {
   // mode, so committed pages cannot be dropped on the way out.
   await checkpointWal(db);
 
-  const journal = await db.execute('PRAGMA journal_mode = DELETE');
-  // The row carries the mode now in force, not the one requested.
-  const mode = journal.rows[0]?.journal_mode;
-  if (String(mode).toLowerCase() !== 'delete') {
-    throw new Error(`journal_mode is still ${String(mode)} after requesting DELETE; the file would ship expecting a -wal sidecar`);
-  }
+  await db.execute('PRAGMA journal_mode = DELETE');
 
   // Repack. 36 of the corpus DB's 65 MB `words` table is unused space inside
   // allocated pages -- rows grown by the morphology_description, grammar_note
   // and pos_tag backfills -- and a bundled asset pays for every hole it ships.
   // Measured 2026-09-24: 164.8 MB -> 127.0 MB in 2.3 s (6.0 MB of download).
   //
-  // Last, because VACUUM cannot run inside a transaction and must own the
-  // file: this is the one point in sealing where both hold. (The ORDER does
-  // not decide the journal mode -- vacuum-then-seal and seal-then-vacuum were
-  // both measured to end in DELETE, because the mode switch rewrites the
-  // header either way. Do not justify the placement on that.)
+  // After the mode switch, because VACUUM cannot run inside a transaction and
+  // must own the file: this is the one point in sealing where both hold.
   await db.execute('VACUUM');
+
+  // Checked LAST, so it covers the repack as well as the switch. VACUUM
+  // rewrites the whole file including its header, so "DELETE survives a
+  // VACUUM" is an assumption about SQLite, not a guarantee we control -- and
+  // if it ever stops holding, sealing would report success and ship exactly
+  // the WAL-header file that reaches NativeDatabase.execSync with a null
+  // handle. The pragma reports the mode now in force, not one requested.
+  const journal = await db.execute('PRAGMA journal_mode');
+  const mode = journal.rows[0]?.journal_mode;
+  if (String(mode).toLowerCase() !== 'delete') {
+    throw new Error(`journal_mode is ${String(mode)} after sealing; the file would ship expecting a -wal sidecar`);
+  }
 }
 
 /**

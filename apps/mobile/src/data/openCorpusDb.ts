@@ -33,9 +33,18 @@ import type * as ExpoSQLite from 'expo-sqlite';
 // vc32 and was already extracted, so vc33's launch took the `if (info.exists)`
 // early return and the cleanup loop -- the code that deleted the user's
 // database -- never ran. A version a phone does not hold is the only thing
-// that makes it run. The DB's contents are unchanged; the next real content
-// change bumps this again.
-export const corpusDbVersion = 'm11b';
+// that makes it run.
+//
+// 's2' for phase S2, which rebuilds the asset twice: the seal-time VACUUM
+// (164.8 -> 127.0 MB) and the prune of the five translator sets the reader
+// cannot display. The first of those is byte-different but content-equivalent,
+// which is the near-miss worth naming -- with no bump an upgrading phone takes
+// the `if (info.exists)` early return, keeps its 164.8 MB extract, and the
+// 37.8 MB of storage this phase buys lands on fresh installs only. The prune
+// after it IS a content change, and would show the old translations. One bump
+// covers both: nothing has shipped 's2' yet, so it is still a version no phone
+// holds. It bumps again the next time the asset changes after S2 ships.
+export const corpusDbVersion = 's2';
 export const corpusDbFileName = `quran-corpus-${corpusDbVersion}.db`;
 
 /** The user's own database, which lives in the same directory as the extracts
