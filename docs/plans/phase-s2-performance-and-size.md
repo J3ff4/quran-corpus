@@ -1743,21 +1743,123 @@ that the bundle is shaped correctly and what each delivery type costs.
 
 ### After (Task 7)
 
+**vc56**, built 2026-09-25, versionCode confirmed with `aapt2 dump badging`.
+Same instrument as Task 1 (`s2-measure.sh`), static arm; the APK is the
+**inline** build, which is the F-Droid artefact and the one these numbers
+describe.
+
+| Metric | Baseline (vc55) | After (vc56) | Delta | |
+|---|---|---|---|---|
+| `apk_bytes` | 219,036,359 | 202,926,365 | -16,109,994 | -7.4% |
+| `db_bytes` | 164,765,696 | **93,564,928** | -71,200,768 | **-43.2%** |
+| `fonts_bytes` | 190,990,690 | 190,990,690 | 0 | 0.0% |
+| `apk_db_zip_bytes` | 41,614,227 | **26,045,384** | -15,568,843 | **-37.4%** |
+| `apk_fonts_zip_bytes` | 127,322,246 | 126,883,233 | -439,013 | -0.3% |
+
+`fonts_bytes` unchanged is correct, not a miss: Task 5 does not delete a
+single font, it moves them into a pack that only the **AAB** carries. This APK
+is the inline build, so it still holds all 604. The -439,013 on the zipped
+figure is build-to-build compression noise, not a change.
+
+**The Play artefact**, measured separately with bundletool (Task 5 Step 5),
+since an asset pack exists only in an app bundle:
+
+| | First download (MIN-MAX) | Margin under 200 MB |
+|---|---|---|
+| Baseline vc55 | 196,960,597 - 197,145,089 | 2.9 MB (1.4%) |
+| After Tasks 2+3 | 183,953,121 - 184,137,954 | 15.9 MB (7.9%) |
+| **After Task 5 (install-time), vc55** | 179,117,098 - 179,298,266 | 20.7 MB (10.4%) |
+| **vc56, the artefact that ships** | **179,117,040 - 179,298,258** | **20.7 MB (10.4%)** |
+
+vc56 reproduces vc55 to within 58 bytes (the versionCode itself), and its pack
+composition is identical: base keeps 7 `.ttf` at 2,235,684 B, the pack holds
+604 at 189,691,644 B.
+
+**Ruled by the owner, 2026-09-25: keep install-time.** Not for the 4.9 MB --
+that alone does not pay for a second build configuration -- but because the
+cap is not close (20.7 MB of margin, roughly three more translator sets at
+~6 MB deflated each, and §7 keeps audio streamed rather than bundled), because
+verifying it costs one extra look in a device session already owed, and
+because fast-follow's real price is a mushaf that is not there on a first
+launch without network. Revisit on a number, not a feeling: first download
+above ~175 MB, or a decision to bundle anything substantial. If checks 433-436
+fail, revert to inline with one env change rather than escalating to
+fast-follow -- that would be paying fast-follow's cost for a problem we do not
+have.
+
+#### Still owed: the device arm
+
+`s2-measure.sh`'s cold-start and jank arms, and every check below, need the
+phone. It is also this session's display, so the run is coordinated with the
+owner rather than driven unattended.
+
+| Metric | Baseline | After |
+|---|---|---|
+| `cold_start_run1/2/3` | 964 / 877 / 851 ms | |
+| `frame_gap_p50` | 11.1 ms | |
+| `frame_gap_p95` | 22.3 ms | |
+| `frame_gap_max` | 1137.9 ms | |
+| `frames_over_32ms` | 4 | |
+| `frames_total` | 118 | |
+
+Artefacts staged for that session:
+
+- `$CLAUDE_JOB_DIR/tmp/quran-corpus-vc56.apk` -- a **copy**, not a symlink,
+  named for the versionCode `aapt2 dump badging` reported. Install with
+  `adb install -r --user 0`; an unqualified `-r` once landed on user 10 and
+  wiped user-0 app data. This covers checks 425-432.
+- `$CLAUDE_JOB_DIR/tmp/vc56.apks` -- the pack build for checks 433-436, which
+  an APK cannot carry. Already built with `--local-testing` (so the packs are
+  served from local storage rather than Play) **and signed** with the project's
+  `debug.keystore`: bundletool's default output is unsigned and therefore not
+  installable, which is a warning easy to read past. Install with
+  `bundletool install-apks --apks=...`.
+- `$CLAUDE_JOB_DIR/tmp/quran-corpus-vc56.aab` -- the bundle those came from.
+
+Being debug-signed, neither can upgrade over an EAS-signed install; expect to
+uninstall first, which also makes 435's "fresh install" honest.
+
+**Check 430 has a trap.** `corpusDbVersion` went `m11b` -> `s2`, so the first
+launch re-extracts a 93.6 MB database. That run is not comparable with the
+baseline's 964/877/851 ms. Launch once to let the extract happen, then take
+the three readings -- otherwise the phase records a cold-start regression that
+is really a one-time migration.
+
 | Metric | Baseline | After | Delta |
 | --- | --- | --- | --- |
 
-### Device checks 425-432
+### Device checks 425-436
 
-| # | Result | Note |
-| --- | --- | --- |
-| 425 | | |
-| 426 | | |
-| 427 | | |
-| 428 | | |
-| 429 | | |
-| 430 | | |
-| 431 | | |
-| 432 | | |
+All unrun: the phone is this session's display, so the run is coordinated with
+the owner. 425-432 take the vc56 APK; 433-436 need the pack build installed
+through `bundletool --local-testing`, which an APK cannot carry.
+
+| # | Build | Check | Result |
+| --- | --- | --- | --- |
+| 425 | APK | Reader shows the correct translation in EN, RU, UZ, UZ-Cyrl | |
+| 426 | APK | Search returns hits for an Arabic, an English and a Russian term | |
+| 427 | APK | A search hit opens the ayah it names | |
+| 428 | APK | Mushaf renders pages 1, 50, 302, 604 with correct glyphs | |
+| 429 | APK | Word-by-word grid renders segments and glosses | |
+| 430 | APK | Cold start not worse than baseline (**discard the first launch** -- see the version-bump trap above) | |
+| 431 | APK | Dictionary root entry shows Hans Wehr and Lane definitions | |
+| 432 | APK | A Russian search returns Abu Adel's wording and no other Russian set's | |
+| 433 | pack | Mushaf renders pages 1, 50, 302, 604 -- not tofu, not a fallback face | |
+| 434 | pack | Page 1 pixel-diffs clean against the same page from the inline build | |
+| 435 | pack | Airplane mode, fresh install: the mushaf still renders | |
+| 436 | pack | The inline (F-Droid) build still renders the mushaf | |
+
+426, 427 and 432 carry the most weight this phase. Task 3 deleted 31,180
+translation rows through a trigger and Task 3b rewrote the FTS index with a
+segment merge -- search is the feature that can break while every size number
+improves. 432 is the positive half: the other Russian sets are gone *and* the
+one that stayed is the one the reader shows.
+
+433 and 434 are the only evidence that install-time pack assets are reachable
+through the app's AssetManager. Everything recorded about Task 5's runtime
+path is read from expo-font and expo-asset source; none of it has run on a
+device. 434 exists because a silent fallback to the system face is this
+project's known font-loading failure mode and it looks exactly like success.
 
 ## Rulings
 
