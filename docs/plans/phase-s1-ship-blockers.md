@@ -791,11 +791,22 @@ Arm B with prior consent and are not recoverable.
 
 ### T3 — device checks 419-424
 
+Build: vc55, non-debuggable (`aapt2 dump badging` carries no
+`application-debuggable`), installed with `adb install -r --user 0` over vc55's
+predecessor. `firstInstallTime` unchanged at `2026-09-25 00:07:11`; launch logged
+`backed up 4 rows`, so the run did not disturb the user DB.
+
 | # | Result | Note |
 | --- | --- | --- |
-| 419 | | |
-| 420 | | |
-| 421 | | |
-| 422 | | |
-| 423 | | |
-| 424 | | |
+| 419 | **PASS** | "419-yes" — source-offer paragraph present, names the repo |
+| 420 | **PASS** | "420-yws. it opens", then confirmed scrolling past the end of the terms into the "How to Apply These Terms to Your New Programs" appendix. The 18 KB single-`<Text>` scroll risk did not land |
+| 421 | **PASS** | "421-yes" — long-press selects the licence body |
+| 422 | **PASS** | "422-1arrow. yes" — one back arrow, back returns to About |
+| 423 | **PASS** | "423-pas" — offer + link read correctly under ru and uz |
+| 424 | **DEFERRED** | "delay talkback" — tracked as issue #100 |
+
+Logcat during the run held two `Choreographer: Skipped N frames!` lines (90 and
+1052). Both were investigated and are **not** licence-screen jank: each is
+bracketed by `OplusHansManager … F enter()` / `freeze uid:` / `unfreeze uid:`,
+so the frame count is frozen wall-clock, not work. 1052 frames is ~11 s, which
+no scroll spends. Do not read either line as the Task 2 risk landing.
