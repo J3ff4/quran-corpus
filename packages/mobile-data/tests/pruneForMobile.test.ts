@@ -4,7 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { createDatabase } from '@quran-corpus/data';
-import { pruneForMobile, pruneOpenDb } from '../scripts/pruneForMobile.js';
+import { pruneOpenDb } from '../scripts/pruneForMobile.js';
 import { removeJournalSidecars, sealOpenDb } from '../scripts/sealDb.js';
 
 const schemaPath = resolve(
@@ -45,12 +45,10 @@ async function seed(path: string) {
 }
 
 it('keeps every translator the reader can select and drops every other one', async () => {
-  const path = join(dir, 'p.db');
-  (await seed(path)).close();
+  const db = await seed(join(dir, 'p.db'));
 
-  const result = await pruneForMobile(path);
+  const result = await pruneOpenDb(db);
 
-  const db = createDatabase(`file:${path}`);
   const kept = await db.execute(
     'SELECT language_code, translator FROM translations ORDER BY 1, 2',
   );
@@ -66,12 +64,10 @@ it('keeps every translator the reader can select and drops every other one', asy
 });
 
 it('lets the delete trigger take the search rows with them', async () => {
-  const path = join(dir, 'q.db');
-  (await seed(path)).close();
+  const db = await seed(join(dir, 'q.db'));
 
-  await pruneForMobile(path);
+  await pruneOpenDb(db);
 
-  const db = createDatabase(`file:${path}`);
   const orphan = await db.execute(
     "SELECT count(*) AS n FROM search_fts WHERE search_fts MATCH 'Kuliev'",
   );

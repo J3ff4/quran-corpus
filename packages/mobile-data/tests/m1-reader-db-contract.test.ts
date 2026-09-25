@@ -206,6 +206,8 @@ describeWithDb('M1 reader DB artifact', () => {
       ayahs: 6236,
       words: 77429,
       languages: ['en', 'ru', 'uz'],
+      // 6236 x the four selected sets, and nothing else. See below.
+      translationsTotal: 24944,
       selectedTranslations: {
         en: { translator: 'Saheeh International', rows: 6236 },
         ru: { translator: 'Abu Adel', rows: 6236 },
@@ -218,28 +220,36 @@ describeWithDb('M1 reader DB artifact', () => {
     });
   });
 
-  it('ships every alternative translator the language switcher can reach', async () => {
-    // validateM1ReaderDbContract only checks the one translator per language the
-    // reader defaults to. The DB carries several per language, and shipping a
-    // language whose alternative is short a verse would surface as a blank ayah,
-    // so assert full coverage across all of them.
+  it('carries no translator the reader has no code path to reach', async () => {
+    // This used to assert the opposite -- that every ALTERNATIVE translator
+    // ships complete -- which was right while the bundle was a whole-file copy
+    // of the corpus. The prune deleted exactly those sets, so the old
+    // assertion could only pass by iterating the four the case above already
+    // checks: a duplicate wearing a misleading name.
+    //
+    // The pair list, not a count: a count of 24944 is also what nine sets
+    // pruned down to four wrong ones would give, and the reader renders a
+    // translator it did not ask for as text in the wrong language.
     const db = createDatabase(`file:${dbPath}`);
 
     try {
       const perTranslator = await db.execute(`
         SELECT language_code, translator, count(*) AS n
         FROM translations
-        WHERE language_code IN ('en', 'uz', 'ru')
         GROUP BY language_code, translator
+        ORDER BY 1, 2
       `);
 
-      expect(perTranslator.rows.length).toBeGreaterThan(0);
-      for (const row of perTranslator.rows) {
-        expect({ translator: row.translator, rows: Number(row.n) }).toEqual({
-          translator: row.translator,
-          rows: 6236,
-        });
-      }
+      expect(perTranslator.rows.map((row) => `${row.language_code}/${row.translator}`)).toEqual([
+        'en/Saheeh International',
+        'ru/Abu Adel',
+        'uz/Tasnim',
+        'uz-Cyrl/Tasnim',
+      ]);
+      // And each is whole. The total alone does not give this: four sets
+      // summing to 24944 can still be one short and one long, which ships as a
+      // blank ayah on the language the switcher lands on.
+      expect(perTranslator.rows.map((row) => Number(row.n))).toEqual([6236, 6236, 6236, 6236]);
     } finally {
       db.close();
     }

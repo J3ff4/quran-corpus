@@ -34,6 +34,8 @@ export interface M1ReaderDbContractSummary {
   ayahs: number;
   words: number;
   languages: string[];
+  /** Every translation row in the file, selected or not. See the check below. */
+  translationsTotal: number;
   selectedTranslations: Record<keyof typeof selectedTranslators, TranslationContractSummary>;
 }
 
@@ -199,7 +201,7 @@ export async function validateM1ReaderDbContract(dbPath = targetDbPath): Promise
   const db = createDatabase(`file:${dbPath}`);
 
   try {
-    const [surahs, ayahs, words, languages, translations] = await Promise.all([
+    const [surahs, ayahs, words, languages, translations, translationsTotal] = await Promise.all([
       db.execute('SELECT count(*) AS n FROM surahs'),
       db.execute('SELECT count(*) AS n FROM ayahs'),
       db.execute('SELECT count(*) AS n FROM words'),
@@ -220,6 +222,7 @@ export async function validateM1ReaderDbContract(dbPath = targetDbPath): Promise
         `,
         args: SELECTED_TRANSLATOR_ENTRIES.flat(),
       }),
+      db.execute('SELECT count(*) AS n FROM translations'),
     ]);
 
     const selectedTranslations = Object.fromEntries(
@@ -243,6 +246,7 @@ export async function validateM1ReaderDbContract(dbPath = targetDbPath): Promise
       ayahs: numberValue(ayahs.rows[0]?.n),
       words: numberValue(words.rows[0]?.n),
       languages: languages.rows.map((row) => String(row.code)),
+      translationsTotal: numberValue(translationsTotal.rows[0]?.n),
       selectedTranslations,
     };
 
@@ -251,6 +255,19 @@ export async function validateM1ReaderDbContract(dbPath = targetDbPath): Promise
     if (summary.words <= 0) throw new Error('Expected word rows for M1 reader DB');
     if (summary.languages.join(',') !== 'en,ru,uz') {
       throw new Error(`Expected content languages en,ru,uz, found ${summary.languages.join(',')}`);
+    }
+
+    // The checks above count only the SELECTED sets, so every one of them
+    // passes unchanged on a DB the prune never touched -- and an unpruned copy
+    // is 25 MB larger and byte-identical in everything this contract looks at.
+    // Nothing else in the pipeline can tell the two apart: the prune reports
+    // its row count to a console.log and no further. This total is what makes
+    // the prune's absence a build failure instead of a silent 25 MB.
+    const expectedTotal = 6236 * SELECTED_TRANSLATOR_ENTRIES.length;
+    if (summary.translationsTotal !== expectedTotal) {
+      throw new Error(
+        `Expected ${expectedTotal} translation rows (${SELECTED_TRANSLATOR_ENTRIES.length} selected sets x 6236), found ${summary.translationsTotal}; the unreachable translator sets were not pruned`,
+      );
     }
 
     for (const [languageCode, translation] of Object.entries(summary.selectedTranslations)) {
