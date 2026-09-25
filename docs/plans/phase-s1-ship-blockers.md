@@ -637,7 +637,7 @@ build configuration is touched, so the revert is total.
 real hardware and recorded here. "Implementation complete, verification
 pending" is an unmet exit criterion.
 
-- [ ] **Step 1: Build and install, coordinated with the owner**
+- [x] **Step 1: Build and install, coordinated with the owner**
 
 ```bash
 bash "$CLAUDE_JOB_DIR/tmp/build55.sh"   # copy of build54.sh, versionCode bumped in app.json
@@ -645,21 +645,21 @@ bash "$CLAUDE_JOB_DIR/tmp/build55.sh"   # copy of build54.sh, versionCode bumped
 
 `taskset -c 7,8` is mandatory. Never build while `expo start` runs.
 
-- [ ] **Step 2: Run these checks and record each verbatim**
+- [x] **Step 2: Run these checks and record each verbatim**
 
 Numbering starts at 419 because 409-418 were spent on the vc54 run
 (2026-09-24, PR #98) — the gap above 408 in `phase-m12` is allocated, not free.
 
 | # | Check | Pass |
 | --- | --- | --- |
-| 419 | About → source-offer paragraph is present and names the repo | |
-| 420 | About → licence link opens the licence; the text is the real GPL, scrolls to the end | |
-| 421 | Long-press the licence body selects text (copyable) | |
-| 422 | One back button on the licence screen; back returns to About | |
-| 423 | Offer + link read correctly under Russian and Uzbek UI | |
-| 424 | TalkBack: the link announces as a link with its label | |
+| 419 | About → source-offer paragraph is present and names the repo | ✅ |
+| 420 | About → licence link opens the licence; the text is the real GPL, scrolls to the end | ✅ |
+| 421 | Long-press the licence body selects text (copyable) | ✅ |
+| 422 | One back button on the licence screen; back returns to About | ✅ |
+| 423 | Offer + link read correctly under Russian and Uzbek UI | ✅ |
+| 424 | TalkBack: the link announces as a link with its label | deferred → #100 |
 
-- [ ] **Step 3: Fill the Verification Log below and commit**
+- [x] **Step 3: Fill the Verification Log below and commit**
 
 ```bash
 git add docs/plans/phase-s1-ship-blockers.md
