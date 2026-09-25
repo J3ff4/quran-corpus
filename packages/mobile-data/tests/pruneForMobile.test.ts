@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { createDatabase } from '@quran-corpus/data';
+import { selectedTranslators } from '../src/translators.js';
 import { pruneOpenDb } from '../scripts/pruneForMobile.js';
 import { removeJournalSidecars, sealOpenDb } from '../scripts/sealDb.js';
 
@@ -80,6 +81,35 @@ it('lets the delete trigger take the search rows with them', async () => {
   // renders as a result the reader taps and gets nothing from.
   expect(orphan.rows[0]?.n).toBe(0);
   expect(survivor.rows[0]?.n).toBe(1);
+});
+
+it('compacts the search index the delete trigger gutted', async () => {
+  // Comparative, because nothing about the post-state alone proves a merge
+  // ran: on a fixture this small the FILE does not shrink at all (page
+  // granularity -- at 300 ayahs the optimized copy is briefly *larger*), so a
+  // size assertion here would pass with the optimize deleted. Two identical
+  // fixtures, one pruned through pruneOpenDb and one through the bare DELETE
+  // it wraps, and the segment count between them is the whole signal.
+  const optimized = await seed(join(dir, 'opt.db'));
+  await pruneOpenDb(optimized);
+  const after = await optimized.execute('SELECT count(*) AS n FROM search_fts_data');
+  optimized.close();
+
+  const plain = await seed(join(dir, 'plain.db'));
+  const keep = Object.entries(selectedTranslators)
+    .map(() => '(language_code = ? AND translator = ?)')
+    .join(' OR ');
+  await plain.execute({
+    sql: `DELETE FROM translations WHERE NOT (${keep})`,
+    args: Object.entries(selectedTranslators).flat(),
+  });
+  const before = await plain.execute('SELECT count(*) AS n FROM search_fts_data');
+  plain.close();
+
+  // An fts5 delete writes a tombstone into a new segment rather than removing
+  // the term, and VACUUM cannot see inside a segment. Measured on the real
+  // asset: 7.74 MB of the bundle.
+  expect(Number(after.rows[0]?.n)).toBeLessThan(Number(before.rows[0]?.n));
 });
 
 it('prunes and seals on one connection, the way the generator does', async () => {

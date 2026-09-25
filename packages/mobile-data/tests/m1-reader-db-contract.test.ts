@@ -157,11 +157,22 @@ describe('M1 reader DB contract', () => {
     await source.execute('CREATE TABLE marker (n INTEGER)');
     await source.execute('INSERT INTO marker (n) VALUES (7)');
     // syncM1ReaderDbAsset prunes the copy before sealing it, so the fixture
-    // needs the table it prunes. No search_fts here: trg_translations_ad only
-    // exists in schema.sql, and this case is about the seal, not the prune.
+    // needs every table the prune touches -- even though this case is about the
+    // seal. Both of these were added after the prune step broke it: the
+    // translations table when the DELETE arrived, search_fts when the index
+    // compaction did. That is the point of the case. It runs the real
+    // generator, so it fails in 57 ms for anything the pipeline needs and the
+    // fixture lacks, where the real asset takes eight minutes to say the same.
+    // No triggers: those live in schema.sql, and nothing here inserts rows.
     await source.execute(
       'CREATE TABLE translations (id INTEGER PRIMARY KEY, ayah_id INTEGER, language_code TEXT, translator TEXT, text TEXT)',
     );
+    await source.execute(`
+      CREATE VIRTUAL TABLE search_fts USING fts5(
+        surah_id UNINDEXED, ayah_number UNINDEXED, source UNINDEXED,
+        ref_id UNINDEXED, body, tokenize = 'unicode61 remove_diacritics 2'
+      )
+    `);
     source.close();
     // Guards the premise of the case: with a source that is not in WAL mode
     // there is nothing to seal and the assertions below would pass vacuously.

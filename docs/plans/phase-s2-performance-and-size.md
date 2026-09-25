@@ -1369,6 +1369,11 @@ sets are gone, and Arabic and English unchanged says the prune did nothing
 else. Canonical `/home/claude/quran-data/quran.db` untouched at 164,765,696 B,
 mtime still 2026-09-21.
 
+*(Correction, added 2026-09-25: this entry recorded probe **numbers** and not
+the probe **terms**, which made it useless as a baseline -- a later gate using
+different terms got 1663/143/56 and looked like data loss until a control was
+built to disprove it. Record the terms. Task 3b below does.)*
+
 **A defect the plan's Step 5 walked into.** Pruning by path and then sealing by
 path is two connections, and libsql holds the WAL lock past `close()` -- the
 copy is in WAL because `schema.sql:2` puts the database it was copied from
@@ -1461,6 +1466,73 @@ exactly. The committed 208,896 B file is 51 pages because regenerating it
 picked up three tables it was missing -- `mushaf_layout`, `root_glosses`,
 `surah_names`. A real staleness fix, but an unrelated one, and the commit body
 does not say so; recorded here instead of amending a landed commit.
+
+### Task 3b -- compacting the search index (from the review)
+
+The review's third finding, measured on the real corpus rather than ported
+from its fixture. An fts5 delete does not remove the term's entry: it writes a
+tombstone into a new segment, reclaimed only by a segment merge. VACUUM
+reclaims database *pages* and cannot see inside a segment, so the 31,180-row
+prune left the search index at very nearly its original size, full of markers
+for rows that no longer exist.
+
+Two arms, each a fresh copy of the canonical DB, python3 `sqlite3` so the WAL
+lock is not in play:
+
+| Arm | fts5 tables | sealed file | time |
+|---|---|---|---|
+| prune + VACUUM | 20,504,576 B | 101,306,368 B | 467 s |
+| prune + `optimize` + VACUUM | 12,763,136 B | **93,564,928 B** | 469 s |
+
+**7,741,440 B (-37.8% of the index) for two seconds.** The reviewer's fixture
+said 47%; the real corpus says 37.8%, which is still larger than Task 2's
+whole VACUUM win of 6.0 MB. Arm A reproduced the ordering experiment's
+101,306,368 B to the byte, so the two measurements are on the same footing.
+
+`INSERT INTO search_fts(search_fts) VALUES('optimize')` now runs in
+`pruneOpenDb`, after the DELETE and before sealing's VACUUM -- the merge frees
+pages, and unrepacked they ship as holes just as the deletes' own pages would.
+
+Tested comparatively, because nothing in the post-state alone proves a merge
+ran: on a fixture this small the file does not shrink at all, and at 300 ayahs
+the optimized copy is briefly *larger* (page granularity), so a size assertion
+would have passed with the optimize deleted. The test prunes two identical
+fixtures, one through `pruneOpenDb` and one through the bare DELETE it wraps,
+and compares `search_fts_data` row counts. Mutation-checked: removing the
+optimize gives `expected 10 to be less than 10`.
+
+### Task 3b content gate, and proof the merge is lossless
+
+Regenerated asset: **93,564,928 B**, matching the arm-C prediction to the
+byte. 31,180 rows pruned. Deflated **30,260,155 -> 26,447,687 B**, another
+**3.81 MB off the download**.
+
+Structural gate: four selected sets at 6236 and no others, 6236 ayahs, 77,429
+words, 128,219 segments, 31,180 FTS rows across five sources at 6236 each, 36
+layout rows on mushaf page 1, `PRAGMA integrity_check` ok, **fts5's own
+`integrity-check` ok**, `journal_mode` delete, no sidecars, header bytes 18/19
+= 1/1. Canonical untouched at 164,765,696 B, mtime 2026-09-21.
+
+Structure is not the gate that matters here. A segment merge rewrites the
+index, and every count above is satisfied by an index that merged *wrongly* --
+the row counts live in `search_fts_content`, which `optimize` does not touch.
+So the check is a differential one against a control copy taken through prune
++ VACUUM with no optimize, both probed with identical terms:
+
+| Probe | no-optimize | optimized |
+|---|---|---|
+| `الله` | 1663 | 1663 |
+| `رحمن` | 0 | 0 |
+| `mercy` | 143 | 143 |
+| `Allah` | 2021 | 2021 |
+| `God` | 27 | 27 |
+| `милость` | 56 | 56 |
+| `Аллах` | 1449 | 1449 |
+| `Tasnim` | 1 | 1 |
+| `rahmat` | 47 | 47 |
+
+Nine terms across Arabic, English, Russian and Latin-script Uzbek, identical
+on both sides, at 101,306,368 B vs 93,564,928 B. The merge is lossless.
 
 ### After (Task 7)
 
