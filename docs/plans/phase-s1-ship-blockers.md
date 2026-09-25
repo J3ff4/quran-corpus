@@ -682,17 +682,112 @@ reason. No row left blank.
 
 ## Verification Log
 
-*(Empty until the device runs. §10: an unmet log is an unmet exit criterion.)*
-
 ### T1 — user-DB survival matrix
 
-| Arm | Seeded | Survived | Logcat | Verdict |
-| --- | --- | --- | --- | --- |
-| A — `install -r` | | | | |
-| B — uninstall + install | | | | |
-| C — delete live DB only | | | | |
+Run 2026-09-25 00:00-00:10 UTC, OnePlus 7 Pro (GM1917), Android 12 / SDK 31,
+`com.qurancorpus.mobile` **vc54** (`app-release.apk`, built 2026-09-24 07:33).
 
-**Ruling:**
+**Deviations from the plan as written, and why:**
+
+1. The plan names `app-release-vc55.apk`. No such artefact exists; the build
+   under test is **vc54**, the same one installed on the phone since
+   2026-09-24 07:33. Verified with `aapt2 dump badging`: `versionCode='54'`.
+2. **Step 1's four seeded values were not planted.** Seeding needs taps, and
+   the phone under `adb` is this session's display. `[user db] backed up N
+   rows` is a machine-readable proxy for the whole row set — `countUserRows`
+   sums `bookmarks + reading_history + reading_days + root_views + settings`
+   (`userDb.ts:255-261`) — so the arms are scored on that count plus the
+   create/restore lines, not on four on-screen values. The baseline was
+   established the same way before Arm A.
+3. **No off-device copy was taken. It is not possible on this device.**
+   `adb backup -noapk` exits 0 and writes a 47-byte file: the
+   `ANDROID BACKUP` header plus an empty deflate stream. Android 12 dropped
+   app data from `adb backup` unless the app is `android:debuggable`;
+   `android:allowBackup="true"` does not override it. Making the build
+   debuggable changes nothing for this purpose — it needs an install, and the
+   installed release was not debuggable. The owner ruled the data
+   **expendable** (2026-09-25): *"i dont nees thosw bookmarks or other
+   stuff"*. The phase-level risk row above is therefore resolved by consent,
+   not by a copy, and the plan's stated precondition was waived knowingly.
+
+**Baseline**, before any arm — `am force-stop` then relaunch, which is what
+makes the reading honest (`backUp` runs inside the memoized `createUserDb`,
+`userDb.ts:21`/`:42`):
+
+```
+09-24 23:53:36.401 I ReactNativeJS: [user db] backed up 19 rows to file:///data/user/0/com.qurancorpus.mobile/files/backups/quran-corpus-user.db.backup
+```
+
+19 rows live. No `creating a NEW` line, no `RESTORED` line. This also settles
+Step 2 on its own terms: **`backUp` runs, and it runs at every open.**
+
+| Arm | Baseline | After | Logcat | Verdict |
+| --- | --- | --- | --- | --- |
+| A — `install -r --user 0` | 19 rows | 19 rows, `firstInstallTime` unchanged `2026-08-31 15:57:23` | `[user db] backed up 19 rows to …/backups/quran-corpus-user.db.backup` | **PASS** — survives |
+| B — `uninstall` + fresh `install` | 19 rows | 0 rows, `firstInstallTime` moved to `2026-09-25 00:07:11` | `W [user db] creating a NEW quran-corpus-user.db -- if this device has run the app before, bookmarks, notes, history and settings have just been lost. file:///data/user/0/com.qurancorpus.mobile/files/SQLite holds: quran-corpus-m11b.db` | **PASS — reproduces the loss** |
+| C — delete live DB only | 4 rows seeded | 4 rows, byte-identical | `W [user db] quran-corpus-user.db was missing and has been RESTORED from file:///…/files/backups/quran-corpus-user.db.backup. Anything saved since the last backup is not in it.` then `[user db] backed up 4 rows to …` | **PASS** — the shipped defence works |
+
+Two secondary facts Arm B establishes, both of which #96 lists as open:
+
+- The absence of a `backed up N rows` line on the fresh install is **correct
+  behaviour, not a missing backup**: `backUp` returns early at `rows === 0`
+  (`userDb.ts:219`). The sibling `the database is empty and a backup exists`
+  warn is also correctly absent — the backup went with the uninstall, so there
+  was nothing to keep.
+- The `SQLite` listing in the warn names **only** `quran-corpus-m11b.db`. No
+  orphaned `-wal` or `-shm` sidecar. #96's stale-sidecar candidate is dead for
+  this path, and the loss is **selective** in the sense that matters: the
+  corpus extract is re-created by `ensureCorpusDbFile` while the user DB is
+  not, because nothing survives an uninstall to restore it from.
+
+**Arm C, how it was run.** The existing `app-debug.apk` (2026-09-01) was
+**rejected as evidence**: `restoreIfMissing` and `backUp` landed in `4729366`
+on 2026-09-21, so that build predates the whole defence and could not test it.
+Built a debuggable variant at head instead. The release buildType already signs
+with `signingConfigs.debug` (`android/app/build.gradle:115`), so adding
+`debuggable true` to it yields a **same-signature** APK that installs with
+`install -r` over the top — no uninstall, and therefore no second data loss.
+Reverted immediately after; the shipped `app-release.apk` was verified free of
+`application-debuggable` and reinstalled, and `run-as` is refused again.
+
+Arm B had left the DB at 0 rows, so the arm had to be seeded first. There is no
+`sqlite3` on the device, so the DB was pulled with `run-as`, written locally
+with python's `sqlite3`, and pushed back:
+
+```bash
+adb exec-out run-as com.qurancorpus.mobile cat files/SQLite/quran-corpus-user.db > seed.db
+# insert bookmark 2:1 with note 'ARM C canary note', arabicSize=large, uiLanguage=ru
+cat seed.db | adb shell 'run-as com.qurancorpus.mobile sh -c "cat > /data/user/0/com.qurancorpus.mobile/files/SQLite/quran-corpus-user.db"'
+```
+
+The inner quoting is load-bearing: written as `adb shell run-as … sh -c "cat >
+…"`, the local shell strips the quotes and the **device's `shell` uid** performs
+the redirect, which fails `Permission denied` against app-private storage. The
+arm then ran as the plan specifies — `rm` the live DB, force-stop, relaunch —
+and the restored file was pulled back and compared: bookmark `(2, 1, 'ARM C
+canary note')` and settings `arabicSize=large`, `uiLanguage=ru` all present.
+
+**Ruling: outcome 1 — #96 is external, not a defect.** Arm B reproduces the
+symptom exactly and Arm A does not, so the cause is an uninstall-and-reinstall,
+matching the owner's recollection. The recorded `firstInstallTime=2026-08-31`
+and `Retain data and using new` are true of the install they describe and say
+nothing about an uninstall preceding it — a reinstall resets `firstInstallTime`
+and it then reads as continuous from that point on. The artefacts and the
+recollection were never in conflict. Arm C independently shows the shipped
+defence restores every non-uninstall case. **Cost if wrong:** we close an issue
+whose real cause is a rare update-path defect that Arm A's single run did not
+provoke — mitigated by the fact that the `creating a NEW` warn now ships, so a
+recurrence is self-reporting rather than reconstructed.
+
+**Residual, accepted not fixed:** the backup lives at `${documentDirectory}backups`,
+inside app data, so it does not survive an uninstall. Covering that needs a
+backup outside app data (SAF or a user-chosen location) — a user-facing export
+feature, not a defence. Not a ship blocker: the loss it would prevent requires
+the user to deliberately uninstall. Filed as #99 rather than built here.
+
+**Device state at the end of the run:** clean vc54 (non-debuggable) installed,
+4 rows (the Arm C canary). The owner's original 19 rows were destroyed by
+Arm B with prior consent and are not recoverable.
 
 ### T3 — device checks 419-424
 
