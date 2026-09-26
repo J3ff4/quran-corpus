@@ -7,9 +7,48 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-09-24
+Updated: 2026-09-26
 
 ## Now
+
+**2026-09-26 — PR #101 merged (squash `74534a0`).** Three owner-reported search
+defects, found on the S2 device run, fixed and verified on vc58.
+
+- **Arabic under-returned everything.** FTS5 matches whole tokens and Arabic
+  glues its article onto the word, so `ارض` was a different token from `الارض`:
+  4 hits against the 275 `الارض` holds on its own. Every Arabic query was doing
+  this. Terms now expand over the proclitics (ال و ف ب ل ك + the article-bearing
+  combos) in `buildFtsMatch`. Live: **4 → 444**.
+- **Russian and Uzbek returned nothing until the reader switched language.** A
+  `sourceFilter` keyed to the reader's own language dropped every other
+  language's rows before the MATCH ran. Deleted outright, not replaced: the
+  corpus has zero cross-script contamination, so it could not change a result,
+  and FTS5 filters columns after MATCH, so it was not a speed win either. The
+  per-translator dedupe was the load-bearing half and stayed — four Russian sets
+  are indexed. Cross-language hits sort below the reader's own and carry the
+  language's native name.
+- **`star` did not find `stars`.** Every term is a prefix query now, 3-char
+  floor. One-directional by design: `stars` still does not find `star`, and no
+  stemmer exists in SQLite for Russian or Uzbek.
+
+`/code-review` ran twice and the second round is why this took a third commit:
+it measured the first Uzbek fix and found it **inert**. Tasnim is indexed 6236
+times under `uz` and again under `uz-Cyrl`, so nearly every Cyrillic hit has a
+Latin twin, the Latin pass runs first, and the twin wins the dedupe — 48 of 50
+folded away, the rest sliced off by the limit. The device showed it before the
+fix: vc57, reader on Кирилл, `rahmat` answered entirely in Latin. The fix is at
+the caller (`searchCorpus` drops the sibling script), not in the query.
+
+Device run on vc58, reader on Uzbek Cyrillic: `ارض` returns the clitic family,
+`star` returns "stars", `rahmat` returns Cyrillic rows unlabelled, `милость`
+returns Russian rows chipped Русский, English hits chip English, a 132-char
+query answers "Nothing found" without hanging. `adb input text` is ASCII-only
+and the device has no clipboard command, so the Arabic and Cyrillic queries were
+typed by tapping the on-screen keyboard.
+
+Still open: search snippets render the normalized FTS body (`واورثكم`, no
+harakat, bare alef), which looks rough beside the reader's Uthmani. Pre-existing,
+not from this work.
 
 **2026-09-24 — PR #98 merged (squash `8003814`).** Four owner-reported UI
 defects found on vc53, fixed and verified on vc54.
