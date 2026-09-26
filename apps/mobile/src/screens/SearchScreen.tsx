@@ -14,6 +14,7 @@ import { SnippetText } from '@/components/SnippetText';
 import { searchCorpus } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { t } from '@/i18n/uiStrings';
+import { contentLanguages, type QueryLanguageCode } from '@/i18n/languages';
 import { useHeldEntry } from '@/motion/entryPager';
 import { usePressScale } from '@/motion/usePressScale';
 import { getReaderSurah } from '@/data/readerPosition';
@@ -24,6 +25,20 @@ import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+/** The native name of a hit's language, or null when the hit needs no label:
+ *  the Arabic body (its face already says so) and the reader's own language
+ *  (which is what an unlabelled row means). `uz-Cyrl` labels as Uzbek -- it is
+ *  the same language in the other alphabet, and the snippet shows which. */
+function crossLanguageLabel(source: string, reader: QueryLanguageCode): string | null {
+  if (source === 'ar') return null;
+  // Both sides fold, or a reader on `uz-Cyrl` gets their own language labelled
+  // back at them the moment a Latin `uz` row lands beside a Cyrillic one.
+  const fold = (c: string): string => (c === 'uz-Cyrl' ? 'uz' : c);
+  const code = fold(source);
+  if (code === fold(reader)) return null;
+  return contentLanguages.find((l) => l.code === code)?.nativeLabel ?? null;
+}
 
 /** One result row, whatever kind it is: a glass card that squeezes on press.
  *
@@ -359,37 +374,59 @@ export function SearchScreen() {
         {result.verses.length > 0 ? (
           <>
             <Text accessibilityRole="header" style={heading}>{t(uiLocale, 'search.verses').toUpperCase()}</Text>
-            {result.verses.map((hit) => (
-              <ResultCard
-                key={`${hit.source}-${hit.surah_id}-${hit.ayah_number}`}
-                testID="search-verse"
-                onPress={() => router.push(`/surah/${hit.surah_id}?ayah=${hit.ayah_number}`)}
-              >
-                <Text
-                  style={{
-                    color: theme.accent,
-                    fontSize: typography.caption,
-                    fontWeight: '600',
-                    fontVariant: ['tabular-nums'],
-                  }}
+            {result.verses.map((hit) => {
+              const languageLabel = crossLanguageLabel(hit.source, queryLanguage);
+              return (
+                <ResultCard
+                  key={`${hit.source}-${hit.surah_id}-${hit.ayah_number}`}
+                  testID="search-verse"
+                  onPress={() => router.push(`/surah/${hit.surah_id}?ayah=${hit.ayah_number}`)}
                 >
-                  {hit.surah_id}:{hit.ayah_number}
-                </Text>
-                <SnippetText
-                  snippet={hit.snippet}
-                  highlightColor={theme.accent}
-                  highlightBackground={theme.accentWash}
-                  // Hafs only for the Arabic body -- a Russian or Uzbek
-                  // snippet has no business in the Uthmani face, and
-                  // `hit.source` is exactly what says which this is.
-                  style={
-                    hit.source === 'ar'
-                      ? { color: theme.text, fontFamily: fonts.arabic, fontSize: 22, writingDirection: 'rtl' }
-                      : { color: theme.text, fontSize: typography.body }
-                  }
-                />
-              </ResultCard>
-            ))}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text
+                      style={{
+                        color: theme.accent,
+                        fontSize: typography.caption,
+                        fontWeight: '600',
+                        fontVariant: ['tabular-nums'],
+                      }}
+                    >
+                      {hit.surah_id}:{hit.ayah_number}
+                    </Text>
+                    {/* Search now follows the query's script rather than the
+                        reader's language, so a Cyrillic query answers with
+                        Russian verses while the reader sits on English. Those
+                        hits need to say what they are -- unlabelled, a Russian
+                        snippet under an English list reads as a bug. */}
+                    {languageLabel ? (
+                      <Text
+                        testID="search-verse-language"
+                        style={{
+                          color: theme.mutedText,
+                          fontSize: typography.caption,
+                          fontWeight: '600',
+                        }}
+                      >
+                        {languageLabel}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <SnippetText
+                    snippet={hit.snippet}
+                    highlightColor={theme.accent}
+                    highlightBackground={theme.accentWash}
+                    // Hafs only for the Arabic body -- a Russian or Uzbek
+                    // snippet has no business in the Uthmani face, and
+                    // `hit.source` is exactly what says which this is.
+                    style={
+                      hit.source === 'ar'
+                        ? { color: theme.text, fontFamily: fonts.arabic, fontSize: 22, writingDirection: 'rtl' }
+                        : { color: theme.text, fontSize: typography.body }
+                    }
+                  />
+                </ResultCard>
+              );
+            })}
           </>
         ) : null}
 

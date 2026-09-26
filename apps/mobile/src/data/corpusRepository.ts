@@ -651,17 +651,35 @@ export async function getM0WordDetail(
   return { detail, segments };
 }
 
-/** Search restricted to what the reader actually shows: Arabic plus the one
- *  translator this language is bound to. Without the translator the DB's four
- *  Russian translations each return the same verse. */
+/** The two Uzbek codes are one translator in two alphabets, so offering both to
+ *  a reader who picked one of them is what made a Cyrillic reader's results
+ *  come back in Latin: Tasnim is indexed 6236 times under each code, every
+ *  Cyrillic hit has a Latin twin, and the Latin pass runs first and fills the
+ *  limit. The sibling script is dropped instead. A reader on any other
+ *  language keeps both -- there is no script for them to have chosen, and a
+ *  cross-language Uzbek hit is more use to them in Latin. */
+function translatorsFor(languageCode: QueryLanguageCode): Record<string, string> {
+  const sibling = languageCode === 'uz' ? 'uz-Cyrl' : languageCode === 'uz-Cyrl' ? 'uz' : null;
+  if (sibling === null) return translatorByLanguage;
+  const offered: Record<string, string> = { ...translatorByLanguage };
+  delete offered[sibling];
+  return offered;
+}
+
+/** Search across every language, restricted to the one translator each is
+ *  bound to -- without that the DB's four Russian sets each return the same
+ *  verse. `languageCode` no longer decides WHICH languages are searched (that
+ *  is the query's script, and tying it to the reader is what made a Russian
+ *  query return nothing on an English reader); it decides which hits sort
+ *  first, and which Uzbek alphabet is on offer. */
 export async function searchCorpus(
   client: MobileDataClient,
   query: string,
   languageCode: QueryLanguageCode,
 ): Promise<SearchResult> {
   return search(client, query, {
-    language: languageCode,
-    translator: translatorByLanguage[languageCode],
+    translators: translatorsFor(languageCode),
+    preferLanguage: languageCode,
   });
 }
 

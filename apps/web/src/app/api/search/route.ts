@@ -11,8 +11,8 @@ export async function GET(request: Request): Promise<Response> {
   }
   const db = await getDatabase();
   // No selection passed: web offers every indexed translation rather than one
-  // fixed translator per language. The options exist for a caller with a
-  // per-language translator choice -- see the comment on sourceFilter in
+  // fixed translator per language. The `translators` option exists for a caller
+  // with a per-language translator choice -- see its comment in
   // queries/search.ts.
   const result = await search(db, q);
   return NextResponse.json(result);

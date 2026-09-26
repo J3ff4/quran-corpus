@@ -188,14 +188,16 @@ async function seedTwoRussian(db: Client): Promise<void> {
   );
 }
 
-describe('searchVerses translator filter', () => {
+const SELECTED = { en: 'T', uz: 'T', ru: 'Abu Adel' };
+
+describe('searchVerses source selection', () => {
   beforeEach(async () => {
     await seedTwoRussian(db);
     await backfillSearchIndex(db);
   });
 
   it('returns one hit per ayah for the selected translator', async () => {
-    const hits = await searchVerses(db, 'Аллаха', { language: 'ru', translator: 'Abu Adel' });
+    const hits = await searchVerses(db, 'Аллаха', { translators: SELECTED });
     const ru = hits.filter((h) => h.source === 'ru');
 
     expect(ru).toHaveLength(1);
@@ -205,61 +207,141 @@ describe('searchVerses translator filter', () => {
   });
 
   it('still returns the Arabic row alongside the selected translation', async () => {
-    const hits = await searchVerses(db, 'الرحمن', { language: 'ru', translator: 'Abu Adel' });
+    const hits = await searchVerses(db, 'الرحمن', { translators: SELECTED });
 
     expect(hits.some((h) => h.source === 'ar')).toBe(true);
   });
 
-  it('excludes languages other than Arabic and the selected one', async () => {
-    const hits = await searchVerses(db, 'Allah', { language: 'ru', translator: 'Abu Adel' });
-
-    expect(hits.some((h) => h.source === 'en')).toBe(false);
-  });
-
-  it('searches every language when no selection is given', async () => {
+  it('searches every translator when no selection is given', async () => {
     const hits = await searchVerses(db, 'Аллаха');
 
     expect(hits.filter((h) => h.source === 'ru')).toHaveLength(2);
   });
 
-  // Review round 2, Important 1+2: sourceFilter's language-only branch (no
-  // translator) was never exercised -- all four cases above pass a translator.
-  it('restricts to Arabic + the selected language when no translator is given', async () => {
-    const ru = await searchVerses(db, 'Аллаха', { language: 'ru' });
-    expect(ru.filter((h) => h.source === 'ru')).toHaveLength(2);
+  // The regression this whole change exists for: on the phone, a Russian query
+  // returned NOTHING until the reader went and switched language, because the
+  // filter was the reader's language rather than the query's script.
+  it('finds Russian verses for a Cyrillic query while the reader is on English', async () => {
+    const hits = await searchVerses(db, 'Аллаха', {
+      translators: SELECTED,
+      preferLanguage: 'en',
+    });
 
-    // 'Allah' only matches the seeded English row's text, never the Cyrillic
-    // ru rows -- so this is the assertion that actually depends on the
-    // filter existing, not on the query text happening not to collide.
-    const excludesEnglish = await searchVerses(db, 'Allah', { language: 'ru' });
-    expect(excludesEnglish.some((h) => h.source === 'en')).toBe(false);
+    expect(hits.some((h) => h.source === 'ru')).toBe(true);
+  });
+
+  it('finds English verses for a Latin query while the reader is on Russian', async () => {
+    const hits = await searchVerses(db, 'name', {
+      translators: SELECTED,
+      preferLanguage: 'ru',
+    });
+
+    expect(hits.some((h) => h.source === 'en')).toBe(true);
+  });
+
+  it('sorts the reader\'s own language above another language\'s hits', async () => {
+    // Both rows must carry the word, or the assertion passes on which row
+    // MATCHED rather than on the order. The seeded Uzbek row is Cyrillic, so a
+    // Latin query cannot reach it -- swap it for the Latin Tasnim wording the
+    // corpus actually stores under `uz`. (The trigger re-indexes on update.)
+    await db.execute("UPDATE translations SET text='Allah nomi bilan' WHERE language_code='uz'");
+
+    const onEnglish = await searchVerses(db, 'Allah', {
+      translators: SELECTED,
+      preferLanguage: 'en',
+    });
+    expect(onEnglish[0]!.source).toBe('en');
+
+    const onUzbek = await searchVerses(db, 'Allah', {
+      translators: SELECTED,
+      preferLanguage: 'uz',
+    });
+    expect(onUzbek[0]!.source).toBe('uz');
   });
 
   it('restricts the Uzbek transliteration pass to the selected translator', async () => {
-    const matching = await searchVerses(db, 'bilan', { language: 'uz', translator: 'T' });
+    const matching = await searchVerses(db, 'bilan', { translators: { uz: 'T' } });
     expect(matching.some((h) => h.source === 'uz')).toBe(true);
 
-    const nonMatching = await searchVerses(db, 'bilan', { language: 'uz', translator: 'nope' });
+    const nonMatching = await searchVerses(db, 'bilan', { translators: { uz: 'nope' } });
     expect(nonMatching.some((h) => h.source === 'uz')).toBe(false);
   });
+});
 
-  // Important 1: translator alone (no language) must be a no-op everywhere,
-  // including the Uzbek pass -- the pair identifies a translation set, and
-  // translator without language doesn't identify anything.
-  it('ignores translator without language, matching the no-options result exactly', async () => {
-    const noOpts = await searchVerses(db, 'bilan');
-    const translatorOnly = await searchVerses(db, 'bilan', { translator: 'Abu Adel' });
+describe('Uzbek in two alphabets', () => {
+  // The live corpus stores Tasnim twice: Latin under `uz`, Cyrillic under
+  // `uz-Cyrl`, and the reader's script toggle picks between them. The base seed
+  // models neither (its `uz` row is Cyrillic), so this block builds the real
+  // shape: one ayah written both ways, and one written only in Cyrillic.
+  const BOTH = { uz: 'T', 'uz-Cyrl': 'T' };
 
-    expect(translatorOnly).toEqual(noOpts);
+  beforeEach(async () => {
+    await db.execute("INSERT INTO languages VALUES ('uz-Cyrl','Uzbek','Ўзбек','ltr')");
+    await db.execute("UPDATE translations SET text='Allah nomi bilan' WHERE language_code='uz'");
+    await db.execute(
+      "INSERT INTO translations (ayah_id,language_code,translator,text) VALUES (1,'uz-Cyrl','T','Аллоҳнинг номи билан')",
+    );
+    await db.execute(
+      "INSERT INTO ayahs (id,surah_id,ayah_number,text_uthmani) VALUES (2,1,2,'ٱلْحَمْدُ')",
+    );
+    // Cyrillic only: nothing under `uz` carries this verse, so it is reachable
+    // from a Latin query ONLY through the transliteration pass.
+    await db.execute(
+      "INSERT INTO translations (ayah_id,language_code,translator,text) VALUES (2,'uz-Cyrl','T','Оламлар Робби билан')",
+    );
   });
 
-  // Important 1's second manifestation: '' disagreed with undefined between
-  // sourceFilter and uzWanted. hasLanguage() must treat both as "unset" in
-  // the Uzbek pass specifically -- undefined alone can't prove this, since
-  // the pre-fix `=== undefined` check also treated undefined as unset.
-  it('treats an empty-string language as unset for the Uzbek pass too', async () => {
-    const hits = await searchVerses(db, 'bilan', { language: '', translator: 'Abu Adel' });
-    expect(hits.some((h) => h.source === 'uz')).toBe(true);
+  it('reaches the Cyrillic Tasnim set from a Latin-typed query', async () => {
+    const hits = await searchVerses(db, 'bilan', { translators: BOTH });
+
+    // Aimed at `uz` alone, the pass could not see this row: `uz-Cyrl` is where
+    // the only Cyrillic set the product shows actually lives.
+    expect(hits.some((h) => h.source === 'uz-Cyrl' && h.ayah_number === 2)).toBe(true);
+  });
+
+  it('returns the Cyrillic row when only that script is on offer', async () => {
+    // The reader's script reaches this as the translator map: with `uz` left
+    // out, ayah 1 -- which exists in BOTH alphabets, as every Tasnim verse
+    // really does -- can only come back Cyrillic. Offering both instead is how
+    // a reader on Cyrillic ended up with an all-Latin result list, because the
+    // Latin pass runs first and its rows win the fold.
+    const hits = await searchVerses(db, 'bilan', { translators: { 'uz-Cyrl': 'T' } });
+    const first = hits.filter((h) => h.ayah_number === 1);
+
+    expect(first).toHaveLength(1);
+    expect(first[0]!.source).toBe('uz-Cyrl');
+  });
+
+  it('returns one row, not two, for a verse written in both alphabets', async () => {
+    const hits = await searchVerses(db, 'bilan', { translators: BOTH });
+    const first = hits.filter((h) => h.ayah_number === 1 && h.source.startsWith('uz'));
+
+    // Ayah 1 matches in both scripts. Two rows for it is the same verse twice.
+    expect(first).toHaveLength(1);
+  });
+});
+
+describe('query length cap', () => {
+  it('returns nothing for a query longer than the cap', async () => {
+    await backfillSearchIndex(db);
+    // Each Arabic term expands over 14 proclitics, so an unbounded query is an
+    // unbounded number of prefix scans on the phone's UI thread.
+    const long = `${'الرحمن '.repeat(20)}`.trim();
+
+    expect(long.length).toBeGreaterThan(100);
+    expect(await searchVerses(db, long)).toEqual([]);
+  });
+
+  it('still answers a query just under the cap', async () => {
+    await backfillSearchIndex(db);
+    // 14 repeats of the same term: 97 chars after the trim, and every term
+    // matches the one Arabic row, so a cap off by a few characters shows up
+    // here as an empty result rather than as nothing at all.
+    const nearCap = 'الرحمن '.repeat(14).trim();
+
+    expect(nearCap.length).toBeLessThanOrEqual(100);
+    const hits = await searchVerses(db, nearCap);
+    expect(hits.some((h) => h.source === 'ar')).toBe(true);
   });
 });
 
