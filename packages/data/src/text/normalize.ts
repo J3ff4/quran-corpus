@@ -98,6 +98,48 @@ function termToMatch(term: string): string {
   return `(${ARABIC_PROCLITICS.map((p) => `${ftsPhrase(p + term)}*`).join(' OR ')})`;
 }
 
+/** What one query term can match, as the highlighter sees it: the same arms
+ *  `termToMatch` hands FTS5, minus the quoting. `exact` mirrors the length
+ *  floor -- below it FTS5 gets a bare phrase, so a highlighter that still
+ *  prefix-matched would paint words the search never matched on. */
+export interface HighlightTerm {
+  term: string;
+  exact: boolean;
+}
+
+/**
+ * The terms a query highlights, derived from the SAME arms `buildFtsMatch`
+ * sends to FTS5.
+ *
+ * Deriving the highlight from the query rather than from FTS5's own
+ * `snippet()` is what lets an Arabic hit be rendered in Uthmani script: the
+ * indexed body is normalized (the tokenizer folds only Latin and Cyrillic), so
+ * `snippet()`'s offsets belong to a string the reader must never see. Offsets
+ * into the normalized body cannot be mapped onto `text_uthmani` -- different
+ * length, different codepoints -- but re-testing each displayed word against
+ * these terms needs no mapping at all.
+ */
+export function highlightTerms(s: string): HighlightTerm[] {
+  return s
+    .split(/\s+/)
+    .filter((t) => t.length > 0)
+    .flatMap((term): HighlightTerm[] => {
+      if (term.length < MIN_PREFIX_LENGTH) return [{ term, exact: true }];
+      if (!ARABIC_LETTER.test(term)) return [{ term, exact: false }];
+      return ARABIC_PROCLITICS.map((p) => ({ term: p + term, exact: false }));
+    });
+}
+
+/** Whether one displayed word is a hit for any of `terms`. The word is
+ *  normalized first, because that is the form the index matched on -- a
+ *  Uthmani word carries harakat the query never does. */
+export function wordMatchesHighlight(word: string, terms: HighlightTerm[]): boolean {
+  const normalized = normalizeArabic(word);
+  // No empty-string guard: `highlightTerms` drops empty terms, and neither
+  // `'' === term` nor `''.startsWith(term)` is ever true for a non-empty one.
+  return terms.some((t) => (t.exact ? normalized === t.term : normalized.startsWith(t.term)));
+}
+
 /**
  * Build an FTS5 MATCH expression from a user query: split on whitespace and
  * require every term (AND).

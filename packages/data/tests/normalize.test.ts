@@ -4,6 +4,8 @@ import {
   buildFtsMatch,
   stripQuranicAnnotations,
   transliterateUzbekLatinToCyrillic,
+  highlightTerms,
+  wordMatchesHighlight,
 } from '../src/text/normalize.js';
 
 describe('normalizeArabic', () => {
@@ -104,5 +106,40 @@ describe('transliterateUzbekLatinToCyrillic', () => {
     expect(transliterateUzbekLatinToCyrillic('yomon')).toBe('ёмон');
     expect(transliterateUzbekLatinToCyrillic('yurak')).toBe('юрак');
     expect(transliterateUzbekLatinToCyrillic('yaxshi')).toBe('яхши');
+  });
+});
+
+describe('highlightTerms', () => {
+  it('offers every proclitic arm the FTS match uses', () => {
+    const terms = highlightTerms('ارض').map((t) => t.term);
+
+    // The highlighter and buildFtsMatch have to agree arm for arm, or a row
+    // the index matched on `والارض` comes back with nothing marked.
+    expect(terms).toContain('ارض');
+    expect(terms).toContain('الارض');
+    expect(terms).toContain('والارض');
+  });
+
+  it('keeps a short term exact, as the index does', () => {
+    expect(highlightTerms('ال')).toEqual([{ term: 'ال', exact: true }]);
+    expect(highlightTerms('star')).toEqual([{ term: 'star', exact: false }]);
+  });
+});
+
+describe('wordMatchesHighlight', () => {
+  it('matches through the harakat the query never carries', () => {
+    expect(wordMatchesHighlight('ٱلرَّحْمَٰنِ', highlightTerms('الرحمن'))).toBe(true);
+  });
+
+  it('matches a prefix, which is what makes stars a hit for star', () => {
+    expect(wordMatchesHighlight('stars', highlightTerms('star'))).toBe(true);
+  });
+
+  it('does NOT prefix-match below the length floor', () => {
+    // FTS5 gets a bare phrase for a two-character term, so it never matched
+    // `الرحمن` on `ال` -- marking it would highlight a word the search did not
+    // find, and `ال` prefixes a large share of every Arabic line.
+    expect(wordMatchesHighlight('ٱلرَّحْمَٰنِ', highlightTerms('ال'))).toBe(false);
+    expect(wordMatchesHighlight('ال', highlightTerms('ال'))).toBe(true);
   });
 });
