@@ -268,6 +268,70 @@ describe('searchVerses source selection', () => {
   });
 });
 
+describe('Uzbek in two alphabets', () => {
+  // The live corpus stores Tasnim twice: Latin under `uz`, Cyrillic under
+  // `uz-Cyrl`, and the reader's script toggle picks between them. The base seed
+  // models neither (its `uz` row is Cyrillic), so this block builds the real
+  // shape: one ayah written both ways, and one written only in Cyrillic.
+  const BOTH = { uz: 'T', 'uz-Cyrl': 'T' };
+
+  beforeEach(async () => {
+    await db.execute("INSERT INTO languages VALUES ('uz-Cyrl','Uzbek','Ўзбек','ltr')");
+    await db.execute("UPDATE translations SET text='Allah nomi bilan' WHERE language_code='uz'");
+    await db.execute(
+      "INSERT INTO translations (ayah_id,language_code,translator,text) VALUES (1,'uz-Cyrl','T','Аллоҳнинг номи билан')",
+    );
+    await db.execute(
+      "INSERT INTO ayahs (id,surah_id,ayah_number,text_uthmani) VALUES (2,1,2,'ٱلْحَمْدُ')",
+    );
+    // Cyrillic only: nothing under `uz` carries this verse, so it is reachable
+    // from a Latin query ONLY through the transliteration pass.
+    await db.execute(
+      "INSERT INTO translations (ayah_id,language_code,translator,text) VALUES (2,'uz-Cyrl','T','Оламлар Робби билан')",
+    );
+  });
+
+  it('reaches the Cyrillic Tasnim set from a Latin-typed query', async () => {
+    const hits = await searchVerses(db, 'bilan', { translators: BOTH });
+
+    // Aimed at `uz` alone, the pass could not see this row: `uz-Cyrl` is where
+    // the only Cyrillic set the product shows actually lives.
+    expect(hits.some((h) => h.source === 'uz-Cyrl' && h.ayah_number === 2)).toBe(true);
+  });
+
+  it('returns one row, not two, for a verse written in both alphabets', async () => {
+    const hits = await searchVerses(db, 'bilan', { translators: BOTH });
+    const first = hits.filter((h) => h.ayah_number === 1 && h.source.startsWith('uz'));
+
+    // Ayah 1 matches in both scripts. Two rows for it is the same verse twice.
+    expect(first).toHaveLength(1);
+  });
+});
+
+describe('query length cap', () => {
+  it('returns nothing for a query longer than the cap', async () => {
+    await backfillSearchIndex(db);
+    // Each Arabic term expands over 14 proclitics, so an unbounded query is an
+    // unbounded number of prefix scans on the phone's UI thread.
+    const long = `${'الرحمن '.repeat(20)}`.trim();
+
+    expect(long.length).toBeGreaterThan(100);
+    expect(await searchVerses(db, long)).toEqual([]);
+  });
+
+  it('still answers a query just under the cap', async () => {
+    await backfillSearchIndex(db);
+    // 14 repeats of the same term: 97 chars after the trim, and every term
+    // matches the one Arabic row, so a cap off by a few characters shows up
+    // here as an empty result rather than as nothing at all.
+    const nearCap = 'الرحمن '.repeat(14).trim();
+
+    expect(nearCap.length).toBeLessThanOrEqual(100);
+    const hits = await searchVerses(db, nearCap);
+    expect(hits.some((h) => h.source === 'ar')).toBe(true);
+  });
+});
+
 describe('search orchestrator', () => {
   it('returns a jump verse with words for a verse ref', async () => {
     await backfillSearchIndex(db);

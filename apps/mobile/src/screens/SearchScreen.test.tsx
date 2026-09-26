@@ -215,6 +215,10 @@ describe('SearchScreen', () => {
         // The reader's own language, and the Arabic body: neither is a
         // cross-language hit, so neither may carry a label.
         { surah_id: 1, ayah_number: 1, source: 'uz-Cyrl', snippet: 'Аллоҳнинг номи' },
+        // Same language, other alphabet: the reader chose `uz-Cyrl`, and
+        // labelling a plain `uz` row "O'zbek" tells them their own language is
+        // foreign to them.
+        { surah_id: 1, ayah_number: 2, source: 'uz', snippet: 'Allah nomi bilan' },
         { surah_id: 1, ayah_number: 1, source: 'ar', snippet: 'بسم الله' },
       ],
       roots: [],
@@ -223,7 +227,7 @@ describe('SearchScreen', () => {
     render(<SearchScreen />);
     fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'Аллаха' } });
 
-    await waitFor(() => expect(screen.getAllByTestId('search-verse')).toHaveLength(4));
+    await waitFor(() => expect(screen.getAllByTestId('search-verse')).toHaveLength(5));
     // The mocked reader sits on uz-Cyrl, so exactly the Russian and English
     // rows are the foreign ones. Asserting the text, not just the count:
     // labelling every row would also produce a passing count on its own.
