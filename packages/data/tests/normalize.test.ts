@@ -37,20 +37,53 @@ describe('stripQuranicAnnotations', () => {
 });
 
 describe('buildFtsMatch', () => {
-  it('quotes a single term as a phrase', () => {
-    expect(buildFtsMatch('throne')).toBe('"throne"');
+  it('makes a term a prefix query, so "star" reaches "stars"', () => {
+    expect(buildFtsMatch('star')).toBe('"star"*');
   });
-  it('ANDs multiple terms, each quoted (any order, any position)', () => {
-    expect(buildFtsMatch('throne god')).toBe('"throne" AND "god"');
+  it('ANDs multiple terms, each its own prefix query', () => {
+    expect(buildFtsMatch('throne god')).toBe('"throne"* AND "god"*');
+  });
+  it('leaves a term below the length floor exact, not a prefix', () => {
+    // A two-letter prefix query matches a large fraction of the corpus, and
+    // two-letter words are mostly particles and stopwords -- nothing real is
+    // lost by keeping them exact.
+    expect(buildFtsMatch('of')).toBe('"of"');
+    expect(buildFtsMatch('a')).toBe('"a"');
   });
   it('neutralizes FTS operators by quoting each term', () => {
     expect(buildFtsMatch('a* OR b')).toBe('"a*" AND "OR" AND "b"');
   });
+  it('keeps a long operator-bearing term quoted, wildcard outside the quotes', () => {
+    // The trailing * is deliberate syntax; the one inside the phrase must stay
+    // literal text, or a user's own '*' becomes a second prefix operator.
+    expect(buildFtsMatch('abc*')).toBe('"abc*"*');
+  });
   it('collapses runs of whitespace and ignores leading/trailing spaces', () => {
-    expect(buildFtsMatch('  throne   god  ')).toBe('"throne" AND "god"');
+    expect(buildFtsMatch('  throne   god  ')).toBe('"throne"* AND "god"*');
   });
   it('escapes embedded double quotes per term', () => {
-    expect(buildFtsMatch('say "hi"')).toBe('"say" AND """hi"""');
+    expect(buildFtsMatch('say "hi"')).toBe('"say"* AND """hi"""*');
+  });
+
+  describe('Arabic proclitic expansion', () => {
+    it('expands an Arabic term over the article and conjunctions', () => {
+      const m = buildFtsMatch('ارض');
+      // The bare form, the article form (275 of the live corpus's 444 hits),
+      // and a conjunction+article form.
+      expect(m).toContain('"ارض"*');
+      expect(m).toContain('"الارض"*');
+      expect(m).toContain('"والارض"*');
+    });
+    it('parenthesizes each term\'s arms so OR cannot bind across the ANDs', () => {
+      const m = buildFtsMatch('ارض سماء');
+      expect(m).toMatch(/^\(.*\) AND \(.*\)$/);
+    });
+    it('does not expand a Latin term over Arabic proclitics', () => {
+      expect(buildFtsMatch('earth')).toBe('"earth"*');
+    });
+    it('leaves a short Arabic term exact, unexpanded', () => {
+      expect(buildFtsMatch('في')).toBe('"في"');
+    });
   });
 });
 

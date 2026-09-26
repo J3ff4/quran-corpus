@@ -40,21 +40,86 @@ export function stripQuranicAnnotations(s: string): string {
   return s.replace(QURANIC_ANNOTATION_MARKS, '');
 }
 
-// Build an FTS5 MATCH expression from a user query: split on whitespace and
-// require every term (AND), each wrapped as a quoted phrase so FTS operators
-// (*, OR, NEAR, ^) in the input are treated as literal text, not syntax. A
-// single-term query collapses to one quoted phrase. Embedded double quotes are
-// doubled per FTS5 phrase-escaping rules.
+// Arabic proclitics: particles that fuse to the FRONT of the following word
+// rather than standing as words of their own -- the definite article, the
+// conjunctions, and the prepositions that combine with it. FTS5 matches whole
+// tokens, so on the live corpus a reader typing `ارض` reaches 4 verses while
+// `الارض` reaches 275: the article is part of the token, and no amount of
+// diacritic folding separates it. Expanding the query over this list brings
+// `ارض` to 444.
+//
+// ponytail: query expansion, not morphology. The linguistically correct search
+// is over word_segments.root/lemma, which the corpus already carries; this is
+// the cheap half, and it overmatches (`بارض` also prefixes unrelated words).
+// Single-letter proclitics are included because they are the common ones (و ف
+// ب ل ك) and the length floor below keeps the resulting prefix queries from
+// being short enough to match everything.
+const ARABIC_PROCLITICS = [
+  '',
+  'ال',
+  'و',
+  'ف',
+  'ب',
+  'ل',
+  'ك',
+  'وال',
+  'فال',
+  'بال',
+  'كال',
+  'لل',
+  'ولل',
+  'فلل',
+];
+
+// Arabic letters proper (not the combining marks normalizeArabic strips, and
+// not the PUA range the mushaf page fonts use).
+const ARABIC_LETTER = /[\u0621-\u064A\u066E-\u06D3]/;
+
+// Below this, a trailing-wildcard term matches a large fraction of the corpus
+// and the proclitic arms match nearly all of it. Two-letter Arabic queries are
+// mostly particles, and two-letter Latin ones are mostly stopwords, so neither
+// loses a real result by staying exact.
+const MIN_PREFIX_LENGTH = 3;
+
+/** One FTS5 phrase, with embedded double quotes doubled per FTS5's escaping
+ *  rules. Quoting is what keeps FTS operators (* OR NEAR ^) in user input
+ *  literal text rather than syntax. */
+function ftsPhrase(term: string): string {
+  return `"${term.replace(/"/g, '""')}"`;
+}
+
+// A phrase followed by `*` is FTS5's prefix query. The `*` sits OUTSIDE the
+// quotes deliberately: inside, it is a literal character in the phrase.
+function termToMatch(term: string): string {
+  if (term.length < MIN_PREFIX_LENGTH) return ftsPhrase(term);
+  if (!ARABIC_LETTER.test(term)) return `${ftsPhrase(term)}*`;
+  // Parenthesized: the arms are alternatives for ONE term, and without them
+  // the OR would bind across the ANDs that join separate terms.
+  return `(${ARABIC_PROCLITICS.map((p) => `${ftsPhrase(p + term)}*`).join(' OR ')})`;
+}
+
+/**
+ * Build an FTS5 MATCH expression from a user query: split on whitespace and
+ * require every term (AND).
+ *
+ * Each term becomes a prefix query, which is what makes "star" find "stars"
+ * and "рахм" find "рахмат" -- SQLite ships a stemmer for neither Russian nor
+ * Uzbek, and Porter would only ever touch the English arm. Arabic terms
+ * additionally expand over the proclitics above, because Arabic glues its
+ * article and conjunctions into the token itself.
+ */
 export function buildFtsMatch(s: string): string {
   return s
     .split(/\s+/)
     .filter((t) => t.length > 0)
-    .map((t) => `"${t.replace(/"/g, '""')}"`)
+    .map(termToMatch)
     .join(' AND ');
 }
 
-// The Uzbek translation set in the DB is Cyrillic-only, but most users type
-// Uzbek in the modern Latin alphabet -- so a Latin query never matches it.
+// Two of the three `uz` translation sets are Cyrillic-only (Alauddin Mansour,
+// Muhammad Sodik Muhammad Yusuf), so a Latin-typed Uzbek query never matches
+// them. (The set the reader actually shows, Tasnim, is Latin under `uz` and
+// Cyrillic under `uz-Cyrl` -- both reachable by their own script without this.)
 // Best-effort Latin -> Cyrillic transliteration so search still hits: covers
 // the standard letters/digraphs and the oʻ/gʻ special letters (several
 // apostrophe glyphs accepted). Not a full orthography (loanword c/w, and the

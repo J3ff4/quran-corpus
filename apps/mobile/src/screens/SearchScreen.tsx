@@ -14,6 +14,7 @@ import { SnippetText } from '@/components/SnippetText';
 import { searchCorpus } from '@/data/corpusRepository';
 import { openCorpusDb } from '@/data/openCorpusDb';
 import { t } from '@/i18n/uiStrings';
+import { contentLanguages, type QueryLanguageCode } from '@/i18n/languages';
 import { useHeldEntry } from '@/motion/entryPager';
 import { usePressScale } from '@/motion/usePressScale';
 import { getReaderSurah } from '@/data/readerPosition';
@@ -24,6 +25,16 @@ import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+/** The native name of a hit's language, or null when the hit needs no label:
+ *  the Arabic body (its face already says so) and the reader's own language
+ *  (which is what an unlabelled row means). `uz-Cyrl` labels as Uzbek -- it is
+ *  the same language in the other alphabet, and the snippet shows which. */
+function crossLanguageLabel(source: string, reader: QueryLanguageCode): string | null {
+  if (source === 'ar' || source === reader) return null;
+  const code = source === 'uz-Cyrl' ? 'uz' : source;
+  return contentLanguages.find((l) => l.code === code)?.nativeLabel ?? null;
+}
 
 /** One result row, whatever kind it is: a glass card that squeezes on press.
  *
@@ -365,16 +376,35 @@ export function SearchScreen() {
                 testID="search-verse"
                 onPress={() => router.push(`/surah/${hit.surah_id}?ayah=${hit.ayah_number}`)}
               >
-                <Text
-                  style={{
-                    color: theme.accent,
-                    fontSize: typography.caption,
-                    fontWeight: '600',
-                    fontVariant: ['tabular-nums'],
-                  }}
-                >
-                  {hit.surah_id}:{hit.ayah_number}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text
+                    style={{
+                      color: theme.accent,
+                      fontSize: typography.caption,
+                      fontWeight: '600',
+                      fontVariant: ['tabular-nums'],
+                    }}
+                  >
+                    {hit.surah_id}:{hit.ayah_number}
+                  </Text>
+                  {/* Search now follows the query's script rather than the
+                      reader's language, so a Cyrillic query answers with
+                      Russian verses while the reader sits on English. Those
+                      hits need to say what they are -- unlabelled, a Russian
+                      snippet under an English list reads as a bug. */}
+                  {crossLanguageLabel(hit.source, queryLanguage) ? (
+                    <Text
+                      testID="search-verse-language"
+                      style={{
+                        color: theme.mutedText,
+                        fontSize: typography.caption,
+                        fontWeight: '600',
+                      }}
+                    >
+                      {crossLanguageLabel(hit.source, queryLanguage)}
+                    </Text>
+                  ) : null}
+                </View>
                 <SnippetText
                   snippet={hit.snippet}
                   highlightColor={theme.accent}
