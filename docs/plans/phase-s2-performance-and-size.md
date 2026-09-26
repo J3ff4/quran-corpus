@@ -1830,24 +1830,25 @@ is really a one-time migration.
 
 ### Device checks 425-436
 
-All unrun: the phone is this session's display, so the run is coordinated with
-the owner. 425-432 take the vc56 APK; 433-436 need the pack build installed
-through `bundletool --local-testing`, which an APK cannot carry.
+Run 2026-09-26 on the owner's OnePlus 7 Pro (GM1917, Android 16), vc56
+installed fresh on user 0, driven over adb with the owner present. 425-432 take
+the vc56 APK; 433-436 need the pack build installed through
+`bundletool --local-testing`, which an APK cannot carry, and are still unrun.
 
 | # | Build | Check | Result |
 | --- | --- | --- | --- |
-| 425 | APK | Reader shows the correct translation in EN, RU, UZ, UZ-Cyrl | |
-| 426 | APK | Search returns hits for an Arabic, an English and a Russian term | |
-| 427 | APK | A search hit opens the ayah it names | |
-| 428 | APK | Mushaf renders pages 1, 50, 302, 604 with correct glyphs | |
-| 429 | APK | Word-by-word grid renders segments and glosses | |
-| 430 | APK | Cold start not worse than baseline (**discard the first launch** -- see the version-bump trap above) | |
-| 431 | APK | Dictionary root entry shows Hans Wehr and Lane definitions | |
-| 432 | APK | A Russian search returns Abu Adel's wording and no other Russian set's | |
-| 433 | pack | Mushaf renders pages 1, 50, 302, 604 -- not tofu, not a fallback face | |
-| 434 | pack | Page 1 pixel-diffs clean against the same page from the inline build | |
-| 435 | pack | Airplane mode, fresh install: the mushaf still renders | |
-| 436 | pack | The inline (F-Droid) build still renders the mushaf | |
+| 425 | APK | Reader shows the correct translation in EN, RU, UZ, UZ-Cyrl | PASS |
+| 426 | APK | Search returns hits for an Arabic, an English and a Russian term | PARTIAL -- English arm passes; Arabic and Russian arms unrun |
+| 427 | APK | A search hit opens the ayah it names | PASS |
+| 428 | APK | Mushaf renders pages 1, 50, 302, 604 with correct glyphs | PASS |
+| 429 | APK | Word-by-word grid renders segments and glosses | PASS |
+| 430 | APK | Cold start not worse than baseline (**discard the first launch** -- see the version-bump trap above) | **FAIL** -- median 980 ms against the baseline's 877 ms (+11.7%); two confounds recorded below |
+| 431 | APK | Dictionary root entry shows Hans Wehr and Lane definitions | PASS |
+| 432 | APK | A Russian search returns Abu Adel's wording and no other Russian set's | PARTIAL -- the reader renders Abu Adel and no second Russian set; the *search* arm is unrun |
+| 433 | pack | Mushaf renders pages 1, 50, 302, 604 -- not tofu, not a fallback face | unrun |
+| 434 | pack | Page 1 pixel-diffs clean against the same page from the inline build | unrun |
+| 435 | pack | Airplane mode, fresh install: the mushaf still renders | unrun |
+| 436 | pack | The inline (F-Droid) build still renders the mushaf | unrun |
 
 426, 427 and 432 carry the most weight this phase. Task 3 deleted 31,180
 translation rows through a trigger and Task 3b rewrote the FTS index with a
@@ -1860,6 +1861,75 @@ through the app's AssetManager. Everything recorded about Task 5's runtime
 path is read from expo-font and expo-asset source; none of it has run on a
 device. 434 exists because a silent fallback to the system face is this
 project's known font-loading failure mode and it looks exactly like success.
+
+#### Run log, 2026-09-26 (APK arm, checks 425-432)
+
+Device: OnePlus 7 Pro (GM1917), Android 16, `versionCode=56`, installed fresh
+on user 0 (`firstInstallTime == lastUpdateTime`), battery 15%, power save off,
+thermal status 0.
+
+**425 PASS.** Reader on 31:3 in all four sets. EN is Saheeh International. RU
+carries Abu Adel's bracketed exegetical inserts (`[тех, которые лучшим
+образом...]`), which Kuliev's plain rendering does not have -- so the
+translator is identified by its own prose, not by the row it came from. UZ
+Latin renders Tasnim. UZ-Cyrl is *not* in the reader's language sheet (which
+offers English / O'zbek / Русский only): it is reached by Settings -> Language
+-> Uzbek script -> Кирилл, exactly as `translators.ts` describes, and after
+flipping it the ayah-of-the-day and the dictionary's "translated as" glosses
+both re-render in Cyrillic (`ҳалолларимиздан ва`, `абадий · ҳеч қачон`).
+
+**426 PARTIAL.** English arm passes: `mercy` returns 31:3, 10:86, 27:77 with
+the term highlighted, and the ROOTS arm under it returns رحم 339, توب 87,
+سكن 69, لعن 41, بقى 21, رأف 13 -- the meaning search from issue #31 working
+corpus-wide. The Arabic and Russian arms are **unrun**, and the reason is
+instrumental, not a defect: `adb shell input text` maps through the device
+KeyCharacterMap and is ASCII-only, `cmd clipboard` is absent on this build
+("No shell command implementation"), and no ADBKeyBoard-style IME is installed.
+Both arms need the owner to type the term on the phone's own keyboard. This is
+the check the phase most needs, because Task 3 deleted 31,180 rows through a
+trigger and Task 3b rewrote the index with a segment merge -- the English arm
+alone does not exercise the Arabic tokenizer or a Russian `search_fts` row.
+
+**427 PASS.** The 31:3 hit opens Luqman at ayah 3, not a neighbour, with the
+same text the hit card showed.
+
+**428 PASS.** Pages 1, 50, 302 and 604 all render QCF glyphs at the right band
+scale: 1 = Al-Fatiha with the ornate surah band, 50 = Aal-Imran opening (Juz
+3), 302 = Al-Kahf 75-83 (Juz 16), 604 = three surah bands (112/113/114) on one
+page. Not tofu, not a fallback face -- the a11y dump reads the line text back
+as PUA codepoints (`ﱁﱂﱃﱄ...`), which is the page font's own mapping.
+
+**429 PASS.** WBW grid on 31:3-5: per-segment colouring, Arabic and gloss
+aligned, joined words shaped correctly.
+
+**430 FAIL.** Three readings after discarding the extraction launch:
+980 / 973 / 986 ms, median **980 ms**, against the baseline's 964 / 877 / 851,
+median **877 ms** -- 103 ms and 11.7% worse. Two confounds, both real, neither
+sufficient to dismiss it:
+
+1. *Battery at 15%.* `low_power` is 0 and `Thermal Status` is 0, so neither
+   Android's power saver nor its thermal governor is engaged -- but OnePlus
+   ships its own low-battery governor that reports through neither.
+2. *No ART profile.* The install is minutes old and logcat says
+   `ProfileInstaller: Skipping profile installation`. The baseline was measured
+   on a build that had been launched many times. The shape of the numbers fits
+   this: the baseline *descends* (964 -> 877 -> 851) as the profile warms,
+   while these three are flat (980 / 973 / 986), which is what a cold profile
+   with nothing to warm looks like.
+
+Re-measure on a charged phone after a dozen launches before treating this as a
+regression in the diff. **Do not close the phase on the strength of the size
+numbers alone** -- a 43% smaller DB that costs 100 ms of launch is a trade the
+owner has not been asked about.
+
+**431 PASS.** `أبد` shows Hans Wehr ("stay, linger") above Lane's Lexicon
+("he remained/ stayed, abode, dwelt constantly...") with Show more, in the
+rank order Task 23 set.
+
+**432 PARTIAL.** The reader half passes and is strong: Abu Adel renders, and no
+second Russian rendering appears for the same ayah, so Kuliev and Rowwad are
+gone from the bundle as Task 3 intended. The *search* half is unrun for the
+same keyboard reason as 426.
 
 ## Rulings
 
