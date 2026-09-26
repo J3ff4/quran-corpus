@@ -299,6 +299,19 @@ describe('Uzbek in two alphabets', () => {
     expect(hits.some((h) => h.source === 'uz-Cyrl' && h.ayah_number === 2)).toBe(true);
   });
 
+  it('returns the Cyrillic row when only that script is on offer', async () => {
+    // The reader's script reaches this as the translator map: with `uz` left
+    // out, ayah 1 -- which exists in BOTH alphabets, as every Tasnim verse
+    // really does -- can only come back Cyrillic. Offering both instead is how
+    // a reader on Cyrillic ended up with an all-Latin result list, because the
+    // Latin pass runs first and its rows win the fold.
+    const hits = await searchVerses(db, 'bilan', { translators: { 'uz-Cyrl': 'T' } });
+    const first = hits.filter((h) => h.ayah_number === 1);
+
+    expect(first).toHaveLength(1);
+    expect(first[0]!.source).toBe('uz-Cyrl');
+  });
+
   it('returns one row, not two, for a verse written in both alphabets', async () => {
     const hits = await searchVerses(db, 'bilan', { translators: BOTH });
     const first = hits.filter((h) => h.ayah_number === 1 && h.source.startsWith('uz'));

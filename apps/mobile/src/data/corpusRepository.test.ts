@@ -16,6 +16,7 @@ import {
   getWordAtLocation,
   getWordsForAyah,
   getWordSummary,
+  searchCorpus,
 } from './corpusRepository';
 import { contentLanguages } from '../i18n/languages';
 
@@ -23,6 +24,50 @@ describe('contentLanguages', () => {
   it('ships English, Uzbek, and Russian in a scalable metadata shape', () => {
     expect(contentLanguages.map((l) => l.code)).toEqual(['en', 'uz', 'ru']);
     expect(contentLanguages.every((l) => l.label.length > 0)).toBe(true);
+  });
+});
+
+describe('searchCorpus', () => {
+  /** Collects the BOUND arguments of every verse statement. The language codes
+   *  on offer arrive as bound pairs; reading the SQL text instead would match
+   *  the `source IN ('uz', 'uz-Cyrl')` literal of the transliteration pass and
+   *  assert nothing. */
+  function recordingClient(args: string[]): MobileDataClient {
+    return {
+      // Some arms bind nothing and arrive as a bare SQL string.
+      execute: async (stmt: string | { sql: string; args?: SqlValue[] }) => {
+        if (typeof stmt !== 'string' && stmt.sql.includes('search_fts MATCH')) {
+          args.push(...(stmt.args ?? []).map(String));
+        }
+        return { rows: [] as MobileRow[] };
+      },
+    } as unknown as MobileDataClient;
+  }
+
+  it('offers only the Uzbek alphabet the reader chose', async () => {
+    // Tasnim is indexed under both codes, so offering both lets the Latin rows
+    // fill the limit and a reader on Cyrillic never sees their own script.
+    const cyrillic: string[] = [];
+    await searchCorpus(recordingClient(cyrillic), 'bilan', 'uz-Cyrl');
+
+    expect(cyrillic).toContain('uz-Cyrl');
+    expect(cyrillic).not.toContain('uz');
+
+    const latin: string[] = [];
+    await searchCorpus(recordingClient(latin), 'bilan', 'uz');
+
+    expect(latin).toContain('uz');
+    expect(latin).not.toContain('uz-Cyrl');
+  });
+
+  it('keeps both alphabets for a reader whose language is neither', async () => {
+    // No script was chosen here, so nothing is being overridden -- and a
+    // cross-language Uzbek hit is more use to an English reader in Latin.
+    const args: string[] = [];
+    await searchCorpus(recordingClient(args), 'mercy', 'en');
+
+    expect(args).toContain('uz');
+    expect(args).toContain('uz-Cyrl');
   });
 });
 
