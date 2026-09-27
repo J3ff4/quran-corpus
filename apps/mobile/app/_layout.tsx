@@ -144,6 +144,14 @@ function AppStack() {
       <Bloom />
       <Stack
         screenOptions={{
+          // Pinned, not left to the platform. `default` resolves to whatever
+          // the OS picks: API 31 gives a slide, but One UI on API 36 gives a
+          // CROSS-FADE -- and every screen here is transparent so the bloom can
+          // show through, so a cross-fade superimposes the outgoing and
+          // incoming screens for the whole ~500ms. Both are readable at once
+          // (owner, Galaxy S24 vs OnePlus 7 Pro). A slide moves one over the
+          // other instead, which a transparent screen survives.
+          animation: 'slide_from_right',
           // Transparent background, but NOT a transparent (overlaying) header:
           // the bloom has to show through the header strip, and a tinted one
           // would cut a flat band across it -- but `headerTransparent` also
