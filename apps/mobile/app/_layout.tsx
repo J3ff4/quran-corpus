@@ -144,6 +144,14 @@ function AppStack() {
       <Bloom />
       <Stack
         screenOptions={{
+          // `animation` is deliberately NOT set: `default` is the zoom, and
+          // the zoom is the motion this app has. What made it look broken on
+          // API 33+ was react-native-screens' own v33 resource variant, which
+          // never fades the outgoing screen -- fine for an opaque screen, but
+          // every screen here is transparent (below). plugins/
+          // withStackZoomTransition.js overrides those four resources with the
+          // pre-33 zoom bodies, so `default` now means the same motion on
+          // every Android version.
           // Transparent background, but NOT a transparent (overlaying) header:
           // the bloom has to show through the header strip, and a tinted one
           // would cut a flat band across it -- but `headerTransparent` also

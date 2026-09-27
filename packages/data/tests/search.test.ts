@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { createDatabase } from '../src/db.js';
 import { runMigrations } from '../src/migrate.js';
 import { backfillSearchIndex, parseVerseRef, searchVerses, search } from '../src/queries/search.js';
+import { normalizeArabic } from '../src/text/normalize.js';
 import type { Client } from '@libsql/client';
 
 async function seed(db: Client): Promise<void> {
@@ -265,6 +266,133 @@ describe('searchVerses source selection', () => {
 
     const nonMatching = await searchVerses(db, 'bilan', { translators: { uz: 'nope' } });
     expect(nonMatching.some((h) => h.source === 'uz')).toBe(false);
+  });
+});
+
+describe('Arabic snippets', () => {
+  const MARK_START = '\u0002';
+  const MARK_END = '\u0003';
+
+  beforeEach(async () => {
+    await backfillSearchIndex(db);
+  });
+
+  it('renders the Uthmani text, not the normalized index body', async () => {
+    const hits = await searchVerses(db, 'الرحمن');
+    const ar = hits.find((h) => h.source === 'ar');
+
+    // The indexed body is `بسم الله الرحمن الرحيم` -- harakat stripped, bare
+    // alef -- because the tokenizer folds only Latin and Cyrillic. Showing it
+    // put a degraded rendering next to the reader's own Uthmani (#102).
+    expect(ar!.snippet).toContain('ٱلرَّحْمَٰنِ');
+    expect(ar!.snippet).toContain('بِسْمِ');
+  });
+
+  it('marks the matched word in the Uthmani rendering', async () => {
+    const hits = await searchVerses(db, 'الرحمن');
+    const ar = hits.find((h) => h.source === 'ar');
+
+    // The mark has to survive the script change: the FTS offsets that would
+    // normally carry it point into a different string entirely.
+    expect(ar!.snippet).toContain(`${MARK_START}ٱلرَّحْمَٰنِ${MARK_END}`);
+  });
+
+  it('marks a proclitic-bearing form, the same one the index matched', async () => {
+    await db.execute(
+      "INSERT INTO ayahs (id,surah_id,ayah_number,text_uthmani) VALUES (9,2,1,'وَٱلْأَرْضِ بَعْدَ ذَٰلِكَ')",
+    );
+    // Indexed exactly as backfillSearchIndex would: normalized.
+    await db.execute({
+      sql: 'INSERT INTO search_fts (surah_id, ayah_number, source, ref_id, body) VALUES (2,1,?,9,?)',
+      args: ['ar', normalizeArabic('وَٱلْأَرْضِ بَعْدَ ذَٰلِكَ')],
+    });
+
+    const hits = await searchVerses(db, 'ارض');
+    const ar = hits.find((h) => h.surah_id === 2);
+
+    // `ارض` reaches this row only through the proclitic arm `والارض`, so a
+    // highlighter built from the bare term alone would leave it unmarked.
+    expect(ar!.snippet).toContain(`${MARK_START}وَٱلْأَرْضِ${MARK_END}`);
+  });
+
+  it('leaves translation snippets to FTS5', async () => {
+    const hits = await searchVerses(db, 'name');
+    const en = hits.find((h) => h.source === 'en');
+
+    // Translations are indexed raw, so `snippet()` already returns display
+    // text -- there is nothing to re-derive.
+    expect(en!.snippet).toContain(`${MARK_START}name${MARK_END}`);
+  });
+
+  it('renders Uthmani unhighlighted when no displayed word matches', async () => {
+    // A row whose indexed body carries a word its display does not: the
+    // annotation strip is exactly the kind of thing that can eat the match.
+    await db.execute(
+      "INSERT INTO ayahs (id,surah_id,ayah_number,text_uthmani) VALUES (8,2,2,'قَوْلٌۭ مَّعْرُوفٌۭ')",
+    );
+    await db.execute({
+      sql: 'INSERT INTO search_fts (surah_id, ayah_number, source, ref_id, body) VALUES (2,2,?,8,?)',
+      args: ['ar', 'زخرف'],
+    });
+
+    const hits = await searchVerses(db, 'زخرف');
+    const ar = hits.find((h) => h.surah_id === 2 && h.ayah_number === 2);
+
+    // The FTS snippet here IS the normalized body -- issue #102's rendering.
+    // Unhighlighted Uthmani is the one thing better than that; blank is worse.
+    expect(ar!.snippet).toContain('مَّعْرُوفٌ');
+    expect(ar!.snippet).not.toContain('زخرف');
+    expect(ar!.snippet).not.toContain(MARK_START);
+  });
+
+  it('opens the window where it shows both terms of an AND query', async () => {
+    // 30 words with the matches 11 apart, at w3 and w14. A 13-word window holds
+    // both, but only from starts 2..3 -- and NEITHER match anchors one of those
+    // (w3 anchors start 0, which drops w14; w14 anchors start 8, which drops
+    // w3). Match-centred candidates alone therefore show one word marked.
+    const filler = Array.from({ length: 30 }, (_, i) => `كَلِمَة${i}`);
+    filler[3] = 'ٱلْأَرْضِ';
+    filler[14] = 'ٱلرَّحْمَٰنِ';
+    const text = filler.join(' ');
+    await db.execute({
+      sql: 'INSERT INTO ayahs (id,surah_id,ayah_number,text_uthmani) VALUES (7,2,3,?)',
+      args: [text],
+    });
+    await db.execute({
+      sql: 'INSERT INTO search_fts (surah_id, ayah_number, source, ref_id, body) VALUES (2,3,?,7,?)',
+      args: ['ar', normalizeArabic(text)],
+    });
+
+    const hits = await searchVerses(db, 'ارض رحمن');
+    const ar = hits.find((h) => h.surah_id === 2 && h.ayah_number === 3);
+
+    expect(ar!.snippet).toContain(`${MARK_START}ٱلْأَرْضِ${MARK_END}`);
+    expect(ar!.snippet).toContain(`${MARK_START}ٱلرَّحْمَٰنِ${MARK_END}`);
+  });
+
+  it('centres a lone match instead of leaving it at the window edge', async () => {
+    // Every window from w8 to w20 shows this one match, so coverage cannot
+    // choose between them; the even-margin key does, and it puts the match in
+    // the middle (w14..w26) rather than at the first start that reaches it.
+    const filler = Array.from({ length: 30 }, (_, i) => `كَلِمَة${i}`);
+    filler[20] = 'ٱلْأَرْضِ';
+    const text = filler.join(' ');
+    await db.execute({
+      sql: 'INSERT INTO ayahs (id,surah_id,ayah_number,text_uthmani) VALUES (8,2,4,?)',
+      args: [text],
+    });
+    await db.execute({
+      sql: 'INSERT INTO search_fts (surah_id, ayah_number, source, ref_id, body) VALUES (2,4,?,8,?)',
+      args: ['ar', normalizeArabic(text)],
+    });
+
+    const hits = await searchVerses(db, 'ارض');
+    const ar = hits.find((h) => h.surah_id === 2 && h.ayah_number === 4);
+
+    expect(ar!.snippet).toContain('كَلِمَة14');
+    expect(ar!.snippet).toContain('كَلِمَة26');
+    expect(ar!.snippet).not.toContain('كَلِمَة13');
+    expect(ar!.snippet).not.toContain('كَلِمَة27');
   });
 });
 
