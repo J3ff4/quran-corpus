@@ -131,10 +131,14 @@ export function highlightTerms(s: string): HighlightTerm[] {
 }
 
 /** Whether one displayed word is a hit for any of `terms`. The word is
- *  normalized and case-folded first, because that is the form the index matched
- *  on -- a Uthmani word carries harakat the query never does, and the tokenizer
- *  (`unicode61 remove_diacritics 2`) folds case on the Latin and Cyrillic rows,
- *  so a translation snippet must not miss `Name` for `name`. */
+ *  normalized first, because that is the form the index matched on: a Uthmani
+ *  word carries harakat the query never does.
+ *
+ *  The case fold is defensive, not live. The only caller renders Arabic, which
+ *  has no case; it matters if a non-Arabic row is ever highlighted here, because
+ *  the tokenizer (`unicode61 remove_diacritics 2`) folds case on Latin and
+ *  Cyrillic while `normalizeArabic` does not -- so `Name` would come back
+ *  unmarked for the query `name` that found it. */
 export function wordMatchesHighlight(word: string, terms: HighlightTerm[]): boolean {
   const normalized = normalizeArabic(word).toLowerCase();
   // No empty-string guard: `highlightTerms` drops empty terms, and neither

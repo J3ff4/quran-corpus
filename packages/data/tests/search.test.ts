@@ -346,11 +346,13 @@ describe('Arabic snippets', () => {
   });
 
   it('opens the window where it shows both terms of an AND query', async () => {
-    // 15 words: the two matches sit 8 apart, so a 13-word window can hold both
-    // -- but only if it is not pinned to the first one (words 0..12 drops w13).
-    const filler = Array.from({ length: 15 }, (_, i) => `كَلِمَة${i}`);
-    filler[5] = 'ٱلْأَرْضِ';
-    filler[13] = 'ٱلرَّحْمَٰنِ';
+    // 30 words with the matches 11 apart, at w3 and w14. A 13-word window holds
+    // both, but only from starts 2..3 -- and NEITHER match anchors one of those
+    // (w3 anchors start 0, which drops w14; w14 anchors start 8, which drops
+    // w3). Match-centred candidates alone therefore show one word marked.
+    const filler = Array.from({ length: 30 }, (_, i) => `كَلِمَة${i}`);
+    filler[3] = 'ٱلْأَرْضِ';
+    filler[14] = 'ٱلرَّحْمَٰنِ';
     const text = filler.join(' ');
     await db.execute({
       sql: 'INSERT INTO ayahs (id,surah_id,ayah_number,text_uthmani) VALUES (7,2,3,?)',
@@ -366,6 +368,31 @@ describe('Arabic snippets', () => {
 
     expect(ar!.snippet).toContain(`${MARK_START}ٱلْأَرْضِ${MARK_END}`);
     expect(ar!.snippet).toContain(`${MARK_START}ٱلرَّحْمَٰنِ${MARK_END}`);
+  });
+
+  it('centres a lone match instead of leaving it at the window edge', async () => {
+    // Every window from w8 to w20 shows this one match, so coverage cannot
+    // choose between them; the even-margin key does, and it puts the match in
+    // the middle (w14..w26) rather than at the first start that reaches it.
+    const filler = Array.from({ length: 30 }, (_, i) => `كَلِمَة${i}`);
+    filler[20] = 'ٱلْأَرْضِ';
+    const text = filler.join(' ');
+    await db.execute({
+      sql: 'INSERT INTO ayahs (id,surah_id,ayah_number,text_uthmani) VALUES (8,2,4,?)',
+      args: [text],
+    });
+    await db.execute({
+      sql: 'INSERT INTO search_fts (surah_id, ayah_number, source, ref_id, body) VALUES (2,4,?,8,?)',
+      args: ['ar', normalizeArabic(text)],
+    });
+
+    const hits = await searchVerses(db, 'ارض');
+    const ar = hits.find((h) => h.surah_id === 2 && h.ayah_number === 4);
+
+    expect(ar!.snippet).toContain('كَلِمَة14');
+    expect(ar!.snippet).toContain('كَلِمَة26');
+    expect(ar!.snippet).not.toContain('كَلِمَة13');
+    expect(ar!.snippet).not.toContain('كَلِمَة27');
   });
 });
 
