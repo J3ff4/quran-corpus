@@ -12,7 +12,7 @@
     ],
     "android": {
       "package": "com.qurancorpus.mobile",
-      "versionCode": 62,
+      "versionCode": 63,
       "adaptiveIcon": {
         "foregroundImage": "./assets/icons/adaptive-icon.png",
         "backgroundColor": "#faf8f3"
@@ -50,7 +50,8 @@
           }
         }
       ],
-      "./plugins/withMushafAssetPack"
+      "./plugins/withMushafAssetPack",
+      "./plugins/withStackZoomTransition"
     ],
     "extra": {
       "audioApiBaseUrl": "",

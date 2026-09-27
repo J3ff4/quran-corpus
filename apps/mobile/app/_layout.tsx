@@ -144,14 +144,14 @@ function AppStack() {
       <Bloom />
       <Stack
         screenOptions={{
-          // Pinned, not left to the platform. `default` resolves to whatever
-          // the OS picks: API 31 gives a slide, but One UI on API 36 gives a
-          // CROSS-FADE -- and every screen here is transparent so the bloom can
-          // show through, so a cross-fade superimposes the outgoing and
-          // incoming screens for the whole ~500ms. Both are readable at once
-          // (owner, Galaxy S24 vs OnePlus 7 Pro). A slide moves one over the
-          // other instead, which a transparent screen survives.
-          animation: 'slide_from_right',
+          // `animation` is deliberately NOT set: `default` is the zoom, and
+          // the zoom is the motion this app has. What made it look broken on
+          // API 33+ was react-native-screens' own v33 resource variant, which
+          // never fades the outgoing screen -- fine for an opaque screen, but
+          // every screen here is transparent (below). plugins/
+          // withStackZoomTransition.js overrides those four resources with the
+          // pre-33 zoom bodies, so `default` now means the same motion on
+          // every Android version.
           // Transparent background, but NOT a transparent (overlaying) header:
           // the bloom has to show through the header strip, and a tinted one
           // would cut a flat band across it -- but `headerTransparent` also
