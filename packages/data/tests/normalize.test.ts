@@ -135,6 +135,13 @@ describe('wordMatchesHighlight', () => {
     expect(wordMatchesHighlight('stars', highlightTerms('star'))).toBe(true);
   });
 
+  it('folds case, which the FTS tokenizer does on Latin and Cyrillic rows', () => {
+    // The index matched `Name` on the query `name`; a case-sensitive
+    // highlighter would leave the very word the search found unmarked.
+    expect(wordMatchesHighlight('Name', highlightTerms('name'))).toBe(true);
+    expect(wordMatchesHighlight('name', highlightTerms('Name'))).toBe(true);
+  });
+
   it('does NOT prefix-match below the length floor', () => {
     // FTS5 gets a bare phrase for a two-character term, so it never matched
     // `الرحمن` on `ال` -- marking it would highlight a word the search did not

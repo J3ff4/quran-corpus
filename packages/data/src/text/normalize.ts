@@ -131,13 +131,18 @@ export function highlightTerms(s: string): HighlightTerm[] {
 }
 
 /** Whether one displayed word is a hit for any of `terms`. The word is
- *  normalized first, because that is the form the index matched on -- a
- *  Uthmani word carries harakat the query never does. */
+ *  normalized and case-folded first, because that is the form the index matched
+ *  on -- a Uthmani word carries harakat the query never does, and the tokenizer
+ *  (`unicode61 remove_diacritics 2`) folds case on the Latin and Cyrillic rows,
+ *  so a translation snippet must not miss `Name` for `name`. */
 export function wordMatchesHighlight(word: string, terms: HighlightTerm[]): boolean {
-  const normalized = normalizeArabic(word);
+  const normalized = normalizeArabic(word).toLowerCase();
   // No empty-string guard: `highlightTerms` drops empty terms, and neither
   // `'' === term` nor `''.startsWith(term)` is ever true for a non-empty one.
-  return terms.some((t) => (t.exact ? normalized === t.term : normalized.startsWith(t.term)));
+  return terms.some((t) => {
+    const term = t.term.toLowerCase();
+    return t.exact ? normalized === term : normalized.startsWith(term);
+  });
 }
 
 /**

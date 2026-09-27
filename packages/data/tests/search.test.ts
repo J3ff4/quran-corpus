@@ -324,7 +324,7 @@ describe('Arabic snippets', () => {
     expect(en!.snippet).toContain(`${MARK_START}name${MARK_END}`);
   });
 
-  it('falls back to the FTS snippet when no displayed word matches', async () => {
+  it('renders Uthmani unhighlighted when no displayed word matches', async () => {
     // A row whose indexed body carries a word its display does not: the
     // annotation strip is exactly the kind of thing that can eat the match.
     await db.execute(
@@ -338,8 +338,34 @@ describe('Arabic snippets', () => {
     const hits = await searchVerses(db, 'زخرف');
     const ar = hits.find((h) => h.surah_id === 2 && h.ayah_number === 2);
 
-    // Unhighlighted Uthmani would be defensible; a blank row is not.
-    expect(ar!.snippet).toContain('زخرف');
+    // The FTS snippet here IS the normalized body -- issue #102's rendering.
+    // Unhighlighted Uthmani is the one thing better than that; blank is worse.
+    expect(ar!.snippet).toContain('مَّعْرُوفٌ');
+    expect(ar!.snippet).not.toContain('زخرف');
+    expect(ar!.snippet).not.toContain(MARK_START);
+  });
+
+  it('opens the window where it shows both terms of an AND query', async () => {
+    // 15 words: the two matches sit 8 apart, so a 13-word window can hold both
+    // -- but only if it is not pinned to the first one (words 0..12 drops w13).
+    const filler = Array.from({ length: 15 }, (_, i) => `كَلِمَة${i}`);
+    filler[5] = 'ٱلْأَرْضِ';
+    filler[13] = 'ٱلرَّحْمَٰنِ';
+    const text = filler.join(' ');
+    await db.execute({
+      sql: 'INSERT INTO ayahs (id,surah_id,ayah_number,text_uthmani) VALUES (7,2,3,?)',
+      args: [text],
+    });
+    await db.execute({
+      sql: 'INSERT INTO search_fts (surah_id, ayah_number, source, ref_id, body) VALUES (2,3,?,7,?)',
+      args: ['ar', normalizeArabic(text)],
+    });
+
+    const hits = await searchVerses(db, 'ارض رحمن');
+    const ar = hits.find((h) => h.surah_id === 2 && h.ayah_number === 3);
+
+    expect(ar!.snippet).toContain(`${MARK_START}ٱلْأَرْضِ${MARK_END}`);
+    expect(ar!.snippet).toContain(`${MARK_START}ٱلرَّحْمَٰنِ${MARK_END}`);
   });
 });
 
