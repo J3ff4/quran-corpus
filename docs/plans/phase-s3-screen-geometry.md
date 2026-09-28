@@ -406,9 +406,24 @@ resize, and `flexShrink: 1` spends the shortfall on an ellipsis. Cold and live
 differ at identical geometry, which rules out every width-dependent
 explanation and leaves stale measurement.
 
-Fixed by keying the strip's row on `useWindowDimensions().width`, so the
-reconfiguration discards the node holding the stale measurement.
-Mutation-checked: deleting the key fails the new test.
+First fix keyed the strip's row on `useWindowDimensions().width`, to discard
+the node holding the stale measurement. On vc69 that held at fold7 (896dp)
+and still failed at fold8 (939dp) -- a remount does not help when the box is
+still sized from a measurement.
+
+Second fix, the one that holds: `flex: 1` on the name instead of
+`flexShrink: 1`. The basis of 0 is the load-bearing half -- the box starts
+from nothing and grows into the row's free space, so it never derives from
+the text's measured width at all, and a stale measurement can only come out
+too narrow to trigger an ellipsis rather than too wide. Mutation-checked:
+restoring `flexShrink: 1` fails the test.
+
+Verified on device, vc70, all four captures read `Al-Baqara` in full:
+
+| geometry | cold | live |
+| --- | --- | --- |
+| fold8 2184x1968 @372 | `Al-Baqara` | `Al-Baqara` |
+| fold7 2184x1968 @390 | `Al-Baqara` | `Al-Baqara` |
 
 Not reproduced in the same sweep, at any of the four Fold geometries, cold or
 live: the clipped first line, and a missing juz number (`Juz 1` rendered in
@@ -443,6 +458,14 @@ wrap either.
 
 To close this one: a photo of the S22 Ultra screen showing the wrapped row,
 or the root it was on.
+
+### Sweep-script rule earned the hard way
+
+A vc69 run dropped mid-sweep -- Samsung wireless debugging dies on its own --
+while a `wm size` override was applied, and the reset only ran at the end of
+each pair. Reset after EVERY capture, never once per pair: a dropped
+connection must not be able to leave someone's phone in an overridden
+geometry.
 
 ### Still owed
 

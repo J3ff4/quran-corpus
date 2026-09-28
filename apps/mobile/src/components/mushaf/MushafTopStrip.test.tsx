@@ -2,12 +2,7 @@ import React from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const win = vi.hoisted(() => ({ width: 390 }));
-
-vi.mock('react-native', async () => ({
-  ...(await import('@/testing/rnHosts.js')).reactNativeTextMock(),
-  useWindowDimensions: () => ({ width: win.width, height: 844, scale: 3, fontScale: 1 }),
-}));
+vi.mock('react-native', async () => (await import('@/testing/rnHosts.js')).reactNativeTextMock());
 
 import { MushafTopStrip } from './MushafTopStrip';
 import { ThemeContext } from '@/theme/themeContext';
@@ -15,7 +10,7 @@ import { themeColors } from '@/theme/tokens';
 
 function renderStrip(props: Partial<React.ComponentProps<typeof MushafTopStrip>> = {}) {
   const onTap = vi.fn();
-  const { rerender } = render(
+  render(
     <ThemeContext.Provider value={themeColors.dark}>
       <MushafTopStrip
         insetTop={28}
@@ -27,13 +22,10 @@ function renderStrip(props: Partial<React.ComponentProps<typeof MushafTopStrip>>
       />
     </ThemeContext.Provider>,
   );
-  return { onTap, rerender };
+  return { onTap };
 }
 
-afterEach(() => {
-  win.width = 390;
-  cleanup();
-});
+afterEach(cleanup);
 
 describe('MushafTopStrip', () => {
   it('names the page: the surah it opens with, and its juz', () => {
@@ -76,22 +68,19 @@ describe('MushafTopStrip', () => {
     expect(strip.style.paddingTop).toBe('28px');
   });
 
-  it('rebuilds the row when the window is resized under it', () => {
-    // Android keeps a Text's measured width across a reconfiguration, so a
-    // foldable opened while the app runs kept the folded measurement and
-    // ellipsised a name that fits twice over -- "Al-Baqa..." on a 900dp
-    // screen (2026-09-27 fold sweep). The row is keyed on the width so the
-    // stale measurement is thrown away with the node that holds it.
-    const { rerender } = renderStrip();
-    const before = screen.getByTestId('mushaf-top-strip').firstChild;
+  it('grows the name to the row instead of shrinking it to the text', () => {
+    // Under `flexShrink: 1` the box came from the text's own measurement, and
+    // Android keeps that across a window reconfiguration -- a Fold opened with
+    // the app running showed "Al-Baqa..." on a 939dp screen (2026-09-27 fold
+    // sweep, reproduced again on vc69 after a remount-based fix held at 896dp
+    // but not 939dp). Growing takes the box from the row's layout instead.
+    renderStrip();
 
-    win.width = 939;
-    rerender(
-      <ThemeContext.Provider value={themeColors.dark}>
-        <MushafTopStrip insetTop={28} surahName="Al-Maidah" juz={6} uiLocale="en" onTap={() => {}} />
-      </ThemeContext.Provider>,
-    );
-
-    expect(screen.getByTestId('mushaf-top-strip').firstChild).not.toBe(before);
+    // flex-basis is the load-bearing half: at 0 the box starts from nothing
+    // and grows to the free space in the row, so it never derives from the
+    // text's measured width the way an `auto` basis under shrink does.
+    const name = screen.getByTestId('page-surah-name');
+    expect(name.style.flexGrow).toBe('1');
+    expect(parseFloat(name.style.flexBasis)).toBe(0);
   });
 });

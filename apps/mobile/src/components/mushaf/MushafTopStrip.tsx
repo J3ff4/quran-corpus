@@ -1,4 +1,4 @@
-import { Pressable, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
@@ -52,17 +52,6 @@ export function MushafTopStrip({
   onTap,
 }: MushafTopStripProps) {
   const theme = useThemeColors();
-  // Android keeps a Text's measured width across a window reconfiguration. On
-  // a foldable opened while the app is running, the name measured against the
-  // folded width stays, and `flexShrink: 1` turns those few missing pixels
-  // into an ellipsis -- "Al-Baqa..." on a 900dp screen with 1700dp of empty
-  // row beside it (2026-09-27 fold sweep: cold-started into the very same
-  // geometry it reads "Al-Baqara"). Remounting the row on a width change
-  // throws the stale measurement away.
-  // ponytail: keyed on width alone; if other labels show the same staleness,
-  // the fix belongs above this component, not another key here.
-  const { width } = useWindowDimensions();
-
   return (
     <Pressable
       testID="mushaf-top-strip"
@@ -74,7 +63,6 @@ export function MushafTopStrip({
       style={{ paddingTop: insetTop, backgroundColor: theme.background }}
     >
       <View
-        key={width}
         style={{
           height: STRIP_ROW_HEIGHT,
           paddingHorizontal: 16,
@@ -87,7 +75,15 @@ export function MushafTopStrip({
           testID="page-surah-name"
           numberOfLines={1}
           accessibilityLabel={surahName}
-          style={{ color: theme.mutedText, fontSize: typography.caption, flexShrink: 1 }}
+          // `flex: 1`, not `flexShrink: 1`. Under shrink the box is sized from
+          // the text's own measurement, and Android keeps that measurement
+          // across a window reconfiguration: a foldable opened while the app
+          // runs kept the folded width and ellipsised a name that fits twice
+          // over -- "Al-Baqa..." on a 939dp screen with 1700dp of empty row
+          // beside it (2026-09-27 fold sweep). Growing instead takes the box
+          // from the row's own layout, so a stale measurement can only come
+          // out too narrow to trigger an ellipsis, never too wide.
+          style={{ color: theme.mutedText, fontSize: typography.caption, flex: 1 }}
         >
           {surahName}
         </Text>
