@@ -506,11 +506,41 @@ ellipse's shape in absolute terms. The fractions reproduce the phone exactly:
 0.6017, so no phone changes appearance. Mutation-checked: restoring the
 per-axis radii fails both new tests.
 
-Device confirmation of the fix is still owed -- the tablet re-locked on its
-screen timeout before the vc71 capture ran.
+**Confirmed on hardware at vc71** (Tab S10+, landscape, 2026-09-28). The
+same green-channel scan that read 45% of the height on vc70 reads 84% on
+vc71, and the screenshots show the wash descending the full left side to the
+bottom edge instead of stopping in a band across the top. The horizontal
+extent drops from full-bleed to ~64% by the same measurement -- that is the
+fix working, not a regression: the wash is now a fixed-shape corner bloom
+rather than a band stretched to the viewport's aspect.
+
+### Checks 446 and 449: run by tap at vc71
+
+Both were blocked because a deep link cannot reach them -- `/word` is a full
+page by design and the sheet only opens from a tap, and the tablet had no
+bookmarks to render.
+
+- **449 bookmarks: PASS.** Created two from the reader's ayah controls, both
+  cards sat in the 640dp column with their edit/delete icons right-aligned
+  and the Arabic laid out RTL; deleted both from the card's trash icon,
+  each left cleanly and the count fell to `0 ayahs - 0 surahs`. Device
+  state restored to empty.
+- **446 word sheet: FAIL at vc71, fixed and re-verified at vc72.** A sheet
+  renders inside a `<Modal>`, outside the navigator whose `sceneStyle`
+  carries `centredContent`, so it was the one surface in the app still
+  pinned to both edges: `Full analysis` ran the full 1360dp with its chevron
+  marooned at the far edge while every screen behind it sat in a 640dp
+  column. Fixed in `BottomSheet.tsx` by capping the rows -- the surface
+  itself stays full-bleed, since it is the bottom edge of the window -- the
+  same pattern `GlassTabBar` already uses. Mutation-checked. Re-captured on
+  vc72: rows now align with the reader cards above them.
 
 ### Still owed
 
-- Install vc68 on the tablet and re-judge checks 443, 446, 448, 449, 451.
+- Fold re-check on real hardware for the two symptoms the sweep could not
+  reproduce: the clipped first mushaf line, and the missing juz number
+  (`Juz 1` rendered in all eight mushaf captures).
+- A photo of the S22 Ultra screen, or the root it was on, to close Defect C.
+- Install vc72 on the S24 (it is on vc70).
 - Owner's call on the 640dp content cap at Fold width: the cap works, and it
   leaves bloom-coloured bands either side of a 939dp screen.
