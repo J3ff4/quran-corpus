@@ -1,4 +1,4 @@
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { bloom } from '@/theme/tokens';
@@ -7,10 +7,10 @@ import { useIsDarkTheme, useThemeColors } from '@/theme/themeContext';
 /**
  * The radial wash the whole app sits on.
  *
- * One instance, mounted behind the navigator in app/_layout.tsx and never
- * re-rendered -- a per-screen copy would repaint a full-screen gradient on
- * every navigation, which is the frame budget the mid-range target does not
- * have. It is pointerEvents="none" so it cannot eat a touch.
+ * One instance, mounted behind the navigator in app/_layout.tsx and repainted
+ * only when the window itself changes size -- a per-screen copy would repaint
+ * a full-screen gradient on every navigation, which is the frame budget the
+ * mid-range target does not have. It is pointerEvents="none" so it cannot eat a touch.
  *
  * SVG rather than a stack of translucent Views: RN has no CSS gradient, and
  * faking a radial one with concentric views bands visibly. react-native-svg was
@@ -35,11 +35,26 @@ export function Bloom() {
   const isDark = useIsDarkTheme();
   const wash = isDark ? bloom.dark : bloom.light;
 
+  // The gradient is placed in real pixels rather than per-axis percentages:
+  // percentages let the viewport's aspect ratio reshape the ellipse, which on
+  // a wide screen collapsed the wash into a left-hugging band with bare ground
+  // beside it (see the `bloom` token's note). Radii come off the diagonal so
+  // the wash is the same shape at every aspect ratio.
+  const { width, height } = useWindowDimensions();
+  const diagonal = Math.hypot(width, height);
+
   return (
     <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.background }]} pointerEvents="none">
       <Svg width="100%" height="100%">
         <Defs>
-          <RadialGradient id="bloom" cx={wash.cx} cy={wash.cy} rx={wash.rx} ry={wash.ry}>
+          <RadialGradient
+            id="bloom"
+            gradientUnits="userSpaceOnUse"
+            cx={width * wash.cx}
+            cy={height * wash.cy}
+            rx={diagonal * wash.rx}
+            ry={diagonal * wash.ry}
+          >
             {wash.stops.map((stop, index) => {
               const { color, opacity } = stopParts(stop);
               return (

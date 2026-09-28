@@ -467,6 +467,48 @@ each pair. Reset after EVERY capture, never once per pair: a dropped
 connection must not be able to leave someone's phone in an overridden
 geometry.
 
+### Tablet re-run — Tab S10+, landscape 1400dp, vc70
+
+Native geometry, no `wm` overrides at all: the tablet IS the wide case.
+
+| check | before | now | note |
+| --- | --- | --- | --- |
+| 440 mushaf column fill | **FAIL** | PASS | fills its column; the side bands are the deliberate 40px font cap |
+| 442 reader wrap | **FAIL** | PASS | Finding 2 closed by the content cap |
+| 443 WBW row estimation | not run | PASS | no overlap, no gap, at 640dp |
+| 444 docked bars opaque | **FAIL** | PASS | Finding 3 was withdrawn; nothing shows through |
+| 445 pill/player not stretched | **FAIL** | PASS | capped and centred |
+| 446 word sheet | not run | **not judged** | a deep link reaches the `/word` route, which is a full page by design; the sheet itself only opens from a tap in the reader |
+| 448 dictionary + root | not run | PASS | alphabet grid, sort row and list all hold; no dead column |
+| 449 bookmarks | not run | **blocked** | the device has no bookmarks, so card shape and swipe-to-delete cannot be judged |
+| 450 settings | PASS | PASS | |
+| 451 about + licence | not run | PASS | GPL text readable, measure sane |
+| 452 no horizontal scroll | PASS | PASS | |
+| 453 measure under ~75 chars | **FAIL** | PASS | ~200 chars at 1368dp before; the cap fixes it at 640dp for every wider screen |
+
+### Defect A — half-painted gradient: REPRODUCED, root-caused, fixed
+
+The tablet in landscape showed it outright. Measured on vc70, three screens,
+identical numbers: the wash stopped at 56% of the width and 53% of the
+height, with flat ground beyond.
+
+Cause is the token geometry, not a stale viewport. `rx` and `ry` were
+percentages of the width and the height, so the ellipse's shape follows the
+viewport's ASPECT RATIO. Authored on a tall phone it is a tall narrow wash
+reading as a vertical fade; the identical numbers on a wide screen draw a
+squat band that dies at `cy + ry` = 60% of the height and, being an ellipse
+centred at `cx` = 18%, narrows toward the left edge on the way down. That
+last part is exactly "gradient only on the left, right side black".
+
+Fixed by sizing both radii off the viewport's DIAGONAL, which fixes the
+ellipse's shape in absolute terms. The fractions reproduce the phone exactly:
+`1.2 * 360 / hypot(360, 800)` = 0.4923 and `0.66 * 800 / hypot(360, 800)` =
+0.6017, so no phone changes appearance. Mutation-checked: restoring the
+per-axis radii fails both new tests.
+
+Device confirmation of the fix is still owed -- the tablet re-locked on its
+screen timeout before the vc71 capture ran.
+
 ### Still owed
 
 - Install vc68 on the tablet and re-judge checks 443, 446, 448, 449, 451.
