@@ -186,3 +186,176 @@ Method notes for next time:
   results on screen.
 - The tablet's mdns entry appears on the same IP as the other devices; only
   one of the three advertised ports actually accepts a connect.
+
+---
+
+# S3b — Three owner-reported defects on hardware we do not have
+
+Reported 2026-09-27 after the first sweep. None reproduce on the Tab S10+, the
+S24 or the OnePlus, so each needs its geometry imitated before it is touched.
+
+## Owner rulings
+
+- **Fold model: 8 first**, then 5, 6, 7. Owner's words: "it looked short not
+  tall like other folds." That is the load-bearing detail -- a Fold whose inner
+  screen is WIDER than it is TALL in the held orientation is a geometry nothing
+  in this app has ever rendered at, and it explains a top clip that no portrait
+  Fold shows.
+- **S22 Ultra: sweep it.** Owner does not know which display setting differs.
+- **Gradient: reproduce first, fix second.** No guessing from the code.
+
+## Geometries to add
+
+`wm size` is in px and `wm density` in dpi; dp width = px / dpi * 160.
+
+| id | wm size | density | dp | stands for |
+|---|---|---|---|---|
+| fold8-wide | 2184x1968 | 372 | 939x846 | **wider than tall** -- the owner's "short" Fold. Run first. |
+| fold7 | 1968x2184 | 372 | 846x939 | Fold 7 inner, portrait |
+| fold6 | 1856x2160 | 374 | 794x924 | Fold 6 inner |
+| fold5 | 1812x2176 | 374 | 775x931 | Fold 5 inner (the first sweep used 390dpi; 374 is closer) |
+
+Exact panel specs for a Fold 8 are not confirmed here. `fold8-wide` is a
+short-and-wide stand-in chosen to match the owner's description, not a spec
+sheet. Say so in the log; do not report it as "tested on a Fold 8".
+
+## Defect A — the wash paints half the screen
+
+**Symptom:** reader gradient on the left only, right side flat dark.
+
+**Suspect:** `src/components/Bloom.tsx` draws `<Svg width="100%" height="100%">`
+inside an `absoluteFill` View. The View's `backgroundColor` still fills, which
+is exactly why the bare half reads as "black" rather than as nothing -- the
+background paints, the gradient does not. Bloom is mounted once in
+`app/_layout.tsx` and, by its own docstring, deliberately never re-rendered.
+react-native-svg resolves a percentage viewport at layout; with no re-render
+there is nothing to make it resolve again when the window doubles in width.
+
+**Reproduce (required before fixing):**
+1. App foregrounded on the reader, S24 at a narrow `wm size`.
+2. `wm size 2184x1968` + `wm density 372` **while it stays foregrounded** --
+   that fires a configuration change without restarting the activity, which is
+   the closest thing here to an unfold.
+3. Screenshot. The defect is confirmed only if the wash covers the left portion
+   and stops at roughly the pre-change width.
+
+If it does not reproduce, stop and say so -- do not fix a bug that is not there
+(the taskbar finding in S3 was withdrawn for exactly this reason).
+
+**Fix if confirmed:** give the Svg explicit numeric `width`/`height` from
+`useWindowDimensions()`. That re-renders Bloom on a configuration change and
+never on a navigation, which keeps the docstring's performance intent intact.
+Its comment must be updated in the same commit or it will describe a component
+that no longer exists.
+
+**Test:** render Bloom at two window sizes through the existing shim and assert
+the Svg's width follows. Mutation-check by pinning the width back to a constant.
+
+## Defect B — mushaf clips at the top on a short screen
+
+**Symptom:** surah English name and juz number invisible; top of line 1 cut.
+
+**Suspect 1 -- DISPROVEN by reading the code, 2026-09-27.** `HEADER_HEIGHT = 0`
+in `MushafPage.tsx` is correct. `MushafTopStrip` is a sibling ABOVE
+`MushafReader` inside a flex column (`MushafScreen.tsx:541-560`), so the
+reader's `flex: 1` already receives height-minus-strip. The strip is not an
+overlay and nothing needs to subtract it twice. Do not "fix" this.
+
+**Suspect 2 -- two independent refs that must agree and have no way to.**
+
+The mushaf cancels the scene's top padding with a negative margin:
+
+- `app/(tabs)/_layout.tsx:15` -- `const { top } = useStableInsets()`, spent as
+  `sceneStyle: { paddingTop: top }`
+- `src/screens/MushafScreen.tsx:122` -- `const { top: insetTop } =
+  useStableInsets()`, spent as `marginTop: -insetTop` AND passed to the strip
+  as `insetTop`
+
+Those are two separate CALL SITES, and `useStableInsets` holds its value in a
+`useRef` -- so there are two refs, each holding its own "last non-zero" top.
+The padding and the margin cancel only while both refs agree. The mushaf hides
+both system bars, which collapses the live inset to 0, and `useRef(live)` seeds
+from whatever was live at mount; `live.top || previous.top` then keeps a 0
+until some non-zero arrives. A configuration change landing while the bars are
+hidden can leave the two refs holding different values, permanently.
+
+A mismatch of d shifts the whole screen up by d: the strip goes off the top
+(no surah name, no juz) and the first line clips. One mechanism, both reported
+symptoms, and only on hardware whose top inset changes while the bars are
+hidden -- which is a fold and nothing else here.
+
+**Instrument before fixing:** log both values together on a page turn. They are
+in different components, so the cheap probe is a temporary `testID` carrying
+each, read with `uiautomator dump`. Confirm they diverge before changing
+anything.
+
+**Reproduce:** mushaf tab at `fold8-wide`, then the three portrait Folds, each
+BOTH cold-started at that geometry and reached by changing geometry live while
+the app is foregrounded. Suspect 2 predicts the clip appears only in the live
+arm and never on a cold start -- that pairing is the control, and it is now the
+only hypothesis left, so a clip on a cold start means neither suspect is right
+and the investigation reopens.
+
+**Fix if the control confirms it:** the two call sites must not each hold their
+own copy. Lift the held inset to one provider read by both, so there is a
+single value that cannot disagree with itself -- the same reasoning §2 gives
+for not forking a shared package, applied to state. Do not paper over it by
+having the mushaf read the live inset: the docstring explains what that costs
+(every mounted tab reflows twice per chrome toggle, ruling 2).
+
+**Test:** drive the two consumers through one provider with a top inset that
+goes non-zero, to 0, then to a DIFFERENT non-zero, and assert the padding and
+the margin still cancel. Mutation-check by restoring the per-call-site ref.
+
+## Defect C — root chips wrap two-per-line on an S22 Ultra
+
+**Symptom:** on an S22 Ultra, 2 chips per row where the OnePlus, S24 and Tab
+S10+ all fit 3.
+
+**Why width alone cannot explain it:** S22 Ultra is 384dp at stock, the S24 is
+360dp. The narrower phone fits MORE. So the variable is not the window.
+
+**Suspect:** `src/components/FormFilterChips.tsx` lays its chips out as
+`flexDirection: 'row', flexWrap: 'wrap', gap: 7` with each chip sized by its
+own content (`paddingHorizontal: 11`, `typography.caption`). Nothing caps a
+chip or reserves a column count, so the wrap point moves with **font scale**:
+a user who has turned One UI's font size up widens every chip and pushes the
+third one over. `src/components/EntryHeader.tsx` wraps the same way and would
+have the same defect.
+
+**Sweep to find the breaking point:** on the S24, hold width at 360dp and walk
+`settings put system font_scale` through 1.0, 1.1, 1.3, 1.5, 1.8; then hold
+font_scale at 1.0 and walk density 480, 540, 600. Screenshot a root entry at
+each. Record the first combination where three chips become two.
+
+`settings put` is blocked on the OnePlus but the S24 is a different vendor
+build -- verify it takes, and restore with `settings put system font_scale 1.0`
+on every exit path, the way `sweep.sh` restores geometry.
+
+**Fix once the breaking point is known:** give the chips a `flexBasis` and
+`flexGrow` so the row commits to a column count instead of letting content
+decide, the way `AlphabetGrid` already does for its ten tiles -- that component
+is the in-repo precedent and its comment already reasons about the 360-412dp
+band. Apply to `FormFilterChips` and `EntryHeader` together.
+
+**Test:** the chip row must keep its column count with a doubled font scale.
+`useWindowDimensions().fontScale` is what `AyahMedallion` already reads, so the
+shim can drive it.
+
+## Risks
+
+| risk | mitigation |
+|---|---|
+| "Fold 8" geometry is invented, so a pass proves less than it looks | Logged as a stand-in, never as a tested model. Run all four Fold geometries, report per-geometry. |
+| A live `wm size` change is not a real fold | Stated as a limitation in the log. It does fire a configuration change, which is the mechanism Defect A turns on. |
+| `settings put system font_scale` blocked or not restored | Verify it takes before the sweep; restore in a trap, and assert the restored value. |
+| Fixing B on the wrong suspect | The cold-start control decides it. No fix before the control runs. |
+
+## Acceptance criteria
+
+- Each of A, B, C is either reproduced with a screenshot naming the geometry,
+  or recorded as NOT REPRODUCED with what was tried. No fix lands without one.
+- Every fix ships with a test that fails when the fix is reverted.
+- `wm size`, `wm density` and `font_scale` are all back to stock on both
+  devices, asserted rather than assumed.
+- The four Fold geometries are each reported pass/fail for the mushaf top.
