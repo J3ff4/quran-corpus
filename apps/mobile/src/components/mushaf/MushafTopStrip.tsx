@@ -1,4 +1,4 @@
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, Text, useWindowDimensions, View } from 'react-native';
 
 import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
@@ -52,6 +52,16 @@ export function MushafTopStrip({
   onTap,
 }: MushafTopStripProps) {
   const theme = useThemeColors();
+  // Android keeps a Text's measured width across a window reconfiguration. On
+  // a foldable opened while the app is running, the name measured against the
+  // folded width stays, and `flexShrink: 1` turns those few missing pixels
+  // into an ellipsis -- "Al-Baqa..." on a 900dp screen with 1700dp of empty
+  // row beside it (2026-09-27 fold sweep: cold-started into the very same
+  // geometry it reads "Al-Baqara"). Remounting the row on a width change
+  // throws the stale measurement away.
+  // ponytail: keyed on width alone; if other labels show the same staleness,
+  // the fix belongs above this component, not another key here.
+  const { width } = useWindowDimensions();
 
   return (
     <Pressable
@@ -64,6 +74,7 @@ export function MushafTopStrip({
       style={{ paddingTop: insetTop, backgroundColor: theme.background }}
     >
       <View
+        key={width}
         style={{
           height: STRIP_ROW_HEIGHT,
           paddingHorizontal: 16,

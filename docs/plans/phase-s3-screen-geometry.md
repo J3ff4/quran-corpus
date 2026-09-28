@@ -378,3 +378,74 @@ shim can drive it.
 - `wm size`, `wm density` and `font_scale` are all back to stock on both
   devices, asserted rather than assumed.
 - The four Fold geometries are each reported pass/fail for the mushaf top.
+
+
+## S3b device run — 2026-09-27 (S24, SM-S921U, vc68)
+
+Geometries were driven with `wm size` / `wm density` on the S24; the tablet
+stayed on its lockscreen all session and the OnePlus is the terminal's own
+display. Every capture is foreground-guarded on `mCurrentFocus`; overrides
+were reset and the reset asserted.
+
+### Defect B — mushaf chrome on an unfolded Fold: REPRODUCED
+
+Each Fold geometry was visited twice, once cold (app force-stopped, resized,
+then launched) and once live (resized under the running app). That pairing is
+the whole experiment.
+
+| geometry | dp width | cold | live |
+| --- | --- | --- | --- |
+| fold8 2184x1968 @372 | 939 | `Al-Baqara` | `Al-Baqa...` |
+| fold7 2184x1968 @390 | 896 | `Al-Baqara` | `Al-Baqa...` |
+| fold6 1812x2176 @390 | 743 | `Al-Baqara` | `Al-Baqara` |
+| fold5 1812x2176 @420 | 690 | `Al-Baqara` | `Al-Baqara` |
+
+Measured label box, fold7: 133px cold, 127px live, in a row 1825px wide. The
+label is not competing for space -- it is holding a width measured before the
+resize, and `flexShrink: 1` spends the shortfall on an ellipsis. Cold and live
+differ at identical geometry, which rules out every width-dependent
+explanation and leaves stale measurement.
+
+Fixed by keying the strip's row on `useWindowDimensions().width`, so the
+reconfiguration discards the node holding the stale measurement.
+Mutation-checked: deleting the key fails the new test.
+
+Not reproduced in the same sweep, at any of the four Fold geometries, cold or
+live: the clipped first line, and a missing juz number (`Juz 1` rendered in
+all eight mushaf captures). Both were reported alongside the truncated name,
+so they may share its cause and be fixed with it -- or not. Owner re-check on
+the real Fold is the only way to close them.
+
+### Defect A — half-painted reader gradient: NOT REPRODUCED
+
+The bloom painted across the full width in every Fold capture, cold and live.
+The report says the bare half was black, which is the dark-theme ground; the
+sweep ran in light. Owner ruled reproduce-before-fix, and there is nothing yet
+to fix against. Next attempt needs dark mode and the live-resize path
+together.
+
+### Defect C — dictionary root pills wrapping 2 + 1: NOT REPRODUCED
+
+Swept at S22 Ultra stock geometry (1440x3088 @600 = 384dp, *wider* in dp than
+the S24 that renders the row correctly): `font_scale` 1.0 / 1.1 / 1.3 / 1.5 /
+1.8, then density 480 / 540 / 600 / 640. The root header's letter pills stayed
+on one line in all nine cases.
+
+Measured from a UI dump at 384dp: the pills plus their transliteration span
+473px of a 1312px row -- 2.8x headroom. No font scale Android offers can wrap
+that row. Whatever the S22 Ultra showed, it is not this row at these settings.
+
+One nearby row does degrade with font scale: the dictionary's
+`Alphabetical` / `By frequency` / `Roots - N` toolbar clips its middle chip
+from `font_scale` 1.3 up. That is #32's accepted trade -- the row scrolls
+rather than wraps, the count stays whole -- not a defect, and not a 2 + 1
+wrap either.
+
+To close this one: a photo of the S22 Ultra screen showing the wrapped row,
+or the root it was on.
+
+### Still owed
+
+- Install vc68 on the tablet and re-judge checks 443, 446, 448, 449, 451.
+- Owner's call on the 640dp content cap at Fold width: the cap works, and it
+  leaves bloom-coloured bands either side of a 939dp screen.
