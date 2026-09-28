@@ -223,13 +223,37 @@ sheet. Say so in the log; do not report it as "tested on a Fold 8".
 
 **Symptom:** reader gradient on the left only, right side flat dark.
 
-**Suspect:** `src/components/Bloom.tsx` draws `<Svg width="100%" height="100%">`
-inside an `absoluteFill` View. The View's `backgroundColor` still fills, which
-is exactly why the bare half reads as "black" rather than as nothing -- the
-background paints, the gradient does not. Bloom is mounted once in
-`app/_layout.tsx` and, by its own docstring, deliberately never re-rendered.
-react-native-svg resolves a percentage viewport at layout; with no re-render
-there is nothing to make it resolve again when the window doubles in width.
+**What the symptom tells us:** the View's `backgroundColor` still fills -- that
+is why the bare half reads as "black" rather than as nothing. The background
+paints, the gradient does not. So the container is the right size and the SVG
+content inside it is not.
+
+**The obvious suspect does NOT survive the source (checked 2026-09-27).**
+`Bloom` is mounted once in `app/_layout.tsx` and its docstring says it is
+deliberately never re-rendered, which looks like a stale percentage viewport.
+It is not:
+
+- `SvgView.onSizeChanged` calls `invalidate()`
+  (`react-native-svg@15.15.4/android/.../SvgView.java:160-162`), so a resize
+  repaints with no re-render needed.
+- `bbWidth` is stored as an `SVGLength` and resolved RELATIVE to the live
+  canvas width at draw time (`SvgView.java:312`), not captured at layout.
+- Every `bloom` token in `src/theme/tokens.ts` is a percentage
+  (`cx: '18%'`, `rx: '120%'`, `ry: '66%'`), so the wash scales with the
+  viewport instead of staying phone-sized.
+
+**So there is no code-supported hypothesis yet.** Reproduce first and capture
+what is actually on screen before forming one -- which is the ruling anyway.
+Candidates to rule in or out only once it is on screen: whether the bare
+region tracks the OLD window width (points back at a stale bound somewhere
+above the Svg) or is a fixed fraction of the NEW one (points at the gradient
+geometry), and whether it survives a backgrounding and return.
+
+**Note for the device run:** the width cap landed in `47c7c0a` puts the scene
+at 640dp centred, so at a Fold's 939dp there will now be bloom-coloured bands
+down both sides of the content. That is expected, is not this defect, and
+should be judged on its own -- it is the first time anyone will see the app
+with the cap applied at Fold width.
 
 **Reproduce (required before fixing):**
 1. App foregrounded on the reader, S24 at a narrow `wm size`.
@@ -242,14 +266,9 @@ there is nothing to make it resolve again when the window doubles in width.
 If it does not reproduce, stop and say so -- do not fix a bug that is not there
 (the taskbar finding in S3 was withdrawn for exactly this reason).
 
-**Fix if confirmed:** give the Svg explicit numeric `width`/`height` from
-`useWindowDimensions()`. That re-renders Bloom on a configuration change and
-never on a navigation, which keeps the docstring's performance intent intact.
-Its comment must be updated in the same commit or it will describe a component
-that no longer exists.
-
-**Test:** render Bloom at two window sizes through the existing shim and assert
-the Svg's width follows. Mutation-check by pinning the width back to a constant.
+**Fix:** not specified here on purpose. The three readings above each point
+somewhere different, and the source rules out the one that would have been
+guessed. Write the fix after the screenshot, not before it.
 
 ## Defect B — mushaf clips at the top on a short screen
 
