@@ -27,7 +27,7 @@ const MIN_LINE_HEIGHT = 1;
  */
 const WIDTH_SLACK = 0.985;
 
-export function mushafFontSize(page: number, textWidth: number): number {
+function widestEm(page: number): number {
   if (!Number.isInteger(page) || page < MUSHAF_PAGE_MIN || page > MUSHAF_PAGE_MAX) {
     throw new RangeError(
       `mushaf page must be an integer ${MUSHAF_PAGE_MIN}..${MUSHAF_PAGE_MAX}, got ${page}`,
@@ -39,7 +39,30 @@ export function mushafFontSize(page: number, textWidth: number): number {
     // or truncated generation -- say which page, not "NaN".
     throw new Error(`no metrics for mushaf page ${page}; run \`scraper mushaf-metrics\``);
   }
-  return Math.min((textWidth * WIDTH_SLACK) / em, MUSHAF_MAX_FONT_SIZE);
+  return em;
+}
+
+export function mushafFontSize(page: number, textWidth: number): number {
+  return Math.min((textWidth * WIDTH_SLACK) / widestEm(page), MUSHAF_MAX_FONT_SIZE);
+}
+
+/**
+ * The widest column this page can actually fill, given the font cap.
+ *
+ * A clamped font cannot reach the edge of its column: these lines are
+ * pre-justified in the source layout, so they have no way to stretch into the
+ * slack. On a phone nothing clamps and this returns `available` untouched. On
+ * the 1400dp tablet every one of the 604 pages clamps, and the median page
+ * covers 47% of its column -- a small island of ragged text in a field of
+ * background (S3 device run, 2026-09-27).
+ *
+ * Narrowing the column is the fix rather than raising the cap: above ~44px
+ * Android starts dropping pieces of these whole-word outlines, which is the
+ * defect MUSHAF_MAX_FONT_SIZE exists to prevent. A narrower centred column is
+ * also the proportion the page has in print.
+ */
+export function mushafColumnWidth(page: number, available: number): number {
+  return Math.min(available, (MUSHAF_MAX_FONT_SIZE * widestEm(page)) / WIDTH_SLACK);
 }
 
 export function mushafLineHeight(textHeight: number, lineCount: number): number {

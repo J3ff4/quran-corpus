@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { MUSHAF_MAX_FONT_SIZE, mushafFontSize, mushafLineHeight } from './pageScale';
+import {
+  MUSHAF_MAX_FONT_SIZE,
+  mushafColumnWidth,
+  mushafFontSize,
+  mushafLineHeight,
+} from './pageScale';
 import { MUSHAF_PAGE_WIDEST_EM } from './pageMetrics.generated';
 
 describe('mushafFontSize', () => {
@@ -39,6 +44,43 @@ describe('mushafFontSize', () => {
     for (let page = 1; page <= 604; page += 1) {
       expect(mushafFontSize(page, 328)).toBeLessThan(MUSHAF_MAX_FONT_SIZE);
     }
+  });
+});
+
+describe('mushafColumnWidth', () => {
+  it('leaves a phone column alone -- nothing clamps at that width', () => {
+    for (let page = 1; page <= 604; page += 1) {
+      expect(mushafColumnWidth(page, 328)).toBe(328);
+    }
+  });
+
+  it('narrows a tablet column to exactly what the page can still fill', () => {
+    // The whole point: after narrowing, the font must land ON the cap rather
+    // than under it, because a font under the cap means the column was cut
+    // further than it had to be.
+    for (const page of [1, 2, 46, 257, 604]) {
+      const column = mushafColumnWidth(page, 1368);
+      expect(column).toBeLessThan(1368);
+      expect(mushafFontSize(page, column)).toBeCloseTo(MUSHAF_MAX_FONT_SIZE, 6);
+    }
+  });
+
+  it('gives every page a column its pre-justified lines fill completely', () => {
+    // The S3 defect stated as an assertion. `fill` is how much of the column
+    // the text covers once the font is clamped; at 1368dp the median page
+    // covered 47% of it before this existed.
+    for (let page = 1; page <= 604; page += 1) {
+      const column = mushafColumnWidth(page, 1368);
+      // The ink this page lays down at the granted font size, in dp. It has to
+      // come back out at the column width: that is what "fills it" means.
+      const inked = (mushafFontSize(page, column) * MUSHAF_PAGE_WIDEST_EM[page - 1]!) / 0.985;
+      expect(inked).toBeCloseTo(column, 4);
+    }
+  });
+
+  it('rejects a page outside 1..604, like the font size does', () => {
+    expect(() => mushafColumnWidth(605, 328)).toThrow(RangeError);
+    expect(() => mushafColumnWidth(0, 328)).toThrow(RangeError);
   });
 });
 

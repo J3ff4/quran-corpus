@@ -2,6 +2,8 @@ import { useSyncExternalStore } from 'react';
 import { Pressable, Text, type LayoutChangeEvent } from 'react-native';
 import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
 
+import { centredContent } from '@/theme/contentWidth';
+
 import { GlassSurface } from './GlassSurface';
 import { Icon, type IconName } from './icons/Icon';
 import { t, type UiStringKey } from '@/i18n/uiStrings';
@@ -177,7 +179,16 @@ export function GlassTabBar({ state, navigation, insets }: GlassTabBarProps) {
         style,
       ]}
     >
-      <GlassSurface docked radius="pill" style={{ flexDirection: 'row', paddingVertical: 6 }}>
+      {/* The cap goes on the pill, not on the positioned box around it: that
+          box sets both `left` and `right`, which already decide its width, so
+          an `alignSelf` there would have nothing to centre within. Five tabs
+          spread across 1400dp are further apart than they are usable. */}
+      <GlassSurface
+        docked
+        testID="tab-pill"
+        radius="pill"
+        style={{ flexDirection: 'row', paddingVertical: 6, ...centredContent }}
+      >
         {state.routes.map((route, index) => {
           const tab = TABS[route.name];
           if (!tab) return null;
