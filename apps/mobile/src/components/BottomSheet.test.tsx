@@ -1,5 +1,6 @@
 import React from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { MAX_CONTENT_WIDTH } from '@/theme/contentWidth';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BottomSheet } from './BottomSheet';
 
@@ -190,6 +191,18 @@ describe('BottomSheet', () => {
     fireEvent.click(screen.getByTestId('sheet-backdrop'));
 
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('caps its rows at the shared content column on a wide display', () => {
+    // A sheet renders inside a <Modal>, outside the navigator whose sceneStyle
+    // carries `centredContent`, so it was the one surface in the app still
+    // pinned to both edges: the word sheet's rows ran the full 1400dp of a
+    // Tab S10+ in landscape with their chevrons at the far edge (2026-09-28).
+    render(<BottomSheet onClose={() => {}} closeLabel="Close"><span>body</span></BottomSheet>);
+
+    const content = screen.getByTestId('sheet-content');
+    expect(content.style.maxWidth).toBe(`${MAX_CONTENT_WIDTH}px`);
+    expect(content.style.alignSelf).toBe('center');
   });
 
   it('keeps 16 under the last row unless the sheet asks for more', () => {
