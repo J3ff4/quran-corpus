@@ -13,7 +13,7 @@ import {
 } from '@/mushaf/highlights';
 import { composePage, MUSHAF_LINES_PER_PAGE, type PageSlot } from '@/mushaf/pageComposition';
 import { useMushafPageFont } from '@/mushaf/pageFont';
-import { mushafFontSize, mushafLineHeight } from '@/mushaf/pageScale';
+import { mushafColumnWidth, mushafFontSize, mushafLineHeight } from '@/mushaf/pageScale';
 import { useThemeColors } from '@/theme/themeContext';
 
 import { BismillahLine } from './BismillahLine';
@@ -117,7 +117,12 @@ export function MushafPage({
 
   if (!ready) return <View style={{ width, height, backgroundColor: theme.background }} />;
 
-  const fontSize = mushafFontSize(page, width - 2 * PAGE_MARGIN);
+  // Not the full width: past a certain column the font clamps and the
+  // pre-justified lines can no longer reach the edge, which leaves the page
+  // stranded against one side. mushafColumnWidth hands back the widest column
+  // this page can still fill, and the block is centred in whatever is left.
+  const columnWidth = mushafColumnWidth(page, width - 2 * PAGE_MARGIN);
+  const fontSize = mushafFontSize(page, columnWidth);
   const lineHeight = mushafLineHeight(height - FOOTER_HEIGHT - HEADER_HEIGHT, MUSHAF_LINES_PER_PAGE);
   const marks: HighlightInput = pressed === null ? highlights : { ...highlights, pressed };
   const color = colorForWord(marks, theme);
@@ -165,7 +170,8 @@ export function MushafPage({
       <View
         style={{
           flex: 1,
-          paddingHorizontal: PAGE_MARGIN,
+          width: columnWidth,
+          alignSelf: 'center',
           paddingTop: HEADER_HEIGHT,
           justifyContent: centred ? 'center' : 'flex-start',
         }}
@@ -202,7 +208,7 @@ export function MushafPage({
                   surahName={surahNames.get(slot.surahId) ?? ''}
                   surahId={slot.surahId}
                   height={lineHeight}
-                  width={width - 2 * PAGE_MARGIN}
+                  width={columnWidth}
                 />
               )}
               {slot?.kind === 'bismillah' && (

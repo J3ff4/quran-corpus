@@ -29,6 +29,7 @@ import {
 import { ThemeContext } from '@/theme/themeContext';
 import { themeColors } from '@/theme/tokens';
 import { rgb } from '@/testing/rgb';
+import { MAX_CONTENT_WIDTH } from '@/theme/contentWidth';
 import { setAutoLayout } from '@/testing/rnHosts';
 
 const ROUTES = ['index', 'surahs', 'mushaf', 'dictionary', 'menu'];
@@ -107,6 +108,14 @@ describe('GlassTabBar', () => {
     expect(tabs[0]?.getAttribute('aria-selected')).toBe('false');
     expect(screen.getByTestId('tab-mushaf-label').style.color).toBe(rgb(themeColors.dark.accent));
     expect(screen.getByTestId('tab-index-label').style.color).toBe(rgb(themeColors.dark.mutedText));
+  });
+
+  it('stops the pill stretching across a tablet', () => {
+    // The bar's own box spans the display (it sets both left and right), so
+    // the cap has to be on the pill inside it. Five tabs spread over 1400dp
+    // are further apart than they are usable (S3 device run, 2026-09-27).
+    renderBar(props(0));
+    expect(screen.getByTestId('tab-pill').style.maxWidth).toBe(`${MAX_CONTENT_WIDTH}px`);
   });
 
   it('carries the mushaf tab, and no longer the morphology one', () => {

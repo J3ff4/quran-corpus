@@ -11,6 +11,7 @@ import { Bloom } from '@/components/Bloom';
 import { ThemedStatusBar } from '@/components/ThemedStatusBar';
 import { openCorpusDb, useCorpusFonts } from '@/data/openCorpusDb';
 import { AppSettingsProvider } from '@/settings/settingsStore';
+import { centredContent } from '@/theme/contentWidth';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 import { useThemeColors } from '@/theme/themeContext';
 
@@ -160,7 +161,7 @@ function AppStack() {
           headerStyle: { backgroundColor: 'transparent' },
           headerTintColor: theme.text,
           headerShadowVisible: false,
-          contentStyle: { backgroundColor: 'transparent' },
+          contentStyle: { backgroundColor: 'transparent', ...centredContent },
           // Every screen renders its own heading; a nav title repeating it
           // would put the same words on screen twice. The header exists for the
           // back affordance.

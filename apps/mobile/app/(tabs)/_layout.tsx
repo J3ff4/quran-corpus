@@ -1,4 +1,5 @@
 import { Tabs } from 'expo-router';
+import { centredContent } from '@/theme/contentWidth';
 import { useStableInsets } from '@/theme/useStableInsets';
 import { GlassTabBar } from '@/components/GlassTabBar';
 import { MiniPlayer } from '@/components/MiniPlayer';
@@ -25,7 +26,10 @@ export default function TabsLayout() {
         // The bloom in app/_layout.tsx is the background for every screen. An
         // opaque scene covers it and leaves the tab pill floating over a flat
         // rectangle.
-        sceneStyle: { backgroundColor: 'transparent', paddingTop: top },
+        // centredContent stops the scene growing past a readable column on a
+        // tablet or an unfolded Fold. Applied to the scene rather than inside
+        // the five screens for the same reason paddingTop is.
+        sceneStyle: { backgroundColor: 'transparent', paddingTop: top, ...centredContent },
       }}
     >
       {/* Titles and icons live in GlassTabBar's own TABS map -- one place, not
@@ -44,7 +48,15 @@ export default function TabsLayout() {
       {/* Not `lazy: false`, unlike Surahs above. This tab opens with a SQLite
           read AND a page-font registration, and moving both into startup costs
           more than the landing cross-fade it would save. */}
-      <Tabs.Screen name="mushaf" />
+      {/* The one scene that opts out of the width cap: a mushaf page is paper,
+          not a column of copy, and it does its own narrowing per page --
+          mushafColumnWidth picks the widest column each page's pre-justified
+          lines can still fill. Capping the scene as well would narrow it
+          twice and take the pager's swipe area with it. */}
+      <Tabs.Screen
+        name="mushaf"
+        options={{ sceneStyle: { backgroundColor: 'transparent', paddingTop: top } }}
+      />
       <Tabs.Screen name="dictionary" />
       <Tabs.Screen name="menu" />
     </Tabs>

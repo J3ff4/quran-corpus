@@ -129,14 +129,31 @@ export const themeColors = {
   },
 };
 
-/** The radial wash behind every screen. Two stops, drawn once by <Bloom>.
+/**
+ * The radial wash behind every screen.
  *
- *  Geometry matches the mockups: a 120%-wide, 66%-tall ellipse centred at
- *  18% / -6%, so the hot corner sits off the top-left edge and the bottom two
- *  thirds of the screen fall back to the flat page colour. */
+ * `cx`/`cy` are fractions of the viewport -- the hot spot sits near the top
+ * left whatever the screen is. `rx`/`ry` are fractions of the viewport's
+ * DIAGONAL, not of its width and height, and that distinction is the whole
+ * point of these numbers.
+ *
+ * They were authored as `rx: 120%` of the width and `ry: 66%` of the height on
+ * a 360x800dp phone. Per-axis percentages make the ellipse's shape follow the
+ * viewport's aspect ratio: on a tall phone it is a tall narrow wash reading as
+ * a vertical fade, and on a wide screen the very same numbers produce a squat
+ * band that dies at 60% of the height and hugs the left edge. Measured on a
+ * Tab S10+ in landscape, 2026-09-27: the wash stopped at 56% of the width and
+ * 53% of the height and the rest of the screen was flat ground. That is the
+ * "gradient only on the left, right side black" a Z Fold owner reported.
+ *
+ * Sizing both radii off the diagonal fixes the ellipse's shape in absolute
+ * terms, so it is the same wash at every aspect ratio. The fractions below
+ * reproduce the phone exactly: 1.2 * 360 / hypot(360, 800) = 0.4923, and
+ * 0.66 * 800 / hypot(360, 800) = 0.6017.
+ */
 export const bloom = {
-  light: { cx: '18%', cy: '-6%', rx: '120%', ry: '66%', stops: ['rgba(31,111,91,0.16)', 'rgba(31,111,91,0)'] },
-  dark: { cx: '18%', cy: '-6%', rx: '120%', ry: '66%', stops: ['rgba(31,111,91,0.62)', 'rgba(31,111,91,0)'] },
+  light: { cx: 0.18, cy: -0.06, rx: 0.4923, ry: 0.6017, stops: ['rgba(31,111,91,0.16)', 'rgba(31,111,91,0)'] },
+  dark: { cx: 0.18, cy: -0.06, rx: 0.4923, ry: 0.6017, stops: ['rgba(31,111,91,0.62)', 'rgba(31,111,91,0)'] },
 } as const;
 
 /** Fake glass: a translucent fill, a hairline, an inset top highlight and a

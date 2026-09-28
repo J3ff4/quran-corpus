@@ -52,7 +52,6 @@ export function MushafTopStrip({
   onTap,
 }: MushafTopStripProps) {
   const theme = useThemeColors();
-
   return (
     <Pressable
       testID="mushaf-top-strip"
@@ -76,7 +75,15 @@ export function MushafTopStrip({
           testID="page-surah-name"
           numberOfLines={1}
           accessibilityLabel={surahName}
-          style={{ color: theme.mutedText, fontSize: typography.caption, flexShrink: 1 }}
+          // `flex: 1`, not `flexShrink: 1`. Under shrink the box is sized from
+          // the text's own measurement, and Android keeps that measurement
+          // across a window reconfiguration: a foldable opened while the app
+          // runs kept the folded width and ellipsised a name that fits twice
+          // over -- "Al-Baqa..." on a 939dp screen with 1700dp of empty row
+          // beside it (2026-09-27 fold sweep). Growing instead takes the box
+          // from the row's own layout, so a stale measurement can only come
+          // out too narrow to trigger an ellipsis, never too wide.
+          style={{ color: theme.mutedText, fontSize: typography.caption, flex: 1 }}
         >
           {surahName}
         </Text>

@@ -10,6 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useReducedMotion } from '@/motion/useReducedMotion';
+import { centredContent } from '@/theme/contentWidth';
 import { useStableInsets } from '@/theme/useStableInsets';
 import { useThemeColors } from '@/theme/themeContext';
 
@@ -273,7 +274,20 @@ export function BottomSheet({ onClose, closeLabel, bottomPadding = 16, children 
               backgroundColor: theme.border,
             }}
           />
-          {children}
+          <View
+            testID="sheet-content"
+            // The surface stays full-bleed -- it is the bottom edge of the
+            // window -- but its rows do not. Every scene in the app is capped
+            // by `centredContent` on the navigator's sceneStyle, and a sheet
+            // lives in a <Modal>, outside that navigator, so it was the one
+            // surface still pinned to both edges: on the Tab S10+ in landscape
+            // (1400dp, 2026-09-28) the word sheet's `Full analysis` row ran
+            // 1360dp with its chevron marooned at the far edge. Same pattern
+            // as GlassTabBar: full-bleed bar, centred column inside it.
+            style={{ ...centredContent, gap: 14 }}
+          >
+            {children}
+          </View>
         </Animated.View>
         </GestureDetector>
         </View>
