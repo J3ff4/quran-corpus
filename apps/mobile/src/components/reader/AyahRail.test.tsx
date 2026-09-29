@@ -47,6 +47,33 @@ describe('juzMarksForSurah', () => {
     ]);
   });
 
+  it('marks a juz that opened in the PREVIOUS surah at ayah 1, not at its own start', () => {
+    // The whole reason this reads `ranges` and not `entry.startAyahNumber`.
+    // The fixture above cannot show it: juz 1 starts at 1:1 and its Al-Baqara
+    // range starts at 2:1, so both are the integer 1, and juz 2 opens inside
+    // Al-Baqara itself, so both are 142. Swapping the two fields is silent
+    // against it -- the brief's own mutation-check was toothless (caught by
+    // the Task 8 implementer). Juz 3 opens at 2:253 and runs into Aal-Imran,
+    // where its first ayah is 1: here the two fields genuinely disagree, and
+    // reading the wrong one puts a "JUZ 3" heading on an ayah 252 rows down a
+    // 200-ayah surah -- or on no row at all in a short one.
+    const spanning = [
+      {
+        juz: 3,
+        startSurahId: 2,
+        startAyahNumber: 253,
+        surahName: 'Al-Baqara',
+        ayahCount: 126,
+        ranges: [
+          { surahId: 2, surahName: 'Al-Baqara', firstAyahNumber: 253, lastAyahNumber: 286, ayahCount: 34 },
+          { surahId: 3, surahName: 'Aal-Imran', firstAyahNumber: 1, lastAyahNumber: 92, ayahCount: 92 },
+        ],
+      },
+    ];
+
+    expect(juzMarksForSurah(spanning, 3)).toEqual([{ juz: 3, firstAyahNumber: 1 }]);
+  });
+
   it('returns one mark for a surah inside a single juz', () => {
     expect(juzMarksForSurah(index, 1)).toEqual([{ juz: 1, firstAyahNumber: 1 }]);
   });
