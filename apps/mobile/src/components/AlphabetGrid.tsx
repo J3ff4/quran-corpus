@@ -26,6 +26,7 @@ export interface AlphabetGridProps {
    *  grid. */
   activeLetter?: string | null;
   onSelect: (letter: string) => void;
+  testID?: string;
 }
 
 function CellBase({
@@ -106,9 +107,10 @@ const Cell = memo(CellBase);
 
 /** The hijāʾī grid. Letters come from the shared order, so these buckets are
  *  the ones rootFirstLetter actually assigns. */
-function AlphabetGridBase({ uiLocale, available, activeLetter, onSelect }: AlphabetGridProps) {
+function AlphabetGridBase({ uiLocale, available, activeLetter, onSelect, testID }: AlphabetGridProps) {
   return (
     <View
+      testID={testID}
       accessibilityRole="list"
       // 29 sibling buttons whose only label is a bare letter; without a name on
       // the container a screen reader gives no clue what the group is.
