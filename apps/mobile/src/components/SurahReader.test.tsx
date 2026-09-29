@@ -5,6 +5,11 @@ import { deferred } from '@/testing/deferred';
 import { SurahReader } from './SurahReader';
 import { estimateRowHeight } from './rowHeightModel';
 
+// Compact by default -- every existing test in this file renders at a phone
+// width and must keep doing so unchanged. Only the row/rail tests below move
+// it to the expanded class.
+const win = vi.hoisted(() => ({ width: 400, height: 800 }));
+
 const mocks = vi.hoisted(() => ({
   onViewableItemsChanged: null as ((info: { viewableItems: Array<{ item: unknown }> }) => void) | null,
   onScrollToIndexFailed: null as
@@ -38,6 +43,9 @@ const mocks = vi.hoisted(() => ({
   // worklet for a press scale.
   animatedStyles: [] as Array<() => Record<string, unknown>>,
   reduceMotion: false,
+  // Empty by default: most tests never reach the expanded class, and the
+  // rail draws fine with no juz headings.
+  juzIndex: [] as unknown[],
 }));
 
 
@@ -146,6 +154,18 @@ vi.mock('expo-router', async () => {
 vi.mock('@/data/readerPosition', () => ({
   getReaderPosition: (surahId: number) => mocks.getReaderPosition(surahId),
   setReaderPosition: (surahId: number, ayahNumber: number) => mocks.setReaderPosition(surahId, ayahNumber),
+}));
+
+// openCorpusDb reaches expo-asset/expo-file-system, native modules with no
+// jsdom counterpart. Only the rail's juz-index fetch touches either of these
+// two, and SurahPicker/WordSheet -- this file's other two corpusRepository
+// callers -- are themselves fully mocked below, so replacing the whole module
+// drops nothing a rendered SurahReader still reaches.
+vi.mock('@/data/openCorpusDb', () => ({
+  openCorpusDb: async () => ({}),
+}));
+vi.mock('@/data/corpusRepository', () => ({
+  getJuzIndex: async () => mocks.juzIndex,
 }));
 
 // The sheet has its own suite; stubbed here so this one covers the wiring --
@@ -374,7 +394,7 @@ vi.mock('react-native', async () => {
       }
       return React.createElement(Div, props);
     },
-    useWindowDimensions: () => ({ width: 400, height: 800, scale: 2, fontScale: 1 }),
+    useWindowDimensions: () => ({ ...win, scale: 2, fontScale: 1 }),
     // The docked recitation bar's layer stretches over the reader.
     StyleSheet: (await import('@/testing/rnHosts.js')).StyleSheet,
     // useReducedMotion reads the OS flag, and useScreenReaderEnabled reads
@@ -402,6 +422,8 @@ async function viewAndSettleWords(item: unknown) {
 describe('SurahReader', () => {
   beforeEach(() => {
     screenReaderOn = false;
+    win.width = 400;
+    win.height = 800;
     mocks.scrollToIndex.mockClear();
     mocks.scrollToOffset.mockClear();
     mocks.push.mockClear();
@@ -1865,6 +1887,53 @@ describe('SurahReader', () => {
     scrollTo(180, 200);
 
     expect(titleStyle()).toEqual({ opacity: 1, translateY: 0 });
+  });
+
+  describe('at the expanded window class', () => {
+    // Local to this block: win is module-level state, and a leaked 1000dp
+    // width would silently move every OTHER describe block in this file onto
+    // the expanded branch too (juz-index fetch included).
+    afterEach(() => {
+      win.width = 400;
+      win.height = 800;
+    });
+
+    it('draws no rail below the expanded class', () => {
+      // The hard constraint of this phase: a phone must render exactly what
+      // it does today. win defaults to 400 (compact) in beforeEach above.
+      render(<SurahReader {...baseProps(readerData())} />);
+
+      expect(screen.queryByTestId('rail-toggle')).toBeNull();
+    });
+
+    it('draws the rail at the expanded class, with a real flexGrow column beside it', () => {
+      win.width = 1000;
+      win.height = 1200;
+      render(<SurahReader {...baseProps(readerData())} />);
+
+      expect(screen.getByTestId('rail-toggle')).toBeTruthy();
+
+      // flex: 1, never flexShrink: 1 -- Android caches a Text's measured width
+      // across a window reconfiguration and a remount does not clear it
+      // (vc69->vc71 in S3). flexShrink alone would also leave flexGrow unset,
+      // so asserting only flexShrink here would pass on either implementation.
+      const column = screen.getByTestId('reader-ayah-column');
+      expect(column.style.flexGrow).toBe('1');
+      expect(Number.parseFloat(column.style.flexBasis)).toBe(0);
+    });
+
+    it('asks the reader to jump when a rail ayah is tapped', () => {
+      win.width = 1000;
+      win.height = 1200;
+      const onJump = vi.fn();
+      render(<SurahReader {...baseProps(readerData())} onJump={onJump} />);
+
+      const row = screen.getAllByTestId('rail-ayah').find((n) => n.dataset.ayah === '3');
+      fireEvent.click(row!);
+
+      // Al-Fatihah is surah 1 in readerData()'s default branch.
+      expect(onJump).toHaveBeenCalledWith(1, 3);
+    });
   });
 });
 

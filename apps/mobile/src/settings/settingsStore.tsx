@@ -56,6 +56,10 @@ export interface AppSettings {
   /** A `Reciter.id`, never a folder. Validated against the shared table on the
    *  way in, because it ends up as a path segment in the audio URL. */
   reciterId: string;
+  /** R4/R5: whether the reader's expanded-window ayah/juz rail is collapsed
+   *  to its toggle. Defaults open -- a control nobody has touched yet should
+   *  show what it does. */
+  readerRailCollapsed: boolean;
 }
 
 export interface AppSettingsContextValue extends AppSettings {
@@ -81,6 +85,7 @@ export interface AppSettingsContextValue extends AppSettings {
   setWbwDensity: (density: WbwDensity) => void;
   setContinuousPlay: (enabled: boolean) => void;
   setReciterId: (id: string) => void;
+  setReaderRailCollapsed: (collapsed: boolean) => void;
   /** Set while the settings database cannot be opened, so a screen can say so
    *  instead of letting changes look saved when nothing is being persisted. */
   storageError: string | null;
@@ -103,6 +108,7 @@ const defaultSettings: AppSettings = {
   wbwDensity: 'dense',
   continuousPlay: false,
   reciterId: DEFAULT_RECITER_ID,
+  readerRailCollapsed: false,
 };
 
 const AppSettingsContext = createContext<AppSettingsContextValue | null>(null);
@@ -119,7 +125,7 @@ const AppSettingsContext = createContext<AppSettingsContextValue | null>(null);
 // change -- the owner's report was that the Arabic dominated the card at any
 // system size. System scaling still composes on top; nothing here sets
 // allowFontScaling.
-const settingKeys = ['uiLocale', 'contentLanguage', 'theme', 'analyticsEnabled', 'arabicScale', 'reduceMotion', 'showTranslation', 'wbwDensity', 'continuousPlay', 'reciterId', 'script'] as const;
+const settingKeys = ['uiLocale', 'contentLanguage', 'theme', 'analyticsEnabled', 'arabicScale', 'reduceMotion', 'showTranslation', 'wbwDensity', 'continuousPlay', 'reciterId', 'script', 'readerRailCollapsed'] as const;
 
 /** A stored boolean, or the default for anything that is not one.
  *
@@ -218,6 +224,7 @@ export async function loadPersistedAppSettings(client: MobileDataClient): Promis
   const continuousPlay = persisted.continuousPlay;
   const persistedReciterId = persisted.reciterId;
   const persistedScript = persisted.script;
+  const readerRailCollapsed = persisted.readerRailCollapsed;
 
   return {
     uiLocale: isUiLocale(persistedUiLocale) ? persistedUiLocale : defaultSettings.uiLocale,
@@ -235,6 +242,7 @@ export async function loadPersistedAppSettings(client: MobileDataClient): Promis
     continuousPlay: continuousPlay === 'true',
     reciterId: isReciterId(persistedReciterId) ? persistedReciterId : defaultSettings.reciterId,
     script: isScript(persistedScript) ? persistedScript : defaultSettings.script,
+    readerRailCollapsed: storedBoolean(readerRailCollapsed, defaultSettings.readerRailCollapsed),
   };
 }
 
@@ -452,6 +460,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
         }
         updateSetting('reciterId', reciterId);
       },
+      setReaderRailCollapsed: (readerRailCollapsed) => updateSetting('readerRailCollapsed', readerRailCollapsed),
     }),
     [settings, storageError, userClient],
   );

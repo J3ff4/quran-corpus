@@ -19,9 +19,11 @@ import {
   type SharedValue,
 } from 'react-native-reanimated';
 import { router, useFocusEffect, useNavigation } from 'expo-router';
+import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
 import { reciterById, splitBasmala, type Word } from '@quran-corpus/data/mobile';
 import { surahNameGlyph } from '@quran-corpus/config/ornaments/surahName';
-import type { ReaderAyah, SurahReaderData, WordSummary } from '@/data/corpusRepository';
+import { getJuzIndex, type JuzEntry, type ReaderAyah, type SurahReaderData, type WordSummary } from '@/data/corpusRepository';
+import { openCorpusDb } from '@/data/openCorpusDb';
 import { getReaderPosition, setReaderPosition } from '@/data/readerPosition';
 import { useSurahIndex } from '@/data/useSurahIndex';
 import type { ContentLanguageCode, QueryLanguageCode, UiLocaleCode } from '@/i18n/languages';
@@ -38,6 +40,7 @@ import { SurahPicker } from './SurahPicker';
 import { WordSheet } from './WordSheet';
 import { GlassSurface } from './GlassSurface';
 import { estimateRowHeight } from './rowHeightModel';
+import { AyahRail, juzMarksForSurah, type JuzMark } from './reader/AyahRail';
 import { useReducedMotion } from '@/motion/useReducedMotion';
 import { t } from '@/i18n/uiStrings';
 import { fonts, typography } from '@/theme/tokens';
@@ -45,6 +48,8 @@ import { useArabicSizes } from '@/theme/useArabicSizes';
 import { useScreenReaderEnabled } from '@/a11y/useScreenReaderEnabled';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
+import { centredContent } from '@/theme/contentWidth';
+import { useWindowClass, type WindowClass } from '@/theme/windowClass';
 
 /** Everything the docked bar needs that the ayah cards do not.
  *
@@ -115,6 +120,13 @@ interface SurahReaderProps {
    *  an ayah held in state here would not survive the jump that set it.
    *  Omitted, the surah name is a label and the sheet never opens. */
   onJump?: (surahId: number, ayahNumber: number) => void;
+  /** R4/R5: whether the expanded-window margin rail is collapsed to its
+   *  toggle. Persisted (readerRailCollapsed), passed down like
+   *  showTranslation rather than read from the store here -- same reason:
+   *  this component stays renderable in a test with no store mounted at all.
+   *  Omitted, the rail defaults open. */
+  railCollapsed?: boolean;
+  onToggleRailCollapsed?: () => void;
 }
 
 // Ayah cards are variable height (Arabic runs wrap differently per ayah), so
@@ -287,6 +299,16 @@ interface AyahListProps {
   /** A sheet is over the reader, so this list must leave the TalkBack order. */
   sheetsOpen: boolean;
   barDocked: boolean;
+  /** R4/R5: the margin rail only exists at this class. Read here rather than
+   *  inside AyahRail itself, because the row it sits in has to change shape
+   *  around it -- a component below the row cannot reach up and do that. */
+  windowClass: WindowClass;
+  /** Every juz boundary inside this surah. Empty until the index has loaded,
+   *  which draws a rail with no juz headings rather than none at all. */
+  juzMarks: JuzMark[];
+  railCollapsed: boolean;
+  onToggleRailCollapsed: () => void;
+  onSelectRailAyah: (ayahNumber: number) => void;
 }
 
 /**
@@ -331,6 +353,11 @@ function AyahList({
   onHeaderMeasured,
   sheetsOpen,
   barDocked,
+  windowClass,
+  juzMarks,
+  railCollapsed,
+  onToggleRailCollapsed,
+  onSelectRailAyah,
 }: AyahListProps) {
   const theme = useThemeColors();
   const arabicSizes = useArabicSizes();
@@ -388,6 +415,11 @@ function AyahList({
   // Whether this mount has been focused before -- see the focus effect below.
   const focusedRef = useRef(false);
   const [positioned, setPositioned] = useState(false);
+  // The rail's position marker. Fed from the SAME onViewableItemsChanged
+  // handler that already writes reading_history -- see the ref-once callback
+  // below -- never a second viewability subscription (viewable-set-change-not-scroll:
+  // a second one would disagree with the first inside one long ayah).
+  const [activeAyahNumber, setActiveAyahNumber] = useState<number | null>(null);
   // 0 until the list has laid out. The row model is width-dependent, and a
   // width guessed from the window would be wrong for mushaf mode, whose plate
   // is inset.
@@ -740,6 +772,10 @@ function AyahList({
   // onViewableItemsChanged is a ref callback built once, outside the React
   // tree, so it cannot close over a prop.
   const surahIdRef = useRef(data.surah.id);
+  // Same reason: the handler below only needs to know the CLASS to decide
+  // whether the rail's position state is worth paying a re-render for, but it
+  // is a ref-once callback and cannot close over the prop directly.
+  const windowClassRef = useRef(windowClass);
   // The ayah actually on screen. Read when the reader is focused again, to tell
   // "the word-by-word screen moved us" from "nothing changed".
   const lastVisibleRef = useRef<number | null>(null);
@@ -751,7 +787,8 @@ function AyahList({
     onReadingAyahRef.current = onReadingAyah;
     onVisibleAyahRef.current = onVisibleAyah;
     surahIdRef.current = data.surah.id;
-  }, [onReadingAyah, onVisibleAyah, data.surah.id]);
+    windowClassRef.current = windowClass;
+  }, [onReadingAyah, onVisibleAyah, data.surah.id, windowClass]);
 
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     // Nothing at all from a layer nobody is looking at: its rows scroll past
@@ -769,6 +806,11 @@ function AyahList({
       // SQLite write. This is what the other two renderings read.
       setReaderPosition(surahIdRef.current, ayahNumber);
       onReadingAyahRef.current?.(ayahNumber);
+      // Only at the class that draws a rail: a setState here is a re-render
+      // of this whole list on every viewable-set change, and paying that on
+      // a phone for a marker nothing on a phone shows would be exactly the
+      // regression this phase's phone-untouched rule exists to catch.
+      if (windowClassRef.current === 'expanded') setActiveAyahNumber(ayahNumber);
     }
     for (const token of viewableItems) {
       const item = token.item as ReaderAyah | undefined;
@@ -780,171 +822,193 @@ function AyahList({
   });
 
   return (
-    <View style={{ flex: 1 }}>
-      <FlatList
-        ref={listRef}
-        data={data.ayahs}
-        keyExtractor={(item) => String(item.ayah.id)}
-        ListHeaderComponent={
-          <View
-            onLayout={(event: LayoutChangeEvent) => {
-              headerHeight.value = event.nativeEvent.layout.height;
-              setHeaderOffset(event.nativeEvent.layout.height);
-              onHeaderMeasured?.();
-            }}
-            style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16 }}
-          >
-            {/* The surah opens on a plate (mockups 1e/1j): the Arabic name
-                leads, the Latin names sit under it in the display serif, and
-                the count and revelation type are a muted caption. */}
-            <SurahPlate>
-              <Text
-                testID="surah-plate-name"
-                // The calligraphic glyph, not `name_arabic` (owner, 2026-09-12).
-                // The plain Arabic name is a title here, not text to be read,
-                // and the index, the mushaf band and this plate now set it in
-                // one face. Announced as the real name: the glyph is a PUA
-                // codepoint, which announces as nothing at all.
-                accessibilityLabel={data.surah.name_arabic}
-                style={{
-                  color: theme.text,
-                  // V4 for all 114, never V2: V2 has no glyph for surah 102
-                  // and draws a box on At-Takathur.
-                  fontFamily: fonts.surahNameAlt,
-                  // The glyph draws the whole name as one piece of calligraphy
-                  // with a tail below the baseline, so it needs more box than
-                  // a banner-sized reading run before it clips. Tracks the
-                  // reader's Arabic size setting like everything else on the
-                  // plate.
-                  fontSize: Math.round(arabicSizes.banner * 1.5),
-                  lineHeight: Math.round(arabicSizes.banner * 2),
-                  textAlign: 'center',
-                  writingDirection: 'rtl',
-                }}
-              >
-                {surahNameGlyph(data.surah.id)}
-              </Text>
-              <Text
-                accessibilityRole="header"
-                style={{ color: theme.text, fontFamily: fonts.displaySemiBold, fontSize: typography.title }}
-              >
-                {data.surah.name_translit}
-              </Text>
-              <Text style={{ color: theme.mutedText, fontFamily: fonts.display, fontSize: typography.body }}>
-                {data.surah.name_translation}
-              </Text>
-              <Text style={{ color: theme.mutedText, fontSize: typography.caption }}>
-                {`${data.surah.ayah_count} ${t(uiLocale, 'surahList.ayahsSuffix')} · ${t(
-                  uiLocale,
-                  data.surah.revelation_type === 'meccan' ? 'browse.meccan' : 'browse.medinan',
-                )}`}
-              </Text>
-              {basmala ? <Bismillah text={basmala} uiLocale={uiLocale} /> : null}
-            </SurahPlate>
-          </View>
-        }
-        renderItem={({ item }) => {
-          const shared = {
-            surahId: data.surah.id,
-            ayahNumber: item.ayah.ayah_number,
-            arabicText: item.ayah.text_uthmani,
-            getWords: getWordsFor(item.ayah.id),
-            bookmarked: bookmarkedAyahs.has(item.ayah.ayah_number),
-            note: notesByAyah?.get(item.ayah.ayah_number) ?? null,
-            playing: playingAyah === item.ayah.ayah_number,
-            uiLocale,
-            audioDisabled: !audioEnabled,
-            onToggleBookmark,
-            // Spread conditionally: exactOptionalPropertyTypes distinguishes
-            // "absent" from "present and undefined", and the renderers declare
-            // the prop optional rather than optional-or-undefined.
-            ...(onEditNote ? { onEditNote } : {}),
-            onToggleAudio,
-            onWordPress,
-          };
-          return (
-            <AyahCard
-              {...shared}
-              translationText={item.translation?.text ?? null}
-              showTranslation={showTranslation}
-            />
-          );
-        }}
-        CellRendererComponent={CellRenderer}
-        onViewableItemsChanged={onViewableItemsChanged.current}
-        onScrollToIndexFailed={onScrollToIndexFailed}
-        // The whole reason a deep scroll stopped jumping.
-        //
-        // VirtualizedList fills its render window outward as the reader
-        // scrolls, so rows *above* the viewport keep mounting for the first
-        // time -- windowSize 21 means it reaches ten viewports up, some 6000dp
-        // back. Until a row mounts, the leading spacer is holding space for it
-        // out of getItemLayout, which is the fitted estimate; the moment it
-        // mounts, its real height takes that space instead. The two differ by
-        // whatever the model got wrong, and React Native does not adjust the
-        // scroll offset to compensate -- so the difference pushes everything
-        // below down, including the ayah under the reader's finger.
-        //
-        // Measured on device, al-Baqara 24 onward, 2026-09-23: three rows
-        // mounting 6000dp above the viewport moved every mounted cell by
-        // +32dp at once and the content jumped 128px backwards mid-drag;
-        // a second fill 16s later moved it 12dp/49px, a third 50dp/202px. The
-        // scroll offset itself was monotonic throughout -- nothing scrolled,
-        // the content grew above. Deterministic to the pixel across three
-        // runs, and invisible to framestats because every one of those frames
-        // rendered inside budget at 90Hz.
-        //
-        // This anchors the topmost visible row instead: content appearing
-        // above it moves the offset, not the reader.
-        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-        getItemLayout={getItemLayout}
-        onLayout={onListLayout}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-        // BottomSheet -- the shell under both WordSheet and LanguageSheet --
-        // sets role="dialog"/aria-modal, but accessibilityViewIsModal is
-        // iOS-only, so on Android the ayah text and both card buttons stay
-        // reachable by TalkBack swipe while either sheet covers them and the
-        // modal is only visually modal (CLAUDE.md §8, WCAG AA). The nav header
-        // is a native toolbar outside this View and is still reachable.
-        importantForAccessibility={sheetsOpen || !live ? 'no-hide-descendants' : 'auto'}
-        initialNumToRender={DEFAULT_INITIAL_RENDER}
-        // `|| arriving` for the same reason the spinner below carries it, and
-        // it is the last blank on the device list. `reveal()` calls
-        // setPositioned(true) and onLanded() in one tick; onLanded starts the
-        // cross-fade, which is a shared-value write that takes effect on the
-        // UI thread at once, while setPositioned waits for React to commit. So
-        // for the frames in between the outgoing layer was already fading out
-        // and the incoming list was still hidden here -- both invisible, and
-        // the bloom showing through as one flash (device, Al-Baqara 2:255,
-        // 2026-09-02). An arriving layer needs no hiding of its own: its
-        // wrapper is at opacity 0 for the whole landing, and the fade is what
-        // reveals it.
-        style={{ flex: 1, opacity: positioned || arriving ? 1 : 0 }}
-        contentContainerStyle={{
-          paddingBottom: listBottomPadding + (barDocked ? RECITATION_BAR_CLEARANCE : 0),
-        }}
-      />
-      {/* Over the list rather than instead of it: the list has to be mounted
-          and laid out for the scroll to have anything to land on. Opacity, not
-          a conditional render, for the same reason. */}
-      {positioned || arriving ? null : (
-        <View
-          testID="reader-positioning"
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: theme.background,
+    <View style={{ flex: 1, flexDirection: windowClass === 'expanded' ? 'row' : 'column' }}>
+      {windowClass === 'expanded' ? (
+        <AyahRail
+          surahId={data.surah.id}
+          ayahCount={data.surah.ayah_count}
+          juzMarks={juzMarks}
+          activeAyahNumber={activeAyahNumber}
+          collapsed={railCollapsed}
+          onToggleCollapsed={onToggleRailCollapsed}
+          onSelectAyah={onSelectRailAyah}
+        />
+      ) : null}
+      {/* flex: 1, never flexShrink: 1 -- the column has to take its width from
+          THIS row's layout every render, not from a cached measure. Android
+          keeps a Text's measured width across a window reconfiguration and a
+          remount does not clear it, which is the exact defect that cost
+          vc69->vc71 in S3. */}
+      <View testID="reader-ayah-column" style={{ flex: 1 }}>
+        <FlatList
+          ref={listRef}
+          data={data.ayahs}
+          keyExtractor={(item) => String(item.ayah.id)}
+          ListHeaderComponent={
+            <View
+              onLayout={(event: LayoutChangeEvent) => {
+                headerHeight.value = event.nativeEvent.layout.height;
+                setHeaderOffset(event.nativeEvent.layout.height);
+                onHeaderMeasured?.();
+              }}
+              style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16 }}
+            >
+              {/* The surah opens on a plate (mockups 1e/1j): the Arabic name
+                  leads, the Latin names sit under it in the display serif, and
+                  the count and revelation type are a muted caption. */}
+              <SurahPlate>
+                <Text
+                  testID="surah-plate-name"
+                  // The calligraphic glyph, not `name_arabic` (owner, 2026-09-12).
+                  // The plain Arabic name is a title here, not text to be read,
+                  // and the index, the mushaf band and this plate now set it in
+                  // one face. Announced as the real name: the glyph is a PUA
+                  // codepoint, which announces as nothing at all.
+                  accessibilityLabel={data.surah.name_arabic}
+                  style={{
+                    color: theme.text,
+                    // V4 for all 114, never V2: V2 has no glyph for surah 102
+                    // and draws a box on At-Takathur.
+                    fontFamily: fonts.surahNameAlt,
+                    // The glyph draws the whole name as one piece of calligraphy
+                    // with a tail below the baseline, so it needs more box than
+                    // a banner-sized reading run before it clips. Tracks the
+                    // reader's Arabic size setting like everything else on the
+                    // plate.
+                    fontSize: Math.round(arabicSizes.banner * 1.5),
+                    lineHeight: Math.round(arabicSizes.banner * 2),
+                    textAlign: 'center',
+                    writingDirection: 'rtl',
+                  }}
+                >
+                  {surahNameGlyph(data.surah.id)}
+                </Text>
+                <Text
+                  accessibilityRole="header"
+                  style={{ color: theme.text, fontFamily: fonts.displaySemiBold, fontSize: typography.title }}
+                >
+                  {data.surah.name_translit}
+                </Text>
+                <Text style={{ color: theme.mutedText, fontFamily: fonts.display, fontSize: typography.body }}>
+                  {data.surah.name_translation}
+                </Text>
+                <Text style={{ color: theme.mutedText, fontSize: typography.caption }}>
+                  {`${data.surah.ayah_count} ${t(uiLocale, 'surahList.ayahsSuffix')} · ${t(
+                    uiLocale,
+                    data.surah.revelation_type === 'meccan' ? 'browse.meccan' : 'browse.medinan',
+                  )}`}
+                </Text>
+                {basmala ? <Bismillah text={basmala} uiLocale={uiLocale} /> : null}
+              </SurahPlate>
+            </View>
+          }
+          renderItem={({ item }) => {
+            const shared = {
+              surahId: data.surah.id,
+              ayahNumber: item.ayah.ayah_number,
+              arabicText: item.ayah.text_uthmani,
+              getWords: getWordsFor(item.ayah.id),
+              bookmarked: bookmarkedAyahs.has(item.ayah.ayah_number),
+              note: notesByAyah?.get(item.ayah.ayah_number) ?? null,
+              playing: playingAyah === item.ayah.ayah_number,
+              uiLocale,
+              audioDisabled: !audioEnabled,
+              onToggleBookmark,
+              // Spread conditionally: exactOptionalPropertyTypes distinguishes
+              // "absent" from "present and undefined", and the renderers declare
+              // the prop optional rather than optional-or-undefined.
+              ...(onEditNote ? { onEditNote } : {}),
+              onToggleAudio,
+              onWordPress,
+            };
+            return (
+              <AyahCard
+                {...shared}
+                translationText={item.translation?.text ?? null}
+                showTranslation={showTranslation}
+              />
+            );
           }}
-        >
-          <ActivityIndicator />
-        </View>
-      )}
+          CellRendererComponent={CellRenderer}
+          onViewableItemsChanged={onViewableItemsChanged.current}
+          onScrollToIndexFailed={onScrollToIndexFailed}
+          // The whole reason a deep scroll stopped jumping.
+          //
+          // VirtualizedList fills its render window outward as the reader
+          // scrolls, so rows *above* the viewport keep mounting for the first
+          // time -- windowSize 21 means it reaches ten viewports up, some 6000dp
+          // back. Until a row mounts, the leading spacer is holding space for it
+          // out of getItemLayout, which is the fitted estimate; the moment it
+          // mounts, its real height takes that space instead. The two differ by
+          // whatever the model got wrong, and React Native does not adjust the
+          // scroll offset to compensate -- so the difference pushes everything
+          // below down, including the ayah under the reader's finger.
+          //
+          // Measured on device, al-Baqara 24 onward, 2026-09-23: three rows
+          // mounting 6000dp above the viewport moved every mounted cell by
+          // +32dp at once and the content jumped 128px backwards mid-drag;
+          // a second fill 16s later moved it 12dp/49px, a third 50dp/202px. The
+          // scroll offset itself was monotonic throughout -- nothing scrolled,
+          // the content grew above. Deterministic to the pixel across three
+          // runs, and invisible to framestats because every one of those frames
+          // rendered inside budget at 90Hz.
+          //
+          // This anchors the topmost visible row instead: content appearing
+          // above it moves the offset, not the reader.
+          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+          getItemLayout={getItemLayout}
+          onLayout={onListLayout}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          // BottomSheet -- the shell under both WordSheet and LanguageSheet --
+          // sets role="dialog"/aria-modal, but accessibilityViewIsModal is
+          // iOS-only, so on Android the ayah text and both card buttons stay
+          // reachable by TalkBack swipe while either sheet covers them and the
+          // modal is only visually modal (CLAUDE.md §8, WCAG AA). The nav header
+          // is a native toolbar outside this View and is still reachable.
+          importantForAccessibility={sheetsOpen || !live ? 'no-hide-descendants' : 'auto'}
+          initialNumToRender={DEFAULT_INITIAL_RENDER}
+          // `|| arriving` for the same reason the spinner below carries it, and
+          // it is the last blank on the device list. `reveal()` calls
+          // setPositioned(true) and onLanded() in one tick; onLanded starts the
+          // cross-fade, which is a shared-value write that takes effect on the
+          // UI thread at once, while setPositioned waits for React to commit. So
+          // for the frames in between the outgoing layer was already fading out
+          // and the incoming list was still hidden here -- both invisible, and
+          // the bloom showing through as one flash (device, Al-Baqara 2:255,
+          // 2026-09-02). An arriving layer needs no hiding of its own: its
+          // wrapper is at opacity 0 for the whole landing, and the fade is what
+          // reveals it.
+          style={{ flex: 1, opacity: positioned || arriving ? 1 : 0 }}
+          // centredContent below the cap is a no-op (phones never reach 640dp),
+          // so this is the same list every phone already ships, plus a cap that
+          // only bites at the widths this phase adds.
+          contentContainerStyle={{
+            ...centredContent,
+            paddingBottom: listBottomPadding + (barDocked ? RECITATION_BAR_CLEARANCE : 0),
+          }}
+        />
+        {/* Over the list rather than instead of it: the list has to be mounted
+            and laid out for the scroll to have anything to land on. Opacity, not
+            a conditional render, for the same reason. */}
+        {positioned || arriving ? null : (
+          <View
+            testID="reader-positioning"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: theme.background,
+            }}
+          >
+            <ActivityIndicator />
+          </View>
+        )}
+      </View>
     </View>
   );
 }
@@ -977,8 +1041,51 @@ export function SurahReader({
   onPageSurah,
   onJump,
   nameLanguage,
+  railCollapsed = false,
+  onToggleRailCollapsed,
 }: SurahReaderProps) {
   const navigation = useNavigation();
+  const windowClass = useWindowClass();
+
+  // The juz index: whole-Quran data, fetched once this reader has ever been
+  // at the expanded class, never at compact or medium where nothing draws it.
+  // Not re-fetched per surah -- ranges for every surah arrive in one query,
+  // and juzMarksForSurah slices it locally.
+  const [juzIndex, setJuzIndex] = useState<JuzEntry[] | null>(null);
+  useEffect(() => {
+    if (windowClass !== 'expanded' || juzIndex !== null) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const db = await openCorpusDb();
+        const client = createExpoSqliteClient(db as ExpoSqliteLike);
+        const rows = await getJuzIndex(client);
+        if (!cancelled) setJuzIndex(rows);
+      } catch (cause) {
+        // Logged, not shown: the rail just draws with no juz headings, which
+        // is a smaller loss than blocking the reader on a margin control.
+        console.error('[reader] juz index load failed', cause);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [windowClass, juzIndex]);
+
+  const juzMarks = useMemo(
+    () => (juzIndex ? juzMarksForSurah(juzIndex, data.surah.id) : []),
+    [juzIndex, data.surah.id],
+  );
+  const onSelectRailAyah = useCallback(
+    (ayahNumber: number) => onJump?.(data.surah.id, ayahNumber),
+    [onJump, data.surah.id],
+  );
+  // A no-op rather than an optional prop threaded through AyahList: AyahRail's
+  // toggle is only reachable once the row above already gated on
+  // windowClass === 'expanded', so by the time this ever runs the caller has
+  // always supplied a real one -- but AyahList's prop is unconditional, and
+  // this is what keeps it from being undefined.
+  const onToggleRailCollapsedOrNoop = onToggleRailCollapsed ?? (() => {});
 
   const [languageOpen, setLanguageOpen] = useState(false);
   // One state, not two booleans: two would let the jump sheet and the picker
@@ -1333,6 +1440,11 @@ export function SurahReader({
         onHeaderMeasured={syncTitleVisible}
         sheetsOpen={Boolean(openWord) || languageOpen || reciterOpen}
         barDocked={barDocked}
+        windowClass={windowClass}
+        juzMarks={juzMarks}
+        railCollapsed={railCollapsed}
+        onToggleRailCollapsed={onToggleRailCollapsedOrNoop}
+        onSelectRailAyah={onSelectRailAyah}
       />
       {/* Hidden from TalkBack behind a sheet for the same reason the list is:
           accessibilityViewIsModal is iOS-only, so on Android a swipe would

@@ -58,6 +58,8 @@ export default function SurahRoute() {
     setReciterId,
     continuousPlay,
     setContinuousPlay,
+    readerRailCollapsed,
+    setReaderRailCollapsed,
   } = useAppSettings();
   const theme = useThemeColors();
   // The surah it was loaded FOR, carried with it. Not read back off the
@@ -510,6 +512,8 @@ export default function SurahRoute() {
         onChangeContentLanguage={setContentLanguage}
         showTranslation={showTranslation}
         onChangeShowTranslation={setShowTranslation}
+        railCollapsed={readerRailCollapsed}
+        onToggleRailCollapsed={() => setReaderRailCollapsed(!readerRailCollapsed)}
         initialAyahNumber={initialAyahNumber}
         seedNonce={seedNonce}
         loadWords={loadWords}
