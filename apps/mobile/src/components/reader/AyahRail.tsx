@@ -34,6 +34,8 @@ export function juzMarksForSurah(index: readonly JuzEntry[], surahId: number): J
 // sidesteps collapsible-measures-out-of-flow entirely. Collapsed matches the
 // toggle's own touch target, so the rail never draws narrower than a target.
 const RAIL_WIDTH = 56;
+// One frame's grace for the cells jumped to above to report their heights.
+const RETRY_MS = 100;
 
 export interface AyahRailProps {
   surahId: number;
@@ -84,6 +86,15 @@ export function AyahRail({
     listRef.current?.scrollToIndex({ index: activeAyahNumber - 1, animated: true });
   }, [activeAyahNumber, collapsed]);
 
+  // Cleared on unmount so a retry cannot fire into a dead ref.
+  const retry = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (retry.current !== null) clearTimeout(retry.current);
+    },
+    [],
+  );
+
   return (
     <View style={{ width: collapsed ? touchTargets.minimum : RAIL_WIDTH, overflow: 'hidden' }}>
       <Pressable
@@ -120,10 +131,21 @@ export function AyahRail({
           // would be a lie. This lands on the row's estimated offset and lets
           // the list correct itself once the cells have measured.
           onScrollToIndexFailed={({ index, averageItemLength }) => {
+            // Two steps, and the second is the one that lands. The estimate
+            // undershoots badly on a long surah -- on the device it put the
+            // rail at ayah 67 while the reader was at 154 -- because the
+            // average is taken from the handful of cells measured so far. So:
+            // jump to the estimate, which mounts the cells around it, then ask
+            // again now that their real heights are known.
             listRef.current?.scrollToOffset({
               offset: index * (averageItemLength || touchTargets.minimum),
               animated: false,
             });
+            if (retry.current !== null) clearTimeout(retry.current);
+            retry.current = setTimeout(() => {
+              retry.current = null;
+              listRef.current?.scrollToIndex({ index, animated: false });
+            }, RETRY_MS);
           }}
           // Not optional. Without one of these two props a scrollToIndex at an
           // offscreen index throws an Invariant Violation that takes the whole

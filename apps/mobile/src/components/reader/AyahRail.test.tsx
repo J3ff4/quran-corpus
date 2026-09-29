@@ -143,6 +143,28 @@ describe('AyahRail', () => {
     expect(listScrollsOf(result).at(-1)).toMatchObject({ offset: 146 * 48 });
   });
 
+  it('asks again once the jumped-to cells have measured', () => {
+    // The estimate alone is not enough: the average comes from the few cells
+    // measured so far, so on a long surah it undershoots -- on the device it
+    // parked the rail at ayah 67 while the reader was at 154. The offset jump
+    // mounts the cells around the target; the retry is what actually lands.
+    vi.useFakeTimers();
+    try {
+      const result = render(<AyahRail {...props} ayahCount={286} activeAyahNumber={147} />);
+      const onFailed = listPropsOf(result)['onScrollToIndexFailed'] as (info: {
+        index: number;
+        averageItemLength: number;
+      }) => void;
+
+      onFailed({ index: 146, averageItemLength: 48 });
+      vi.advanceTimersByTime(200);
+
+      expect(listScrollsOf(result).at(-1)).toMatchObject({ index: 146 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('draws only the toggle when collapsed', () => {
     render(<AyahRail {...props} collapsed />);
     expect(screen.queryAllByTestId('rail-ayah')).toHaveLength(0);
