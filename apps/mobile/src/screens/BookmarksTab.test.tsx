@@ -5,6 +5,12 @@ import { createMemoryUserClient } from '../data/userRepository.testHelpers';
 import { getBookmarks, setBookmark, setBookmarkNote } from '../data/userRepository';
 import BookmarksTab from '../../app/bookmarks';
 import { ROW_GAP } from '../motion/bookmarkExit';
+import { listPropsOf } from '@/testing/rnHosts';
+
+// A mutable width behind useWindowDimensions, so the column tests below can
+// move the window without a second `vi.mock('react-native', ...)` -- only one
+// factory per mocked module is honoured. Same pattern as BrowseList.test.tsx.
+const win = vi.hoisted(() => ({ width: 390 }));
 
 const mocks = vi.hoisted(() => ({
   userClient: null as ReturnType<typeof createMemoryUserClient> | null,
@@ -76,8 +82,13 @@ vi.mock('expo-router', async () => {
 // itself is device-gated like every other one in this app (BottomSheet.test.tsx
 // owns the only gesture assertions), and its delete panel calls exactly the
 // handler the in-row control does -- which is what the suite below drives.
+// `testID` is forwarded onto a plain wrapper (unlike every other prop here) so
+// the grid tests can prove each card carries its OWN Swipeable rather than one
+// Swipeable around a whole row (R8) -- a unit test cannot prove the gesture
+// arbitration itself, only this structure.
 vi.mock('react-native-gesture-handler/ReanimatedSwipeable', () => ({
-  default: ({ children }: { children?: React.ReactNode }) => children,
+  default: ({ children, testID }: { children?: React.ReactNode; testID?: string }) =>
+    React.createElement('div', { 'data-testid': testID }, children),
 }));
 
 // BottomSheet reaches reanimated and gesture-handler, neither of which parses
@@ -121,7 +132,7 @@ vi.mock('react-native-safe-area-context', () => ({
 
 vi.mock('react-native', async () => {
   const React = await import('react');
-  const { host, AppState, FlatList, SectionList, Modal, StyleSheet, AccessibilityInfo, useWindowDimensions } =
+  const { host, AppState, FlatList, SectionList, Modal, StyleSheet, AccessibilityInfo } =
     await import('@/testing/rnHosts.js');
 
   const Input = ({
@@ -152,7 +163,7 @@ vi.mock('react-native', async () => {
   return {
     AppState,
     AccessibilityInfo,
-    useWindowDimensions,
+    useWindowDimensions: () => ({ width: win.width, height: 844, scale: 3, fontScale: 1 }),
     // The sheet subscribes to Android back. Inert here: BottomSheet.test.tsx
     // owns that behaviour, this suite only needs the sheet to mount.
     BackHandler: { addEventListener: () => ({ remove: () => {} }) },
@@ -183,9 +194,25 @@ vi.mock('react-native', async () => {
  *  `<testID>-highlight` sibling for its inset rim, and an unanchored
  *  `/^bookmark-row-/` counts every row twice. */
 const ROW_ID = /^bookmark-row-\d+-\d+$/;
+/** The whole-card press target -- see BookmarkRow. Anchored, same reason as
+ *  ROW_ID: a bare `bookmark-card` would also match nothing, since every card
+ *  carries its own coordinate. */
+const CARD_ID = /^bookmark-card-\d+-\d+$/;
+/** One Swipeable per card (R8) -- see the ReanimatedSwipeable mock above. */
+const SWIPEABLE_ID = /^bookmark-swipeable-\d+-\d+$/;
 
 function rowIds() {
   return screen.queryAllByTestId(ROW_ID).map((node) => node.getAttribute('data-testid'));
+}
+
+/** A bare mount, optionally switched to another tab: `numColumns` comes from
+ *  useWindowDimensions alone, so it is on the list before the user DB ever
+ *  opens. */
+function renderScreen({ tab }: { tab?: 'recent' | 'surah' | 'notes' } = {}) {
+  const result = render(<BookmarksTab />);
+  if (tab === 'surah') fireEvent.click(screen.getByText('By surah'));
+  else if (tab === 'notes') fireEvent.click(screen.getByText('With notes'));
+  return result;
 }
 
 describe('BookmarksTab', () => {
@@ -200,7 +227,10 @@ describe('BookmarksTab', () => {
     mocks.heldTimings = [];
   });
 
-  afterEach(cleanup);
+  afterEach(() => {
+    win.width = 390;
+    cleanup();
+  });
 
   it('refreshes persisted bookmarks when the tab regains focus', async () => {
     const userClient = requireUserClient();
@@ -752,6 +782,52 @@ describe('BookmarksTab', () => {
     await waitFor(() => expect(screen.queryByText('throne')).toBeNull());
     // The bookmark itself survives -- clearing a note is not deleting a row.
     expect(rowIds()).toEqual(['bookmark-row-2-255']);
+  });
+
+  it('lays bookmark cards out in columns on a landscape tablet', () => {
+    // 1400dp, 420dp measured minimum -> 3 columns. The minimum is the largest
+    // of the four surfaces because a note can run two lines.
+    win.width = 1400;
+    const result = renderScreen();
+    expect(listPropsOf(result)['numColumns']).toBe(3);
+  });
+
+  it('keeps one column on a phone', () => {
+    // Not `?? 1`: a fallback that papers over a missing prop would pass this
+    // test even if the screen stopped setting numColumns at all.
+    const result = renderScreen();
+    expect(listPropsOf(result)['numColumns']).toBe(1);
+  });
+
+  it('keeps every card swipeable in the grid', async () => {
+    // R8. A grid that quietly drops the swipe wrapper takes delete away on
+    // exactly the screens that gained columns, and looks like a layout
+    // change. The count matching proves each card carries its OWN Swipeable,
+    // not one Swipeable wrapping a whole row -- the gesture arbitration
+    // itself is device check 507.
+    win.width = 1400;
+    const userClient = requireUserClient();
+    await setBookmark(userClient, 2, 255, true);
+    await setBookmark(userClient, 1, 1, true);
+
+    renderScreen();
+    await screen.findByTestId('bookmark-row-2-255');
+
+    expect(screen.getAllByTestId(SWIPEABLE_ID)).toHaveLength(screen.getAllByTestId(CARD_ID).length);
+    expect(screen.getAllByTestId(CARD_ID).length).toBe(2);
+  });
+
+  it('chunks the By-surah sections into rows of N', async () => {
+    // The surah tab is a SectionList, which has no numColumns.
+    win.width = 1400;
+    const userClient = requireUserClient();
+    await setBookmark(userClient, 2, 255, true);
+    await setBookmark(userClient, 2, 1, true);
+
+    renderScreen({ tab: 'surah' });
+    await screen.findByTestId('bookmark-row-2-1');
+
+    expect(screen.getAllByTestId('grid-cell').length).toBeGreaterThan(0);
   });
 });
 

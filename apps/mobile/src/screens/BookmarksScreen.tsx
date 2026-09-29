@@ -22,6 +22,7 @@ import Animated, {
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 
 import { ConfirmSheet } from '@/components/ConfirmSheet';
+import { GridCell, chunk } from '@/components/BrowseList';
 import { GlassSurface } from '@/components/GlassSurface';
 import { Icon } from '@/components/icons/Icon';
 import { NoteEditor } from '@/components/NoteEditor';
@@ -55,6 +56,8 @@ import { useAppSettings } from '@/settings/settingsStore';
 import { radii, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
+import { minCardWidths } from '@/theme/minCardWidths';
+import { useColumns } from '@/theme/windowClass';
 
 /** The slide, then the collapse. Deliberately sequential rather than one
  *  motion: the card leaves first and the list closes afterwards, so the eye
@@ -119,6 +122,10 @@ export function BookmarksScreen() {
   const { uiLocale, nameLanguage } = useAppSettings();
   const theme = useThemeColors();
   const paddingBottom = useListBottomPadding();
+  const { columns, itemWidth } = useColumns(minCardWidths.bookmarkCard, {
+    gap: 10,
+    horizontalPadding: 32,
+  });
   const [tab, setTab] = useState<BookmarkTab>('recent');
   const [editing, setEditing] = useState<Bookmark | null>(null);
   const [noteError, setNoteError] = useState<string | null>(null);
@@ -388,11 +395,28 @@ export function BookmarksScreen() {
       {tab === 'surah' ? (
         <SectionList
           testID="bookmarks-list"
-          sections={sections}
+          // SectionList has no numColumns -- chunked into rows of `columns`
+          // here, same as BrowseList's own section arm.
+          sections={sections.map((section) => ({ ...section, data: chunk(section.data, columns) }))}
           // The tab is in the key so switching cannot hand a recycled row the
-          // wrong item.
-          keyExtractor={(item) => `surah-${keyOf(item)}`}
-          renderItem={renderRow}
+          // wrong item. Keyed off the row's first bookmark now that a row can
+          // hold more than one.
+          keyExtractor={(row) => `surah-${keyOf(row[0]!)}`}
+          renderItem={({ item: row }) => (
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {row.map((item) => (
+                <GridCell key={keyOf(item)} width={itemWidth}>
+                  {renderRow({ item })}
+                </GridCell>
+              ))}
+              {/* Spacers on a short final row, not a stretched card -- a lone
+                  card that grows to full width reads as a different, larger
+                  card. */}
+              {Array.from({ length: columns - row.length }, (_, i) => (
+                <View key={`spacer-${i}`} style={{ width: itemWidth }} />
+              ))}
+            </View>
+          )}
           renderSectionHeader={({ section }) => (
             <Text
               accessibilityRole="header"
@@ -420,8 +444,14 @@ export function BookmarksScreen() {
         <FlatList
           testID="bookmarks-list"
           data={visible}
+          numColumns={columns}
+          // RN throws on a numColumns change without a remount, and a
+          // rotation changes it. The key is the column count, so the list
+          // rebuilds exactly when RN requires it and never otherwise.
+          key={`cols-${columns}`}
+          columnWrapperStyle={columns > 1 ? { gap: 10 } : undefined}
           keyExtractor={(item) => `${tab}-${keyOf(item)}`}
-          renderItem={renderRow}
+          renderItem={(info) => <GridCell width={itemWidth}>{renderRow(info)}</GridCell>}
           style={{ flex: 1 }}
           // paddingTop, unlike the SectionList above: nothing here heads the
           // list, so the first card sat flush against the segmented control.
@@ -674,6 +704,11 @@ function BookmarkRow({
     <Animated.View style={slideStyle}>
     <Swipeable
       ref={swipe}
+      // Its own Swipeable per card, never one Swipeable around a row --
+      // side-by-side cards would then contend for the row's pan (R8). This
+      // testID is what a unit test can prove of that structure; the gesture
+      // arbitration itself is device check 507.
+      testID={`bookmark-swipeable-${bookmark.surahId}-${bookmark.ayahNumber}`}
       friction={2}
       rightThreshold={40}
       // No overshoot: the panel is a fixed-width target, and letting the row
