@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
 import { FlatList, Pressable, SectionList, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
@@ -10,6 +10,8 @@ import { useReducedMotion } from '@/motion/useReducedMotion';
 import { fonts, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
+import { minCardWidths } from '@/theme/minCardWidths';
+import { useColumns } from '@/theme/windowClass';
 
 
 export interface BrowseItem {
@@ -215,6 +217,30 @@ function Row({ item }: { item: BrowseItem }) {
   );
 }
 
+/**
+ * One grid cell. Exported, because Bookmarks (Task 5) renders the same cell --
+ * two cell wrappers is where one gains a fix and the other keeps the bug (§3).
+ *
+ * `width` only at more than one column: pinning it at one column would change
+ * the phone, where the row has always filled its parent.
+ */
+export function GridCell({ width, children }: { width: number | undefined; children: ReactNode }) {
+  return (
+    <View testID="grid-cell" style={width === undefined ? undefined : { width }}>
+      {children}
+    </View>
+  );
+}
+
+/** Rows of `columns` items, the final row short rather than padded with
+ *  fabricated data -- the spacer is drawn, not modelled. */
+export function chunk<T>(items: readonly T[], columns: number): T[][] {
+  if (columns <= 1) return items.map((item) => [item]);
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += columns) rows.push(items.slice(i, i + columns));
+  return rows;
+}
+
 export interface BrowseListProps {
   /** Exactly one of these. Sections drive a SectionList, items a FlatList. */
   items?: BrowseItem[];
@@ -238,19 +264,41 @@ export function BrowseList({ items, sections }: BrowseListProps) {
     () => ({ paddingHorizontal: 16, paddingTop: 8, paddingBottom, gap: 10 }),
     [paddingBottom],
   );
+  const { columns, itemWidth } = useColumns(minCardWidths.browseRow, {
+    gap: 10,
+    // 16 either side, matching contentContainerStyle above.
+    horizontalPadding: 32,
+  });
 
   if (sections) {
     // Emptied here, not at the call site: a screen that filtered its own rows
     // would have to remember to keep the header, and a section that loses its
-    // header can never be reopened.
-    const rendered = sections.map((section) =>
-      section.expanded === false ? { ...section, data: [] } : section,
-    );
+    // header can never be reopened. Chunked into rows of `columns` after --
+    // SectionList has no numColumns, so this is the section arm's whole
+    // answer to the grid.
+    const rendered = sections.map((section) => ({
+      ...section,
+      data: section.expanded === false ? [] : chunk(section.data, columns),
+    }));
 
     return (
       <SectionList
+        testID="browse-list"
         sections={rendered}
-        renderItem={({ item }) => <Row item={item} />}
+        renderItem={({ item: row }) => (
+          <View testID="browse-row" style={{ flexDirection: 'row', gap: 10 }}>
+            {row.map((entry) => (
+              <GridCell key={entry.key} width={itemWidth}>
+                <Row item={entry} />
+              </GridCell>
+            ))}
+            {/* Spacers, not a stretched card: a lone card on the final row
+                that grows to full width reads as a different, larger card. */}
+            {Array.from({ length: columns - row.length }, (_, i) => (
+              <View key={`spacer-${i}`} testID="browse-row-spacer" style={{ width: itemWidth }} />
+            ))}
+          </View>
+        )}
         renderSectionHeader={({ section }) => {
           const label = (
             <View
@@ -312,7 +360,7 @@ export function BrowseList({ items, sections }: BrowseListProps) {
             </Pressable>
           );
         }}
-        keyExtractor={(item) => item.key}
+        keyExtractor={(row) => row[0]!.key}
         stickySectionHeadersEnabled={false}
         // A row under an open keyboard: RN's default swallows the first tap to
         // dismiss it, so the surah picker -- whose filter field autofocuses --
@@ -327,8 +375,19 @@ export function BrowseList({ items, sections }: BrowseListProps) {
 
   return (
     <FlatList
+      testID="browse-list"
       data={items ?? []}
-      renderItem={({ item }) => <Row item={item} />}
+      numColumns={columns}
+      // RN throws on a numColumns change without a remount, and a rotation
+      // changes it. The key is the column count, so the list rebuilds exactly
+      // when RN requires it and never otherwise.
+      key={`cols-${columns}`}
+      columnWrapperStyle={columns > 1 ? { gap: 10 } : undefined}
+      renderItem={({ item }) => (
+        <GridCell width={itemWidth}>
+          <Row item={item} />
+        </GridCell>
+      )}
       keyExtractor={(item) => item.key}
       // See the section list above: without this the first tap under an open
       // keyboard only dismisses the keyboard.
