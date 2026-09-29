@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** In landscape, the mushaf shows two facing pages and one swipe turns the leaf with a hinged flip, like a book.
+**Goal:** In landscape, the mushaf shows two facing pages and one swipe turns the leaf, like a book.
 
-**Architecture:** Spreads are fixed pairs anchored from the right — recto odd, verso `recto+1` — so a page always sits on the same half and the 604 pages become 302 leaves. Portrait keeps today's single-page `PagerView` untouched; landscape renders a bespoke Reanimated pager holding three spreads, which is what makes a hinged turn possible at all.
+**Architecture:** Spreads are fixed pairs anchored from the right — recto odd, verso `recto+1` — so a page always sits on the same half and the 604 pages become 302 leaves. Both orientations use the one `PagerView` we already have: portrait gives it 604 single-page children, landscape gives it 302 two-cell children. There is no second pager and no custom page transition.
 
-**Tech Stack:** react-native-pager-view 8.0.2 (portrait, unchanged), Reanimated 4.5.1 + react-native-gesture-handler 2.32.0 (landscape spread), QCF page fonts via expo-font.
+**Tech Stack:** react-native-pager-view 8.0.2 (both orientations), QCF page fonts via expo-font. **No new dependency, no Reanimated work in this phase.**
 
 **Spec:** No separate spec. Owner rulings below, collected 2026-09-28 in session `session_019jJdHkf1ugay9RMWAkYPMy`. Depends on **S4a having landed** — the window classes and the orientation unlock come from there.
 
@@ -15,11 +15,11 @@
 ## Global Constraints
 
 - **Portrait is not changing.** Single-page `PagerView`, today's behaviour, byte-for-byte. Every task asserts it.
+- **The page transition is not changing either.** Android's own `PagerView` slide, in both orientations. No hinge, no curl, no custom gesture.
 - Spread appears in **landscape only** (box wider than tall), ruling R-B2.
 - Recto identifies the spread. Stored position stays **a single page number** — no user-DB change in this phase (R-B3).
 - The QCF per-page render band is load-bearing: **whole-word glyphs drop outside a per-page size band**, and subsetting is not the cause (`qcf-page-font-render-band`). Halving the box halves the scale, which walks straight into it. Task 4 exists for this alone.
 - 54 pages have header/bismillah line gaps; they must be checked in a spread, not assumed.
-- Reduced motion (`reduceMotion` setting) falls back to the slide. No hinge (§8).
 - 60fps target. The mushaf has already fought a glyph-atlas thrash at ~146 texture uploads/frame; a hardware layer plus memo took swipes from 92% janky/34ms to 8%/9ms (`mushaf-glyph-atlas-thrash`). Keep both.
 - `packages/data` untouched. No schema change. **No §5 trigger** — no data layer, no trust boundary, no user-DB write.
 - Commits end with the `Co-Authored-By` / `Claude-Session` trailers from S4a's constraints.
@@ -31,24 +31,23 @@
 | R-B1 | Two-page spread, "like a real book. one swipe turns page like a book with animation" |
 | R-B2 | Landscape only. Portrait keeps one page |
 | R-B3 | The right page (recto) identifies the spread |
-| R-B4 | Hinged flip now (rotateY about the spine); the true paper curl is a later phase |
+| R-B4 | ~~Hinged flip now~~ — **superseded 2026-09-29 by the owner:** drop the hinge and the curl together, keep the plain slide. Both are a later phase, if ever |
 | R-B5 | Mushaf gets **no kebab**. No new chrome in this phase at all |
 
 ### Rulings I made, with their cost
 
-- **Bespoke Reanimated pager for the spread; `PagerView` stays for portrait.** `PagerView` exposes no way to replace its transition, so a hinge is impossible inside it. A bespoke pager also sidesteps its other known problem — it re-renders all 604 children on any prop change. *Cost if wrong:* landscape paging feel differs from portrait's Android fling, which is exactly the thing we moved to `PagerView` to get right. Mitigation: Task 3 lands the spread on a slide and **check 604 compares the feel against portrait before the hinge is written**. If the feel is wrong, the fallback is a spread inside `PagerView` with no hinge, and R-B4 gets renegotiated.
-- **Three mounted spreads, not a window of pages.** Previous, current, next. *Cost if wrong:* a fast repeated swipe outruns the mount; check 605 is a 10-swipe burst.
+- **One pager, two modes — `spread` is a prop, not a second component.** With the hinge gone there is nothing `PagerView` cannot do, and a bespoke pager would have re-litigated the whole Android paging fight (`android-paging-snaps-from-predicted-fling`) for a transition we are no longer writing. *Cost if wrong:* `MushafPager` carries a branch. Cheap, and the alternative was two page renderers drifting apart.
+- **The pager remounts on a mode flip (`key={mode}`).** Its child count goes 604 ↔ 302, which is the `numColumns` hazard in another costume. *Cost if wrong:* a rotation lands on a blank or wrong page — check 603 catches it.
 - **Page 1 is a recto and sits alone.** In a printed mushaf Al-Fatiha faces Al-Baqara's opening, so the natural pairs are (1,2),(3,4)…(603,604) with nothing orphaned. Adopted because it orphans no page and keeps every recto odd. *Cost if wrong:* the pairing is off by one against the owner's physical copy — check 601 verifies against it, and the fix is one line in `spreadFor`.
 
 ## Traps
 
-Same list as S4a §Traps applies. Three matter most here:
+Same list as S4a §Traps applies. Four matter most here:
 
-1. **`withTiming` in a worklet restarts the curve on every render** — shared value + effect (`reanimated-withtiming-in-worklet-restarts`).
-2. **A swipe begins as a press.** Press-feedback state held above the pager re-renders every mounted page at gesture start; keep it in the cell (`swipe-begins-as-a-press-on-content`).
-3. **A `useEffect` cleanup cannot see the new value** — this already broke mushaf Play once (`useeffect-cleanup-cannot-see-the-new-value`).
-
-Plus: **Reanimated's test shim hands back a fresh box per render** unless the local fix is in place — `useSharedValue` returning a new object per render loses writes and makes prop-seeded animation tests vacuous (`reanimated-shim-hands-back-a-fresh-box`). Verify that shim before trusting any animation test in this phase.
+1. **A swipe begins as a press.** Press-feedback state held above the pager re-renders every mounted page at gesture start; keep it in the cell (`swipe-begins-as-a-press-on-content`).
+2. **`PagerView` re-renders all its children on any prop change** (`android-paging-snaps-from-predicted-fling`). Halving the child count to 302 helps; the memo on the cell is still load-bearing.
+3. **Glyph-atlas thrash.** The hardware layer plus the memo took swipes from 92% janky/34ms to 8%/9ms (`mushaf-glyph-atlas-thrash`). A spread draws two cells per leaf, so keep both on the cell, not on the leaf.
+4. **A `useEffect` cleanup cannot see the new value** — this already broke mushaf Play once (`useeffect-cleanup-cannot-see-the-new-value`). The `focusPage` effect gains a spread branch; compare in the effect body.
 
 ---
 
@@ -57,14 +56,10 @@ Plus: **Reanimated's test shim hands back a fresh box per render** unless the lo
 **New**
 - `apps/mobile/src/mushaf/spread.ts` — the pairing math. Pure, no RN.
 - `apps/mobile/src/mushaf/spread.test.ts`
-- `apps/mobile/src/components/mushaf/SpreadPager.tsx` — bespoke 3-cell Reanimated pager.
-- `apps/mobile/src/components/mushaf/SpreadPager.test.tsx`
-- `apps/mobile/src/components/mushaf/HingedLeaf.tsx` — the rotateY turn and its shading.
-- `apps/mobile/src/components/mushaf/HingedLeaf.test.tsx`
 
 **Modified**
-- `apps/mobile/src/screens/MushafScreen.tsx` — branch on landscape.
-- `apps/mobile/src/components/mushaf/MushafPager.tsx` — portrait path, untouched except for extraction of the shared page cell.
+- `apps/mobile/src/screens/MushafScreen.tsx` — computes `spread = width > height` and passes it down.
+- `apps/mobile/src/components/mushaf/MushafPager.tsx` — gains the `spread` prop and the leaf children; the page body is extracted into a shared `MushafPageCell` in the same file.
 - `apps/mobile/src/mushaf/` page-scale helper (`mushafColumnWidth`) — a half-box variant.
 - `apps/mobile/src/mushaf/highlightsContext.tsx` — highlight must resolve on either half.
 
@@ -219,198 +214,208 @@ git commit -m "feat(mobile/mushaf): recto-anchored spread pairing for 604 pages"
 
 ---
 
-### Task 2: Landscape branches to a spread
+### Task 2: Landscape draws a spread, inside the pager we already have
 
 **Files:**
+- Modify: `apps/mobile/src/components/mushaf/MushafPager.tsx`
 - Modify: `apps/mobile/src/screens/MushafScreen.tsx`
-- Modify: `apps/mobile/src/components/mushaf/MushafPager.tsx` (extract the page cell only)
-- Test: `apps/mobile/src/screens/MushafScreen.test.tsx`
+- Test: `apps/mobile/src/components/mushaf/MushafPager.test.tsx`, `apps/mobile/src/screens/MushafScreen.test.tsx`
 
 **Interfaces:**
-- Consumes: `spreadFor`, `spreadIndexFor` from Task 1; `useWindowDimensions`.
-- Produces: `MushafPageCell` — the single-page renderer, extracted unchanged from `MushafPager` so both pagers draw an identical page. `<MushafPageCell page={number} width={number} />`.
+- Consumes: `spreadFor`, `spreadAt`, `spreadIndexFor`, `SPREAD_COUNT` from Task 1; `useWindowDimensions`.
+- Produces: `MushafPager` gains one optional prop — `spread?: boolean` (default `false`). Everything else about its signature is unchanged. In spread mode its `onPageChange` reports the **recto** of the leaf turned to.
+
+There is no bespoke pager and no hinge in this phase (see *Rulings I made*). A
+spread is the same `PagerView` with 302 children instead of 604, each child
+holding two page cells in a `row-reverse` row. That keeps Android's own fling —
+the thing `react-native-pager-view` was adopted for after
+`decelerationRate="fast"` made pages *harder* to turn — identical in both
+orientations, and it halves the child count rather than adding a second pager.
 
 - [ ] **Step 1: Write the failing test**
 
 ```tsx
-  it('shows one page in portrait, exactly as it does today', () => {
-    // Portrait is not changing. A regression here is the phase failing, not a
-    // trade-off: the phone only ever sees this path.
-    win.width = 800; win.height = 1300;
-    renderScreen();
-    expect(screen.getByTestId('mushaf-pager')).toBeTruthy();
-    expect(screen.queryByTestId('mushaf-spread')).toBeNull();
+  it('renders one page per child in portrait, exactly as it does today', () => {
+    // Portrait is not changing. A regression here is the phase failing.
+    render(<MushafPager {...props} initialPage={3} />);
+    const cells = screen.getAllByTestId('mushaf-page-cell');
+    expect(cells).toHaveLength(1);
+    expect(cells[0].dataset.page).toBe('3');
   });
 
-  it('shows a spread in landscape', () => {
-    win.width = 1400; win.height = 900;
-    renderScreen();
-    expect(screen.getByTestId('mushaf-spread')).toBeTruthy();
-    expect(screen.queryByTestId('mushaf-pager')).toBeNull();
+  it('renders two page cells per child in spread mode', () => {
+    render(<MushafPager {...props} spread initialPage={3} />);
+    expect(screen.getAllByTestId('mushaf-page-cell').map((c) => c.dataset.page))
+      .toEqual(['3', '4']);
   });
 
   it('puts the recto on the right in the layout, not just in the data', () => {
     // RTL. A row that renders [recto, verso] left-to-right reads backwards and
     // is invisible in a data-only assertion.
-    win.width = 1400; win.height = 900;
-    renderScreen({ page: 3 });
-    const halves = screen.getAllByTestId('spread-half');
-    expect(halves.map((h) => h.dataset.page)).toEqual(['3', '4']);
-    expect(screen.getByTestId('mushaf-spread').style.flexDirection).toBe('row-reverse');
+    render(<MushafPager {...props} spread initialPage={3} />);
+    expect(screen.getByTestId('mushaf-leaf').style.flexDirection).toBe('row-reverse');
   });
 
-  it('keeps an even page on its own leaf when landscape opens', () => {
-    // Rotating on page 4 must land on leaf (3,4) with 4 on the left -- not
+  it('opens an even page on its own leaf, not as a recto', () => {
+    // Rotating on page 4 must land on leaf (3,4) with 4 on the LEFT -- not
     // rebuild the book around 4 as a recto.
-    win.width = 1400; win.height = 900;
-    renderScreen({ page: 4 });
-    expect(screen.getAllByTestId('spread-half').map((h) => h.dataset.page)).toEqual(['3', '4']);
+    render(<MushafPager {...props} spread initialPage={4} />);
+    expect(screen.getAllByTestId('mushaf-page-cell').map((c) => c.dataset.page))
+      .toEqual(['3', '4']);
   });
 
-  it('decides on the box, not on the class', () => {
-    // A 1000x1400 medium-class tablet in portrait is still portrait: two pages
-    // there would be tall and narrow and would walk into the render band.
-    win.width = 1000; win.height = 1400;
-    renderScreen();
-    expect(screen.queryByTestId('mushaf-spread')).toBeNull();
+  it('gives each half exactly half the box', () => {
+    // A cell handed the full width overflows the leaf and the QCF page is
+    // clipped rather than scaled -- which looks like a font bug, not a layout one.
+    render(<MushafPager {...props} spread width={1400} initialPage={3} />);
+    for (const cell of screen.getAllByTestId('mushaf-page-cell')) {
+      expect(cell.dataset.width).toBe('700');
+    }
+  });
+
+  it('reports the recto when a leaf settles', () => {
+    // The caller stores a page number (R-B3, no data change), so a leaf turn
+    // has to hand back a page and not a leaf index.
+    const onPageChange = vi.fn();
+    const { settleOn } = renderPager({ spread: true, initialPage: 3, onPageChange });
+    settleOn(2); // leaf index 2 == pages 5,6
+    expect(onPageChange).toHaveBeenCalledWith(5);
+  });
+
+  it('remounts the pager when the mode flips', () => {
+    // PagerView does not survive its child count changing under it (604 -> 302)
+    // any more than a FlatList survives a numColumns change: the key is what
+    // forces the remount, and without it a rotation lands on the wrong page or
+    // on a blank one.
+    const { rerender } = render(<MushafPager {...props} initialPage={3} />);
+    const before = screen.getByTestId('mushaf-pager').dataset.mode;
+    rerender(<MushafPager {...props} spread initialPage={3} />);
+    expect(screen.getByTestId('mushaf-pager').dataset.mode).not.toBe(before);
   });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+`renderPager` is a helper in this test file that renders the pager and returns
+`settleOn(index)`, which fires the component's own `onPageSelected` contract —
+assert against the contract the component listens for, not a simulated raw
+touch stream.
 
-Run: `cd apps/mobile && npx vitest run src/screens/MushafScreen.test.tsx`
-Expected: FAIL — no `mushaf-spread`.
+And in `MushafScreen.test.tsx`:
 
-- [ ] **Step 3: Implement**
+```tsx
+  it('decides on the box, not on the window class', () => {
+    // A 1000x1400 medium-class tablet in portrait is still portrait: two pages
+    // there would be tall and narrow and would walk into the QCF render band.
+    win.width = 1000; win.height = 1400;
+    renderScreen();
+    expect(screen.getByTestId('mushaf-pager').dataset.spread).toBe('false');
+  });
 
-Extract the page cell out of `MushafPager` into `MushafPageCell` with no behaviour change — same fonts, same memo, same hardware layer. Both pagers then render the identical cell (§3 DRY: two page renderers is where one gains a fix and the other keeps the bug).
+  it('asks for a spread when the box is wider than it is tall', () => {
+    win.width = 1400; win.height = 900;
+    renderScreen();
+    expect(screen.getByTestId('mushaf-pager').dataset.spread).toBe('true');
+  });
+```
 
-In `MushafScreen`:
+- [ ] **Step 2: Run them and watch them fail**
+
+Run: `cd apps/mobile && npx vitest run src/components/mushaf/MushafPager.test.tsx src/screens/MushafScreen.test.tsx`
+Expected: FAIL — `spread` is not a prop; no `mushaf-leaf`.
+
+- [ ] **Step 3: Implement the pager**
+
+Extract today's page body into `MushafPageCell` with **no behaviour change** —
+same fonts, same `memo`, same `renderToHardwareTextureAndroid`, same per-page
+query. Both modes then render the identical cell (§3 DRY: two page renderers is
+where one gains a fix and the other keeps the bug). Give it
+`testID="mushaf-page-cell"` and a `width` prop.
+
+```tsx
+const LEAVES = Array.from({ length: SPREAD_COUNT }, (_, i) => i);
+
+// PagerView holds its children by index. Flipping between 604 and 302 children
+// under a live pager is the same hazard as changing a FlatList's numColumns:
+// remount, or land on the wrong page.
+const mode = spread ? 'spread' : 'single';
+const halfWidth = Math.floor(width / 2);
+
+<PagerView
+  key={mode}
+  testID="mushaf-pager"
+  data-mode={mode}
+  initialPage={spread ? spreadIndexFor(clampPage(initialPage)) : clampPage(initialPage) - MUSHAF_PAGE_MIN}
+  onPageSelected={(e) => {
+    const i = e.nativeEvent.position;
+    onPageChange(spread ? spreadAt(i).recto : PAGES[i]);
+  }}
+  ...
+>
+  {spread
+    ? LEAVES.map((i) => {
+        const { recto, verso } = spreadAt(i);
+        return (
+          <View key={i}>
+            {/* row-reverse: RTL, the recto is the RIGHT half. */}
+            <View testID="mushaf-leaf" style={{ flex: 1, flexDirection: 'row-reverse' }}>
+              <MushafPageCell page={recto} width={halfWidth} {...cellProps} />
+              {verso !== null ? <MushafPageCell page={verso} width={halfWidth} {...cellProps} /> : null}
+            </View>
+          </View>
+        );
+      })
+    : PAGES.map((page) => (
+        <View key={page}>
+          <MushafPageCell page={page} width={width} {...cellProps} />
+        </View>
+      ))}
+</PagerView>
+```
+
+Keep `WINDOW` and the existing draw-window logic; in spread mode the window is
+measured in leaves, so one leaf either side draws — two cells each, the same
+three-pages-worth of glyph atlas portrait already carries.
+
+The `focusPage` effect resolves through `spreadIndexFor` in spread mode and
+stays page-indexed otherwise.
+
+- [ ] **Step 4: Implement the screen branch**
 
 ```tsx
   const { width, height } = useWindowDimensions();
   // The box, not the window class: a 1000dp portrait tablet is still portrait,
   // and two pages in a tall narrow box lands outside the QCF render band.
-  const landscape = width > height;
+  const spread = width > height;
 ```
 
-Render `<SpreadPager .../>` when `landscape`, today's `<MushafPager .../>` otherwise. The spread container is `flexDirection: 'row-reverse'` so the recto sits on the right.
-
-- [ ] **Step 4: Run the tests**
-
-Run: `cd apps/mobile && npx vitest run src/screens/MushafScreen.test.tsx src/components/mushaf && npx tsc --noEmit`
-Expected: PASS, and every existing mushaf test passes unchanged.
-
-- [ ] **Step 5: Mutation-check**
-
-Change `width > height` to `width >= 840`: the "decides on the box" test must FAIL. Change `row-reverse` to `row`: the recto test must FAIL. Restore by editing.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add apps/mobile/src/screens/MushafScreen.tsx apps/mobile/src/components/mushaf
-git commit -m "feat(mobile/mushaf): draw a two-page spread in landscape"
-```
-
----
-
-### Task 3: The spread pager, on a slide
-
-**Files:**
-- Create: `apps/mobile/src/components/mushaf/SpreadPager.tsx`
-- Create: `apps/mobile/src/components/mushaf/SpreadPager.test.tsx`
-
-**Interfaces:**
-- Consumes: `spreadAt`, `spreadFor`, `SPREAD_COUNT`; `MushafPageCell`.
-- Produces: `<SpreadPager page={number} onPageChange={(page: number) => void} />` — `page` is any page; the pager resolves it to a leaf. `onPageChange` reports the **recto** of the leaf turned to.
-
-Slide first, hinge in Task 5. This task proves paging, mounting and layout before any motion risk is added — and check 604 compares its feel against portrait's `PagerView` before the hinge is written at all.
-
-- [ ] **Step 1: Write the failing test**
-
-```tsx
-  it('mounts three leaves: previous, current, next', () => {
-    // Not a window over 302: three cells is the whole point of a bespoke
-    // pager here, and it is what keeps the glyph atlas from thrashing.
-    render(<SpreadPager page={11} onPageChange={() => {}} />);
-    expect(screen.getAllByTestId('spread-leaf').map((l) => l.dataset.index)).toEqual(['4', '5', '6']);
-  });
-
-  it('mounts two leaves at the start of the book', () => {
-    // No leaf -1. A pager that mounts one anyway renders page 0 and the QCF
-    // font has no glyph for it.
-    render(<SpreadPager page={1} onPageChange={() => {}} />);
-    expect(screen.getAllByTestId('spread-leaf').map((l) => l.dataset.index)).toEqual(['0', '1']);
-  });
-
-  it('mounts two leaves at the end of the book', () => {
-    render(<SpreadPager page={604} onPageChange={() => {}} />);
-    expect(screen.getAllByTestId('spread-leaf').map((l) => l.dataset.index)).toEqual(['300', '301']);
-  });
-
-  it('reports the recto when a leaf is turned', () => {
-    // The caller stores a page number (R-B3, no data change), so the pager has
-    // to hand back a page and not a leaf index.
-    const onPageChange = vi.fn();
-    const { turnForward } = renderPager({ page: 3, onPageChange });
-    turnForward();
-    expect(onPageChange).toHaveBeenCalledWith(5);
-  });
-
-  it('does not turn past the last leaf', () => {
-    const onPageChange = vi.fn();
-    const { turnForward } = renderPager({ page: 604, onPageChange });
-    turnForward();
-    expect(onPageChange).not.toHaveBeenCalled();
-  });
-
-  it('keeps press feedback inside the leaf', () => {
-    // A swipe begins as a press. Press state held above the pager re-renders
-    // every mounted leaf at gesture start, which is 2-3 full QCF pages.
-    render(<SpreadPager page={11} onPageChange={() => {}} />);
-    expect(screen.getByTestId('spread-pager').dataset.pressed).toBeUndefined();
-  });
-```
-
-`renderPager` is a helper in this test file that renders the pager and returns a `turnForward()` which drives the gesture the way the component listens for it — assert against the component's own gesture contract, not against a simulated raw touch stream.
-
-- [ ] **Step 2: Run it and watch it fail**
-
-Run: `cd apps/mobile && npx vitest run src/components/mushaf/SpreadPager.test.tsx`
-Expected: FAIL — module does not exist.
-
-- [ ] **Step 3: Verify the Reanimated shim before writing any animation**
-
-`useSharedValue` in the test shim has previously returned **a new object per render**, which loses writes and makes every prop-seeded animation test pass vacuously. Confirm the local fix is in `src/testing/` before trusting a single assertion below. If it is not, fix the shim first — as its own commit.
-
-- [ ] **Step 4: Implement**
-
-A `Gesture.Pan()` driving one shared value (the leaf offset in leaf-widths), `withSpring` on release to the nearest leaf, three absolutely-positioned leaves translated off that value. `runOnJS(onPageChange)` only when the settled leaf differs from the one it started on.
-
-- Set the shared value in an **effect** when `page` changes, never `withTiming` inside a worklet.
-- Keep `MushafPageCell`'s hardware layer (`renderToHardwareTextureAndroid`) and its memo — swipes went from 92% janky/34ms to 8%/9ms because of them.
-- Press feedback lives in the cell (trap 2).
-- Clamp at both ends; no leaf -1 and no leaf 302.
+Pass `spread` straight through to `MushafPager`. No second component, no branch
+in the screen body beyond this one prop.
 
 - [ ] **Step 5: Run the tests**
 
-Run: `cd apps/mobile && npx vitest run src/components/mushaf && npx tsc --noEmit && npx eslint .`
-Expected: PASS.
+Run: `cd apps/mobile && npx vitest run src/screens/MushafScreen.test.tsx src/components/mushaf && npx tsc --noEmit && npx eslint .`
+Expected: PASS, and every existing mushaf test passes unchanged.
 
 - [ ] **Step 6: Mutation-check**
 
-Remove the end clamp: the "does not turn past the last leaf" test must FAIL. Change the mounted window to `[current]`: the three-leaf test must FAIL. Restore by editing.
+Change `width > height` to `width >= 840`: the "decides on the box" test must
+FAIL. Change `row-reverse` to `row`: the recto test must FAIL. Delete
+`key={mode}`: the remount test must FAIL. Hand both cells `width` instead of
+`halfWidth`: the half-box test must FAIL. Restore each by editing — never
+`git checkout` or `git restore`.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add apps/mobile/src/components/mushaf/SpreadPager.tsx apps/mobile/src/components/mushaf/SpreadPager.test.tsx
-git commit -m "feat(mobile/mushaf): a three-leaf spread pager on a slide"
+git add apps/mobile/src/screens/MushafScreen.tsx apps/mobile/src/components/mushaf
+git commit -m "feat(mobile/mushaf): draw a two-page spread in landscape
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_019jJdHkf1ugay9RMWAkYPMy"
 ```
 
 ---
 
-### Task 4: Page scale inside a half-box, against the render band
+### Task 3: Page scale inside a half-box, against the render band
 
 **Files:**
 - Modify: the page-scale helper in `apps/mobile/src/mushaf/` (`mushafColumnWidth` and its test)
@@ -486,89 +491,7 @@ git commit -m "feat(mobile/mushaf): fit a page to a half-box inside the QCF rend
 
 ---
 
-### Task 5: The hinged turn
-
-**Files:**
-- Create: `apps/mobile/src/components/mushaf/HingedLeaf.tsx`
-- Create: `apps/mobile/src/components/mushaf/HingedLeaf.test.tsx`
-- Modify: `apps/mobile/src/components/mushaf/SpreadPager.tsx`
-
-**Do not start this until check 604 has confirmed the slide's feel on device.** If the bespoke pager feels worse than portrait's `PagerView`, the fallback (spread inside `PagerView`, no hinge) is on the table and R-B4 gets renegotiated — that is the ruling recorded above.
-
-**Interfaces:**
-- Consumes: the pager's gesture progress shared value.
-- Produces: `<HingedLeaf progress={SharedValue<number>} side="recto" | "verso" children />` — rotates about the spine and draws the shading.
-
-- [ ] **Step 1: Write the failing test**
-
-```tsx
-  it('rotates about the spine, not about the leaf centre', () => {
-    // A leaf hinged at its middle looks like a card flipping in mid-air. The
-    // transform origin has to sit on the spine edge.
-    const progress = makeSharedValue(0.5);
-    render(<HingedLeaf progress={progress} side="recto"><span>page</span></HingedLeaf>);
-    const leaf = screen.getByTestId('hinged-leaf');
-    expect(leaf.style.transformOrigin).toContain('left');
-  });
-
-  it('turns the recto toward the spine and the verso away from it', () => {
-    // Opposite signs. Same sign on both and the leaves pass through each other.
-    const progress = makeSharedValue(0.5);
-    const { rectoAngle, versoAngle } = renderBothSides(progress);
-    expect(Math.sign(rectoAngle)).toBe(-Math.sign(versoAngle));
-  });
-
-  it('is flat at rest and side-on at the halfway point', () => {
-    expect(angleAt(0)).toBe(0);
-    expect(Math.abs(angleAt(0.5))).toBeCloseTo(90, 0);
-  });
-
-  it('deepens the shading as the leaf turns', () => {
-    // The shading is what makes a rotateY read as paper rather than a
-    // flipping rectangle.
-    expect(shadeAt(0.5)).toBeGreaterThan(shadeAt(0.1));
-  });
-
-  it('falls back to a slide when reduced motion is on', () => {
-    // §8. The hinge is the flourish; the page turn is the function.
-    const { container } = renderWithSettings({ reduceMotion: true });
-    expect(container.querySelector('[data-testid="hinged-leaf"]')).toBeNull();
-  });
-```
-
-`makeSharedValue` must produce a **stable** box across renders — see the shim warning in Task 3 Step 3. If it does not, these tests pass whatever the component does.
-
-- [ ] **Step 2: Run it and watch it fail**
-
-Run: `cd apps/mobile && npx vitest run src/components/mushaf/HingedLeaf.test.tsx`
-Expected: FAIL — module does not exist.
-
-- [ ] **Step 3: Implement**
-
-`useAnimatedStyle` mapping progress to `rotateY` with a `perspective` ahead of it in the transform array (order matters — perspective last is a no-op), `transformOrigin` on the spine edge, and an overlay whose opacity rises with `|progress|` for the shading. Read `reduceMotion` from the settings store and render the children bare when it is set.
-
-Keep the leaf's hardware layer. A rotateY on a texture is cheap; a rotateY that re-rasterises a QCF page every frame is 146 texture uploads a frame again.
-
-- [ ] **Step 4: Run the tests and measure the frames**
-
-Run: `cd apps/mobile && npx vitest run src/components/mushaf && npx tsc --noEmit && npx eslint .`
-
-Then on device, per `ui-thread-jank-measure-framestats`: **framestats gaps only**, three repeats, inside the animation window. JS logs, gfxinfo percentiles and frame *duration* are all blind to a UI-thread stall. Record the numbers in the log.
-
-- [ ] **Step 5: Mutation-check**
-
-Make both sides' angles the same sign: that test must FAIL. Remove the `reduceMotion` branch: that test must FAIL. Move `perspective` to the end of the transform array — no unit test catches it, so record that check 607 is the gate (a hinge with no perspective looks like a squashing rectangle). Restore by editing.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add apps/mobile/src/components/mushaf
-git commit -m "feat(mobile/mushaf): turn the leaf on a spine hinge"
-```
-
----
-
-### Task 6: Position, highlight and playback across a leaf
+### Task 4: Position, highlight and playback across a leaf
 
 **Files:**
 - Modify: `apps/mobile/src/mushaf/highlightsContext.tsx`
@@ -647,7 +570,7 @@ git commit -m "fix(mobile/mushaf): treat a leaf as one unit for position, highli
 
 ---
 
-### Task 7: Build, device run, and the verification log
+### Task 5: Build, device run, and the verification log
 
 Build and install exactly as S4a Task 11 (prebuild only if a native dep changed — nothing here adds one, so a Gradle `assembleRelease` is enough; `taskset -c 7,8` still mandatory, `adb install -r --user 0` still mandatory, APK served as a copy named for the versionCode verified with an explicitly-resolved `aapt2`).
 
@@ -657,12 +580,9 @@ Build and install exactly as S4a Task 11 (prebuild only if a native dep changed 
 | 601 | Pairing matches the owner's physical mushaf for pages 1-2, 3-4, 603-604 | |
 | 602 | Portrait still one page, identical to vc72 | |
 | 603 | Rotate on page 4 → leaf (3,4), page 4 on the left; rotate back → page 4 | |
-| 604 | **Slide feel vs portrait PagerView** — is the bespoke pager as good? Gate for Task 5 | |
+| 604 | framestats gaps inside a landscape turn, 3 repeats — no UI-thread stall (two cells per leaf) | |
 | 605 | 10 fast swipes in a burst — no blank leaf, no missed mount | |
 | 606 | Every glyph present on 20 sampled pages incl. the 54 with header/bismillah gaps | |
-| 607 | Hinge reads as paper: perspective present, shading deepens, no squashing rectangle | |
-| 608 | framestats gaps inside the turn, 3 repeats — no UI-thread stall | |
-| 609 | Reduced motion on → slide, no hinge | |
 | 610 | Playback crossing recto→verso does not turn; verso→next recto does | |
 | 611 | Highlight lands on an ayah on the left half | |
 | 612 | Close on a landscape leaf, reopen in portrait — lands on the recto | |
@@ -674,30 +594,29 @@ Build and install exactly as S4a Task 11 (prebuild only if a native dep changed 
 ## Acceptance criteria
 
 - [ ] Landscape draws a recto-right spread; portrait is unchanged.
-- [ ] One swipe turns one leaf, with a hinge (or a slide under reduced motion).
+- [ ] One swipe turns one leaf, on Android's own `PagerView` slide — the same feel as portrait.
 - [ ] Every page's half-box scale sits inside the 11.91-18.17em render band, evidenced by the sweep in `SPREAD-BAND-CHECK.md` **and** check 606.
 - [ ] Stored position is still a single page number. No migration, no user-DB write.
 - [ ] Playback and highlight treat a leaf as one unit.
 - [ ] Suite, type-check and lint green; every branch mutation-checked.
-- [ ] Checks 600-614 run and recorded.
+- [ ] Checks 600-606 and 610-614 run and recorded.
 
 ## Risks and rollbacks
 
 | Risk | Mitigation | Rollback |
 |---|---|---|
 | Half-box scale leaves the QCF band → missing words | Task 4 sweeps all 604 before any device build; check 606 | Fixed scale with letterboxing instead of a per-page fit — owner ruling needed |
-| Bespoke pager feels worse than `PagerView` | Check 604 gates Task 5 | Spread inside `PagerView`, slide only, R-B4 renegotiated |
-| Hinge misses 60fps | framestats gaps, 3 repeats, check 608 | `reduceMotion` path is already the slide — make it the default |
+| Two QCF cells per leaf costs frames | framestats gaps, 3 repeats, check 604; memo + hardware layer kept on the cell | Drop the draw window to the current leaf only |
+| Mode flip lands on a blank page | `key={mode}` remount, mutation-checked; check 603 | Revert to portrait-only — one prop, one line in the screen |
 | Pairing off-by-one vs the printed mushaf | Check 601 against the owner's own copy | One line in `spreadFor` |
-| Reanimated shim makes animation tests vacuous | Verified in Task 3 Step 3 before any assertion is trusted | Fix the shim as its own commit |
 
 ## Out of scope
 
-- The true paper curl (R-B4 defers it; it needs Skia and a rasterised page).
+- **Any custom page-turn animation** — hinge and curl both (owner, 2026-09-29). The curl additionally needs Skia and a rasterised page; a mushaf page is live QCF `Text`.
 - Any new mushaf chrome (R-B5) — the khatm ribbon is S4c.
 - Portrait spreads, at any width.
 - Changing what position is stored.
 
 ## Verification log
 
-*(empty — Task 7 fills this)*
+*(empty — Task 5 fills this)*
