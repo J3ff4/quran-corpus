@@ -1,6 +1,7 @@
 import React from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MAX_CONTENT_WIDTH } from '@/theme/contentWidth';
 import { MenuScreen } from './MenuScreen';
 
 const mocks = vi.hoisted(() => ({ push: vi.fn() }));
@@ -18,14 +19,14 @@ vi.mock('expo-router', () => ({
 }));
 
 vi.mock('react-native', async () => {
-  const { host, StyleSheet } = await import('@/testing/rnHosts.js');
+  const { host, StyleSheet, scrollViewHost } = await import('@/testing/rnHosts.js');
   return {
     AccessibilityInfo: {
       isReduceMotionEnabled: async () => false,
       addEventListener: () => ({ remove: () => {} }),
     },
     Pressable: host('button'),
-    ScrollView: host('div'),
+    ScrollView: scrollViewHost(),
     StyleSheet,
     Text: host('span'),
     View: host('div'),
@@ -33,6 +34,19 @@ vi.mock('react-native', async () => {
 });
 
 describe('MenuScreen', () => {
+
+  it('keeps its copy to a readable measure on a wide window', () => {
+    // Prose does not get wider than its measure. Task 2 removed the
+    // navigator cap that used to do this for every screen; these four are the
+    // screens that actually wanted it. Asserted on the scroll view's content
+    // container, not its `style`: capping `style` would centre the scroll
+    // view and its scrollbar instead of the copy.
+    render(<MenuScreen />);
+
+    const content = screen.getByTestId('menu-scroll-content');
+    expect(content.style.maxWidth).toBe(`${MAX_CONTENT_WIDTH}px`);
+    expect(content.style.alignSelf).toBe('center');
+  });
   beforeEach(() => mocks.push.mockReset());
   afterEach(cleanup);
 

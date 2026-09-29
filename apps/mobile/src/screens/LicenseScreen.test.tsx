@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import React from 'react';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { MAX_CONTENT_WIDTH } from '@/theme/contentWidth';
 import { GPL_2_0_TEXT } from '../licenses/gpl-2.0';
 import { LicenseScreen } from './LicenseScreen';
 
@@ -14,6 +15,19 @@ vi.mock('@/settings/settingsStore', () => ({
 vi.mock('react-native', async () => (await import('@/testing/rnHosts.js')).reactNativeTextMock());
 
 describe('LicenseScreen', () => {
+
+  it('keeps its copy to a readable measure on a wide window', () => {
+    // Prose does not get wider than its measure. Task 2 removed the
+    // navigator cap that used to do this for every screen; these four are the
+    // screens that actually wanted it. Asserted on the scroll view's content
+    // container, not its `style`: capping `style` would centre the scroll
+    // view and its scrollbar instead of the copy.
+    render(<LicenseScreen />);
+
+    const content = screen.getByTestId('license-scroll-content');
+    expect(content.style.maxWidth).toBe(`${MAX_CONTENT_WIDTH}px`);
+    expect(content.style.alignSelf).toBe('center');
+  });
   afterEach(cleanup);
 
   it('carries the FSF text byte for byte', () => {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { MAX_CONTENT_WIDTH } from '@/theme/contentWidth';
 import { RECITERS } from '@quran-corpus/data/mobile';
 import { selectedTranslators } from '@quran-corpus/mobile-data';
 import AboutTab from '../../app/about';
@@ -21,6 +22,19 @@ vi.mock('expo-router', () => ({ router: { push: mocks.push } }));
 vi.mock('react-native', async () => (await import('@/testing/rnHosts.js')).reactNativeTextMock());
 
 describe('AboutTab', () => {
+
+  it('keeps its copy to a readable measure on a wide window', () => {
+    // Prose does not get wider than its measure. Task 2 removed the
+    // navigator cap that used to do this for every screen; these four are the
+    // screens that actually wanted it. Asserted on the scroll view's content
+    // container, not its `style`: capping `style` would centre the scroll
+    // view and its scrollbar instead of the copy.
+    render(<AboutTab />);
+
+    const content = screen.getByTestId('about-scroll-content');
+    expect(content.style.maxWidth).toBe(`${MAX_CONTENT_WIDTH}px`);
+    expect(content.style.alignSelf).toBe('center');
+  });
   afterEach(cleanup);
 
   it('names every audio source the app can play', () => {

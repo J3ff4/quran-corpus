@@ -2,6 +2,7 @@ import { ScrollView, Text } from 'react-native';
 import { t } from '@/i18n/uiStrings';
 import { typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
+import { centredContent } from '@/theme/contentWidth';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
 import { useAppSettings } from '@/settings/settingsStore';
 import { GPL_2_0_TEXT } from '@/licenses/gpl-2.0';
@@ -26,8 +27,13 @@ export function LicenseScreen() {
 
   return (
     <ScrollView
+      testID="license-scroll"
       style={{ flex: 1 }}
-      contentContainerStyle={{ paddingBottom, paddingHorizontal: 16, paddingTop: 12, gap: 12 }}
+      // Prose, and prose does not grow past its measure. Task 2 took the
+      // navigator's cap off every screen; these four wanted it. On the
+      // contentContainer, not on `style`: capping `style` would centre the
+      // scroll view itself, and its scrollbar with it.
+      contentContainerStyle={{ paddingBottom, paddingHorizontal: 16, paddingTop: 12, gap: 12, ...centredContent }}
     >
       <Text
         accessibilityRole="header"

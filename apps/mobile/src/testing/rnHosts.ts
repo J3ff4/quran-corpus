@@ -240,6 +240,51 @@ export type LayoutHandler = (event: { nativeEvent: { lines: { text: string }[] }
  * module via `await import('@/testing/rnHosts.js')` -- see the module-level
  * comment above for why the extension is required.
  */
+// A ScrollView is two boxes on the device -- the scrolling viewport, styled
+// by `style`, and the content container inside it, styled by
+// `contentContainerStyle` -- and the shim used to drop the second one
+// entirely. Anything set there (a padding, a centred measure) was invisible
+// to every test, which is the same class of blindness that let shadows ship
+// unasserted. Rendered as a real child box instead, carrying
+// `<testID>-content` so a suite can reach it.
+
+/**
+ * A `ScrollView` host that renders BOTH of its boxes.
+ *
+ * On the device a ScrollView is a scrolling viewport styled by `style` with a
+ * content container inside it styled by `contentContainerStyle`. The shim used
+ * to drop the second style entirely, so anything set there -- a padding, a
+ * centred measure -- was invisible to every test: the same class of blindness
+ * that once let shadows ship unasserted. The inner box carries
+ * `<testID>-content` so a suite can reach it.
+ */
+export function scrollViewHost() {
+  const HostScrollDiv = host('div');
+  return function ScrollViewHost({
+    children,
+    contentContainerStyle,
+    ...rest
+  }: Record<string, unknown> & {
+    children?: React.ReactNode;
+    contentContainerStyle?: unknown;
+    testID?: string;
+  }) {
+    const testID = rest.testID as string | undefined;
+    return React.createElement(
+      HostScrollDiv,
+      rest,
+      React.createElement(
+        HostScrollDiv,
+        // Spread, not `testID: undefined`: the app tsconfig runs
+        // exactOptionalPropertyTypes, under which an explicit undefined is not
+        // the same as an absent prop.
+        { style: contentContainerStyle, ...(testID ? { testID: `${testID}-content` } : {}) },
+        children,
+      ),
+    );
+  };
+}
+
 export function reactNativeTextMock() {
   const layoutHandlers = new Map<string, LayoutHandler>();
   const HostText = host('span');
@@ -270,7 +315,7 @@ export function reactNativeTextMock() {
     AppState,
     FlatList,
     Modal,
-    ScrollView: host('div'),
+    ScrollView: scrollViewHost(),
     SectionList,
     StyleSheet,
     useWindowDimensions,

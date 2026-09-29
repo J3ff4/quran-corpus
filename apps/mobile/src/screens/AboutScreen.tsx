@@ -9,6 +9,7 @@ import type { UiLocaleCode } from '@/i18n/languages';
 import { t, type UiStringKey } from '@/i18n/uiStrings';
 import { radii, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
+import { centredContent } from '@/theme/contentWidth';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
 import { useAppSettings } from '@/settings/settingsStore';
 
@@ -95,8 +96,13 @@ export function AboutScreen() {
 
   return (
     <ScrollView
+      testID="about-scroll"
       style={{ flex: 1 }}
-      contentContainerStyle={{ paddingBottom, paddingHorizontal: 16, paddingTop: 12, gap: 4 }}
+      // Prose, and prose does not grow past its measure. Task 2 took the
+      // navigator's cap off every screen; these four wanted it. On the
+      // contentContainer, not on `style`: capping `style` would centre the
+      // scroll view itself, and its scrollbar with it.
+      contentContainerStyle={{ paddingBottom, paddingHorizontal: 16, paddingTop: 12, gap: 4, ...centredContent }}
     >
       <Text
         accessibilityRole="header"

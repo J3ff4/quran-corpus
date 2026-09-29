@@ -11,6 +11,7 @@ import { usePressScale } from '@/motion/usePressScale';
 import { useAppSettings } from '@/settings/settingsStore';
 import { fonts, radii, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
+import { centredContent } from '@/theme/contentWidth';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -35,8 +36,13 @@ export function MenuScreen() {
 
   return (
     <ScrollView
+      testID="menu-scroll"
       style={{ flex: 1 }}
-      contentContainerStyle={{ paddingBottom, paddingHorizontal: 16, paddingTop: 12, gap: 10 }}
+      // Prose, and prose does not grow past its measure. Task 2 took the
+      // navigator's cap off every screen; these four wanted it. On the
+      // contentContainer, not on `style`: capping `style` would centre the
+      // scroll view itself, and its scrollbar with it.
+      contentContainerStyle={{ paddingBottom, paddingHorizontal: 16, paddingTop: 12, gap: 10, ...centredContent }}
     >
       <Text
         accessibilityRole="header"

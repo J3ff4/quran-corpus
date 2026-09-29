@@ -1,6 +1,7 @@
 import React from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MAX_CONTENT_WIDTH } from '@/theme/contentWidth';
 import SettingsTab from '../../app/settings';
 
 const mocks = vi.hoisted(() => ({
@@ -64,6 +65,19 @@ vi.mock('expo-router', () => ({
 vi.mock('react-native', async () => (await import('@/testing/rnHosts.js')).reactNativeTextMock());
 
 describe('SettingsTab', () => {
+
+  it('keeps its copy to a readable measure on a wide window', () => {
+    // Prose does not get wider than its measure. Task 2 removed the
+    // navigator cap that used to do this for every screen; these four are the
+    // screens that actually wanted it. Asserted on the scroll view's content
+    // container, not its `style`: capping `style` would centre the scroll
+    // view and its scrollbar instead of the copy.
+    render(<SettingsTab />);
+
+    const content = screen.getByTestId('settings-scroll-content');
+    expect(content.style.maxWidth).toBe(`${MAX_CONTENT_WIDTH}px`);
+    expect(content.style.alignSelf).toBe('center');
+  });
   beforeEach(() => {
     mocks.setArabicScale.mockClear();
     mocks.setReduceMotion.mockClear();
