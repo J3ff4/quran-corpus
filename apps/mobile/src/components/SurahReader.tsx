@@ -1047,10 +1047,13 @@ export function SurahReader({
   const navigation = useNavigation();
   const windowClass = useWindowClass();
 
-  // The juz index: whole-Quran data, fetched once this reader has ever been
-  // at the expanded class, never at compact or medium where nothing draws it.
-  // Not re-fetched per surah -- ranges for every surah arrive in one query,
-  // and juzMarksForSurah slices it locally.
+  // The juz index: whole-Quran data, fetched once per mount once this reader
+  // is at the expanded class, never at compact or medium where nothing draws
+  // it. One query covers every surah and juzMarksForSurah slices it locally --
+  // but the reader is mounted with key={surahId}, so this state resets and the
+  // query runs again on each surah turn, the same as useSurahIndex's own
+  // per-mount refetch. Tablet-only, off the render path, and not worth a
+  // module cache that would also have to be invalidated in tests.
   const [juzIndex, setJuzIndex] = useState<JuzEntry[] | null>(null);
   useEffect(() => {
     if (windowClass !== 'expanded' || juzIndex !== null) return;
