@@ -111,6 +111,28 @@ export function AyahRail({
           key={surahId}
           ref={listRef}
           nativeID="reader-ayah-rail"
+          // Not optional. Without one of these two props a scrollToIndex at an
+          // offscreen index throws an Invariant Violation that takes the whole
+          // app down -- which is exactly what deep-linking into the middle of
+          // a surah does (device, 2026-09-29, vc73: opening Al-Baqara at 2:147
+          // crashed on mount). `getItemLayout` is the wrong half of the pair
+          // here: a juz heading makes rows non-uniform, so a computed offset
+          // would be a lie. This lands on the row's estimated offset and lets
+          // the list correct itself once the cells have measured.
+          onScrollToIndexFailed={({ index, averageItemLength }) => {
+            listRef.current?.scrollToOffset({
+              offset: index * (averageItemLength || touchTargets.minimum),
+              animated: false,
+            });
+          }}
+          // Not optional. Without one of these two props a scrollToIndex at an
+          // offscreen index throws an Invariant Violation that takes the whole
+          // app down -- which is exactly what deep-linking into the middle of
+          // a surah does (device, 2026-09-29, vc73: opening Al-Baqara at 2:147
+          // crashed on mount). `getItemLayout` is the wrong half of the pair
+          // here: a juz heading makes rows non-uniform, so a computed offset
+          // would be a lie. This lands on the row's estimated offset and lets
+          // the list correct itself once the cells have measured.
           data={ayahNumbers}
           keyExtractor={(ayahNumber) => String(ayahNumber)}
           renderItem={({ item: ayahNumber }) => {

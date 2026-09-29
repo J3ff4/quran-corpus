@@ -1,5 +1,6 @@
 import React from 'react';
 import { cleanup, render, screen } from '@testing-library/react';
+import { listPropsOf, listScrollsOf } from '@/testing/rnHosts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const win = vi.hoisted(() => ({ width: 1400, height: 900 }));
@@ -118,6 +119,28 @@ describe('AyahRail', () => {
     for (const row of screen.getAllByTestId('rail-ayah')) {
       expect(Number.parseFloat(row.style.minHeight)).toBeGreaterThanOrEqual(48);
     }
+  });
+
+  it('survives a jump to an ayah that has never been measured', () => {
+    // A FlatList whose scrollToIndex lands on an offscreen index throws an
+    // Invariant Violation -- "scrollToIndex should be used in conjunction with
+    // getItemLayout or onScrollToIndexFailed" -- and on the device that is not
+    // a warning, it takes the whole app down. Deep-linking into the middle of
+    // a surah does exactly that: opening Al-Baqara at 2:147 crashed vc73 on
+    // mount. getItemLayout is the wrong half of the pair here, because a juz
+    // heading makes the rows non-uniform.
+    const result = render(<AyahRail {...props} ayahCount={286} activeAyahNumber={147} />);
+
+    const onFailed = listPropsOf(result)['onScrollToIndexFailed'] as
+      | ((info: { index: number; averageItemLength: number }) => void)
+      | undefined;
+    expect(typeof onFailed).toBe('function');
+
+    // And it must actually move the list, not just exist to silence the
+    // invariant: a no-op handler leaves the rail parked at ayah 1 while the
+    // reader is 146 ayahs further down.
+    onFailed!({ index: 146, averageItemLength: 48 });
+    expect(listScrollsOf(result).at(-1)).toMatchObject({ offset: 146 * 48 });
   });
 
   it('draws only the toggle when collapsed', () => {
