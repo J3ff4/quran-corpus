@@ -1710,3 +1710,25 @@ Both are cosmetic and are the owner's call.
 and the phone half of 520 — 519 in particular, since "the phone is unchanged"
 is this phase's own stated exit criterion and no phone has run this build.
 
+
+### Review round, vc76+ (`11b39a6`)
+
+`/code-review` on the branch returned 8 findings; 6 were fixed, 2 declined.
+The one that matters for this log is the row-height model: it was fed the
+viewport's width while the content it models wraps at `MAX_CONTENT_WIDTH`,
+so on the tablet every row was estimated at roughly half its true height and
+the error compounded down all 286 offsets. That is scroll geometry, and
+**checks 511 and 516 were run against the wrong geometry** — both need a
+re-run on a build newer than vc76, along with a fresh look at the rail
+landing behind the retry cap.
+
+The three cosmetic/a11y fixes (rail marker seeding, rail rows announcing
+as buttons, the orientation policy re-running on a screen change) are
+untested on hardware: 514 was already owed, and the foldable case behind
+the orientation change has no hardware at all (R12).
+
+Declined, with reasons: the dictionary grid's `horizontalPadding: 32` over a
+list with no horizontal padding (real, cosmetic, and check 504 has already
+passed against the current arithmetic — changing it moves column counts no
+hardware has seen), and the 9dp/10dp vertical gap between wrapped search
+cards (same).
