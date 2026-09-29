@@ -1648,4 +1648,65 @@ git push -u origin feat/s4a-responsive-tablet
 
 ## Verification log
 
-*(empty — Task 11 fills this)*
+### Device run 1 — 2026-09-29, Tab S10+ (SM-X820), vc73 → vc76
+
+Build: local Gradle, arm64-v8a, `taskset -c 7,8`. Note for the next run: the
+plan's `~/jdk-17` path is stale — the JDK lives at `~/tools/jdk-17.0.20.1+1`.
+
+Tablet geometry: 1752x2800 at density 320, i.e. **1400dp landscape and 876dp
+portrait**. Both are the `expanded` class, so rotation alone never exercises
+the compact branch on this device; check 517 reaches it with a `wm size`
+override instead.
+
+Three defects found, all of them in the ayah rail, none of them visible to
+jsdom, each fixed and re-verified on a fresh build:
+
+| # | Defect | Fix | Verified on |
+|---|---|---|---|
+| D1 | **Crash.** Opening a surah part-way in (Al-Baqara at 2:147) killed the app: `Invariant Violation: scrollToIndex should be used in conjunction with getItemLayout or onScrollToIndexFailed`. The rail scrolls its active row into view on mount, and that index has never been measured. | `onScrollToIndexFailed` on the rail's list. `getItemLayout` is the wrong half of the pair — a juz heading makes the rows non-uniform. `b5b3015` | vc74 |
+| D2 | Rail landed ~80 ayahs short: it sat at ayah 67 with the reader at 154, because `averageItemLength` is averaged over the few cells measured so far. | Jump to the estimate (which mounts the cells around it), then ask again a frame later. `b5b3015`→`(retry)` | vc75 |
+| D3 | **Rail did not scroll at all** — every swipe landed on a row as a press. Its container stretches to the reader row, but the FlatList had no flex of its own, so it sized to its 286 rows and was clipped by `overflow: hidden`. | `flex: 1` on the list. | vc76 |
+
+D1 was called in Task 8's own report as "only a device can settle"; it turned
+out to be a crash, not a rough landing. D3 is the kind of defect no unit test
+in this repo could have caught — the shim renders a list eagerly and in full,
+so "the list is clipped and unscrollable" and "the list is fine" look
+identical in jsdom.
+
+| # | Check | Device | Result |
+|---|---|---|---|
+| 500 | Home, Surahs, Dictionary, Bookmarks, Menu fill the display in landscape | Tab S10+ | **PASS** — no dead bands; Menu/prose capped at 640dp and centred, which is the point of Task 10 |
+| 501 | Same five in portrait | Tab S10+ | **PASS** |
+| 502 | Browse 3 columns landscape, 2 portrait, no clipped row | Tab S10+ | **PASS** — 3 at 1400dp, 2 at 876dp |
+| 503 | Rotate on Browse — no redbox, columns recount, no stale ellipsis | Tab S10+ | **PASS** — recounted 3→2 live, trap 7 not observed |
+| 504 | Dictionary grid, alphabet picker full width | Tab S10+ | **PASS** (portrait, 2 columns) |
+| 505 | Re-measure min card widths against real content | Tab S10+ | **PASS, no correction needed** — nothing clipped or ellipsised at any width tried; `minCardWidths.ts` unchanged |
+| 506 | Bookmarks grid, cards aligned, shadow not clipped | Tab S10+ | **NOT RUN** — the device has zero bookmarks and creating them writes the owner's own user DB |
+| 507 | Swipe-to-delete in the middle column; neighbour does not move | Tab S10+ | **NOT RUN** — same reason |
+| 508 | Search results 2 columns, Uthmani snippet not clipped | Tab S10+ | **PASS** — 2 columns, snippets truncate by `numberOfLines`, not by clipping |
+| 509 | Word sheet is a centred dialog, no grab handle, backdrop tap dismisses | Tab S10+ | **PASS** — all three |
+| 510 | Surah-jump, reciter, language, note and confirm sheets as dialogs | Tab S10+ | **PARTIAL** — only the word sheet was opened; the other five share the same `isDialog` branch but were not individually seen |
+| 511 | Reader: capped column, rail on the side, marker tracks scroll, rail tap jumps | Tab S10+ | **PASS** (after D1/D2/D3) — tapping rail 190 put the reader on 190 |
+| 512 | Rail juz headings on the right ayahs | Tab S10+ | **PARTIAL** — `JUZ 1` sits correctly above ayah 1; `JUZ 2` at 142 not seen directly. This is the check that surfaced D1 |
+| 513 | Collapse the rail, kill the app, reopen — still collapsed | Tab S10+ | **PASS** — survived `am force-stop`, and the reading position came back with it |
+| 514 | Rail toggle announces expanded/collapsed under TalkBack | Tab S10+ | **NOT RUN** — needs TalkBack driven by hand |
+| 515 | Tab pill still a centred pill, opaque over content | Tab S10+ | **PASS** — opaque over scrolled rows at every width |
+| 516 | Rotate on the reader mid-surah — position holds, no ellipsis on the surah name | Tab S10+ | **PASS** |
+| 517 | ~500dp window: single column everywhere, sheets are sheets | Tab S10+ | **PASS (layout)** — via `wm size 1000x1600`; compact layout throughout. Sheet-vs-dialog not separately re-checked at that width |
+| 518 | Freeform window dragged across 600 and 840 — layout recounts live | Tab S10+ | **NOT RUN** — needs a hand-dragged freeform window |
+| 519 | Phone regression: identical to vc72, no rail, no columns | OnePlus / S24 | **NOT RUN** — no phone attached to this session |
+| 520 | Phone stays portrait, tablet rotates freely | both | **HALF** — tablet rotates freely (confirmed repeatedly); the phone half needs a phone |
+| 521 | Large font scale — columns drop rather than rows wrapping | Tab S10+ | **PASS** — at `font_scale 1.5` browse went 3 columns → 2, no wrapped or clipped rows |
+
+Device state was restored afterwards: `wm size reset`, `font_scale 1.0`,
+rotation back to landscape.
+
+**Observations, not defects:** the rail hugs the screen's left edge with no
+outer padding while the ayah column is centred, which reads as detached; and
+the active-row highlight was not always visible after a rail-initiated jump.
+Both are cosmetic and are the owner's call.
+
+**Still owed before this phase is complete:** checks 506, 507, 514, 518, 519,
+and the phone half of 520 — 519 in particular, since "the phone is unchanged"
+is this phase's own stated exit criterion and no phone has run this build.
+
