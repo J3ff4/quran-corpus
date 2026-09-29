@@ -42,7 +42,9 @@ const mocks = vi.hoisted(() => ({
   /** The sheet's own Keyboard subscriptions, by event name. jsdom has no
    *  keyboard, so calling one of these IS the keyboard opening. */
   keyboardListeners: new Map<string, (event: unknown) => void>(),
-  /** Every useAnimatedStyle worklet, in declaration order: backdrop, sheet. */
+  /** Every useAnimatedStyle worklet, in declaration order: backdrop, sheet,
+   *  dialog lift. Indexed BY POSITION below, so a new one declared earlier
+   *  silently re-points every assertion. */
   styleFactories: [] as Array<() => Record<string, unknown>>,
   gestures: new Map<string, (event: never) => void>(),
   // Which animation primitive each move went through. The frames are not
