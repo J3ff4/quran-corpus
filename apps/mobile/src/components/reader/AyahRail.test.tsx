@@ -165,6 +165,16 @@ describe('AyahRail', () => {
     }
   });
 
+  it('bounds its list so the rail can actually scroll', () => {
+    // A FlatList with no flex of its own sizes to its content, and 286 rows
+    // of content in a container with overflow:hidden is a clipped, unscrollable
+    // column: on the device every swipe landed on a row as a press instead of
+    // scrolling (vc75). flex: 1 is what gives it the container's height.
+    const result = render(<AyahRail {...props} ayahCount={286} />);
+
+    expect(listPropsOf(result)['style']).toMatchObject({ flex: 1 });
+  });
+
   it('draws only the toggle when collapsed', () => {
     render(<AyahRail {...props} collapsed />);
     expect(screen.queryAllByTestId('rail-ayah')).toHaveLength(0);

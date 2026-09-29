@@ -121,6 +121,12 @@ export function AyahRail({
           // several components away.
           key={surahId}
           ref={listRef}
+          // Bounded, or it does not scroll. The rail's container is stretched
+          // to the reader row's height, but a FlatList with no flex of its own
+          // sizes to its CONTENT -- 286 rows -- so it overflowed, got clipped
+          // by the container's overflow:hidden, and every swipe landed on a
+          // row as a press instead of scrolling (device, 2026-09-29, vc75).
+          style={{ flex: 1 }}
           nativeID="reader-ayah-rail"
           // Not optional. Without one of these two props a scrollToIndex at an
           // offscreen index throws an Invariant Violation that takes the whole
