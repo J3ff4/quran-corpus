@@ -36,6 +36,11 @@ export function juzMarksForSurah(index: readonly JuzEntry[], surahId: number): J
 const RAIL_WIDTH = 56;
 // One frame's grace for the cells jumped to above to report their heights.
 const RETRY_MS = 100;
+// A retry that fails re-enters the same handler, so without a cap a target the
+// list cannot reach yanks the offset every RETRY_MS forever and fights the
+// finger. Two is what the two-step landing below needs; a third has never
+// bought anything the second did not.
+const MAX_SCROLL_RETRIES = 2;
 
 export interface AyahRailProps {
   surahId: number;
@@ -45,6 +50,12 @@ export interface AyahRailProps {
   collapsed: boolean;
   onToggleCollapsed: () => void;
   onSelectAyah: (ayahNumber: number) => void;
+  /** Forwarded to the root View. The reader hides the rail behind an open
+   *  sheet and on its outgoing layer the same way it hides the ayah list --
+   *  `accessibilityViewIsModal` is iOS-only, so on Android this is the only
+   *  thing keeping a TalkBack swipe from walking off a modal sheet onto 286
+   *  ayah buttons. */
+  importantForAccessibility?: 'auto' | 'no-hide-descendants';
 }
 
 /**
@@ -66,6 +77,7 @@ export function AyahRail({
   collapsed,
   onToggleCollapsed,
   onSelectAyah,
+  importantForAccessibility = 'auto',
 }: AyahRailProps) {
   const theme = useThemeColors();
   const listRef = useRef<FlatList<number>>(null);
@@ -83,11 +95,15 @@ export function AyahRail({
   // onViewableItemsChanged, the one handler this rail's position comes from.
   useEffect(() => {
     if (collapsed || activeAyahNumber === null) return;
+    // A fresh target gets a fresh budget: the cap below exists to stop one
+    // unreachable index looping, not to stop the rail following the reader.
+    attempts.current = 0;
     listRef.current?.scrollToIndex({ index: activeAyahNumber - 1, animated: true });
   }, [activeAyahNumber, collapsed]);
 
   // Cleared on unmount so a retry cannot fire into a dead ref.
   const retry = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const attempts = useRef(0);
   useEffect(
     () => () => {
       if (retry.current !== null) clearTimeout(retry.current);
@@ -96,7 +112,11 @@ export function AyahRail({
   );
 
   return (
-    <View style={{ width: collapsed ? touchTargets.minimum : RAIL_WIDTH, overflow: 'hidden' }}>
+    <View
+      testID="ayah-rail"
+      importantForAccessibility={importantForAccessibility}
+      style={{ width: collapsed ? touchTargets.minimum : RAIL_WIDTH, overflow: 'hidden' }}
+    >
       <Pressable
         testID="rail-toggle"
         accessibilityRole="button"
@@ -147,20 +167,14 @@ export function AyahRail({
               offset: index * (averageItemLength || touchTargets.minimum),
               animated: false,
             });
+            if (attempts.current >= MAX_SCROLL_RETRIES) return;
+            attempts.current += 1;
             if (retry.current !== null) clearTimeout(retry.current);
             retry.current = setTimeout(() => {
               retry.current = null;
               listRef.current?.scrollToIndex({ index, animated: false });
             }, RETRY_MS);
           }}
-          // Not optional. Without one of these two props a scrollToIndex at an
-          // offscreen index throws an Invariant Violation that takes the whole
-          // app down -- which is exactly what deep-linking into the middle of
-          // a surah does (device, 2026-09-29, vc73: opening Al-Baqara at 2:147
-          // crashed on mount). `getItemLayout` is the wrong half of the pair
-          // here: a juz heading makes rows non-uniform, so a computed offset
-          // would be a lie. This lands on the row's estimated offset and lets
-          // the list correct itself once the cells have measured.
           data={ayahNumbers}
           keyExtractor={(ayahNumber) => String(ayahNumber)}
           renderItem={({ item: ayahNumber }) => {
@@ -170,6 +184,7 @@ export function AyahRail({
               <>
                 {juz === undefined ? null : (
                   <View
+                    accessibilityRole="header"
                     testID="rail-juz"
                     {...({ 'data-before-ayah': String(ayahNumber) } as Record<string, string>)}
                   >
@@ -180,6 +195,13 @@ export function AyahRail({
                 )}
                 <Pressable
                   testID="rail-ayah"
+                  accessibilityRole="button"
+                  // A bare numeral announces as "147" with no role and no
+                  // context. §8 asks for WCAG AA, and the toggle above got the
+                  // full disclosure treatment while the 286 targets below it
+                  // got none.
+                  accessibilityLabel={`Ayah ${ayahNumber}`}
+                  accessibilityState={{ selected: active }}
                   onPress={() => onSelectAyah(ayahNumber)}
                   style={{
                     minHeight: touchTargets.minimum,

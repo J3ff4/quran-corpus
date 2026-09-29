@@ -235,6 +235,16 @@ export function BookmarksScreen() {
     }));
   }, [bookmarks, surahNames]);
 
+  // Chunked into rows of `columns` here rather than inline in the JSX below:
+  // built inline it hands SectionList new section objects and new row arrays on
+  // every render, which defeats the memoised row callback above -- every
+  // visible card re-renders on any state change, including while a swipe is
+  // open (swipe-begins-as-a-press-on-content).
+  const griddedSections = useMemo(
+    () => sections.map((section) => ({ ...section, data: chunk(section.data, columns) })),
+    [sections, columns],
+  );
+
   const surahCount = useMemo(
     () => new Set(bookmarks.map((bookmark) => bookmark.surahId)).size,
     [bookmarks],
@@ -397,7 +407,7 @@ export function BookmarksScreen() {
           testID="bookmarks-list"
           // SectionList has no numColumns -- chunked into rows of `columns`
           // here, same as BrowseList's own section arm.
-          sections={sections.map((section) => ({ ...section, data: chunk(section.data, columns) }))}
+          sections={griddedSections}
           // The tab is in the key so switching cannot hand a recycled row the
           // wrong item. Keyed off the row's first bookmark now that a row can
           // hold more than one.

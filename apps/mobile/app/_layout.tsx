@@ -93,13 +93,27 @@ export default function RootLayout() {
   // and a moment of "free" between mount and this effect (there isn't one --
   // effects with no deps fire in the same commit) would cost nothing a user
   // could act on in that window anyway.
+  //
+  // Re-run on every 'screen' change, not once at mount: on a foldable the
+  // device's own smallest width is one number folded and another unfolded,
+  // and the lock is per-activity, so a launch-time decision would pin the
+  // large inner display to portrait for the rest of the session. On a phone
+  // and on a tablet nothing after the first call changes anything -- a phone
+  // is locked so it emits no rotation, and a tablet's branch only unlocks an
+  // already-unlocked window.
   useEffect(() => {
-    const { width, height } = Dimensions.get('screen');
-    void applyOrientationPolicy({
-      smallestWidth: Math.min(width, height),
-      lock: ScreenOrientation.lockAsync,
-      portraitUp: ScreenOrientation.OrientationLock.PORTRAIT_UP,
-    });
+    const apply = () => {
+      const { width, height } = Dimensions.get('screen');
+      void applyOrientationPolicy({
+        smallestWidth: Math.min(width, height),
+        lock: ScreenOrientation.lockAsync,
+        unlock: ScreenOrientation.unlockAsync,
+        portraitUp: ScreenOrientation.OrientationLock.PORTRAIT_UP,
+      });
+    };
+    apply();
+    const subscription = Dimensions.addEventListener('change', apply);
+    return () => subscription.remove();
   }, []);
 
   if (fontError || corpusError) {

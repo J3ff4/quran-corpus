@@ -270,17 +270,26 @@ export function BrowseList({ items, sections }: BrowseListProps) {
     horizontalPadding: 32,
   });
 
-  if (sections) {
-    // Emptied here, not at the call site: a screen that filtered its own rows
-    // would have to remember to keep the header, and a section that loses its
-    // header can never be reopened. Chunked into rows of `columns` after --
-    // SectionList has no numColumns, so this is the section arm's whole
-    // answer to the grid.
-    const rendered = sections.map((section) => ({
-      ...section,
-      data: section.expanded === false ? [] : chunk(section.data, columns),
-    }));
+  // Emptied here, not at the call site: a screen that filtered its own rows
+  // would have to remember to keep the header, and a section that loses its
+  // header can never be reopened. Chunked into rows of `columns` after --
+  // SectionList has no numColumns, so this is the section arm's whole answer
+  // to the grid.
+  //
+  // Memoised because the row callback below is, and for the same reason: built
+  // inline it hands SectionList new section objects and new row arrays on every
+  // render, so nothing downstream can ever compare equal and every visible row
+  // re-renders on any state change.
+  const rendered = useMemo(
+    () =>
+      (sections ?? []).map((section) => ({
+        ...section,
+        data: section.expanded === false ? [] : chunk(section.data, columns),
+      })),
+    [sections, columns],
+  );
 
+  if (sections) {
     return (
       <SectionList
         testID="browse-list"

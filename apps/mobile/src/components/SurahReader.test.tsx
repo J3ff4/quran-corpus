@@ -2,6 +2,7 @@ import React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { deferred } from '@/testing/deferred';
+import { MAX_CONTENT_WIDTH } from '@/theme/contentWidth';
 import { SurahReader } from './SurahReader';
 import { estimateRowHeight } from './rowHeightModel';
 
@@ -21,6 +22,7 @@ const mocks = vi.hoisted(() => ({
     | ((data: unknown, index: number) => { length: number; offset: number; index: number })
     | null,
   headerLayout: null as ((height: number) => void) | null,
+  listLayout: null as ((width: number) => void) | null,
   /** The landing target's own onLayout. The list mock renders no real
    *  geometry, so this is how a test says where the row actually came out. */
   targetRowLayout: null as ((y: number) => void) | null,
@@ -307,7 +309,7 @@ vi.mock('react-native', async () => {
     // Forwards the ref, so the imperative scroll calls the component makes on
     // mount are observable. A plain function component silently swallows it
     // and every scroll assertion would pass against a null ref.
-    FlatList: ({ data, ListHeaderComponent, renderItem, CellRendererComponent, onViewableItemsChanged, onScrollToIndexFailed, onScroll, onContentSizeChange, getItemLayout, contentContainerStyle, importantForAccessibility, initialNumToRender, style, ref }: {
+    FlatList: ({ data, ListHeaderComponent, renderItem, CellRendererComponent, onViewableItemsChanged, onScrollToIndexFailed, onScroll, onContentSizeChange, onLayout, getItemLayout, contentContainerStyle, importantForAccessibility, initialNumToRender, style, ref }: {
       data: unknown[];
       ListHeaderComponent?: React.ReactNode;
       renderItem: (info: { item: unknown; index: number }) => React.ReactNode;
@@ -316,6 +318,7 @@ vi.mock('react-native', async () => {
       onScrollToIndexFailed?: (info: { index: number; averageItemLength: number }) => void;
       onScroll?: (event: { nativeEvent: { contentOffset: { y: number } } }) => void;
       onContentSizeChange?: (width: number, height: number) => void;
+      onLayout?: (event: { nativeEvent: { layout: { width: number } } }) => void;
       getItemLayout?: (data: unknown, index: number) => { length: number; offset: number; index: number };
       contentContainerStyle?: { paddingBottom?: number };
       importantForAccessibility?: string;
@@ -328,6 +331,9 @@ vi.mock('react-native', async () => {
       mocks.onScroll = onScroll ?? null;
       mocks.onContentSizeChange = onContentSizeChange ?? null;
       mocks.getItemLayout = getItemLayout ?? null;
+      mocks.listLayout = onLayout
+        ? (width: number) => onLayout({ nativeEvent: { layout: { width } } })
+        : null;
       React.useImperativeHandle(ref, () => ({
         scrollToIndex: mocks.scrollToIndex,
         scrollToOffset: mocks.scrollToOffset,
@@ -430,6 +436,7 @@ describe('SurahReader', () => {
     mocks.setOptions.mockClear();
     mocks.onScroll = null;
     mocks.headerLayout = null;
+    mocks.listLayout = null;
     mocks.targetRowLayout = null;
     mocks.autoLayoutY = null;
     mocks.animatedStyles = [];
@@ -529,6 +536,43 @@ describe('SurahReader', () => {
     // Offsets are cumulative: an index's offset is every earlier row summed.
     // FlatList sums nothing itself -- this table is the whole scroll geometry.
     expect(second.offset).toBe(first.length);
+  });
+
+  it('estimates rows against the capped measure, not the viewport', () => {
+    // The row model is width-dependent and onLayout measures the VIEWPORT,
+    // but since S4a the content inside it stops at MAX_CONTENT_WIDTH. Text
+    // wraps at the narrower of the two, so a tablet-wide viewport must
+    // estimate exactly what a 640dp one does -- anything else is half-height
+    // rows compounding down the whole offset table.
+    const props = baseProps(readerData(10));
+    render(<SurahReader {...props} />);
+
+    act(() => {
+      mocks.listLayout!(MAX_CONTENT_WIDTH);
+    });
+    const capped = mocks.getItemLayout!(props.data.ayahs, 5).offset;
+    act(() => {
+      mocks.listLayout!(1344);
+    });
+    expect(mocks.getItemLayout!(props.data.ayahs, 5).offset).toBe(capped);
+    expect(capped).toBeGreaterThan(0);
+  });
+
+  it('still narrows the estimate on a window narrower than the cap', () => {
+    // The clamp is a cap, not a constant: a phone is 360dp and its rows wrap
+    // sooner, so they are taller. Without this the clamp could be a hardcoded
+    // 640 and the test above would not notice.
+    const props = baseProps(readerData(10));
+    render(<SurahReader {...props} />);
+
+    act(() => {
+      mocks.listLayout!(MAX_CONTENT_WIDTH);
+    });
+    const capped = mocks.getItemLayout!(props.data.ayahs, 5).offset;
+    act(() => {
+      mocks.listLayout!(360);
+    });
+    expect(mocks.getItemLayout!(props.data.ayahs, 5).offset).toBeGreaterThan(capped);
   });
 
   it('counts the list header in every offset it hands FlatList', () => {
@@ -1920,6 +1964,46 @@ describe('SurahReader', () => {
       const column = screen.getByTestId('reader-ayah-column');
       expect(column.style.flexGrow).toBe('1');
       expect(Number.parseFloat(column.style.flexBasis)).toBe(0);
+    });
+
+    it('takes the rail out of the accessibility tree behind an open sheet', () => {
+      // The gate used to sit on the FlatList alone, and the rail is its
+      // SIBLING, not its descendant. accessibilityViewIsModal is iOS-only, so
+      // on Android a TalkBack swipe walked off the modal sheet straight onto
+      // every ayah button in the rail.
+      win.width = 1000;
+      win.height = 1200;
+      render(<SurahReader {...baseProps(readerData())} />);
+      const rail = () => screen.getByTestId('ayah-rail');
+
+      expect(rail().getAttribute('data-hidden-from-a11y')).toBeNull();
+
+      renderReaderHeader();
+      openHeaderActions();
+      fireEvent.click(screen.getByTestId('open-language'));
+
+      expect(rail().getAttribute('data-hidden-from-a11y')).toBe('true');
+    });
+
+    it('seeds the rail marker when the window becomes expanded', async () => {
+      // Viewability fires on a viewable-SET change, never on a resize, so a
+      // reader scrolled to 2:3 on a folded Fold and then unfolded left the
+      // rail with no marker at all until the next hand scroll.
+      win.width = 400;
+      win.height = 800;
+      const data = readerData(5);
+      const { rerender } = render(<SurahReader {...baseProps(data)} />);
+      await act(async () => {});
+      act(() => {
+        mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[2] }] });
+      });
+
+      win.width = 1000;
+      win.height = 1200;
+      rerender(<SurahReader {...baseProps(data)} />);
+
+      const active = screen.getAllByTestId('rail-ayah').filter((n) => n.dataset.active === 'true');
+      expect(active.map((n) => n.dataset.ayah)).toEqual(['3']);
     });
 
     it('asks the reader to jump when a rail ayah is tapped', () => {

@@ -165,6 +165,80 @@ describe('AyahRail', () => {
     }
   });
 
+  it('gives up rather than yanking the offset forever', () => {
+    // A retry that fails re-enters this same handler, so without a cap an
+    // unreachable target jumps the offset every 100ms for as long as the rail
+    // is mounted -- fighting any manual scroll, on the exact long surah the
+    // two-step landing exists for.
+    vi.useFakeTimers();
+    try {
+      const result = render(<AyahRail {...props} ayahCount={286} activeAyahNumber={147} />);
+      const onFailed = listPropsOf(result)['onScrollToIndexFailed'] as (info: {
+        index: number;
+        averageItemLength: number;
+      }) => void;
+
+      // The follow effect has already asked once on mount; only what the
+      // handler adds is under test.
+      const before = listScrollsOf(result).filter((call) => 'index' in call).length;
+      for (let round = 0; round < 6; round += 1) {
+        onFailed({ index: 146, averageItemLength: 48 });
+        vi.advanceTimersByTime(200);
+      }
+
+      // Two retries. Every later round may still jump to the estimated
+      // offset, but it must schedule nothing more.
+      const retried = listScrollsOf(result).filter((call) => 'index' in call);
+      expect(retried).toHaveLength(before + 2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('gives a fresh target a fresh retry budget', () => {
+    // The cap stops one unreachable index looping; it must not stop the rail
+    // following the reader down the surah.
+    vi.useFakeTimers();
+    try {
+      const result = render(<AyahRail {...props} ayahCount={286} activeAyahNumber={147} />);
+      const onFailed = listPropsOf(result)['onScrollToIndexFailed'] as (info: {
+        index: number;
+        averageItemLength: number;
+      }) => void;
+
+      for (let round = 0; round < 4; round += 1) {
+        onFailed({ index: 146, averageItemLength: 48 });
+        vi.advanceTimersByTime(200);
+      }
+      result.rerender(<AyahRail {...props} ayahCount={286} activeAyahNumber={200} />);
+      onFailed({ index: 199, averageItemLength: 48 });
+      vi.advanceTimersByTime(200);
+
+      expect(listScrollsOf(result).at(-1)).toMatchObject({ index: 199 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('announces its rows as buttons that name their ayah', () => {
+    // A bare numeral announces as "147" with no role and no context, while
+    // the toggle above got the full disclosure treatment (§8, WCAG AA).
+    render(<AyahRail {...props} />);
+
+    const row = screen.getAllByTestId('rail-ayah')[1]!;
+    expect(row.getAttribute('role')).toBe('button');
+    expect(row.getAttribute('aria-label')).toBe('Ayah 2');
+  });
+
+  it('hides itself from the accessibility tree when the reader asks', () => {
+    // accessibilityViewIsModal is iOS-only, so on Android this prop is the
+    // only thing keeping a TalkBack swipe from walking off an open sheet onto
+    // every ayah button in the rail.
+    render(<AyahRail {...props} importantForAccessibility="no-hide-descendants" />);
+
+    expect(screen.getByTestId('ayah-rail').getAttribute('data-hidden-from-a11y')).toBe('true');
+  });
+
   it('bounds its list so the rail can actually scroll', () => {
     // A FlatList with no flex of its own sizes to its content, and 286 rows
     // of content in a container with overflow:hidden is a clipped, unscrollable

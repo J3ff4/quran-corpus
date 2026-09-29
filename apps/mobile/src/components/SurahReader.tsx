@@ -48,7 +48,7 @@ import { useArabicSizes } from '@/theme/useArabicSizes';
 import { useScreenReaderEnabled } from '@/a11y/useScreenReaderEnabled';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
-import { centredContent } from '@/theme/contentWidth';
+import { centredContent, MAX_CONTENT_WIDTH } from '@/theme/contentWidth';
 import { useWindowClass, type WindowClass } from '@/theme/windowClass';
 
 /** Everything the docked bar needs that the ayah cards do not.
@@ -460,7 +460,14 @@ function AyahList({
       if (!item) continue;
       const height = estimateRowHeight({
         arabicSize: arabicSizes.reader,
-        listWidth,
+        // The VIEWPORT is what onListLayout measures, and since S4a the
+        // content inside it stops at MAX_CONTENT_WIDTH. Text wraps at the
+        // narrower of the two, so on a 1400dp tablet an unclamped width told
+        // the model rows wrapped at ~1344dp when they wrap at 640 -- roughly
+        // half the true height, compounding down every row of the offset
+        // table. Still 0 before the first layout: Math.min(0, 640) is 0, and
+        // estimateRowHeight guards that itself.
+        listWidth: Math.min(listWidth, MAX_CONTENT_WIDTH),
         arabicChars: item.ayah.text_uthmani?.length ?? 0,
         // Zero when the reader is drawing no translation, which is what
         // rowHeightModel documents the field to mean. Taken straight off the
@@ -790,6 +797,18 @@ function AyahList({
     windowClassRef.current = windowClass;
   }, [onReadingAyah, onVisibleAyah, data.surah.id, windowClass]);
 
+  // Seeded, because the handler below is the only writer and it fires on a
+  // viewable-SET change, never on a resize (viewable-set-change-not-scroll).
+  // Read to 2:154 on a folded Fold or in split-screen, then unfold: the rail
+  // mounts with no marker and its follow effect has nothing to scroll to, so
+  // it sits at ayah 1 until the reader is scrolled by hand. `??`, not an
+  // assignment: a marker the handler has already written is the fresher of
+  // the two.
+  useEffect(() => {
+    if (windowClass !== 'expanded') return;
+    setActiveAyahNumber((current) => current ?? lastVisibleRef.current);
+  }, [windowClass]);
+
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     // Nothing at all from a layer nobody is looking at: its rows scroll past
     // as it lands, and every one of them would be written to the reading
@@ -829,6 +848,7 @@ function AyahList({
           ayahCount={data.surah.ayah_count}
           juzMarks={juzMarks}
           activeAyahNumber={activeAyahNumber}
+          importantForAccessibility={sheetsOpen || !live ? 'no-hide-descendants' : 'auto'}
           collapsed={railCollapsed}
           onToggleCollapsed={onToggleRailCollapsed}
           onSelectAyah={onSelectRailAyah}
