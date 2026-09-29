@@ -11,6 +11,12 @@ const mocks = vi.hoisted(() => ({
   setOptions: vi.fn(),
 }));
 
+// A mutable width behind useWindowDimensions, so the grid tests below can
+// move the window without a second `vi.mock('react-native', ...)` -- only one
+// factory per mocked module is honoured. Same pattern as
+// DictionaryScreen.test.tsx / BrowseList.test.tsx.
+const win = vi.hoisted(() => ({ width: 390 }));
+
 vi.mock('@/settings/settingsStore', () => ({
   useAppSettings: () => ({
     uiLocale: 'en',
@@ -93,6 +99,7 @@ vi.mock('react-native', async () => {
     Text: host('span'),
     TextInput: Input,
     View: host('div'),
+    useWindowDimensions: () => ({ width: win.width, height: 844, scale: 3, fontScale: 1 }),
   };
 });
 
@@ -600,5 +607,65 @@ describe('SearchScreen go-to', () => {
     // Ruling R3: a name goes to the head of its surah.
     expect(mocks.push).toHaveBeenCalledWith('/surah/36?ayah=1');
     expect(screen.queryByTestId('surah-picker')).toBeNull();
+  });
+});
+
+describe('SearchScreen results grid', () => {
+  beforeEach(() => {
+    mocks.searchCorpus.mockReset();
+    mocks.searchCorpus.mockResolvedValue({
+      jump: null,
+      verses: [
+        { surah_id: 2, ayah_number: 255, source: 'ar', snippet: 'ٱللَّهُ' },
+        { surah_id: 3, ayah_number: 1, source: 'ar', snippet: 'الٓمٓ' },
+      ],
+      roots: [],
+    });
+  });
+  afterEach(() => {
+    win.width = 390;
+    cleanup();
+  });
+
+  async function renderScreen() {
+    render(<SearchScreen />);
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'throne' } });
+    await act(async () => {
+      await settle();
+    });
+  }
+
+  it('wraps the ayahs group into columns on a landscape tablet', async () => {
+    // 1400dp, 480dp measured minimum (searchResult -- an Uthmani snippet is
+    // the longest single line anywhere in the app) -> 2 columns.
+    //
+    // itemWidth = (available - gap*(columns-1)) / columns, per useColumns:
+    // available = 1400 - 32 = 1368; itemWidth = (1368 - 10) / 2 = 679.
+    win.width = 1400;
+    await renderScreen();
+
+    const group = screen.getByTestId('search-group-ayahs');
+    expect(group.style.flexWrap).toBe('wrap');
+    expect(screen.getAllByTestId('search-verse')[0]!.style.width).toBe('679px');
+  });
+
+  it('does not wrap on a phone', async () => {
+    // Compact unchanged: no flexWrap, no pinned card width.
+    await renderScreen();
+
+    const group = screen.getByTestId('search-group-ayahs');
+    expect(group.style.flexWrap).toBe('');
+    expect(screen.getAllByTestId('search-verse')[0]!.style.width).toBe('');
+  });
+
+  it('keeps the group heading out of the wrap', async () => {
+    // A heading pulled into the flow becomes a column and stops heading
+    // anything.
+    win.width = 1400;
+    await renderScreen();
+
+    expect(
+      screen.getByTestId('search-heading-ayahs').closest('[data-testid="search-group-ayahs"]'),
+    ).toBeNull();
   });
 });
