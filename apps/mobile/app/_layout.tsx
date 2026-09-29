@@ -1,8 +1,9 @@
 import { NavigationBar } from 'expo-navigation-bar';
 import { Stack } from 'expo-router';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, Dimensions, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { configureAudioSession } from '@/audio/ayahAudio';
@@ -10,6 +11,7 @@ import { RecitationProvider } from '@/audio/recitationContext';
 import { Bloom } from '@/components/Bloom';
 import { ThemedStatusBar } from '@/components/ThemedStatusBar';
 import { openCorpusDb, useCorpusFonts } from '@/data/openCorpusDb';
+import { applyOrientationPolicy } from '@/layout/orientation';
 import { AppSettingsProvider } from '@/settings/settingsStore';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 import { useThemeColors } from '@/theme/themeContext';
@@ -83,6 +85,22 @@ export default function RootLayout() {
   useEffect(() => {
     if (settled) void SplashScreen.hideAsync();
   }, [settled]);
+
+  // Independent of the extract/splash gate above -- it never reads or sets
+  // fontsLoaded/corpusReady/settled, so it cannot race either. The manifest's
+  // own `orientation: "default"` already governs the activity's orientation
+  // at cold start, before any JS runs; this only re-applies the phone lock,
+  // and a moment of "free" between mount and this effect (there isn't one --
+  // effects with no deps fire in the same commit) would cost nothing a user
+  // could act on in that window anyway.
+  useEffect(() => {
+    const { width, height } = Dimensions.get('screen');
+    void applyOrientationPolicy({
+      smallestWidth: Math.min(width, height),
+      lock: ScreenOrientation.lockAsync,
+      portraitUp: ScreenOrientation.OrientationLock.PORTRAIT_UP,
+    });
+  }, []);
 
   if (fontError || corpusError) {
     // Hidden here rather than left to the effect above: React aborts the render
