@@ -452,6 +452,47 @@ describe('BottomSheet', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('centres a dialog in the space above the keyboard', () => {
+    // The note sheet is a dialog at expanded, and a dialog that ignores the
+    // keyboard puts its text area behind it -- the exact bug the owner hit on
+    // the sheet path (2026-09-10, "text area is still behind the keyboard").
+    // The container is padded rather than the card translated: translating a
+    // tall card by a full keyboard's height pushes its top edge off-screen,
+    // shrinking the box it centres in cannot.
+    win.width = 1400;
+    render(<BottomSheet onClose={() => {}} closeLabel="Close"><span>body</span></BottomSheet>);
+
+    mocks.keyboardListeners.get('keyboardDidShow')?.({ endCoordinates: { height: 300 } });
+
+    // 300 of keyboard + the 24dp bottom inset, same sum the sheet path lifts by.
+    expect(mocks.styleFactories[2]!().paddingBottom).toBe(324);
+  });
+
+  it('leaves the sheet path unpadded when the keyboard opens', () => {
+    // The other half of the branch. Below expanded the surface is
+    // `position: absolute, bottom: 0` and lifts itself by translateY -- an
+    // ungated container padding would move the backdrop's flex box under a
+    // sheet that is already clearing the keyboard on its own.
+    win.width = 400;
+    render(<BottomSheet onClose={() => {}} closeLabel="Close"><span>body</span></BottomSheet>);
+
+    mocks.keyboardListeners.get('keyboardDidShow')?.({ endCoordinates: { height: 300 } });
+
+    expect(mocks.styleFactories[2]!().paddingBottom).toBe(0);
+  });
+
+  it('lets a dialog ask for more room under its last row', () => {
+    // The word sheet passes bottomPadding={24}. A dialog hardcoded to 20 is
+    // the one surface in the app where that prop silently does nothing.
+    win.width = 1400;
+    const { rerender } = render(<BottomSheet onClose={() => {}} closeLabel="Close"><span>body</span></BottomSheet>);
+    // No bottom inset on a dialog -- it is not docked against a system bar.
+    expect(screen.getByTestId('sheet-surface').style.paddingBottom).toBe('20px');
+
+    rerender(<BottomSheet onClose={() => {}} closeLabel="Close" bottomPadding={24}><span>body</span></BottomSheet>);
+    expect(screen.getByTestId('sheet-surface').style.paddingBottom).toBe('24px');
+  });
+
   it('still dismisses a dialog on the Android back button', () => {
     win.width = 1400;
     const onClose = vi.fn();

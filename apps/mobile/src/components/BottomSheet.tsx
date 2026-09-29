@@ -219,6 +219,21 @@ export function BottomSheet({ onClose, closeLabel, bottomPadding = 16, children 
     };
   });
 
+  // The dialog clears the keyboard by shrinking the box it is centred in, not
+  // by moving the card. Translating a centred card up by a full keyboard's
+  // height pushes a tall one's top edge off the screen; padding the container
+  // cannot, because the card is still centred in whatever is left.
+  //
+  // Same `keyboardLift` the sheet path uses, for the same reason: this lives
+  // in a <Modal>, where `useAnimatedKeyboard` reads 0 forever (see the comment
+  // on keyboardLift). The owner hit exactly that bug on the sheet path --
+  // 2026-09-10, "text area is still behind the keyboard" -- and the note sheet
+  // is a dialog at expanded, so shipping this branch without a lift recreates
+  // it on a tablet. With the keyboard closed the lift is 0 and this is inert.
+  const dialogLiftStyle = useAnimatedStyle(() => ({
+    paddingBottom: isDialog ? keyboardLift.value : 0,
+  }));
+
   return (
     <Modal
       transparent
@@ -246,13 +261,15 @@ export function BottomSheet({ onClose, closeLabel, bottomPadding = 16, children 
           was fixing is handled by padding the sheet past the inset instead,
           which is the thing that was actually wrong. */}
       <GestureHandlerRootView style={StyleSheet.absoluteFill}>
-        <View
+        <Animated.View
+          testID="sheet-container"
           style={[
             StyleSheet.absoluteFill,
             // Below expanded the surface positions itself (`position:
             // absolute, bottom: 0`) and this is inert. At expanded the
             // surface is a normal flow child, centred by its parent.
             { justifyContent: isDialog ? 'center' : 'flex-end' },
+            dialogLiftStyle,
           ]}
           pointerEvents="box-none"
         >
@@ -287,7 +304,13 @@ export function BottomSheet({ onClose, closeLabel, bottomPadding = 16, children 
                     borderRadius: 28,
                     paddingHorizontal: 20,
                     paddingTop: 20,
-                    paddingBottom: 20,
+                    // Symmetric by default, but `bottomPadding` still wins
+                    // when it asks for more: the word sheet passes 24 to keep
+                    // its last row off the edge, and a dialog that silently
+                    // ignored it would be the only surface in the app where
+                    // that prop does nothing. No `bottomInset` here -- a
+                    // centred card is not docked against a system bar.
+                    paddingBottom: Math.max(bottomPadding, 20),
                     gap: 14,
                     // Android draws only `elevation`, not the shadow* props
                     // -- reuses the same card shadow every other surface in
@@ -356,7 +379,7 @@ export function BottomSheet({ onClose, closeLabel, bottomPadding = 16, children 
         // that is merely disabled.
         return isDialog ? surface : <GestureDetector gesture={pan}>{surface}</GestureDetector>;
       })()}
-        </View>
+        </Animated.View>
       </GestureHandlerRootView>
     </Modal>
   );
