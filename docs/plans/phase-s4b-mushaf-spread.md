@@ -619,7 +619,70 @@ Build and install exactly as S4a Task 11 (prebuild only if a native dep changed 
 
 ## Verification log
 
-*(empty — Task 5 fills this)*
+### Desk work, 2026-10-01
+
+Tasks 1-4 implemented, each mutation-checked, each committed on
+`feat/s4b-mushaf-spread`. Task 5 — the build and the device run — is owed, and
+the phase is not complete until it is run: no device has seen a leaf.
+
+| Task | Commit | What landed |
+|---|---|---|
+| 1 | `d73030c` | `spread.ts` — recto-anchored pairing, bounds from the shared package |
+| 3 | `b319336` | one type size per leaf; `SPREAD-BAND-CHECK.md`; `MushafPage` size override |
+| 2 | `02f4876` | the pager's spread mode, the leaf, the mode remount, the leaf focus guard |
+| 4 | `65205ea` | the ayah-text window widened by a page either side on a spread |
+
+Task 3 ran before Task 2, because the pager needs `mushafLeafFontSize`.
+
+Gates: `tsc --noEmit` clean, `eslint src app` clean, `vitest run` **129 files,
+1581 tests** (1540 before this phase). Portrait's 119 existing mushaf tests pass
+unchanged, which is the phase's own hard constraint, and three new ones assert
+it stays that way.
+
+**Four tests were caught asserting nothing by the mutation step, not by review.**
+Worth recording because each looked right:
+
+1. `?? leafFontSize` in `MushafPage` passed with the fix deleted — not a vacuous
+   test but genuinely redundant code, since `mushafColumnForFontSize` is the
+   exact inverse of `mushafFontSize`. In the one case the two differ, a size too
+   large for the half, the `??` was the worse of the two.
+2. The mode-remount test asserted child counts, which change with or without
+   `key={mode}`. It now goes through `pagerHost`'s per-node command log, where a
+   surviving pager instance carries its pre-flip history.
+3. The shared-leaf-size tests used pages 53/54, which both clamp at the font cap
+   and therefore agree however the code is written. 298 of 302 leaves are like
+   that at the Tab S10+ half-box; the tests now use leaf 27, one of the four
+   where the halves genuinely diverge.
+4. The forward half of Task 4's widening passed both ways because the fixture
+   ran out of pages and both widths fell through to `LAST_SURAH_ID`.
+
+### Checks owed (Task 5)
+
+Nothing in the table below has been run. The APK has not been built.
+
+| # | Check | Result |
+|---|---|---|
+| 600 | Landscape shows two pages, recto on the RIGHT | |
+| 601 | Pairing matches the owner's physical mushaf for 1-2, 3-4, 603-604 | |
+| 602 | Portrait still one page, identical to vc72 | |
+| 603 | Rotate on page 4 → leaf (3,4), page 4 on the left; rotate back → page 4 | |
+| 604 | framestats gaps inside a landscape turn, 3 repeats — no UI-thread stall | |
+| 605 | 10 fast swipes in a burst — no blank leaf, no missed mount | |
+| 606 | Every glyph present on 20 sampled pages incl. the 54 with header/bismillah gaps | |
+| 607 | **New.** Both halves of leaf 27, 177, 399 or 443 at the same type size — the four where they diverge | |
+| 610 | Playback crossing recto→verso does not turn; verso→next recto does | |
+| 611 | Highlight lands on an ayah on the left half | |
+| 612 | Close on a landscape leaf, reopen in portrait — lands on the recto | |
+| 613 | Page-jump sheet lands on the right leaf | |
+| 614 | Phone regression: mushaf unchanged | |
+
+Check 607 is new, from ruling R-X4: the shared leaf size is only observable on
+four leaves out of 302, so a spot check anywhere else in the book cannot see it.
+
+Carried forward from S4a and still owed: 519 (the phone regression, S4a's own
+exit criterion), the phone half of 520, 518, 514's spoken announcement, and the
+rail-tap spinner check. 614 here is the same phone build, so one phone session
+can clear both phases' phone checks.
 
 ---
 
