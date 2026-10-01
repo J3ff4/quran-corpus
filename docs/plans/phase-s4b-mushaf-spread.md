@@ -682,8 +682,21 @@ importing from there broke 15 of them and said where the constant belonged.
 
 ### Checks owed (Task 5)
 
-Nothing in the table below has been run. **APK: versionCode 79, release,
-arm64-v8a**, built on this branch at `576a6ec`.
+Nothing in the table below has been run.
+
+**APK ready.** versionCode 79, release, arm64-v8a, built at `576a6ec`, 194 MB.
+Served as a copy, not a symlink: `~/apks/quran-corpus-vc79.apk`. versionCode
+verified `79` with `/home/claude/android-sdk/build-tools/35.0.0/aapt2 dump
+badging` on the served copy, not on the build output. Debug-signed, so it cannot
+upgrade over an EAS build — uninstall first if one is present.
+
+```bash
+/home/claude/android-sdk/platform-tools/adb -s adb-R52XC0AYMZZ-S3tLzk._adb-tls-connect._tcp \
+  install -r --user 0 ~/apks/quran-corpus-vc79.apk
+```
+
+`--user 0` is mandatory: an unqualified `adb install -r` once landed on user 10
+(Guest) and wiped user-0 app data.
 
 | # | Check | Result |
 |---|---|---|
