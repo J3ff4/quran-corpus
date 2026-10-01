@@ -1798,3 +1798,33 @@ Three bookmarks were created and all three deleted; the device reads
 **Unchanged from the vc77 entry:** 514's spoken announcement, 518, 519 and
 the phone half of 520 are still owed, and 519 is still this phase's own exit
 criterion.
+
+### Review round, 2026-10-01 (`93dc84b`)
+
+`/code-review` on the open PR. Seven findings; four fixed, two declined, one
+turned into an owed device check.
+
+| # | Finding | Outcome |
+|---|---|---|
+| 1 | Section arm wraps cells in a row at one column -> phone cards hug content | FIXED, `GridRow` |
+| 2 | Same defect hand-rolled in the bookmarks surah tab | FIXED by the same component |
+| 3 | Pending `onScrollToIndexFailed` retry not cancelled when the target changes | FIXED |
+| 4 | Dictionary counts the card's own 16dp margins twice | FIXED |
+| 5 | A rail tap routes through the jump seed and paints the positioning spinner | OWED as a device check |
+| 6 | A juz continuing into a surah is marked at ayah 1 | DECLINED, deliberate |
+| 7 | `navigatorCap` regex truncates at the first `}` and can fail open | FIXED |
+
+**Finding 5** is a real observation and not fixable from a desk: the jump sheet
+used to hide `positioned = false` behind its own dismissal, and the rail stays
+on screen, so a rail tap may flash the opaque `reader-positioning` overlay over
+the ayah column. Added to the owed list below rather than guessed at.
+
+**Finding 6** is the documented intent, not a defect: `juzMarksForSurah` reads
+`ranges`, so a juz inherited from the previous surah is marked at ayah 1 on
+purpose -- the rail says which juz you are in, and the behaviour has its own
+test (`marks a juz that opened in the PREVIOUS surah at ayah 1`). The reviewer's
+fair point is the word "boundaries" in the docstring; the code is right.
+
+**Owed, updated:** 514's spoken announcement, 518, 519 (still this phase's exit
+criterion), the phone half of 520, and now a rail-tap spinner check at the
+expanded class.
