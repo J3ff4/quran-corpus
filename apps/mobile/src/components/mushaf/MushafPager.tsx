@@ -245,6 +245,13 @@ export const MushafPager = memo(function MushafPager({
       // knows, and the recto is the stable identity of the paper.
       const page = spread ? spreadAt(index).recto : index + MUSHAF_PAGE_MIN;
       if (page === settled.current) return;
+      // Already on this leaf, by its other half. Android fires onPageSelected
+      // once on mount and the flip above remounts the pager, so rotating off
+      // page 4 arrives here with position 1, whose recto is 3. Reporting it
+      // would rewrite the saved reading position to the facing page -- and
+      // rotating back would land on 3, not the page the reader was reading.
+      // Nothing turned, so there is nothing to report.
+      if (spread && spreadFor(settled.current).index === index) return;
       settled.current = page;
       onPageChange(page);
     },
@@ -262,13 +269,22 @@ export const MushafPager = memo(function MushafPager({
     // being recited on it. Compared here, in the effect body, and not in a
     // cleanup: a cleanup cannot see the new value, which has already broken
     // mushaf Play once.
-    if (spread && spreadFor(focusPage).index === spreadFor(settled.current).index) return;
+    if (spread && spreadFor(focusPage).index === spreadFor(settled.current).index) {
+      // No turn -- but the caller still has to be told, because it drives
+      // playback off the page it believes is in view. At a surah seam inside a
+      // leaf (page 106 finishes surah 4 and prints 5:1 below it) a turn request
+      // that is silently refused leaves it waiting for an arrival that never
+      // comes, and the recitation stops where portrait carries on.
+      settled.current = focusPage;
+      onPageChange(focusPage);
+      return;
+    }
     // settled is deliberately NOT written here: this turn ends in an
     // onPageSelected like any other, and that is what reports it to the
     // caller. Writing it would turn an auto-turn into a page the reading
     // position never records.
     pagerRef.current?.setPage(indexOf(focusPage));
-  }, [focusPage, spread]);
+  }, [focusPage, spread, onPageChange]);
 
   return (
     <PagerView

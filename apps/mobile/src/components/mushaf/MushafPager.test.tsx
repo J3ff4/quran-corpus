@@ -425,6 +425,29 @@ describe('MushafPager in spread mode', () => {
     expect(pagerCommandsOf(result)).toEqual([{ page: 2, animated: true }]);
   });
 
+  it('reports the half it refused to turn to, so playback carries on', () => {
+    // Refusing the turn is right; staying silent is not. The caller drives
+    // playback off the page it believes is in view, so at a surah seam inside a
+    // leaf -- page 106 finishes surah 4 and prints 5:1 below it -- a turn
+    // request that is dropped leaves it waiting for an arrival that never comes,
+    // and the recitation stops where portrait carries on.
+    const onPageChange = vi.fn();
+    const result = render(
+      <MushafPager {...props} spread initialPage={3} focusPage={null} onPageChange={onPageChange} />,
+    );
+    result.rerender(
+      <MushafPager {...props} spread initialPage={3} focusPage={4} onPageChange={onPageChange} />,
+    );
+    expect(pagerCommandsOf(result)).toEqual([]);
+    expect(onPageChange).toHaveBeenCalledWith(4);
+
+    // And the seam out of the leaf still turns, from the half just reported.
+    result.rerender(
+      <MushafPager {...props} spread initialPage={3} focusPage={5} onPageChange={onPageChange} />,
+    );
+    expect(pagerCommandsOf(result)).toEqual([{ page: 2, animated: true }]);
+  });
+
 it('follows the reader across a mode flip, not the page they opened on', () => {
     // The two defects a rotation exposes, and neither is visible in a render
     // that never flips. MushafPager itself does NOT remount on a flip -- only
@@ -461,6 +484,30 @@ it('follows the reader across a mode flip, not the page they opened on', () => {
     expect(pagerPropsOf(result).initialPage).toBe(298); // page 299, zero-based
     expect(drawn()).toContain(299);
     expect(drawn()).not.toContain(150);
+  });
+
+  it('keeps an even page across a rotation instead of reporting its recto', () => {
+    // A leaf is identified by its recto, and the reader may be on the verso.
+    // Android fires onPageSelected once on mount and the flip remounts the
+    // PagerView, so that mount-time event arrives naming the recto -- 299 for a
+    // reader on page 300. Reported, it rewrites the saved reading position to
+    // the facing page and rotating back lands on 299.
+    const onPageChange = vi.fn();
+    const result = render(
+      <MushafPager {...props} initialPage={106} onPageChange={onPageChange} />,
+    );
+    settle(result, 300);
+    onPageChange.mockClear();
+
+    result.rerender(<MushafPager {...props} spread initialPage={106} onPageChange={onPageChange} />);
+    act(() => {
+      pagerPropsOf(result).onPageSelected?.({ nativeEvent: { position: 149 } });
+    });
+    expect(onPageChange).not.toHaveBeenCalled();
+
+    // The page itself survives the round trip, which is what the reader sees.
+    result.rerender(<MushafPager {...props} initialPage={106} onPageChange={onPageChange} />);
+    expect(pagerPropsOf(result).initialPage).toBe(299); // page 300, zero-based
   });
 
   it('keeps every leaf in the tree, even when it draws nothing', () => {
