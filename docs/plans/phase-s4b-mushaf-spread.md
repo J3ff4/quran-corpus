@@ -620,3 +620,84 @@ Build and install exactly as S4a Task 11 (prebuild only if a native dep changed 
 ## Verification log
 
 *(empty — Task 5 fills this)*
+
+---
+
+## Execution rulings, 2026-10-01
+
+The plan was written against the mushaf as described in the M7 notes, not as the
+code actually stands after M7d and S4a. Five of its interfaces do not exist.
+Each divergence is ruled on here rather than implemented as written, with what
+it costs if the ruling is wrong.
+
+**R-X1 — `spread` is derived in `MushafReader` from its measured box, not in
+`MushafScreen` from `useWindowDimensions`.** The plan's own test says "decides
+on the box, not on the window class", and the box is already measured:
+`MushafReader` sizes the pager from an `onLayout`, precisely because the window
+is taller than the pager by the status bar, `MushafTopStrip` and the tab bar.
+Reading `useWindowDimensions` in the screen would introduce a second, less
+accurate source for the same number, and near square the two disagree — a
+1000x1050 window is portrait while its inner box may be 1000x900, which is
+landscape. *Cost if wrong:* the spread appears at a slightly different aspect
+than the window's; never a wrong page. The test moves from `MushafScreen.test`
+to `MushafReader.test`, where the layout event can be fired.
+
+**R-X2 — no `MushafPageCell` extraction.** The plan asks for the page body to be
+pulled out into a shared cell. It already is: `PagerPage` in `MushafPager.tsx`
+is the memoised, hardware-layered, per-page-query cell, and `MushafPage` beneath
+it already takes `width`/`height` and scales itself. Both halves of a leaf
+render the same `PagerPage`. *Cost if wrong:* none identified — the extraction
+the plan wanted is a no-op against this code, and doing it anyway would be a
+rename with no behaviour.
+
+**R-X3 — Task 3's render band is a misreading; the real constraint is the font
+cap.** The plan asserts each half-box scale lands inside "the 11.91-18.17em
+render band". That range is `MUSHAF_PAGE_WIDEST_EM`'s min and max — each page's
+widest line measured in em, a constant of the page's own content that does not
+move when the box does. Asserting a computed scale against it would pass for
+every implementation, which is exactly the vacuous assertion §4 step 4 exists to
+catch. The real band is `MUSHAF_MAX_FONT_SIZE = 40`: above ~44px Android drops
+pieces of these whole-word outlines (M7b device run). Halving the box lowers the
+font, which moves *away* from that ceiling — so the spread cannot walk into the
+documented defect, and the plan's stated "phase's real risk" does not exist.
+What does exist is replaced below. *Cost if wrong:* a size floor nobody has
+measured, caught by check 606 on 20 sampled pages.
+
+**R-X4 — the real Task 3 defect is that facing pages would draw at different
+type sizes.** Each page's font comes from its own `widestEm`, so page 3 (15.71em)
+and a neighbour at 17.2em land on different sizes and different column widths in
+identical halves. In print both pages of a leaf are the same size and the
+narrower page simply keeps more margin. So a leaf resolves ONE font size — the
+smaller of its two pages' fits — and each page's column follows from it. New in
+`pageScale.ts`: `mushafPageFontSize`, `mushafLeafFontSize`,
+`mushafColumnForFontSize`, all delegating to the existing `mushafFontSize` /
+`mushafColumnWidth` pair so there is still one formula. `MushafPage` gains an
+optional `fontSize` override and is byte-identical without it (proved
+algebraically both ways in the commit body, and asserted). *Cost if wrong:* the
+leaf is set from the wrong page and one half has slack it did not need.
+
+**R-X5 — highlights already resolve per word, so there is nothing page-keyed to
+fix.** Task 4 asks for "the highlight lookup to accept both of a leaf's pages".
+`HighlightInput` is keyed `surah:ayah` and `MushafPagerProps.ayahTexts` is
+documented "Page-agnostic lookups, shared by every mounted page" — a page draws
+whatever marks its own words carry. The left half is already highlightable.
+`highlightsContext.tsx` is untouched. What Task 4 is really about is the leaf
+guard, and that is one condition in the pager's `focusPage` effect: compare leaf
+indices, not pages, so playback crossing recto to verso does not turn a leaf
+that is already showing the ayah being recited. *Cost if wrong:* nothing — the
+device checks 610 and 611 cover both halves of the claim.
+
+**R-X6 — the draw window stays at one leaf either side (6 pages drawn, against
+portrait's 3).** The plan claims a spread carries "the same three-pages-worth of
+glyph atlas"; it is six. Narrowing to the current leaf only would halve that,
+but `offscreenPageLimit` has to stay in step with the drawn window or a swipe
+lands on a cell that draws nothing, and a blank leaf mid-turn is a visible
+defect where a doubled footprint is not. *Cost if wrong:* memory and atlas
+pressure in landscape. Checks 604 and 605 measure it; the rollback is already
+in the plan's risk table — drop the spread window to the current leaf.
+
+**R-X7 — `spread.ts` takes its page bounds from `@quran-corpus/data/mobile`.**
+The plan declares its own `PAGE_MIN`/`PAGE_MAX`; `MUSHAF_PAGE_MIN` and
+`MUSHAF_PAGE_MAX` are already the shared source of that fact and
+`MushafPager.tsx` imports them. A second copy is a §3 violation waiting to
+disagree. `SPREAD_COUNT` is derived, not written. *Cost if wrong:* none.
