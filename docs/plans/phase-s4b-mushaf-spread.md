@@ -631,11 +631,12 @@ the phase is not complete until it is run: no device has seen a leaf.
 | 3 | `b319336` | one type size per leaf; `SPREAD-BAND-CHECK.md`; `MushafPage` size override |
 | 2 | `02f4876` | the pager's spread mode, the leaf, the mode remount, the leaf focus guard |
 | 4 | `65205ea` | the ayah-text window widened by a page either side on a spread |
+| — | `576a6ec` | self-review fixes: the reader's place survives a rotation; the text inset moved to `pageScale` |
 
 Task 3 ran before Task 2, because the pager needs `mushafLeafFontSize`.
 
 Gates: `tsc --noEmit` clean, `eslint src app` clean, `vitest run` **129 files,
-1581 tests** (1540 before this phase). Portrait's 119 existing mushaf tests pass
+1583 tests** (1540 before this phase). Portrait's 119 existing mushaf tests pass
 unchanged, which is the phase's own hard constraint, and three new ones assert
 it stays that way.
 
@@ -656,9 +657,33 @@ Worth recording because each looked right:
 4. The forward half of Task 4's widening passed both ways because the fixture
    ran out of pages and both widths fell through to `LAST_SURAH_ID`.
 
+**Self-review (§4 step 2) found two defects the tests could not.** Both need a
+render that actually flips mode, and every spread test written for Task 2
+rendered one mode only:
+
+- `initialPage` was still derived from the prop — the page the reader *launched*
+  on — so a reader who opened on 106 and swiped to 300 was dragged back to 106
+  on every rotation.
+- `current`, which decides what draws, survived the flip holding the old mode's
+  unit. Portrait page 106 is index 105; read as a leaf index that is leaf 105,
+  pages 211-212, so the drawn window sat a hundred leaves from the leaf on
+  screen and a rotation landed on blank paper.
+
+`key={mode}` remounts the PagerView but **not** `MushafPager` itself, which is
+what both defects turn on. The real ViewPager2 fires `onPageSelected` at mount
+and would probably have papered over the second one after a frame; relying on
+that is not a fix. Check 608 below is the device half.
+
+The same pass caught a §3 violation: the leaf sized its halves against a `32`
+restated in the pager beside `MushafPage`'s own `2 * PAGE_MARGIN`, with a comment
+admitting the two had to match. It is now `MUSHAF_PAGE_TEXT_INSET` in
+`pageScale.ts` — not in `MushafPage`, which the pager's own tests mock, and
+importing from there broke 15 of them and said where the constant belonged.
+
 ### Checks owed (Task 5)
 
-Nothing in the table below has been run. The APK has not been built.
+Nothing in the table below has been run. **APK: versionCode 79, release,
+arm64-v8a**, built on this branch at `576a6ec`.
 
 | # | Check | Result |
 |---|---|---|
@@ -670,6 +695,7 @@ Nothing in the table below has been run. The APK has not been built.
 | 605 | 10 fast swipes in a burst — no blank leaf, no missed mount | |
 | 606 | Every glyph present on 20 sampled pages incl. the 54 with header/bismillah gaps | |
 | 607 | **New.** Both halves of leaf 27, 177, 399 or 443 at the same type size — the four where they diverge | |
+| 608 | **New.** Open on page 1, swipe to ~300, rotate — lands on the leaf holding 300, not back on 1, and both halves draw | |
 | 610 | Playback crossing recto→verso does not turn; verso→next recto does | |
 | 611 | Highlight lands on an ayah on the left half | |
 | 612 | Close on a landscape leaf, reopen in portrait — lands on the recto | |
