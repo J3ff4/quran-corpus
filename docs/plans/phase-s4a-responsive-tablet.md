@@ -1732,3 +1732,44 @@ list with no horizontal padding (real, cosmetic, and check 504 has already
 passed against the current arithmetic — changing it moves column counts no
 hardware has seen), and the 9dp/10dp vertical gap between wrapped search
 cards (same).
+
+### Device run, vc77 (`c802b56` + versionCode bump) — 2026-10-01
+
+Tab S10+ only, no phone on adb. Device reported 1752×2800 at density 320
+(876 × 1400dp), run in both orientations. This run exists to clear the two
+checks the review round invalidated (511, 516) and the four that were owed
+for reasons other than hardware (506, 507, 512, 514).
+
+| # | Check | Result |
+|---|---|---|
+| 506 | Bookmarks grid, cards aligned, shadow not clipped | **PASS** — 3 columns at 1400dp, cards top-aligned, nothing clipped. 1 column at 876dp portrait, which is correct arithmetic and not a defect: `bookmarkCard` is 420, so a second column needs 882dp and the tablet's portrait width is 876 |
+| 507 | Swipe-to-delete in the middle column; the neighbour does not move | **FAIL → fixed** — the neighbour did not move, but the swiped card slid out of its own cell and painted over the card beside it. `GridCell` pinned a width without clipping. Fixed; re-run owed on vc78 |
+| 511 | Reader: capped column, rail on the side, marker tracks scroll | **PASS** — and this is the real evidence for the review round's row-height finding: with the rail scrolled to the end, tapping ayah 280 of 286 landed the reader exactly on 280. A half-scale offset table could not do that |
+| 512 | Rail juz headings on the right ayahs | **PASS** — `JUZ 1` above ayah 1 and `JUZ 2` directly above 142, both seen. Clears the vc76 PARTIAL |
+| 514 | Rail toggle announces expanded/collapsed; rows reachable | **PARTIAL → half fixed** — rows pass outright: the dump shows 286 `android.widget.Button` nodes labelled `Ayah N`, so trap 1 is clear. The toggle does not: it had no `accessibilityLabel`, so its chevron Text became the content-desc and the dump read `content-desc="›"`. Fixed. The announcement itself still needs TalkBack and a pair of ears |
+| 516 | Rotate on the reader mid-surah — position holds, no ellipsis | **PASS** — rotated landscape→portrait at ayah 280; 280 stayed the top card, surah name unellipsised, column still capped. Clears the invalidated vc76 pass |
+
+506 and 507 were run by creating three bookmarks (2:280, 2:281, 2:282) and
+deleting all three afterwards. The device is back to `0 ayahs · 0 surahs`, so
+the owner's user DB is at net zero rows. Rotation settings were left as
+found (`accelerometer_rotation 0`, `user_rotation 1`).
+
+**Two more defects this run turned up, outside any check:**
+
+- The rail opens parked at ayah 1 with nothing marked after a deep-link
+  landing. `reveal()` writes the two reading-position consumers precisely
+  because viewability is muted for the whole jump and never fires again on
+  its own — the rail's marker is the third consumer and was missed. Opening
+  Al-Baqara at 2:142 from the Continue-reading card showed it. Fixed.
+- The juz heading was the only row in the rail not centred: its `View`
+  defaults to `alignItems: 'stretch'`, so the label drew from x=0 and the J
+  of `JUZ 2` was shaved against the screen edge. Fixed. This is the "rail
+  hugs the left edge" observation from the vc76 run, now with a cause.
+
+All four fixes are in `c0825f0`, each with a test that was mutation-checked
+by deleting the fix and watching that test alone fail.
+
+**Still owed:** 507 and 514's toggle on vc78; 514's announcement, 518, 519
+and the phone half of 520 all need hardware or hands this session did not
+have. 519 remains this phase's own exit criterion and no phone has run any
+build of this branch.
