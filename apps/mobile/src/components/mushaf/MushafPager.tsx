@@ -10,7 +10,7 @@ import type { MobileDataClient } from '@quran-corpus/mobile-data';
 
 import type { UiLocaleCode } from '@/i18n/languages';
 import { useHighlights } from '@/mushaf/highlightsContext';
-import { mushafLeafFontSize } from '@/mushaf/pageScale';
+import { MUSHAF_PAGE_TEXT_INSET, mushafLeafFontSize } from '@/mushaf/pageScale';
 import { SPREAD_COUNT, spreadAt, spreadFor } from '@/mushaf/spread';
 import { useMushafPage } from '@/mushaf/useMushafPage';
 
@@ -26,18 +26,12 @@ const PAGES = Array.from(
  *  and complete even though most of it draws nothing. */
 const LEAVES = Array.from({ length: SPREAD_COUNT }, (_, i) => i);
 
-/** How much of MushafPage's width its text block can use, for a leaf deciding
- *  one type size for both of its halves. Must match MushafPage's own
- *  PAGE_MARGIN either side -- a leaf that sizes against a wider box than the
- *  page draws into hands down a size the page then clamps away, which puts the
- *  two halves back on different sizes. */
-const PAGE_TEXT_MARGIN = 32;
-
 /** How many pages either side of the current one draw their content.
  *
  *  One, matching the `offscreenPageLimit` below: a swipe has to land on a page
  *  that is already drawn, and anything further is memory spent on pages nobody
- *  is about to see. */
+ *  is about to see. In spread mode the unit is a leaf, so one either side is six
+ *  drawn pages rather than three -- see the component docstring. */
 export const WINDOW = 1;
 
 /** The one page a number arriving from outside is allowed to mean.
@@ -141,7 +135,10 @@ const MushafLeaf = memo(function MushafLeaf({
   // One size for both halves, decided here because neither page can see the
   // other. Without it the two pages of a leaf draw at different sizes whenever
   // one of them clamps and the other does not -- see mushafLeafFontSize.
-  const fontSize = mushafLeafFontSize(recto, verso, half - PAGE_TEXT_MARGIN);
+  // The shared inset, not a 32 restated here: a leaf that sizes against a wider
+  // box than the page draws into hands down a size the page then clamps away,
+  // which puts the two halves back on different sizes.
+  const fontSize = mushafLeafFontSize(recto, verso, half - MUSHAF_PAGE_TEXT_INSET);
   return (
     <View testID="mushaf-leaf" style={{ flex: 1, flexDirection: 'row-reverse' }}>
       <PagerPage page={recto} width={half} fontSize={fontSize} {...rest} />
@@ -211,7 +208,17 @@ export const MushafPager = memo(function MushafPager({
   const indexOf = (page: number) => (spread ? spreadFor(page).index : page - MUSHAF_PAGE_MIN);
   // Which pages draw. Separate from `settled` because it drives rendering and
   // therefore has to be state, where the settle guard must NOT re-render.
-  const [current, setCurrent] = useState(() => indexOf(clampPage(initialPage)));
+  // Tagged with the mode it was measured in. A leaf index and a page index are
+  // different units, and MushafPager itself does NOT remount on a flip -- only
+  // the PagerView below it does, through `key` -- so an untagged `current` would
+  // survive the flip holding the old unit's number. Portrait page 106 is index
+  // 105; as a leaf index that is leaf 105, pages 211-212, so the drawn window
+  // would sit 100 leaves from the leaf on screen and the reader would rotate
+  // onto blank paper.
+  const [current, setCurrent] = useState(() => ({
+    mode,
+    index: indexOf(clampPage(initialPage)),
+  }));
   // The page the reader is on, as far as the caller has been told. Android
   // fires onPageSelected once on mount with the initial page, and `setPage`
   // below lands through the same event, so the caller is told only when the
@@ -224,10 +231,15 @@ export const MushafPager = memo(function MushafPager({
   // never moved to.
   const settled = useRef(spread ? spreadFor(clampPage(initialPage)).recto : clampPage(initialPage));
 
+  // Re-derived during the flip's own render rather than in an effect: the
+  // PagerView below remounts on the same render, and an effect would leave one
+  // committed frame drawing the wrong leaf.
+  if (current.mode !== mode) setCurrent({ mode, index: indexOf(settled.current) });
+
   const onPageSelected = useCallback(
     (event: { nativeEvent: { position: number } }) => {
       const index = event.nativeEvent.position;
-      setCurrent(index);
+      setCurrent({ mode, index });
       // The recto, because the caller stores a single page number and a leaf
       // has two. Which half the reader's eye is on is not something the pager
       // knows, and the recto is the stable identity of the paper.
@@ -236,7 +248,7 @@ export const MushafPager = memo(function MushafPager({
       settled.current = page;
       onPageChange(page);
     },
-    [onPageChange, spread],
+    [onPageChange, spread, mode],
   );
 
   useEffect(() => {
@@ -269,7 +281,11 @@ export const MushafPager = memo(function MushafPager({
       ref={pagerRef}
       testID="mushaf-pager"
       style={{ flex: 1 }}
-      initialPage={indexOf(clampPage(initialPage))}
+      // Where the reader IS, not where they opened. `initialPage` is read at
+      // mount, and the flip above remounts this pager -- so the prop's original
+      // value would drag a reader on page 300 back to the page they launched on
+      // every time they rotated the tablet.
+      initialPage={indexOf(settled.current)}
       layoutDirection="rtl"
       offscreenPageLimit={WINDOW}
       onPageSelected={onPageSelected}
@@ -287,14 +303,14 @@ export const MushafPager = memo(function MushafPager({
       {spread
         ? LEAVES.map((leaf) => (
             <View key={leaf}>
-              {Math.abs(leaf - current) <= WINDOW ? (
+              {Math.abs(leaf - current.index) <= WINDOW ? (
                 <MushafLeaf leaf={leaf} {...page} />
               ) : null}
             </View>
           ))
         : PAGES.map((item) => (
             <View key={item}>
-              {Math.abs(indexOf(item) - current) <= WINDOW ? (
+              {Math.abs(indexOf(item) - current.index) <= WINDOW ? (
                 <PagerPage page={item} {...page} />
               ) : null}
             </View>

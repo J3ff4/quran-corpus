@@ -425,6 +425,44 @@ describe('MushafPager in spread mode', () => {
     expect(pagerCommandsOf(result)).toEqual([{ page: 2, animated: true }]);
   });
 
+it('follows the reader across a mode flip, not the page they opened on', () => {
+    // The two defects a rotation exposes, and neither is visible in a render
+    // that never flips. MushafPager itself does NOT remount on a flip -- only
+    // the PagerView below it does -- so (a) `initialPage` would still be the
+    // page the reader LAUNCHED on, dragging them back there on every rotation,
+    // and (b) `current` would survive holding the old mode's unit, so the drawn
+    // window would sit a hundred leaves from the leaf on screen and the reader
+    // would rotate onto blank paper.
+    const result = render(<MushafPager {...props} initialPage={106} />);
+    settle(result, 300);
+    // Only what the spread drew: the mocked page records every render, so the
+    // portrait pages before the flip would otherwise count toward the set below.
+    mocks.pageProps = [];
+
+    result.rerender(<MushafPager {...props} spread initialPage={106} />);
+
+    const leaf = 149; // spreadFor(300) -- pages 299, 300
+    expect(pagerPropsOf(result).initialPage).toBe(leaf);
+    // And the window moved with it: leaves 148..150, which is pages 297..302.
+    expect(drawn()).toEqual(new Set([297, 298, 299, 300, 301, 302]));
+  });
+
+  it('follows the reader back when the flip goes the other way', () => {
+    // Rotating back has to land on the leaf's own pages, not on leaf 149 read
+    // as page 149.
+    const result = render(<MushafPager {...props} spread initialPage={299} />);
+    act(() => {
+      pagerPropsOf(result).onPageSelected?.({ nativeEvent: { position: 149 } });
+    });
+    mocks.pageProps = [];
+
+    result.rerender(<MushafPager {...props} initialPage={299} />);
+
+    expect(pagerPropsOf(result).initialPage).toBe(298); // page 299, zero-based
+    expect(drawn()).toContain(299);
+    expect(drawn()).not.toContain(150);
+  });
+
   it('keeps every leaf in the tree, even when it draws nothing', () => {
     // ViewPager2 pages by child index here too: a leaf that is not handed over
     // shifts every leaf after it.

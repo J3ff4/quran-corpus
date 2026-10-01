@@ -11,6 +11,18 @@ import { MUSHAF_PAGE_WIDEST_EM } from './pageMetrics.generated';
  */
 export const MUSHAF_MAX_FONT_SIZE = 40;
 
+/**
+ * What a page's side margins take off its width before the text block is fitted.
+ *
+ * Here rather than in MushafPage, even though that is the only component that
+ * draws with it: a leaf has to size against the text block too, in order to give
+ * both of its halves one type size, and it cannot import a component module the
+ * pager's own tests mock. One place for the figure is what keeps a caller from
+ * sizing against a wider box than the page draws into -- which hands down a size
+ * the page then clamps away, invisibly, until two facing pages differ.
+ */
+export const MUSHAF_PAGE_TEXT_INSET = 32;
+
 /** A floor, so a mid-layout zero height cannot make a line invisible. */
 const MIN_LINE_HEIGHT = 1;
 
