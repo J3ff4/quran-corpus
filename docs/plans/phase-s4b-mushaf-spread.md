@@ -714,6 +714,9 @@ upgrade over an EAS build — uninstall first if one is present.
 | 612 | Close on a landscape leaf, reopen in portrait — lands on the recto | |
 | 613 | Page-jump sheet lands on the right leaf | |
 | 614 | Phone regression: mushaf unchanged | |
+| 615 | **New.** Landscape, recite through a leaf that carries a surah seam (page 106: surah 4 ends, 5:1 is printed below) — audio carries on through the verso and then turns to the next leaf | |
+| 616 | **New.** Landscape, saved position on an EVEN page (108) — both halves draw their surah band and bismillah line, not only their words | |
+| 617 | **New.** Short wide box: split-screen or a freeform window dragged flat — lines do not overlap, and the type shrinks instead | |
 
 Check 607 is new, from ruling R-X4: the shared leaf size is only observable on
 four leaves out of 302, so a spot check anywhere else in the book cannot see it.
@@ -722,6 +725,49 @@ Carried forward from S4a and still owed: 519 (the phone regression, S4a's own
 exit criterion), the phone half of 520, 518, 514's spoken announcement, and the
 rail-tap spinner check. 614 here is the same phone build, so one phone session
 can clear both phases' phone checks.
+
+---
+
+## Independent review, 2026-10-01
+
+Run at the owner's request on `main...HEAD`. §5 applies: `spread.ts` adds a
+range validator on a page number arriving from the user DB, and the pager's
+settle path writes the reading position, so the trust-boundary and on-device-DB
+triggers both fire. One pass, five findings, four fixed and one subsumed.
+
+The review confirmed the parts the phase turns on — the pairing math, the
+leaf-size algebra, `row-reverse`, `key={mode}`, the render-phase unit
+re-derivation and `initialPage={indexOf(settled.current)}`. Every finding was
+in what sits *above* the pager, and every one of them came from the same thing
+the tests could not see: a leaf has two pages and everything above it still
+speaks in one.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | `settled` holds the portrait page across a flip, so rotating off an even page reports its recto and rewrites the reading position | Fixed `6b2aa36` — compare by leaf identity, report nothing when the position is already on this leaf |
+| 2 | The same-leaf focus guard refused the turn silently, so continuous recitation stalled at every surah seam in landscape | Fixed `6b2aa36` — report the half without turning to it |
+| 3 | `pageLines` is the recto's rows only, so the page-audio helpers are blind to the verso | Subsumed by 2: `currentPage` now follows the playhead across the leaf, so the seam logic reads the half being recited. "Play this page" still starts at the recto and flows through the verso, which is the leaf's reading order and not a defect |
+| 4 | The type size is fitted to width alone; nothing clamps it to the line box, so a short wide box draws glyphs taller than their slots | Fixed `c2c760c` — fit to the line box before the column is built |
+| 5 | The widened surah window assumed `page` was a recto; it can be a verso | Fixed `7e43261` — anchor on `spreadFor(page).recto`, guarded |
+
+Finding 4 is pre-existing — landscape single-page was worse, clamped at
+`MUSHAF_MAX_FONT_SIZE` under a tall box — but the band check validated only the
+width axis and this phase makes landscape the headline mode. The fix caps the
+type at exactly one line box, which is the unarguable part: a glyph taller than
+its slot cannot not overlap. Whether that ratio *reads* comfortable is a device
+question, not a desk one — every shipping configuration today sits at
+`lineHeight / fontSize` ≥ 1.49, and the Tab S10+ in landscape lands near 1.12.
+Check 606 is where that gets measured; if it reads tight, the fix is a factor on
+the clamp, with the number taken from that run.
+
+Gates after the fixes: `tsc --noEmit` exit 0, `eslint src app` exit 0,
+`vitest run` 129 files / **1589 tests** (1583 before this round). Six new tests.
+Each of the four fixes was mutation-checked and its test fails when the fix is
+deleted; a fifth mutation — moving the line-box clamp to *after* the column is
+built — fails the column test and passes the size test, which is what makes
+those two tests distinct rather than one assertion twice. The leaf-invariant
+test under the clamp is a regression guard only: both halves are handed the same
+height, so no plausible mutation separates them.
 
 ---
 
