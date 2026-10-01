@@ -16,9 +16,9 @@ import { useMushafPageFont } from '@/mushaf/pageFont';
 import {
   MUSHAF_PAGE_TEXT_INSET,
   mushafColumnForFontSize,
-  mushafColumnWidth,
   mushafFontSize,
   mushafLineHeight,
+  mushafPageFontSize,
 } from '@/mushaf/pageScale';
 import { useThemeColors } from '@/theme/themeContext';
 
@@ -136,24 +136,34 @@ export function MushafPage({
 
   // Not the full width: past a certain column the font clamps and the
   // pre-justified lines can no longer reach the edge, which leaves the page
-  // stranded against one side. mushafColumnWidth hands back the widest column
-  // this page can still fill, and the block is centred in whatever is left.
+  // stranded against one side. The column is built for the size the page draws
+  // at, so it is the widest column this page can still fill, and the block is
+  // centred in whatever is left.
   //
-  // With a leaf size only the COLUMN changes: it is built for that size rather
-  // than for this page's own fit, and then clamped to the half it has to sit
-  // in. The size itself still comes back out of the column, which is not a
-  // redundancy -- `mushafColumnForFontSize` is the exact inverse of
-  // `mushafFontSize`, so a column built for 31.4dp reads back as 31.4dp, and
-  // in the one case where it cannot (a size too large for the half, which the
-  // clamp cuts) reading it back is what keeps the line inside the column
-  // instead of drawing it at a size the column cannot hold.
+  // With a leaf size only what the size is WANTED at changes: a leaf hands both
+  // halves one, where a lone page asks for its own fit. Either way the column is
+  // built for that size and clamped to the box, and the size then comes back out
+  // of the column -- `mushafColumnForFontSize` is the exact inverse of
+  // `mushafFontSize`, so a column built for 31.4dp reads back as 31.4dp, and in
+  // the one case where it cannot (a size too large for the box, which the clamp
+  // cuts) reading it back is what keeps the line inside the column instead of
+  // drawing it at a size the column cannot hold.
+  //
+  // Fitted to the line box as well as to the width. The page is a fixed 15-line
+  // grid and each slot is exactly `lineHeight` tall with nothing clipping it, so
+  // a glyph whose em box is taller than its slot spills into the lines above and
+  // below -- which reads as the dropped-glyph font defect rather than as an
+  // oversized one. Width alone was enough while landscape meant one page across
+  // the whole tablet and the font clamped at MUSHAF_MAX_FONT_SIZE under a tall
+  // box, but a short wide box (a 600dp tablet turned sideways, a split-screen or
+  // freeform window) fits a size on width that the height cannot hold. Both
+  // halves of a leaf are given the same height, so one line box binds both and
+  // the leaf keeps its single size.
   const available = width - MUSHAF_PAGE_TEXT_INSET;
-  const columnWidth =
-    leafFontSize === undefined
-      ? mushafColumnWidth(page, available)
-      : Math.min(available, mushafColumnForFontSize(page, leafFontSize));
-  const fontSize = mushafFontSize(page, columnWidth);
   const lineHeight = mushafLineHeight(height - FOOTER_HEIGHT - HEADER_HEIGHT, MUSHAF_LINES_PER_PAGE);
+  const wanted = Math.min(leafFontSize ?? mushafPageFontSize(page, available), lineHeight);
+  const columnWidth = Math.min(available, mushafColumnForFontSize(page, wanted));
+  const fontSize = mushafFontSize(page, columnWidth);
   const marks: HighlightInput = pressed === null ? highlights : { ...highlights, pressed };
   const color = colorForWord(marks, theme);
   const background = backgroundForWord(marks, theme);

@@ -16,7 +16,14 @@ vi.mock('@/mushaf/pageFont', () => ({
 }));
 
 import { ayahKey } from '@/mushaf/highlights';
-import { mushafColumnWidth, mushafFontSize, mushafPageFontSize } from '@/mushaf/pageScale';
+import { MUSHAF_LINES_PER_PAGE } from '@/mushaf/pageComposition';
+import {
+  mushafColumnWidth,
+  mushafFontSize,
+  mushafLeafFontSize,
+  mushafLineHeight,
+  mushafPageFontSize,
+} from '@/mushaf/pageScale';
 
 import { MushafPage } from './MushafPage';
 
@@ -296,10 +303,54 @@ describe('MushafPage type size', () => {
     // the column rather than taken from the prop: a column cut to the half with
     // the prop's size still drawn into it is a line wider than its box, which
     // is the ellipsis the width slack exists to prevent.
-    render(<MushafPage {...props} width={700} fontSize={400} />);
+    // A tall box, so the WIDTH is what cuts the size here. props.height leaves a
+    // 37.9dp line box, which would otherwise bind first and make this a test of
+    // the height clamp below rather than of the column.
+    render(<MushafPage {...props} width={700} height={1200} fontSize={400} />);
     expect(glyphFontSizeOf(screen.getByText('A'))).toBeCloseTo(
       mushafPageFontSize(106, 700 - 32),
       4,
     );
+  });
+
+  it('fits the glyphs to the line box, not only to the width', () => {
+    // A short wide box -- a 600dp tablet turned sideways, a split-screen or a
+    // freeform window -- fits a size on width that the height cannot hold. The
+    // 15 slots are exactly `lineHeight` tall with nothing clipping them, so a
+    // glyph taller than its slot spills into the lines above and below.
+    const box = { width: 960, height: 400 };
+    const lineBox = mushafLineHeight(box.height - 72, MUSHAF_LINES_PER_PAGE);
+    const widthFit = mushafPageFontSize(106, box.width - 32);
+    // Or this asserts nothing: the clamp is only observable where the width
+    // would have allowed a bigger size than the line box.
+    expect(widthFit).toBeGreaterThan(lineBox);
+
+    render(<MushafPage {...props} {...box} />);
+    expect(glyphFontSizeOf(screen.getByText('A'))).toBeCloseTo(lineBox, 4);
+  });
+
+  it('narrows the column to the height-fitted size too', () => {
+    // The fit happens BEFORE the column is built, not after: a column built for
+    // a size the height then cuts leaves the block drawn small inside a box
+    // sized for the bigger one, which strands a narrow page of text in a wide
+    // field of paper.
+    const tall = render(<MushafPage {...props} width={960} height={1200} />);
+    const wide = textBlockWidthOf(tall.container);
+    tall.unmount();
+    const short = render(<MushafPage {...props} width={960} height={400} />);
+    expect(textBlockWidthOf(short.container)).toBeLessThan(wide);
+  });
+
+  it('holds both halves of a leaf to one size under the line box', () => {
+    // Both halves are handed the same height, so the line box cuts them
+    // identically and a leaf keeps its single size (R-X4) even where the clamp
+    // is what decides it.
+    const box = { width: 480, height: 400 };
+    const leafSize = mushafLeafFontSize(27, 28, box.width - 32);
+    const recto = render(<MushafPage {...props} {...box} page={27} fontSize={leafSize} />);
+    const rectoSize = glyphFontSizeOf(screen.getByText('A'));
+    recto.unmount();
+    render(<MushafPage {...props} {...box} page={28} fontSize={leafSize} />);
+    expect(glyphFontSizeOf(screen.getByText('A'))).toBeCloseTo(rectoSize, 4);
   });
 });
