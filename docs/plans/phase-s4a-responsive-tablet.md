@@ -1773,3 +1773,28 @@ by deleting the fix and watching that test alone fail.
 and the phone half of 520 all need hardware or hands this session did not
 have. 519 remains this phase's own exit criterion and no phone has run any
 build of this branch.
+
+### Re-verification, vc78 (`c0825f0`) — 2026-10-01
+
+Same tablet, landscape (1400 × 876dp). Build made from a clean tree, so the
+bundle is the committed code and not a mutation-poisoned one.
+
+| What | Result |
+|---|---|
+| **507** re-run | **PASS** — the swiped middle card now clips at its own cell edge: its title renders as `136` instead of `Al-Baqara 2:136`, and the 2:138 card beside it is untouched. Deleting from the swipe committed cleanly and the row reflowed |
+| **514** toggle | **PASS (tree)** — `rail-toggle` reads `content-desc='Ayah list'` on an `android.widget.Button`, where vc77 read `'›'`. Rows still reachable, labelled `Ayah 135`..`Ayah 148`. The spoken announcement is still unverified — that needs TalkBack and ears |
+| Rail marker on landing | **PASS** — opening Al-Baqara at 2:135 from the Continue-reading card, the rail came up already scrolled to the 135-147 band with **135 marked**, with no scroll of any kind. Previously it sat at ayah 1 with nothing marked. The virtualised row range is itself the evidence: the rail renders from 135, not from 1 |
+| Juz heading | **PASS** — `JUZ 2` measures `[22,1104][90,1140]`: 68px wide, inset 22px inside a 112px rail, so its centre is 56, exactly half the rail. vc77 had it flush at x=0 with the J shaved |
+
+**Regression sweep on the shared `GridCell` change.** The clip applies to
+every pinned grid cell, not just bookmarks, so the three other grid surfaces
+were re-checked at the same width: browse 3 columns, dictionary 4 columns
+with the alphabet picker full width, search 2 columns with snippets ending in
+an ellipsis rather than a clip. Nothing newly clipped on any of them.
+
+Three bookmarks were created and all three deleted; the device reads
+`0 ayahs · 0 surahs`. Rotation left as found.
+
+**Unchanged from the vc77 entry:** 514's spoken announcement, 518, 519 and
+the phone half of 520 are still owed, and 519 is still this phase's own exit
+criterion.
