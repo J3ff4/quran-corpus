@@ -728,6 +728,34 @@ can clear both phases' phone checks.
 
 ---
 
+## APK, versionCode 80
+
+Built 2026-10-01 at `a6e1967`, release / arm64-v8a, 202972589 bytes, `BUILD
+SUCCESSFUL in 1m 38s`. Served as a **copy** at `~/apks/quran-corpus-vc80.apk`
+(194M), versionCode verified `80` on that copy with `aapt2 dump badging`.
+
+vc79 is superseded and should not be used: it predates the review round, and
+checks 603, 610 and 615-617 all test behaviour its four fixes change.
+
+The first vc80 attempt built as **79**. `app.json`'s `versionCode` does not
+reach Gradle — `android/` is `expo prebuild` output, so the live value is
+`android/app/build.gradle` and only a prebuild syncs them. The build exits 0 and
+hands back the old number, so the only thing that catches it is reading
+`aapt2 dump badging` off the copy that is actually served.
+
+Debug-signed, so it cannot upgrade over an EAS build — uninstall one first if
+present.
+
+```bash
+/home/claude/android-sdk/platform-tools/adb -s adb-R52XC0AYMZZ-S3tLzk._adb-tls-connect._tcp \
+  install -r --user 0 ~/apks/quran-corpus-vc80.apk
+```
+
+`--user 0` is not optional: an unqualified `-r` once landed on user 10 (Guest)
+and wiped user-0 app data.
+
+---
+
 ## Independent review, 2026-10-01
 
 Run at the owner's request on `main...HEAD`. §5 applies: `spread.ts` adds a
