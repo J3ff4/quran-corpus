@@ -255,6 +255,22 @@ describe('AyahRail', () => {
     expect(screen.getByTestId('rail-toggle')).toBeTruthy();
   });
 
+  it('names the toggle instead of leaving TalkBack the chevron glyph', () => {
+    // With no label the child Text becomes the content-desc and TalkBack
+    // announces the punctuation itself -- the device dump at vc77 read
+    // content-desc="\u203a" on an android.widget.Button (check 514).
+    render(<AyahRail {...props} />);
+    expect(screen.getByTestId('rail-toggle').getAttribute('aria-label')).toBe('Ayah list');
+  });
+
+  it('centres the juz heading like every other row', () => {
+    // The heading View left to itself stretches its Text across the whole
+    // 56dp rail, so the label drew from x=0 and the J was shaved against the
+    // screen edge while the numerals beside it sat centred (device, vc77).
+    render(<AyahRail {...props} />);
+    expect(screen.getAllByTestId('rail-juz')[0]!.style.alignItems).toBe('center');
+  });
+
   it('pairs aria-expanded with aria-controls on the toggle', () => {
     // Review-flagged pattern in this repo: a disclosure with
     // accessibilityState.expanded and nothing saying what it controls.

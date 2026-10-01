@@ -120,6 +120,11 @@ export function AyahRail({
       <Pressable
         testID="rail-toggle"
         accessibilityRole="button"
+        // Without this the chevron Text below becomes the content-desc and
+        // TalkBack announces the glyph itself -- "\u203a button" (device check
+        // 514, vc77). accessibilityState carries expanded/collapsed; the label
+        // has to name what is being expanded.
+        accessibilityLabel="Ayah list"
         accessibilityState={{ expanded: !collapsed }}
         onPress={onToggleCollapsed}
         style={{ minHeight: touchTargets.minimum, alignItems: 'center', justifyContent: 'center' }}
@@ -186,6 +191,11 @@ export function AyahRail({
                   <View
                     accessibilityRole="header"
                     testID="rail-juz"
+                    // Centred like every ayah row. Left to itself this View
+                    // stretches its Text across the full 56dp and the label
+                    // starts hard against x=0, where the J lost its stem
+                    // (device, vc77).
+                    style={{ alignItems: 'center' }}
                     {...({ 'data-before-ayah': String(ayahNumber) } as Record<string, string>)}
                   >
                     <Text style={{ color: theme.mutedText, fontSize: typography.caption }}>

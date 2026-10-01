@@ -300,4 +300,20 @@ describe('GridCell', () => {
     render(<GridCell width={200}>{'child'}</GridCell>);
     expect(screen.getByTestId('grid-cell').style.width).toBe('200px');
   });
+
+  it('clips a pinned cell so a swipe cannot cross into the next column', () => {
+    // A Swipeable translates its card sideways. Unclipped, the bookmark card
+    // in the middle column slid straight over the card beside it (device
+    // check 507, vc77) -- the neighbour did not move, it was painted on.
+    render(<GridCell width={200}>{'child'}</GridCell>);
+    expect(screen.getByTestId('grid-cell').style.overflow).toBe('hidden');
+  });
+
+  it('leaves a single column unclipped, so the phone keeps its card shadow', () => {
+    // The clip above is a tablet fix and the phone has no neighbour to cross;
+    // clipping there would cost the card's shadow on a surface that must not
+    // change.
+    render(<GridCell width={undefined}>{'child'}</GridCell>);
+    expect(screen.getByTestId('grid-cell').style.overflow).toBe('');
+  });
 });

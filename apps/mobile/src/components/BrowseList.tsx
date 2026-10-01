@@ -226,7 +226,16 @@ function Row({ item }: { item: BrowseItem }) {
  */
 export function GridCell({ width, children }: { width: number | undefined; children: ReactNode }) {
   return (
-    <View testID="grid-cell" style={width === undefined ? undefined : { width }}>
+    // overflow only where a width is pinned, i.e. at more than one column. A
+    // Swipeable inside translates its card sideways, and with the cell
+    // unclipped that card slides straight over the neighbouring column
+    // (device check 507, vc77). At one column there is no neighbour to cross
+    // and clipping would eat the card's shadow on the phone, which must not
+    // change.
+    <View
+      testID="grid-cell"
+      style={width === undefined ? undefined : { width, overflow: 'hidden' }}
+    >
       {children}
     </View>
   );

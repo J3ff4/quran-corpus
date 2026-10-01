@@ -658,6 +658,12 @@ function AyahList({
       if (anchor.ayah !== null) {
         lastVisibleRef.current = anchor.ayah;
         setReaderPosition(data.surah.id, anchor.ayah);
+        // And the rail's marker, which is fed from onViewableItemsChanged and
+        // so is blind to the landing for exactly the same reason as the two
+        // writes around it. Without it the rail opens parked at ayah 1 with
+        // nothing marked while the reader sits at 2:142, until the first
+        // manual scroll changes the viewable set (device, vc77).
+        setActiveAyahNumber(anchor.ayah);
         // And the durable half (issue #59). The store above is in memory and
         // dies with the process; the row the Continue-reading card reads is in
         // the user database, and nothing else writes it for a landing either.

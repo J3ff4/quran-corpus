@@ -2006,6 +2006,38 @@ describe('SurahReader', () => {
       expect(active.map((n) => n.dataset.ayah)).toEqual(['3']);
     });
 
+    it('marks the ayah a deep-link landing settled on, with no scroll after it', async () => {
+      // Same blind spot as the two reading-position writes beside it in
+      // reveal(): the marker is fed from onViewableItemsChanged, which is
+      // muted for the whole jump and never fires again on its own. On the
+      // device at vc77, opening Al-Baqara at 2:142 from the Continue-reading
+      // card and expanding the rail showed it parked at ayah 1 with nothing
+      // marked, while the reader sat at 142.
+      win.width = 1000;
+      win.height = 1200;
+      vi.useFakeTimers();
+      try {
+        // readerData(30) is the one fixture whose surah carries a real
+        // ayah_count (286, Al-Baqara), and the rail draws ayah_count rows --
+        // the 300-ayah fixture still says al-Fatihah's 7.
+        render(<SurahReader {...baseProps(readerData(30))} initialAyahNumber={25} />);
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(8100);
+        });
+
+        // The landing really did settle, so a missing marker below is the
+        // marker's own gap and not a landing that never ran.
+        expect(mocks.setReaderPosition).toHaveBeenCalledWith(2, 25);
+        const active = screen
+          .getAllByTestId('rail-ayah')
+          .filter((n) => n.dataset.active === 'true');
+        expect(active.map((n) => n.dataset.ayah)).toEqual(['25']);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('asks the reader to jump when a rail ayah is tapped', () => {
       win.width = 1000;
       win.height = 1200;
