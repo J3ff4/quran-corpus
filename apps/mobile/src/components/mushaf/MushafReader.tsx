@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, type LayoutChangeEvent } from 'react-native';
-import type { MushafWord } from '@quran-corpus/data/mobile';
+import { MUSHAF_PAGE_MAX, MUSHAF_PAGE_MIN, type MushafWord } from '@quran-corpus/data/mobile';
 import type { MobileDataClient } from '@quran-corpus/mobile-data';
 
 import type { UiLocaleCode } from '@/i18n/languages';
@@ -9,6 +9,7 @@ import { ayahKey, type HighlightInput } from '@/mushaf/highlights';
 import { HighlightsProvider } from '@/mushaf/highlightsContext';
 import { useMushafAyahs, type MushafIndex } from '@/mushaf/mushafReaderData';
 import { useMushafPageFont } from '@/mushaf/pageFont';
+import { spreadFor } from '@/mushaf/spread';
 import { useThemeColors } from '@/theme/themeContext';
 
 import { MushafPager } from './MushafPager';
@@ -113,20 +114,27 @@ export function MushafReader({
   // after it opens with, so the window's range covers every band and bismillah
   // inside it.
   //
-  // One page wider either side on a spread: `page` is the leaf's recto, and the
-  // pager draws a leaf either side of it, so the drawn pages run from recto - 2
-  // to recto + 3 rather than from page - 1 to page + 1. Left at portrait's width
-  // the first drawn page would be outside the range, which is not a blank page
-  // but something worse -- a page that draws its words and leaves its band and
-  // its bismillah line empty.
+  // One page wider either side on a spread: the pager draws a leaf either side
+  // of the one on screen, so the drawn pages run from recto - 2 to recto + 3
+  // rather than from page - 1 to page + 1.
   const surahIds = useMemo(() => {
     const back = spread ? 2 : 1;
     const forward = spread ? 4 : 3;
-    const first = index.pages.get(page - back)?.startSurahId ?? index.pages.get(page)?.startSurahId;
+    // Measured from the leaf's RECTO, not from `page`. `page` is whichever half
+    // was last reported -- the opening page, or the half the recitation moved
+    // onto -- and on an even one the window would sit a page off the leaf that
+    // is drawn: opening in landscape on page 4 would range from page 2 while
+    // the pager draws 1..6, leaving the first drawn page outside the fetched
+    // surahs. That is not a blank page but something worse -- a page that draws
+    // its words and leaves its band and its bismillah line empty.
+    const anchor =
+      spread && page >= MUSHAF_PAGE_MIN && page <= MUSHAF_PAGE_MAX ? spreadFor(page).recto : page;
+    const first =
+      index.pages.get(anchor - back)?.startSurahId ?? index.pages.get(anchor)?.startSurahId;
     if (first === undefined) return [];
     // One past the window: the last window page runs up to whatever the next
     // page opens with, and past the end of the mushaf that is the last surah.
-    const last = index.pages.get(page + forward)?.startSurahId ?? LAST_SURAH_ID;
+    const last = index.pages.get(anchor + forward)?.startSurahId ?? LAST_SURAH_ID;
     const ids: number[] = [];
     for (let surahId = first; surahId <= Math.max(first, last); surahId += 1) ids.push(surahId);
     return ids;

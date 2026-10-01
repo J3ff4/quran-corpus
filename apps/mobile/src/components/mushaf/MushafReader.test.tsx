@@ -138,6 +138,26 @@ it('fetches a page further either side on a spread', () => {
     expect(mocks.ayahSurahIds).not.toContain(4); // page 104 is not drawn
   });
 
+  it('anchors the spread window on the leaf, not on the half it was handed', () => {
+    // `page` is whichever half was last reported: the page the saved position
+    // opened on, or the half the recitation moved onto. Measured from an even
+    // one the window sits a page off the leaf that is drawn -- page 108 would
+    // range from page 106 while the pager draws 105..110 -- and a page outside
+    // the range still draws its words, just with its band and its bismillah
+    // line empty.
+    const pages = new Map(
+      [103, 104, 105, 106, 107, 108, 109, 110, 111, 112].map((page) => [
+        page,
+        { page, startSurahId: page - 100, startAyahNumber: 1, surahName: `S${page}`, juz: 6 },
+      ]),
+    );
+    setAutoLayout({ width: 1400, height: 820 });
+    render(<MushafReader {...props} initialPage={108} index={{ ...index, pages }} />);
+
+    expect(mocks.ayahSurahIds).toContain(5); // page 105, the first drawn page
+    expect(mocks.ayahSurahIds).not.toContain(12); // page 112 is two past the window
+  });
+
   it('keeps portrait on the window it has always used', () => {
     // The widening is landscape-only. Fetching two pages either side in portrait
     // would pull surahs nothing on screen can draw, which is three extra
