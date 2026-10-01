@@ -96,6 +96,10 @@ export function MushafReader({
   // reader's own header, and a page sized to the window would push its footer
   // off the bottom of the screen.
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
+  // Two facing pages, when the box is wider than it is tall. See the docstring:
+  // the box is measured here and nowhere else, so this is the only place that
+  // can answer the question.
+  const spread = size !== null && size.width > size.height;
 
   // The surahs whose ayah rows the pages on screen can need. Four pages, not
   // one: a surah that starts halfway down page N is the *opening* surah of
@@ -108,16 +112,25 @@ export function MushafReader({
   // surahs on a page run from the surah it opens with to the one the page
   // after it opens with, so the window's range covers every band and bismillah
   // inside it.
+  //
+  // One page wider either side on a spread: `page` is the leaf's recto, and the
+  // pager draws a leaf either side of it, so the drawn pages run from recto - 2
+  // to recto + 3 rather than from page - 1 to page + 1. Left at portrait's width
+  // the first drawn page would be outside the range, which is not a blank page
+  // but something worse -- a page that draws its words and leaves its band and
+  // its bismillah line empty.
   const surahIds = useMemo(() => {
-    const first = index.pages.get(page - 1)?.startSurahId ?? index.pages.get(page)?.startSurahId;
+    const back = spread ? 2 : 1;
+    const forward = spread ? 4 : 3;
+    const first = index.pages.get(page - back)?.startSurahId ?? index.pages.get(page)?.startSurahId;
     if (first === undefined) return [];
     // One past the window: the last window page runs up to whatever the next
     // page opens with, and past the end of the mushaf that is the last surah.
-    const last = index.pages.get(page + 3)?.startSurahId ?? LAST_SURAH_ID;
+    const last = index.pages.get(page + forward)?.startSurahId ?? LAST_SURAH_ID;
     const ids: number[] = [];
     for (let surahId = first; surahId <= Math.max(first, last); surahId += 1) ids.push(surahId);
     return ids;
-  }, [index.pages, page]);
+  }, [index.pages, page, spread]);
   const ayahs = useMushafAyahs(client, surahIds);
 
   const ayahTexts = useMemo(() => {
@@ -208,7 +221,7 @@ export function MushafReader({
           initialPage={initialPage}
           width={size.width}
           height={size.height}
-          spread={size.width > size.height}
+          spread={spread}
           ayahTexts={ayahTexts}
           surahNames={index.surahNames}
           uiLocale={uiLocale}

@@ -106,6 +106,55 @@ it('keeps one page per child when the box is taller than it is wide', () => {
     expect(mocks.pagerProps.at(-1)).toMatchObject({ spread: false });
   });
 
+it('fetches a page further either side on a spread', () => {
+    // `page` is the leaf's RECTO and the pager draws a leaf either side, so the
+    // drawn pages run recto - 2 .. recto + 3. At portrait's width the first and
+    // last drawn pages fall outside the fetched range, and a page outside it
+    // still draws its words -- it just draws its surah band and its bismillah
+    // line empty, which is how this failed on page 604 before.
+    // Out to 112, so the page one past the window has a surah of its own and the
+    // forward edge is observable rather than falling through to LAST_SURAH_ID.
+    const pages = new Map(
+      [103, 104, 105, 106, 107, 108, 109, 110, 111, 112].map((page) => [
+        page,
+        {
+          page,
+          startSurahId: page - 100,
+          startAyahNumber: 1,
+          surahName: `S${page}`,
+          juz: 6,
+        },
+      ]),
+    );
+    setAutoLayout({ width: 1400, height: 820 });
+    render(<MushafReader {...props} initialPage={107} index={{ ...index, pages }} />);
+
+    // Leaf (107,108) is leaf 53, so leaves 52..54 draw pages 105..110. The range
+    // runs from page 105's own surah to the surah page 111 opens with -- a surah
+    // that starts partway down page 110 is page 111's opener, and page 110 has
+    // to draw its bismillah.
+    expect(mocks.ayahSurahIds).toContain(5); // page 105, the first drawn page
+    expect(mocks.ayahSurahIds).toContain(11); // page 111, one past the window
+    expect(mocks.ayahSurahIds).not.toContain(4); // page 104 is not drawn
+  });
+
+  it('keeps portrait on the window it has always used', () => {
+    // The widening is landscape-only. Fetching two pages either side in portrait
+    // would pull surahs nothing on screen can draw, which is three extra
+    // queries per turn for nothing.
+    const pages = new Map(
+      [103, 104, 105, 106, 107, 108, 109].map((page) => [
+        page,
+        { page, startSurahId: page - 100, startAyahNumber: 1, surahName: `S${page}`, juz: 6 },
+      ]),
+    );
+    setAutoLayout({ width: 876, height: 1400 });
+    render(<MushafReader {...props} initialPage={106} index={{ ...index, pages }} />);
+
+    expect(mocks.ayahSurahIds).toContain(5); // page 105, the first drawn page
+    expect(mocks.ayahSurahIds).not.toContain(4); // page 104 is not drawn
+  });
+
   it('asks for a spread when the box is wider than it is tall', () => {
     setAutoLayout({ width: 1400, height: 820 });
     render(<MushafReader {...props} />);
