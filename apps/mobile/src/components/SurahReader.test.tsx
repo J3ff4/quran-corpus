@@ -2,8 +2,14 @@ import React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { deferred } from '@/testing/deferred';
+import { MAX_CONTENT_WIDTH } from '@/theme/contentWidth';
 import { SurahReader } from './SurahReader';
 import { estimateRowHeight } from './rowHeightModel';
+
+// Compact by default -- every existing test in this file renders at a phone
+// width and must keep doing so unchanged. Only the row/rail tests below move
+// it to the expanded class.
+const win = vi.hoisted(() => ({ width: 400, height: 800 }));
 
 const mocks = vi.hoisted(() => ({
   onViewableItemsChanged: null as ((info: { viewableItems: Array<{ item: unknown }> }) => void) | null,
@@ -16,6 +22,7 @@ const mocks = vi.hoisted(() => ({
     | ((data: unknown, index: number) => { length: number; offset: number; index: number })
     | null,
   headerLayout: null as ((height: number) => void) | null,
+  listLayout: null as ((width: number) => void) | null,
   /** The landing target's own onLayout. The list mock renders no real
    *  geometry, so this is how a test says where the row actually came out. */
   targetRowLayout: null as ((y: number) => void) | null,
@@ -38,6 +45,9 @@ const mocks = vi.hoisted(() => ({
   // worklet for a press scale.
   animatedStyles: [] as Array<() => Record<string, unknown>>,
   reduceMotion: false,
+  // Empty by default: most tests never reach the expanded class, and the
+  // rail draws fine with no juz headings.
+  juzIndex: [] as unknown[],
 }));
 
 
@@ -146,6 +156,18 @@ vi.mock('expo-router', async () => {
 vi.mock('@/data/readerPosition', () => ({
   getReaderPosition: (surahId: number) => mocks.getReaderPosition(surahId),
   setReaderPosition: (surahId: number, ayahNumber: number) => mocks.setReaderPosition(surahId, ayahNumber),
+}));
+
+// openCorpusDb reaches expo-asset/expo-file-system, native modules with no
+// jsdom counterpart. Only the rail's juz-index fetch touches either of these
+// two, and SurahPicker/WordSheet -- this file's other two corpusRepository
+// callers -- are themselves fully mocked below, so replacing the whole module
+// drops nothing a rendered SurahReader still reaches.
+vi.mock('@/data/openCorpusDb', () => ({
+  openCorpusDb: async () => ({}),
+}));
+vi.mock('@/data/corpusRepository', () => ({
+  getJuzIndex: async () => mocks.juzIndex,
 }));
 
 // The sheet has its own suite; stubbed here so this one covers the wiring --
@@ -287,7 +309,7 @@ vi.mock('react-native', async () => {
     // Forwards the ref, so the imperative scroll calls the component makes on
     // mount are observable. A plain function component silently swallows it
     // and every scroll assertion would pass against a null ref.
-    FlatList: ({ data, ListHeaderComponent, renderItem, CellRendererComponent, onViewableItemsChanged, onScrollToIndexFailed, onScroll, onContentSizeChange, getItemLayout, contentContainerStyle, importantForAccessibility, initialNumToRender, style, ref }: {
+    FlatList: ({ data, ListHeaderComponent, renderItem, CellRendererComponent, onViewableItemsChanged, onScrollToIndexFailed, onScroll, onContentSizeChange, onLayout, getItemLayout, contentContainerStyle, importantForAccessibility, initialNumToRender, style, ref }: {
       data: unknown[];
       ListHeaderComponent?: React.ReactNode;
       renderItem: (info: { item: unknown; index: number }) => React.ReactNode;
@@ -296,6 +318,7 @@ vi.mock('react-native', async () => {
       onScrollToIndexFailed?: (info: { index: number; averageItemLength: number }) => void;
       onScroll?: (event: { nativeEvent: { contentOffset: { y: number } } }) => void;
       onContentSizeChange?: (width: number, height: number) => void;
+      onLayout?: (event: { nativeEvent: { layout: { width: number } } }) => void;
       getItemLayout?: (data: unknown, index: number) => { length: number; offset: number; index: number };
       contentContainerStyle?: { paddingBottom?: number };
       importantForAccessibility?: string;
@@ -308,6 +331,9 @@ vi.mock('react-native', async () => {
       mocks.onScroll = onScroll ?? null;
       mocks.onContentSizeChange = onContentSizeChange ?? null;
       mocks.getItemLayout = getItemLayout ?? null;
+      mocks.listLayout = onLayout
+        ? (width: number) => onLayout({ nativeEvent: { layout: { width } } })
+        : null;
       React.useImperativeHandle(ref, () => ({
         scrollToIndex: mocks.scrollToIndex,
         scrollToOffset: mocks.scrollToOffset,
@@ -374,7 +400,7 @@ vi.mock('react-native', async () => {
       }
       return React.createElement(Div, props);
     },
-    useWindowDimensions: () => ({ width: 400, height: 800, scale: 2, fontScale: 1 }),
+    useWindowDimensions: () => ({ ...win, scale: 2, fontScale: 1 }),
     // The docked recitation bar's layer stretches over the reader.
     StyleSheet: (await import('@/testing/rnHosts.js')).StyleSheet,
     // useReducedMotion reads the OS flag, and useScreenReaderEnabled reads
@@ -402,12 +428,15 @@ async function viewAndSettleWords(item: unknown) {
 describe('SurahReader', () => {
   beforeEach(() => {
     screenReaderOn = false;
+    win.width = 400;
+    win.height = 800;
     mocks.scrollToIndex.mockClear();
     mocks.scrollToOffset.mockClear();
     mocks.push.mockClear();
     mocks.setOptions.mockClear();
     mocks.onScroll = null;
     mocks.headerLayout = null;
+    mocks.listLayout = null;
     mocks.targetRowLayout = null;
     mocks.autoLayoutY = null;
     mocks.animatedStyles = [];
@@ -507,6 +536,43 @@ describe('SurahReader', () => {
     // Offsets are cumulative: an index's offset is every earlier row summed.
     // FlatList sums nothing itself -- this table is the whole scroll geometry.
     expect(second.offset).toBe(first.length);
+  });
+
+  it('estimates rows against the capped measure, not the viewport', () => {
+    // The row model is width-dependent and onLayout measures the VIEWPORT,
+    // but since S4a the content inside it stops at MAX_CONTENT_WIDTH. Text
+    // wraps at the narrower of the two, so a tablet-wide viewport must
+    // estimate exactly what a 640dp one does -- anything else is half-height
+    // rows compounding down the whole offset table.
+    const props = baseProps(readerData(10));
+    render(<SurahReader {...props} />);
+
+    act(() => {
+      mocks.listLayout!(MAX_CONTENT_WIDTH);
+    });
+    const capped = mocks.getItemLayout!(props.data.ayahs, 5).offset;
+    act(() => {
+      mocks.listLayout!(1344);
+    });
+    expect(mocks.getItemLayout!(props.data.ayahs, 5).offset).toBe(capped);
+    expect(capped).toBeGreaterThan(0);
+  });
+
+  it('still narrows the estimate on a window narrower than the cap', () => {
+    // The clamp is a cap, not a constant: a phone is 360dp and its rows wrap
+    // sooner, so they are taller. Without this the clamp could be a hardcoded
+    // 640 and the test above would not notice.
+    const props = baseProps(readerData(10));
+    render(<SurahReader {...props} />);
+
+    act(() => {
+      mocks.listLayout!(MAX_CONTENT_WIDTH);
+    });
+    const capped = mocks.getItemLayout!(props.data.ayahs, 5).offset;
+    act(() => {
+      mocks.listLayout!(360);
+    });
+    expect(mocks.getItemLayout!(props.data.ayahs, 5).offset).toBeGreaterThan(capped);
   });
 
   it('counts the list header in every offset it hands FlatList', () => {
@@ -1865,6 +1931,125 @@ describe('SurahReader', () => {
     scrollTo(180, 200);
 
     expect(titleStyle()).toEqual({ opacity: 1, translateY: 0 });
+  });
+
+  describe('at the expanded window class', () => {
+    // Local to this block: win is module-level state, and a leaked 1000dp
+    // width would silently move every OTHER describe block in this file onto
+    // the expanded branch too (juz-index fetch included).
+    afterEach(() => {
+      win.width = 400;
+      win.height = 800;
+    });
+
+    it('draws no rail below the expanded class', () => {
+      // The hard constraint of this phase: a phone must render exactly what
+      // it does today. win defaults to 400 (compact) in beforeEach above.
+      render(<SurahReader {...baseProps(readerData())} />);
+
+      expect(screen.queryByTestId('rail-toggle')).toBeNull();
+    });
+
+    it('draws the rail at the expanded class, with a real flexGrow column beside it', () => {
+      win.width = 1000;
+      win.height = 1200;
+      render(<SurahReader {...baseProps(readerData())} />);
+
+      expect(screen.getByTestId('rail-toggle')).toBeTruthy();
+
+      // flex: 1, never flexShrink: 1 -- Android caches a Text's measured width
+      // across a window reconfiguration and a remount does not clear it
+      // (vc69->vc71 in S3). flexShrink alone would also leave flexGrow unset,
+      // so asserting only flexShrink here would pass on either implementation.
+      const column = screen.getByTestId('reader-ayah-column');
+      expect(column.style.flexGrow).toBe('1');
+      expect(Number.parseFloat(column.style.flexBasis)).toBe(0);
+    });
+
+    it('takes the rail out of the accessibility tree behind an open sheet', () => {
+      // The gate used to sit on the FlatList alone, and the rail is its
+      // SIBLING, not its descendant. accessibilityViewIsModal is iOS-only, so
+      // on Android a TalkBack swipe walked off the modal sheet straight onto
+      // every ayah button in the rail.
+      win.width = 1000;
+      win.height = 1200;
+      render(<SurahReader {...baseProps(readerData())} />);
+      const rail = () => screen.getByTestId('ayah-rail');
+
+      expect(rail().getAttribute('data-hidden-from-a11y')).toBeNull();
+
+      renderReaderHeader();
+      openHeaderActions();
+      fireEvent.click(screen.getByTestId('open-language'));
+
+      expect(rail().getAttribute('data-hidden-from-a11y')).toBe('true');
+    });
+
+    it('seeds the rail marker when the window becomes expanded', async () => {
+      // Viewability fires on a viewable-SET change, never on a resize, so a
+      // reader scrolled to 2:3 on a folded Fold and then unfolded left the
+      // rail with no marker at all until the next hand scroll.
+      win.width = 400;
+      win.height = 800;
+      const data = readerData(5);
+      const { rerender } = render(<SurahReader {...baseProps(data)} />);
+      await act(async () => {});
+      act(() => {
+        mocks.onViewableItemsChanged?.({ viewableItems: [{ item: data.ayahs[2] }] });
+      });
+
+      win.width = 1000;
+      win.height = 1200;
+      rerender(<SurahReader {...baseProps(data)} />);
+
+      const active = screen.getAllByTestId('rail-ayah').filter((n) => n.dataset.active === 'true');
+      expect(active.map((n) => n.dataset.ayah)).toEqual(['3']);
+    });
+
+    it('marks the ayah a deep-link landing settled on, with no scroll after it', async () => {
+      // Same blind spot as the two reading-position writes beside it in
+      // reveal(): the marker is fed from onViewableItemsChanged, which is
+      // muted for the whole jump and never fires again on its own. On the
+      // device at vc77, opening Al-Baqara at 2:142 from the Continue-reading
+      // card and expanding the rail showed it parked at ayah 1 with nothing
+      // marked, while the reader sat at 142.
+      win.width = 1000;
+      win.height = 1200;
+      vi.useFakeTimers();
+      try {
+        // readerData(30) is the one fixture whose surah carries a real
+        // ayah_count (286, Al-Baqara), and the rail draws ayah_count rows --
+        // the 300-ayah fixture still says al-Fatihah's 7.
+        render(<SurahReader {...baseProps(readerData(30))} initialAyahNumber={25} />);
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(8100);
+        });
+
+        // The landing really did settle, so a missing marker below is the
+        // marker's own gap and not a landing that never ran.
+        expect(mocks.setReaderPosition).toHaveBeenCalledWith(2, 25);
+        const active = screen
+          .getAllByTestId('rail-ayah')
+          .filter((n) => n.dataset.active === 'true');
+        expect(active.map((n) => n.dataset.ayah)).toEqual(['25']);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('asks the reader to jump when a rail ayah is tapped', () => {
+      win.width = 1000;
+      win.height = 1200;
+      const onJump = vi.fn();
+      render(<SurahReader {...baseProps(readerData())} onJump={onJump} />);
+
+      const row = screen.getAllByTestId('rail-ayah').find((n) => n.dataset.ayah === '3');
+      fireEvent.click(row!);
+
+      // Al-Fatihah is surah 1 in readerData()'s default branch.
+      expect(onJump).toHaveBeenCalledWith(1, 3);
+    });
   });
 });
 

@@ -9,10 +9,12 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useGlassSkin } from '@/components/GlassSurface';
 import { useReducedMotion } from '@/motion/useReducedMotion';
 import { centredContent } from '@/theme/contentWidth';
 import { useStableInsets } from '@/theme/useStableInsets';
 import { useThemeColors } from '@/theme/themeContext';
+import { useWindowClass } from '@/theme/windowClass';
 
 // No spring. Owner ruling 2026-08-17, after the third device run: "i dont like
 // that spring. just regular movement is fine." Two prior passes tried to tune
@@ -65,8 +67,14 @@ export interface BottomSheetProps {
  */
 export function BottomSheet({ onClose, closeLabel, bottomPadding = 16, children }: BottomSheetProps) {
   const theme = useThemeColors();
+  const skin = useGlassSkin();
   const reduced = useReducedMotion();
   const { height: screenHeight } = useWindowDimensions();
+  // R9: a sheet that spans a 1400dp tablet reads as broken, not roomy -- at
+  // the expanded window class it becomes a centred dialog instead. Medium
+  // deliberately keeps the sheet: a 700dp window is not wide enough for a
+  // dialog to read as anything but a sheet with margins.
+  const isDialog = useWindowClass() === 'expanded';
 
   // Starts a full screen down so the first frame is off-screen, rather than the
   // sheet appearing in place and then sliding.
@@ -152,7 +160,11 @@ export function BottomSheet({ onClose, closeLabel, bottomPadding = 16, children 
   }, [onClose]);
 
   const pan = Gesture.Pan()
-    .enabled(!reduced)
+    // Drag-to-dismiss is meaningless on a centred card -- there is no edge to
+    // drag toward -- so it is disabled at expanded, same as under reduced
+    // motion. The GestureDetector below is also unmounted entirely at
+    // expanded; this belt-and-braces the case where it isn't.
+    .enabled(!reduced && !isDialog)
     .onUpdate((event) => {
       // Downward only: dragging up would lift the sheet off the bottom edge
       // and open a gap onto the backdrop.
@@ -183,15 +195,43 @@ export function BottomSheet({ onClose, closeLabel, bottomPadding = 16, children 
     });
 
   const backdropStyle = useAnimatedStyle(() => ({ opacity: fade.value }));
-  const sheetStyle = useAnimatedStyle(() => ({
-    // Under reduced motion the sheet fades with the backdrop and never moves;
-    // otherwise it is opaque throughout and only translates.
-    opacity: reduced ? fade.value : 1,
-    // Minus the keyboard, so the sheet sits ON its top edge rather than under
-    // it. Subtracted from the same value the entrance and the drag write, so
-    // a sheet dragged down with the keyboard up still lands where it should
-    // and a keyboard opening mid-entrance does not fight the slide.
-    transform: [{ translateY: translateY.value - keyboardLift.value }],
+  const sheetStyle = useAnimatedStyle(() => {
+    if (isDialog) {
+      // Scale + fade, not a slide -- there is no bottom edge to slide up
+      // from. Driven off `fade`, the same value the sheet's own entrance
+      // already animates: no second shared value to keep in sync. Under
+      // reduced motion, opacity only, per the same rule as the sheet.
+      return {
+        opacity: fade.value,
+        transform: [{ scale: reduced ? 1 : 0.92 + fade.value * 0.08 }],
+      };
+    }
+    return {
+      // Under reduced motion the sheet fades with the backdrop and never
+      // moves; otherwise it is opaque throughout and only translates.
+      opacity: reduced ? fade.value : 1,
+      // Minus the keyboard, so the sheet sits ON its top edge rather than
+      // under it. Subtracted from the same value the entrance and the drag
+      // write, so a sheet dragged down with the keyboard up still lands
+      // where it should and a keyboard opening mid-entrance does not fight
+      // the slide.
+      transform: [{ translateY: translateY.value - keyboardLift.value }],
+    };
+  });
+
+  // The dialog clears the keyboard by shrinking the box it is centred in, not
+  // by moving the card. Translating a centred card up by a full keyboard's
+  // height pushes a tall one's top edge off the screen; padding the container
+  // cannot, because the card is still centred in whatever is left.
+  //
+  // Same `keyboardLift` the sheet path uses, for the same reason: this lives
+  // in a <Modal>, where `useAnimatedKeyboard` reads 0 forever (see the comment
+  // on keyboardLift). The owner hit exactly that bug on the sheet path --
+  // 2026-09-10, "text area is still behind the keyboard" -- and the note sheet
+  // is a dialog at expanded, so shipping this branch without a lift recreates
+  // it on a tablet. With the keyboard closed the lift is 0 and this is inert.
+  const dialogLiftStyle = useAnimatedStyle(() => ({
+    paddingBottom: isDialog ? keyboardLift.value : 0,
   }));
 
   return (
@@ -221,7 +261,18 @@ export function BottomSheet({ onClose, closeLabel, bottomPadding = 16, children 
           was fixing is handled by padding the sheet past the inset instead,
           which is the thing that was actually wrong. */}
       <GestureHandlerRootView style={StyleSheet.absoluteFill}>
-        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+        <Animated.View
+          testID="sheet-container"
+          style={[
+            StyleSheet.absoluteFill,
+            // Below expanded the surface positions itself (`position:
+            // absolute, bottom: 0`) and this is inert. At expanded the
+            // surface is a normal flow child, centred by its parent.
+            { justifyContent: isDialog ? 'center' : 'flex-end' },
+            dialogLiftStyle,
+          ]}
+          pointerEvents="box-none"
+        >
       <AnimatedPressable
         testID="sheet-backdrop"
         accessibilityRole="button"
@@ -229,68 +280,106 @@ export function BottomSheet({ onClose, closeLabel, bottomPadding = 16, children 
         onPress={onClose}
         style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0, 0, 0, 0.4)' }, backdropStyle]}
       />
-      <GestureDetector gesture={pan}>
-        <Animated.View
-          role="dialog"
-          aria-modal
-          testID="sheet-surface"
-          onLayout={(event: LayoutChangeEvent) => {
-            sheetHeight.value = event.nativeEvent.layout.height;
-          }}
-          style={[
-            {
-              position: 'absolute',
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: theme.surface,
-              borderTopLeftRadius: 16,
-              borderTopRightRadius: 16,
-              paddingHorizontal: 20,
-              // Owner, 2026-09-10, on the device: "remove these big padding on
-              // top word sheet. and note has both top and bottom big padding."
-              // The handle's own marginBottom is gone with it: the column's
-              // `gap` already separates it from the first row, so the two were
-              // stacking to 34dp under a 4dp bar. 8 + handle + gap puts the
-              // first row 26dp down, half of the 50 it was, and the 28 below
-              // was dead space under Save with the keyboard up.
-              paddingTop: 8,
-              // Past the navigation bar, not under it. The sheet is
-              // anchored at bottom: 0 of an edge-to-edge window, so on a
-              // three-button device the buttons sat ON its last row (owner, on
-              // an S24, 2026-09-15).
-              paddingBottom: bottomPadding + bottomInset,
-              gap: 14,
-            },
-            sheetStyle,
-          ]}
-        >
-          <View
-            style={{
-              alignSelf: 'center',
-              width: 40,
-              height: 4,
-              borderRadius: 2,
-              backgroundColor: theme.border,
+      {(() => {
+        const surface = (
+          <Animated.View
+            role="dialog"
+            aria-modal
+            testID="sheet-surface"
+            onLayout={(event: LayoutChangeEvent) => {
+              sheetHeight.value = event.nativeEvent.layout.height;
             }}
-          />
-          <View
-            testID="sheet-content"
-            // The surface stays full-bleed -- it is the bottom edge of the
-            // window -- but its rows do not. Every scene in the app is capped
-            // by `centredContent` on the navigator's sceneStyle, and a sheet
-            // lives in a <Modal>, outside that navigator, so it was the one
-            // surface still pinned to both edges: on the Tab S10+ in landscape
-            // (1400dp, 2026-09-28) the word sheet's `Full analysis` row ran
-            // 1360dp with its chevron marooned at the far edge. Same pattern
-            // as GlassTabBar: full-bleed bar, centred column inside it.
-            style={{ ...centredContent, gap: 14 }}
+            style={[
+              isDialog
+                ? {
+                    // A centred card, not a sheet: all four corners, no
+                    // bottom inset to clear (nothing is docked against a
+                    // system bar), and 520 rather than 640 because a dialog
+                    // wants to read as an object on the screen, not as a
+                    // column of the page.
+                    alignSelf: 'center',
+                    width: '100%',
+                    maxWidth: 520,
+                    backgroundColor: theme.surface,
+                    borderRadius: 28,
+                    paddingHorizontal: 20,
+                    paddingTop: 20,
+                    // Symmetric by default, but `bottomPadding` still wins
+                    // when it asks for more: the word sheet passes 24 to keep
+                    // its last row off the edge, and a dialog that silently
+                    // ignored it would be the only surface in the app where
+                    // that prop does nothing. No `bottomInset` here -- a
+                    // centred card is not docked against a system bar.
+                    paddingBottom: Math.max(bottomPadding, 20),
+                    gap: 14,
+                    // Android draws only `elevation`, not the shadow* props
+                    // -- reuses the same card shadow every other surface in
+                    // the app lifts off the page with.
+                    ...skin.shadow,
+                  }
+                : {
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: theme.surface,
+                    borderTopLeftRadius: 16,
+                    borderTopRightRadius: 16,
+                    paddingHorizontal: 20,
+                    // Owner, 2026-09-10, on the device: "remove these big padding on
+                    // top word sheet. and note has both top and bottom big padding."
+                    // The handle's own marginBottom is gone with it: the column's
+                    // `gap` already separates it from the first row, so the two were
+                    // stacking to 34dp under a 4dp bar. 8 + handle + gap puts the
+                    // first row 26dp down, half of the 50 it was, and the 28 below
+                    // was dead space under Save with the keyboard up.
+                    paddingTop: 8,
+                    // Past the navigation bar, not under it. The sheet is
+                    // anchored at bottom: 0 of an edge-to-edge window, so on a
+                    // three-button device the buttons sat ON its last row (owner, on
+                    // an S24, 2026-09-15).
+                    paddingBottom: bottomPadding + bottomInset,
+                    gap: 14,
+                  },
+              sheetStyle,
+            ]}
           >
-            {children}
-          </View>
+            {!isDialog && (
+              // Hidden at expanded: the handle advertises a drag, and the
+              // dialog has no drag to advertise.
+              <View
+                testID="sheet-handle"
+                style={{
+                  alignSelf: 'center',
+                  width: 40,
+                  height: 4,
+                  borderRadius: 2,
+                  backgroundColor: theme.border,
+                }}
+              />
+            )}
+            <View
+              testID="sheet-content"
+              // The surface stays full-bleed -- it is the bottom edge of the
+              // window -- but its rows do not. Every scene in the app is capped
+              // by `centredContent` on the navigator's sceneStyle, and a sheet
+              // lives in a <Modal>, outside that navigator, so it was the one
+              // surface still pinned to both edges: on the Tab S10+ in landscape
+              // (1400dp, 2026-09-28) the word sheet's `Full analysis` row ran
+              // 1360dp with its chevron marooned at the far edge. Same pattern
+              // as GlassTabBar: full-bleed bar, centred column inside it.
+              style={{ ...centredContent, gap: 14 }}
+            >
+              {children}
+            </View>
+          </Animated.View>
+        );
+        // Drag-to-dismiss only exists for the sheet: a dialog has no edge to
+        // drag toward, so it mounts no GestureDetector at all rather than one
+        // that is merely disabled.
+        return isDialog ? surface : <GestureDetector gesture={pan}>{surface}</GestureDetector>;
+      })()}
         </Animated.View>
-        </GestureDetector>
-        </View>
       </GestureHandlerRootView>
     </Modal>
   );

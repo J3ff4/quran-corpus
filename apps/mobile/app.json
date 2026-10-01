@@ -4,7 +4,7 @@
     "slug": "quran-corpus-mobile",
     "scheme": "qurancorpus",
     "version": "0.0.1",
-    "orientation": "portrait",
+    "orientation": "default",
     "userInterfaceStyle": "automatic",
     "icon": "./assets/icons/icon.png",
     "assetBundlePatterns": [
@@ -12,7 +12,7 @@
     ],
     "android": {
       "package": "com.qurancorpus.mobile",
-      "versionCode": 72,
+      "versionCode": 78,
       "adaptiveIcon": {
         "foregroundImage": "./assets/icons/adaptive-icon.png",
         "backgroundColor": "#faf8f3"

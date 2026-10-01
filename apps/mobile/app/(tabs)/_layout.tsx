@@ -1,5 +1,4 @@
 import { Tabs } from 'expo-router';
-import { centredContent } from '@/theme/contentWidth';
 import { useStableInsets } from '@/theme/useStableInsets';
 import { GlassTabBar } from '@/components/GlassTabBar';
 import { MiniPlayer } from '@/components/MiniPlayer';
@@ -26,10 +25,11 @@ export default function TabsLayout() {
         // The bloom in app/_layout.tsx is the background for every screen. An
         // opaque scene covers it and leaves the tab pill floating over a flat
         // rectangle.
-        // centredContent stops the scene growing past a readable column on a
-        // tablet or an unfolded Fold. Applied to the scene rather than inside
-        // the five screens for the same reason paddingTop is.
-        sceneStyle: { backgroundColor: 'transparent', paddingTop: top, ...centredContent },
+        // No width cap here: a navigator cannot know what the scene below it
+        // draws, and capping all five at 640 turned every tab into a phone-width
+        // strip on a tablet (owner, 2026-09-28). The measure lives on the
+        // content that wants one -- SurahReader's column, the prose screens.
+        sceneStyle: { backgroundColor: 'transparent', paddingTop: top },
       }}
     >
       {/* Titles and icons live in GlassTabBar's own TABS map -- one place, not

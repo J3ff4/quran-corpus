@@ -10,6 +10,7 @@ import {
   type RootSearchItem,
 } from '@quran-corpus/data/mobile';
 import { AlphabetGrid } from '@/components/AlphabetGrid';
+import { GridCell } from '@/components/BrowseList';
 import { DictionaryRow } from '@/components/DictionaryRow';
 import { FrequencyList } from '@/components/FrequencyList';
 import { useGlassSkin } from '@/components/GlassSurface';
@@ -23,6 +24,8 @@ import { useAppSettings } from '@/settings/settingsStore';
 import { radii, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
+import { minCardWidths } from '@/theme/minCardWidths';
+import { useColumns } from '@/theme/windowClass';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -197,6 +200,17 @@ export function DictionaryScreen() {
   const { uiLocale } = useAppSettings();
   const theme = useThemeColors();
   const paddingBottom = useListBottomPadding();
+  // Unlike browse/bookmarks/search, this list has NO container padding and no
+  // columnWrapperStyle gap: DictionaryRow carries marginHorizontal: 16 itself,
+  // because FrequencyList renders the same card. So the cells must tile the
+  // full width -- padding or a gap subtracted here is dead space off the right
+  // edge, and the card's own margins were then counted a second time, giving a
+  // 16dp left gutter against a 48dp right one (review, 2026-10-01). The minimum
+  // is raised by those same 32 so it still means "a card at least 300 wide".
+  const { columns, itemWidth } = useColumns(minCardWidths.dictionaryRoot + 32, {
+    gap: 0,
+    horizontalPadding: 0,
+  });
   const [pane, setPane] = useState<Pane>('browse');
   const [kind, setKind] = useState<'roots' | 'lemmas' | 'verbs'>('roots');
   // null while loading; a bare TextInput/list must not read as "no roots" for
@@ -319,15 +333,17 @@ export function DictionaryScreen() {
 
   const renderRow = useCallback(
     ({ item }: { item: BrowseRoot }) => (
-      <DictionaryRow
-        uiLocale={uiLocale}
-        arabic={item.root_arabic}
-        translit={item.root_buckwalter}
-        count={item.occurrence_count}
-        href={`/root/${encodeURIComponent(item.root_buckwalter)}`}
-      />
+      <GridCell width={itemWidth}>
+        <DictionaryRow
+          uiLocale={uiLocale}
+          arabic={item.root_arabic}
+          translit={item.root_buckwalter}
+          count={item.occurrence_count}
+          href={`/root/${encodeURIComponent(item.root_buckwalter)}`}
+        />
+      </GridCell>
     ),
-    [uiLocale],
+    [uiLocale, itemWidth],
   );
 
   const paneOptions = useMemo(
@@ -384,6 +400,12 @@ export function DictionaryScreen() {
             <FlatList
               testID="dictionary-list"
               data={visible}
+              numColumns={columns}
+              // RN throws on a numColumns change without a remount, and a
+              // rotation changes it. The key is the column count, so the list
+              // rebuilds exactly when RN requires it and never otherwise.
+              key={`cols-${columns}`}
+              columnWrapperStyle={columns > 1 ? { gap: 10 } : undefined}
               keyExtractor={keyOfRoot}
               // Otherwise Android's default ("never") reads the first tap on a
               // row -- with the keyboard open from the search box above -- as
@@ -393,6 +415,7 @@ export function DictionaryScreen() {
                 <>
                   {searching ? null : (
                     <AlphabetGrid
+                      testID="dictionary-alphabet"
                       uiLocale={uiLocale}
                       available={available}
                       activeLetter={letter}

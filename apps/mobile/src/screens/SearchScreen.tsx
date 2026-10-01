@@ -23,6 +23,8 @@ import { useAppSettings } from '@/settings/settingsStore';
 import { fonts, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
+import { minCardWidths } from '@/theme/minCardWidths';
+import { useColumns } from '@/theme/windowClass';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -55,12 +57,16 @@ function ResultCard({
   accessibilityLabel,
   onPress,
   tinted = false,
+  style,
   children,
 }: {
   testID: string;
   accessibilityLabel?: string;
   onPress: () => void;
   tinted?: boolean;
+  /** The pinned width on a wide window (Task 6) -- undefined at one column,
+   *  where the card keeps filling its parent exactly as it does on a phone. */
+  style?: { width: number } | undefined;
   children: React.ReactNode;
 }) {
   const theme = useThemeColors();
@@ -74,7 +80,7 @@ function ResultCard({
       onPress={onPress}
       onPressIn={press.onPressIn}
       onPressOut={press.onPressOut}
-      style={[press.style, { marginBottom: 9 }]}
+      style={[press.style, { marginBottom: 9 }, style]}
     >
       <GlassSurface
         // Through `tint` rather than a backgroundColor in `style`: both reach
@@ -113,6 +119,19 @@ export function SearchScreen() {
   const { uiLocale, queryLanguage, nameLanguage } = useAppSettings();
   const theme = useThemeColors();
   const paddingBottom = useListBottomPadding();
+  // Search results are a plain `.map()` in a ScrollView, not a FlatList/
+  // SectionList (Task 6 differs from Tasks 3-5 for exactly this reason) --
+  // so the grid is `flexWrap` on each group's container plus a pinned card
+  // width, not `numColumns`/`chunk`.
+  const { columns, itemWidth } = useColumns(minCardWidths.searchResult, {
+    gap: 10,
+    horizontalPadding: 32,
+  });
+  const groupStyle =
+    columns > 1
+      ? { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: 10 }
+      : undefined;
+  const cardStyle = itemWidth === undefined ? undefined : { width: itemWidth };
 
   const [query, setQuery] = useState('');
   const [result, setResult] = useState<SearchResult>(EMPTY_SEARCH_RESULT);
@@ -373,14 +392,24 @@ export function SearchScreen() {
 
         {result.verses.length > 0 ? (
           <>
-            <Text accessibilityRole="header" style={heading}>{t(uiLocale, 'search.verses').toUpperCase()}</Text>
-            {result.verses.map((hit) => {
+            <Text
+              testID="search-heading-ayahs"
+              accessibilityRole="header"
+              style={heading}
+            >
+              {t(uiLocale, 'search.verses').toUpperCase()}
+            </Text>
+            {/* The heading stays outside this View: swept into the wrap flow
+                it would become a column and stop heading anything. */}
+            <View testID="search-group-ayahs" style={groupStyle}>
+              {result.verses.map((hit) => {
               const languageLabel = crossLanguageLabel(hit.source, queryLanguage);
               return (
                 <ResultCard
                   key={`${hit.source}-${hit.surah_id}-${hit.ayah_number}`}
                   testID="search-verse"
                   onPress={() => router.push(`/surah/${hit.surah_id}?ayah=${hit.ayah_number}`)}
+                  style={cardStyle}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <Text
@@ -426,14 +455,22 @@ export function SearchScreen() {
                   />
                 </ResultCard>
               );
-            })}
+              })}
+            </View>
           </>
         ) : null}
 
         {result.roots.length > 0 ? (
           <>
-            <Text accessibilityRole="header" style={heading}>{t(uiLocale, 'search.roots').toUpperCase()}</Text>
-            {result.roots.map((root) => (
+            <Text
+              testID="search-heading-roots"
+              accessibilityRole="header"
+              style={heading}
+            >
+              {t(uiLocale, 'search.roots').toUpperCase()}
+            </Text>
+            <View testID="search-group-roots" style={groupStyle}>
+              {result.roots.map((root) => (
               <ResultCard
                 key={root.root_buckwalter}
                 testID="search-root"
@@ -442,6 +479,7 @@ export function SearchScreen() {
                 // with nothing to say what the number counts.
                 accessibilityLabel={`${root.root_arabic}, ${root.occurrence_count} ${t(uiLocale, 'dictionary.occurrences')}`}
                 onPress={() => router.push(`/root/${encodeURIComponent(root.root_buckwalter)}`)}
+                style={cardStyle}
               >
                 <View
                   style={{
@@ -476,7 +514,8 @@ export function SearchScreen() {
                   </Text>
                 </View>
               </ResultCard>
-            ))}
+              ))}
+            </View>
           </>
         ) : null}
       </ScrollView>

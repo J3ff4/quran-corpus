@@ -592,6 +592,34 @@ describe('loadPersistedAppSettings', () => {
     await expect(loadPersistedAppSettings(userClient)).resolves.toMatchObject({ continuousPlay: true });
   });
 
+  it('reads readerRailCollapsed as on only for the exact stored "true"', async () => {
+    // Same String(value) hazard as reduceMotion and continuousPlay above: the
+    // rail defaults open, so a garbage row must not silently collapse it.
+    const userClient = requireSettingsClient();
+    await saveSetting(userClient, 'readerRailCollapsed', 'false');
+
+    await expect(loadPersistedAppSettings(userClient)).resolves.toMatchObject({
+      readerRailCollapsed: false,
+    });
+
+    await saveSetting(userClient, 'readerRailCollapsed', 'true');
+
+    await expect(loadPersistedAppSettings(userClient)).resolves.toMatchObject({
+      readerRailCollapsed: true,
+    });
+  });
+
+  it('falls back to OPEN for a readerRailCollapsed it does not recognise', async () => {
+    const userClient = requireSettingsClient();
+    for (const bad of ['maybe', 'TRUE', '1', '']) {
+      await saveSetting(userClient, 'readerRailCollapsed', bad);
+
+      const settings = await loadPersistedAppSettings(userClient);
+
+      expect(settings.readerRailCollapsed, `stored ${JSON.stringify(bad)}`).toBe(false);
+    }
+  });
+
   it('shows the translation until the reader says otherwise', async () => {
     // Default true: translation mode with no translation is an empty card.
     const userClient = requireSettingsClient();

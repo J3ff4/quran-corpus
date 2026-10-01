@@ -4,6 +4,21 @@ import { MAX_CONTENT_WIDTH } from '@/theme/contentWidth';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BottomSheet } from './BottomSheet';
 
+// A mutable width/height behind useWindowDimensions, so the dialog tests
+// below can move the window without a second `vi.mock('react-native', ...)`
+// -- only one factory per mocked module is honoured. Same pattern as
+// SearchScreen.test.tsx / DictionaryScreen.test.tsx / BrowseList.test.tsx.
+const win = vi.hoisted(() => ({ width: 400, height: 800 }));
+
+// Reset at the top level, not inside one describe's beforeEach: a test late
+// in the file left `win.width` at 1400 and it leaked into the unrelated
+// "disappearing navigation bar" describe below, which never touches `win`
+// itself.
+beforeEach(() => {
+  win.width = 400;
+  win.height = 800;
+});
+
 /** The sheet's recorded `onEnd`, the only gesture callback this suite drives. */
 function panEnd() {
   return mocks.gestures.get('onEnd') as
@@ -27,7 +42,9 @@ const mocks = vi.hoisted(() => ({
   /** The sheet's own Keyboard subscriptions, by event name. jsdom has no
    *  keyboard, so calling one of these IS the keyboard opening. */
   keyboardListeners: new Map<string, (event: unknown) => void>(),
-  /** Every useAnimatedStyle worklet, in declaration order: backdrop, sheet. */
+  /** Every useAnimatedStyle worklet, in declaration order: backdrop, sheet,
+   *  dialog lift. Indexed BY POSITION below, so a new one declared earlier
+   *  silently re-points every assertion. */
   styleFactories: [] as Array<() => Record<string, unknown>>,
   gestures: new Map<string, (event: never) => void>(),
   // Which animation primitive each move went through. The frames are not
@@ -74,7 +91,7 @@ vi.mock('react-native', async () => {
     StyleSheet: { absoluteFill: {} },
     Text: host('span'),
     View: host('div'),
-    useWindowDimensions: () => ({ width: 400, height: 800, scale: 2, fontScale: 1 }),
+    useWindowDimensions: () => ({ width: win.width, height: win.height, scale: 2, fontScale: 1 }),
   };
 });
 
@@ -198,6 +215,10 @@ describe('BottomSheet', () => {
     // carries `centredContent`, so it was the one surface in the app still
     // pinned to both edges: the word sheet's rows ran the full 1400dp of a
     // Tab S10+ in landscape with their chevrons at the far edge (2026-09-28).
+    // Set explicitly rather than trusting the default: this test is about
+    // `centredContent`'s own cap, not about the dialog/sheet split R9 adds,
+    // so it stays below the expanded threshold on purpose.
+    win.width = 700;
     render(<BottomSheet onClose={() => {}} closeLabel="Close"><span>body</span></BottomSheet>);
 
     const content = screen.getByTestId('sheet-content');
@@ -385,6 +406,104 @@ describe('BottomSheet', () => {
     render(<BottomSheet onClose={() => {}} closeLabel="Close"><span>the body</span></BottomSheet>);
 
     expect(screen.getByRole('dialog').textContent).toContain('the body');
+  });
+
+  it('becomes a centred dialog on an expanded window', () => {
+    // R9. A bottom sheet on a 1400dp landscape tablet puts its controls at the
+    // far bottom edge, away from both hands.
+    win.width = 1400;
+    win.height = 900;
+    render(<BottomSheet onClose={() => {}} closeLabel="Close"><span>body</span></BottomSheet>);
+
+    const surface = screen.getByTestId('sheet-surface');
+    expect(surface.style.maxWidth).toBe('520px');
+    expect(surface.style.alignSelf).toBe('center');
+    // Not glued to the bottom any more.
+    expect(surface.style.bottom).toBe('');
+  });
+
+  it('hides the grab handle on a dialog', () => {
+    // The handle advertises a drag, and the dialog has no drag.
+    win.width = 1400;
+    render(<BottomSheet onClose={() => {}} closeLabel="Close"><span>body</span></BottomSheet>);
+    expect(screen.queryByTestId('sheet-handle')).toBeNull();
+  });
+
+  it('stays a bottom sheet on a phone and on a medium window', () => {
+    // Compact unchanged, and medium deliberately keeps the sheet: a 700dp
+    // window is not wide enough for a dialog to read as anything but a sheet
+    // with margins.
+    for (const width of [360, 700]) {
+      win.width = width;
+      render(<BottomSheet onClose={() => {}} closeLabel="Close"><span>body</span></BottomSheet>);
+      expect(screen.getByTestId('sheet-surface').style.bottom).toBe('0px');
+      expect(screen.getByTestId('sheet-handle')).toBeTruthy();
+      cleanup();
+    }
+  });
+
+  it('still dismisses a dialog on backdrop tap', () => {
+    // Drag is gone at expanded; backdrop tap and the back button are what is
+    // left, so neither may regress along with it.
+    win.width = 1400;
+    const onClose = vi.fn();
+    render(<BottomSheet onClose={onClose} closeLabel="Close"><span>body</span></BottomSheet>);
+
+    fireEvent.click(screen.getByTestId('sheet-backdrop'));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('centres a dialog in the space above the keyboard', () => {
+    // The note sheet is a dialog at expanded, and a dialog that ignores the
+    // keyboard puts its text area behind it -- the exact bug the owner hit on
+    // the sheet path (2026-09-10, "text area is still behind the keyboard").
+    // The container is padded rather than the card translated: translating a
+    // tall card by a full keyboard's height pushes its top edge off-screen,
+    // shrinking the box it centres in cannot.
+    win.width = 1400;
+    render(<BottomSheet onClose={() => {}} closeLabel="Close"><span>body</span></BottomSheet>);
+
+    mocks.keyboardListeners.get('keyboardDidShow')?.({ endCoordinates: { height: 300 } });
+
+    // 300 of keyboard + the 24dp bottom inset, same sum the sheet path lifts by.
+    expect(mocks.styleFactories[2]!().paddingBottom).toBe(324);
+  });
+
+  it('leaves the sheet path unpadded when the keyboard opens', () => {
+    // The other half of the branch. Below expanded the surface is
+    // `position: absolute, bottom: 0` and lifts itself by translateY -- an
+    // ungated container padding would move the backdrop's flex box under a
+    // sheet that is already clearing the keyboard on its own.
+    win.width = 400;
+    render(<BottomSheet onClose={() => {}} closeLabel="Close"><span>body</span></BottomSheet>);
+
+    mocks.keyboardListeners.get('keyboardDidShow')?.({ endCoordinates: { height: 300 } });
+
+    expect(mocks.styleFactories[2]!().paddingBottom).toBe(0);
+  });
+
+  it('lets a dialog ask for more room under its last row', () => {
+    // The word sheet passes bottomPadding={24}. A dialog hardcoded to 20 is
+    // the one surface in the app where that prop silently does nothing.
+    win.width = 1400;
+    const { rerender } = render(<BottomSheet onClose={() => {}} closeLabel="Close"><span>body</span></BottomSheet>);
+    // No bottom inset on a dialog -- it is not docked against a system bar.
+    expect(screen.getByTestId('sheet-surface').style.paddingBottom).toBe('20px');
+
+    rerender(<BottomSheet onClose={() => {}} closeLabel="Close" bottomPadding={24}><span>body</span></BottomSheet>);
+    expect(screen.getByTestId('sheet-surface').style.paddingBottom).toBe('24px');
+  });
+
+  it('still dismisses a dialog on the Android back button', () => {
+    win.width = 1400;
+    const onClose = vi.fn();
+    render(<BottomSheet onClose={onClose} closeLabel="Close"><span>body</span></BottomSheet>);
+
+    const handled = mocks.backPress?.();
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(handled).toBe(true);
   });
 });
 

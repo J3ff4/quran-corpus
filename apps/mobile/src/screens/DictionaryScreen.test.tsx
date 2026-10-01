@@ -25,6 +25,11 @@ const mocks = vi.hoisted(() => ({
   ] as unknown[],
 }));
 
+// A mutable width behind useWindowDimensions, so the column tests below can
+// move the window without a second `vi.mock('react-native', ...)` -- only one
+// factory per mocked module is honoured. Same pattern as BrowseList.test.tsx.
+const win = vi.hoisted(() => ({ width: 390 }));
+
 vi.mock('@/settings/settingsStore', () => ({ useAppSettings: () => ({ uiLocale: 'en', reduceMotion: false }) }));
 vi.mock('expo-router', () => ({ router: { push: mocks.push } }));
 vi.mock('@/components/icons/Icon', () => ({ Icon: () => null }));
@@ -76,17 +81,23 @@ vi.mock('react-native', async () => {
     renderItem,
     ListHeaderComponent,
     ListEmptyComponent,
+    numColumns,
     testID,
   }: {
     data: unknown[];
     renderItem: (info: { item: unknown; index: number }) => React.ReactNode;
     ListHeaderComponent?: React.ReactNode;
     ListEmptyComponent?: React.ReactNode;
+    numColumns?: number;
     testID?: string;
   }) =>
     React.createElement(
       'div',
-      { 'data-testid': testID },
+      {
+        'data-testid': testID,
+        // Read back via `.dataset.numColumns` -- see the column tests below.
+        'data-num-columns': numColumns === undefined ? undefined : String(numColumns),
+      },
       ListHeaderComponent ?? null,
       data.length === 0
         ? (ListEmptyComponent ?? null)
@@ -106,6 +117,7 @@ vi.mock('react-native', async () => {
     Text: host('span'),
     TextInput: Input,
     View: host('div'),
+    useWindowDimensions: () => ({ width: win.width, height: 844, scale: 3, fontScale: 1 }),
   };
 });
 
@@ -133,11 +145,21 @@ async function renderLoadedWithLetters() {
   return qaf;
 }
 
+/** A bare mount, for the column tests: `numColumns` comes from
+ *  useWindowDimensions alone, so it is on the list before the roots query
+ *  ever settles. */
+function renderScreen() {
+  render(<DictionaryScreen />);
+}
+
 describe('DictionaryScreen', () => {
   beforeEach(() => {
     mocks.push.mockReset();
   });
-  afterEach(cleanup);
+  afterEach(() => {
+    win.width = 390;
+    cleanup();
+  });
 
   it('lists every root on Browse, without a letter tap', async () => {
     render(<DictionaryScreen />);
@@ -450,5 +472,39 @@ describe('DictionaryScreen', () => {
     const toolbar = scroller.querySelector('[role="toolbar"]');
     expect(toolbar).not.toBeNull();
     expect(toolbar!.querySelectorAll('button').length).toBeGreaterThan(1);
+  });
+
+  it('lays the roots out in columns on a landscape tablet', () => {
+    // 1400dp, 300dp measured minimum -> 4 columns. A root cell is the
+    // smallest card in the app, so this is the surface where a fixed count
+    // would waste the most space.
+    win.width = 1400;
+    renderScreen();
+    expect(screen.getByTestId('dictionary-list').dataset.numColumns).toBe('4');
+  });
+
+  it('counts the card\'s own margins once, so a column is never under the minimum', () => {
+    // This list passes no paddingHorizontal and no columnWrapperStyle gap: the
+    // card carries marginHorizontal: 16 itself, because FrequencyList renders
+    // the same card. Subtracting a container padding of 32 and a gap of 10 on
+    // top of that counted the margins twice, and at 1300dp it fitted 4 cells of
+    // 310 -- a 278dp card, under its own 300dp measured minimum.
+    win.width = 1300;
+    renderScreen();
+    expect(screen.getByTestId('dictionary-list').dataset.numColumns).toBe('3');
+  });
+
+  it('keeps one column on a phone', () => {
+    renderScreen();
+    expect(screen.getByTestId('dictionary-list').dataset.numColumns ?? '1').toBe('1');
+  });
+
+  it('keeps the alphabet grid full width above the columns', () => {
+    // The letter picker is a header, not a cell. Handing it to numColumns
+    // would slice it into a column and it would stop being a picker.
+    win.width = 1400;
+    renderScreen();
+    const header = screen.getByTestId('dictionary-alphabet');
+    expect(header.closest('[data-testid="grid-cell"]')).toBeNull();
   });
 });
