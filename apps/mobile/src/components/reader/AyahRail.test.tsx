@@ -220,6 +220,32 @@ describe('AyahRail', () => {
     }
   });
 
+  it('drops a pending retry when the reader has already moved on', () => {
+    // The retry is scheduled 100ms out. If the reader passes another ayah in
+    // that window the follow effect scrolls to the new one -- and then the old
+    // timer fires and yanks the rail back to an ayah the reader has left, the
+    // same fighting-the-finger behaviour the retry cap exists to stop.
+    vi.useFakeTimers();
+    try {
+      const result = render(<AyahRail {...props} ayahCount={286} activeAyahNumber={147} />);
+      const onFailed = listPropsOf(result)['onScrollToIndexFailed'] as (info: {
+        index: number;
+        averageItemLength: number;
+      }) => void;
+
+      onFailed({ index: 146, averageItemLength: 48 });
+      // Before the retry's 100ms is up.
+      vi.advanceTimersByTime(40);
+      result.rerender(<AyahRail {...props} ayahCount={286} activeAyahNumber={200} />);
+      vi.advanceTimersByTime(500);
+
+      const indexed = listScrollsOf(result).filter((call) => 'index' in call);
+      expect(indexed.at(-1)).toMatchObject({ index: 199 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('announces its rows as buttons that name their ayah', () => {
     // A bare numeral announces as "147" with no role and no context, while
     // the toggle above got the full disclosure treatment (§8, WCAG AA).

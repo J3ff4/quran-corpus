@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, type ReactNode } from 'react';
 import { FlatList, Pressable, SectionList, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
@@ -241,6 +241,52 @@ export function GridCell({ width, children }: { width: number | undefined; child
   );
 }
 
+/**
+ * One row of a hand-rolled grid: the cells, plus spacers where the final row is
+ * short.
+ *
+ * SectionList has no `numColumns`, so the two section arms in the app build
+ * their own rows. They must behave like the FlatList arms at one column, and
+ * RN draws no row wrapper there -- which is load-bearing, not cosmetic: inside
+ * `flexDirection: 'row'` a cell with no pinned width sizes to its CONTENT
+ * (flexBasis auto, flexGrow 0), where as a column child it stretched. Wrapping
+ * anyway made every phone card hug its own title instead of filling the list
+ * (review, 2026-10-01).
+ */
+export function GridRow({
+  cells,
+  columns,
+  itemWidth,
+}: {
+  cells: readonly { key: string; node: ReactNode }[];
+  columns: number;
+  itemWidth: number | undefined;
+}) {
+  if (columns === 1) {
+    return (
+      <>
+        {cells.map((cell) => (
+          <Fragment key={cell.key}>{cell.node}</Fragment>
+        ))}
+      </>
+    );
+  }
+  return (
+    <View testID="browse-row" style={{ flexDirection: 'row', gap: 10 }}>
+      {cells.map((cell) => (
+        <GridCell key={cell.key} width={itemWidth}>
+          {cell.node}
+        </GridCell>
+      ))}
+      {/* Spacers, not a stretched card: a lone card on the final row that
+          grows to full width reads as a different, larger card. */}
+      {Array.from({ length: columns - cells.length }, (_, i) => (
+        <View key={`spacer-${i}`} testID="browse-row-spacer" style={{ width: itemWidth }} />
+      ))}
+    </View>
+  );
+}
+
 /** Rows of `columns` items, the final row short rather than padded with
  *  fabricated data -- the spacer is drawn, not modelled. */
 export function chunk<T>(items: readonly T[], columns: number): T[][] {
@@ -304,18 +350,11 @@ export function BrowseList({ items, sections }: BrowseListProps) {
         testID="browse-list"
         sections={rendered}
         renderItem={({ item: row }) => (
-          <View testID="browse-row" style={{ flexDirection: 'row', gap: 10 }}>
-            {row.map((entry) => (
-              <GridCell key={entry.key} width={itemWidth}>
-                <Row item={entry} />
-              </GridCell>
-            ))}
-            {/* Spacers, not a stretched card: a lone card on the final row
-                that grows to full width reads as a different, larger card. */}
-            {Array.from({ length: columns - row.length }, (_, i) => (
-              <View key={`spacer-${i}`} testID="browse-row-spacer" style={{ width: itemWidth }} />
-            ))}
-          </View>
+          <GridRow
+            columns={columns}
+            itemWidth={itemWidth}
+            cells={row.map((entry) => ({ key: entry.key, node: <Row item={entry} /> }))}
+          />
         )}
         renderSectionHeader={({ section }) => {
           const label = (

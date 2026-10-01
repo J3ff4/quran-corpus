@@ -483,6 +483,17 @@ describe('DictionaryScreen', () => {
     expect(screen.getByTestId('dictionary-list').dataset.numColumns).toBe('4');
   });
 
+  it('counts the card\'s own margins once, so a column is never under the minimum', () => {
+    // This list passes no paddingHorizontal and no columnWrapperStyle gap: the
+    // card carries marginHorizontal: 16 itself, because FrequencyList renders
+    // the same card. Subtracting a container padding of 32 and a gap of 10 on
+    // top of that counted the margins twice, and at 1300dp it fitted 4 cells of
+    // 310 -- a 278dp card, under its own 300dp measured minimum.
+    win.width = 1300;
+    renderScreen();
+    expect(screen.getByTestId('dictionary-list').dataset.numColumns).toBe('3');
+  });
+
   it('keeps one column on a phone', () => {
     renderScreen();
     expect(screen.getByTestId('dictionary-list').dataset.numColumns ?? '1').toBe('1');

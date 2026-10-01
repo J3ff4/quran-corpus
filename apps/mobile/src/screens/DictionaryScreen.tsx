@@ -200,9 +200,16 @@ export function DictionaryScreen() {
   const { uiLocale } = useAppSettings();
   const theme = useThemeColors();
   const paddingBottom = useListBottomPadding();
-  const { columns, itemWidth } = useColumns(minCardWidths.dictionaryRoot, {
-    gap: 10,
-    horizontalPadding: 32,
+  // Unlike browse/bookmarks/search, this list has NO container padding and no
+  // columnWrapperStyle gap: DictionaryRow carries marginHorizontal: 16 itself,
+  // because FrequencyList renders the same card. So the cells must tile the
+  // full width -- padding or a gap subtracted here is dead space off the right
+  // edge, and the card's own margins were then counted a second time, giving a
+  // 16dp left gutter against a 48dp right one (review, 2026-10-01). The minimum
+  // is raised by those same 32 so it still means "a card at least 300 wide".
+  const { columns, itemWidth } = useColumns(minCardWidths.dictionaryRoot + 32, {
+    gap: 0,
+    horizontalPadding: 0,
   });
   const [pane, setPane] = useState<Pane>('browse');
   const [kind, setKind] = useState<'roots' | 'lemmas' | 'verbs'>('roots');

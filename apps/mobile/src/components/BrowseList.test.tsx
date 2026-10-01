@@ -261,6 +261,17 @@ describe('BrowseList columns', () => {
     expect([...widths][0]).not.toBe('');
   });
 
+  it('wraps a phone section in no row at all, so its cards still stretch', () => {
+    // Compact byte-for-byte again, and this arm is where it was lost: a row
+    // wrapper makes an unpinned cell size to its content (flexBasis auto,
+    // flexGrow 0) where as a column child it stretched, so every surah card
+    // hugged its own title. RN draws no wrapper at numColumns=1 and the
+    // hand-rolled section arm has to match.
+    render(<BrowseList sections={[{ title: 'Juz 1', data: sixItems }]} />);
+    expect(screen.queryAllByTestId('browse-row')).toHaveLength(0);
+    expect(screen.getByText('Surah 1')).toBeTruthy();
+  });
+
   it('chunks a section into rows of N, keeping every item', () => {
     // SectionList has no numColumns, so the section arm builds its own rows.
     win.width = 1400;

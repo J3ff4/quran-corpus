@@ -15,12 +15,12 @@ describe('no width cap on a navigator', () => {
   for (const file of ['app/_layout.tsx', 'app/(tabs)/_layout.tsx']) {
     it(`${file} does not cap scene width`, () => {
       const source = readFileSync(join(root, file), 'utf8');
-      const styles = source.match(/(?:contentStyle|sceneStyle):\s*\{[^}]*\}/g) ?? [];
-
-      expect(styles.length).toBeGreaterThan(0);
-      for (const style of styles) {
-        expect(style).not.toMatch(/maxWidth|centredContent/);
-      }
+      // Whole file, not a `{[^}]*}` slice of it: that slice stops at the
+      // first `}`, so a style holding any nested object truncates before a
+      // maxWidth further down and the assertion passes over the very cap it
+      // was written to catch (review, 2026-10-01).
+      expect(source).toMatch(/(?:contentStyle|sceneStyle):/);
+      expect(source).not.toMatch(/maxWidth|centredContent/);
     });
   }
 });

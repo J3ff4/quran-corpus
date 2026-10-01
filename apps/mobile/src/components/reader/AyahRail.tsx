@@ -98,6 +98,14 @@ export function AyahRail({
     // A fresh target gets a fresh budget: the cap below exists to stop one
     // unreachable index looping, not to stop the rail following the reader.
     attempts.current = 0;
+    // And the old target's pending retry has to go with the budget. Left armed
+    // it fires after this scroll lands and yanks the rail back to the ayah the
+    // reader has already left -- the exact "fights the finger" behaviour the cap
+    // exists to prevent (review, 2026-10-01).
+    if (retry.current !== null) {
+      clearTimeout(retry.current);
+      retry.current = null;
+    }
     listRef.current?.scrollToIndex({ index: activeAyahNumber - 1, animated: true });
   }, [activeAyahNumber, collapsed]);
 

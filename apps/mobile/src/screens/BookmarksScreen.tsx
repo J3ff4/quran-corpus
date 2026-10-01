@@ -22,7 +22,7 @@ import Animated, {
 import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } from '@quran-corpus/mobile-data';
 
 import { ConfirmSheet } from '@/components/ConfirmSheet';
-import { GridCell, chunk } from '@/components/BrowseList';
+import { GridCell, GridRow, chunk } from '@/components/BrowseList';
 import { GlassSurface } from '@/components/GlassSurface';
 import { Icon } from '@/components/icons/Icon';
 import { NoteEditor } from '@/components/NoteEditor';
@@ -413,19 +413,11 @@ export function BookmarksScreen() {
           // hold more than one.
           keyExtractor={(row) => `surah-${keyOf(row[0]!)}`}
           renderItem={({ item: row }) => (
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              {row.map((item) => (
-                <GridCell key={keyOf(item)} width={itemWidth}>
-                  {renderRow({ item })}
-                </GridCell>
-              ))}
-              {/* Spacers on a short final row, not a stretched card -- a lone
-                  card that grows to full width reads as a different, larger
-                  card. */}
-              {Array.from({ length: columns - row.length }, (_, i) => (
-                <View key={`spacer-${i}`} style={{ width: itemWidth }} />
-              ))}
-            </View>
+            <GridRow
+              columns={columns}
+              itemWidth={itemWidth}
+              cells={row.map((item) => ({ key: keyOf(item), node: renderRow({ item }) }))}
+            />
           )}
           renderSectionHeader={({ section }) => (
             <Text
