@@ -65,6 +65,50 @@ export function mushafColumnWidth(page: number, available: number): number {
   return Math.min(available, (MUSHAF_MAX_FONT_SIZE * widestEm(page)) / WIDTH_SLACK);
 }
 
+/**
+ * The type size this page lands on when `available` dp of width is offered to
+ * its text block.
+ *
+ * The same number as `mushafFontSize(page, mushafColumnWidth(page, available))`,
+ * which is how the page itself has always arrived at it -- stated directly
+ * because a leaf has to know both of its pages' sizes BEFORE either one has a
+ * column, and the column is what the size then follows from.
+ */
+export function mushafPageFontSize(page: number, available: number): number {
+  return mushafFontSize(page, mushafColumnWidth(page, available));
+}
+
+/**
+ * One type size for both halves of a leaf: the smaller of the two fits.
+ *
+ * Facing pages at different sizes read as a rendering bug. Each page's size
+ * comes from its own widest line, and those differ -- the lines are
+ * pre-justified in the source layout -- so two pages in identical halves would
+ * otherwise draw at different sizes whenever one of them clamps and the other
+ * does not. In print both pages of a leaf are set at one size and the narrower
+ * page simply keeps more margin, which is what taking the smaller fit gives.
+ */
+export function mushafLeafFontSize(
+  recto: number,
+  verso: number | null,
+  available: number,
+): number {
+  const rectoSize = mushafPageFontSize(recto, available);
+  return verso === null ? rectoSize : Math.min(rectoSize, mushafPageFontSize(verso, available));
+}
+
+/**
+ * The column this page needs in order to draw at exactly `fontSize`.
+ *
+ * The inverse of `mushafFontSize`, for the case where the size was decided
+ * somewhere above the page -- a leaf, where both halves share one. The page
+ * still clamps it to the width it was given, so a column cannot run off its
+ * half.
+ */
+export function mushafColumnForFontSize(page: number, fontSize: number): number {
+  return (fontSize * widestEm(page)) / WIDTH_SLACK;
+}
+
 export function mushafLineHeight(textHeight: number, lineCount: number): number {
   if (lineCount <= 0) return MIN_LINE_HEIGHT;
   return Math.max(textHeight / lineCount, MIN_LINE_HEIGHT);

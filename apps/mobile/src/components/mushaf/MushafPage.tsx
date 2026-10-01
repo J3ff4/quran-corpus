@@ -13,7 +13,12 @@ import {
 } from '@/mushaf/highlights';
 import { composePage, MUSHAF_LINES_PER_PAGE, type PageSlot } from '@/mushaf/pageComposition';
 import { useMushafPageFont } from '@/mushaf/pageFont';
-import { mushafColumnWidth, mushafFontSize, mushafLineHeight } from '@/mushaf/pageScale';
+import {
+  mushafColumnForFontSize,
+  mushafColumnWidth,
+  mushafFontSize,
+  mushafLineHeight,
+} from '@/mushaf/pageScale';
 import { useThemeColors } from '@/theme/themeContext';
 
 import { BismillahLine } from './BismillahLine';
@@ -50,6 +55,13 @@ export interface MushafPageProps {
   lines: MushafLine[];
   width: number;
   height: number;
+  /** One type size for both halves of a leaf, when a leaf decided it.
+   *
+   *  Omitted in portrait, where a page is alone and fits itself. On a spread
+   *  the two pages sit in identical halves, and each one's own fit comes from
+   *  its own widest line -- so left to themselves facing pages draw at
+   *  different sizes, which reads as a rendering bug. See mushafLeafFontSize. */
+  fontSize?: number;
   highlights: HighlightInput;
   /** Real Uthmani text per ayah, keyed by `ayahKey`. From the corpus `ayahs`
    *  table, never from the glyph rows: those are private-use codepoints and a
@@ -91,6 +103,7 @@ export function MushafPage({
   lines,
   width,
   height,
+  fontSize: leafFontSize,
   highlights,
   ayahTexts,
   surahNames,
@@ -121,7 +134,20 @@ export function MushafPage({
   // pre-justified lines can no longer reach the edge, which leaves the page
   // stranded against one side. mushafColumnWidth hands back the widest column
   // this page can still fill, and the block is centred in whatever is left.
-  const columnWidth = mushafColumnWidth(page, width - 2 * PAGE_MARGIN);
+  //
+  // With a leaf size only the COLUMN changes: it is built for that size rather
+  // than for this page's own fit, and then clamped to the half it has to sit
+  // in. The size itself still comes back out of the column, which is not a
+  // redundancy -- `mushafColumnForFontSize` is the exact inverse of
+  // `mushafFontSize`, so a column built for 31.4dp reads back as 31.4dp, and
+  // in the one case where it cannot (a size too large for the half, which the
+  // clamp cuts) reading it back is what keeps the line inside the column
+  // instead of drawing it at a size the column cannot hold.
+  const available = width - 2 * PAGE_MARGIN;
+  const columnWidth =
+    leafFontSize === undefined
+      ? mushafColumnWidth(page, available)
+      : Math.min(available, mushafColumnForFontSize(page, leafFontSize));
   const fontSize = mushafFontSize(page, columnWidth);
   const lineHeight = mushafLineHeight(height - FOOTER_HEIGHT - HEADER_HEIGHT, MUSHAF_LINES_PER_PAGE);
   const marks: HighlightInput = pressed === null ? highlights : { ...highlights, pressed };
