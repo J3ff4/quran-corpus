@@ -98,6 +98,31 @@ afterEach(() => {
 });
 
 describe('MushafReader', () => {
+it('keeps one page per child when the box is taller than it is wide', () => {
+    // Portrait is not changing in this phase (ruling R-B2). A regression here is
+    // the phase failing, not a detail.
+    setAutoLayout({ width: 876, height: 1400 });
+    render(<MushafReader {...props} />);
+    expect(mocks.pagerProps.at(-1)).toMatchObject({ spread: false });
+  });
+
+  it('asks for a spread when the box is wider than it is tall', () => {
+    setAutoLayout({ width: 1400, height: 820 });
+    render(<MushafReader {...props} />);
+    expect(mocks.pagerProps.at(-1)).toMatchObject({ spread: true });
+  });
+
+  it('decides on the measured box, not on the window it sits in', () => {
+    // A 1000dp-wide tablet in portrait is still portrait, and a spread there
+    // would be two tall narrow pages. The box is also NOT the window: the pager
+    // sits under the status bar, MushafTopStrip and the tab bar, so near square
+    // the window and the box disagree and only the box is what a page has to
+    // fit (ruling R-X1).
+    setAutoLayout({ width: 1000, height: 1400 });
+    render(<MushafReader {...props} />);
+    expect(mocks.pagerProps.at(-1)).toMatchObject({ spread: false });
+  });
+
   it('draws nothing until it knows how big a page is', () => {
     // A page sized to the window rather than to the space under the header
     // pushes its own footer off the bottom of the screen.

@@ -37,6 +37,9 @@ import { pagerCommandsOf, pagerPropsOf } from '@/testing/pagerHost';
 import { HighlightsProvider } from '@/mushaf/highlightsContext';
 import { MUSHAF_PAGE_MAX, MUSHAF_PAGE_MIN } from '@quran-corpus/data/mobile';
 
+import { mushafLeafFontSize, mushafPageFontSize } from '@/mushaf/pageScale';
+import { SPREAD_COUNT } from '@/mushaf/spread';
+
 import { MushafPager, WINDOW } from './MushafPager';
 
 /** The reader's marks at one step of the landing pulse. */
@@ -267,5 +270,177 @@ describe('MushafPager', () => {
     expect(pagerPropsOf(render(<MushafPager {...props} initialPage={9000} />)).initialPage).toBe(
       MUSHAF_PAGE_MAX - 1,
     );
+  });
+});
+
+describe('MushafPager in spread mode', () => {
+  /** The distinct pages that drew. A set, not the raw list: the mocked page
+   *  records its props on every render pass, so the list double-counts. */
+  const drawn = () => new Set(mocks.pageProps.map((p) => p['page']));
+
+  /** A leaf whose two pages do NOT fit at the same size on the Tab S10+ half-box.
+   *
+   *  298 of 302 leaves have both pages clamped at the font cap there, so they
+   *  agree whatever the code does and a shared-size assertion made on one of them
+   *  passes vacuously. These four are where the mechanism is observable --
+   *  see scripts/SPREAD-BAND-CHECK.md. */
+  const DIVERGENT_RECTO = 27;
+
+  it('spans the 302 leaves of the mushaf, not its 604 pages', () => {
+    const pager = pagerPropsOf(render(<MushafPager {...props} spread />));
+    expect(React.Children.count(pager.children)).toBe(SPREAD_COUNT);
+  });
+
+  it('draws two pages per leaf', () => {
+    render(<MushafPager {...props} spread initialPage={3} />);
+    // Ruling R-X6 keeps the window at one leaf so a swipe never lands on a cell
+    // that draws nothing -- which costs six drawn pages against portrait's three.
+    // The leaf the reader is on, plus one either side: six pages, not three.
+    expect(drawn()).toEqual(new Set([1, 2, 3, 4, 5, 6]));
+    expect(drawn().size).toBe(2 * (2 * WINDOW + 1));
+  });
+
+  it('puts the recto on the right in the layout, not just in the data', () => {
+    // RTL: the recto is the RIGHT half. A row laying [recto, verso] out left to
+    // right reads backwards and is invisible in any assertion made against the
+    // page numbers alone, which is why this one is about flexDirection.
+    const { container } = render(<MushafPager {...props} spread initialPage={3} />);
+    const leaf = container.querySelector('[data-testid="mushaf-leaf"]') as HTMLElement;
+    expect(leaf.style.flexDirection).toBe('row-reverse');
+  });
+
+  it('opens an even page on its own leaf, not as a recto', () => {
+    // Rotating while on page 4 must land on leaf (3,4) with 4 on the LEFT, not
+    // rebuild the book around 4 as a recto and shift all 604 pages by one.
+    const pager = pagerPropsOf(render(<MushafPager {...props} spread initialPage={4} />));
+    expect(pager.initialPage).toBe(1); // leaf (3,4)
+    expect(drawn()).toContain(3);
+    expect(drawn()).toContain(4);
+  });
+
+  it('gives each half exactly half the box', () => {
+    // A page handed the full width overflows its half and the QCF page is
+    // clipped rather than scaled, which looks like a font bug and not a layout
+    // one.
+    render(<MushafPager {...props} spread width={1400} initialPage={3} />);
+    for (const page of mocks.pageProps) expect(page['width']).toBe(700);
+  });
+
+  it('sizes both halves of a leaf from the same number', () => {
+    // Facing pages at different sizes read as a rendering bug. Each page's own
+    // fit comes from its own widest line, so left alone they differ.
+    render(<MushafPager {...props} spread width={1400} initialPage={DIVERGENT_RECTO} />);
+    const leafSize = mushafLeafFontSize(DIVERGENT_RECTO, DIVERGENT_RECTO + 1, 700 - 32);
+    const onLeaf = mocks.pageProps.filter(
+      (p) => p['page'] === DIVERGENT_RECTO || p['page'] === DIVERGENT_RECTO + 1,
+    );
+    expect(onLeaf).not.toHaveLength(0);
+    for (const page of onLeaf) expect(page['fontSize']).toBe(leafSize);
+    // And the size is one the pages do not agree on by themselves, or the
+    // assertion above would hold with the mechanism deleted.
+    expect(mushafPageFontSize(DIVERGENT_RECTO, 700 - 32)).not.toBe(
+      mushafPageFontSize(DIVERGENT_RECTO + 1, 700 - 32),
+    );
+  });
+
+  it('sizes a leaf from the half it has, not the whole box', () => {
+    // The leaf size has to be computed against the half a page actually draws
+    // into. Against the full box it comes out too large, the page clamps it
+    // back to its own fit, and the two halves are on different sizes again --
+    // with the leaf size still looking present in every prop.
+    render(<MushafPager {...props} spread width={1400} initialPage={DIVERGENT_RECTO} />);
+    const onLeaf = mocks.pageProps.find((p) => p['page'] === DIVERGENT_RECTO)!;
+    expect(onLeaf['fontSize']).toBe(
+      mushafLeafFontSize(DIVERGENT_RECTO, DIVERGENT_RECTO + 1, 700 - 32),
+    );
+    expect(onLeaf['fontSize']).not.toBe(
+      mushafLeafFontSize(DIVERGENT_RECTO, DIVERGENT_RECTO + 1, 1400 - 32),
+    );
+  });
+
+  it('starts on the leaf holding the page it was given', () => {
+    expect(pagerPropsOf(render(<MushafPager {...props} spread initialPage={107} />)).initialPage)
+      .toBe(53); // leaf (107,108)
+  });
+
+  it('reports the recto when a leaf settles', () => {
+    // The caller stores a single page number (R-B3, no data change), so a leaf
+    // turn has to hand back a page and not a leaf index.
+    const onPageChange = vi.fn();
+    const result = render(
+      <MushafPager {...props} spread initialPage={3} onPageChange={onPageChange} />,
+    );
+    act(() => {
+      pagerPropsOf(result).onPageSelected?.({ nativeEvent: { position: 2 } });
+    });
+    expect(onPageChange).toHaveBeenCalledWith(5); // leaf 2 == pages 5,6
+  });
+
+  it('does not report a turn when it opens on a verso', () => {
+    // Android fires onPageSelected once at mount. Opening on page 4 settles on
+    // leaf (3,4), whose recto is 3 -- which must not be written back as a turn
+    // the reader never made.
+    const onPageChange = vi.fn();
+    const result = render(
+      <MushafPager {...props} spread initialPage={4} onPageChange={onPageChange} />,
+    );
+    act(() => {
+      pagerPropsOf(result).onPageSelected?.({ nativeEvent: { position: 1 } });
+    });
+    expect(onPageChange).not.toHaveBeenCalled();
+  });
+
+  it('remounts the pager when the mode flips', () => {
+    // The child COUNT changes under it, 604 -> 302. ViewPager2 holds its
+    // children by index, so a live pager handed a different-length list keeps
+    // its old position and lands on the wrong leaf or on a blank one -- the
+    // same hazard as changing a FlatList's numColumns.
+    //
+    // Asserted through the pager's own identity rather than its child count,
+    // because the count changes with or without a remount: pagerHost keys the
+    // turns it was asked for to the pager NODE, so a surviving instance carries
+    // its pre-flip history and a remounted one starts empty.
+    const result = render(<MushafPager {...props} initialPage={3} focusPage={108} />);
+    expect(pagerCommandsOf(result)).toEqual([{ page: 107, animated: true }]);
+
+    result.rerender(<MushafPager {...props} spread initialPage={3} focusPage={null} />);
+    expect(pagerCommandsOf(result)).toEqual([]);
+    expect(React.Children.count(pagerPropsOf(result).children)).toBe(SPREAD_COUNT);
+  });
+
+  it('does not turn a leaf that already shows the ayah being recited', () => {
+    // Playback crossing from the recto onto the verso is a page change the
+    // reader can SEE -- both halves are on screen -- so turning there flips the
+    // leaf away from the ayah being recited on it. This is the one the plan
+    // called the real bug: turn-on-every-page-change logic written for a
+    // single-page pager.
+    const result = render(<MushafPager {...props} spread initialPage={3} focusPage={null} />);
+    result.rerender(<MushafPager {...props} spread initialPage={3} focusPage={4} />);
+    expect(pagerCommandsOf(result)).toEqual([]);
+  });
+
+  it('turns the leaf when playback crosses onto the next one', () => {
+    const result = render(<MushafPager {...props} spread initialPage={3} focusPage={null} />);
+    result.rerender(<MushafPager {...props} spread initialPage={3} focusPage={5} />);
+    expect(pagerCommandsOf(result)).toEqual([{ page: 2, animated: true }]);
+  });
+
+  it('keeps every leaf in the tree, even when it draws nothing', () => {
+    // ViewPager2 pages by child index here too: a leaf that is not handed over
+    // shifts every leaf after it.
+    const pager = pagerPropsOf(render(<MushafPager {...props} spread />));
+    const cells = React.Children.toArray(pager.children) as { props: { children: unknown } }[];
+    expect(cells).toHaveLength(SPREAD_COUNT);
+    expect(cells[0]!.props.children).toBeNull();
+  });
+
+  it('memoises a leaf, so a chrome toggle does not redraw six pages', () => {
+    // Twice the exposure portrait has: a leaf holds two pages, so an
+    // unmemoised leaf costs six rasterisations where a page cost three.
+    const pager = pagerPropsOf(render(<MushafPager {...props} spread initialPage={3} />));
+    const cell = React.Children.toArray(pager.children)[1] as {
+      props: { children: { type: { $$typeof?: symbol } } };
+    };
+    expect(cell.props.children.type.$$typeof).toBe(Symbol.for('react.memo'));
   });
 });

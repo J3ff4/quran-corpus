@@ -66,6 +66,14 @@ export interface MushafReaderProps {
  * TalkBack labels can all belong to a surah the route never named, so the
  * texts are fetched for the surahs on screen rather than taken from the
  * reader's own payload.
+ *
+ * **Two facing pages when the box is wider than it is tall** (ruling R-B2). Off
+ * the MEASURED box, not a window class or `useWindowDimensions`: the pager sits
+ * under the status bar, MushafTopStrip and the tab bar, so the window is taller
+ * than the box by all three and near square the two disagree -- a 1000x1050
+ * window is portrait while the box inside it is landscape. The box is what the
+ * spread has to fit, and this component is the only thing that measures it
+ * (ruling R-X1).
  */
 export function MushafReader({
   client,
@@ -200,6 +208,7 @@ export function MushafReader({
           initialPage={initialPage}
           width={size.width}
           height={size.height}
+          spread={size.width > size.height}
           ayahTexts={ayahTexts}
           surahNames={index.surahNames}
           uiLocale={uiLocale}
