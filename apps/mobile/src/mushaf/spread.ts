@@ -53,6 +53,3 @@ export function spreadAt(index: number): Spread {
   return spreadFor(index * 2 + MUSHAF_PAGE_MIN);
 }
 
-export function spreadIndexFor(page: number): number {
-  return spreadFor(page).index;
-}

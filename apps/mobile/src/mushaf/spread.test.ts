@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MUSHAF_PAGE_MAX, MUSHAF_PAGE_MIN } from '@quran-corpus/data/mobile';
 
-import { SPREAD_COUNT, spreadAt, spreadFor, spreadIndexFor } from './spread';
+import { SPREAD_COUNT, spreadAt, spreadFor } from './spread';
 
 describe('spreadFor', () => {
   it('puts an odd page on the right and its successor on the left', () => {
@@ -40,7 +40,6 @@ describe('spreadFor', () => {
       const spread = spreadFor(page);
       expect([spread.recto, spread.verso]).toContain(page);
       expect(spreadAt(spread.index)).toEqual(spread);
-      expect(spreadIndexFor(page)).toBe(spread.index);
     }
   });
 
