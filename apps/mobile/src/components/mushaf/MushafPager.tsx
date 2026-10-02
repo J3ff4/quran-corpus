@@ -278,9 +278,53 @@ export const MushafPager = memo(function MushafPager({
   // committed frame drawing the wrong leaf.
   if (current.mode !== mode) setCurrent({ mode, index: indexOf(settled.current) });
 
+  // Whether the pager is moving because something asked it to -- a finger on
+  // the glass, or our own `setPage` below. False means the only thing that has
+  // happened to this pager is a relayout, and a position report arriving then
+  // is not a page turn. See onPageSelected.
+  const turning = useRef(false);
+
+  const onPageScrollStateChanged = useCallback(
+    (event: { nativeEvent: { pageScrollState: 'idle' | 'dragging' | 'settling' } }) => {
+      // Latched on movement and cleared when the pager comes to rest. The
+      // clear matters as much as the set: a drag the reader abandons -- partway
+      // across, then released -- settles back onto the SAME page, and
+      // ViewPager2 announces nothing because nothing arrived. Without this the
+      // flag would stay raised, and the next relayout's bogus position would be
+      // read as that abandoned gesture finally landing.
+      turning.current = event.nativeEvent.pageScrollState !== 'idle';
+    },
+    [],
+  );
+
   const onPageSelected = useCallback(
     (event: { nativeEvent: { position: number } }) => {
       const index = event.nativeEvent.position;
+      // A relayout moves the pager, and ViewPager2 reports the move as a turn.
+      //
+      // Measured on device (2026-10-01, issue #107): resizing this pager --
+      // which every rotation does, and which multi-window does without any
+      // rotation at all -- makes ViewPager2 re-derive its scroll offset and land
+      // ONE INDEX SHORT under `layoutDirection="rtl"`, then announce it through
+      // onPageSelected like any other arrival. The event trace is what separates
+      // the two: a finger goes `dragging, settling, selected, idle`, while a
+      // relayout emits a bare `selected` with the state never leaving idle.
+      //
+      // That one spurious index is the whole of #107. Rotating off page 561 wrote
+      // `settled = 560`, and the flip below then correctly asked for the leaf
+      // holding 560 -- recto 559 -- so the reader arrived a leaf early. The
+      // algebra was never wrong; its input was.
+      //
+      // The pager really has moved, so the report cannot merely be dropped: put
+      // it back where the reader was. That re-assertion lands through this same
+      // handler with `index === indexOf(settled.current)`, which is the mount
+      // case below and reports nothing, so it cannot recur.
+      const moved = turning.current;
+      turning.current = false;
+      if (!moved && index !== indexOf(settled.current)) {
+        pagerRef.current?.setPageWithoutAnimation(indexOf(settled.current));
+        return;
+      }
       setCurrent({ mode, index });
       // The recto, because the caller stores a single page number and a leaf
       // has two. Which half the reader's eye is on is not something the pager
@@ -325,6 +369,13 @@ export const MushafPager = memo(function MushafPager({
     // onPageSelected like any other, and that is what reports it to the
     // caller. Writing it would turn an auto-turn into a page the reading
     // position never records.
+    //
+    // Marked as a commanded move BEFORE the command, so the arrival is read as
+    // a turn and not as the relayout artifact above. Set here rather than left
+    // to Android's own `settling`: a turn we asked for is legitimate whatever
+    // states the platform chooses to emit on the way, and an auto-turn that the
+    // guard bounced back would strand playback on the page it started from.
+    turning.current = true;
     pagerRef.current?.setPage(indexOf(focusPage));
   }, [focusPage, spread]);
 
@@ -347,6 +398,9 @@ export const MushafPager = memo(function MushafPager({
       layoutDirection="rtl"
       offscreenPageLimit={WINDOW}
       onPageSelected={onPageSelected}
+      // Not telemetry: this is what tells onPageSelected whether the arrival it
+      // is about to be handed came from a gesture or from a relayout.
+      onPageScrollStateChanged={onPageScrollStateChanged}
       // No stretch past page 1 or 604: the mushaf has no cover to pull open,
       // and the rubber-band reads as a page that failed to turn. NOT
       // `overdrag={false}` -- that prop's Android setter is a bare `return` in

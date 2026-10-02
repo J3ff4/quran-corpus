@@ -44,7 +44,7 @@ vi.mock('@/mushaf/pageFont', () => ({
   mushafFontFamily: (page: number) => `QCF2${String(page).padStart(3, '0')}`,
 }));
 
-import { pagerCommandsOf, pagerPropsOf } from '@/testing/pagerHost';
+import { pagerCommandsOf, pagerPropsOf, pagerRelayout, pagerTurn } from '@/testing/pagerHost';
 import { HighlightsProvider } from '@/mushaf/highlightsContext';
 import { MUSHAF_PAGE_MAX, MUSHAF_PAGE_MIN } from '@quran-corpus/data/mobile';
 
@@ -82,16 +82,16 @@ const props = {
   onTap: vi.fn(),
 };
 
-/** The event ViewPager2 emits when a turn settles. Zero-based, unlike a page. */
-const selected = (page: number) => ({ nativeEvent: { position: page - 1 } });
-
-/** Fires a settle through React, so the window state it sets is committed. */
+/** Fires a whole finger turn through React, so the window state it sets is
+ *  committed. The full gesture and not a lone onPageSelected: a bare position
+ *  report is what a RELAYOUT emits, and the pager now tells the two apart --
+ *  see pagerTurn and issue #107. Zero-based, unlike a page. */
 const settle = (
   result: { container: { querySelectorAll(s: string): ArrayLike<object> } },
   page: number,
 ) => {
   act(() => {
-    pagerPropsOf(result).onPageSelected?.(selected(page));
+    pagerTurn(result, page - 1);
   });
 };
 
@@ -384,7 +384,7 @@ describe('MushafPager in spread mode', () => {
       <MushafPager {...props} spread initialPage={3} onPageChange={onPageChange} />,
     );
     act(() => {
-      pagerPropsOf(result).onPageSelected?.({ nativeEvent: { position: 2 } });
+      pagerTurn(result, 2);
     });
     expect(onPageChange).toHaveBeenCalledWith(5); // leaf 2 == pages 5,6
   });
@@ -488,7 +488,7 @@ it('follows the reader across a mode flip, not the page they opened on', () => {
     // as page 149.
     const result = render(<MushafPager {...props} spread initialPage={299} />);
     act(() => {
-      pagerPropsOf(result).onPageSelected?.({ nativeEvent: { position: 149 } });
+      pagerTurn(result, 149);
     });
     mocks.pageProps = [];
 
@@ -552,8 +552,10 @@ it('follows the reader across a mode flip, not the page they opened on', () => {
     onPageChange.mockClear();
 
     result.rerender(<MushafPager {...props} spread initialPage={106} onPageChange={onPageChange} />);
+    // The remounted pager's own mount announcement, which is a BARE selection
+    // and names the recto -- not a turn, and not the relayout artifact either.
     act(() => {
-      pagerPropsOf(result).onPageSelected?.({ nativeEvent: { position: 149 } });
+      pagerRelayout(result, 149);
     });
     expect(onPageChange).not.toHaveBeenCalled();
 
