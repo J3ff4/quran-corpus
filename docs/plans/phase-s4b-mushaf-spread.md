@@ -941,12 +941,12 @@ carried over and checks 612 and 616 read a real saved position.
 | 600 | Landscape shows two pages, recto on the RIGHT | **PASS** |
 | 601 | Pairing matches the owner's physical mushaf for 1-2, 3-4, 603-604 | **PASS** (structure) -- owner still to confirm against the printed copy |
 | 602 | Portrait still one page | **PASS** |
-| 603 | Rotate on page 4 -> leaf (3,4); rotate back -> page 4 | **FAIL** -- defect 1 |
+| 603 | Rotate on page 4 -> leaf (3,4); rotate back -> page 4 | **FAIL** -- defect 1; **re-run PASS on vc82** |
 | 604 | framestats gaps inside a landscape turn, 3 repeats | **PASS** |
 | 605 | 10 fast swipes, no blank leaf | **PASS** |
 | 606 | Every glyph present on sampled pages incl. the band pages | **PASS** |
 | 607 | Both halves of leaf 27/177/399/443 at the same type size | **PASS** |
-| 608 | Open on 1, swipe to ~300, rotate | **FAIL** (rotation half) -- defect 1 |
+| 608 | Open on 1, swipe to ~300, rotate | **FAIL** (rotation half) -- defect 1; **re-run PASS on vc82** |
 | 610 | Playback recto->verso does not turn; verso->next recto does | **PASS** |
 | 611 | Highlight lands on an ayah on the left half | **PASS** |
 | 612 | Close on a landscape leaf, reopen in portrait -> recto | **PASS** |
@@ -1078,6 +1078,17 @@ Verified on device: three resizes and four rotation round trips hold the page,
 odd (555) and even (554), and a jump to page 100 still lands
 (`settled=99, init=49`). 1596 tests pass; each of the four load-bearing lines
 fails a test when removed.
+
+**Re-verified on the clean vc82** (no instrumentation, reading the `Page N`
+content-descs the reader actually sees): page 99 rotates onto leaf (99,100) and
+back to 99; page 98 onto leaf (97,98) and back to 98; the page then holds
+through three more round trips. Checks **603 and 608 now pass**. Served as a
+copy at `~/apks/quran-corpus-vc82.apk` (194M), versionCode verified `82` on that
+copy with `aapt2 dump badging`.
+
+An instrumented repack reports the versionCode of the APK it was built from, so
+`aapt2` cannot tell it from the clean build of the same number -- which is why
+the clean build is vc82 and not a rebuilt vc81.
 
 **Side finding -- the double was modelling the artifact as a turn.** Every suite
 fired a bare `onPageSelected` to mean "a swipe", which the device says is a
