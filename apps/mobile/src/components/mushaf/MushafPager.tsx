@@ -12,7 +12,9 @@ import type { UiLocaleCode } from '@/i18n/languages';
 import { useHighlights } from '@/mushaf/highlightsContext';
 import { MUSHAF_PAGE_TEXT_INSET, mushafLeafFontSize } from '@/mushaf/pageScale';
 import { SPREAD_COUNT, spreadAt, spreadFor } from '@/mushaf/spread';
+import { useMushafPageFont } from '@/mushaf/pageFont';
 import { useMushafPage } from '@/mushaf/useMushafPage';
+import { useThemeColors } from '@/theme/themeContext';
 
 import { MushafPage } from './MushafPage';
 
@@ -128,22 +130,56 @@ const PagerPage = memo(function PagerPage({ client, page, ...rest }: PageProps) 
 const MushafLeaf = memo(function MushafLeaf({
   leaf,
   width,
+  height,
   ...rest
 }: Omit<PageProps, 'page' | 'fontSize'> & { leaf: number }) {
+  const theme = useThemeColors();
   const { recto, verso } = spreadAt(leaf);
   const half = Math.floor(width / 2);
+  // Both halves, or neither. Each page gates its own glyphs on its own QCF
+  // font and the two TTFs register independently, so a leaf reached before
+  // both have arrived draws text on one half and blank paper on the other --
+  // which reads as a broken page rather than as a page still loading. The
+  // reader's own readiness signal cannot cover this: it watches `initialPage`,
+  // which is one of the two.
+  //
+  // SETTLED, not ready: a font that will never load must not hold its facing
+  // page for ever. Each page then draws, or draws its own blank, as before.
+  const rectoFont = useMushafPageFont(recto);
+  // A verso is null only past the end of the book, which 604 pages never
+  // reach; the recto stands in so the hook count cannot change under React.
+  const versoFont = useMushafPageFont(verso ?? recto);
+  const paired = fontSettled(rectoFont) && fontSettled(versoFont);
+  // One size for both halves, decided here because neither page can see the
+  // other. Without it the two pages of a leaf draw at different sizes whenever
+  // one of them clamps and the other does not -- see mushafLeafFontSize.
+  // The shared inset, not a 32 restated here: a leaf that sizes against a wider
+  // box than the page draws into hands down a size the page then clamps away,
+  // which puts the two halves back on different sizes.
   const fontSize = mushafLeafFontSize(recto, verso, half - MUSHAF_PAGE_TEXT_INSET);
+  if (!paired) {
+    return (
+      <View
+        testID="mushaf-leaf"
+        style={{ width, height, backgroundColor: theme.background }}
+      />
+    );
+  }
   return (
     <View testID="mushaf-leaf" style={{ flex: 1, flexDirection: 'row-reverse' }}>
-      <PagerPage page={recto} width={half} fontSize={fontSize} {...rest} />
+      <PagerPage page={recto} width={half} height={height} fontSize={fontSize} {...rest} />
       {verso !== null ? (
-        <PagerPage page={verso} width={half} fontSize={fontSize} {...rest} />
+        <PagerPage page={verso} width={half} height={height} fontSize={fontSize} {...rest} />
       ) : null}
     </View>
   );
 });
 
-
+/** A font that has either arrived or failed. A failure is as final as a
+ *  success for the purpose of deciding whether to wait for it. */
+function fontSettled(font: { ready: boolean; error: Error | null }): boolean {
+  return font.ready || font.error !== null;
+}
 
 /**
  * The mushaf, all 604 pages of it, turning right to left.

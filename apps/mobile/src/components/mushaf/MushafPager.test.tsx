@@ -14,6 +14,11 @@ vi.mock('react-native-pager-view', async () => {
 
 const mocks = vi.hoisted(() => ({
   pageProps: [] as Array<Record<string, unknown>>,
+  /** Pages whose QCF font has not arrived. A leaf withholds BOTH halves until
+   *  both have settled, so this is how a half-loaded leaf is staged. */
+  fontPending: new Set<number>(),
+  /** Pages whose font will never arrive. Settled, so they must not hold a leaf. */
+  fontFailed: new Set<number>(),
 }));
 
 // Mocked only so the marks the pager hands DOWN are observable: with no client
@@ -31,7 +36,11 @@ vi.mock('./MushafPage', async () => {
 
 // The page draws through expo-font, which dies at import under jsdom.
 vi.mock('@/mushaf/pageFont', () => ({
-  useMushafPageFont: () => ({ family: 'QCF2106', ready: false, error: null }),
+  useMushafPageFont: (page: number) => ({
+    family: `QCF2${String(page).padStart(3, '0')}`,
+    ready: !mocks.fontPending.has(page) && !mocks.fontFailed.has(page),
+    error: mocks.fontFailed.has(page) ? new Error(`no font for ${page}`) : null,
+  }),
   mushafFontFamily: (page: number) => `QCF2${String(page).padStart(3, '0')}`,
 }));
 
@@ -56,6 +65,8 @@ const marks = (landingProgress: number) => ({
 afterEach(() => {
   cleanup();
   mocks.pageProps = [];
+  mocks.fontPending.clear();
+  mocks.fontFailed.clear();
 });
 
 const props = {
@@ -486,6 +497,30 @@ it('follows the reader across a mode flip, not the page they opened on', () => {
     expect(pagerPropsOf(result).initialPage).toBe(298); // page 299, zero-based
     expect(drawn()).toContain(299);
     expect(drawn()).not.toContain(150);
+  });
+
+  it('holds both halves of a leaf until both fonts have settled', () => {
+    // The two TTFs register independently, so a leaf that let each half draw on
+    // its own font showed text on one side and blank paper on the other -- which
+    // reads as a broken page, not as a page still loading. The reader's own
+    // readiness signal cannot cover it: it watches initialPage, one of the two.
+    mocks.fontPending.add(4);
+    render(<MushafPager {...props} spread initialPage={3} />);
+
+    expect(drawn()).not.toContain(3); // the half whose font HAS arrived
+    expect(drawn()).not.toContain(4);
+    // Per leaf, not across the window: the leaves either side still draw.
+    expect(drawn()).toContain(1);
+    expect(drawn()).toContain(6);
+  });
+
+  it('draws a leaf whose font failed rather than waiting for ever', () => {
+    // A failure is as final as a success for the purpose of waiting. Held on
+    // `ready` alone, a page whose font will never load would blank its facing
+    // page for the life of the process.
+    mocks.fontFailed.add(4);
+    render(<MushafPager {...props} spread initialPage={3} />);
+    expect(drawn()).toContain(3);
   });
 
   it('does not re-issue an auto-turn when only the handler identity changes', () => {
