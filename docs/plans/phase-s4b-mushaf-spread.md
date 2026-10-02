@@ -780,17 +780,49 @@ the surah, which is the field that separates 127 from 128.
 (95,96)↔95, and three more hold (127,128)↔127. Also holds through rotate-then-
 tap-immediately (tap 150ms into the relayout), three rounds.
 
-### Found during the run, not yet ruled on
+### Found during the run — ruled and fixed
 
-**Rotating to portrait moves the reader back a page when their stored page is a
+**Rotating to portrait moved the reader back a page when their stored page was a
 verso.** Deterministic: stored 128, open the mushaf in landscape → leaf
-(127,128) correct; rotate to portrait → page **127**. `settled` is seeded
-`spreadFor(initialPage).recto`, so the verso half of the stored position is
-dropped at mount and the flip has nothing to go back to. It is the mount-time
-twin of round 3's finding 1 — same cause, a page identity narrowed to a leaf
-identity — but it touches ruling R-B3 directly, so it wants an owner ruling
-rather than a fix. The position row is NOT rewritten (the flip reports nothing),
-so the reader's saved place survives; only the page on screen moves.
+(127,128) correct; rotate to portrait → page **127**. `settled` was seeded
+`spreadFor(initialPage).recto`, so the verso half of the stored position was
+dropped at mount and the flip had nothing to go back to. The mount-time twin of
+round 3's finding 1 — the same cause, a page identity narrowed to a leaf
+identity.
+
+**Owner ruling, 2026-10-02: a rotation keeps the verso.** Fixed `e272fe1`,
+`settled` is seeded with the page. R-B3 identifies a LEAF by its recto; it does
+not say the reader's place is a leaf, and a rotation is not a page turn. Safe
+because the arrival that follows is caught by onPageSelected's leaf guard, not by
+the seed — which is what the recto seed existed to do before that guard was
+written.
+
+**Only the mount path was ever affected.** A flip from portrait already carried
+the page, verso and all, because a real turn had written it. That is why the
+existing rotation test stayed green and the defect was reachable only by opening
+the mushaf cold in landscape.
+
+It also reached the DB. The run's own position row drifted from `Al-Anam 6:1`
+(page 128) to `Al-Maidah 5:114` (page **127**) at some point across the vc83
+rotation testing — the narrowed value persisted. The exact event that recorded it
+was not isolated; what is certain is that the pre-fix pager put a page the reader
+had not turned to into the position row.
+
+### vc84 — the verso ruling verified
+
+Rebuilt as vc84 and re-run, with the stored position set to an even page first
+(the vc83 drift above had left it on 127, where a cold mount proves nothing).
+
+| Step | Expected | Read |
+|---|---|---|
+| Cold mount, landscape, stored 128 | leaf (127,128) | `128` `127` |
+| Rotate to portrait | **128** — was 127 on vc83 | `128` |
+| Rotate back, and again, twice | holds | `128 127` → `128` → `128 127` |
+| Swipe to a new leaf | recto reported, unchanged | leaf (125,126), portrait **125** |
+| Position row after the swipe | page 125's opener | `Continue reading Al-Maidah 5:104` |
+
+The swipe row is the regression half: a reader who turns to a new leaf still gets
+its recto, so the ruling changed the mount seed and nothing else.
 
 ### One unreproduced observation
 
