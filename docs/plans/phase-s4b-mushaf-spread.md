@@ -728,7 +728,51 @@ can clear both phases' phone checks.
 
 ---
 
-## APK, versionCode 80
+## Independent review, round 2, 2026-10-01
+
+Re-run because round 1's fixes were substantial enough to plausibly introduce a
+defect — which one of them had. Four findings; three fixed, one filed.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | Round 1 widened the auto-turn effect's deps to include `onPageChange`, which MushafScreen passed as an inline arrow while re-rendering on every audio tick — so an in-flight turn re-issued `setPage` per tick and fought itself | Fixed `6fc032e` — the pager holds the callback in a ref; the screen builds it once |
+| 2 | Each half of a leaf gated on its own QCF font, so a leaf reached before both arrived drew text on one side and blank paper on the other | Fixed `f0ed4c0` — both halves withheld until both fonts have *settled* |
+| 3 | The font cache has no eviction and a spread doubles the rate it fills toward ~120MB | Filed as **issue #106**. No fix available here: `expo-font` has no unload, so the only change would be a smaller window, not a bound. The ceiling is unchanged at 604 families |
+| 4 | `spreadIndexFor` exported, called only by its own test | Deleted `0d26f3b` |
+
+Finding 1 was a regression this phase introduced, and it is why the round-2 run
+was worth the pass: it degraded playback auto-turns in **both** orientations, so
+it would have read on device as a mushaf-wide player defect rather than as a
+spread one. Its own mutation-check could not have caught it — the behaviour only
+appears across two renders that change nothing but a function's identity, which
+no single render asserts.
+
+Finding 2's fix forced the pager test's font mock from a flat `ready: false` to
+per-page. With it stuck false the new gate would have withheld every leaf in
+every spread test, which is how a correct fix can look like fifteen broken tests.
+
+Gates: `tsc --noEmit` 0, `eslint src app` 0, `vitest run` 129 files /
+**1592 tests**. Three new tests, all three mutation-checked.
+
+---
+
+## APK, versionCode 81
+
+Supersedes vc80, which carries finding 1 — the degraded auto-turn — in both
+orientations. Built 2026-10-01 at `0d26f3b`.
+
+Bumped in **both** `android/app/build.gradle` and `app.json`. Only the gradle
+file reaches the build; `app.json` is kept in step so a future `expo prebuild`
+does not silently roll it back.
+
+```bash
+/home/claude/android-sdk/platform-tools/adb -s adb-R52XC0AYMZZ-S3tLzk._adb-tls-connect._tcp \
+  install -r --user 0 ~/apks/quran-corpus-vc81.apk
+```
+
+---
+
+## APK, versionCode 80 (superseded)
 
 Built 2026-10-01 at `a6e1967`, release / arm64-v8a, 202972589 bytes, `BUILD
 SUCCESSFUL in 1m 38s`. Served as a **copy** at `~/apks/quran-corpus-vc80.apk`
