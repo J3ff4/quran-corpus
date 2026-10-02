@@ -352,6 +352,29 @@ describe('MushafPager in spread mode', () => {
     expect(drawn()).toContain(8);
   });
 
+  it('catches the window up when a second swipe starts before the first rests', () => {
+    // A reader can catch the page mid-settle, and then `idle` never arrives
+    // between the two turns. Holding the shift until `idle` would leave the
+    // window a whole leaf behind the finger, so the second gesture lands on a
+    // cell nothing has drawn into -- blank paper sliding in under the thumb,
+    // which is the defect ruling R-X6 keeps WINDOW at one leaf to prevent.
+    const result = render(<MushafPager {...props} spread initialPage={3} />);
+    const fire = (pageScrollState: 'idle' | 'dragging' | 'settling') =>
+      pagerPropsOf(result).onPageScrollStateChanged?.({ nativeEvent: { pageScrollState } });
+    act(() => {
+      fire('dragging');
+      fire('settling');
+      pagerPropsOf(result).onPageSelected?.({ nativeEvent: { position: 2 } });
+    });
+    // Second gesture begins with no `idle` in between.
+    act(() => {
+      fire('dragging');
+    });
+    // Leaf 3 is (7,8): the cell the second swipe is travelling onto. The whole
+    // set, not a `toContain` on a cleared list -- see the test above.
+    expect(drawn()).toEqual(new Set([1, 2, 3, 4, 5, 6, 7, 8]));
+  });
+
   it('draws a commanded jump onto its target before turning there', () => {
     // The one move that can outrun the window. A gesture travels one index onto
     // a leaf already drawn; a jump can cross the book, so deferring it to `idle`

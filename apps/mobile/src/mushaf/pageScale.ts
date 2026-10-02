@@ -79,23 +79,46 @@ const widestEm = (page: number) => pageEm(MUSHAF_PAGE_WIDEST_EM, page, 'width me
 const tallestEm = (page: number) => pageEm(MUSHAF_PAGE_LINE_EM, page, 'height metrics');
 
 /**
- * The largest type this page can set in a line box of `lineHeight` without
- * Android cutting the top off its glyphs.
+ * The smallest type this clamp will ask a page to set.
  *
- * RN's Android text honours an explicit lineHeight by keeping the font's
- * descent and squeezing the ASCENT to fit, so everything the box cannot hold
- * comes off the TOP -- which on this script is the harakat. Measured on the
+ * Below this the page is not a reading surface, so the ink no longer gets to
+ * decide. 15 lines of ~1.9em need 28.5em of height, which a phone in landscape
+ * simply does not have: `app.json` leaves orientation `default`, and a turned
+ * phone measures ~360dp tall, so an honest fit lands at 8.7dp on the tallest
+ * page. 18dp is where the page stops being legible, and under the floor the
+ * old trade comes back -- slightly clipped, but readable, which is the better
+ * of two bad renderings. Every usable configuration clears it with room: phone
+ * portrait 25-39dp, tablet landscape 24-37dp, tablet portrait at the 40dp cap.
+ */
+export const MUSHAF_MIN_FONT_SIZE = 18;
+
+/**
+ * The largest type this page can set in a line box of `lineHeight` without its
+ * glyphs running outside the line.
+ *
+ * A line box asks for 1.0em; this type carries 1.4532-2.2112em of ink
+ * (median 1.880), so the old `Math.min(size, lineHeight)` guard was about half
+ * the real requirement and the surplus had to go somewhere. Measured on the
  * tablet in landscape (2026-10-02): every page set at the 40dp cap in a 49.9dp
- * line box, needing 1.84-2.09em, and showed a hard horizontal cut at the top of
- * every one of its 15 lines.
+ * line box, lines collided, and the harakat along the top of each one were lost
+ * into the line above. At the size this function returns the same pages leave a
+ * clear band between every pair of lines, device-verified on pages 97/98.
  *
- * The cap this imposes is real: 15 lines of ~1.9em is 28.5em of height, so a
- * short wide box fits far less type than its width would take. That is the
- * page's own proportion rather than a limit this code invents -- a leaf is
- * printed at one size, and in print the narrow page simply keeps more margin.
+ * What RN does with the surplus, since the comment this replaces had it wrong:
+ * `CustomLineHeightSpan` (RN 0.86) is CSS half-leading --
+ * `leading = lineHeight - (ascent + descent)` split evenly above and below --
+ * so a short box shrinks BOTH sides, not the ascent alone. The ink still
+ * overhangs symmetrically, and on device that overhang draws rather than being
+ * cut; it is the collision with the neighbouring line that destroys the
+ * harakat, which is why fitting the whole ink is the fix.
+ *
+ * The cap this imposes is real: a short wide box fits far less type than its
+ * width would take. That is the page's own proportion rather than a limit this
+ * code invents -- a leaf is printed at one size, and in print the narrow page
+ * simply keeps more margin. Floored at MUSHAF_MIN_FONT_SIZE; see there.
  */
 export function mushafLineFitFontSize(page: number, lineHeight: number): number {
-  return lineHeight / tallestEm(page);
+  return Math.max(lineHeight / tallestEm(page), MUSHAF_MIN_FONT_SIZE);
 }
 
 export function mushafFontSize(page: number, textWidth: number): number {

@@ -44,13 +44,15 @@ def tallest_line_em(
 ) -> float:
     """The tallest line's ink, top to bottom, in em.
 
-    A page's type is capped at `line height / this`, because Android cuts what
-    does not fit. React Native's CustomLineHeightSpan honours an explicit
-    lineHeight by keeping the font's descent and squeezing the ASCENT to fit,
-    so everything the box cannot hold comes off the top of the glyph -- which
-    on this script is the harakat. Measured on the tablet in landscape
-    (2026-10-02): pages set at the 40dp cap in a 49.9dp line box showed a hard
-    horizontal cut at every line's top edge.
+    A page's type is capped at `line height / this`, because a line box only
+    asks for 1.0em and this type carries 1.45-2.21em. React Native's
+    CustomLineHeightSpan (0.86) is CSS half-leading: it splits
+    `lineHeight - (ascent + descent)` evenly above and below, so a box smaller
+    than the ink shrinks BOTH sides and the glyph overhangs its line
+    symmetrically. On device that overhang draws rather than being cut -- what
+    destroys the harakat is the collision with the line above. Measured on the
+    tablet in landscape (2026-10-02): pages set at the 40dp cap in a 49.9dp
+    line box ran their lines together and lost the marks along every top edge.
 
     Per line, not per font: `head.yMax - head.yMin` is the extreme of every
     glyph in the page's font, and the tallest glyph and the deepest one are

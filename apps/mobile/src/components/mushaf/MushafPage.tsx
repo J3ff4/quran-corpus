@@ -138,12 +138,12 @@ export function MushafPage({
   //
   // `Math.min(size, lineHeight)` was the old guard, which only ever asked for a
   // ratio of 1.0 -- and these lines need 1.45 to 2.21em depending on what is
-  // stacked above and below their letters. Android does not spill what does not
-  // fit, it CUTS it, and RN's line box keeps the descent and squeezes the
-  // ascent, so the whole shortfall comes off the top: harakat sliced flat at
-  // every line's top edge on the tablet in landscape, where the width fits 40dp
-  // in a 49.9dp line box that holds 24 to 34 (owner, 2026-10-02; the Fold open
-  // is the same short-and-wide shape).
+  // stacked above and below their letters. The surplus does not vanish: RN's
+  // half-leading hands it back as overhang above and below the line, where it
+  // collides with the neighbouring line's own overhang and takes the harakat
+  // with it. On the tablet in landscape the width fits 40dp into a 49.9dp line
+  // box that holds 24 to 34, and every top edge lost its marks (owner,
+  // 2026-10-02; the Fold open is the same short-and-wide shape).
   //
   // Both halves of a leaf are given the same height, so one line box binds both
   // and the leaf keeps its single size.

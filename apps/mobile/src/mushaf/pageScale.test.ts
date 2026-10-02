@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   MUSHAF_MAX_FONT_SIZE,
+  MUSHAF_MIN_FONT_SIZE,
+  MUSHAF_PAGE_FOOTER_HEIGHT,
   mushafColumnForFontSize,
   mushafColumnWidth,
   mushafFontSize,
@@ -101,13 +103,16 @@ const HALF_FOLD = Math.floor(939 / 2) - 32;
  *  Measured on the glass, not derived: the text block ran 112..1607px at
  *  density 2 on the Tab S10+ (2026-10-02), which is 747.5dp over 15 lines. */
 const LINE_BOX_TABLET = mushafLineHeight(747.5, 15);
-/** The shortest line box that still keeps the type at the phone's floor.
+/** The line box a PHONE gets when it is turned on its side.
  *
- *  The tallest line in the book needs 2.2112em, so 18dp of type wants 39.8dp of
- *  line -- and both shipping landscape boxes are well clear of it. A window
- *  shorter than this draws smaller type, which is the clamp working rather than
- *  failing. */
-const LINE_BOX_FLOOR = 18 * Math.max(...MUSHAF_PAGE_LINE_EM);
+ *  `app.json` leaves orientation `default`, so this ships. A phone measures
+ *  ~360dp tall in landscape, which leaves 288dp over 15 lines -- 19.2dp of line
+ *  for type that wants 2.2112em of it. An unfloored ink fit answers 8.7dp,
+ *  so this is the box that makes the legibility assertion below bind. It is
+ *  deliberately NOT derived from MUSHAF_PAGE_LINE_EM: a bound computed from the
+ *  same table the code divides by is true by construction and asserts nothing,
+ *  which is how an unreadable phone landscape shipped green once already. */
+const LINE_BOX_PHONE_LANDSCAPE = mushafLineHeight(360 - MUSHAF_PAGE_FOOTER_HEIGHT, 15);
 
 describe('mushafPageFontSize', () => {
   it('is the size the page has always arrived at, stated directly', () => {
@@ -178,13 +183,32 @@ describe('mushafLeafFontSize', () => {
     // out smaller than the phone draws it, or the spread is less legible than
     // one page on a phone.
     for (const available of [HALF_FOLD, HALF_TABLET]) {
-      for (const lineBox of [LINE_BOX_FLOOR, LINE_BOX_TABLET]) {
+      for (const lineBox of [LINE_BOX_PHONE_LANDSCAPE, LINE_BOX_TABLET]) {
         for (let index = 0; index < 302; index += 1) {
           const leaf = mushafLeafFontSize(index * 2 + 1, index * 2 + 2, available, lineBox);
           expect(leaf).toBeLessThanOrEqual(MUSHAF_MAX_FONT_SIZE);
           expect(leaf).toBeGreaterThanOrEqual(18);
         }
       }
+    }
+  });
+});
+
+describe('MUSHAF_MIN_FONT_SIZE', () => {
+  it('stops a short box from shrinking the page out of legibility', () => {
+    // A phone in landscape cannot hold 15 lines of ~1.9em: the honest fit is
+    // 8.7dp on the tallest page, which is not a reading surface. Below the
+    // floor the old trade comes back -- the glyphs overhang their line -- and
+    // that is the better of two bad renderings.
+    const worst = MUSHAF_PAGE_LINE_EM.indexOf(Math.max(...MUSHAF_PAGE_LINE_EM)) + 1;
+    expect(LINE_BOX_PHONE_LANDSCAPE / MUSHAF_PAGE_LINE_EM[worst - 1]!).toBeLessThan(
+      MUSHAF_MIN_FONT_SIZE,
+    );
+    expect(mushafLineFitFontSize(worst, LINE_BOX_PHONE_LANDSCAPE)).toBe(MUSHAF_MIN_FONT_SIZE);
+    // And never binds where the page is readable: the tablet's own line box
+    // clears it on every page, so the floor cannot silently inflate type.
+    for (let page = 1; page <= 604; page += 1) {
+      expect(mushafLineFitFontSize(page, LINE_BOX_TABLET)).toBeGreaterThan(MUSHAF_MIN_FONT_SIZE);
     }
   });
 });

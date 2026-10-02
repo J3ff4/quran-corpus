@@ -334,12 +334,18 @@ export const MushafPager = memo(function MushafPager({
       // ViewPager2 announces nothing because nothing arrived. Without this the
       // flag would stay raised, and the next relayout's bogus position would be
       // read as that abandoned gesture finally landing.
-      const moving = event.nativeEvent.pageScrollState !== 'idle';
-      turning.current = moving;
-      if (moving) return;
-      // At rest, so the window can shift with no animation left to stutter.
-      // An abandoned drag reaches here with nothing stashed, which is correct:
-      // it arrived nowhere, so there is nothing to draw.
+      const state = event.nativeEvent.pageScrollState;
+      turning.current = state !== 'idle';
+      // `settling` is the one state that must wait: it IS the animation this
+      // defers the mount out of. `dragging` flushes because a second gesture
+      // has begun before the last one came to rest, and the window is still
+      // one leaf behind -- hold it any longer and the finger lands on a cell
+      // nothing has drawn into. The mount then falls at the start of a drag,
+      // where frames follow the finger, rather than inside a settle.
+      if (state === 'settling') return;
+      // At rest, or a new drag, so the window can shift with no animation left
+      // to stutter. An abandoned drag reaches here with nothing stashed, which
+      // is correct: it arrived nowhere, so there is nothing to draw.
       const next = pending.current;
       pending.current = null;
       if (next === null || next.mode !== mode) return;
