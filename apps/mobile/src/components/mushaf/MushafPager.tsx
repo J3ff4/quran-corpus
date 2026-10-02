@@ -355,20 +355,34 @@ export const MushafPager = memo(function MushafPager({
     // being recited on it. Compared here, in the effect body, and not in a
     // cleanup: a cleanup cannot see the new value, which has already broken
     // mushaf Play once.
-    if (spread && spreadFor(focusPage).index === spreadFor(settled.current).index) {
-      // No turn -- but the caller still has to be told, because it drives
-      // playback off the page it believes is in view. At a surah seam inside a
-      // leaf (page 106 finishes surah 4 and prints 5:1 below it) a turn request
-      // that is silently refused leaves it waiting for an arrival that never
-      // comes, and the recitation stops where portrait carries on.
+    if (spread) {
+      // Read before the write below, which is also what the arrival's leaf guard
+      // reads back.
+      const sameLeaf = spreadFor(focusPage).index === spreadFor(settled.current).index;
+      // The caller asked for a PAGE. This pager turns LEAVES, and a leaf can
+      // only ever report its recto (ruling R-B3), so page 128's arrival says
+      // 127 -- and 58 of 114 surahs first appear on an even page, as do nearly
+      // all the juz. Left to the arrival, every jump to one of those would be
+      // answered with the facing page: the strip would name it, Play would
+      // recite its first ayah, and the position row on the reader's phone would
+      // persist it. So the page itself is reported here, for the turn as much as
+      // for the refusal; the arrival then finds `settled` already on this leaf
+      // and stays quiet.
       settled.current = focusPage;
       onPageChangeRef.current(focusPage);
-      return;
+      // Both halves are already on screen, so there is nothing to turn -- and
+      // turning would flip the leaf away from the ayah being recited on it. The
+      // report above is owed either way: at a surah seam inside a leaf (page 106
+      // finishes surah 4 and prints 5:1 below it) a request that is silently
+      // dropped leaves the caller waiting for an arrival that never comes, and
+      // the recitation stops where portrait carries on.
+      if (sameLeaf) return;
     }
-    // settled is deliberately NOT written here: this turn ends in an
-    // onPageSelected like any other, and that is what reports it to the
-    // caller. Writing it would turn an auto-turn into a page the reading
-    // position never records.
+    // In single mode settled is deliberately NOT written here: the turn ends in
+    // an onPageSelected carrying the page itself, and that is what reports it to
+    // the caller. Writing it without reporting would turn an auto-turn into a
+    // page the reading position never records. A spread cannot wait for that
+    // arrival, for the reason just above.
     //
     // Marked as a commanded move BEFORE the command, so the arrival is read as
     // a turn and not as the relayout artifact above. Set here rather than left

@@ -49,7 +49,7 @@ import { HighlightsProvider } from '@/mushaf/highlightsContext';
 import { MUSHAF_PAGE_MAX, MUSHAF_PAGE_MIN } from '@quran-corpus/data/mobile';
 
 import { mushafLeafFontSize, mushafPageFontSize } from '@/mushaf/pageScale';
-import { SPREAD_COUNT } from '@/mushaf/spread';
+import { SPREAD_COUNT, spreadFor } from '@/mushaf/spread';
 
 import { MushafPager, WINDOW } from './MushafPager';
 
@@ -581,5 +581,24 @@ it('follows the reader across a mode flip, not the page they opened on', () => {
       props: { children: { type: { $$typeof?: symbol } } };
     };
     expect(cell.props.children.type.$$typeof).toBe(Symbol.for('react.memo'));
+  });
+  it('answers a jump with the page asked for, not the leaf it landed on', () => {
+    // 58 of 114 surahs first appear on an even page, as do nearly all the juz,
+    // so this is the ordinary case for Go-to and the surah picker rather than an
+    // edge. A leaf can only report its recto (ruling R-B3), so left to the
+    // arrival a jump to 128 is answered 127: the strip names 127, Play recites
+    // 127's first ayah, and the position row on the reader's phone keeps 127.
+    const onPageChange = vi.fn();
+    const result = render(
+      <MushafPager {...props} spread initialPage={3} focusPage={null} onPageChange={onPageChange} />,
+    );
+    onPageChange.mockClear();
+    result.rerender(
+      <MushafPager {...props} spread initialPage={3} focusPage={128} onPageChange={onPageChange} />,
+    );
+    expect(pagerCommandsOf(result)).toEqual([{ page: spreadFor(128).index, animated: true }]);
+    // Exactly once: the arrival that follows carries the recto, and the leaf
+    // guard has to swallow it rather than correct 128 back down to 127.
+    expect(onPageChange.mock.calls).toEqual([[128]]);
   });
 });
