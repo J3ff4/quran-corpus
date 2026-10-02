@@ -12,7 +12,9 @@ vi.mock('react-native-pager-view', async () => {
   return pagerViewMock();
 });
 
-const mocks = vi.hoisted(() => ({ pageProps: [] as Array<Record<string, unknown>> }));
+const mocks = vi.hoisted(() => ({
+  pageProps: [] as Array<Record<string, unknown>>,
+}));
 
 // Mocked only so the marks the pager hands DOWN are observable: with no client
 // the real page has no lines, so nothing it draws can show whether it was
@@ -484,6 +486,21 @@ it('follows the reader across a mode flip, not the page they opened on', () => {
     expect(pagerPropsOf(result).initialPage).toBe(298); // page 299, zero-based
     expect(drawn()).toContain(299);
     expect(drawn()).not.toContain(150);
+  });
+
+  it('does not re-issue an auto-turn when only the handler identity changes', () => {
+    // MushafScreen re-renders on every audio position tick and rebuilds its
+    // handler with it. Depending on that identity re-ran the turn effect on
+    // every tick while the turn was still in flight, and
+    // setCurrentItem(sameIndex, smoothScroll) mid-scroll re-animates from
+    // wherever the page has got to -- so the turn fought itself and crawled.
+    const result = render(<MushafPager {...props} focusPage={null} />);
+    result.rerender(<MushafPager {...props} focusPage={108} onPageChange={vi.fn()} />);
+    expect(pagerCommandsOf(result)).toEqual([{ page: 107, animated: true }]);
+
+    result.rerender(<MushafPager {...props} focusPage={108} onPageChange={vi.fn()} />);
+    result.rerender(<MushafPager {...props} focusPage={108} onPageChange={vi.fn()} />);
+    expect(pagerCommandsOf(result)).toEqual([{ page: 107, animated: true }]);
   });
 
   it('keeps an even page across a rotation instead of reporting its recto', () => {

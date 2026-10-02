@@ -263,6 +263,26 @@ export function MushafScreen() {
     [index.pages, recorder],
   );
 
+  // A stable identity, not the inline arrow it was. This screen re-renders on
+  // every audio position tick, and an inline handler re-rendered the pager --
+  // which hands all 604 of its children back to PagerView -- on each of them,
+  // and re-issued an auto-turn that was still in flight.
+  const onReaderPageChange = useCallback(
+    (page: number) => {
+      // Cleared once the pager has arrived, or the next jump to the same page
+      // would be a prop that never changes and so never moves it.
+      setFocusPage(null);
+      // A page that is not the one the seam asked for means the reader swiped
+      // somewhere else, and the request is stale: left standing, it would fire
+      // minutes later when a swipe happened to land on that page and start
+      // reciting with nothing pressed.
+      setPendingPlayPage((pending) => (pending === null || pending === page ? pending : null));
+      setPageInView(page);
+      onPageChange(page);
+    },
+    [onPageChange],
+  );
+
   const audio = useRecitationController();
   // Whether the engine is sounding for US. It is one engine app-wide now, so a
   // recitation the reader started is audible here too -- and painting a band
@@ -564,18 +584,7 @@ export function MushafScreen() {
         playingAyah={sounding ? playing : null}
         focusPage={focusPage}
         uiLocale={uiLocale}
-        onPageChange={(page) => {
-          // Cleared once the pager has arrived, or the next jump to the same
-          // page would be a prop that never changes and so never moves it.
-          setFocusPage(null);
-          // A page that is not the one the seam asked for means the reader
-          // swiped somewhere else, and the request is stale: left standing, it
-          // would fire minutes later when a swipe happened to land on that page
-          // and start reciting with nothing pressed.
-          setPendingPlayPage((pending) => (pending === null || pending === page ? pending : null));
-          setPageInView(page);
-          onPageChange(page);
-        }}
+        onPageChange={onReaderPageChange}
         onWordPress={onWordPress}
         onTap={toggleChrome}
         onLanded={noop}

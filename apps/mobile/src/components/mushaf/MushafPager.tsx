@@ -132,12 +132,6 @@ const MushafLeaf = memo(function MushafLeaf({
 }: Omit<PageProps, 'page' | 'fontSize'> & { leaf: number }) {
   const { recto, verso } = spreadAt(leaf);
   const half = Math.floor(width / 2);
-  // One size for both halves, decided here because neither page can see the
-  // other. Without it the two pages of a leaf draw at different sizes whenever
-  // one of them clamps and the other does not -- see mushafLeafFontSize.
-  // The shared inset, not a 32 restated here: a leaf that sizes against a wider
-  // box than the page draws into hands down a size the page then clamps away,
-  // which puts the two halves back on different sizes.
   const fontSize = mushafLeafFontSize(recto, verso, half - MUSHAF_PAGE_TEXT_INSET);
   return (
     <View testID="mushaf-leaf" style={{ flex: 1, flexDirection: 'row-reverse' }}>
@@ -148,6 +142,8 @@ const MushafLeaf = memo(function MushafLeaf({
     </View>
   );
 });
+
+
 
 /**
  * The mushaf, all 604 pages of it, turning right to left.
@@ -201,6 +197,16 @@ export const MushafPager = memo(function MushafPager({
   ...page
 }: MushafPagerProps) {
   const pagerRef = useRef<PagerView | null>(null);
+  // Held in a ref so nothing below depends on this callback's IDENTITY.
+  // MushafScreen re-renders on every audio position tick, and an identity that
+  // changes with it re-ran the auto-turn effect on every tick while a turn was
+  // still in flight: ViewPager2.setCurrentItem(sameIndex, smoothScroll) mid
+  // scroll re-animates from wherever the page has got to, so the turn fought
+  // itself and crawled. It also kept onPageSelected unstable, which handed
+  // PagerView a new prop per tick -- and PagerView re-renders all 604 children
+  // on any prop change.
+  const onPageChangeRef = useRef(onPageChange);
+  onPageChangeRef.current = onPageChange;
   // The unit this pager pages across: a page in portrait, a leaf of two in
   // landscape. Every index below is in these units -- a leaf index is NOT a
   // page number, and mixing them lands the reader 300 pages away.
@@ -253,9 +259,9 @@ export const MushafPager = memo(function MushafPager({
       // Nothing turned, so there is nothing to report.
       if (spread && spreadFor(settled.current).index === index) return;
       settled.current = page;
-      onPageChange(page);
+      onPageChangeRef.current(page);
     },
-    [onPageChange, spread, mode],
+    [spread, mode],
   );
 
   useEffect(() => {
@@ -276,7 +282,7 @@ export const MushafPager = memo(function MushafPager({
       // that is silently refused leaves it waiting for an arrival that never
       // comes, and the recitation stops where portrait carries on.
       settled.current = focusPage;
-      onPageChange(focusPage);
+      onPageChangeRef.current(focusPage);
       return;
     }
     // settled is deliberately NOT written here: this turn ends in an
@@ -284,7 +290,7 @@ export const MushafPager = memo(function MushafPager({
     // caller. Writing it would turn an auto-turn into a page the reading
     // position never records.
     pagerRef.current?.setPage(indexOf(focusPage));
-  }, [focusPage, spread, onPageChange]);
+  }, [focusPage, spread]);
 
   return (
     <PagerView
