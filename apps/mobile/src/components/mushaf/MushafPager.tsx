@@ -266,12 +266,20 @@ export const MushafPager = memo(function MushafPager({
   // below lands through the same event, so the caller is told only when the
   // page actually differs from what it was last told.
   //
-  // Seeded with the leaf's RECTO in spread mode, not the page asked for: a leaf
-  // is identified by its recto (ruling R-B3), so opening on page 4 settles on
-  // leaf (3,4) and reports 3. Seeding with 4 would make Android's own
-  // mount-time onPageSelected look like a turn and write a position the reader
-  // never moved to.
-  const settled = useRef(spread ? spreadFor(clampPage(initialPage)).recto : clampPage(initialPage));
+  // The page, in both modes -- NOT narrowed to the leaf's recto in spread mode.
+  // A leaf is identified by its recto (ruling R-B3), but the reader's place is a
+  // page, and the owner ruled 2026-10-02 that a rotation keeps the verso. Seeded
+  // with the recto, opening the mushaf on a stored page 128 landed correctly on
+  // leaf (127,128) and then rotated to portrait on **127**: the verso half was
+  // dropped at mount, so the flip had nothing to go back to. Measured on the
+  // tablet, vc83.
+  //
+  // Safe because the arrival that follows is caught by the leaf guard in
+  // onPageSelected, not by this value: Android fires onPageSelected once at
+  // mount naming the recto, and that guard sees `settled` already on the
+  // arriving leaf and reports nothing. Seeding the page therefore cannot look
+  // like a turn the reader never made.
+  const settled = useRef(clampPage(initialPage));
 
   // Re-derived during the flip's own render rather than in an effect: the
   // PagerView below remounts on the same render, and an effect would leave one

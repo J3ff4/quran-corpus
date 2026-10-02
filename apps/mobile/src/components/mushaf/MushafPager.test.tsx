@@ -640,4 +640,28 @@ it('follows the reader across a mode flip, not the page they opened on', () => {
     expect(onPageChange).not.toHaveBeenCalled();
     expect(pagerCommandsOf(result).at(-1)).toEqual({ page: spreadFor(3).index, animated: false });
   });
+  it('keeps the verso when the mushaf opens in spread and then rotates', () => {
+    // The owner's ruling, 2026-10-02: a rotation keeps the verso. Measured on
+    // the tablet (vc83) before the fix -- a stored page 128 opened correctly on
+    // leaf (127,128) and rotated to portrait on 127, because `settled` was
+    // seeded with the leaf's recto and the verso half was gone before the flip
+    // could read it. Distinct from the portrait-first case below it: there a
+    // real turn had written 300, so nothing was ever narrowed.
+    const onPageChange = vi.fn();
+    const result = render(
+      <MushafPager {...props} spread initialPage={128} onPageChange={onPageChange} />,
+    );
+    // The right leaf is on screen either way -- the defect was never visible
+    // until the flip.
+    expect(pagerPropsOf(result).initialPage).toBe(spreadFor(128).index);
+    // Android's mount announcement names the recto. It must stay unreported, or
+    // the seed would be written back over as a turn nobody made.
+    act(() => {
+      pagerRelayout(result, spreadFor(128).index);
+    });
+    expect(onPageChange).not.toHaveBeenCalled();
+
+    result.rerender(<MushafPager {...props} initialPage={128} onPageChange={onPageChange} />);
+    expect(pagerPropsOf(result).initialPage).toBe(127); // page 128, zero-based
+  });
 });
