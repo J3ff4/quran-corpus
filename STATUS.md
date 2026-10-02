@@ -7,9 +7,86 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-09-26
+Updated: 2026-10-02
 
 ## Now
+
+**2026-10-02 — PR #108 merged (squash `b26975096f7ff5e21de4e52bdc65d9e4e1a7ebd7`
+= `b269750`). Phase S4b, the mushaf's landscape two-page spread.** Issue #107
+is closed by the merge. The font-cache issue (number 106, no hash on purpose —
+a closing keyword anywhere near the reference closes it, and the parser ignores
+negation) stays OPEN: `expo-font` has no unload, so no fix exists. vc84
+installed on the tablet; `~/apks/` holds vc79-vc84.
+
+In landscape the mushaf turns **leaves**, not pages: 302 two-page children in
+the same `PagerView` instead of 604 one-page ones, so Android's own fling is
+identical in both orientations — no second pager, no custom transition (R-B4
+dropped the hinge). Pairs anchored from the right and fixed: (1,2), (3,4) …
+(603,604).
+
+**The spread itself was the easy half.** Three defects in how a *position
+report* is interpreted took the rest, each found only on device, each in the
+path that writes the reading position to the on-device user DB:
+
+- **A resize is not a page turn (#107).** ViewPager2 under
+  `layoutDirection="rtl"` re-derives its scroll offset on relayout, lands **one
+  index short**, and announces it through `onPageSelected` like a genuine
+  arrival — corrupting `settled` before the mode flip read it. The algebra was
+  never wrong; its input was. Two measurements did the work: `settled` became an
+  **even** page and spread mode only ever wrote a recto, so **parity alone named
+  the writing branch**; and a `wm size` resize that keeps the mode reproduces it
+  with no rotation, so multi-window was in scope too. Discriminator = the
+  scroll-state trace (finger: `dragging/settling/selected/idle`; relayout: a
+  bare `selected`). The pager really has moved, so the position is
+  **re-asserted**, not dropped.
+- **A jump was answered with the facing page.** A leaf can only report its recto
+  (R-B3), so a commanded turn to 128 arrived saying 127 — the routine path for
+  **58 of 114 surahs** and nearly every juz. Strip, Play, `pendingPlayPage` and
+  the position row all took the facing page. The commanded page is now reported
+  by the command.
+- **A rotation dropped the verso.** Owner ruling 2026-10-02: a rotation keeps
+  the verso. `settled` was seeded with the leaf's recto, so opening cold in
+  landscape on a stored 128 showed leaf (127,128) and rotated to portrait on
+  **127**. R-B3 identifies a *leaf* by its recto; it does not say the reader's
+  place is a leaf. **This one reached the DB** — the position row drifted from
+  128's opener to 127's on its own during the vc83 testing.
+
+Seven execution rulings R-X1..R-X7 are appended to the plan: it was written
+against interfaces this code does not have, and five were wrong.
+
+**Three `/code-review` rounds.** Round 2 caught a regression this phase
+introduced that degraded playback auto-turns in *both* orientations. Round 3
+(triggered by §5's user-DB clause) returned six findings, five fixed and one
+declined as unreachable. CodeRabbit: the first green status was the documented
+`Review skipped: manual review required for this OSS repository` fail-open; a
+bare `@coderabbitai review` made it actually run, after which it read the diff
+properly — 9 pre-merge checks passed, empty `APPROVED`, and **one Low finding
+living only in the walkthrough with no thread**, declined with its reasoning on
+the PR.
+
+Gates: `tsc` 0, `eslint src` 0, **130 files / 1600 tests**, every behavioural fix
+mutation-checked individually. Five device runs, vc79 → vc84.
+
+**Method notes worth keeping.** `console.warn` reaches **nothing** in a release
+RN build (the console polyfill only pipes to native logging in dev) and `run-as`
+is refused on a non-debuggable package — the channel that works is encoding
+state into `testID`, which surfaces to `uiautomator` as `resource-id`. A
+`uiautomator dump` **restores the system rotation**, so re-assert the lock after
+every dump. `uiautomator` cannot settle at all while the playing highlight
+animates, so the playback arm was read from `dumpsys media_session`. A 35s
+repack loop (`expo export:embed` → `hermesc` → swap the bundle → `zipalign` →
+`apksigner`) beats the 2m24s Gradle build for JS-only changes, but an
+instrumented repack **reports the versionCode of the APK it was built from**, so
+a clean rebuild needs a new number.
+
+**Still owed on S4b:** check **614** on the phone (clears S4a's 519 in the same
+session) and check **601** against the owner's physical printed mushaf. One
+one-leaf observation did **not** reproduce in ten attempts across four paths and
+is logged in the plan rather than filed, with the invariant that would close it.
+
+**2026-10-01 — PR #105 merged (squash `1098396`). Phase S4a, responsive tablet
+layout.** Recorded here late: this file was last updated 2026-09-26 and never
+saw S4a land.
 
 **2026-09-26 — PR #101 merged (squash `74534a0`).** Three owner-reported search
 defects, found on the S2 device run, fixed and verified on vc58.
