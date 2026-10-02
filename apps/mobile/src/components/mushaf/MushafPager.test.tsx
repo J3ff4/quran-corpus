@@ -601,4 +601,43 @@ it('follows the reader across a mode flip, not the page they opened on', () => {
     // guard has to swallow it rather than correct 128 back down to 127.
     expect(onPageChange.mock.calls).toEqual([[128]]);
   });
+
+  it('does not re-render when the pager reports the page it is already on', () => {
+    // Every render here rebuilds a 302-element child array and hands PagerView a
+    // new children prop, which re-renders all of them -- the cost the glyph
+    // atlas cannot absorb mid-swipe. Two events say nothing changed: ViewPager2
+    // announcing its opening page at attach, and the #107 bounce re-asserting a
+    // position. Both land in onPageSelected, so `current` has to compare equal
+    // rather than arrive as a fresh object.
+    const result = render(<MushafPager {...props} spread initialPage={3} />);
+    const before = pagerPropsOf(result).children;
+    act(() => {
+      pagerRelayout(result, spreadFor(3).index);
+    });
+    // Identity through a boolean, not `toBe`: on a failure vitest diffs the two
+    // values, and diffing a pair of 302-element React trees exhausts the heap --
+    // the mutation-check for this line came back as an OOM instead of a
+    // readable assertion.
+    expect(pagerPropsOf(result).children === before).toBe(true);
+  });
+
+  it('bounces an impossible position instead of throwing inside a native event', () => {
+    // The #107 guard only catches a bogus index while nothing is moving. With a
+    // turn in flight -- playback's own auto-turn, say -- the same index falls
+    // straight through, and -1 raises a RangeError out of spreadAt from inside a
+    // native event handler. In single mode it is quieter and worse: page 0
+    // reaches the reading-position row on the phone.
+    const onPageChange = vi.fn();
+    const result = render(
+      <MushafPager {...props} spread initialPage={3} onPageChange={onPageChange} />,
+    );
+    onPageChange.mockClear();
+    act(() => {
+      const pager = pagerPropsOf(result);
+      pager.onPageScrollStateChanged?.({ nativeEvent: { pageScrollState: 'dragging' } });
+      pager.onPageSelected?.({ nativeEvent: { position: -1 } });
+    });
+    expect(onPageChange).not.toHaveBeenCalled();
+    expect(pagerCommandsOf(result).at(-1)).toEqual({ page: spreadFor(3).index, animated: false });
+  });
 });

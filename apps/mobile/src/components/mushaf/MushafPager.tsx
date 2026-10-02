@@ -300,6 +300,17 @@ export const MushafPager = memo(function MushafPager({
   const onPageSelected = useCallback(
     (event: { nativeEvent: { position: number } }) => {
       const index = event.nativeEvent.position;
+      // The position comes from native, and #107 below is the standing proof
+      // that ViewPager2 reports positions nobody asked for. An impossible one is
+      // treated exactly like that artifact -- put the pager back, report nothing
+      // -- rather than reaching spreadAt, which raises a RangeError from inside
+      // a native event handler, or, in single mode, quietly recording page 0 as
+      // the reader's position on their phone.
+      if (!Number.isInteger(index) || index < 0 || index >= (spread ? LEAVES : PAGES).length) {
+        turning.current = false;
+        pagerRef.current?.setPageWithoutAnimation(indexOf(settled.current));
+        return;
+      }
       // A relayout moves the pager, and ViewPager2 reports the move as a turn.
       //
       // Measured on device (2026-10-01, issue #107): resizing this pager --
@@ -325,7 +336,15 @@ export const MushafPager = memo(function MushafPager({
         pagerRef.current?.setPageWithoutAnimation(indexOf(settled.current));
         return;
       }
-      setCurrent({ mode, index });
+      // Compared field by field, not handed over as a fresh object: `current`
+      // is an object only because it carries the mode tag, and a new one on
+      // every arrival means React can never bail out -- so the mount
+      // announcement and each bounce re-assertion above would re-render this
+      // pager, rebuild its 302- or 604-element child array, and hand PagerView
+      // a new children prop, which re-renders every one of them. The docstring's
+      // "must not re-render for anything but a page turn or a resize" is load
+      // bearing: it is what keeps a swipe off the glyph-atlas thrash.
+      setCurrent((prev) => (prev.mode === mode && prev.index === index ? prev : { mode, index }));
       // The recto, because the caller stores a single page number and a leaf
       // has two. Which half the reader's eye is on is not something the pager
       // knows, and the recto is the stable identity of the paper.
