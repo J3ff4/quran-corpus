@@ -756,6 +756,68 @@ Gates: `tsc --noEmit` 0, `eslint src app` 0, `vitest run` 129 files /
 
 ---
 
+## Device run, vc83 (2026-10-02) — the even-page jump
+
+Tablet, landscape locked, `wm size` physical 1752x2800. The check review round 3
+created: a commanded jump to an **even** page, which no previous run exercised.
+
+**Go to → Page 128 — PASS on all three arms.** Page 127 opens at 5:114
+(Al-Māʾidah), 128 opens at 6:1 (Al-Anʿām), so the surah discriminates the two
+where the juz does not:
+
+| Arm | Read from | Result |
+|---|---|---|
+| The leaf | `content-desc` | `Page 128` left, `Page 127` right — correct pairing, recto right under RTL |
+| The strip | `mushaf-top-strip` | `Al-Anam, Juz 7` — **128's** surah. Pre-fix this said Al-Māʾidah |
+| Play | `dumpsys media_session` | `description=Al-Anam, Mahmoud Khalil Al-Husary (Murattal)`, `state=PLAYING` — started on 128's first ayah, not 127's |
+| The position row | Home's continue card | `Continue reading Al-Anam 6:1` — **128's** opener persisted to the user DB |
+
+`uiautomator dump` cannot settle while the playing highlight animates, so the
+playback arm is read from `dumpsys media_session` instead — its `description` is
+the surah, which is the field that separates 127 from 128.
+
+**#107 re-verified on vc83:** three portrait↔landscape round trips hold leaf
+(95,96)↔95, and three more hold (127,128)↔127. Also holds through rotate-then-
+tap-immediately (tap 150ms into the relayout), three rounds.
+
+### Found during the run, not yet ruled on
+
+**Rotating to portrait moves the reader back a page when their stored page is a
+verso.** Deterministic: stored 128, open the mushaf in landscape → leaf
+(127,128) correct; rotate to portrait → page **127**. `settled` is seeded
+`spreadFor(initialPage).recto`, so the verso half of the stored position is
+dropped at mount and the flip has nothing to go back to. It is the mount-time
+twin of round 3's finding 1 — same cause, a page identity narrowed to a leaf
+identity — but it touches ruling R-B3 directly, so it wants an owner ruling
+rather than a fix. The position row is NOT rewritten (the flip reports nothing),
+so the reader's saved place survives; only the page on screen moves.
+
+### One unreproduced observation
+
+Early in the run the leaf went from (97,98) to (95,96) — one leaf back, the
+`spreadAt(47).recto = 95` signature of an accepted artifact — across a dump's
+rotation round trip plus a tap at (700,1700). **Not reproduced in ten further
+attempts** across three paths: dumps alone (4×), taps on a settled pager (2×),
+clean mount + round trips (5×), and rotate-then-tap-mid-relayout (3×). Logged
+rather than filed: (700,1700) sits inside the navigation-bar strip once chrome
+is up, so the original may have been Android's own gesture area rather than the
+app.
+
+The structural hole that *could* produce it, if it is real: the guard trusts the
+platform's `dragging`, so an artifact arriving inside a volunteered scroll-state
+sequence is accepted. The closing invariant, if it ever needs closing, is that a
+**gesture can only ever move one index** in ViewPager2 while a command moves to
+exactly the index asked for — so anything else is an artifact. Not implemented:
+it would change a path this run just verified, to fix a defect that cannot
+currently be demonstrated.
+
+### Side effect of the run
+
+The reading position is now **Al-Anʿām 6:1 (page 128)**, moved from An-Nisa
+4:122 where the owner left it.
+
+---
+
 ## Independent review, round 3, 2026-10-02
 
 Run on the whole branch after the #107 fix landed, because that fix sits in the
