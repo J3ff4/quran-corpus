@@ -619,4 +619,647 @@ Build and install exactly as S4a Task 11 (prebuild only if a native dep changed 
 
 ## Verification log
 
-*(empty — Task 5 fills this)*
+### Desk work, 2026-10-01
+
+Tasks 1-4 implemented, each mutation-checked, each committed on
+`feat/s4b-mushaf-spread`. Task 5 — the build and the device run — is owed, and
+the phase is not complete until it is run: no device has seen a leaf.
+
+| Task | Commit | What landed |
+|---|---|---|
+| 1 | `d73030c` | `spread.ts` — recto-anchored pairing, bounds from the shared package |
+| 3 | `b319336` | one type size per leaf; `SPREAD-BAND-CHECK.md`; `MushafPage` size override |
+| 2 | `02f4876` | the pager's spread mode, the leaf, the mode remount, the leaf focus guard |
+| 4 | `65205ea` | the ayah-text window widened by a page either side on a spread |
+| — | `576a6ec` | self-review fixes: the reader's place survives a rotation; the text inset moved to `pageScale` |
+
+Task 3 ran before Task 2, because the pager needs `mushafLeafFontSize`.
+
+Gates: `tsc --noEmit` clean, `eslint src app` clean, `vitest run` **129 files,
+1583 tests** (1540 before this phase). Portrait's 119 existing mushaf tests pass
+unchanged, which is the phase's own hard constraint, and three new ones assert
+it stays that way.
+
+**Four tests were caught asserting nothing by the mutation step, not by review.**
+Worth recording because each looked right:
+
+1. `?? leafFontSize` in `MushafPage` passed with the fix deleted — not a vacuous
+   test but genuinely redundant code, since `mushafColumnForFontSize` is the
+   exact inverse of `mushafFontSize`. In the one case the two differ, a size too
+   large for the half, the `??` was the worse of the two.
+2. The mode-remount test asserted child counts, which change with or without
+   `key={mode}`. It now goes through `pagerHost`'s per-node command log, where a
+   surviving pager instance carries its pre-flip history.
+3. The shared-leaf-size tests used pages 53/54, which both clamp at the font cap
+   and therefore agree however the code is written. 298 of 302 leaves are like
+   that at the Tab S10+ half-box; the tests now use leaf 27, one of the four
+   where the halves genuinely diverge.
+4. The forward half of Task 4's widening passed both ways because the fixture
+   ran out of pages and both widths fell through to `LAST_SURAH_ID`.
+
+**Self-review (§4 step 2) found two defects the tests could not.** Both need a
+render that actually flips mode, and every spread test written for Task 2
+rendered one mode only:
+
+- `initialPage` was still derived from the prop — the page the reader *launched*
+  on — so a reader who opened on 106 and swiped to 300 was dragged back to 106
+  on every rotation.
+- `current`, which decides what draws, survived the flip holding the old mode's
+  unit. Portrait page 106 is index 105; read as a leaf index that is leaf 105,
+  pages 211-212, so the drawn window sat a hundred leaves from the leaf on
+  screen and a rotation landed on blank paper.
+
+`key={mode}` remounts the PagerView but **not** `MushafPager` itself, which is
+what both defects turn on. The real ViewPager2 fires `onPageSelected` at mount
+and would probably have papered over the second one after a frame; relying on
+that is not a fix. Check 608 below is the device half.
+
+The same pass caught a §3 violation: the leaf sized its halves against a `32`
+restated in the pager beside `MushafPage`'s own `2 * PAGE_MARGIN`, with a comment
+admitting the two had to match. It is now `MUSHAF_PAGE_TEXT_INSET` in
+`pageScale.ts` — not in `MushafPage`, which the pager's own tests mock, and
+importing from there broke 15 of them and said where the constant belonged.
+
+### Checks owed (Task 5)
+
+Nothing in the table below has been run.
+
+**APK ready.** versionCode 79, release, arm64-v8a, built at `576a6ec`, 194 MB.
+Served as a copy, not a symlink: `~/apks/quran-corpus-vc79.apk`. versionCode
+verified `79` with `/home/claude/android-sdk/build-tools/35.0.0/aapt2 dump
+badging` on the served copy, not on the build output. Debug-signed, so it cannot
+upgrade over an EAS build — uninstall first if one is present.
+
+```bash
+/home/claude/android-sdk/platform-tools/adb -s adb-R52XC0AYMZZ-S3tLzk._adb-tls-connect._tcp \
+  install -r --user 0 ~/apks/quran-corpus-vc79.apk
+```
+
+`--user 0` is mandatory: an unqualified `adb install -r` once landed on user 10
+(Guest) and wiped user-0 app data.
+
+| # | Check | Result |
+|---|---|---|
+| 600 | Landscape shows two pages, recto on the RIGHT | |
+| 601 | Pairing matches the owner's physical mushaf for 1-2, 3-4, 603-604 | |
+| 602 | Portrait still one page, identical to vc72 | |
+| 603 | Rotate on page 4 → leaf (3,4), page 4 on the left; rotate back → page 4 | |
+| 604 | framestats gaps inside a landscape turn, 3 repeats — no UI-thread stall | |
+| 605 | 10 fast swipes in a burst — no blank leaf, no missed mount | |
+| 606 | Every glyph present on 20 sampled pages incl. the 54 with header/bismillah gaps | |
+| 607 | **New.** Both halves of leaf 27, 177, 399 or 443 at the same type size — the four where they diverge | |
+| 608 | **New.** Open on page 1, swipe to ~300, rotate — lands on the leaf holding 300, not back on 1, and both halves draw | |
+| 610 | Playback crossing recto→verso does not turn; verso→next recto does | |
+| 611 | Highlight lands on an ayah on the left half | |
+| 612 | Close on a landscape leaf, reopen in portrait — lands on the recto | |
+| 613 | Page-jump sheet lands on the right leaf | |
+| 614 | Phone regression: mushaf unchanged | |
+| 615 | **New.** Landscape, recite through a leaf that carries a surah seam (page 106: surah 4 ends, 5:1 is printed below) — audio carries on through the verso and then turns to the next leaf | |
+| 616 | **New.** Landscape, saved position on an EVEN page (108) — both halves draw their surah band and bismillah line, not only their words | |
+| 617 | **New.** Short wide box: split-screen or a freeform window dragged flat — lines do not overlap, and the type shrinks instead | |
+
+Check 607 is new, from ruling R-X4: the shared leaf size is only observable on
+four leaves out of 302, so a spot check anywhere else in the book cannot see it.
+
+Carried forward from S4a and still owed: 519 (the phone regression, S4a's own
+exit criterion), the phone half of 520, 518, 514's spoken announcement, and the
+rail-tap spinner check. 614 here is the same phone build, so one phone session
+can clear both phases' phone checks.
+
+---
+
+## Independent review, round 2, 2026-10-01
+
+Re-run because round 1's fixes were substantial enough to plausibly introduce a
+defect — which one of them had. Four findings; three fixed, one filed.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | Round 1 widened the auto-turn effect's deps to include `onPageChange`, which MushafScreen passed as an inline arrow while re-rendering on every audio tick — so an in-flight turn re-issued `setPage` per tick and fought itself | Fixed `6fc032e` — the pager holds the callback in a ref; the screen builds it once |
+| 2 | Each half of a leaf gated on its own QCF font, so a leaf reached before both arrived drew text on one side and blank paper on the other | Fixed `f0ed4c0` — both halves withheld until both fonts have *settled* |
+| 3 | The font cache has no eviction and a spread doubles the rate it fills toward ~120MB | Filed as **issue #106**. No fix available here: `expo-font` has no unload, so the only change would be a smaller window, not a bound. The ceiling is unchanged at 604 families |
+| 4 | `spreadIndexFor` exported, called only by its own test | Deleted `0d26f3b` |
+
+Finding 1 was a regression this phase introduced, and it is why the round-2 run
+was worth the pass: it degraded playback auto-turns in **both** orientations, so
+it would have read on device as a mushaf-wide player defect rather than as a
+spread one. Its own mutation-check could not have caught it — the behaviour only
+appears across two renders that change nothing but a function's identity, which
+no single render asserts.
+
+Finding 2's fix forced the pager test's font mock from a flat `ready: false` to
+per-page. With it stuck false the new gate would have withheld every leaf in
+every spread test, which is how a correct fix can look like fifteen broken tests.
+
+Gates: `tsc --noEmit` 0, `eslint src app` 0, `vitest run` 129 files /
+**1592 tests**. Three new tests, all three mutation-checked.
+
+---
+
+## Device run, vc83 (2026-10-02) — the even-page jump
+
+Tablet, landscape locked, `wm size` physical 1752x2800. The check review round 3
+created: a commanded jump to an **even** page, which no previous run exercised.
+
+**Go to → Page 128 — PASS on all three arms.** Page 127 opens at 5:114
+(Al-Māʾidah), 128 opens at 6:1 (Al-Anʿām), so the surah discriminates the two
+where the juz does not:
+
+| Arm | Read from | Result |
+|---|---|---|
+| The leaf | `content-desc` | `Page 128` left, `Page 127` right — correct pairing, recto right under RTL |
+| The strip | `mushaf-top-strip` | `Al-Anam, Juz 7` — **128's** surah. Pre-fix this said Al-Māʾidah |
+| Play | `dumpsys media_session` | `description=Al-Anam, Mahmoud Khalil Al-Husary (Murattal)`, `state=PLAYING` — started on 128's first ayah, not 127's |
+| The position row | Home's continue card | `Continue reading Al-Anam 6:1` — **128's** opener persisted to the user DB |
+
+`uiautomator dump` cannot settle while the playing highlight animates, so the
+playback arm is read from `dumpsys media_session` instead — its `description` is
+the surah, which is the field that separates 127 from 128.
+
+**#107 re-verified on vc83:** three portrait↔landscape round trips hold leaf
+(95,96)↔95, and three more hold (127,128)↔127. Also holds through rotate-then-
+tap-immediately (tap 150ms into the relayout), three rounds.
+
+### Found during the run — ruled and fixed
+
+**Rotating to portrait moved the reader back a page when their stored page was a
+verso.** Deterministic: stored 128, open the mushaf in landscape → leaf
+(127,128) correct; rotate to portrait → page **127**. `settled` was seeded
+`spreadFor(initialPage).recto`, so the verso half of the stored position was
+dropped at mount and the flip had nothing to go back to. The mount-time twin of
+round 3's finding 1 — the same cause, a page identity narrowed to a leaf
+identity.
+
+**Owner ruling, 2026-10-02: a rotation keeps the verso.** Fixed `e272fe1`,
+`settled` is seeded with the page. R-B3 identifies a LEAF by its recto; it does
+not say the reader's place is a leaf, and a rotation is not a page turn. Safe
+because the arrival that follows is caught by onPageSelected's leaf guard, not by
+the seed — which is what the recto seed existed to do before that guard was
+written.
+
+**Only the mount path was ever affected.** A flip from portrait already carried
+the page, verso and all, because a real turn had written it. That is why the
+existing rotation test stayed green and the defect was reachable only by opening
+the mushaf cold in landscape.
+
+It also reached the DB. The run's own position row drifted from `Al-Anam 6:1`
+(page 128) to `Al-Maidah 5:114` (page **127**) at some point across the vc83
+rotation testing — the narrowed value persisted. The exact event that recorded it
+was not isolated; what is certain is that the pre-fix pager put a page the reader
+had not turned to into the position row.
+
+### vc84 — the verso ruling verified
+
+Rebuilt as vc84 and re-run, with the stored position set to an even page first
+(the vc83 drift above had left it on 127, where a cold mount proves nothing).
+
+| Step | Expected | Read |
+|---|---|---|
+| Cold mount, landscape, stored 128 | leaf (127,128) | `128` `127` |
+| Rotate to portrait | **128** — was 127 on vc83 | `128` |
+| Rotate back, and again, twice | holds | `128 127` → `128` → `128 127` |
+| Swipe to a new leaf | recto reported, unchanged | leaf (125,126), portrait **125** |
+| Position row after the swipe | page 125's opener | `Continue reading Al-Maidah 5:104` |
+
+The swipe row is the regression half: a reader who turns to a new leaf still gets
+its recto, so the ruling changed the mount seed and nothing else.
+
+### One unreproduced observation
+
+Early in the run the leaf went from (97,98) to (95,96) — one leaf back, the
+`spreadAt(47).recto = 95` signature of an accepted artifact — across a dump's
+rotation round trip plus a tap at (700,1700). **Not reproduced in ten further
+attempts** across three paths: dumps alone (4×), taps on a settled pager (2×),
+clean mount + round trips (5×), and rotate-then-tap-mid-relayout (3×). Logged
+rather than filed: (700,1700) sits inside the navigation-bar strip once chrome
+is up, so the original may have been Android's own gesture area rather than the
+app.
+
+The structural hole that *could* produce it, if it is real: the guard trusts the
+platform's `dragging`, so an artifact arriving inside a volunteered scroll-state
+sequence is accepted. The closing invariant, if it ever needs closing, is that a
+**gesture can only ever move one index** in ViewPager2 while a command moves to
+exactly the index asked for — so anything else is an artifact. Not implemented:
+it would change a path this run just verified, to fix a defect that cannot
+currently be demonstrated.
+
+### Side effect of the run
+
+The reading position is now **Al-Anʿām 6:1 (page 128)**, moved from An-Nisa
+4:122 where the owner left it.
+
+---
+
+## Independent review, round 3, 2026-10-02
+
+Run on the whole branch after the #107 fix landed, because that fix sits in the
+path that writes the on-device reading position — §5's third trigger. Six
+findings; five fixed, one declined.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | **MEDIUM.** A commanded cross-leaf turn let the arrival report the leaf's recto, so a jump to an even page answered with the facing page | Fixed `e56397d` |
+| 2 | `setCurrent({ mode, index })` is a fresh object every arrival, so React can never bail out — the mount announcement and each #107 bounce re-rendered the pager and all 302 or 604 children | Fixed `32b5a60` |
+| 3 | `event.nativeEvent.position` reached `spreadAt` unvalidated; with a turn in flight, `-1` throws from inside a native handler, or records page 0 to the user DB | Fixed `32b5a60` |
+| 4 | The `turning` latch has no path down if a commanded `setPage` is a no-op | **Declined** — unreachable: the spread branch returns before the latch is set when the leaf is already in view, and in single mode `focusPage !== settled.current` implies a different index. A guard for a state no caller can reach is a guard no test can defend |
+| 5 | Orphaned docblock in `MushafPage.tsx` — it described the `PAGE_MARGIN` this branch deleted | Fixed `6d34732` |
+| 6 | `spreadFor` derives its bounds from the shared package, then assumes `MUSHAF_PAGE_MIN` is odd in the one line of arithmetic | Fixed `6d34732` — same result at MIN = 1, so **no test moves**; it is the code agreeing with its own docstring, not a behaviour change |
+
+Finding 1 is the one worth the pass, and it is the same class as #107 one layer
+up: a leaf can only report its recto (ruling R-B3), so an arrival cannot answer
+"which page did you ask for". 58 of 114 surahs first appear on an even page, as
+do nearly all the juz — so Go-to, the surah picker and a juz jump all landed the
+screen one page off in landscape, naming the facing page in the strip, reciting
+its first ayah, cancelling `pendingPlayPage`, and persisting it to the user DB.
+The same-leaf refusal directly above it already reported the exact page for
+precisely that reason; the turn did not. Not a rotation defect, so the vc81 and
+vc82 device runs had no reason to catch it: every check 601-613 that jumps does
+so in portrait, or to an odd page.
+
+Findings 2 and 3 were both created by the #107 fix's own neighbourhood — 2 by
+the mode tag `current` gained this phase, 3 by a guard that only covers the
+no-movement case. Neither is visible in a passing suite.
+
+Gates: `tsc --noEmit` 0, `eslint src` 0, `vitest run` 130 files /
+**1599 tests**. Three new tests; all three mutation-checked individually (each
+fails exactly one test when its line is removed). Finding 2's check first came
+back as a **heap exhaustion** rather than an assertion failure — a failing
+`toBe` on two 302-element React trees exhausts the diff — so that test compares
+identity through a boolean.
+
+**The vc82 APK on the tablet predates all of this.** It carries the #107 fix
+and nothing from this round, so checks 601-613 stand as recorded; a jump to an
+even page in landscape is unverified on device and is the next build's first
+check.
+
+---
+
+## APK, versionCode 81
+
+Supersedes vc80, which carries finding 1 — the degraded auto-turn — in both
+orientations. Built 2026-10-01 at `0d26f3b`.
+
+Bumped in **both** `android/app/build.gradle` and `app.json`. Only the gradle
+file reaches the build; `app.json` is kept in step so a future `expo prebuild`
+does not silently roll it back.
+
+Release / arm64-v8a, 202972549 bytes, `BUILD SUCCESSFUL in 2m 26s`. Served as a
+**copy** at `~/apks/quran-corpus-vc81.apk` (194M), versionCode verified `81` on
+that copy with `aapt2 dump badging`. vc79 and vc80 re-verified as 79 and 80, so
+all three labels in `~/apks/` are honest.
+
+```bash
+/home/claude/android-sdk/platform-tools/adb -s adb-R52XC0AYMZZ-S3tLzk._adb-tls-connect._tcp \
+  install -r --user 0 ~/apks/quran-corpus-vc81.apk
+```
+
+---
+
+## APK, versionCode 80 (superseded)
+
+Built 2026-10-01 at `a6e1967`, release / arm64-v8a, 202972589 bytes, `BUILD
+SUCCESSFUL in 1m 38s`. Served as a **copy** at `~/apks/quran-corpus-vc80.apk`
+(194M), versionCode verified `80` on that copy with `aapt2 dump badging`.
+
+vc79 is superseded and should not be used: it predates the review round, and
+checks 603, 610 and 615-617 all test behaviour its four fixes change.
+
+The first vc80 attempt built as **79**. `app.json`'s `versionCode` does not
+reach Gradle — `android/` is `expo prebuild` output, so the live value is
+`android/app/build.gradle` and only a prebuild syncs them. The build exits 0 and
+hands back the old number, so the only thing that catches it is reading
+`aapt2 dump badging` off the copy that is actually served.
+
+Debug-signed, so it cannot upgrade over an EAS build — uninstall one first if
+present.
+
+```bash
+/home/claude/android-sdk/platform-tools/adb -s adb-R52XC0AYMZZ-S3tLzk._adb-tls-connect._tcp \
+  install -r --user 0 ~/apks/quran-corpus-vc80.apk
+```
+
+`--user 0` is not optional: an unqualified `-r` once landed on user 10 (Guest)
+and wiped user-0 app data.
+
+---
+
+## Independent review, 2026-10-01
+
+Run at the owner's request on `main...HEAD`. §5 applies: `spread.ts` adds a
+range validator on a page number arriving from the user DB, and the pager's
+settle path writes the reading position, so the trust-boundary and on-device-DB
+triggers both fire. One pass, five findings, four fixed and one subsumed.
+
+The review confirmed the parts the phase turns on — the pairing math, the
+leaf-size algebra, `row-reverse`, `key={mode}`, the render-phase unit
+re-derivation and `initialPage={indexOf(settled.current)}`. Every finding was
+in what sits *above* the pager, and every one of them came from the same thing
+the tests could not see: a leaf has two pages and everything above it still
+speaks in one.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | `settled` holds the portrait page across a flip, so rotating off an even page reports its recto and rewrites the reading position | Fixed `6b2aa36` — compare by leaf identity, report nothing when the position is already on this leaf |
+| 2 | The same-leaf focus guard refused the turn silently, so continuous recitation stalled at every surah seam in landscape | Fixed `6b2aa36` — report the half without turning to it |
+| 3 | `pageLines` is the recto's rows only, so the page-audio helpers are blind to the verso | Subsumed by 2: `currentPage` now follows the playhead across the leaf, so the seam logic reads the half being recited. "Play this page" still starts at the recto and flows through the verso, which is the leaf's reading order and not a defect |
+| 4 | The type size is fitted to width alone; nothing clamps it to the line box, so a short wide box draws glyphs taller than their slots | Fixed `c2c760c` — fit to the line box before the column is built |
+| 5 | The widened surah window assumed `page` was a recto; it can be a verso | Fixed `7e43261` — anchor on `spreadFor(page).recto`, guarded |
+
+Finding 4 is pre-existing — landscape single-page was worse, clamped at
+`MUSHAF_MAX_FONT_SIZE` under a tall box — but the band check validated only the
+width axis and this phase makes landscape the headline mode. The fix caps the
+type at exactly one line box, which is the unarguable part: a glyph taller than
+its slot cannot not overlap. Whether that ratio *reads* comfortable is a device
+question, not a desk one — every shipping configuration today sits at
+`lineHeight / fontSize` ≥ 1.49, and the Tab S10+ in landscape lands near 1.12.
+Check 606 is where that gets measured; if it reads tight, the fix is a factor on
+the clamp, with the number taken from that run.
+
+Gates after the fixes: `tsc --noEmit` exit 0, `eslint src app` exit 0,
+`vitest run` 129 files / **1589 tests** (1583 before this round). Six new tests.
+Each of the four fixes was mutation-checked and its test fails when the fix is
+deleted; a fifth mutation — moving the line-box clamp to *after* the column is
+built — fails the column test and passes the size test, which is what makes
+those two tests distinct rather than one assertion twice. The leaf-invariant
+test under the clamp is a regression guard only: both halves are handed the same
+height, so no plausible mutation separates them.
+
+---
+
+## Execution rulings, 2026-10-01
+
+The plan was written against the mushaf as described in the M7 notes, not as the
+code actually stands after M7d and S4a. Five of its interfaces do not exist.
+Each divergence is ruled on here rather than implemented as written, with what
+it costs if the ruling is wrong.
+
+**R-X1 — `spread` is derived in `MushafReader` from its measured box, not in
+`MushafScreen` from `useWindowDimensions`.** The plan's own test says "decides
+on the box, not on the window class", and the box is already measured:
+`MushafReader` sizes the pager from an `onLayout`, precisely because the window
+is taller than the pager by the status bar, `MushafTopStrip` and the tab bar.
+Reading `useWindowDimensions` in the screen would introduce a second, less
+accurate source for the same number, and near square the two disagree — a
+1000x1050 window is portrait while its inner box may be 1000x900, which is
+landscape. *Cost if wrong:* the spread appears at a slightly different aspect
+than the window's; never a wrong page. The test moves from `MushafScreen.test`
+to `MushafReader.test`, where the layout event can be fired.
+
+**R-X2 — no `MushafPageCell` extraction.** The plan asks for the page body to be
+pulled out into a shared cell. It already is: `PagerPage` in `MushafPager.tsx`
+is the memoised, hardware-layered, per-page-query cell, and `MushafPage` beneath
+it already takes `width`/`height` and scales itself. Both halves of a leaf
+render the same `PagerPage`. *Cost if wrong:* none identified — the extraction
+the plan wanted is a no-op against this code, and doing it anyway would be a
+rename with no behaviour.
+
+**R-X3 — Task 3's render band is a misreading; the real constraint is the font
+cap.** The plan asserts each half-box scale lands inside "the 11.91-18.17em
+render band". That range is `MUSHAF_PAGE_WIDEST_EM`'s min and max — each page's
+widest line measured in em, a constant of the page's own content that does not
+move when the box does. Asserting a computed scale against it would pass for
+every implementation, which is exactly the vacuous assertion §4 step 4 exists to
+catch. The real band is `MUSHAF_MAX_FONT_SIZE = 40`: above ~44px Android drops
+pieces of these whole-word outlines (M7b device run). Halving the box lowers the
+font, which moves *away* from that ceiling — so the spread cannot walk into the
+documented defect, and the plan's stated "phase's real risk" does not exist.
+What does exist is replaced below. *Cost if wrong:* a size floor nobody has
+measured, caught by check 606 on 20 sampled pages.
+
+**R-X4 — the real Task 3 defect is that facing pages would draw at different
+type sizes.** Each page's font comes from its own `widestEm`, so page 3 (15.71em)
+and a neighbour at 17.2em land on different sizes and different column widths in
+identical halves. In print both pages of a leaf are the same size and the
+narrower page simply keeps more margin. So a leaf resolves ONE font size — the
+smaller of its two pages' fits — and each page's column follows from it. New in
+`pageScale.ts`: `mushafPageFontSize`, `mushafLeafFontSize`,
+`mushafColumnForFontSize`, all delegating to the existing `mushafFontSize` /
+`mushafColumnWidth` pair so there is still one formula. `MushafPage` gains an
+optional `fontSize` override and is byte-identical without it (proved
+algebraically both ways in the commit body, and asserted). *Cost if wrong:* the
+leaf is set from the wrong page and one half has slack it did not need.
+
+**R-X5 — highlights already resolve per word, so there is nothing page-keyed to
+fix.** Task 4 asks for "the highlight lookup to accept both of a leaf's pages".
+`HighlightInput` is keyed `surah:ayah` and `MushafPagerProps.ayahTexts` is
+documented "Page-agnostic lookups, shared by every mounted page" — a page draws
+whatever marks its own words carry. The left half is already highlightable.
+`highlightsContext.tsx` is untouched. What Task 4 is really about is the leaf
+guard, and that is one condition in the pager's `focusPage` effect: compare leaf
+indices, not pages, so playback crossing recto to verso does not turn a leaf
+that is already showing the ayah being recited. *Cost if wrong:* nothing — the
+device checks 610 and 611 cover both halves of the claim.
+
+**R-X6 — the draw window stays at one leaf either side (6 pages drawn, against
+portrait's 3).** The plan claims a spread carries "the same three-pages-worth of
+glyph atlas"; it is six. Narrowing to the current leaf only would halve that,
+but `offscreenPageLimit` has to stay in step with the drawn window or a swipe
+lands on a cell that draws nothing, and a blank leaf mid-turn is a visible
+defect where a doubled footprint is not. *Cost if wrong:* memory and atlas
+pressure in landscape. Checks 604 and 605 measure it; the rollback is already
+in the plan's risk table — drop the spread window to the current leaf.
+
+**R-X7 — `spread.ts` takes its page bounds from `@quran-corpus/data/mobile`.**
+The plan declares its own `PAGE_MIN`/`PAGE_MAX`; `MUSHAF_PAGE_MIN` and
+`MUSHAF_PAGE_MAX` are already the shared source of that fact and
+`MushafPager.tsx` imports them. A second copy is a §3 violation waiting to
+disagree. `SPREAD_COUNT` is derived, not written. *Cost if wrong:* none.
+
+---
+
+## Device run, vc81 (2026-10-01)
+
+Galaxy Tab S10+ (SM_X820), 1752x2800 at 320dpi -- 876x1400dp, so landscape is
+1400x876dp and every window class in play here is `expanded`. Installed as an
+upgrade over vc78 (vc79 and vc80 were never on the device), so the user DB
+carried over and checks 612 and 616 read a real saved position.
+
+| # | Check | Result |
+|---|-------|--------|
+| 600 | Landscape shows two pages, recto on the RIGHT | **PASS** |
+| 601 | Pairing matches the owner's physical mushaf for 1-2, 3-4, 603-604 | **PASS** (structure) -- owner still to confirm against the printed copy |
+| 602 | Portrait still one page | **PASS** |
+| 603 | Rotate on page 4 -> leaf (3,4); rotate back -> page 4 | **FAIL** -- defect 1; **re-run PASS on vc82** |
+| 604 | framestats gaps inside a landscape turn, 3 repeats | **PASS** |
+| 605 | 10 fast swipes, no blank leaf | **PASS** |
+| 606 | Every glyph present on sampled pages incl. the band pages | **PASS** |
+| 607 | Both halves of leaf 27/177/399/443 at the same type size | **PASS** |
+| 608 | Open on 1, swipe to ~300, rotate | **FAIL** (rotation half) -- defect 1; **re-run PASS on vc82** |
+| 610 | Playback recto->verso does not turn; verso->next recto does | **PASS** |
+| 611 | Highlight lands on an ayah on the left half | **PASS** |
+| 612 | Close on a landscape leaf, reopen in portrait -> recto | **PASS** |
+| 613 | Page-jump sheet lands on the right leaf | **PASS** |
+| 614 | Phone regression | **NOT RUN** -- no phone attached |
+| 615 | Recite through a leaf carrying a surah seam | **PASS** |
+| 616 | Even saved page draws both bands | **PASS**, with a caveat |
+| 617 | Short wide box does not overlap | **PASS** |
+
+### What the passes actually measured
+
+**600 / 601.** The two `mushaf-page-tap` cells sit at `[0,112][1400,1752]` and
+`[1400,112][2800,1752]`, and the odd page's medallion is always in the right
+cell. Jumping to either half of a pair lands on the same leaf: 3 and 4 both
+give (3,4), 603 gives (603,604), 1 gives (1,2) with Al-Fatiha facing
+Al-Baqara's opening and nothing orphaned at either end.
+
+**604.** The panel runs at **120Hz**, so the budget is 8.33ms, not 16.7 -- the
+first measurement pass read the wrong CSV column and has been discarded. Across
+three turns: median inter-frame gap **8.33ms** (a steady 120fps through the
+turn), 3-4 gaps over 12ms per turn, worst **24.99ms** (two dropped frames),
+frame duration median ~5ms against the 8.33ms budget. The one ~60ms frame per
+run is the incoming leaf's first rasterisation. Two QCF cells per leaf have not
+introduced a UI-thread stall.
+
+**605.** Ten fast swipes moved leaf (199,200) to (219,220) -- exactly ten
+turns, no double-turn, no missed mount, no blank half.
+
+**606.** Thirteen leaves sampled across the book (49/50 through 601/602). Every
+half drew lines; zero empty line nodes. Counts below 15 fall exactly on the
+pages carrying a surah band. Leaf (587,588) is the hard case -- page 587 holds
+**two** surah bands and two bismillah lines -- and both render with their
+ornament, no overlap and no missing glyphs.
+
+**607.** All four leaves draw both halves on one baseline grid at one size;
+the line boxes line up across the gutter.
+
+**617.** Forced to a 2800x1000px box (875x312dp, lineHeight 13.9dp) the type
+shrank and the column narrowed with it -- all 15 lines, both bands, both
+bismillah lines, **no overlap**. This is the round-1 line-box clamp (`c2c760c`)
+doing exactly what it was added for: without it the glyphs stay width-fitted
+and spill across a 13.9dp slot.
+
+**616, and its caveat.** An even saved page (108) cold-starts onto leaf
+(107,108) with both halves fully drawn. But 107/108 are mid-surah, so this leaf
+has no band to draw and the check's own wording is not satisfiable there. The
+band half of it is covered by 606's leaf (587,588) and by leaf (1,2).
+
+### Defect 1 -- a rotation loses the page (checks 603, 608)
+
+Reproducible 100%, both with and without `uiautomator` in the loop.
+
+Measured rule: **in portrait on page N, rotating to landscape lands on the leaf
+holding N-1.** For even N that is the right leaf, because N-1 is its recto. For
+odd N it is the leaf BEFORE the one the reader was on.
+
+| portrait page | landscape leaf | expected |
+|---|---|---|
+| 2 | (1,2) | (1,2) correct |
+| 10 | (9,10) | (9,10) correct |
+| 3 | (1,2) | **(3,4)** |
+| 235 | (233,234) | **(235,236)** |
+
+Rotating the other way lands on the leaf's recto, which is ruling R-B3 working
+as designed. The two compose badly: a full round trip walks an even page back
+to its recto (10 -> leaf (9,10) -> 9), and an odd page back a whole leaf
+(235 -> leaf (233,234) -> 234). Repeating the cycle from a settled page does
+not drift further -- page 2 round-trips to 2 indefinitely.
+
+**MushafPager's own algebra is not the bug.** A desk test that renders it in
+portrait, fires `onPageSelected(234)` (page 235) and re-renders with `spread`
+asks PagerView for leaf 117 and gets it. The same holds for the reverse flip.
+So the defect lives in the live tree -- MushafReader's measured `spread`,
+MushafScreen's state, or ViewPager2's own mount-time `onPageSelected` stream --
+and specifically in territory the shim's PagerView does not model. The `-1`
+is the signature of a zero-based INDEX reaching a page-valued parameter.
+
+Next step is not another guess: it is a reproduction that includes the real
+rotation, i.e. driving MushafReader through a size change rather than toggling
+`spread` on the pager directly. Only then is there something to mutation-check.
+
+#### Resolved (2026-10-02, `12a3b8e`)
+
+The reproduction above was built and **came back green**, which eliminated the
+seam as well: `MushafRotation.test.tsx` drives the real reader and the real
+pager through a measured size change and lands on the right leaf. That left no
+desk route, so the device was instrumented -- the pager's live state encoded
+into its `testID`, read back through `uiautomator` as a `resource-id`.
+`console.warn` was tried first and reaches **nothing** in a release build (no
+`transform-remove-console` in `babel.config.js`, yet zero `ReactNativeJS`
+lines), so the `testID` is the only readable channel from a release binary.
+
+| | mode | settled | init | cur |
+|---|---|---|---|---|
+| portrait, page 561 | `single` | **561** | 560 | 560 |
+| after rotate | `spread` | **560** | 279 | 279 |
+
+`settled` is overwritten *before* the flip reads it, so the flip then correctly
+asks for the leaf holding 560. The algebra was never wrong; its input was. And
+560 is **even**, which names the writer: spread mode only ever writes a recto,
+so this was a **single-mode** report carrying index 559 while the reader sat on
+index 560.
+
+**Rotation was never required.** A `wm size` resize that keeps the mode
+reproduces it alone -- so multi-window hits the same defect, and the real
+subject is a relayout, not an orientation change. ViewPager2 re-derives its
+scroll offset under `layoutDirection="rtl"`, lands one index short, and
+announces it through `onPageSelected` like any arrival.
+
+The scroll-state trace is the discriminator, and the only one:
+
+```
+P:558                                   mount announcement
+S:dragging, S:settling, P:557, S:idle   real swipe
+P:556                                   resize  -- bare P, state never left idle
+P:555                                   rotate  -- bare P again
+P:277                                   new spread pager's mount announcement
+```
+
+Fix: refuse an arrival with no movement behind it, and -- because the pager
+really has moved -- put it back where the reader was. A commanded turn (the
+`focusPage` effect: playback's auto-turn and the jump sheet) marks itself before
+issuing the command rather than trusting Android to emit `settling`, since a
+bounced auto-turn would strand playback. The flag clears on `idle` too: an
+abandoned drag reports no arrival, and a latched flag would certify the next
+relayout as that gesture landing.
+
+Verified on device: three resizes and four rotation round trips hold the page,
+odd (555) and even (554), and a jump to page 100 still lands
+(`settled=99, init=49`). 1596 tests pass; each of the four load-bearing lines
+fails a test when removed.
+
+**Re-verified on the clean vc82** (no instrumentation, reading the `Page N`
+content-descs the reader actually sees): page 99 rotates onto leaf (99,100) and
+back to 99; page 98 onto leaf (97,98) and back to 98; the page then holds
+through three more round trips. Checks **603 and 608 now pass**. Served as a
+copy at `~/apks/quran-corpus-vc82.apk` (194M), versionCode verified `82` on that
+copy with `aapt2 dump badging`.
+
+An instrumented repack reports the versionCode of the APK it was built from, so
+`aapt2` cannot tell it from the clean build of the same number -- which is why
+the clean build is vc82 and not a rebuilt vc81.
+
+**Side finding -- the double was modelling the artifact as a turn.** Every suite
+fired a bare `onPageSelected` to mean "a swipe", which the device says is a
+relayout. `pagerHost` now models the scroll states, and the six suites that
+meant a swipe say so through `pagerTurn`. The *programmatic* state sequence is
+deliberately modelled as the weaker case (a bare selection): it was not measured
+the way the gesture and relayout traces were, so a consumer that only survives
+because Android volunteered a state change does not survive in the double.
+
+### Still owed
+
+- 614, the phone regression -- no phone was attached for this run. It still
+  clears S4a's 519 in the same session.
+- 601 against the owner's own printed mushaf.
+
+### Device state after the run
+
+`wm user-rotation` restored to `free`, `wm size` reset to default, media volume
+set to 8/15 (it was lowered to 2 for the playback checks; the pre-run value was
+not recorded). Restored again after the #107 diagnosis on 2026-10-02 (`free`,
+`wm size reset`).
+
+### Build loop
+
+The 2m26s Gradle `assembleRelease` is not the iteration loop. A JS-only change
+goes through `export:embed` -> `hermesc` -> swap `assets/index.android.bundle`
+inside the existing APK -> `zipalign` -> `apksigner` -> install, which is **35s
+end to end** and reuses the native libs and the 140MB corpus
+(`$CLAUDE_JOB_DIR/tmp/s4b/repack-tab.sh`). `hermesc` is not under
+`node_modules/react-native/sdks` in this workspace -- pnpm puts it at
+`node_modules/.pnpm/hermes-compiler@*/node_modules/hermes-compiler/hermesc/linux64-bin/hermesc`.
+
+`uiautomator dump` **restores the system rotation**, so every dump in a rotation
+test has to be followed by re-asserting `wm user-rotation lock`. Confirmed
+against a screencap-only repeat of check 603: byte-identical results, so the
+defect was real and not a dump artifact.

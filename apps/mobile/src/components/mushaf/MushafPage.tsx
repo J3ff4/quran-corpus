@@ -13,7 +13,13 @@ import {
 } from '@/mushaf/highlights';
 import { composePage, MUSHAF_LINES_PER_PAGE, type PageSlot } from '@/mushaf/pageComposition';
 import { useMushafPageFont } from '@/mushaf/pageFont';
-import { mushafColumnWidth, mushafFontSize, mushafLineHeight } from '@/mushaf/pageScale';
+import {
+  MUSHAF_PAGE_TEXT_INSET,
+  mushafColumnForFontSize,
+  mushafFontSize,
+  mushafLineHeight,
+  mushafPageFontSize,
+} from '@/mushaf/pageScale';
 import { useThemeColors } from '@/theme/themeContext';
 
 import { BismillahLine } from './BismillahLine';
@@ -21,15 +27,16 @@ import { MushafLineRow } from './MushafLineRow';
 import { PageCorners } from './PageCorners';
 import { SurahBand } from './SurahBand';
 
-/** Side margin the text block sits inside, and the strips its furniture owns
- *  at the top and bottom. All three are subtracted before the page is scaled,
- *  so the type never runs into any of them.
- *
- *  The furniture moved into the page's corners in M7d (rulings 8 and 9), and
- *  in 2026-09 the top half of it moved again, off the leaf and onto
- *  MushafTopStrip. What is left on the page is the number in a bottom
- *  corner. */
-const PAGE_MARGIN = 16;
+// The strip the page's furniture owns at the bottom, subtracted before the page
+// is scaled so the type never runs into it. The side margin lives in pageScale
+// as MUSHAF_PAGE_TEXT_INSET, with the rest of the width arithmetic: a leaf has
+// to size against the text block too, and it cannot import a component module
+// the pager's own tests mock.
+//
+// The furniture moved into the page's corners in M7d (rulings 8 and 9), and in
+// 2026-09 the top half of it moved again, off the leaf and onto MushafTopStrip.
+// What is left on the page is the number in a bottom corner.
+//
 // 72, not 44. The leaf used to sit flush against the bottom of the glass while
 // a strip of chrome ran across the top of it; the owner asked for the text
 // block up and the gap under it (2026-09-15). The surah and juz moving into
@@ -50,6 +57,13 @@ export interface MushafPageProps {
   lines: MushafLine[];
   width: number;
   height: number;
+  /** One type size for both halves of a leaf, when a leaf decided it.
+   *
+   *  Omitted in portrait, where a page is alone and fits itself. On a spread
+   *  the two pages sit in identical halves, and each one's own fit comes from
+   *  its own widest line -- so left to themselves facing pages draw at
+   *  different sizes, which reads as a rendering bug. See mushafLeafFontSize. */
+  fontSize?: number;
   highlights: HighlightInput;
   /** Real Uthmani text per ayah, keyed by `ayahKey`. From the corpus `ayahs`
    *  table, never from the glyph rows: those are private-use codepoints and a
@@ -91,6 +105,7 @@ export function MushafPage({
   lines,
   width,
   height,
+  fontSize: leafFontSize,
   highlights,
   ayahTexts,
   surahNames,
@@ -119,11 +134,34 @@ export function MushafPage({
 
   // Not the full width: past a certain column the font clamps and the
   // pre-justified lines can no longer reach the edge, which leaves the page
-  // stranded against one side. mushafColumnWidth hands back the widest column
-  // this page can still fill, and the block is centred in whatever is left.
-  const columnWidth = mushafColumnWidth(page, width - 2 * PAGE_MARGIN);
-  const fontSize = mushafFontSize(page, columnWidth);
+  // stranded against one side. The column is built for the size the page draws
+  // at, so it is the widest column this page can still fill, and the block is
+  // centred in whatever is left.
+  //
+  // With a leaf size only what the size is WANTED at changes: a leaf hands both
+  // halves one, where a lone page asks for its own fit. Either way the column is
+  // built for that size and clamped to the box, and the size then comes back out
+  // of the column -- `mushafColumnForFontSize` is the exact inverse of
+  // `mushafFontSize`, so a column built for 31.4dp reads back as 31.4dp, and in
+  // the one case where it cannot (a size too large for the box, which the clamp
+  // cuts) reading it back is what keeps the line inside the column instead of
+  // drawing it at a size the column cannot hold.
+  //
+  // Fitted to the line box as well as to the width. The page is a fixed 15-line
+  // grid and each slot is exactly `lineHeight` tall with nothing clipping it, so
+  // a glyph whose em box is taller than its slot spills into the lines above and
+  // below -- which reads as the dropped-glyph font defect rather than as an
+  // oversized one. Width alone was enough while landscape meant one page across
+  // the whole tablet and the font clamped at MUSHAF_MAX_FONT_SIZE under a tall
+  // box, but a short wide box (a 600dp tablet turned sideways, a split-screen or
+  // freeform window) fits a size on width that the height cannot hold. Both
+  // halves of a leaf are given the same height, so one line box binds both and
+  // the leaf keeps its single size.
+  const available = width - MUSHAF_PAGE_TEXT_INSET;
   const lineHeight = mushafLineHeight(height - FOOTER_HEIGHT - HEADER_HEIGHT, MUSHAF_LINES_PER_PAGE);
+  const wanted = Math.min(leafFontSize ?? mushafPageFontSize(page, available), lineHeight);
+  const columnWidth = Math.min(available, mushafColumnForFontSize(page, wanted));
+  const fontSize = mushafFontSize(page, columnWidth);
   const marks: HighlightInput = pressed === null ? highlights : { ...highlights, pressed };
   const color = colorForWord(marks, theme);
   const background = backgroundForWord(marks, theme);
