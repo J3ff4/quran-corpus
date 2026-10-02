@@ -9,6 +9,7 @@ import { useStableInsets } from '@/theme/useStableInsets';
 import { STRIP_ROW_HEIGHT } from './MushafTopStrip';
 
 import { GlassSurface } from '@/components/GlassSurface';
+import { centredContent } from '@/theme/contentWidth';
 import { SearchHeaderButton } from '@/components/SearchHeaderButton';
 import { Icon } from '@/components/icons/Icon';
 import type { UiLocaleCode } from '@/i18n/languages';
@@ -94,7 +95,17 @@ export function MushafChrome({ visible, uiLocale, onOpenJump, onOpenSearch }: Mu
         style,
       ]}
     >
-      <GlassSurface docked radius="card" style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8 }}>
+      {/* Capped and centred like the tab pill, and for the same reason: the
+          positioned box above runs the full width between the screen margins,
+          so on a 1400dp tablet this card was more than twice the pill's length
+          (owner, 2026-10-02). The cap goes on the surface, never on the
+          positioned box -- that box sets both `left` and `right`, so a maxWidth
+          there shrinks it against the left edge instead of centring it. */}
+      <GlassSurface
+        docked
+        radius="card"
+        style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, ...centredContent }}
+      >
         <Pressable
           testID="mushaf-open-jump"
           accessibilityRole="button"
