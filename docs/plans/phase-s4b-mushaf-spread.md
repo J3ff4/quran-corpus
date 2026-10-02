@@ -1028,6 +1028,65 @@ Next step is not another guess: it is a reproduction that includes the real
 rotation, i.e. driving MushafReader through a size change rather than toggling
 `spread` on the pager directly. Only then is there something to mutation-check.
 
+#### Resolved (2026-10-02, `12a3b8e`)
+
+The reproduction above was built and **came back green**, which eliminated the
+seam as well: `MushafRotation.test.tsx` drives the real reader and the real
+pager through a measured size change and lands on the right leaf. That left no
+desk route, so the device was instrumented -- the pager's live state encoded
+into its `testID`, read back through `uiautomator` as a `resource-id`.
+`console.warn` was tried first and reaches **nothing** in a release build (no
+`transform-remove-console` in `babel.config.js`, yet zero `ReactNativeJS`
+lines), so the `testID` is the only readable channel from a release binary.
+
+| | mode | settled | init | cur |
+|---|---|---|---|---|
+| portrait, page 561 | `single` | **561** | 560 | 560 |
+| after rotate | `spread` | **560** | 279 | 279 |
+
+`settled` is overwritten *before* the flip reads it, so the flip then correctly
+asks for the leaf holding 560. The algebra was never wrong; its input was. And
+560 is **even**, which names the writer: spread mode only ever writes a recto,
+so this was a **single-mode** report carrying index 559 while the reader sat on
+index 560.
+
+**Rotation was never required.** A `wm size` resize that keeps the mode
+reproduces it alone -- so multi-window hits the same defect, and the real
+subject is a relayout, not an orientation change. ViewPager2 re-derives its
+scroll offset under `layoutDirection="rtl"`, lands one index short, and
+announces it through `onPageSelected` like any arrival.
+
+The scroll-state trace is the discriminator, and the only one:
+
+```
+P:558                                   mount announcement
+S:dragging, S:settling, P:557, S:idle   real swipe
+P:556                                   resize  -- bare P, state never left idle
+P:555                                   rotate  -- bare P again
+P:277                                   new spread pager's mount announcement
+```
+
+Fix: refuse an arrival with no movement behind it, and -- because the pager
+really has moved -- put it back where the reader was. A commanded turn (the
+`focusPage` effect: playback's auto-turn and the jump sheet) marks itself before
+issuing the command rather than trusting Android to emit `settling`, since a
+bounced auto-turn would strand playback. The flag clears on `idle` too: an
+abandoned drag reports no arrival, and a latched flag would certify the next
+relayout as that gesture landing.
+
+Verified on device: three resizes and four rotation round trips hold the page,
+odd (555) and even (554), and a jump to page 100 still lands
+(`settled=99, init=49`). 1596 tests pass; each of the four load-bearing lines
+fails a test when removed.
+
+**Side finding -- the double was modelling the artifact as a turn.** Every suite
+fired a bare `onPageSelected` to mean "a swipe", which the device says is a
+relayout. `pagerHost` now models the scroll states, and the six suites that
+meant a swipe say so through `pagerTurn`. The *programmatic* state sequence is
+deliberately modelled as the weaker case (a bare selection): it was not measured
+the way the gesture and relayout traces were, so a consumer that only survives
+because Android volunteered a state change does not survive in the double.
+
 ### Still owed
 
 - 614, the phone regression -- no phone was attached for this run. It still
@@ -1038,4 +1097,20 @@ rotation, i.e. driving MushafReader through a size change rather than toggling
 
 `wm user-rotation` restored to `free`, `wm size` reset to default, media volume
 set to 8/15 (it was lowered to 2 for the playback checks; the pre-run value was
-not recorded).
+not recorded). Restored again after the #107 diagnosis on 2026-10-02 (`free`,
+`wm size reset`).
+
+### Build loop
+
+The 2m26s Gradle `assembleRelease` is not the iteration loop. A JS-only change
+goes through `export:embed` -> `hermesc` -> swap `assets/index.android.bundle`
+inside the existing APK -> `zipalign` -> `apksigner` -> install, which is **35s
+end to end** and reuses the native libs and the 140MB corpus
+(`$CLAUDE_JOB_DIR/tmp/s4b/repack-tab.sh`). `hermesc` is not under
+`node_modules/react-native/sdks` in this workspace -- pnpm puts it at
+`node_modules/.pnpm/hermes-compiler@*/node_modules/hermes-compiler/hermesc/linux64-bin/hermesc`.
+
+`uiautomator dump` **restores the system rotation**, so every dump in a rotation
+test has to be followed by re-asserting `wm user-rotation lock`. Confirmed
+against a screencap-only repeat of check 603: byte-identical results, so the
+defect was real and not a dump artifact.
