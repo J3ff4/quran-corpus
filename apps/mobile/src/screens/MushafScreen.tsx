@@ -37,6 +37,7 @@ import { t } from '@/i18n/uiStrings';
 import { ayahKey, type PressedWord } from '@/mushaf/highlights';
 import { useMushafIndex } from '@/mushaf/mushafReaderData';
 import { useMushafPage } from '@/mushaf/useMushafPage';
+import { useMushafPortraitLock } from '@/mushaf/orientationLock';
 import { ayahOnPage, firstAyahOnPage, nextAyahOnPage } from '@/mushaf/pageAudio';
 import { pageForAyah, pageForJump } from '@/mushaf/pageJump';
 import {
@@ -113,6 +114,10 @@ export function MushafScreen() {
   // stranded the tab bar (#80) -- and the screen already knows whether it is
   // the one being looked at.
   const mushafFocused = useIsFocused();
+  // Portrait only on phone-shaped windows, for as long as the mushaf is the
+  // screen being looked at. See the hook: a page on its side has no height to
+  // set 15 lines in.
+  useMushafPortraitLock(mushafFocused);
   // Measured by the tab bar itself: its height is its icon, its label and its
   // padding at whatever type scale the device is set to, and a player docked
   // above a guessed one either overlaps the pill or floats over the page.
