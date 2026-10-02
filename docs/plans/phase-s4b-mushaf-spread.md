@@ -756,6 +756,50 @@ Gates: `tsc --noEmit` 0, `eslint src app` 0, `vitest run` 129 files /
 
 ---
 
+## Independent review, round 3, 2026-10-02
+
+Run on the whole branch after the #107 fix landed, because that fix sits in the
+path that writes the on-device reading position — §5's third trigger. Six
+findings; five fixed, one declined.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | **MEDIUM.** A commanded cross-leaf turn let the arrival report the leaf's recto, so a jump to an even page answered with the facing page | Fixed `e56397d` |
+| 2 | `setCurrent({ mode, index })` is a fresh object every arrival, so React can never bail out — the mount announcement and each #107 bounce re-rendered the pager and all 302 or 604 children | Fixed `32b5a60` |
+| 3 | `event.nativeEvent.position` reached `spreadAt` unvalidated; with a turn in flight, `-1` throws from inside a native handler, or records page 0 to the user DB | Fixed `32b5a60` |
+| 4 | The `turning` latch has no path down if a commanded `setPage` is a no-op | **Declined** — unreachable: the spread branch returns before the latch is set when the leaf is already in view, and in single mode `focusPage !== settled.current` implies a different index. A guard for a state no caller can reach is a guard no test can defend |
+| 5 | Orphaned docblock in `MushafPage.tsx` — it described the `PAGE_MARGIN` this branch deleted | Fixed `6d34732` |
+| 6 | `spreadFor` derives its bounds from the shared package, then assumes `MUSHAF_PAGE_MIN` is odd in the one line of arithmetic | Fixed `6d34732` — same result at MIN = 1, so **no test moves**; it is the code agreeing with its own docstring, not a behaviour change |
+
+Finding 1 is the one worth the pass, and it is the same class as #107 one layer
+up: a leaf can only report its recto (ruling R-B3), so an arrival cannot answer
+"which page did you ask for". 58 of 114 surahs first appear on an even page, as
+do nearly all the juz — so Go-to, the surah picker and a juz jump all landed the
+screen one page off in landscape, naming the facing page in the strip, reciting
+its first ayah, cancelling `pendingPlayPage`, and persisting it to the user DB.
+The same-leaf refusal directly above it already reported the exact page for
+precisely that reason; the turn did not. Not a rotation defect, so the vc81 and
+vc82 device runs had no reason to catch it: every check 601-613 that jumps does
+so in portrait, or to an odd page.
+
+Findings 2 and 3 were both created by the #107 fix's own neighbourhood — 2 by
+the mode tag `current` gained this phase, 3 by a guard that only covers the
+no-movement case. Neither is visible in a passing suite.
+
+Gates: `tsc --noEmit` 0, `eslint src` 0, `vitest run` 130 files /
+**1599 tests**. Three new tests; all three mutation-checked individually (each
+fails exactly one test when its line is removed). Finding 2's check first came
+back as a **heap exhaustion** rather than an assertion failure — a failing
+`toBe` on two 302-element React trees exhausts the diff — so that test compares
+identity through a boolean.
+
+**The vc82 APK on the tablet predates all of this.** It carries the #107 fix
+and nothing from this round, so checks 601-613 stand as recorded; a jump to an
+even page in landscape is unverified on device and is the next build's first
+check.
+
+---
+
 ## APK, versionCode 81
 
 Supersedes vc80, which carries finding 1 — the degraded auto-turn — in both
