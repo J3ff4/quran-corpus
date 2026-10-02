@@ -13,7 +13,8 @@ export const SPREAD_COUNT = Math.ceil((MUSHAF_PAGE_MAX - MUSHAF_PAGE_MIN + 1) / 
 export interface Spread {
   /** 0-based leaf index -- what the pager pages across. */
   index: number;
-  /** The right-hand page. Always odd, which is the whole of ruling R-B3. */
+  /** The right-hand page -- odd at MUSHAF_PAGE_MIN = 1, which is the whole of
+   *  ruling R-B3. Its parity follows the bound's, not a literal here. */
   recto: number;
   /** The left-hand page. Never null at 604 pages, but typed for it so a future
    *  edition with an odd page count cannot silently pair off the end. */
@@ -39,7 +40,12 @@ function assertPage(page: number): void {
  */
 export function spreadFor(page: number): Spread {
   assertPage(page);
-  const recto = page % 2 === 1 ? page : page - 1;
+  // Anchored on the bound rather than on odd/even, because everything else in
+  // this file derives from MUSHAF_PAGE_MIN and this was the one line that did
+  // not: `page % 2 === 1` quietly assumes the first page is odd, and under an
+  // even bound it would return a recto BELOW the first page and a fractional
+  // index, which spreadAt then rejects for indices the pager legitimately holds.
+  const recto = MUSHAF_PAGE_MIN + 2 * Math.floor((page - MUSHAF_PAGE_MIN) / 2);
   const verso = recto + 1 <= MUSHAF_PAGE_MAX ? recto + 1 : null;
   return { index: (recto - MUSHAF_PAGE_MIN) / 2, recto, verso };
 }

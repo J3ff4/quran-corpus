@@ -27,18 +27,16 @@ import { MushafLineRow } from './MushafLineRow';
 import { PageCorners } from './PageCorners';
 import { SurahBand } from './SurahBand';
 
-/** The strips the page's furniture owns at the top and bottom, subtracted before
- *  the page is scaled so the type never runs into either.
- *
- *  The side margin lives in pageScale as MUSHAF_PAGE_TEXT_INSET, with the rest
- *  of the width arithmetic: a leaf has to size against the text block too, and
- *  it cannot import a component module the pager's own tests mock.
- *
- *  The furniture moved into the page's corners in M7d (rulings 8 and 9), and
- *  in 2026-09 the top half of it moved again, off the leaf and onto
- *  MushafTopStrip. What is left on the page is the number in a bottom
- *  corner. */
-
+// The strip the page's furniture owns at the bottom, subtracted before the page
+// is scaled so the type never runs into it. The side margin lives in pageScale
+// as MUSHAF_PAGE_TEXT_INSET, with the rest of the width arithmetic: a leaf has
+// to size against the text block too, and it cannot import a component module
+// the pager's own tests mock.
+//
+// The furniture moved into the page's corners in M7d (rulings 8 and 9), and in
+// 2026-09 the top half of it moved again, off the leaf and onto MushafTopStrip.
+// What is left on the page is the number in a bottom corner.
+//
 // 72, not 44. The leaf used to sit flush against the bottom of the glass while
 // a strip of chrome ran across the top of it; the owner asked for the text
 // block up and the gap under it (2026-09-15). The surah and juz moving into
