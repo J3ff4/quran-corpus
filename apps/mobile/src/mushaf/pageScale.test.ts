@@ -5,10 +5,11 @@ import {
   mushafColumnWidth,
   mushafFontSize,
   mushafLeafFontSize,
+  mushafLineFitFontSize,
   mushafLineHeight,
   mushafPageFontSize,
 } from './pageScale';
-import { MUSHAF_PAGE_WIDEST_EM } from './pageMetrics.generated';
+import { MUSHAF_PAGE_LINE_EM, MUSHAF_PAGE_WIDEST_EM } from './pageMetrics.generated';
 
 describe('mushafFontSize', () => {
   it('fills the width with the page-s widest line, less the rounding slack', () => {
@@ -95,6 +96,18 @@ describe('mushafColumnWidth', () => {
  *  spread actually ships into. */
 const HALF_TABLET = Math.floor(1400 / 2) - 32;
 const HALF_FOLD = Math.floor(939 / 2) - 32;
+/** The line box the tablet actually lays out in landscape.
+ *
+ *  Measured on the glass, not derived: the text block ran 112..1607px at
+ *  density 2 on the Tab S10+ (2026-10-02), which is 747.5dp over 15 lines. */
+const LINE_BOX_TABLET = mushafLineHeight(747.5, 15);
+/** The shortest line box that still keeps the type at the phone's floor.
+ *
+ *  The tallest line in the book needs 2.2112em, so 18dp of type wants 39.8dp of
+ *  line -- and both shipping landscape boxes are well clear of it. A window
+ *  shorter than this draws smaller type, which is the clamp working rather than
+ *  failing. */
+const LINE_BOX_FLOOR = 18 * Math.max(...MUSHAF_PAGE_LINE_EM);
 
 describe('mushafPageFontSize', () => {
   it('is the size the page has always arrived at, stated directly', () => {
@@ -120,20 +133,26 @@ describe('mushafLeafFontSize', () => {
     for (let index = 0; index < 302; index += 1) {
       const recto = index * 2 + 1;
       const verso = recto + 1;
-      const leaf = mushafLeafFontSize(recto, verso, HALF_TABLET);
-      expect(leaf).toBe(
-        Math.min(mushafPageFontSize(recto, HALF_TABLET), mushafPageFontSize(verso, HALF_TABLET)),
-      );
-      expect(leaf).toBeLessThanOrEqual(mushafPageFontSize(recto, HALF_TABLET));
-      expect(leaf).toBeLessThanOrEqual(mushafPageFontSize(verso, HALF_TABLET));
+      const leaf = mushafLeafFontSize(recto, verso, HALF_TABLET, LINE_BOX_TABLET);
+      // Both fits, on both halves: the width each page can fill and the ink its
+      // tallest line needs. The smallest of the four is the leaf's size.
+      const fits = [recto, verso].flatMap((page) => [
+        mushafPageFontSize(page, HALF_TABLET),
+        mushafLineFitFontSize(page, LINE_BOX_TABLET),
+      ]);
+      expect(leaf).toBe(Math.min(...fits));
+      for (const fit of fits) expect(leaf).toBeLessThanOrEqual(fit);
     }
   });
 
   it('falls back to the recto alone on a leaf with no verso', () => {
     // 604 pages pair exactly, so this is the odd-edition guard -- the same one
     // Spread.verso is typed nullable for.
-    expect(mushafLeafFontSize(603, null, HALF_TABLET)).toBe(
-      mushafPageFontSize(603, HALF_TABLET),
+    expect(mushafLeafFontSize(603, null, HALF_TABLET, LINE_BOX_TABLET)).toBe(
+      Math.min(
+        mushafPageFontSize(603, HALF_TABLET),
+        mushafLineFitFontSize(603, LINE_BOX_TABLET),
+      ),
     );
   });
 
@@ -144,7 +163,7 @@ describe('mushafLeafFontSize', () => {
     const divergent = [];
     for (let index = 0; index < 302; index += 1) {
       const recto = index * 2 + 1;
-      const leaf = mushafLeafFontSize(recto, recto + 1, HALF_TABLET);
+      const leaf = mushafLeafFontSize(recto, recto + 1, HALF_TABLET, LINE_BOX_TABLET);
       if (leaf !== mushafPageFontSize(recto, HALF_TABLET)) divergent.push(recto);
     }
     expect(divergent.length).toBeGreaterThan(0);
@@ -159,10 +178,12 @@ describe('mushafLeafFontSize', () => {
     // out smaller than the phone draws it, or the spread is less legible than
     // one page on a phone.
     for (const available of [HALF_FOLD, HALF_TABLET]) {
-      for (let index = 0; index < 302; index += 1) {
-        const leaf = mushafLeafFontSize(index * 2 + 1, index * 2 + 2, available);
-        expect(leaf).toBeLessThanOrEqual(MUSHAF_MAX_FONT_SIZE);
-        expect(leaf).toBeGreaterThanOrEqual(18);
+      for (const lineBox of [LINE_BOX_FLOOR, LINE_BOX_TABLET]) {
+        for (let index = 0; index < 302; index += 1) {
+          const leaf = mushafLeafFontSize(index * 2 + 1, index * 2 + 2, available, lineBox);
+          expect(leaf).toBeLessThanOrEqual(MUSHAF_MAX_FONT_SIZE);
+          expect(leaf).toBeGreaterThanOrEqual(18);
+        }
       }
     }
   });

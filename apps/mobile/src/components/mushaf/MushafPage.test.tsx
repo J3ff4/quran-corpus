@@ -21,6 +21,7 @@ import {
   mushafColumnWidth,
   mushafFontSize,
   mushafLeafFontSize,
+  mushafLineFitFontSize,
   mushafLineHeight,
   mushafPageFontSize,
 } from '@/mushaf/pageScale';
@@ -262,7 +263,11 @@ describe('MushafPage type size', () => {
     // Portrait is not changing in this phase. The optional prop reversed the
     // order the size and the column are derived in, so the no-prop path has to
     // land on the same two numbers the page drew before it existed.
-    render(<MushafPage {...props} />);
+    //
+    // A tall box, so the WIDTH is what decides. props.height leaves a 37.9dp
+    // line box, and page 106's tallest line needs 1.962em of it, so the ink
+    // clamp would bind first and this would test that instead.
+    render(<MushafPage {...props} height={900} />);
     const column = mushafColumnWidth(106, 360 - 32);
     expect(glyphFontSizeOf(screen.getByText('A'))).toBeCloseTo(mushafFontSize(106, column), 4);
   });
@@ -272,7 +277,9 @@ describe('MushafPage type size', () => {
     // used its own fit is the defect: two facing pages at different sizes in
     // identical boxes.
     const own = mushafPageFontSize(106, 700 - 32);
-    render(<MushafPage {...props} width={700} fontSize={own - 5} />);
+    // Tall, for the reason above: the leaf size is only observable where the
+    // page's own ink clamp does not cut it first.
+    render(<MushafPage {...props} width={700} height={1600} fontSize={own - 5} />);
     expect(glyphFontSizeOf(screen.getByText('A'))).toBeCloseTo(own - 5, 4);
   });
 
@@ -281,11 +288,18 @@ describe('MushafPage type size', () => {
     // into slack. A page held to a smaller size than it could fill therefore
     // has to take a narrower column and keep the difference as margin -- which
     // is what a printed mushaf does with the narrower page of a leaf.
-    const { container, unmount } = render(<MushafPage {...props} width={700} />);
+    // Tall enough that the ink clamp binds on neither render, or both columns
+    // come back at the same clamped size and the comparison says nothing.
+    const { container, unmount } = render(<MushafPage {...props} width={700} height={1600} />);
     const wide = textBlockWidthOf(container);
     unmount();
     const narrowed = render(
-      <MushafPage {...props} width={700} fontSize={mushafPageFontSize(106, 700 - 32) - 5} />,
+      <MushafPage
+        {...props}
+        width={700}
+        height={1600}
+        fontSize={mushafPageFontSize(106, 700 - 32) - 5}
+      />,
     );
     expect(textBlockWidthOf(narrowed.container)).toBeLessThan(wide);
   });
@@ -305,28 +319,39 @@ describe('MushafPage type size', () => {
     // is the ellipsis the width slack exists to prevent.
     // A tall box, so the WIDTH is what cuts the size here. props.height leaves a
     // 37.9dp line box, which would otherwise bind first and make this a test of
-    // the height clamp below rather than of the column.
-    render(<MushafPage {...props} width={700} height={1200} fontSize={400} />);
+    // the ink clamp below rather than of the column.
+    render(<MushafPage {...props} width={700} height={1600} fontSize={400} />);
     expect(glyphFontSizeOf(screen.getByText('A'))).toBeCloseTo(
       mushafPageFontSize(106, 700 - 32),
       4,
     );
   });
 
-  it('fits the glyphs to the line box, not only to the width', () => {
-    // A short wide box -- a 600dp tablet turned sideways, a split-screen or a
-    // freeform window -- fits a size on width that the height cannot hold. The
-    // 15 slots are exactly `lineHeight` tall with nothing clipping them, so a
-    // glyph taller than its slot spills into the lines above and below.
+  it('fits the glyphs to the ink of the line, not to the line box', () => {
+    // A short wide box -- a 600dp tablet turned sideways, a tablet in landscape,
+    // a Fold opened, a split-screen window -- fits a size on width that the
+    // height cannot hold.
+    //
+    // `fontSize <= lineHeight` was the old guard and it is not the rule: these
+    // lines carry 1.45 to 2.21em of ink depending on what is stacked above and
+    // below their letters, so a box only asks for a ratio of 1.0 while the type
+    // needs about two. Android does not spill the excess, it CUTS it, and RN's
+    // line box keeps the descent and squeezes the ascent -- so the shortfall
+    // comes off the top of the glyph. That is the harakat sliced flat across
+    // every line on the tablet in landscape (owner, 2026-10-02).
     const box = { width: 960, height: 400 };
     const lineBox = mushafLineHeight(box.height - 72, MUSHAF_LINES_PER_PAGE);
     const widthFit = mushafPageFontSize(106, box.width - 32);
+    const inkFit = mushafLineFitFontSize(106, lineBox);
     // Or this asserts nothing: the clamp is only observable where the width
-    // would have allowed a bigger size than the line box.
-    expect(widthFit).toBeGreaterThan(lineBox);
+    // would have allowed a bigger size than the ink leaves room for.
+    expect(widthFit).toBeGreaterThan(inkFit);
+    // And the old rule would have passed a size this one rejects -- page 106
+    // needs 1.962em, so the ink fit is a little over half the line box.
+    expect(inkFit).toBeLessThan(lineBox);
 
     render(<MushafPage {...props} {...box} />);
-    expect(glyphFontSizeOf(screen.getByText('A'))).toBeCloseTo(lineBox, 4);
+    expect(glyphFontSizeOf(screen.getByText('A'))).toBeCloseTo(inkFit, 4);
   });
 
   it('narrows the column to the height-fitted size too', () => {
@@ -346,7 +371,12 @@ describe('MushafPage type size', () => {
     // identically and a leaf keeps its single size (R-X4) even where the clamp
     // is what decides it.
     const box = { width: 480, height: 400 };
-    const leafSize = mushafLeafFontSize(27, 28, box.width - 32);
+    const leafSize = mushafLeafFontSize(
+      27,
+      28,
+      box.width - 32,
+      mushafLineHeight(box.height - 72, MUSHAF_LINES_PER_PAGE),
+    );
     const recto = render(<MushafPage {...props} {...box} page={27} fontSize={leafSize} />);
     const rectoSize = glyphFontSizeOf(screen.getByText('A'));
     recto.unmount();
