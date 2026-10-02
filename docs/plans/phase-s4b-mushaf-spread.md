@@ -926,3 +926,116 @@ The plan declares its own `PAGE_MIN`/`PAGE_MAX`; `MUSHAF_PAGE_MIN` and
 `MUSHAF_PAGE_MAX` are already the shared source of that fact and
 `MushafPager.tsx` imports them. A second copy is a §3 violation waiting to
 disagree. `SPREAD_COUNT` is derived, not written. *Cost if wrong:* none.
+
+---
+
+## Device run, vc81 (2026-10-01)
+
+Galaxy Tab S10+ (SM_X820), 1752x2800 at 320dpi -- 876x1400dp, so landscape is
+1400x876dp and every window class in play here is `expanded`. Installed as an
+upgrade over vc78 (vc79 and vc80 were never on the device), so the user DB
+carried over and checks 612 and 616 read a real saved position.
+
+| # | Check | Result |
+|---|-------|--------|
+| 600 | Landscape shows two pages, recto on the RIGHT | **PASS** |
+| 601 | Pairing matches the owner's physical mushaf for 1-2, 3-4, 603-604 | **PASS** (structure) -- owner still to confirm against the printed copy |
+| 602 | Portrait still one page | **PASS** |
+| 603 | Rotate on page 4 -> leaf (3,4); rotate back -> page 4 | **FAIL** -- defect 1 |
+| 604 | framestats gaps inside a landscape turn, 3 repeats | **PASS** |
+| 605 | 10 fast swipes, no blank leaf | **PASS** |
+| 606 | Every glyph present on sampled pages incl. the band pages | **PASS** |
+| 607 | Both halves of leaf 27/177/399/443 at the same type size | **PASS** |
+| 608 | Open on 1, swipe to ~300, rotate | **FAIL** (rotation half) -- defect 1 |
+| 610 | Playback recto->verso does not turn; verso->next recto does | **PASS** |
+| 611 | Highlight lands on an ayah on the left half | **PASS** |
+| 612 | Close on a landscape leaf, reopen in portrait -> recto | **PASS** |
+| 613 | Page-jump sheet lands on the right leaf | **PASS** |
+| 614 | Phone regression | **NOT RUN** -- no phone attached |
+| 615 | Recite through a leaf carrying a surah seam | **PASS** |
+| 616 | Even saved page draws both bands | **PASS**, with a caveat |
+| 617 | Short wide box does not overlap | **PASS** |
+
+### What the passes actually measured
+
+**600 / 601.** The two `mushaf-page-tap` cells sit at `[0,112][1400,1752]` and
+`[1400,112][2800,1752]`, and the odd page's medallion is always in the right
+cell. Jumping to either half of a pair lands on the same leaf: 3 and 4 both
+give (3,4), 603 gives (603,604), 1 gives (1,2) with Al-Fatiha facing
+Al-Baqara's opening and nothing orphaned at either end.
+
+**604.** The panel runs at **120Hz**, so the budget is 8.33ms, not 16.7 -- the
+first measurement pass read the wrong CSV column and has been discarded. Across
+three turns: median inter-frame gap **8.33ms** (a steady 120fps through the
+turn), 3-4 gaps over 12ms per turn, worst **24.99ms** (two dropped frames),
+frame duration median ~5ms against the 8.33ms budget. The one ~60ms frame per
+run is the incoming leaf's first rasterisation. Two QCF cells per leaf have not
+introduced a UI-thread stall.
+
+**605.** Ten fast swipes moved leaf (199,200) to (219,220) -- exactly ten
+turns, no double-turn, no missed mount, no blank half.
+
+**606.** Thirteen leaves sampled across the book (49/50 through 601/602). Every
+half drew lines; zero empty line nodes. Counts below 15 fall exactly on the
+pages carrying a surah band. Leaf (587,588) is the hard case -- page 587 holds
+**two** surah bands and two bismillah lines -- and both render with their
+ornament, no overlap and no missing glyphs.
+
+**607.** All four leaves draw both halves on one baseline grid at one size;
+the line boxes line up across the gutter.
+
+**617.** Forced to a 2800x1000px box (875x312dp, lineHeight 13.9dp) the type
+shrank and the column narrowed with it -- all 15 lines, both bands, both
+bismillah lines, **no overlap**. This is the round-1 line-box clamp (`c2c760c`)
+doing exactly what it was added for: without it the glyphs stay width-fitted
+and spill across a 13.9dp slot.
+
+**616, and its caveat.** An even saved page (108) cold-starts onto leaf
+(107,108) with both halves fully drawn. But 107/108 are mid-surah, so this leaf
+has no band to draw and the check's own wording is not satisfiable there. The
+band half of it is covered by 606's leaf (587,588) and by leaf (1,2).
+
+### Defect 1 -- a rotation loses the page (checks 603, 608)
+
+Reproducible 100%, both with and without `uiautomator` in the loop.
+
+Measured rule: **in portrait on page N, rotating to landscape lands on the leaf
+holding N-1.** For even N that is the right leaf, because N-1 is its recto. For
+odd N it is the leaf BEFORE the one the reader was on.
+
+| portrait page | landscape leaf | expected |
+|---|---|---|
+| 2 | (1,2) | (1,2) correct |
+| 10 | (9,10) | (9,10) correct |
+| 3 | (1,2) | **(3,4)** |
+| 235 | (233,234) | **(235,236)** |
+
+Rotating the other way lands on the leaf's recto, which is ruling R-B3 working
+as designed. The two compose badly: a full round trip walks an even page back
+to its recto (10 -> leaf (9,10) -> 9), and an odd page back a whole leaf
+(235 -> leaf (233,234) -> 234). Repeating the cycle from a settled page does
+not drift further -- page 2 round-trips to 2 indefinitely.
+
+**MushafPager's own algebra is not the bug.** A desk test that renders it in
+portrait, fires `onPageSelected(234)` (page 235) and re-renders with `spread`
+asks PagerView for leaf 117 and gets it. The same holds for the reverse flip.
+So the defect lives in the live tree -- MushafReader's measured `spread`,
+MushafScreen's state, or ViewPager2's own mount-time `onPageSelected` stream --
+and specifically in territory the shim's PagerView does not model. The `-1`
+is the signature of a zero-based INDEX reaching a page-valued parameter.
+
+Next step is not another guess: it is a reproduction that includes the real
+rotation, i.e. driving MushafReader through a size change rather than toggling
+`spread` on the pager directly. Only then is there something to mutation-check.
+
+### Still owed
+
+- 614, the phone regression -- no phone was attached for this run. It still
+  clears S4a's 519 in the same session.
+- 601 against the owner's own printed mushaf.
+
+### Device state after the run
+
+`wm user-rotation` restored to `free`, `wm size` reset to default, media volume
+set to 8/15 (it was lowered to 2 for the playback checks; the pre-run value was
+not recorded).
