@@ -53,14 +53,41 @@ export function pagerViewMock() {
       if (node.current) pagerProps.set(node.current, props);
     });
 
+    // ViewPager2 announces where it landed, and it announces its OPENING page
+    // the same way -- `onPageSelected` fires once at attach carrying
+    // `initialPage`, before anything has turned. A mock that stays silent until
+    // a suite fires the event by hand lets a component read its own `settled`
+    // state as never having been told anything, which is not a state the device
+    // can be in. Both are modelled here: the mount event and the one every
+    // imperative turn lands through.
+    const select = React.useCallback((page: number) => {
+      const handler = pagerProps.get(node.current ?? {})?.onPageSelected;
+      handler?.({ nativeEvent: { position: page } });
+    }, []);
+
     React.useImperativeHandle(ref, () => ({
       setPage: (page: number) => {
         if (node.current) pagerCommands.get(node.current)?.push({ page, animated: true });
+        select(page);
       },
       setPageWithoutAnimation: (page: number) => {
         if (node.current) pagerCommands.get(node.current)?.push({ page, animated: false });
+        select(page);
       },
     }));
+
+    // Once per mount, after the props above are recorded. A remount -- which is
+    // what a mushaf mode flip does, through `key` -- is a fresh mount and fires
+    // it again, which is exactly the event a rotation has to survive.
+    const opened = React.useRef(false);
+    React.useEffect(() => {
+      if (opened.current) return;
+      opened.current = true;
+      select(typeof props.initialPage === 'number' ? props.initialPage : 0);
+      // Mount only, which is the whole point: the opening page is announced
+      // once per mounted pager. `opened` guards a re-run anyway, so the deps
+      // list is documentation rather than control.
+    });
 
     return (
       <div
