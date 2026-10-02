@@ -765,6 +765,11 @@ Bumped in **both** `android/app/build.gradle` and `app.json`. Only the gradle
 file reaches the build; `app.json` is kept in step so a future `expo prebuild`
 does not silently roll it back.
 
+Release / arm64-v8a, 202972549 bytes, `BUILD SUCCESSFUL in 2m 26s`. Served as a
+**copy** at `~/apks/quran-corpus-vc81.apk` (194M), versionCode verified `81` on
+that copy with `aapt2 dump badging`. vc79 and vc80 re-verified as 79 and 80, so
+all three labels in `~/apks/` are honest.
+
 ```bash
 /home/claude/android-sdk/platform-tools/adb -s adb-R52XC0AYMZZ-S3tLzk._adb-tls-connect._tcp \
   install -r --user 0 ~/apks/quran-corpus-vc81.apk
