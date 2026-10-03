@@ -323,13 +323,14 @@ describe('MushafPager in spread mode', () => {
     expect(drawn().size).toBe(2 * (2 * WINDOW + 1));
   });
 
-  it('leaves the next leaf unmounted until the pager comes to rest', () => {
-    // ViewPager2 announces the arrival when the finger LIFTS, with the settle
-    // animation still to run, so mounting the next leaf there puts ~300
-    // whole-word glyphs and two queries inside that animation. Measured at
-    // 120Hz on the tablet: three to four dropped frames ~90ms after release,
-    // peaking at 29.9ms against an 8.3ms budget, clean either side. See
-    // `pending` in MushafPager.
+  it('draws the leaf beyond the arrival as soon as the finger lifts', () => {
+    // NOT held until the pager rests. vc85/vc86 deferred this to keep the
+    // mount out of the settle animation, and a reader swiping fast never gives
+    // the pager an `idle` between turns: the second swipe then travels onto a
+    // leaf whose QCF fonts have had ~100ms rather than a whole settle, and
+    // MushafPage draws blank paper until its font registers. The owner hit it
+    // on a OnePlus (2026-10-02). No scroll state is fired after the arrival
+    // here -- that absence IS the assertion.
     const result = render(<MushafPager {...props} spread initialPage={3} />);
     act(() => {
       const pager = pagerPropsOf(result);
@@ -337,41 +338,10 @@ describe('MushafPager in spread mode', () => {
       pager.onPageScrollStateChanged?.({ nativeEvent: { pageScrollState: 'settling' } });
       pager.onPageSelected?.({ nativeEvent: { position: 2 } });
     });
-    // The WHOLE set, not `not.toContain(7)` on a cleared list: deferring means
-    // nothing re-renders, so a list emptied first stays empty and the assertion
-    // passes however the component behaves. Leaf 2 is (5,6) and was already
-    // drawn, so the turn still lands on paper; leaf 3 is (7,8), and mounting it
-    // is the work that waits.
-    expect(drawn()).toEqual(new Set([1, 2, 3, 4, 5, 6]));
-    act(() => {
-      pagerPropsOf(result).onPageScrollStateChanged?.({
-        nativeEvent: { pageScrollState: 'idle' },
-      });
-    });
-    expect(drawn()).toContain(7);
-    expect(drawn()).toContain(8);
-  });
-
-  it('catches the window up when a second swipe starts before the first rests', () => {
-    // A reader can catch the page mid-settle, and then `idle` never arrives
-    // between the two turns. Holding the shift until `idle` would leave the
-    // window a whole leaf behind the finger, so the second gesture lands on a
-    // cell nothing has drawn into -- blank paper sliding in under the thumb,
-    // which is the defect ruling R-X6 keeps WINDOW at one leaf to prevent.
-    const result = render(<MushafPager {...props} spread initialPage={3} />);
-    const fire = (pageScrollState: 'idle' | 'dragging' | 'settling') =>
-      pagerPropsOf(result).onPageScrollStateChanged?.({ nativeEvent: { pageScrollState } });
-    act(() => {
-      fire('dragging');
-      fire('settling');
-      pagerPropsOf(result).onPageSelected?.({ nativeEvent: { position: 2 } });
-    });
-    // Second gesture begins with no `idle` in between.
-    act(() => {
-      fire('dragging');
-    });
-    // Leaf 3 is (7,8): the cell the second swipe is travelling onto. The whole
-    // set, not a `toContain` on a cleared list -- see the test above.
+    // Leaf 3 is (7,8), the cell the next swipe travels onto. The WHOLE set
+    // rather than a `toContain` on a cleared list: a component that re-renders
+    // nothing leaves an emptied list empty, and the assertion would pass
+    // however it behaved.
     expect(drawn()).toEqual(new Set([1, 2, 3, 4, 5, 6, 7, 8]));
   });
 

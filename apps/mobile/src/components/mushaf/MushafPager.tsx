@@ -303,29 +303,6 @@ export const MushafPager = memo(function MushafPager({
   // is not a page turn. See onPageSelected.
   const turning = useRef(false);
 
-  // The window shift, held until the pager comes to rest.
-  //
-  // ViewPager2 fires onPageSelected when it goes from dragging to settling --
-  // the moment the finger lifts, with the whole settle animation still to run.
-  // Shifting the drawn window there mounts the arriving leaf's two pages, some
-  // 300 whole-word glyphs and two queries, INSIDE that animation. Measured on
-  // the tablet at 120Hz (2026-10-02): every turn ran a clean 8.3ms through the
-  // drag, dropped three to four frames in a ~130ms band starting ~90ms after
-  // release -- peaks of 25.6, 26.9 and 29.9ms against an 8.3ms budget -- and
-  // was clean again for the rest of the settle. One stutter, late in the turn,
-  // which is exactly what the owner reported.
-  //
-  // Nothing is blank while it waits: a gesture moves exactly one index and
-  // WINDOW is 1, so the leaf being landed on is ALREADY drawn. Only the leaf
-  // beyond it needs mounting, and nothing can reach that before the next
-  // gesture. A commanded jump is the one move that can outrun the window, and
-  // it draws its own target before asking for the turn -- see the focusPage
-  // effect.
-  //
-  // Tagged with the mode for the same reason `current` is: a flip remounts the
-  // pager, and an index stashed in leaves must never be applied as a page.
-  const pending = useRef<{ mode: typeof mode; index: number } | null>(null);
-
   const onPageScrollStateChanged = useCallback(
     (event: { nativeEvent: { pageScrollState: 'idle' | 'dragging' | 'settling' } }) => {
       // Latched on movement and cleared when the pager comes to rest. The
@@ -334,24 +311,14 @@ export const MushafPager = memo(function MushafPager({
       // ViewPager2 announces nothing because nothing arrived. Without this the
       // flag would stay raised, and the next relayout's bogus position would be
       // read as that abandoned gesture finally landing.
-      const state = event.nativeEvent.pageScrollState;
-      turning.current = state !== 'idle';
-      // `settling` is the one state that must wait: it IS the animation this
-      // defers the mount out of. `dragging` flushes because a second gesture
-      // has begun before the last one came to rest, and the window is still
-      // one leaf behind -- hold it any longer and the finger lands on a cell
-      // nothing has drawn into. The mount then falls at the start of a drag,
-      // where frames follow the finger, rather than inside a settle.
-      if (state === 'settling') return;
-      // At rest, or a new drag, so the window can shift with no animation left
-      // to stutter. An abandoned drag reaches here with nothing stashed, which
-      // is correct: it arrived nowhere, so there is nothing to draw.
-      const next = pending.current;
-      pending.current = null;
-      if (next === null || next.mode !== mode) return;
-      setCurrent((prev) => (prev.mode === next.mode && prev.index === next.index ? prev : next));
+      //
+      // The latch is all this handler does. Holding the WINDOW SHIFT here
+      // instead -- waiting for the pager to reach rest before drawing the page
+      // beyond the one being landed on -- is a defect, and it shipped in vc86:
+      // see the arrival in onPageSelected.
+      turning.current = event.nativeEvent.pageScrollState !== 'idle';
     },
-    [mode],
+    [],
   );
 
   const onPageSelected = useCallback(
@@ -393,18 +360,31 @@ export const MushafPager = memo(function MushafPager({
         pagerRef.current?.setPageWithoutAnimation(indexOf(settled.current));
         return;
       }
-      // Stashed, not drawn: the settle animation has not started yet. See
-      // `pending` for the frames this costs when it is applied here instead.
+      // Drawn now, at the finger's lift, and NOT held until the turn settles.
       //
-      // The flush compares field by field rather than handing over a fresh
-      // object, because `current` is an object only for its mode tag and a new
-      // one per arrival means React can never bail out -- so the mount
+      // Deferring it is tempting and was tried (vc85/vc86): mounting the
+      // arriving leaf's two pages -- ~300 whole-word glyphs, two queries and
+      // two QCF fonts -- inside the settle animation costs three to four
+      // frames in a ~130ms band ~90ms after release, measured at 120Hz on the
+      // tablet. But the page BEYOND the arrival is what this draws, and the
+      // reader reaches it by swiping again before the pager has rested. Each
+      // page draws blank paper until its own ~200KB font has registered
+      // (MushafPage) and its rows have come back from SQLite, and a fast
+      // second swipe gives that ~100-150ms where a settle gives 250ms+. The
+      // owner swiped fast through the mushaf on a OnePlus and got blank pages
+      // (2026-10-02); vc56, which never deferred, does not. A late stutter is
+      // a worse turn, a blank page is no page, so the mount stays here where
+      // the font has the whole settle to arrive.
+      //
+      // Compared field by field, not handed over as a fresh object: `current`
+      // is an object only because it carries the mode tag, and a new one on
+      // every arrival means React can never bail out -- so the mount
       // announcement and each bounce re-assertion above would re-render this
       // pager, rebuild its 302- or 604-element child array, and hand PagerView
       // a new children prop, which re-renders every one of them. The docstring's
       // "must not re-render for anything but a page turn or a resize" is load
       // bearing: it is what keeps a swipe off the glyph-atlas thrash.
-      pending.current = { mode, index };
+      setCurrent((prev) => (prev.mode === mode && prev.index === index ? prev : { mode, index }));
       // The recto, because the caller stores a single page number and a leaf
       // has two. Which half the reader's eye is on is not something the pager
       // knows, and the recto is the stable identity of the paper.
@@ -468,13 +448,12 @@ export const MushafPager = memo(function MushafPager({
     // to Android's own `settling`: a turn we asked for is legitimate whatever
     // states the platform chooses to emit on the way, and an auto-turn that the
     // guard bounced back would strand playback on the page it started from.
-    // Drawn BEFORE the turn, where a gesture's shift waits for `idle`. A
+    // Drawn BEFORE the turn, where a gesture's own shift is drawn on arrival. A
     // command can move any distance, so its target is usually outside the drawn
-    // window -- deferring it would turn the pager onto blank paper and leave it
-    // there until the pager came to rest. A gesture never can: it moves one
-    // index, onto a leaf already drawn, which is what makes the wait safe.
+    // window, and waiting for the arrival would animate the pager across blank
+    // paper. A gesture moves one index, onto a page already drawn, so it has
+    // nothing to pre-draw.
     const target = indexOf(focusPage);
-    pending.current = null;
     setCurrent((prev) => (prev.mode === mode && prev.index === target ? prev : { mode, index: target }));
     turning.current = true;
     pagerRef.current?.setPage(target);
