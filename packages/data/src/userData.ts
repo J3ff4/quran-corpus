@@ -431,12 +431,11 @@ export async function getKhatmPage(client: QueryClient): Promise<number | null> 
 }
 
 export interface KhatmPageInput {
-  /** 1..604, or null to lift the ribbon. */
-  page: number | null;
+  /** 1..604. Lifting the mark is `clearKhatmPage`, not `page: null` -- see there. */
+  page: number;
   /** The marked page's own first ayah. Required because `reading_history` has
    *  NOT NULL coordinates and no defaults, so the first write to a database
-   *  where nothing has been read has to supply them -- and taking them from the
-   *  page being marked keeps the row coherent instead of inventing 1:1. */
+   *  where nothing has been read has to supply them. */
   surahId: number;
   ayahNumber: number;
 }
@@ -446,20 +445,48 @@ export async function setKhatmPage(
   { page, surahId, ayahNumber }: KhatmPageInput,
 ): Promise<void> {
   assertAyahCoordinate(surahId, ayahNumber);
-  if (page !== null && (!Number.isInteger(page) || page < USER_PAGE_MIN || page > USER_PAGE_MAX)) {
+  // The page comes from a pager index rather than from anything typed, and
+  // INTEGER accepts every wrong value there is. Last boundary before a file
+  // that survives app updates.
+  if (!Number.isInteger(page) || page < USER_PAGE_MIN || page > USER_PAGE_MAX) {
     throw new RangeError(
-      `khatm page must be an integer in ${USER_PAGE_MIN}..${USER_PAGE_MAX} or null, got ${String(page)}`,
+      `khatm page must be an integer in ${USER_PAGE_MIN}..${USER_PAGE_MAX}, got ${String(page)}`,
     );
   }
 
   // Upsert, not UPDATE: the row does not exist until something has been read,
   // and an UPDATE would affect zero rows and report success.
+  //
+  // The INSERT branch fills the automatic position too, from the same page.
+  // Not decoration: `getLastReadingPosition` returns a row as soon as one
+  // exists, and HomeScreen's Continue card shows whatever it returns. Writing
+  // only the coordinates left that card pointing at an ayah nobody had read,
+  // with a null page, so it resumed in the ayah reader instead of at the page
+  // just marked. Marking page 123 means the reader is on page 123 at its first
+  // ayah, which is exactly what `recordReadingPosition` would have stored on
+  // landing there -- so the row says one true thing instead of two halves of
+  // different ones. The DO UPDATE branch still touches `khatm_page` alone: on
+  // a database that has been read, the automatic position is not ours to move.
   await client.execute({
-    sql: `INSERT INTO reading_history (id, surah_id, ayah_number, khatm_page)
-          VALUES (1, ?, ?, ?)
+    sql: `INSERT INTO reading_history (id, surah_id, ayah_number, page, khatm_page)
+          VALUES (1, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET khatm_page = excluded.khatm_page`,
-    args: [surahId, ayahNumber, page],
+    args: [surahId, ayahNumber, page, page],
   });
+}
+
+/**
+ * Lift the mark, leaving everything else in the row alone.
+ *
+ * An UPDATE rather than the upsert above, and that is the whole point: with no
+ * row there is no mark to lift, so zero rows affected is the correct outcome
+ * and not a silent failure. `setKhatmPage` cannot serve this case -- its INSERT
+ * branch needs NOT NULL coordinates, and the only ones a lift could offer are
+ * invented, which is how an earlier draft came to write a reading position of
+ * 1:1 for a reader who had never opened surah 1.
+ */
+export async function clearKhatmPage(client: QueryClient): Promise<void> {
+  await client.execute(`UPDATE reading_history SET khatm_page = NULL WHERE id = 1`);
 }
 
 export async function saveSetting(client: QueryClient, key: string, value: string): Promise<void> {

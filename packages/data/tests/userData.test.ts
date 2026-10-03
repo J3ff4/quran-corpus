@@ -9,6 +9,7 @@ import {
   USER_PAGE_MIN,
   countDistinctRootsViewed,
   getBookmarks,
+  clearKhatmPage,
   getKhatmPage,
   getLastReadingPosition,
   getReadingDays,
@@ -660,6 +661,22 @@ describe('khatm mark', () => {
     await expect(getKhatmPage(db)).resolves.toBe(5);
   });
 
+  it('leaves a coherent reading position on a database where nothing has been read', async () => {
+    // The INSERT branch creates the row, and from that moment
+    // getLastReadingPosition returns something -- HomeScreen's Continue card
+    // shows it unconditionally. Writing the coordinates without the page left
+    // that card offering an ayah nobody had read, in the ayah reader, instead
+    // of the page just marked. A page mark means "I am on page 5, at its
+    // first ayah", which is what landing there would have recorded anyway.
+    const db = await migratedUserDb();
+    await setKhatmPage(db, { page: 5, surahId: 1, ayahNumber: 1 });
+    await expect(getLastReadingPosition(db)).resolves.toEqual({
+      surahId: 1,
+      ayahNumber: 1,
+      page: 5,
+    });
+  });
+
   it('replaces the previous mark rather than adding one', async () => {
     // R-C1: exactly one mark.
     const db = await migratedUserDb();
@@ -668,10 +685,37 @@ describe('khatm mark', () => {
     await expect(getKhatmPage(db)).resolves.toBe(300);
   });
 
-  it('clears the mark on null', async () => {
+  it('lifts the mark', async () => {
     const db = await migratedUserDb();
     await setKhatmPage(db, { page: 5, surahId: 1, ayahNumber: 1 });
-    await setKhatmPage(db, { page: null, surahId: 1, ayahNumber: 1 });
+    await clearKhatmPage(db);
+    await expect(getKhatmPage(db)).resolves.toBeNull();
+  });
+
+  it('lifting a mark leaves the automatic position standing', async () => {
+    // clearKhatmPage is an UPDATE over a shared row. Widened to touch anything
+    // but khatm_page -- or written as a DELETE -- it takes the reader's place
+    // in the book with it.
+    const db = await migratedUserDb();
+    await recordReadingPosition(db, { surahId: 2, ayahNumber: 255, page: 42 });
+    await setKhatmPage(db, { page: 123, surahId: 25, ayahNumber: 1 });
+    await clearKhatmPage(db);
+    await expect(getLastReadingPosition(db)).resolves.toEqual({
+      surahId: 2,
+      ayahNumber: 255,
+      page: 42,
+    });
+  });
+
+  it('lifting a mark on a database where nothing has been read stores nothing', async () => {
+    // Zero rows affected is the right answer here, so this must NOT be the
+    // upsert setKhatmPage uses: an INSERT would need coordinates no lift has,
+    // and the invented 1:1 it would store reads as a reading position for a
+    // reader who has never opened surah 1 -- which HomeScreen's Continue card
+    // then offers them.
+    const db = await migratedUserDb();
+    await clearKhatmPage(db);
+    await expect(getLastReadingPosition(db)).resolves.toBeNull();
     await expect(getKhatmPage(db)).resolves.toBeNull();
   });
 
@@ -712,6 +756,12 @@ describe('khatm mark', () => {
     for (const page of [0, 605, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
       await expect(setKhatmPage(db, { page, surahId: 1, ayahNumber: 1 })).rejects.toThrow(RangeError);
     }
+    // Not reachable through the type, so it is the runtime boundary being
+    // pinned: a null here would store as a lifted mark on a row this call also
+    // creates, which is a write the caller did not ask for.
+    await expect(
+      setKhatmPage(db, { page: null as unknown as number, surahId: 1, ayahNumber: 1 }),
+    ).rejects.toThrow(RangeError);
     await expect(getKhatmPage(db)).resolves.toBeNull();
   });
 
