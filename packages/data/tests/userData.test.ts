@@ -679,9 +679,17 @@ describe('khatm mark', () => {
     // The two values share a row and mean different things: one moves as you
     // scroll, one only when you tap. A write that clobbers the other is a
     // silent data loss on a file that survives app updates.
+    //
+    // The two coordinates must DIFFER. With the same surah and ayah in both
+    // calls, a `DO UPDATE SET` widened to `surah_id = excluded.surah_id,
+    // ayah_number = excluded.ayah_number` writes values that happen to equal
+    // what is already there, and this test passes over the exact defect it is
+    // named for. Marking the page you are already on is also the one case the
+    // feature is not for: a khatm mark is dropped somewhere other than where
+    // the automatic position has got to.
     const db = await migratedUserDb();
     await recordReadingPosition(db, { surahId: 2, ayahNumber: 255, page: 42 });
-    await setKhatmPage(db, { page: 123, surahId: 2, ayahNumber: 255 });
+    await setKhatmPage(db, { page: 123, surahId: 25, ayahNumber: 1 });
     await expect(getLastReadingPosition(db)).resolves.toEqual({ surahId: 2, ayahNumber: 255, page: 42 });
     await expect(getKhatmPage(db)).resolves.toBe(123);
   });
