@@ -11,6 +11,14 @@ export interface HighlightInput {
    *  the other three mark an ayah, and this one has to say which of its words
    *  the sheet about to open is about (M7d ruling 4). */
   pressed: PressedWord | null;
+  /** The khatm-marked page, or null when nothing is marked.
+   *
+   *  A PAGE, not an ayah key, and so the one member of this type that is not
+   *  per-ayah: the mark is dropped on a leaf (R-C1), and a page is the unit a
+   *  reader stops at. It rides here rather than down through `MushafPager`
+   *  because the pager hands PagerView all 604 children -- see
+   *  HighlightsProvider, which exists for exactly that. */
+  khatmPage: number | null;
 }
 
 export interface PressedWord {

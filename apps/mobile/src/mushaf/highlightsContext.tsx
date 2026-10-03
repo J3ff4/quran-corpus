@@ -8,6 +8,7 @@ const EMPTY: HighlightInput = {
   playing: null,
   landingProgress: 0,
   pressed: null,
+  khatmPage: null,
 };
 
 const HighlightsContext = createContext<HighlightInput>(EMPTY);

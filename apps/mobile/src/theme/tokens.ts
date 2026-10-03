@@ -66,6 +66,16 @@ export const themeColors = {
     // 10.57:1, and it is 1.31:1 against accentWash -- the pressed word's
     // ground, which sits on top of it.
     playingWash: '#a8d5b5',
+    // The khatm ribbon: a deep madder rather than a pure red. A saturated red
+    // fights warm paper, and madder reads as silk. 6.48:1 against the page's
+    // own off-white (#fffdf8), 6.21:1 against the page ground -- a shape, not
+    // type, so the bar it has to clear is 3:1.
+    //
+    // It sits 1.10:1 from `dangerFill` below, which is to say it is very nearly
+    // the same red. Owner-chosen (R-C7) and left alone: the two are never
+    // co-present. A ribbon is a strip on a mushaf page; dangerFill is an 88pt
+    // panel behind a swiped bookmark row, a screen away.
+    ribbon: '#A8323C',
     danger: colors.danger, // 6.9:1 on paper
     // The same red as a FILL rather than as text -- the swipe-to-delete panel
     // is 88pt of solid colour, not a line of type. Light mode can reuse the
@@ -103,6 +113,10 @@ export const themeColors = {
     // one: stronger against the page than the bookmark (1.79:1 vs 1.39:1),
     // because it moves and the bookmark stands. nightText on it is 8.79:1.
     playingWash: '#26473a',
+    // The ribbon, lifted for night: #A8323C on #151412 is a brown, not a silk.
+    // 4.10:1 against the page and 3.82:1 on the card surface -- clear of the
+    // 3:1 a non-text shape has to make, on both.
+    ribbon: '#C4515A',
     // Not colors.danger: #9f2d2d on night is 2.5:1, well under AA. Error text
     // is exactly the text a user must be able to read, so the night palette
     // takes a lighter red rather than reusing the brand one.
