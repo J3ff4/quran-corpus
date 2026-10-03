@@ -11,6 +11,7 @@ const base = {
   playing: null,
   landingProgress: 0,
   pressed: null,
+  khatmPage: null,
 };
 
 describe('colorForWord', () => {
@@ -37,6 +38,7 @@ describe('colorForWord', () => {
       playing: ayahKey(2, 5),
       landingProgress: 1,
       pressed: null,
+      khatmPage: null,
     };
     expect(colorForWord(all, theme)(2, 5, 1)).toBe(theme.text);
     expect(backgroundForWord(all, theme)(2, 5, 1)).toBe(theme.playingWash);
