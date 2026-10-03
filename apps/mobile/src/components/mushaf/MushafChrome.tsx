@@ -40,6 +40,17 @@ export interface MushafChromeProps {
   uiLocale: UiLocaleCode;
   onOpenJump: () => void;
   onOpenSearch: () => void;
+  /** Is the page in front of the reader the khatm-marked one? Decides which
+   *  way the button goes, in words as well as in what it does. */
+  marked: boolean;
+  onToggleMark: () => void;
+  /** The stored mark could not be READ.
+   *
+   *  The button is disabled, because "unreadable" and "unmarked" look
+   *  identical from here and only one of them is safe to act on: offering the
+   *  mark over a failed read invites the reader to overwrite a khatm the
+   *  database still holds, in a file that survives app updates. */
+  markUnavailable: boolean;
 }
 
 /**
@@ -54,7 +65,15 @@ export interface MushafChromeProps {
  * bar docked over scrollable content needs an opaque backing -- the lesson four
  * sub-phases of M6 kept re-learning.
  */
-export function MushafChrome({ visible, uiLocale, onOpenJump, onOpenSearch }: MushafChromeProps) {
+export function MushafChrome({
+  visible,
+  uiLocale,
+  onOpenJump,
+  onOpenSearch,
+  marked,
+  onToggleMark,
+  markUnavailable,
+}: MushafChromeProps) {
   const theme = useThemeColors();
   // The bar is positioned off the status bar's inset and fades out as that
   // bar is hidden. Read live, the inset collapses to 0 mid-fade and the chrome
@@ -124,6 +143,28 @@ export function MushafChrome({ visible, uiLocale, onOpenJump, onOpenSearch }: Mu
           <Text numberOfLines={1} style={{ color: theme.mutedText, fontSize: typography.caption }}>
             {t(uiLocale, 'jump.title')}
           </Text>
+        </Pressable>
+        {/* Before search, so the two page-level controls sit together and the
+            search button keeps the trailing edge it has everywhere else. */}
+        <Pressable
+          testID="mushaf-ribbon-button"
+          accessibilityRole="button"
+          accessibilityLabel={t(uiLocale, marked ? 'mushaf.liftMark' : 'mushaf.markPage')}
+          accessibilityState={{ disabled: markUnavailable }}
+          disabled={markUnavailable}
+          onPress={onToggleMark}
+          style={{
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: touchTargets.minimum,
+            minWidth: touchTargets.minimum,
+            // Dimmed rather than hidden: a control that disappears when a read
+            // fails reads as a missing feature, and the reader has no way to
+            // know the mark is still there.
+            opacity: markUnavailable ? 0.4 : 1,
+          }}
+        >
+          <Icon name="bookmark" color={marked ? theme.ribbon : theme.mutedText} size={18} />
         </Pressable>
         <SearchHeaderButton uiLocale={uiLocale} onPress={onOpenSearch} />
       </GlassSurface>

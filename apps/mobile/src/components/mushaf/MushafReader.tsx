@@ -42,6 +42,9 @@ export interface MushafReaderProps {
   landingAyah: { surahId: number; ayahNumber: number } | null;
   /** `surah:ayah` keys, from the reader's bookmark map. */
   bookmarkedKeys: ReadonlySet<string>;
+  /** The khatm-marked page, or null. Travels inside `highlights` from here --
+   *  see HighlightsProvider for why it is not a pager prop. */
+  khatmPage: number | null;
   playingAyah: { surahId: number; ayahNumber: number } | null;
   /** The page the recitation has moved onto, or null. */
   focusPage: number | null;
@@ -82,6 +85,7 @@ export function MushafReader({
   initialPage,
   landingAyah,
   bookmarkedKeys,
+  khatmPage,
   playingAyah,
   focusPage,
   uiLocale,
@@ -178,8 +182,9 @@ export function MushafReader({
       // knows about it, which is the point -- a touch must not re-render the
       // two pages the reader is not touching.
       pressed: null,
+      khatmPage,
     }),
-    [bookmarkedKeys, landingKey, playingAyah, pulse],
+    [bookmarkedKeys, landingKey, playingAyah, pulse, khatmPage],
   );
 
   // The reader is cross-fading onto this, and a page whose font has not landed
@@ -237,6 +242,7 @@ export function MushafReader({
           onPageChange={onListPageChange}
           onWordLongPress={onPagerWordLongPress}
           onTap={onTap}
+          reduceMotion={reducedMotion}
         />
         </HighlightsProvider>
       ) : null}

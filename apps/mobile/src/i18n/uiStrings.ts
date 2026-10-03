@@ -17,6 +17,8 @@ export type UiStringKey =
   | 'mushaf.playPage'
   // The khatm ribbon's read failure -- shown while the mark is unreadable,
   // not while there simply is none.
+  | 'mushaf.markPage'
+  | 'mushaf.liftMark'
   | 'mushaf.khatmLoadFailed'
   | 'jump.title'
   | 'jump.surahTitle'
@@ -314,6 +316,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'mushaf.jumpGo': 'Go',
     'mushaf.jumpOutOfRange': 'Nothing there. Page 1-604, surah 1-114, juz 1-30.',
     'mushaf.playPage': 'Play this page',
+    'mushaf.markPage': 'Mark this page',
+    'mushaf.liftMark': 'Lift the mark',
     'mushaf.khatmLoadFailed': 'Unable to load the khatm mark',
     // Every go-to control and every go-to sheet, the mushaf's included: one
     // move, one word (owner, 2026-09-24).
@@ -571,6 +575,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'mushaf.jumpGo': 'Oʻtish',
     'mushaf.jumpOutOfRange': 'Bunday joy yoʻq. Sahifa 1-604, sura 1-114, juz 1-30.',
     'mushaf.playPage': 'Sahifani tinglash',
+    'mushaf.markPage': 'Bu sahifani belgilash',
+    'mushaf.liftMark': 'Belgini olib tashlash',
     'mushaf.khatmLoadFailed': 'Xatm belgisini yuklab boʻlmadi',
     'jump.title': 'Oʻtish',
     'jump.surahTitle': 'Suraga oʻtish',
@@ -810,6 +816,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'mushaf.jumpGo': 'Перейти',
     'mushaf.jumpOutOfRange': 'Такого нет. Страница 1-604, сура 1-114, джуз 1-30.',
     'mushaf.playPage': 'Слушать страницу',
+    'mushaf.markPage': 'Отметить эту страницу',
+    'mushaf.liftMark': 'Снять отметку',
     'mushaf.khatmLoadFailed': 'Не удалось загрузить отметку хатма',
     'jump.title': 'Перейти',
     'jump.surahTitle': 'Перейти к суре',
