@@ -191,17 +191,6 @@ vi.mock('expo-status-bar', async () => {
 // Inert on purpose. The suites that exercise playback pass their own driver
 // into useRecitation and never touch these; the rest only need the import to
 // resolve.
-// expo-screen-orientation, for the same reason again: a native module with no
-// jsdom counterpart, now reached by the mushaf on every render. The spies are
-// shared so a suite can assert WHICH request the screen made -- a lock that
-// never fires and a lock fired on a tablet look identical from the rendered
-// output.
-vi.mock('expo-screen-orientation', () => ({
-  OrientationLock: { PORTRAIT_UP: 'PORTRAIT_UP' },
-  lockAsync: vi.fn(async () => undefined),
-  unlockAsync: vi.fn(async () => undefined),
-}));
-
 vi.mock('expo-audio', () => ({
   createAudioPlayer: vi.fn(),
   setAudioModeAsync: vi.fn(async () => undefined),
