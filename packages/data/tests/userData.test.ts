@@ -677,6 +677,29 @@ describe('khatm mark', () => {
     });
   });
 
+  it('reads a row it did not write as no mark, rather than handing back a bad page', async () => {
+    // setKhatmPage range-checks on the way in, and that is not enough to trust
+    // the read: the column is INTEGER, the file lives on a device across app
+    // updates, and an older build opening a newer one's database -- or plain
+    // storage damage -- is a row this code never wrote. Unvalidated, these
+    // flowed into requestMushafPage and the pager's clamp opened page 1 as
+    // though the reader had marked it.
+    const db = await migratedUserDb();
+    await setKhatmPage(db, { page: 5, surahId: 1, ayahNumber: 1 });
+
+    for (const bad of [0, 605, 9000, -3, 1.5, 'page five']) {
+      await db.execute({
+        sql: `UPDATE reading_history SET khatm_page = ? WHERE id = 1`,
+        args: [bad],
+      });
+      await expect(getKhatmPage(db)).resolves.toBeNull();
+    }
+
+    // The guard rejects bad values, it does not reject every value.
+    await db.execute({ sql: `UPDATE reading_history SET khatm_page = ? WHERE id = 1`, args: [604] });
+    await expect(getKhatmPage(db)).resolves.toBe(604);
+  });
+
   it('replaces the previous mark rather than adding one', async () => {
     // R-C1: exactly one mark.
     const db = await migratedUserDb();

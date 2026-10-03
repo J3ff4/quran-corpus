@@ -17,8 +17,9 @@
  */
 let pending: number | null = null;
 
-/** 1..604. Validated by the caller -- the only writer reads it from the user
- *  DB, where `setKhatmPage` has already range-checked it. */
+/** 1..604, guaranteed by `getKhatmPage`, which range-checks the row on the way
+ *  out of the user DB -- not by `setKhatmPage` guarding the write, which says
+ *  nothing about a row this app did not write. */
 export function requestMushafPage(page: number): void {
   pending = page;
 }

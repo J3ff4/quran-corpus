@@ -427,7 +427,18 @@ export async function getLastReadingPosition(client: QueryClient): Promise<Readi
 export async function getKhatmPage(client: QueryClient): Promise<number | null> {
   const rows = await client.execute(`SELECT khatm_page FROM reading_history WHERE id = 1`);
   const value = rows.rows[0]?.['khatm_page'];
-  return value === null || value === undefined ? null : Number(value);
+  if (value === null || value === undefined) return null;
+  const page = Number(value);
+  // Range-checked on the way out as well as in. `setKhatmPage` guarding the
+  // write is not enough to trust the read: the column is INTEGER, which accepts
+  // anything, and this file lives on a device across app updates -- an older
+  // build opening a newer one's database, or plain storage damage, is a row we
+  // did not write. Unvalidated, a NaN or a 9000 flowed through the Home card
+  // into `requestMushafPage` and the pager's clamp silently opened page 1.
+  // Treated as no mark rather than thrown: a corrupt row must not take Home
+  // down, and an absent ribbon is the honest rendering of a page we cannot name.
+  if (!Number.isInteger(page) || page < USER_PAGE_MIN || page > USER_PAGE_MAX) return null;
+  return page;
 }
 
 export interface KhatmPageInput {
