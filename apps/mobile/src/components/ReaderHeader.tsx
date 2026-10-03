@@ -1,6 +1,7 @@
 import { Pressable, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { AdjacentNavButton } from './AdjacentNav';
+import { ArabicSizeStepper } from './ArabicSizeStepper';
 import { HeaderCard } from './HeaderCard';
 import { SearchHeaderButton } from './SearchHeaderButton';
 import { SegmentedControl } from './SegmentedControl';
@@ -157,13 +158,13 @@ export function ReaderHeader({
            leaving them mounted holds the ayah list at no-hide-descendants
            behind whatever opens next; the curtain unmounts them when shut,
            which is the same guarantee by a shorter route. */
+        <View style={{ gap: 10, paddingTop: 4 }}>
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
             gap: 24,
-            paddingTop: 4,
           }}
         >
           {onChangeShowTranslation ? (
@@ -215,6 +216,10 @@ export function ReaderHeader({
           >
             <Icon name="globe" color={theme.accent} />
           </Pressable>
+        </View>
+        {/* Arabic size, two taps instead of a trip to Settings (R-C6). The
+            same stored value Settings writes -- one setting, two ways in. */}
+        <ArabicSizeStepper uiLocale={uiLocale} />
         </View>
       }
     />

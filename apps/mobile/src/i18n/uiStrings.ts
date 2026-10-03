@@ -219,6 +219,8 @@ export type UiStringKey =
   | 'settings.arabicSizeMedium'
   | 'settings.arabicSizeLarge'
   | 'settings.arabicSizeXlarge'
+  | 'settings.arabicSizeIncrease'
+  | 'settings.arabicSizeDecrease'
   | 'settings.arabicSizeHint'
   | 'settings.wbwDensity'
   | 'settings.wbwDensityHint'
@@ -473,6 +475,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.themeLight': 'Light',
     'settings.themeDark': 'Dark',
     'settings.arabicSize': 'Arabic size',
+    'settings.arabicSizeIncrease': 'Increase Arabic size',
+    'settings.arabicSizeDecrease': 'Decrease Arabic size',
     'settings.arabicSizeSmall': 'Small',
     'settings.arabicSizeMedium': 'Medium',
     'settings.arabicSizeLarge': 'Large',
@@ -727,6 +731,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.themeLight': 'Yorug‘',
     'settings.themeDark': 'Qorong‘i',
     'settings.arabicSize': 'Arab yozuvi o‘lchami',
+    'settings.arabicSizeIncrease': 'Arab yozuvi oʻlchamini kattalashtirish',
+    'settings.arabicSizeDecrease': 'Arab yozuvi oʻlchamini kichraytirish',
     'settings.arabicSizeSmall': 'Kichik',
     'settings.arabicSizeMedium': 'O‘rtacha',
     'settings.arabicSizeLarge': 'Katta',
@@ -969,6 +975,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.themeLight': 'Светлая',
     'settings.themeDark': 'Темная',
     'settings.arabicSize': 'Размер арабского текста',
+    'settings.arabicSizeIncrease': 'Увеличить размер арабского',
+    'settings.arabicSizeDecrease': 'Уменьшить размер арабского',
     'settings.arabicSizeSmall': 'Мелкий',
     'settings.arabicSizeMedium': 'Средний',
     'settings.arabicSizeLarge': 'Крупный',

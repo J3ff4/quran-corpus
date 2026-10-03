@@ -4,6 +4,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { reciterById } from '@quran-corpus/data/mobile';
 
+import { ARABIC_SIZE_LABEL_KEYS } from '@/components/ArabicSizeStepper';
 import { GlassSurface } from '@/components/GlassSurface';
 import { Icon } from '@/components/icons/Icon';
 import { ReciterSheet } from '@/components/ReciterSheet';
@@ -22,13 +23,6 @@ const themeLabelKeys = {
   system: 'settings.themeSystem',
   light: 'settings.themeLight',
   dark: 'settings.themeDark',
-} as const;
-
-const arabicSizeLabelKeys = {
-  small: 'settings.arabicSizeSmall',
-  medium: 'settings.arabicSizeMedium',
-  large: 'settings.arabicSizeLarge',
-  xlarge: 'settings.arabicSizeXlarge',
 } as const;
 
 const densityLabelKeys = {
@@ -332,7 +326,7 @@ export function SettingsScreen() {
           hint={label('settings.arabicSizeHint')}
           options={(['small', 'medium', 'large', 'xlarge'] as const).map((value) => ({
             value,
-            label: label(arabicSizeLabelKeys[value]),
+            label: label(ARABIC_SIZE_LABEL_KEYS[value]),
           }))}
           value={settings.arabicScale}
           onChange={settings.setArabicScale}
