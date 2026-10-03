@@ -696,12 +696,34 @@ Owner asked for two things after the device run:
 | 721 | Marked → tap the card: the mushaf opens on exactly that page. Back to Home, tap again: it jumps again | |
 | 722 | Roots studied is untouched — same half-width card, same weekly bars | |
 
-Gates on the implementation: mobile `tsc` 0, `eslint` 0, 134 files / 1650 tests green.
-Mutation-checked: the retract distance, the `drawn` mount, the invitation's error gate,
-the request's clearing (which caught a vacuous test of its own first) and the
-cold-vs-warm branch each break a named test when reverted. **§5 needs no independent
-review** — no `packages/data` change, no trust boundary, and no write to the on-device
-user DB; the khatm read is a read.
+Gates on the implementation: mobile `type-check` 0 (**both halves** — `tsconfig.json`
+AND `tsconfig.test.json`, which is what CI runs; an earlier pass ran only the first and
+reported 0 while 109 errors stood in four mushaf suites), `eslint` 0, 134 files /
+1651 tests green. Mutation-checked: the retract distance, the `drawn` mount, the
+invitation's error gate, the request's clearing (which caught a vacuous test of its own
+first), the cold-vs-warm branch, `useUserDbOnFocus`'s settled flag and `getKhatmPage`'s
+read-side range check each break a named test when reverted.
+
+**§5 DOES need an independent review, and it ran.** The earlier waiver here was scoped
+to Task 6 and written as though it covered the branch: Task 6 alone touches no data
+layer, but the branch carries migration 5, `setKhatmPage`/`clearKhatmPage` and a new
+`RangeError` validator — all three §5 triggers at once. `/code-review` ran 2026-10-03
+on the whole branch; findings and dispositions below.
+
+### `/code-review` 2026-10-03 — dispositions
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | `type-check` red: `khatmPage` and `reduceMotion` made required, 4 suites not updated (109 errors) | **Fixed.** `highlights.test.ts` literals + `marks()`, `MushafPager`/`MushafReader`/`MushafRotation` prop objects. Real, mine, CI-blocking — the earlier gate ran only `tsc --noEmit`, not the `-p tsconfig.test.json` half the script and CI both run. |
+| 3 | Home card swaps "Start khatm" for the placeholder on every focus/resume | **Fixed in the shared hook.** `useUserDbOnFocus` narrowed `loading` on `data === null`, a proxy for "never resolved" that is wrong for any load whose own answer is null. Now a `settled` flag. Fixes every future null-answering consumer, not just this card. |
+| 4 | `getKhatmPage` returns the row unvalidated; `pageRequest`'s docstring claims a guarantee it lacks | **Fixed.** Symmetric range check on read, out-of-range/non-numeric read as no mark rather than thrown (a corrupt row must not take Home down). Docstring now credits the read guard, not the write guard. |
+| 7 | `onToggleMark`'s `useCallback` is inert — depends on `khatm`, a fresh object each render | **Fixed.** Depends on `khatm.mark`/`khatm.lift`, which are `useCallback`-stable. |
+| 5 | §5 waiver scoped to Task 6, written as if it covered the PR; checks 716-722 blank | **Fixed** (waiver above). Checks still genuinely owed — vc90 is installed on both devices and the run is scheduled with the owner. |
+| 2 | `KhatmRibbon` animates inside the page's hardware layer | **Deferred to the device run, not declined.** The claim is plausible and the counter-argument in the inline comment is weak — a turn animates the pager, not the ribbon. But the only honest verdict is a framestats gap measurement (3 repeats, gaps inside the animation window), and that needs the owner's phone. Added as check 723. |
+| 6 | Arabic size stepper rebuilds the reader's offset table with no re-anchor | **Real, out of scope here.** Pre-existing in kind — reachable from Settings before this branch — but the new stepper puts it one tap away mid-read. Filed as its own issue rather than fixed inside a branch already carrying three §5 triggers. |
+| 8 | `reading_days` is now write-only | **Accepted, no change.** One row per reading day costs nothing and the plan deliberately keeps the write so a returning streak needs no backfill. The dead `getReadingDays` re-export through `userRepository` goes when something next touches that file. |
+
+| 723 | Mark and lift on a dense page → framestats gaps inside the 220/280ms window, 3 repeats, vs. the same page untouched | |
 
 ## Acceptance criteria
 
