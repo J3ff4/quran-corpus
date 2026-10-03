@@ -26,8 +26,18 @@ const NOTCH = 7;
  * frame. The SHAPE of the drop -- that it falls DOWN into place rather than
  * rising into it -- is unassertable through the component and has to be stated
  * here to be testable at all.
+ *
+ * Workletized for the reason `bookmarkExit`'s `rowExit` is: the style worklet
+ * below runs on the UI thread, where a plain imported function is not callable
+ * at all -- reanimated throws rather than hopping threads, and the throw takes
+ * the screen down with it. Without the directive, opening the mushaf tab
+ * crashed the app outright (device, vc88).
+ *
+ * The directive is inert under vitest, which does not run reanimated's babel
+ * plugin, so the tests below still call this as the plain function it reads as.
  */
 export function khatmRibbonTranslateY(progress: number): number {
+  'worklet';
   return (progress - 1) * DROP;
 }
 
