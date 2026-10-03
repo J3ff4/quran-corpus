@@ -1,6 +1,8 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { deferred } from '../testing/deferred';
+
 const mocks = vi.hoisted(() => ({
   data: null as number | null,
   loading: false,
@@ -127,6 +129,113 @@ describe('useKhatmMark', () => {
     });
     expect(caught).toBeInstanceOf(Error);
     expect((caught as Error).message).toBe('disk full');
+  });
+
+  it('does not let a late failure undo a newer write that already landed', async () => {
+    // Two taps, resolving out of order: the first write is still open when the
+    // second one succeeds, and then the first one fails. Rolling back to
+    // "whatever the override was before this write" would restore the state
+    // from before BOTH taps -- painting "no mark" over a page the database has
+    // just marked. The rollback target is the last CONFIRMED value, so it is
+    // right in every ordering.
+    const stalled = deferred<void>();
+    mocks.setKhatmPage.mockReturnValueOnce(stalled.promise);
+    const { result } = renderHook(() => useKhatmMark('en'));
+
+    let first!: Promise<void>;
+    act(() => {
+      first = result.current.mark(5, { surahId: 1, ayahNumber: 1 }).catch(() => {});
+    });
+    await act(() => result.current.mark(300, { surahId: 25, ayahNumber: 1 }));
+    expect(result.current.markedPage).toBe(300);
+
+    await act(async () => {
+      stalled.reject(new Error('database is locked'));
+      await first;
+    });
+    expect(result.current.markedPage).toBe(300);
+  });
+
+  it('does not drop the newer mark when an older write fails first', async () => {
+    // The other ordering: both writes still in flight, and the OLDER one
+    // fails. Only the newest write may roll back -- an older one restoring its
+    // own stale value flashes the ribbon off while the write that will set it
+    // is still on its way. Same generation guard useUserDbOnFocus uses on its
+    // reads.
+    const older = deferred<void>();
+    const newer = deferred<void>();
+    mocks.setKhatmPage.mockReturnValueOnce(older.promise).mockReturnValueOnce(newer.promise);
+    const { result } = renderHook(() => useKhatmMark('en'));
+
+    let first!: Promise<void>;
+    let second!: Promise<void>;
+    act(() => {
+      first = result.current.mark(5, { surahId: 1, ayahNumber: 1 }).catch(() => {});
+    });
+    act(() => {
+      second = result.current.mark(300, { surahId: 25, ayahNumber: 1 });
+    });
+    expect(result.current.markedPage).toBe(300);
+
+    await act(async () => {
+      older.reject(new Error('database is locked'));
+      await first;
+    });
+    expect(result.current.markedPage).toBe(300);
+
+    await act(async () => {
+      newer.resolve();
+      await second;
+    });
+    expect(result.current.markedPage).toBe(300);
+  });
+
+  it('rolls back to the stored value, not to an unconfirmed in-flight mark', async () => {
+    // Two taps in flight, the NEWER one fails. Rolling back to "whatever the
+    // override was when this write started" restores the older tap's page --
+    // which no write has confirmed, and which is left on screen for good once
+    // that older write fails too and the generation guard stops it rolling
+    // back. The rollback target is the last value actually written, so with
+    // nothing confirmed it falls through to `stored.data`.
+    const older = deferred<void>();
+    const newer = deferred<void>();
+    mocks.setKhatmPage.mockReturnValueOnce(older.promise).mockReturnValueOnce(newer.promise);
+    const { result } = renderHook(() => useKhatmMark('en'));
+
+    let first!: Promise<void>;
+    let second!: Promise<void>;
+    act(() => {
+      first = result.current.mark(5, { surahId: 1, ayahNumber: 1 }).catch(() => {});
+    });
+    act(() => {
+      second = result.current.mark(300, { surahId: 25, ayahNumber: 1 }).catch(() => {});
+    });
+
+    await act(async () => {
+      newer.reject(new Error('database is locked'));
+      await second;
+    });
+    expect(result.current.markedPage).toBeNull();
+
+    await act(async () => {
+      older.reject(new Error('database is locked'));
+      await first;
+    });
+    expect(result.current.markedPage).toBeNull();
+  });
+
+  it('keeps mark and lift stable across renders', async () => {
+    // These go to a button in the mushaf chrome, above a PagerView that
+    // re-renders all 604 of its children whenever a prop changes identity.
+    // The stubbed useUserDbOnFocus above returns a fresh object every render,
+    // exactly as the real one does, so a handler that depends on it directly
+    // is a new function every time.
+    const { result, rerender } = renderHook(() => useKhatmMark('en'));
+    const { mark, lift } = result.current;
+    await act(() => result.current.mark(5, { surahId: 1, ayahNumber: 1 }));
+    rerender();
+    expect(result.current.mark).toBe(mark);
+    expect(result.current.lift).toBe(lift);
   });
 
   it('loading means nothing-to-show-yet, not no-mark', () => {
