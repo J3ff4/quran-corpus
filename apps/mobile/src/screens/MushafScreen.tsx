@@ -340,7 +340,10 @@ export function MushafScreen() {
     // hook has already rolled the ribbon back, and the read error is what the
     // button's disabled state is for.
     void run.catch(() => {});
-  }, [marked, khatm, currentPage, pageLines]);
+    // `khatm.mark`/`khatm.lift` rather than `khatm`: the hook returns a fresh
+    // object literal every render, so depending on the whole thing re-made this
+    // handler on exactly the audio ticks the useCallback is here to survive.
+  }, [marked, khatm.mark, khatm.lift, currentPage, pageLines]);
 
   const audio = useRecitationController();
   // Whether the engine is sounding for US. It is one engine app-wide now, so a
