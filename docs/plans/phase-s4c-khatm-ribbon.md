@@ -659,6 +659,50 @@ Check 715 is not optional. The user DB survives app updates and this phase migra
 
 - [x] Record every result, fill the Verification Log, commit, push. **Do not open the PR.**
 
+### Task 6: The ribbon's exit, and a khatm entry on Home (follow-up, 2026-10-03)
+
+Owner asked for two things after the device run:
+
+1. **The ribbon had no exit.** `if (!marked) return null` unmounted the view in the
+   same render that cleared the mark, so the retract animated a shared value nothing
+   was drawing — a lift read as the ribbon blinking out. Fix: keep it drawn until the
+   exit lands (`drawn` state + `withTiming`'s completion through `runOnJS`, the shape
+   `BookmarksScreen`'s row exit already uses), and make the exit a **retract**, not a
+   reverse drop: the silk rises its whole 56dp length under a clipping parent, no
+   fade, 280ms — pulled out of the book rather than evaporating (owner's call over a
+   symmetric 24dp rise and over a fade-only exit).
+   `khatmRibbonTranslateY` is **deleted**: offset and opacity are now plain shared
+   values the style worklet reads directly, so there is no imported call inside
+   `useAnimatedStyle` and no way back to the vc88 crash class.
+2. **A khatm entry on Home.** Owner ruling: it **replaces the day-streak counter**
+   (half-width, beside Roots studied) rather than taking a card of its own. Streak
+   display, its `getReadingDays` read and `counters.ts`'s `streakFrom` are deleted —
+   git holds them if it comes back. Marked → the page number over "Khatm page";
+   read landed with no mark → "Start khatm"; still loading or unreadable → a dash,
+   never the invitation (an unreadable mark is not an absent one).
+   The page reaches the mushaf through `src/mushaf/pageRequest.ts`, a one-shot module
+   store in the shape of `chromeVisibility` beside it, **not** a route param: the
+   mushaf is a tab and stays mounted, so a param sticks to the route and a second tap
+   on the same card would be a value that never changes. `router.navigate`, not
+   `push` — pushing a tab stacks a second copy of it.
+
+| # | Check | Result |
+|---|---|---|
+| 716 | Lift the mark → the ribbon RETRACTS upward under the page's top edge; no blink, no fade | |
+| 717 | Mark again right after a lift → the drop is the short 24dp fall, not a 56dp one | |
+| 718 | Reduced motion → a lift removes the ribbon at once, with no retract | |
+| 719 | Home shows the marked page as a number over "Khatm page", where the streak used to be | |
+| 720 | No mark on the file → the card reads "Start khatm"; tapping opens the mushaf where it would have opened anyway | |
+| 721 | Marked → tap the card: the mushaf opens on exactly that page. Back to Home, tap again: it jumps again | |
+| 722 | Roots studied is untouched — same half-width card, same weekly bars | |
+
+Gates on the implementation: mobile `tsc` 0, `eslint` 0, 134 files / 1650 tests green.
+Mutation-checked: the retract distance, the `drawn` mount, the invitation's error gate,
+the request's clearing (which caught a vacuous test of its own first) and the
+cold-vs-warm branch each break a named test when reverted. **§5 needs no independent
+review** — no `packages/data` change, no trust boundary, and no write to the on-device
+user DB; the khatm read is a read.
+
 ## Acceptance criteria
 
 - [ ] `reading_history` gains `khatm_page` by an additive migration that is safe to run twice.

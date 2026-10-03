@@ -37,6 +37,7 @@ import { t } from '@/i18n/uiStrings';
 import { ayahKey, type PressedWord } from '@/mushaf/highlights';
 import { useMushafIndex } from '@/mushaf/mushafReaderData';
 import { useMushafPage } from '@/mushaf/useMushafPage';
+import { takeMushafPage } from '@/mushaf/pageRequest';
 import { ayahOnPage, firstAyahOnPage, nextAyahOnPage } from '@/mushaf/pageAudio';
 import { useKhatmMark } from '@/mushaf/useKhatmMark';
 import { pageForAyah, pageForJump } from '@/mushaf/pageJump';
@@ -196,6 +197,31 @@ export function MushafScreen() {
     // one this screen has already rolled back.
     setBookmarks(new Map(rows.map((bookmark) => [ayahKey(bookmark.surahId, bookmark.ayahNumber), bookmark.note])));
   }, [savedBookmarks.data]);
+
+  // A page another tab asked this one to open on -- Home's khatm card, which
+  // is a promise about one particular page and so cannot be served by the
+  // saved reading position. Taken on focus rather than read: see pageRequest.
+  const [requestedPage, setRequestedPage] = useState<number | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      const page = takeMushafPage();
+      if (page !== null) setRequestedPage(page);
+    }, []),
+  );
+
+  // Cleared as it is consumed, so tapping the same card twice is two jumps and
+  // not one: `focusPage` is a prop the pager compares, and a request left
+  // standing would never change to announce the second tap.
+  useEffect(() => {
+    if (requestedPage === null) return;
+    setRequestedPage(null);
+    // Before the pager exists, the request IS the opening page -- mounting on
+    // the saved one and jumping would turn 200 pages in front of the reader.
+    // After it, a jump is the only way in. The saved-position effect below
+    // stands down either way, because it bails once `initialPage` is set.
+    if (initialPage === null) setInitialPage(requestedPage);
+    else setFocusPage(requestedPage);
+  }, [requestedPage, initialPage]);
 
   // The opening page, resolved once and then never again: `initialPage` is
   // what the pager mounts on, and it owns the page after that.

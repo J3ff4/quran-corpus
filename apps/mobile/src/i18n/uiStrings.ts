@@ -93,7 +93,8 @@ export type UiStringKey =
   | 'home.continue'
   | 'home.noHistory'
   | 'home.loadFailed'
-  | 'home.streak'
+  | 'home.khatmPage'
+  | 'home.startKhatm'
   | 'home.rootsStudied'
   | 'home.rootsThisWeek'
   | 'home.ayahOfTheDay'
@@ -393,7 +394,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'home.continue': 'Continue reading',
     'home.noHistory': 'No reading history yet',
     'home.loadFailed': 'Unable to load reading history',
-    'home.streak': 'Day streak',
+    'home.khatmPage': 'Khatm page',
+    'home.startKhatm': 'Start khatm',
     'home.rootsStudied': 'Roots studied',
     'home.rootsThisWeek': 'Roots this week',
     'home.ayahOfTheDay': 'Ayah of the day',
@@ -649,7 +651,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'home.continue': 'O‘qishni davom ettirish',
     'home.noHistory': 'Hali o‘qish tarixi yo‘q',
     'home.loadFailed': 'O‘qish tarixini yuklab bo‘lmadi',
-    'home.streak': 'Kunlik seriya',
+    'home.khatmPage': 'Xatm sahifasi',
+    'home.startKhatm': 'Xatmni boshlash',
     'home.rootsStudied': 'O‘rganilgan o‘zaklar',
     'home.rootsThisWeek': 'Shu haftadagi o‘zaklar',
     'home.ayahOfTheDay': 'Kunlik oyat',
@@ -892,7 +895,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'home.continue': 'Продолжить чтение',
     'home.noHistory': 'Истории чтения пока нет',
     'home.loadFailed': 'Не удалось загрузить историю чтения',
-    'home.streak': 'Серия дней',
+    'home.khatmPage': 'Страница хатма',
+    'home.startKhatm': 'Начать хатм',
     'home.rootsStudied': 'Изучено корней',
     'home.rootsThisWeek': 'Корни за неделю',
     'home.ayahOfTheDay': 'Аят дня',

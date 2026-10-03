@@ -55,6 +55,10 @@ const mocks = vi.hoisted(() => ({
   loadFails: false,
   continuousPlay: false,
   focusTeardowns: [] as Array<() => void>,
+  // Kept so a test can re-focus the tab without unmounting it: a tab screen
+  // stays mounted when the user leaves, so "coming back to the mushaf" is a
+  // focus callback running again and nothing else.
+  focusCallbacks: [] as Array<() => void | (() => void)>,
   hideChrome: vi.fn(),
   releaseChrome: vi.fn(),
   appStateListeners: [] as Array<(state: string) => void>,
@@ -96,6 +100,7 @@ vi.mock('expo-router', async () => {
     useIsFocused: () => mocks.isFocused,
     useFocusEffect: (callback: () => void | (() => void)) => {
       React.useEffect(() => {
+        mocks.focusCallbacks.push(callback);
         const teardown = callback();
         // Kept so a test can run the BLUR half without unmounting: a tab screen
         // is not unmounted when the user leaves it, which is the whole reason
@@ -265,6 +270,7 @@ vi.mock('@/mushaf/mushafReaderData', () => ({
 }));
 
 import { MushafScreen } from './MushafScreen';
+import { requestMushafPage, takeMushafPage } from '@/mushaf/pageRequest';
 
 beforeEach(() => {
   mocks.readerProps = [];
@@ -280,6 +286,10 @@ beforeEach(() => {
   mocks.loadFails = false;
   mocks.continuousPlay = false;
   mocks.focusTeardowns = [];
+  mocks.focusCallbacks = [];
+  // Module state: a page one test requested and did not consume is visible to
+  // the next one.
+  takeMushafPage();
   mocks.appStateListeners = [];
   mocks.recordReadingPosition.mockClear();
   mocks.khatmPage = null;
@@ -348,6 +358,56 @@ describe('MushafScreen', () => {
     const props = await renderScreen();
 
     expect(props()['initialPage']).toBe(106);
+  });
+
+  it('opens on a page another tab asked for, not on the saved position', async () => {
+    // Home's khatm card. The mark is deliberately NOT the reading position --
+    // reading past it does not move it -- so opening on the saved page would
+    // land somewhere other than the khatm every time.
+    mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
+    requestMushafPage(107);
+
+    const props = await renderScreen();
+
+    expect(props()['initialPage']).toBe(107);
+  });
+
+  it('jumps to a requested page when the tab is already open', async () => {
+    // The usual case, not the exception: the mushaf is a tab, so it is already
+    // mounted and `initialPage` is long since spent. Remounting it on the
+    // request instead would throw away the pager the reader is looking at.
+    mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
+    const props = await renderScreen();
+    expect(props()['focusPage']).toBeNull();
+
+    requestMushafPage(107);
+    await act(async () => {
+      mocks.focusCallbacks.forEach((callback) => callback());
+    });
+
+    expect(props()['initialPage']).toBe(106);
+    expect(props()['focusPage']).toBe(107);
+  });
+
+  it('jumps again when the same page is requested a second time', async () => {
+    // The dead-button case. `focusPage` is a prop the pager compares, and the
+    // request behind it is state: a request that was not cleared as it was
+    // consumed is a value that cannot CHANGE back to itself, so the second tap
+    // on Home's khatm card would move nothing at all.
+    requestMushafPage(107);
+    const props = await renderScreen();
+
+    // Away from it, exactly as a reader swiping would -- this is also what
+    // clears `focusPage` once the pager has arrived.
+    turnTo(props, 106);
+    expect(props()['focusPage']).toBeNull();
+
+    requestMushafPage(107);
+    await act(async () => {
+      mocks.focusCallbacks.forEach((callback) => callback());
+    });
+
+    expect(props()['focusPage']).toBe(107);
   });
 
   it('opens on the Fatiha when nothing has been read', async () => {

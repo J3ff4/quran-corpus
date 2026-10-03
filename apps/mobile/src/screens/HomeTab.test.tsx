@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import HomeTab from '../../app/(tabs)/index';
 import { localDay } from '../home/counters';
+import { takeMushafPage } from '../mushaf/pageRequest';
 import { ayahForDay } from '../home/ayahOfTheDay';
 
 // Real today, not a pinned date. The screen reads the device clock, and a
@@ -13,11 +14,12 @@ const daysAgo = (n: number) => localDay(new Date(Date.now() - n * 86_400_000));
 
 const mocks = vi.hoisted(() => ({
   getLastReadingPosition: vi.fn(),
-  getReadingDays: vi.fn(),
+  getKhatmPage: vi.fn(),
   getRootViewsByDay: vi.fn(),
   countDistinctRootsViewed: vi.fn(),
   getAyahReaderLocation: vi.fn(),
   push: vi.fn(),
+  navigate: vi.fn(),
   focusCallbacks: [] as Array<() => void | (() => void)>,
 }));
 
@@ -35,7 +37,7 @@ vi.mock('@/data/openCorpusDb', () => ({
 
 vi.mock('@/data/userRepository', () => ({
   getLastReadingPosition: (...args: unknown[]) => mocks.getLastReadingPosition(...args),
-  getReadingDays: (...args: unknown[]) => mocks.getReadingDays(...args),
+  getKhatmPage: (...args: unknown[]) => mocks.getKhatmPage(...args),
   getRootViewsByDay: (...args: unknown[]) => mocks.getRootViewsByDay(...args),
   countDistinctRootsViewed: (...args: unknown[]) => mocks.countDistinctRootsViewed(...args),
 }));
@@ -60,7 +62,11 @@ vi.mock('@/settings/settingsStore', () => ({
 vi.mock('expo-router', async () => {
   const React = await import('react');
   return {
-    router: { push: (...args: unknown[]) => mocks.push(...args) },
+    router: {
+      push: (...args: unknown[]) => mocks.push(...args),
+      // The khatm card switches TABS, which is navigate and not push.
+      navigate: (...args: unknown[]) => mocks.navigate(...args),
+    },
     useFocusEffect: (callback: () => void | (() => void)) => {
       React.useEffect(() => {
         mocks.focusCallbacks.push(callback);
@@ -138,8 +144,11 @@ describe('HomeTab', () => {
   beforeEach(() => {
     mocks.focusCallbacks = [];
     mocks.push.mockReset();
+    mocks.navigate.mockReset();
+    // Module state: a request one test leaves behind is visible to the next.
+    takeMushafPage();
     mocks.getLastReadingPosition.mockReset().mockResolvedValue(null);
-    mocks.getReadingDays.mockReset().mockResolvedValue([]);
+    mocks.getKhatmPage.mockReset().mockResolvedValue(null);
     mocks.getRootViewsByDay.mockReset().mockResolvedValue([]);
     mocks.countDistinctRootsViewed.mockReset().mockResolvedValue(0);
     mocks.getAyahReaderLocation.mockReset().mockImplementation(
@@ -189,26 +198,6 @@ describe('HomeTab', () => {
     expect(screen.queryByText('No reading history yet')).toBeNull();
   });
 
-  it('shows the streak the counters derive, not a raw row count', async () => {
-    mocks.getReadingDays.mockResolvedValue([TODAY, daysAgo(1), daysAgo(4)]);
-
-    render(<HomeTab />);
-
-    // Three rows, two of them consecutive: the number on screen is the streak,
-    // not the row count.
-    expect((await screen.findByTestId('home-streak-value')).textContent).toBe('2');
-  });
-
-  it('asks for the whole reading history, not a window that would cap the streak', async () => {
-    render(<HomeTab />);
-
-    await waitFor(() => expect(mocks.getReadingDays).toHaveBeenCalled());
-    // A streak has no window. Passing today-6 here would silently cap a
-    // 40-day streak at 7 and there would be nothing on screen to say so.
-    const [, sinceDay] = mocks.getReadingDays.mock.calls[0] as [unknown, string];
-    expect(new Date(`${sinceDay}T00:00:00Z`).getTime()).toBeLessThan(Date.now() - 365 * 86_400_000);
-  });
-
   it('shows seven bars in the weekly log even with one day of history', async () => {
     mocks.getRootViewsByDay.mockResolvedValue([{ day: TODAY, roots: 3 }]);
 
@@ -248,17 +237,6 @@ describe('HomeTab', () => {
     expect(bars.every((bar) => bar.getAttribute('aria-label') === null)).toBe(true);
   });
 
-  it('shows a placeholder rather than 0 while the counters are still loading', async () => {
-    // Never resolves: the first paint of every cold launch looks like this.
-    mocks.getReadingDays.mockReturnValue(new Promise(() => {}));
-
-    render(<HomeTab />);
-
-    // 0 would be a wrong number, not an empty one -- a reader with a 40-day
-    // streak would be told they have none, on every launch.
-    expect((await screen.findByTestId('home-streak-value')).textContent).toBe('\u2014');
-  });
-
   it('says so when the continue card cannot read its ayah from the corpus', async () => {
     mocks.getLastReadingPosition.mockResolvedValue({ surahId: 2, ayahNumber: 255 });
     mocks.getAyahReaderLocation.mockRejectedValue(new Error('bundled db missing'));
@@ -269,6 +247,77 @@ describe('HomeTab', () => {
     // nothing anywhere says the read failed.
     await waitFor(() => expect(screen.getAllByText('Unable to load surah').length).toBe(2));
     expect(screen.getByTestId('home-continue')).toBeTruthy();
+  });
+
+  it('shows the khatm page where the day streak used to be', async () => {
+    mocks.getKhatmPage.mockResolvedValue(418);
+
+    render(<HomeTab />);
+
+    expect((await screen.findByTestId('home-khatm-value')).textContent).toBe('418');
+    expect(screen.getByText('Khatm page')).toBeTruthy();
+  });
+
+  it('invites a khatm when the file holds no mark', async () => {
+    render(<HomeTab />);
+
+    // The read has landed with nothing marked, which is the one state the
+    // invitation is the truth in.
+    expect((await screen.findByTestId('home-khatm-value')).textContent).toBe('Start khatm');
+  });
+
+  it('holds the dash rather than inviting a khatm while the mark is still loading', async () => {
+    // Never resolves: the first paint of every cold launch looks like this.
+    mocks.getKhatmPage.mockReturnValue(new Promise(() => {}));
+
+    render(<HomeTab />);
+
+    // "Start khatm" here would offer to start one the reader is already
+    // halfway through, on every single launch.
+    expect((await screen.findByTestId('home-khatm-value')).textContent).toBe('\u2014');
+  });
+
+  it('opens the mushaf tab AT the marked page', async () => {
+    mocks.getKhatmPage.mockResolvedValue(418);
+
+    render(<HomeTab />);
+    fireEvent.click(await screen.findByTestId('home-khatm'));
+
+    // The page has to travel, not just the destination: the mushaf otherwise
+    // opens on the saved reading position, and reading past the mark
+    // deliberately does not move it -- so without this the card lands
+    // somewhere other than the khatm on every tap.
+    expect(takeMushafPage()).toBe(418);
+    // navigate, not push: pushing a tab stacks a second copy of it.
+    expect(mocks.navigate).toHaveBeenCalledWith('/mushaf');
+  });
+
+  it('opens the mushaf with no page to jump to when nothing is marked', async () => {
+    render(<HomeTab />);
+    fireEvent.click(await screen.findByTestId('home-khatm'));
+
+    // Page 1 would be wrong and the saved position is the mushaf's own
+    // business: the invitation goes to the mushaf and leaves it where it opens.
+    expect(takeMushafPage()).toBeNull();
+    expect(mocks.navigate).toHaveBeenCalledWith('/mushaf');
+  });
+
+  it('still opens the mushaf when the mark cannot be read', async () => {
+    mocks.getKhatmPage.mockRejectedValue(new Error('nope'));
+
+    render(<HomeTab />);
+
+    await screen.findByText('Unable to load the khatm mark');
+    // NOT "Start khatm": an unreadable mark is not an absent one, and offering
+    // to start a khatm over one the file may still hold is the single wrong
+    // thing this card could say.
+    expect(screen.getByTestId('home-khatm-value').textContent).toBe('\u2014');
+    fireEvent.click(screen.getByTestId('home-khatm'));
+    // Nothing here writes, so an unreadable mark costs the jump and nothing
+    // else. The control that could OVERWRITE a khatm is the mushaf's own
+    // chrome button, which gates on this error itself.
+    expect(takeMushafPage()).toBeNull();
+    expect(mocks.navigate).toHaveBeenCalledWith('/mushaf');
   });
 
   it('shows every root ever opened, not just this week', async () => {
@@ -284,17 +333,17 @@ describe('HomeTab', () => {
     // Three independent loads on one screen. Before this, one rejected query
     // blanked the whole tab.
     mocks.getLastReadingPosition.mockRejectedValue(new Error('nope'));
-    mocks.getReadingDays.mockResolvedValue([TODAY]);
+    mocks.countDistinctRootsViewed.mockResolvedValue(7);
 
     render(<HomeTab />);
 
-    expect((await screen.findByTestId('home-streak-value')).textContent).toBe('1');
+    expect((await screen.findByTestId('home-roots-value')).textContent).toBe('7');
     expect(screen.getByText('Unable to load reading history')).toBeTruthy();
   });
 
   it('keeps the reading position when the counters fail to load', async () => {
     mocks.getLastReadingPosition.mockResolvedValue({ surahId: 2, ayahNumber: 255 });
-    mocks.getReadingDays.mockRejectedValue(new Error('nope'));
+    mocks.countDistinctRootsViewed.mockRejectedValue(new Error('nope'));
 
     render(<HomeTab />);
 
