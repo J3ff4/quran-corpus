@@ -16,6 +16,7 @@ import { Icon, type IconName } from './icons/Icon';
 import { usePressScale } from '@/motion/usePressScale';
 import { t } from '@/i18n/uiStrings';
 import type { UiLocaleCode } from '@/i18n/languages';
+import { centredContent } from '@/theme/contentWidth';
 import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
@@ -228,7 +229,15 @@ export function RecitationBar({
       pointerEvents="box-none"
       style={dock ? { position: 'absolute', left: 16, right: 16, bottom: insets.bottom + 12 } : undefined}
     >
-      <GlassSurface docked flat={flat} radius="pill" style={{ paddingHorizontal: 14, paddingVertical: 10, gap: 6 }}>
+      <GlassSurface
+        docked
+        flat={flat}
+        radius="pill"
+        // Capped only when this bar is the one docking. Undocked it is a child
+        // of whatever placed it -- Home's card stack, the mushaf's own player --
+        // and a cap there would make it narrower than the cards beside it.
+        style={{ paddingHorizontal: 14, paddingVertical: 10, gap: 6, ...(dock ? centredContent : null) }}
+      >
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <TransportButton
             icon="skipBack"

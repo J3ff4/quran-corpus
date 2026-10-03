@@ -14,9 +14,11 @@ import {
 import { composePage, MUSHAF_LINES_PER_PAGE, type PageSlot } from '@/mushaf/pageComposition';
 import { useMushafPageFont } from '@/mushaf/pageFont';
 import {
+  MUSHAF_PAGE_FOOTER_HEIGHT,
   MUSHAF_PAGE_TEXT_INSET,
   mushafColumnForFontSize,
   mushafFontSize,
+  mushafLineFitFontSize,
   mushafLineHeight,
   mushafPageFontSize,
 } from '@/mushaf/pageScale';
@@ -27,22 +29,6 @@ import { MushafLineRow } from './MushafLineRow';
 import { PageCorners } from './PageCorners';
 import { SurahBand } from './SurahBand';
 
-// The strip the page's furniture owns at the bottom, subtracted before the page
-// is scaled so the type never runs into it. The side margin lives in pageScale
-// as MUSHAF_PAGE_TEXT_INSET, with the rest of the width arithmetic: a leaf has
-// to size against the text block too, and it cannot import a component module
-// the pager's own tests mock.
-//
-// The furniture moved into the page's corners in M7d (rulings 8 and 9), and in
-// 2026-09 the top half of it moved again, off the leaf and onto MushafTopStrip.
-// What is left on the page is the number in a bottom corner.
-//
-// 72, not 44. The leaf used to sit flush against the bottom of the glass while
-// a strip of chrome ran across the top of it; the owner asked for the text
-// block up and the gap under it (2026-09-15). The surah and juz moving into
-// MushafTopStrip freed the 26dp header at the same time, so the block rises by
-// that and the space lands here.
-const FOOTER_HEIGHT = 72;
 // The page's own header strip is gone: MushafTopStrip prints the surah and the
 // juz above the leaf now, in the band the tabs layout was already reserving for
 // the status bar. Kept as a named 0 rather than deleted from the scale
@@ -147,19 +133,26 @@ export function MushafPage({
   // cuts) reading it back is what keeps the line inside the column instead of
   // drawing it at a size the column cannot hold.
   //
-  // Fitted to the line box as well as to the width. The page is a fixed 15-line
-  // grid and each slot is exactly `lineHeight` tall with nothing clipping it, so
-  // a glyph whose em box is taller than its slot spills into the lines above and
-  // below -- which reads as the dropped-glyph font defect rather than as an
-  // oversized one. Width alone was enough while landscape meant one page across
-  // the whole tablet and the font clamped at MUSHAF_MAX_FONT_SIZE under a tall
-  // box, but a short wide box (a 600dp tablet turned sideways, a split-screen or
-  // freeform window) fits a size on width that the height cannot hold. Both
-  // halves of a leaf are given the same height, so one line box binds both and
-  // the leaf keeps its single size.
+  // Fitted to the line box as well as to the width, and fitted to the page's own
+  // INK rather than to its em.
+  //
+  // `Math.min(size, lineHeight)` was the old guard, which only ever asked for a
+  // ratio of 1.0 -- and these lines need 1.45 to 2.21em depending on what is
+  // stacked above and below their letters. The surplus does not vanish: RN's
+  // half-leading hands it back as overhang above and below the line, where it
+  // collides with the neighbouring line's own overhang and takes the harakat
+  // with it. On the tablet in landscape the width fits 40dp into a 49.9dp line
+  // box that holds 24 to 34, and every top edge lost its marks (owner,
+  // 2026-10-02; the Fold open is the same short-and-wide shape).
+  //
+  // Both halves of a leaf are given the same height, so one line box binds both
+  // and the leaf keeps its single size.
   const available = width - MUSHAF_PAGE_TEXT_INSET;
-  const lineHeight = mushafLineHeight(height - FOOTER_HEIGHT - HEADER_HEIGHT, MUSHAF_LINES_PER_PAGE);
-  const wanted = Math.min(leafFontSize ?? mushafPageFontSize(page, available), lineHeight);
+  const lineHeight = mushafLineHeight(height - MUSHAF_PAGE_FOOTER_HEIGHT - HEADER_HEIGHT, MUSHAF_LINES_PER_PAGE);
+  const wanted = Math.min(
+    leafFontSize ?? mushafPageFontSize(page, available),
+    mushafLineFitFontSize(page, lineHeight),
+  );
   const columnWidth = Math.min(available, mushafColumnForFontSize(page, wanted));
   const fontSize = mushafFontSize(page, columnWidth);
   const marks: HighlightInput = pressed === null ? highlights : { ...highlights, pressed };
@@ -265,7 +258,7 @@ export function MushafPage({
       {/* TalkBack reads this, not the lines: the glyphs are private-use
           codepoints. One focusable band per ayah, in mushaf order, laid over
           the page and taking no touches -- the words underneath keep theirs. */}
-      <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: FOOTER_HEIGHT }}>
+      <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: MUSHAF_PAGE_FOOTER_HEIGHT }}>
         {ayahsOnPage(lines).map(({ surahId, ayahNumber }) => (
           <View
             key={ayahKey(surahId, ayahNumber)}
@@ -282,7 +275,7 @@ export function MushafPage({
         ))}
       </View>
 
-      <View style={{ height: FOOTER_HEIGHT }} />
+      <View style={{ height: MUSHAF_PAGE_FOOTER_HEIGHT }} />
       <PageCorners page={page} uiLocale={uiLocale} />
     </Pressable>
   );

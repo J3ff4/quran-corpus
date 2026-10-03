@@ -2,6 +2,7 @@ import { View } from 'react-native';
 import { usePathname } from 'expo-router';
 
 import { RecitationBar } from './RecitationBar';
+import { centredContent } from '@/theme/contentWidth';
 import { useTabBarTop } from './GlassTabBar';
 import { useRecitationController } from '@/audio/recitationContext';
 import { reciterById } from '@quran-corpus/data/mobile';
@@ -61,21 +62,25 @@ export function MiniPlayer() {
       pointerEvents="box-none"
       style={{ position: 'absolute', left: 16, right: 16, bottom: tabBarTop + 8 }}
     >
-      <RecitationBar
-        dock={false}
-        ayahNumber={ayah}
-        surahName={track.surahName}
-        playing={audio.playing}
-        positionSec={audio.positionSec}
-        durationSec={audio.durationSec}
-        reciterLabel={reciterById(reciterId)?.label ?? ''}
-        uiLocale={uiLocale}
-        onTogglePlay={() => audio.toggle(track, ayah)}
-        onSkipNext={audio.skipNext}
-        onSkipPrevious={audio.skipPrevious}
-        onSeek={audio.seekTo}
-        onDismiss={audio.stop}
-      />
+      {/* The cap on a child, not on the box above: that box sets both `left`
+          and `right`. See MushafChrome. */}
+      <View style={centredContent}>
+        <RecitationBar
+          dock={false}
+          ayahNumber={ayah}
+          surahName={track.surahName}
+          playing={audio.playing}
+          positionSec={audio.positionSec}
+          durationSec={audio.durationSec}
+          reciterLabel={reciterById(reciterId)?.label ?? ''}
+          uiLocale={uiLocale}
+          onTogglePlay={() => audio.toggle(track, ayah)}
+          onSkipNext={audio.skipNext}
+          onSkipPrevious={audio.skipPrevious}
+          onSeek={audio.seekTo}
+          onDismiss={audio.stop}
+        />
+      </View>
       {/* No reciter picker and no continuous toggle: both are settings, and
           this bar exists to get you back to a recitation rather than to
           configure one. The screen that started it still owns those. */}

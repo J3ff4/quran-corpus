@@ -10,6 +10,7 @@ import type { UiLocaleCode } from '@/i18n/languages';
 import { t } from '@/i18n/uiStrings';
 import { showChrome, useChromeVisible } from '@/mushaf/chromeVisibility';
 import { useReducedMotion } from '@/motion/useReducedMotion';
+import { centredContent } from '@/theme/contentWidth';
 import { touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 
@@ -139,7 +140,7 @@ export function MushafPlayer({
         expanded={playing}
         growMs={reducedMotion ? 0 : PLAYER_GROW_MS}
         full={
-          <View testID="mushaf-player-full">
+          <View testID="mushaf-player-full" style={centredContent}>
           <RecitationBar
             dock={false}
             ayahNumber={ayahNumber}
@@ -160,7 +161,7 @@ export function MushafPlayer({
           </View>
         }
         compact={
-          <View testID="mushaf-player-compact">
+          <View testID="mushaf-player-compact" style={centredContent}>
           <GlassSurface
             docked
             radius="pill"

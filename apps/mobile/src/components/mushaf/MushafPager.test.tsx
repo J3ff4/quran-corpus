@@ -48,7 +48,13 @@ import { pagerCommandsOf, pagerPropsOf, pagerRelayout, pagerTurn } from '@/testi
 import { HighlightsProvider } from '@/mushaf/highlightsContext';
 import { MUSHAF_PAGE_MAX, MUSHAF_PAGE_MIN } from '@quran-corpus/data/mobile';
 
-import { mushafLeafFontSize, mushafPageFontSize } from '@/mushaf/pageScale';
+import { MUSHAF_LINES_PER_PAGE } from '@/mushaf/pageComposition';
+import {
+  MUSHAF_PAGE_FOOTER_HEIGHT,
+  mushafLeafFontSize,
+  mushafLineHeight,
+  mushafPageFontSize,
+} from '@/mushaf/pageScale';
 import { SPREAD_COUNT, spreadFor } from '@/mushaf/spread';
 
 import { MushafPager, WINDOW } from './MushafPager';
@@ -299,6 +305,10 @@ describe('MushafPager in spread mode', () => {
    *  see scripts/SPREAD-BAND-CHECK.md. */
   const DIVERGENT_RECTO = 27;
 
+  /** The line box of the 1600dp-tall box those two tests render into. The leaf
+   *  builds the same one from the height it is given -- see MushafLeaf. */
+  const LEAF_LINE_BOX = mushafLineHeight(1600 - MUSHAF_PAGE_FOOTER_HEIGHT, MUSHAF_LINES_PER_PAGE);
+
   it('spans the 302 leaves of the mushaf, not its 604 pages', () => {
     const pager = pagerPropsOf(render(<MushafPager {...props} spread />));
     expect(React.Children.count(pager.children)).toBe(SPREAD_COUNT);
@@ -311,6 +321,43 @@ describe('MushafPager in spread mode', () => {
     // The leaf the reader is on, plus one either side: six pages, not three.
     expect(drawn()).toEqual(new Set([1, 2, 3, 4, 5, 6]));
     expect(drawn().size).toBe(2 * (2 * WINDOW + 1));
+  });
+
+  it('draws the leaf beyond the arrival as soon as the finger lifts', () => {
+    // NOT held until the pager rests. vc85/vc86 deferred this to keep the
+    // mount out of the settle animation, and a reader swiping fast never gives
+    // the pager an `idle` between turns: the second swipe then travels onto a
+    // leaf whose QCF fonts have had ~100ms rather than a whole settle, and
+    // MushafPage draws blank paper until its font registers. The owner hit it
+    // on a OnePlus (2026-10-02). No scroll state is fired after the arrival
+    // here -- that absence IS the assertion.
+    const result = render(<MushafPager {...props} spread initialPage={3} />);
+    act(() => {
+      const pager = pagerPropsOf(result);
+      pager.onPageScrollStateChanged?.({ nativeEvent: { pageScrollState: 'dragging' } });
+      pager.onPageScrollStateChanged?.({ nativeEvent: { pageScrollState: 'settling' } });
+      pager.onPageSelected?.({ nativeEvent: { position: 2 } });
+    });
+    // Leaf 3 is (7,8), the cell the next swipe travels onto. The WHOLE set
+    // rather than a `toContain` on a cleared list: a component that re-renders
+    // nothing leaves an emptied list empty, and the assertion would pass
+    // however it behaved.
+    expect(drawn()).toEqual(new Set([1, 2, 3, 4, 5, 6, 7, 8]));
+  });
+
+  it('draws a commanded jump onto its target before turning there', () => {
+    // The one move that can outrun the window. A gesture travels one index onto
+    // a leaf already drawn; a jump can cross the book, so deferring it to `idle`
+    // would turn the pager onto blank paper and hold it there for the whole
+    // settle. No scroll state is fired here at all -- the assertion is that the
+    // target is drawn without one.
+    const result = render(<MushafPager {...props} spread initialPage={3} focusPage={null} />);
+    mocks.pageProps = [];
+    act(() => {
+      result.rerender(<MushafPager {...props} spread initialPage={3} focusPage={300} />);
+    });
+    expect(drawn()).toContain(299);
+    expect(drawn()).toContain(300);
   });
 
   it('puts the recto on the right in the layout, not just in the data', () => {
@@ -342,8 +389,17 @@ describe('MushafPager in spread mode', () => {
   it('sizes both halves of a leaf from the same number', () => {
     // Facing pages at different sizes read as a rendering bug. Each page's own
     // fit comes from its own widest line, so left alone they differ.
-    render(<MushafPager {...props} spread width={1400} initialPage={DIVERGENT_RECTO} />);
-    const leafSize = mushafLeafFontSize(DIVERGENT_RECTO, DIVERGENT_RECTO + 1, 700 - 32);
+    // Tall, so the WIDTH decides: under props.height the ink clamp binds first
+    // and puts both halves on 20.8dp whatever this mechanism does.
+    render(
+      <MushafPager {...props} spread width={1400} height={1600} initialPage={DIVERGENT_RECTO} />,
+    );
+    const leafSize = mushafLeafFontSize(
+      DIVERGENT_RECTO,
+      DIVERGENT_RECTO + 1,
+      700 - 32,
+      LEAF_LINE_BOX,
+    );
     const onLeaf = mocks.pageProps.filter(
       (p) => p['page'] === DIVERGENT_RECTO || p['page'] === DIVERGENT_RECTO + 1,
     );
@@ -361,13 +417,15 @@ describe('MushafPager in spread mode', () => {
     // into. Against the full box it comes out too large, the page clamps it
     // back to its own fit, and the two halves are on different sizes again --
     // with the leaf size still looking present in every prop.
-    render(<MushafPager {...props} spread width={1400} initialPage={DIVERGENT_RECTO} />);
+    render(
+      <MushafPager {...props} spread width={1400} height={1600} initialPage={DIVERGENT_RECTO} />,
+    );
     const onLeaf = mocks.pageProps.find((p) => p['page'] === DIVERGENT_RECTO)!;
     expect(onLeaf['fontSize']).toBe(
-      mushafLeafFontSize(DIVERGENT_RECTO, DIVERGENT_RECTO + 1, 700 - 32),
+      mushafLeafFontSize(DIVERGENT_RECTO, DIVERGENT_RECTO + 1, 700 - 32, LEAF_LINE_BOX),
     );
     expect(onLeaf['fontSize']).not.toBe(
-      mushafLeafFontSize(DIVERGENT_RECTO, DIVERGENT_RECTO + 1, 1400 - 32),
+      mushafLeafFontSize(DIVERGENT_RECTO, DIVERGENT_RECTO + 1, 1400 - 32, LEAF_LINE_BOX),
     );
   });
 

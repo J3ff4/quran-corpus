@@ -10,7 +10,13 @@ import type { MobileDataClient } from '@quran-corpus/mobile-data';
 
 import type { UiLocaleCode } from '@/i18n/languages';
 import { useHighlights } from '@/mushaf/highlightsContext';
-import { MUSHAF_PAGE_TEXT_INSET, mushafLeafFontSize } from '@/mushaf/pageScale';
+import { MUSHAF_LINES_PER_PAGE } from '@/mushaf/pageComposition';
+import {
+  MUSHAF_PAGE_FOOTER_HEIGHT,
+  MUSHAF_PAGE_TEXT_INSET,
+  mushafLeafFontSize,
+  mushafLineHeight,
+} from '@/mushaf/pageScale';
 import { SPREAD_COUNT, spreadAt, spreadFor } from '@/mushaf/spread';
 import { useMushafPageFont } from '@/mushaf/pageFont';
 import { useMushafPage } from '@/mushaf/useMushafPage';
@@ -156,7 +162,12 @@ const MushafLeaf = memo(function MushafLeaf({
   // The shared inset, not a 32 restated here: a leaf that sizes against a wider
   // box than the page draws into hands down a size the page then clamps away,
   // which puts the two halves back on different sizes.
-  const fontSize = mushafLeafFontSize(recto, verso, half - MUSHAF_PAGE_TEXT_INSET);
+  // The same line box the page will build, for the same reason the inset is
+  // shared: a leaf that sized on width alone would hand down a size each half
+  // then clamps against its own ink, and two pages needing different line room
+  // would come back at different sizes.
+  const lineHeight = mushafLineHeight(height - MUSHAF_PAGE_FOOTER_HEIGHT, MUSHAF_LINES_PER_PAGE);
+  const fontSize = mushafLeafFontSize(recto, verso, half - MUSHAF_PAGE_TEXT_INSET, lineHeight);
   if (!paired) {
     return (
       <View
@@ -300,6 +311,11 @@ export const MushafPager = memo(function MushafPager({
       // ViewPager2 announces nothing because nothing arrived. Without this the
       // flag would stay raised, and the next relayout's bogus position would be
       // read as that abandoned gesture finally landing.
+      //
+      // The latch is all this handler does. Holding the WINDOW SHIFT here
+      // instead -- waiting for the pager to reach rest before drawing the page
+      // beyond the one being landed on -- is a defect, and it shipped in vc86:
+      // see the arrival in onPageSelected.
       turning.current = event.nativeEvent.pageScrollState !== 'idle';
     },
     [],
@@ -344,6 +360,22 @@ export const MushafPager = memo(function MushafPager({
         pagerRef.current?.setPageWithoutAnimation(indexOf(settled.current));
         return;
       }
+      // Drawn now, at the finger's lift, and NOT held until the turn settles.
+      //
+      // Deferring it is tempting and was tried (vc85/vc86): mounting the
+      // arriving leaf's two pages -- ~300 whole-word glyphs, two queries and
+      // two QCF fonts -- inside the settle animation costs three to four
+      // frames in a ~130ms band ~90ms after release, measured at 120Hz on the
+      // tablet. But the page BEYOND the arrival is what this draws, and the
+      // reader reaches it by swiping again before the pager has rested. Each
+      // page draws blank paper until its own ~200KB font has registered
+      // (MushafPage) and its rows have come back from SQLite, and a fast
+      // second swipe gives that ~100-150ms where a settle gives 250ms+. The
+      // owner swiped fast through the mushaf on a OnePlus and got blank pages
+      // (2026-10-02); vc56, which never deferred, does not. A late stutter is
+      // a worse turn, a blank page is no page, so the mount stays here where
+      // the font has the whole settle to arrive.
+      //
       // Compared field by field, not handed over as a fresh object: `current`
       // is an object only because it carries the mode tag, and a new one on
       // every arrival means React can never bail out -- so the mount
@@ -416,8 +448,15 @@ export const MushafPager = memo(function MushafPager({
     // to Android's own `settling`: a turn we asked for is legitimate whatever
     // states the platform chooses to emit on the way, and an auto-turn that the
     // guard bounced back would strand playback on the page it started from.
+    // Drawn BEFORE the turn, where a gesture's own shift is drawn on arrival. A
+    // command can move any distance, so its target is usually outside the drawn
+    // window, and waiting for the arrival would animate the pager across blank
+    // paper. A gesture moves one index, onto a page already drawn, so it has
+    // nothing to pre-draw.
+    const target = indexOf(focusPage);
+    setCurrent((prev) => (prev.mode === mode && prev.index === target ? prev : { mode, index: target }));
     turning.current = true;
-    pagerRef.current?.setPage(indexOf(focusPage));
+    pagerRef.current?.setPage(target);
   }, [focusPage, spread]);
 
   return (
