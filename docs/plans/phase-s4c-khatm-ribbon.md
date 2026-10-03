@@ -607,26 +607,57 @@ Build and install as in S4a Task 11 — no native dependency is added here, so `
 
 | # | Check | Result |
 |---|---|---|
-| 700 | Unmarked pages show no ribbon anywhere in the book | |
-| 701 | Tap the ribbon button → ribbon drops onto the page in madder crimson | |
-| 702 | Kill the app, reopen → ribbon still on the same page | |
-| 703 | Mark a page that opens mid-ayah; stored coordinate is that page's own first ayah, not the previous page's | |
-| 704 | Mark a second page → the first ribbon is gone (one mark, R-C1) | |
-| 705 | Tap the button on the marked page → ribbon lifts | |
-| 706 | Reading on past the mark does not move it (it is deliberate, not automatic) | |
-| 707 | The automatic continue-reading position still works and is unaffected | |
-| 708 | Ribbon colour reads as silk on both light and dark paper | |
-| 709 | Reduced motion → ribbon appears with no drop | |
-| 710 | TalkBack: the button says mark/lift; the ribbon is not a second node | |
-| 711 | Font stepper in the reader: four steps, both ends disabled correctly | |
-| 712 | Font stepper in morphology: same four steps, same stored value | |
-| 713 | Change the size in the kebab → Settings shows the new value, and vice versa | |
-| 714 | Mushaf has **no** kebab and **no** size control (R-C5, R-C6) | |
-| 715 | Upgrade path: install over the previous build — existing bookmarks, notes and position all survive | |
+| 700 | Unmarked pages show no ribbon anywhere in the book | **PASS** — swept 414-419; ribbon drawn only on the marked page, 0 ribbon px elsewhere |
+| 701 | Tap the ribbon button → ribbon drops onto the page in madder crimson | **PASS** — ribbon appears in `rgb(194,81,90)` = `#C4515A`, the dark-paper token |
+| 702 | Kill the app, reopen → ribbon still on the same page | **PASS** — `am force-stop` + relaunch, ribbon still on the same page |
+| 703 | Mark a page that opens mid-ayah; stored coordinate is that page's own first ayah, not the previous page's | **BLOCKED** — see note below; no device with a virgin `reading_history` |
+| 704 | Mark a second page → the first ribbon is gone (one mark, R-C1) | **PASS** — marked 416, 414's ribbon gone; one mark only |
+| 705 | Tap the button on the marked page → ribbon lifts | **PASS** — button flips to "Lift the mark"; ribbon gone, and still gone after a restart |
+| 706 | Reading on past the mark does not move it (it is deliberate, not automatic) | **PASS** — marked 416, read on to 419, returned: mark still exactly on 416 |
+| 707 | The automatic continue-reading position still works and is unaffected | **PASS** — read to 418, Home shows "Al-Ahzab 33:1" (page 418), not the marked 416 |
+| 708 | Ribbon colour reads as silk on both light and dark paper | **PASS** (measured) — `#A8323C` on `#FAF8F3` = **6.21:1**; `#C4515A` on `#151412` = **4.10:1**; both clear AA non-text. "Reads as silk" is the owner's call |
+| 709 | Reduced motion → ribbon appears with no drop | **PARTIAL** — mark and lift both correct with Reduce animations on; the absence of the 220ms drop is below screencap resolution (~200ms), owner's eye needed |
+| 710 | TalkBack: the button says mark/lift; the ribbon is not a second node | **NOT RUN** — TalkBack needs the owner's ears |
+| 711 | Font stepper in the reader: four steps, both ends disabled correctly | **PASS** — Small/Medium/Large/Extra large; up disabled at top, down at bottom, no wrap |
+| 712 | Font stepper in morphology: same four steps, same stored value | **PASS** — same stepper on the WbW screen, carrying the value set in the reader |
+| 713 | Change the size in the kebab → Settings shows the new value, and vice versa | **PASS** both ways — morphology → Settings showed Large; Settings → reader showed Extra large |
+| 714 | Mushaf has **no** kebab and **no** size control (R-C5, R-C6) | **PASS** — mushaf chrome exposes only Go to / Mark / Search / Reciter / Play |
+| 715 | Upgrade path: install over the previous build — existing bookmarks, notes and position all survive | **PASS** — vc87→vc88 in place; bookmark, note text and position all survived the v5 migration |
+
+**Device run 2026-10-03, vc89, OnePlus GM1917 (`adb-358b6f97`).** 13 PASS, 1 PARTIAL,
+1 BLOCKED, 1 NOT RUN.
+
+**A crash fixed first (`d02c5ce`).** vc88 killed the process outright on opening the
+Mushaf tab: `khatmRibbonTranslateY` was a plain module function called from inside
+`useAnimatedStyle`'s body, which runs on the UI thread, and Worklets throws fatally
+rather than hopping threads. `'worklet';` on the helper, as `bookmarkExit`'s `rowExit`
+has carried since the identical crash on Bookmarks in September. **No test can catch
+this class:** vitest does not run `react-native-reanimated/plugin`, so the directive is
+an inert string literal under test and its absence fails nothing. Verified instead in
+the shipped bundle — two worklets from `KhatmRibbon.tsx` where the crashing build had
+one.
+
+**Why 703 is blocked, and why that is not a defect.** `setKhatmPage`'s `ON CONFLICT`
+branch updates `khatm_page` alone, by design and by its own docstring: on a database
+that has been read, the automatic position is not ours to move. The `surahId`/`ayahNumber`
+it takes therefore reach the file only through the INSERT branch, which exists to satisfy
+`reading_history`'s NOT NULL coordinates on a virgin row. So the `position === 1` choice
+has observable consequences **only on a device that has never recorded a reading
+position** — and the phone under test has years of one. The tablet dropped off the adb
+bridge mid-run. This check needs a fresh install on a second device; it cannot be run by
+wiping the owner's phone.
+
+**One unexplained observation, not reproducing.** On the very first launch of vc89 the
+ribbon was drawn on page 414, and after navigating two pages away and back it was gone,
+with the button reading "Mark this page" and enabled (so the read had succeeded and
+returned null, not errored). Every subsequent mark survived navigation, a force-stop and
+a cold start. The only `clearKhatmPage` caller is `lift`, which was not tapped. The
+likeliest origin is the vc88 crash loop that immediately preceded it — the process was
+dying on every mushaf mount. Flagged rather than buried; worth one look if it recurs.
 
 Check 715 is not optional. The user DB survives app updates and this phase migrates it; installing over a previous build is the only way to test the migration that will actually run on the owner's phone. A debug-signed local APK **cannot** upgrade over an EAS build — if the installed build is an EAS one, this check needs a matching signature or it is recorded as **not run**, not as a pass.
 
-- [ ] Record every result, fill the Verification Log, commit, push. **Do not open the PR.**
+- [x] Record every result, fill the Verification Log, commit, push. **Do not open the PR.**
 
 ## Acceptance criteria
 
