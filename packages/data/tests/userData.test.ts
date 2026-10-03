@@ -9,6 +9,7 @@ import {
   USER_PAGE_MIN,
   countDistinctRootsViewed,
   getBookmarks,
+  getKhatmPage,
   getLastReadingPosition,
   getReadingDays,
   getRootViewsByDay,
@@ -21,6 +22,7 @@ import {
   recordRootView,
   setBookmark,
   setBookmarkNote,
+  setKhatmPage,
 } from '../src/userData.js';
 
 /** Records what reached the driver, so a rejected write can be shown to have
@@ -634,5 +636,90 @@ describe('reading position by page', () => {
     // copies honest.
     const { MUSHAF_PAGE_MIN, MUSHAF_PAGE_MAX } = await import('../src/queries/mushaf.js');
     expect([USER_PAGE_MIN, USER_PAGE_MAX]).toEqual([MUSHAF_PAGE_MIN, MUSHAF_PAGE_MAX]);
+  });
+});
+
+describe('khatm mark', () => {
+  it('is null on a fresh database', async () => {
+    const db = await migratedUserDb();
+    await expect(getKhatmPage(db)).resolves.toBeNull();
+  });
+
+  it('writes and reads back a page', async () => {
+    const db = await migratedUserDb();
+    await setKhatmPage(db, { page: 123, surahId: 2, ayahNumber: 260 });
+    await expect(getKhatmPage(db)).resolves.toBe(123);
+  });
+
+  it('writes on a database where nothing has been read yet', async () => {
+    // reading_history is a single row with CHECK (id = 1) and NOT NULL
+    // coordinates. An UPDATE here touches zero rows and silently does nothing,
+    // which is the shape of bug that looks like "the ribbon does not stick".
+    const db = await migratedUserDb();
+    await setKhatmPage(db, { page: 5, surahId: 1, ayahNumber: 1 });
+    await expect(getKhatmPage(db)).resolves.toBe(5);
+  });
+
+  it('replaces the previous mark rather than adding one', async () => {
+    // R-C1: exactly one mark.
+    const db = await migratedUserDb();
+    await setKhatmPage(db, { page: 5, surahId: 1, ayahNumber: 1 });
+    await setKhatmPage(db, { page: 300, surahId: 25, ayahNumber: 1 });
+    await expect(getKhatmPage(db)).resolves.toBe(300);
+  });
+
+  it('clears the mark on null', async () => {
+    const db = await migratedUserDb();
+    await setKhatmPage(db, { page: 5, surahId: 1, ayahNumber: 1 });
+    await setKhatmPage(db, { page: null, surahId: 1, ayahNumber: 1 });
+    await expect(getKhatmPage(db)).resolves.toBeNull();
+  });
+
+  it('does not disturb the automatic reading position', async () => {
+    // The two values share a row and mean different things: one moves as you
+    // scroll, one only when you tap. A write that clobbers the other is a
+    // silent data loss on a file that survives app updates.
+    const db = await migratedUserDb();
+    await recordReadingPosition(db, { surahId: 2, ayahNumber: 255, page: 42 });
+    await setKhatmPage(db, { page: 123, surahId: 2, ayahNumber: 255 });
+    await expect(getLastReadingPosition(db)).resolves.toEqual({ surahId: 2, ayahNumber: 255, page: 42 });
+    await expect(getKhatmPage(db)).resolves.toBe(123);
+  });
+
+  it('does not let the automatic position clear the mark', async () => {
+    // The other direction, which is the one that actually bites: every scroll
+    // calls recordReadingPosition, so an upsert there that omits khatm_page
+    // wipes the ribbon on the next swipe.
+    const db = await migratedUserDb();
+    await setKhatmPage(db, { page: 123, surahId: 2, ayahNumber: 255 });
+    await recordReadingPosition(db, { surahId: 3, ayahNumber: 1, page: 50 });
+    await expect(getKhatmPage(db)).resolves.toBe(123);
+  });
+
+  it('rejects a page outside the mushaf', async () => {
+    // The page comes from a pager index; nothing upstream range-checks it, and
+    // INTEGER accepts every wrong value there is. Last boundary before a file
+    // that survives app updates.
+    const db = await migratedUserDb();
+    for (const page of [0, 605, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      await expect(setKhatmPage(db, { page, surahId: 1, ayahNumber: 1 })).rejects.toThrow(RangeError);
+    }
+    await expect(getKhatmPage(db)).resolves.toBeNull();
+  });
+
+  it('rejects a bad ayah coordinate', async () => {
+    const db = await migratedUserDb();
+    await expect(setKhatmPage(db, { page: 5, surahId: 115, ayahNumber: 1 })).rejects.toThrow();
+    await expect(setKhatmPage(db, { page: 5, surahId: 1, ayahNumber: 0 })).rejects.toThrow();
+  });
+
+  it('survives the migration running twice', async () => {
+    // Every open applies the schema and the migrations. ADD COLUMN throws on
+    // the second run, and a caught-and-ignored throw is indistinguishable from
+    // a migration that did nothing.
+    const db = await migratedUserDb();
+    await setKhatmPage(db, { page: 77, surahId: 4, ayahNumber: 1 });
+    await migrateUserDb(db);
+    await expect(getKhatmPage(db)).resolves.toBe(77);
   });
 });
