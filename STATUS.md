@@ -11,6 +11,76 @@ Updated: 2026-10-02
 
 ## Now
 
+**2026-10-02 — PR #109 merged (squash `0e06383`). The mushaf turn stutter, the
+clipped harakat, and the overlong docked bars.** Owner approved vc87 on the
+OnePlus the same day. No §5 trigger fired (no `packages/data`, no input
+validation, no on-device user-DB write), so it shipped on §4's self-review plus
+gates.
+
+**The harakat clip was the real fix, and it is invisible on a phone by
+construction.** A line box asks for 1.0em; this type carries 1.4532-2.2112em of
+ink (median 1.880), so the old `Math.min(size, lineHeight)` guard was about half
+the real requirement. RN 0.86's `CustomLineHeightSpan` is CSS half-leading —
+`leading = lineHeight - (ascent + descent)` split evenly — so a short box
+shrinks **both** sides and the ink overhangs symmetrically; on device that
+overhang *draws* rather than being cut, and what destroys the marks is the
+**collision with the line above**. Hence fitting the whole ink, not the ascent.
+New `scraper mushaf-metrics` arm measures it per page off the shipped fonts into
+`apps/mobile/src/mushaf/pageMetrics.generated.ts` (604 entries, widest-line em
+and tallest-line ink em). Per *line*, not per font: `head.yMax - head.yMin` is
+the extreme of every glyph in the page's font and the tallest and deepest glyph
+usually sit on different lines — taking them together costs ~10% of type size
+for a clash that never happens (page 109: 1.852em by line vs 2.056em by font =
+26.9dp vs 24.3dp). Clamp floored at 18dp, because an honest fit in phone
+landscape lands at 8.7dp.
+
+Why the owner saw no change on the phone: at 328dp of text width the **width**
+fit wins almost everywhere. On the OnePlus in portrait (pager height ~724,
+lineBox 43.5) the ink clamp binds on **8 of 604** pages, and the smallest final
+size (17.78dp, page 443) comes from the width fit. At lineBox 39.9 it binds on
+158, at 36.5 on 528 — always as the larger of the two fits, so type barely
+moves. The clipping was a **tablet-landscape** defect, device-verified fixed on
+pages 97/98.
+
+**Two regressions this branch introduced in vc86 and reverted in vc87.** Both
+were mine, both found by the owner on device, both worth recognising again:
+
+- **A deferred window shift blanks pages on a fast swipe** (`27d9e56`, patched
+  by `76beaa6`, reverted by `f3c7639`). Holding the drawn-window shift until
+  `pageScrollState === 'idle'` was premised on "a gesture only moves onto a page
+  already drawn." True for **one** gesture — but the page it defers is the one
+  *beyond* the arrival, and a second swipe is exactly how the reader reaches it.
+  The mount then lands at the **start of drag 2** (~100-150ms of cover) where
+  the arrival gives the whole settle (250ms+). `MushafPage` returns a bare
+  background `View` until its own ~200KB QCF TTF has registered through
+  `expo-font`, so the reader sees blank paper. The `dragging` catch-up in
+  `76beaa6` moved the flush to that same too-late moment — shortened the gap,
+  never closed it. The regression guard in `MushafPager.test.tsx` fires **no**
+  scroll-state event after `onPageSelected`; that absence is the assertion.
+  The late-turn stutter the deferral was built for is back, and the owner
+  deferred the real fix (prefetch without drawing) 2026-10-02.
+- **`unlockAsync()` is not scoped to the caller's lock** (`12ca7c2`, reverted
+  `1627035`). A mushaf-only portrait lock whose cleanup unlocked on losing focus
+  released the **app-wide** S4a lock, so the phone rotated everywhere after one
+  visit to the mushaf. The requested policy already shipped in S4a:
+  `applyOrientationPolicy` in `apps/mobile/src/layout/orientation.ts`, called
+  from `app/_layout.tsx` on mount and on every `Dimensions` change, locking
+  `PORTRAIT_UP` when `min(screen w,h) < 600`. The correct action was deletion,
+  not addition. Note it swallows a refusal and returns `'free'`, so an OEM skin
+  that rejects `lockAsync` rotates everywhere and always did.
+
+Third fix in the PR, unrelated: every docked bar (MiniPlayer, RecitationBar,
+MushafChrome) now caps at the content width instead of spanning a 1400dp tablet.
+
+Gates: `tsc` 0, `eslint --max-warnings 0` 0, **130 files / 1603 tests**, the new
+regression guard mutation-checked (1 of 46 failed, right line, right diff).
+Device runs vc85 → vc87.
+
+**Build gotcha:** vc87 came out 273MB in 10m44s instead of ~202MB in ~4min —
+`expo prebuild` regenerates the gitignored `apps/mobile/android/gradle.properties`
+and loses the `reactNativeArchitectures=arm64-v8a` pin, so it built all four
+ABIs. Re-pinned locally after the merge; re-check it after any prebuild.
+
 **2026-10-02 — PR #108 merged (squash `b26975096f7ff5e21de4e52bdc65d9e4e1a7ebd7`
 = `b269750`). Phase S4b, the mushaf's landscape two-page spread.** Issue #107
 is closed by the merge. The font-cache issue (number 106, no hash on purpose —
