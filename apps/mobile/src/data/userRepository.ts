@@ -7,6 +7,7 @@ export {
   NOTE_MAX_LENGTH,
   countDistinctRootsViewed,
   getBookmarks,
+  getKhatmPage,
   getLastReadingPosition,
   getReadingDays,
   getRootViewsByDay,
@@ -18,6 +19,8 @@ export {
   saveSetting,
   setBookmark,
   setBookmarkNote,
+  setKhatmPage,
   type Bookmark,
+  type KhatmPageInput,
   type ReadingPosition,
 } from '@quran-corpus/data/user-db';
