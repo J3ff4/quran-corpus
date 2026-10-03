@@ -58,6 +58,12 @@ export function useUserDbOnFocus<T>(
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // "A read has finished at least once", which is what "nothing to show yet"
+  // actually means. `data === null` was standing in for it, and that is wrong
+  // for any load whose own answer is null: `getKhatmPage` resolves to null when
+  // no page is marked, so Home's khatm card never settled and swapped its
+  // "Start khatm" label for the placeholder on every focus and every resume.
+  const [settled, setSettled] = useState(false);
 
   // Held in a ref so callers may pass an inline closure without the focus
   // effect re-subscribing on every render.
@@ -98,7 +104,10 @@ export function useUserDbOnFocus<T>(
           // belongs on screen in a Uzbek or Russian UI.
           if (current()) setError(fallbackMessage);
         } finally {
-          if (current()) setLoading(false);
+          if (current()) {
+            setLoading(false);
+            setSettled(true);
+          }
         }
       }
 
@@ -126,5 +135,5 @@ export function useUserDbOnFocus<T>(
   // call site: two screens read it across four calls, all of them render it as
   // a spinner, and the one that got it wrong got it wrong invisibly. See
   // UserDbLoadState.
-  return { data, loading: loading && data === null, error, reload };
+  return { data, loading: loading && !settled, error, reload };
 }
