@@ -7,8 +7,10 @@ const mocks = vi.hoisted(() => ({
   data: null as number | null,
   loading: false,
   reload: vi.fn(),
+  error: null as string | null,
   getKhatmPage: vi.fn(),
   setKhatmPage: vi.fn(),
+  clearKhatmPage: vi.fn(),
 }));
 
 // This hook's whole job is the optimistic mark/lift/override logic layered on
@@ -20,7 +22,7 @@ vi.mock('@/data/useUserDbOnFocus', () => ({
   useUserDbOnFocus: () => ({
     data: mocks.data,
     loading: mocks.loading,
-    error: null,
+    error: mocks.error,
     reload: mocks.reload,
   }),
 }));
@@ -28,6 +30,7 @@ vi.mock('@/data/useUserDbOnFocus', () => ({
 vi.mock('@/data/userRepository', () => ({
   getKhatmPage: mocks.getKhatmPage,
   setKhatmPage: mocks.setKhatmPage,
+  clearKhatmPage: mocks.clearKhatmPage,
 }));
 
 vi.mock('@/data/userDb', () => ({
@@ -45,10 +48,13 @@ import { useKhatmMark } from './useKhatmMark';
 beforeEach(() => {
   mocks.data = null;
   mocks.loading = false;
+  mocks.error = null;
   mocks.reload.mockReset();
   mocks.getKhatmPage.mockReset();
   mocks.setKhatmPage.mockReset();
   mocks.setKhatmPage.mockResolvedValue(undefined);
+  mocks.clearKhatmPage.mockReset();
+  mocks.clearKhatmPage.mockResolvedValue(undefined);
 });
 
 describe('useKhatmMark', () => {
@@ -85,14 +91,12 @@ describe('useKhatmMark', () => {
     await act(() => result.current.mark(5, { surahId: 1, ayahNumber: 1 }));
     await act(() => result.current.lift());
     expect(result.current.markedPage).toBeNull();
-    // lift() is only reachable once a mark exists, so the reading_history row
-    // already exists and setKhatmPage's ON CONFLICT upsert discards whatever
-    // coordinates are sent -- real, valid, and inert is all that is required.
-    expect(mocks.setKhatmPage).toHaveBeenLastCalledWith(expect.anything(), {
-      page: null,
-      surahId: 1,
-      ayahNumber: 1,
-    });
+    // Through clearKhatmPage, which takes no coordinates. setKhatmPage's
+    // insert branch would need some, and the only ones a lift can offer are
+    // invented -- which is how an earlier draft stored a reading position of
+    // 1:1 for a reader who had never opened surah 1.
+    expect(mocks.clearKhatmPage).toHaveBeenCalledTimes(1);
+    expect(mocks.setKhatmPage).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the previous mark when a write rejects', async () => {
@@ -236,6 +240,58 @@ describe('useKhatmMark', () => {
     rerender();
     expect(result.current.mark).toBe(mark);
     expect(result.current.lift).toBe(lift);
+  });
+
+  it('does not go back to loading while the re-read after a write is in flight', async () => {
+    // reload() is called on a successful write and is not awaited, so
+    // useUserDbOnFocus reports loading again until the re-read lands. The
+    // override already holds the value, so there is nothing to wait for -- and
+    // a consumer that renders `loading` as a spinner-or-nothing would blink the
+    // ribbon out during exactly the drop animation the override protects.
+    const { result, rerender } = renderHook(() => useKhatmMark('en'));
+    await act(() => result.current.mark(123, { surahId: 2, ayahNumber: 260 }));
+    mocks.loading = true;
+    rerender();
+    expect(result.current.markedPage).toBe(123);
+    expect(result.current.loading).toBe(false);
+  });
+
+  it('surfaces a read failure instead of reporting no mark', async () => {
+    // "unreadable" and "unmarked" look the same from markedPage, and they are
+    // not the same: offering the mark button over a failed read invites the
+    // reader to overwrite a khatm the database still holds. The hook cannot
+    // tell them apart for the caller, so it has to pass the error out.
+    mocks.error = 'Unable to load the khatm mark';
+    const { result } = renderHook(() => useKhatmMark('en'));
+    expect(result.current.markedPage).toBeNull();
+    expect(result.current.error).toBe('Unable to load the khatm mark');
+  });
+
+  it('does not let an older write that lands last become the rollback target', async () => {
+    // A(5) is still open when B(300) succeeds, and then A succeeds too. Only
+    // one of the two is what the database now holds: expo-sqlite serialises
+    // per connection, so the statements ran in call order and B is last. An
+    // unguarded success path records A's page as "confirmed" simply because it
+    // resolved last, and the NEXT failure then rolls the ribbon back to 5 --
+    // a page B has already replaced.
+    const older = deferred<void>();
+    mocks.setKhatmPage.mockReturnValueOnce(older.promise);
+    const { result } = renderHook(() => useKhatmMark('en'));
+
+    let first!: Promise<void>;
+    act(() => {
+      first = result.current.mark(5, { surahId: 1, ayahNumber: 1 });
+    });
+    await act(() => result.current.mark(300, { surahId: 25, ayahNumber: 1 }));
+    await act(async () => {
+      older.resolve();
+      await first;
+    });
+    expect(result.current.markedPage).toBe(300);
+
+    mocks.setKhatmPage.mockRejectedValueOnce(new Error('disk full'));
+    await act(() => result.current.mark(7, { surahId: 2, ayahNumber: 1 }).catch(() => {}));
+    expect(result.current.markedPage).toBe(300);
   });
 
   it('loading means nothing-to-show-yet, not no-mark', () => {

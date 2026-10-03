@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
 
 import { openUserDb } from '@/data/userDb';
-import { getKhatmPage, setKhatmPage } from '@/data/userRepository';
+import { clearKhatmPage, getKhatmPage, setKhatmPage } from '@/data/userRepository';
 import { useUserDbOnFocus } from '@/data/useUserDbOnFocus';
 import { t } from '@/i18n/uiStrings';
 import type { UiLocaleCode } from '@/i18n/languages';
@@ -14,7 +14,23 @@ export interface KhatmMark {
   lift: () => Promise<void>;
   /** Nothing to show yet -- see useUserDbOnFocus's own `loading` doc. */
   loading: boolean;
+  /**
+   * Set when the stored mark could not be READ, which is not the same as
+   * "there is no mark".
+   *
+   * It has to leave the hook, because the two states look identical here and
+   * only differ in what the reader is allowed to do: offering `mark` over an
+   * unreadable value invites them to overwrite a khatm the database still
+   * holds, on a file that survives app updates. Task 3's chrome button gates
+   * on this.
+   */
+  error: string | null;
 }
+
+/** The client `setKhatmPage` and `clearKhatmPage` take, without importing the
+ *  libsql-side type into the app (CLAUDE.md §2 -- @quran-corpus/data/user-db is
+ *  a leaf, and its QueryClient type lives behind the barrel). */
+type UserDbClient = Parameters<typeof setKhatmPage>[0];
 
 /** What `markedPage` shows instead of the stored value, or null to defer to it. */
 type Override = { page: number | null } | null;
@@ -70,17 +86,21 @@ export function useKhatmMark(uiLocale: UiLocaleCode): KhatmMark {
   const reload = stored.reload;
 
   const write = useCallback(
-    async (input: { page: number | null; surahId: number; ayahNumber: number }) => {
+    async (page: number | null, store: (client: UserDbClient) => Promise<void>) => {
       const mine = ++generation.current;
-      apply({ page: input.page });
+      apply({ page });
       try {
         // No client in state to reuse: MushafScreen keeps only the corpus
         // client mounted and opens the user DB per write (toggleBookmark,
         // recordReadingPosition), so this follows the same shape.
         const userDb = await openUserDb();
         const client = createExpoSqliteClient(userDb as ExpoSqliteLike);
-        await setKhatmPage(client, input);
-        confirmed.current = { page: input.page };
+        await store(client);
+        // Guarded like the rollback below, and for the mirror-image reason: an
+        // older write resolving after a newer one would otherwise record its
+        // own page as the last confirmed value, so the NEXT failure would roll
+        // back to a page the newer write has already replaced.
+        if (mine === generation.current) confirmed.current = { page };
         // Not awaited. The override already shows what was stored; this keeps
         // `stored.data` honest for the rollback path above, which falls
         // through to it whenever nothing has been confirmed yet.
@@ -95,26 +115,31 @@ export function useKhatmMark(uiLocale: UiLocaleCode): KhatmMark {
 
   const mark = useCallback(
     (page: number, firstAyah: { surahId: number; ayahNumber: number }) =>
-      write({ page, surahId: firstAyah.surahId, ayahNumber: firstAyah.ayahNumber }),
+      write(page, (client) =>
+        setKhatmPage(client, {
+          page,
+          surahId: firstAyah.surahId,
+          ayahNumber: firstAyah.ayahNumber,
+        }),
+      ),
     [write],
   );
 
-  const lift = useCallback(
-    () =>
-      // lift() is only reachable when a mark already exists, so the
-      // reading_history row already exists and setKhatmPage's ON CONFLICT
-      // upsert discards whatever coordinates are passed here -- see
-      // KhatmPageInput's doc in packages/data/src/userData.ts. Surah 1, ayah 1
-      // is valid and inert: not a real position, just satisfying the NOT NULL
-      // columns that this path never touches.
-      write({ page: null, surahId: 1, ayahNumber: 1 }),
-    [write],
-  );
+  // `clearKhatmPage`, not `setKhatmPage(..., { page: null })`: a lift has no
+  // coordinates of its own, and the pair this used to invent (1:1, valid and
+  // inert) became a real reading position whenever the row did not exist yet.
+  const lift = useCallback(() => write(null, clearKhatmPage), [write]);
 
   return {
     markedPage: override ? override.page : stored.data,
     mark,
     lift,
-    loading: stored.loading,
+    // An override is something to show, so the read behind it is never
+    // "nothing to show yet". `reload()` after a successful write sets
+    // `stored.loading` back to true until the re-read lands, and without this
+    // the ribbon blinks out mid-drop -- the animation the override exists to
+    // protect (R-C7).
+    loading: stored.loading && override === null,
+    error: stored.error,
   };
 }

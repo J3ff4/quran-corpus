@@ -5,6 +5,7 @@
 // for both the schema and the statements that read it.
 export {
   NOTE_MAX_LENGTH,
+  clearKhatmPage,
   countDistinctRootsViewed,
   getBookmarks,
   getKhatmPage,
