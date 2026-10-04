@@ -153,6 +153,29 @@ have been re-created, both without notes, as they were.
 | 167 | TalkBack, swipe through one bookmark row | **PASS** | Three separate accessibility targets per row and no fourth: "Open An-Nahl 16:90", "Add note"/"Edit note", "Delete bookmark". The card itself is not a target -- its taps route through the link. |
 | 168 | Reader: un-bookmark an ayah that carries a note | **PASS** | Un-bookmarking a noted ayah in the READER raises the same glass sheet as 163, word for word and in the same layout, not the Material dialog M6h shipped. Cancel kept the bookmark and its note. |
 
+| 169 | Note sheet from a bookmark row | **PASS** | Note sheet from a bookmark row: title "Add note" (456x22dp) with "Aal-Imran 3:191" beneath it (456x18dp), and the input is a filled, bordered field 454x48dp -- it reads as a field, not a bare line. |
+| 170 | Note sheet buttons | **PASS** | Measured from the `uiautomator` dump at density 320 (2px = 1dp): **Cancel 74x48dp, Save 63x48dp** -- both exactly at the 48dp minimum. Save is a filled accent button (green fill, dark label), Cancel is plain text.  |
+| 171 | Note sheet with the keyboard up | **PASS** | With the keyboard up the sheet lifts and both buttons sit at y=579..617 on a 1752px screen, clear of the keyboard. Save is reachable without dismissing it -- no finding to file against D53. |
+| 172 | Note sheet from the reader | **PASS** | The note sheet raised from the READER (check 168's path, on An-Nahl 16:90) is the same sheet with the same title treatment -- title, "<Surah> s:a" beneath, same field and buttons. |
+| 173 | Reciter sheet | **PASS** | Active row carries a tinted fill, accent-coloured bold label and a **drawn check mark**; inactive rows are plain text on the sheet surface. No circle glyphs anywhere -- the position is spelled in the accessible name ("1 / 10"), not drawn as filled/empty bullets. |
+| 174 | Reciter sheet at a large font scale | **PASS** | OS font scale 1.35: all ten rows are present in the tree and on screen without scrolling, and the last one -- "Muhammad Ayyoub, 10 / 10", bounds y=1303..1399 -- renders whole above the sheet's rounded bottom edge. Not clipped. |
+| 175 | Reciter selection | **PASS** | Re-tapping the ACTIVE reciter closes the sheet and leaves the setting as it was ("Reciter, Mahmoud Khalil Al-Husary (Murattal)") -- no write. Tapping a different row switching the reciter and closing is check 87, which also proved the switch reaches the audio (a 4440ms track where Husary's was 5224ms). |
+| 176 | Word sheet | **PASS** | On a word with a root (دِيَٰرِهِمْ at 3:195) the sheet shows BOTH links as full-width rows in one bordered card, each with a chevron and separated by a hairline: "Full analysis" and "Root دور". They use the shared press-scale style measured in check 54. A word with no root (فَلَا at 3:188) correctly shows only "Full analysis". |
+| 177 | Lemma ⓘ | **PASS** | Drawn, not a glyph: `InfoButton` renders `<Icon name="info">`, and `Icon` is `<Svg><Path/></Svg>` from react-native-svg with path data "ported verbatim from web so the two products draw one glyph set". Tapping it opens a sheet -- "About these translations / From word-by-word translations, ordered by frequency — not dictionary definitions." It also carries `accessibilityState={{ expanded }}`. |
+| 178 | Delete-confirm sheet | **PASS** | Unchanged from check 163: the same glass sheet, the same danger-coloured Delete and text Cancel, the same 48dp button metrics as 170. |
+| 179 | TalkBack on the reciter sheet | PASS, and no TalkBack needed | The three things TalkBack would read are all in the node itself: every row is an `android.widget.RadioButton` (the role), each accessible name ends with its position -- "1 / 10" through "10 / 10" -- and `checked=true` appears on exactly one row, the active reciter, with `checked=false` on the other nine. All ten rows are 480x48dp. |
+| 180 | Dark theme, every sheet | **PASS** | Every sheet raised during this run was on the dark surface and legible: note sheet, reciter sheet, delete confirm, word sheet, info sheet. Measured on the reciter sheet's active row, the worst case for accent-on-tint: accent rgb(90,165,141) on tint rgb(33,46,40) = **4.85:1**, clearing AA for normal text, and the label is bold besides. |
+| 181 | Open 2:282 from a bookmark | PASS, with an intermittent noted | Opening 2:282 from a bookmark lands with "Ayah 282" at y=398 -- the same y as every correct landing in this run (16:90, 31:3, 2:49, 2:55, 2:50) -- first try, no visible scrolling. Verified cold (force-stop, relaunch, straight to the bookmark) and warm. INTERMITTENT, recorded not filed: twice early in this group a deep link to 2:282 landed roughly a screen INSIDE the ayah, with no "Ayah 282" header on screen and the viewport showing "ٱلشُّهَدَآءُ إِذَا مَا دُعُوا..." about 60% through. It did not reproduce in SEVEN subsequent attempts -- cold, warm, from a bookmark, from search, re-entering the same ayah, from a different ayah in the same surah, and under 684MB of resident memory after turning mushaf pages. Flaky on the hardest ayah in the corpus; worth a watch rather than a confident bug report. |
+| 182 | Same, at Arabic size X-Large | **PASS** | Same landing at Arabic size **Extra large** -- the 512dp-drift config this check calls the model's worst case. 2:282's opening words sit at the top of the content area, y=336. |
+| 183 | Open 2:282, then switch mode | **PASS** | From 2:282, switching to Words lands on the chunk "Ayahs 282–286" with Ayah 282 first -- on it, not near it. |
+| 184 | Open a surah with no ayah param | **PASS** | Opening a surah with no ayah param lands at the top (surah plate, then Ayah 1) with no jump and no flash: sampled at 0.05/0.15/0.30/0.60/1.2s, the frames are byte-identical in ink from 150ms onward (3663215 px at every delay) and the 50ms frame differs by 0.5%, which is the entrance settling. No blank or inverted frame at any delay. |
+| 185 | Open 16:90 from search | **PASS** | Covered under check 95: 16:90 from search lands on An-Nahl Ayah 90 at the top of the view -- the ayah the abandoned recovery used to miss by 41. |
+| 186 | After any of the above, check the reading position | **PASS** | After landing on 2:282, Home reads "Continue reading Al-Baqara 2:282" -- the ayah landed on, not one flown over on the way. |
+| 187 | Scroll Al-Baqara top to bottom by hand | **PASS** | Scrolled al-Baqara by hand over 24 swipes. The first visible ayah advances strictly monotonically -- 2, 5, 8, 11, 14, 16, 18, 21, 23, 25, 27, 29, 31, 33, 35, 37, 40, 42, 45, 47, 50, 52, 55, 56 -- never backtracking, which is what a mis-estimated row height looks like when the list corrects itself. No row drawn at the wrong height. Smooth with it: 11110 frames, **6 janky (0.05%)**, p50 7ms, p90 9ms, p95 11ms, p99 14ms against an 11.11ms budget at 90Hz. |
+| 188 | Repeat 181 with Reduce animations on | **PASS** | Same 2:282 landing with Reduce animations on: the ayah's opening words at the top of the content, no motion. |
+| 189 | Deep-link into the surah already on screen | **PASS** | Deep-linking to 2:50 while the reader already held al-Baqara (parked at 2:282) re-landed with Ayah 50 at y=398, without remounting. Re-entering the SAME ayah already on screen also re-lands cleanly. |
+| 190 | Turn to the previous/next surah with the chevrons | **PASS** | From mid-surah (al-Baqara ayah 56): Next surah -> Aal-Imran **Ayah 1**; Previous surah -> Al-Baqara **Ayah 1**. Both land at ayah 1 rather than a remembered position. |
+
 ## What the checklist itself got wrong
 
 Three checks and two more are no longer runnable as written, and that is a finding
@@ -171,19 +194,18 @@ about the checklist, not a gap in the build:
 
 ## Still to run
 
-Checks 169-190 (m6j sheet chrome, m6l row estimation), plus two deferred to a
-single screen-off batch at the end: **82**'s "audio continues while locked" half
-and **88** (airplane mode), which cannot run earlier because both devices reach
-`adb` over the wifi the test switches off.
+Two checks, both needing the screen off, batched to the end of the run because
+either can cost the `adb` connection: **82**'s "audio continues while locked" half
+and **88** (airplane mode) — both devices reach `adb` over the wifi check 88
+switches off.
 
-**86 needs the owner** -- an audio-focus loss cannot be provoked from `adb` without
-driving a third-party app's UI or playing arbitrary media on the owner's tablet.
-**143 and 144 need TalkBack running**; label and state were verified present but the
-spoken output was not (issue #34). **148, 149 and 152 are blocked** for the reasons
-in their rows: a migration that cannot be re-run without risking the user DB, a
+**86 needs the owner** — an audio-focus loss cannot be provoked from `adb` without
+driving a third-party app's UI or playing arbitrary media on the owner's tablet; it
+wants a real incoming call or another audio app started by hand mid-recitation.
+**143 and 144 need TalkBack running**; label and state were verified present but not
+the spoken output (issue #34). **148, 149 and 152 are blocked** for the reasons in
+their rows: a migration that cannot be re-run without risking the user DB, a
 60-bookmark list this device does not have, and `input text` being ASCII-only.
 
-One real numbering collision: **79 is used twice**, by m6e (rail vs wrapped) and by
-m6f (play a single ayah). Both are answered above. The 148-168 range only *looks*
-like a collision -- m6h takes 148-154 and 160-168, m6i takes 155-159, and they
-interleave cleanly.
+**The phone still owes the layout checks.** Everything here ran at 876dp, an
+expanded window class. Behaviour carries over; phone layout does not.
