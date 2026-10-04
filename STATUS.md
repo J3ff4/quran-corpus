@@ -7,9 +7,49 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-10-02
+Updated: 2026-10-04
 
 ## Now
+
+**2026-10-04 — PR #111 merged (squash `4523324`). Phase S4c: the khatm ribbon, a
+Home card for it, and the Arabic size stepper.** CI green both jobs. One deliberate
+mark per file, set and lifted by hand from the mushaf chrome, drawn as silk in the
+marked page's top corner. Not the automatic continue-reading position — reading past
+the mark does not move it. Two owner overrides, written into the source so nobody
+"fixes" them: the ribbon hangs **top LEFT** (R-C7, against the physical mushaf), and
+it is **invisible to TalkBack** (the chrome button already says "Lift the mark" in
+words). The Home khatm card REPLACES the day-streak counter — the streak number is
+gone entirely, by owner ruling.
+
+**§5 fired three ways at once** (migration 5, two on-device user-DB writers, a new
+`RangeError` validator) and `/code-review` ran. 8 findings: 5 fixed, #110 filed, 1
+answered by measurement, 1 accepted. The two worth remembering:
+
+- **`useUserDbOnFocus` narrowed `loading` on `data === null`** — "no data" standing in
+  for "no read has finished". Wrong for any load whose own answer is null, which
+  `getKhatmPage` is, so Home's card swapped "Start khatm" for the placeholder on every
+  focus, resume and write. Fixed in the shared hook: every other consumer settles by
+  accident because it returns a non-null object.
+- **`type-check` is TWO tsc runs** (`tsconfig.json` && `tsconfig.test.json`). A bare
+  `npx tsc --noEmit` reported 0 while **109** errors stood in four mushaf suites. vitest
+  does not type-check, so 1650 tests were green with the types broken. CI runs the npm
+  script; the gap is only ever local.
+
+`getKhatmPage` now range-checks on the way **out** as well as in: the column is INTEGER,
+the file survives app updates, and a row this app did not write is supported. A bad row
+reads as no mark rather than throwing.
+
+**Device run vc91, OnePlus — checks 700-723, all pass.** 709 (was PARTIAL) and 710 (was
+NOT RUN) both came off the owed list. The technique that unblocked them: a screencap
+costs ~280ms, so a burst samples a 220ms animation exactly once — instead, fire the
+toggle, sleep a known fraction, take ONE frame, repeat at other delays, and read the
+population. Also answered the review's deferred finding: framestats at 90Hz, 3 repeats,
+control 22.5ms max gap vs mark+lift 33.4ms — one extra dropped frame, at a different
+phase each repeat, once *after* both animations ended. No hardware-layer thrash.
+
+**Still owed:** check **703** needs a virgin `reading_history` — the tablet is PIN-locked
+and clearing the owner's phone is data loss, not a test. Issue **#110** (Arabic size
+stepper rebuilds the reader's offset table with no re-anchor) stays open.
 
 **2026-10-02 — PR #109 merged (squash `0e06383`). The mushaf turn stutter, the
 clipped harakat, and the overlong docked bars.** Owner approved vc87 on the
