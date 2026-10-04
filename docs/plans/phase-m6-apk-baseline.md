@@ -30,6 +30,22 @@ curve across repeats. Layout and labels were read from the accessibility tree
 exact, and cheap. Contrast figures are WCAG ratios computed from the glyph cores
 against the measured surface behind them, not from design tokens.
 
+Audio was measured through `dumpsys media_session` rather than the screen: it gives
+playback state, position, track length and the metadata the lock screen renders, at
+~38ms per sample, and it keeps working where `uiautomator dump` does not -- the dump
+waits for window idle and returns an empty file while anything animates or plays.
+Two traps worth writing down. `dumpsys media_session` reports `position` as of its
+own `updated` timestamp and goes stale while PAUSED (it read 274ms where the UI read
+0:11), so the UI is the instrument for scrub assertions. And `input swipe` under
+about 500ms does not register here at all, while a device-side loop of swipes needs
+a `sleep` between them or every one after the first is dropped.
+
+**Device settings changed for this run**, recorded so they can be put back:
+screen timeout 10min -> 30min, continuous play OFF -> ON, reciter Husary (Murattal)
+-> Abdul Basit (Murattal), theme -> Light, interface language -> Russian and back to
+English. Ringer was already SILENT and was left alone. All are restored at the end
+of the run.
+
 ## Results
 
 | # | Check | Verdict | Evidence |
@@ -67,6 +83,23 @@ against the measured surface behind them, not from design tokens.
 | 78 | Segment colours, both themes | **PASS** | Every distinct segment colour clears AA on the glass surface. Light: 5.64-7.27:1. Dark: 7.17-8.96:1 |
 | 79 | Play a single ayah | **RESOLVED** | Owner picked wrapped; the rail branch is gone. Only 'dense' and 'hybrid' remain in settingsStore; the two surviving references to 'rail' are migration-fallback comments, not code paths |
 
+| 80 | Scrub | **PASS** | Scrub, measured on ayah 7 (15.02s track). Drags to 20/50/90% read 0:03/-0:12, 0:07/-0:07, 0:13/-0:01 -- every pair sums to the track length and the fill matches the drag. Backward seeks verified too, so the result cannot be confused with elapsed time. NOTE: dumpsys media_session position goes stale while PAUSED (read 274ms where the UI read 0:11); the UI is the instrument here. |
+| 81 | Continuous play through a surah boundary case (al-Fatiha, 7 ayahs) | **PASS** | Continuous play across al-Fatiha, sampled 3393x over 130s. Exactly SEVEN tracks (5224/6347/4571/4702/6922/5433/15020 ms), then STOPPED at 52.3s and still stopped 77s later. Does not wrap, does not restart. Reader bar parks on "Ayah 7 - Play", resumable. |
+| 82 | Lock the screen mid-ayah | **PARTIAL** | Lock-screen controls: notification is posted, MediaStyle, category=transport, flags=NO_CLEAR|FOREGROUND_SERVICE, bound via android.mediaSession token; android.title="Al-Fatiha", android.text="Mahmoud Khalil Al-Husary (Murattal)" -- surah AND reciter, as required. Session active=true. Carries no Notification.Action buttons: media3 lets the system draw transport from the session. OBSERVATION: vis=PRIVATE, so content on a secure lock screen depends on the user's sensitive-notification setting. "Audio continues while locked" deferred to the screen-off batch. |
+| 83 | Lock-screen transport, Android 13+ | **PASS** | Transport keys dispatched to the session: MEDIA_PAUSE -> PAUSED(2) at 1657ms; MEDIA_PLAY -> PLAYING(3) resuming 1657->2972; MEDIA_NEXT -> position reset to 2 with buffered 6347 (= ayah 2's length), i.e. it advanced. OBSERVATION: the legacy PlaybackState bitmask 7339979 omits SKIP_TO_NEXT(32) and SKIP_TO_PREVIOUS(16) though next demonstrably works -- affects legacy controllers reading the bitmask, not media3's own command set. |
+| 84 | Listen across an ayah boundary | **PASS** | Six ayah seams measured from state transitions: 190, 130, 130, 150, 150, 120 ms. Max 190ms against a ~1s fail threshold. Every seam passes through BUFFERING, so each ayah is fetched fresh -- these numbers are wifi numbers and would widen on a slow link. Cold start from tap to sound: 820ms. |
+| 85 | Play with the device in silent mode | **PASS** | Ringer was already SILENT (mode_ringer=0) for the entire run, so all seven ayahs above played under it. Explicit re-check: STREAM_MUSIC Muted=false at volume 8/15 on speaker, positions advancing 0 -> 1872 -> 4876. Structural reason: ringer-affected streams = SYSTEM|RING|NOTIFICATION|DTMF, which excludes STREAM_MUSIC. |
+| 86 | Incoming call or another audio app mid-recitation | **BLOCKED** | Cannot drive an audio-focus loss from adb without either operating a third-party app's UI or playing arbitrary external media on the owner's tablet; neither is acceptable. Launching the other installed Quran app did not request focus, and the VOICE_COMMAND intent took none. FINDING recorded anyway from the focus stack while playing: the app holds "gain: GAIN_TRANSIENT" with "usage=USAGE_UNKNOWN", while the media session's own attributes are USAGE_MEDIA -- a transient request for a long recitation, and attributes that disagree with the session. Focus is released when playback stops. Needs the owner: a real incoming call, or another audio app started by hand mid-recitation. |
+| 87 | Switch reciter mid-surah | **PASS** | Switched Husary (Murattal) -> Abdul Basit (Murattal) from Settings. Ayah 1 then loads a 4440ms track where Husary's was 5224ms -- a different file, not a relabel -- and session metadata reads "Al-Fatiha, Abdul Basit (Murattal)". Survives a restart: am force-stop + relaunch, Settings still reads Abdul Basit (and Home still offered "Continue reading Al-Fatiha 1:1"). Picker is a centred dialog at this width and lists ten reciters with NO Alafasy, per the M6 ruling. |
+| 89 | Dictionary browse, both themes | **PASS** | Dictionary browse, both themes. Glass is measured, not eyeballed: tile interiors track the bloom across the row -- dark (23,41,35)->(21,20,18) over ground (20,34,29)->(18,17,16); light (251,250,245)->(254,252,247) over ground (245,244,239)->(248,246,241). Both are ground plus a constant ~+6/channel lift, i.e. translucent fill, not a painted colour. Arabic crisp in both; hijai order right-to-left; selected chip outlined in accent. |
+| 90 | Root ق-و-ل | **PASS** | Root قول: entry plate (ق و ل tiles, "qwl", "1722 occurrences" -- matches roots.occurrence_count and a live word_segments count), Hans Wehr card, Lane card. Lane is collapsible where the entry needs it: قول's text fits whole so no control appears, while ضرب (1423-char Lane entry) shows "Show more" -> "Show less" and the card grows, pushing FILTER BY FORM from y1237 to y1333. Compound-root count checked on أمم as the plan's own log does: 119 occurrences on device, and its six form chips sum to 35+1+12+6+64+1 = 119. |
+| 91 | Derived-form chips | **PASS** | Form chips. Tapping "umm, Noun, 35" filters the concordance to 35 with rows tagged umm (first 3:7:10). No dim: body luminance 240.64 / 240.64 / 240.65 across before / mid-gesture / settled. No layout shift: chips sat at x126/251/381 before and x125/250/380 after -- 1px. |
+| 92 | Root Previous/Next through five roots, then back | **PASS** | Five Nexts walked Amm -> Amn -> Amw -> Anv -> Ans -> Anf, then ONE system Back landed straight on the dictionary search results (Roots · 9, أمم 119) with the query intact. It did not walk back through the other four. |
+| 93 | Frequency list, scrolled to the bottom (1000 rows) | **PASS** | Frequency list runs to exactly 1000 rows; last row is #1000 محو (3 occurrences) and it clears the tab pill. Smooth under load: 39570 frames across the whole scroll, 1 janky (0.00%), p50 5ms / p90 7ms / p95 8ms / p99 9ms, all inside the 11.11ms budget at 90Hz. OBSERVATION: the list's bottom inset accounts for the tab pill but NOT the docked MiniPlayer, which overlaps rows 999-1000. Harmless at this width (the centred card covers only the empty middle column, rank and form stay readable) but the bar is full-width on a phone -- re-check there. |
+| 94 | Lemma entry in Russian UI | **PASS** | Russian UI. Lemma screen reads Предыдущая / Следующая (feminine, agreeing with лемма) and "2699 вхождений"; the root screen reached from it reads Предыдущий / Следующий (masculine, корень). Genitive plural correct on counts throughout ("287 вхождений", "Корни · 6"). OBSERVATION: the header up-affordance still announces "Navigate up" in English under a Russian UI -- it is React Navigation's default label, not one of ours (no match in apps/mobile), so it is a navigator config gap rather than a missing translation. |
+| 95 | Search "qwl" | PASS, same deviation as the Expo Go run | The check as written cannot hold: a Buckwalter root is neither a verse reference nor translation text, so "qwl" returns the ROOTS arm alone. Three queries, one per kind, each opening the right screen: qwl -> ROOTS -> قول's root page; 16:90 -> the GO TO card -> reader at An-Nahl Ayah 90; mercy -> VERSES (31:3, 10:86, 27:77, 17:24) -> reader at Luqman with Ayah 3 in view. NOTE: an "Edl" search first read "Roots · 0"; reading the field back out of the a11y tree showed the query was stale, and a clean "Edl" gives Roots · 43. No case-sensitivity defect -- both arms lowercase. |
+| 96 | Concordance tap into 16:90 | **PASS** | Root عدل (28 occurrences, concordance order 2:48:16, 2:123:12 ... matching the DB exactly). Scrolled to the 16:90:4 row and tapped it: lands on An-Nahl with Ayah 90 at the top of the view (y398), 91 and 92 below. The M5c deep-link fix holds from the concordance caller. |
+
 ## What the checklist itself got wrong
 
 Three checks and two more are no longer runnable as written, and that is a finding
@@ -85,7 +118,17 @@ about the checklist, not a gap in the build:
 
 ## Still to run
 
-Checks 80-190 (m6f audio, m6g dictionary and search, m6r reader navigation,
-m6h bookmarks and notes, m6i settings and about, m6j sheet chrome, m6l row
-estimation). The harness used here is reusable; nothing about the remaining
-groups needs a different approach.
+Checks 124-190 (m6r reader navigation, m6h bookmarks and notes, m6i settings and
+about, m6j sheet chrome, m6l row estimation), plus two deferred to a single
+screen-off batch at the end of the run: **82**'s "audio continues while locked"
+half, and **88** (airplane mode), which cannot be done earlier because both
+devices reach `adb` over the same wifi the test would switch off.
+
+**86 needs the owner.** An audio-focus loss cannot be provoked from `adb`
+without driving a third-party app's UI or playing arbitrary media on the owner's
+tablet. It wants a real incoming call, or another audio app started by hand while
+a recitation runs.
+
+Note the checklist numbers **155-159 are used twice**, by m6i settings-and-about
+and by m6h bookmarks-and-notes. Both sets still have to run; the collision is in
+the source plans, not here.
