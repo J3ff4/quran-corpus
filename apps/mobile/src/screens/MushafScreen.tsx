@@ -37,7 +37,9 @@ import { t } from '@/i18n/uiStrings';
 import { ayahKey, type PressedWord } from '@/mushaf/highlights';
 import { useMushafIndex } from '@/mushaf/mushafReaderData';
 import { useMushafPage } from '@/mushaf/useMushafPage';
+import { takeMushafPage } from '@/mushaf/pageRequest';
 import { ayahOnPage, firstAyahOnPage, nextAyahOnPage } from '@/mushaf/pageAudio';
+import { useKhatmMark } from '@/mushaf/useKhatmMark';
 import { pageForAyah, pageForJump } from '@/mushaf/pageJump';
 import {
   hideChrome,
@@ -196,6 +198,31 @@ export function MushafScreen() {
     setBookmarks(new Map(rows.map((bookmark) => [ayahKey(bookmark.surahId, bookmark.ayahNumber), bookmark.note])));
   }, [savedBookmarks.data]);
 
+  // A page another tab asked this one to open on -- Home's khatm card, which
+  // is a promise about one particular page and so cannot be served by the
+  // saved reading position. Taken on focus rather than read: see pageRequest.
+  const [requestedPage, setRequestedPage] = useState<number | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      const page = takeMushafPage();
+      if (page !== null) setRequestedPage(page);
+    }, []),
+  );
+
+  // Cleared as it is consumed, so tapping the same card twice is two jumps and
+  // not one: `focusPage` is a prop the pager compares, and a request left
+  // standing would never change to announce the second tap.
+  useEffect(() => {
+    if (requestedPage === null) return;
+    setRequestedPage(null);
+    // Before the pager exists, the request IS the opening page -- mounting on
+    // the saved one and jumping would turn 200 pages in front of the reader.
+    // After it, a jump is the only way in. The saved-position effect below
+    // stands down either way, because it bails once `initialPage` is set.
+    if (initialPage === null) setInitialPage(requestedPage);
+    else setFocusPage(requestedPage);
+  }, [requestedPage, initialPage]);
+
   // The opening page, resolved once and then never again: `initialPage` is
   // what the pager mounts on, and it owns the page after that.
   useEffect(() => {
@@ -282,6 +309,41 @@ export function MushafScreen() {
     },
     [onPageChange],
   );
+
+  const khatm = useKhatmMark(uiLocale);
+  const marked = khatm.markedPage !== null && khatm.markedPage === currentPage;
+
+  // A stable identity, not an inline arrow: this screen re-renders on every
+  // audio position tick, and MushafChrome is memo-sensitive for the same
+  // reason the pager is.
+  const onToggleMark = useCallback(() => {
+    // The page's OWN first ayah -- the word at `position === 1`. Not the
+    // index's `startAyahNumber`, which is the ayah a page opens IN and on most
+    // pages belongs to the page before.
+    //
+    // Null is real: 2:282 alone fills more than a page, so a page can begin no
+    // ayah at all. The page's opening word is then the honest coordinate for
+    // "where the reader is", and these coordinates are only ever read as a
+    // reading position -- the khatm page is the payload.
+    const first = firstAyahOnPage(pageLines) ?? pageLines[0]?.words[0];
+    // No rows yet, or no page yet -- `currentPage` is null until the saved
+    // position lands on a cold start. Nothing happens, rather than a write
+    // with an invented page or invented coordinates.
+    if (!first || currentPage === null) return;
+    // Lift ONLY when this page is the marked one. A lift with nothing marked
+    // is a write the reader did not ask for.
+    const run = marked
+      ? khatm.lift()
+      : khatm.mark(currentPage, { surahId: first.surahId, ayahNumber: first.ayahNumber });
+    // `mark` and `lift` re-throw by design so a caller can surface the
+    // failure; unhandled in a press handler that is a red box on device. The
+    // hook has already rolled the ribbon back, and the read error is what the
+    // button's disabled state is for.
+    void run.catch(() => {});
+    // `khatm.mark`/`khatm.lift` rather than `khatm`: the hook returns a fresh
+    // object literal every render, so depending on the whole thing re-made this
+    // handler on exactly the audio ticks the useCallback is here to survive.
+  }, [marked, khatm.mark, khatm.lift, currentPage, pageLines]);
 
   const audio = useRecitationController();
   // Whether the engine is sounding for US. It is one engine app-wide now, so a
@@ -578,6 +640,7 @@ export function MushafScreen() {
         initialPage={initialPage}
         landingAyah={null}
         bookmarkedKeys={bookmarkedKeys}
+        khatmPage={khatm.markedPage}
         // Sounding, not parked: `playing` is the ayah the player sits ON and
         // survives a pause, so passing it raw kept an ayah lit with nothing
         // coming out of it. The reader draws the same distinction.
@@ -634,6 +697,9 @@ export function MushafScreen() {
         uiLocale={uiLocale}
         onOpenJump={() => setJumpView('jump')}
         onOpenSearch={() => router.push('/search')}
+        marked={marked}
+        onToggleMark={onToggleMark}
+        markUnavailable={khatm.error !== null}
       />
       {jumpView === 'jump' ? (
         <PageJumpSheet

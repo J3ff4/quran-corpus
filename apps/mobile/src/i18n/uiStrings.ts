@@ -15,6 +15,11 @@ export type UiStringKey =
   // The compact player's play button. Not "Play": it starts the page, which
   // on 15 lines of glyphs is the fact worth announcing.
   | 'mushaf.playPage'
+  // The khatm ribbon's read failure -- shown while the mark is unreadable,
+  // not while there simply is none.
+  | 'mushaf.markPage'
+  | 'mushaf.liftMark'
+  | 'mushaf.khatmLoadFailed'
   | 'jump.title'
   | 'jump.surahTitle'
   | 'jump.surah'
@@ -88,7 +93,8 @@ export type UiStringKey =
   | 'home.continue'
   | 'home.noHistory'
   | 'home.loadFailed'
-  | 'home.streak'
+  | 'home.khatmPage'
+  | 'home.startKhatm'
   | 'home.rootsStudied'
   | 'home.rootsThisWeek'
   | 'home.ayahOfTheDay'
@@ -214,6 +220,8 @@ export type UiStringKey =
   | 'settings.arabicSizeMedium'
   | 'settings.arabicSizeLarge'
   | 'settings.arabicSizeXlarge'
+  | 'settings.arabicSizeIncrease'
+  | 'settings.arabicSizeDecrease'
   | 'settings.arabicSizeHint'
   | 'settings.wbwDensity'
   | 'settings.wbwDensityHint'
@@ -311,6 +319,9 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'mushaf.jumpGo': 'Go',
     'mushaf.jumpOutOfRange': 'Nothing there. Page 1-604, surah 1-114, juz 1-30.',
     'mushaf.playPage': 'Play this page',
+    'mushaf.markPage': 'Mark this page',
+    'mushaf.liftMark': 'Lift the mark',
+    'mushaf.khatmLoadFailed': 'Unable to load the khatm mark',
     // Every go-to control and every go-to sheet, the mushaf's included: one
     // move, one word (owner, 2026-09-24).
     'jump.title': 'Go to',
@@ -383,7 +394,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'home.continue': 'Continue reading',
     'home.noHistory': 'No reading history yet',
     'home.loadFailed': 'Unable to load reading history',
-    'home.streak': 'Day streak',
+    'home.khatmPage': 'Khatm page',
+    'home.startKhatm': 'Start khatm',
     'home.rootsStudied': 'Roots studied',
     'home.rootsThisWeek': 'Roots this week',
     'home.ayahOfTheDay': 'Ayah of the day',
@@ -465,6 +477,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.themeLight': 'Light',
     'settings.themeDark': 'Dark',
     'settings.arabicSize': 'Arabic size',
+    'settings.arabicSizeIncrease': 'Increase Arabic size',
+    'settings.arabicSizeDecrease': 'Decrease Arabic size',
     'settings.arabicSizeSmall': 'Small',
     'settings.arabicSizeMedium': 'Medium',
     'settings.arabicSizeLarge': 'Large',
@@ -567,6 +581,9 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'mushaf.jumpGo': 'Oʻtish',
     'mushaf.jumpOutOfRange': 'Bunday joy yoʻq. Sahifa 1-604, sura 1-114, juz 1-30.',
     'mushaf.playPage': 'Sahifani tinglash',
+    'mushaf.markPage': 'Bu sahifani belgilash',
+    'mushaf.liftMark': 'Belgini olib tashlash',
+    'mushaf.khatmLoadFailed': 'Xatm belgisini yuklab boʻlmadi',
     'jump.title': 'Oʻtish',
     'jump.surahTitle': 'Suraga oʻtish',
     'jump.surah': 'Sura',
@@ -634,7 +651,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'home.continue': 'O‘qishni davom ettirish',
     'home.noHistory': 'Hali o‘qish tarixi yo‘q',
     'home.loadFailed': 'O‘qish tarixini yuklab bo‘lmadi',
-    'home.streak': 'Kunlik seriya',
+    'home.khatmPage': 'Xatm sahifasi',
+    'home.startKhatm': 'Xatmni boshlash',
     'home.rootsStudied': 'O‘rganilgan o‘zaklar',
     'home.rootsThisWeek': 'Shu haftadagi o‘zaklar',
     'home.ayahOfTheDay': 'Kunlik oyat',
@@ -716,6 +734,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.themeLight': 'Yorug‘',
     'settings.themeDark': 'Qorong‘i',
     'settings.arabicSize': 'Arab yozuvi o‘lchami',
+    'settings.arabicSizeIncrease': 'Arab yozuvi oʻlchamini kattalashtirish',
+    'settings.arabicSizeDecrease': 'Arab yozuvi oʻlchamini kichraytirish',
     'settings.arabicSizeSmall': 'Kichik',
     'settings.arabicSizeMedium': 'O‘rtacha',
     'settings.arabicSizeLarge': 'Katta',
@@ -805,6 +825,9 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'mushaf.jumpGo': 'Перейти',
     'mushaf.jumpOutOfRange': 'Такого нет. Страница 1-604, сура 1-114, джуз 1-30.',
     'mushaf.playPage': 'Слушать страницу',
+    'mushaf.markPage': 'Отметить эту страницу',
+    'mushaf.liftMark': 'Снять отметку',
+    'mushaf.khatmLoadFailed': 'Не удалось загрузить отметку хатма',
     'jump.title': 'Перейти',
     'jump.surahTitle': 'Перейти к суре',
     'jump.surah': 'Сура',
@@ -872,7 +895,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'home.continue': 'Продолжить чтение',
     'home.noHistory': 'Истории чтения пока нет',
     'home.loadFailed': 'Не удалось загрузить историю чтения',
-    'home.streak': 'Серия дней',
+    'home.khatmPage': 'Страница хатма',
+    'home.startKhatm': 'Начать хатм',
     'home.rootsStudied': 'Изучено корней',
     'home.rootsThisWeek': 'Корни за неделю',
     'home.ayahOfTheDay': 'Аят дня',
@@ -955,6 +979,8 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'settings.themeLight': 'Светлая',
     'settings.themeDark': 'Темная',
     'settings.arabicSize': 'Размер арабского текста',
+    'settings.arabicSizeIncrease': 'Увеличить размер арабского',
+    'settings.arabicSizeDecrease': 'Уменьшить размер арабского',
     'settings.arabicSizeSmall': 'Мелкий',
     'settings.arabicSizeMedium': 'Средний',
     'settings.arabicSizeLarge': 'Крупный',

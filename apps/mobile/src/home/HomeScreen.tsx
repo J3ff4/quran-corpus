@@ -9,28 +9,23 @@ import { getAyahReaderLocation, type ReaderLocation } from '@/data/corpusReposit
 import { openCorpusDb } from '@/data/openCorpusDb';
 import {
   countDistinctRootsViewed,
+  getKhatmPage,
   getLastReadingPosition,
-  getReadingDays,
   getRootViewsByDay,
 } from '@/data/userRepository';
 import { useUserDbOnFocus } from '@/data/useUserDbOnFocus';
 import { ayahForDay } from '@/home/ayahOfTheDay';
 import { HomePlayerCard } from '@/home/HomePlayerCard';
-import { WEEK_DAYS, localDay, streakFrom, weeklyLog, type DailyRoots } from '@/home/counters';
+import { WEEK_DAYS, localDay, weeklyLog, type DailyRoots } from '@/home/counters';
 import { t } from '@/i18n/uiStrings';
 import type { UiLocaleCode } from '@/i18n/languages';
 import { usePressScale } from '@/motion/usePressScale';
+import { requestMushafPage } from '@/mushaf/pageRequest';
 import { useAppSettings } from '@/settings/settingsStore';
 import { fonts, touchTargets, typography } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/themeContext';
 import { useArabicSizes } from '@/theme/useArabicSizes';
 import { useListBottomPadding } from '@/theme/useListBottomPadding';
-
-/** The whole history, not a window: a streak has no length limit, and a
- *  seven-day cutoff would silently cap a 40-day one at 7 with nothing on
- *  screen to say the number was truncated. One row per day read, so this is a
- *  few thousand rows after a decade. */
-const ALL_HISTORY = '1970-01-01';
 
 const WEEK_BAR_HEIGHT = 44;
 
@@ -56,13 +51,13 @@ export function HomeScreen() {
 
   const position = useUserDbOnFocus(getLastReadingPosition, t(uiLocale, 'home.loadFailed'));
 
-  // Two loads rather than one because they fail independently and each card
-  // shows its own error; both are wrapped in useCallback so the focus effect
-  // does not re-subscribe on every render.
-  const readingDays = useUserDbOnFocus(
-    useCallback((client: MobileDataClient) => getReadingDays(client, ALL_HISTORY), []),
-    t(uiLocale, 'home.countersFailed'),
-  );
+  // On focus, not once: the mark is made on the mushaf tab, and Home is where
+  // the reader comes back to. A card showing the page they lifted an hour ago
+  // is worse than one showing nothing.
+  const khatm = useUserDbOnFocus(getKhatmPage, t(uiLocale, 'mushaf.khatmLoadFailed'));
+
+  // Wrapped in useCallback so the focus effect does not re-subscribe on every
+  // render.
   const roots = useUserDbOnFocus(
     useCallback(
       async (client: MobileDataClient) => {
@@ -83,9 +78,7 @@ export function HomeScreen() {
   const continueAyah = useCorpusAyah(position.data?.surahId ?? null, position.data?.ayahNumber ?? null);
   const dailyAyah = useCorpusAyah(daily.surah, daily.ayah);
 
-  const streak = streakFrom(readingDays.data ?? [], today);
   const week = weeklyLog(roots.data?.byDay ?? [], today);
-  const countersError = readingDays.error ?? roots.error;
 
   return (
     <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, gap: 14, paddingBottom }}>
@@ -124,12 +117,21 @@ export function HomeScreen() {
         />
       ) : null}
 
-      {countersError ? <ErrorLine message={countersError} /> : null}
+      {/* Two lines, not one `a ?? b`: the khatm and the counters are separate
+          reads of separate tables, and a reader whose khatm is unreadable has
+          to be told THAT -- the card below it shows a dash either way. */}
+      {khatm.error ? <ErrorLine message={khatm.error} /> : null}
+      {roots.error ? <ErrorLine message={roots.error} /> : null}
       <View style={{ flexDirection: 'row', gap: 14 }}>
-        <CounterCard
-          testID="home-streak"
-          label={t(uiLocale, 'home.streak')}
-          value={readingDays.loading ? null : streak}
+        {/* Where the day-streak counter used to be (owner, 2026-10-03). The
+            khatm is the thing a reader comes back for, and it had no way in
+            from Home at all -- the saved position cannot stand in for it,
+            because reading past the mark deliberately does not move it. */}
+        <KhatmCard
+          error={khatm.error !== null}
+          loading={khatm.loading}
+          page={khatm.data}
+          uiLocale={uiLocale}
         />
         <CounterCard
           testID="home-roots"
@@ -327,6 +329,108 @@ function ContinueCard({
         </Text>
       ) : null}
     </PressableCard>
+  );
+}
+
+/** The ribbon mark on the khatm card: a stub of the real thing. Deliberately
+ *  not KhatmRibbon itself -- that one is absolutely positioned against a
+ *  mushaf page's top edge and cannot sit in a row. */
+const KHATM_MARK = { width: 6, height: 20 };
+
+/**
+ * Half-width glass card: the khatm page, or an invitation to set one.
+ *
+ * Tapping it opens the mushaf tab AT that page, which is the whole point --
+ * the mushaf otherwise opens on the saved reading position, and the khatm mark
+ * is explicitly not that position. The page travels through
+ * `requestMushafPage` rather than a route param; see that module for why.
+ *
+ * A failed READ is not treated as "no mark": the card shows a dash and still
+ * opens the mushaf, just without asking it to jump. Nothing here writes, so an
+ * unreadable value costs navigation precision and nothing else -- the control
+ * that could overwrite a khatm is the mushaf's own chrome button, and it gates
+ * on the error itself.
+ */
+function KhatmCard({
+  error,
+  loading,
+  page,
+  uiLocale,
+}: {
+  /** The mark could not be READ, which is not the same as there being none --
+   *  see `KhatmMark.error`. Treated here exactly as "not yet": offering to
+   *  START a khatm over a mark the file may still hold is the one wrong thing
+   *  this card could say. */
+  error: boolean;
+  /** Nothing to show YET, which is not the same as nothing marked: the two
+   *  states differ by a whole word on screen ("Start khatm" against a page
+   *  number), and painting the invitation first makes every launch flash an
+   *  offer to start a khatm the reader is already halfway through. */
+  loading: boolean;
+  page: number | null;
+  uiLocale: UiLocaleCode;
+}) {
+  const theme = useThemeColors();
+  const press = usePressScale();
+  const marked = page !== null;
+  // Set once the read has landed, succeeded, and found no mark on the file.
+  // Only then is the invitation the truth.
+  const invite = !loading && !error && !marked;
+  return (
+    <AnimatedPressable
+      testID="home-khatm"
+      accessibilityRole="link"
+      // The visible number is bare ("418"); on its own a screen reader
+      // announces a figure with nothing to say what tapping it does.
+      accessibilityLabel={
+        invite ? t(uiLocale, 'home.startKhatm') : [t(uiLocale, 'home.khatmPage'), page].filter(Boolean).join(' ')
+      }
+      onPress={() => {
+        if (page !== null) requestMushafPage(page);
+        // navigate, not push: the mushaf is a TAB, and pushing one stacks a
+        // second copy of it over the tabs instead of switching to it.
+        router.navigate('/mushaf');
+      }}
+      onPressIn={press.onPressIn}
+      onPressOut={press.onPressOut}
+      style={[{ flex: 1 }, press.style]}
+    >
+      <GlassSurface style={{ flex: 1, padding: 16, gap: 4 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View
+            style={{
+              ...KHATM_MARK,
+              borderRadius: 1,
+              // Muted when there is no mark: the colour is what says a khatm is
+              // running, so an unset card must not wear it at full strength.
+              backgroundColor: marked ? theme.ribbon : theme.border,
+            }}
+          />
+          <Text
+            testID="home-khatm-value"
+            numberOfLines={1}
+            style={{
+              color: theme.text,
+              fontFamily: fonts.displaySemiBold,
+              // The invitation is words, not a figure, so it cannot be set at
+              // the counters' display size -- "Start khatm" at 34pt wraps to
+              // three lines in a half-width card.
+              fontSize: invite ? typography.body : COUNTER_SIZE,
+            }}
+          >
+            {/* A dash while the read is in flight, the same stand-in the
+                counters use -- a page number the file may not hold must not be
+                painted first and corrected after. */}
+            {invite ? t(uiLocale, 'home.startKhatm') : (page ?? '—')}
+          </Text>
+        </View>
+        {invite ? null : (
+          <Text style={{ color: theme.mutedText, fontSize: typography.caption }}>
+            {t(uiLocale, 'home.khatmPage')}
+          </Text>
+        )}
+      </GlassSurface>
+    </AnimatedPressable>
   );
 }
 

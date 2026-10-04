@@ -74,6 +74,10 @@ export interface MushafPagerProps {
   onWordLongPress: (word: MushafWord) => void;
   /** A tap on any page. Toggles the chrome (ruling 3). */
   onTap: () => void;
+  /** Passed through to every page for the khatm ribbon's drop. A stable
+   *  boolean -- it moves only when the device setting does -- so it does not
+   *  cost this pager the 604-child re-render a live prop would. */
+  reduceMotion: boolean;
   /** Two facing pages per child instead of one, anchored from the right.
    *
    *  Landscape only (ruling R-B2), and decided from the measured box rather

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { localDay, streakFrom, weeklyLog } from './counters';
+import { localDay, weeklyLog } from './counters';
 
 describe('localDay', () => {
   afterEach(() => {
@@ -24,40 +24,6 @@ describe('localDay', () => {
 
   it('pads a single-digit month and day', () => {
     expect(localDay(new Date(2026, 0, 5, 12, 0, 0))).toBe('2026-01-05');
-  });
-});
-
-describe('streakFrom', () => {
-  it('counts consecutive days ending today', () => {
-    expect(streakFrom(['2026-08-24', '2026-08-23', '2026-08-22'], '2026-08-24')).toBe(3);
-  });
-
-  it('still counts a streak that ended yesterday', () => {
-    // Opened at 09:00 having read last night: the streak is alive until the
-    // day is missed entirely. Resetting at midnight would show 0 to someone
-    // with a 40-day run.
-    expect(streakFrom(['2026-08-23', '2026-08-22'], '2026-08-24')).toBe(2);
-  });
-
-  it('is zero when the last reading was two days ago', () => {
-    expect(streakFrom(['2026-08-22', '2026-08-21'], '2026-08-24')).toBe(0);
-  });
-
-  it('stops at the first gap', () => {
-    expect(streakFrom(['2026-08-24', '2026-08-22', '2026-08-21'], '2026-08-24')).toBe(1);
-  });
-
-  it('crosses a month boundary', () => {
-    // Date arithmetic done on the string would give 2026-08-00 here.
-    expect(streakFrom(['2026-09-01', '2026-08-31'], '2026-09-01')).toBe(2);
-  });
-
-  it('crosses a year boundary', () => {
-    expect(streakFrom(['2027-01-01', '2026-12-31', '2026-12-30'], '2027-01-01')).toBe(3);
-  });
-
-  it('is zero with no history at all', () => {
-    expect(streakFrom([], '2026-08-24')).toBe(0);
   });
 });
 

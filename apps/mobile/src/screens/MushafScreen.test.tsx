@@ -34,6 +34,13 @@ const mocks = vi.hoisted(() => ({
   position: null as { surahId: number; ayahNumber: number; page: number | null } | null,
   bookmarks: [] as { surahId: number; ayahNumber: number; note: string | null }[],
   recordReadingPosition: vi.fn(),
+  /** The stored khatm page, and the two writers behind the chrome button. */
+  khatmPage: null as number | null,
+  /** The READ failing, which is its own state: `loadFails` covers the corpus,
+   *  and a khatm that cannot be read is what disables the button. */
+  khatmReadFails: false,
+  setKhatmPage: vi.fn(),
+  clearKhatmPage: vi.fn(),
   setBookmark: vi.fn(),
   setBookmarkNote: vi.fn(),
   useRecitation: vi.fn(),
@@ -48,6 +55,10 @@ const mocks = vi.hoisted(() => ({
   loadFails: false,
   continuousPlay: false,
   focusTeardowns: [] as Array<() => void>,
+  // Kept so a test can re-focus the tab without unmounting it: a tab screen
+  // stays mounted when the user leaves, so "coming back to the mushaf" is a
+  // focus callback running again and nothing else.
+  focusCallbacks: [] as Array<() => void | (() => void)>,
   hideChrome: vi.fn(),
   releaseChrome: vi.fn(),
   appStateListeners: [] as Array<(state: string) => void>,
@@ -89,6 +100,7 @@ vi.mock('expo-router', async () => {
     useIsFocused: () => mocks.isFocused,
     useFocusEffect: (callback: () => void | (() => void)) => {
       React.useEffect(() => {
+        mocks.focusCallbacks.push(callback);
         const teardown = callback();
         // Kept so a test can run the BLUR half without unmounting: a tab screen
         // is not unmounted when the user leaves it, which is the whole reason
@@ -185,6 +197,18 @@ vi.mock('@/data/userRepository', () => ({
     mocks.setBookmarkNote(...args);
     return Promise.resolve();
   },
+  getKhatmPage: () =>
+    mocks.khatmReadFails
+      ? Promise.reject(new Error('database is locked'))
+      : Promise.resolve(mocks.khatmPage),
+  setKhatmPage: (...args: unknown[]) => {
+    mocks.setKhatmPage(...args);
+    return Promise.resolve();
+  },
+  clearKhatmPage: (...args: unknown[]) => {
+    mocks.clearKhatmPage(...args);
+    return Promise.resolve();
+  },
 }));
 vi.mock('@/audio/recitationContext', () => ({
   useRecitationController: () => ({
@@ -246,6 +270,7 @@ vi.mock('@/mushaf/mushafReaderData', () => ({
 }));
 
 import { MushafScreen } from './MushafScreen';
+import { requestMushafPage, takeMushafPage } from '@/mushaf/pageRequest';
 
 beforeEach(() => {
   mocks.readerProps = [];
@@ -261,8 +286,16 @@ beforeEach(() => {
   mocks.loadFails = false;
   mocks.continuousPlay = false;
   mocks.focusTeardowns = [];
+  mocks.focusCallbacks = [];
+  // Module state: a page one test requested and did not consume is visible to
+  // the next one.
+  takeMushafPage();
   mocks.appStateListeners = [];
   mocks.recordReadingPosition.mockClear();
+  mocks.khatmPage = null;
+  mocks.khatmReadFails = false;
+  mocks.setKhatmPage.mockClear();
+  mocks.clearKhatmPage.mockClear();
   mocks.hideChrome.mockClear();
   mocks.releaseChrome.mockClear();
   mocks.toggleAyah.mockClear();
@@ -327,6 +360,56 @@ describe('MushafScreen', () => {
     expect(props()['initialPage']).toBe(106);
   });
 
+  it('opens on a page another tab asked for, not on the saved position', async () => {
+    // Home's khatm card. The mark is deliberately NOT the reading position --
+    // reading past it does not move it -- so opening on the saved page would
+    // land somewhere other than the khatm every time.
+    mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
+    requestMushafPage(107);
+
+    const props = await renderScreen();
+
+    expect(props()['initialPage']).toBe(107);
+  });
+
+  it('jumps to a requested page when the tab is already open', async () => {
+    // The usual case, not the exception: the mushaf is a tab, so it is already
+    // mounted and `initialPage` is long since spent. Remounting it on the
+    // request instead would throw away the pager the reader is looking at.
+    mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
+    const props = await renderScreen();
+    expect(props()['focusPage']).toBeNull();
+
+    requestMushafPage(107);
+    await act(async () => {
+      mocks.focusCallbacks.forEach((callback) => callback());
+    });
+
+    expect(props()['initialPage']).toBe(106);
+    expect(props()['focusPage']).toBe(107);
+  });
+
+  it('jumps again when the same page is requested a second time', async () => {
+    // The dead-button case. `focusPage` is a prop the pager compares, and the
+    // request behind it is state: a request that was not cleared as it was
+    // consumed is a value that cannot CHANGE back to itself, so the second tap
+    // on Home's khatm card would move nothing at all.
+    requestMushafPage(107);
+    const props = await renderScreen();
+
+    // Away from it, exactly as a reader swiping would -- this is also what
+    // clears `focusPage` once the pager has arrived.
+    turnTo(props, 106);
+    expect(props()['focusPage']).toBeNull();
+
+    requestMushafPage(107);
+    await act(async () => {
+      mocks.focusCallbacks.forEach((callback) => callback());
+    });
+
+    expect(props()['focusPage']).toBe(107);
+  });
+
   it('opens on the Fatiha when nothing has been read', async () => {
     const props = await renderScreen();
 
@@ -340,6 +423,132 @@ describe('MushafScreen', () => {
     const props = await renderScreen();
 
     expect(props()['initialPage']).toBe(1);
+  });
+
+  it('marks the page the reader is on, at the page-s OWN first ayah', async () => {
+    // Page 106 opens mid-ayah: An-Nisa 176 is a tail carried over from 105, and
+    // the first ayah that BEGINS here is Al-Ma'idah 1. The index would answer
+    // 4:176 (`startAyahNumber` is the ayah a page opens IN), and that
+    // coordinate belongs to the page before.
+    mocks.position = { surahId: 4, ayahNumber: 176, page: 106 };
+    mocks.pageLines.set(106, [
+      { words: [{ surahId: 4, ayahNumber: 176, position: 7 }] },
+      { words: [{ surahId: 5, ayahNumber: 1, position: 1 }] },
+    ]);
+    await renderScreen();
+
+    await act(async () => (mocks.chromeProps.at(-1)?.['onToggleMark'] as () => void)());
+
+    await waitFor(() =>
+      expect(mocks.setKhatmPage).toHaveBeenCalledWith(expect.anything(), {
+        page: 106,
+        surahId: 5,
+        ayahNumber: 1,
+      }),
+    );
+    expect(mocks.clearKhatmPage).not.toHaveBeenCalled();
+  });
+
+  it('marks rather than lifts when nothing is marked', async () => {
+    // The gate on `markedPage !== null`. Without it the one button lifts a mark
+    // that does not exist -- a write the reader did not ask for, into a file
+    // that survives app updates -- and the page they meant to mark stays
+    // unmarked.
+    mocks.khatmPage = null;
+    mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
+    mocks.pageLines.set(106, [{ words: [{ surahId: 5, ayahNumber: 82, position: 1 }] }]);
+    await renderScreen();
+
+    expect(mocks.chromeProps.at(-1)?.['marked']).toBe(false);
+    await act(async () => (mocks.chromeProps.at(-1)?.['onToggleMark'] as () => void)());
+
+    await waitFor(() => expect(mocks.setKhatmPage).toHaveBeenCalledTimes(1));
+    expect(mocks.clearKhatmPage).not.toHaveBeenCalled();
+  });
+
+  it('lifts the mark when the page in view is the marked one', async () => {
+    mocks.khatmPage = 106;
+    mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
+    mocks.pageLines.set(106, [{ words: [{ surahId: 5, ayahNumber: 82, position: 1 }] }]);
+    await renderScreen();
+
+    await waitFor(() => expect(mocks.chromeProps.at(-1)?.['marked']).toBe(true));
+    await act(async () => (mocks.chromeProps.at(-1)?.['onToggleMark'] as () => void)());
+
+    await waitFor(() => expect(mocks.clearKhatmPage).toHaveBeenCalledTimes(1));
+    expect(mocks.setKhatmPage).not.toHaveBeenCalled();
+  });
+
+  it('marks, not lifts, on a page that is not the marked one', async () => {
+    // One mark (R-C1). Standing on page 200 with 106 marked, the button MOVES
+    // the mark -- it does not lift the one on the page the reader cannot see.
+    mocks.khatmPage = 106;
+    mocks.position = { surahId: 5, ayahNumber: 82, page: 200 };
+    mocks.pageLines.set(200, [{ words: [{ surahId: 7, ayahNumber: 1, position: 1 }] }]);
+    await renderScreen();
+
+    expect(mocks.chromeProps.at(-1)?.['marked']).toBe(false);
+    await act(async () => (mocks.chromeProps.at(-1)?.['onToggleMark'] as () => void)());
+
+    await waitFor(() =>
+      expect(mocks.setKhatmPage).toHaveBeenCalledWith(expect.anything(), {
+        page: 200,
+        surahId: 7,
+        ayahNumber: 1,
+      }),
+    );
+    expect(mocks.clearKhatmPage).not.toHaveBeenCalled();
+  });
+
+  it('writes nothing when the page-s rows have not arrived', async () => {
+    // `pageLines` is empty until the fetch lands, and a write on an empty page
+    // would have to invent its coordinates.
+    mocks.position = { surahId: 5, ayahNumber: 82, page: 106 };
+    await renderScreen();
+
+    await act(async () => (mocks.chromeProps.at(-1)?.['onToggleMark'] as () => void)());
+
+    expect(mocks.setKhatmPage).not.toHaveBeenCalled();
+    expect(mocks.clearKhatmPage).not.toHaveBeenCalled();
+  });
+
+  it('marks a page that begins no ayah at all', async () => {
+    // 2:282 alone fills more than a page, so `firstAyahOnPage` is legitimately
+    // null and the page's opening word is the honest coordinate. The mark still
+    // has to land -- a page the reader cannot mark is the defect here, and the
+    // page number is the payload either way.
+    mocks.position = { surahId: 2, ayahNumber: 282, page: 48 };
+    mocks.pageLines.set(48, [{ words: [{ surahId: 2, ayahNumber: 282, position: 40 }] }]);
+    await renderScreen();
+
+    await act(async () => (mocks.chromeProps.at(-1)?.['onToggleMark'] as () => void)());
+
+    await waitFor(() =>
+      expect(mocks.setKhatmPage).toHaveBeenCalledWith(expect.anything(), {
+        page: 48,
+        surahId: 2,
+        ayahNumber: 282,
+      }),
+    );
+  });
+
+  it('tells the reader which page carries the ribbon', async () => {
+    // It travels inside `highlights` from MushafReader, not as a pager prop --
+    // but the screen is what reads it, so this is where the wiring is pinned.
+    mocks.khatmPage = 300;
+    await renderScreen();
+
+    await waitFor(() => expect(mocks.readerProps.at(-1)?.['khatmPage']).toBe(300));
+  });
+
+  it('disables the mark button when the stored mark cannot be read', async () => {
+    // "Unreadable" and "unmarked" look identical, and only one is safe to act
+    // on: marking over a failed read overwrites a khatm the database still
+    // holds.
+    mocks.khatmReadFails = true;
+    await renderScreen();
+
+    await waitFor(() => expect(mocks.chromeProps.at(-1)?.['markUnavailable']).toBe(true));
   });
 
   it('records a page turn against the page-s own opening ayah', async () => {

@@ -64,6 +64,7 @@ const props = {
     playing: null,
     landingProgress: 0,
     pressed: null,
+    khatmPage: null,
   },
   ayahTexts: new Map([
     [ayahKey(2, 1), 'ALIF LAM MIM'],
@@ -75,6 +76,7 @@ const props = {
   uiLocale: 'en' as const,
   onWordLongPress: () => {},
   onTap: () => {},
+  reduceMotion: false,
 };
 
 const lineBoxesOf = (container: HTMLElement) =>
@@ -104,6 +106,19 @@ const glyphFontSizeOf = (glyph: HTMLElement) =>
   parseFloat((glyph.parentElement as HTMLElement).style.fontSize);
 
 describe('MushafPage', () => {
+  it('hangs the khatm ribbon on the marked page, and only on it', () => {
+    // The carrier and the drawing, pinned together. `khatmPage` rides in
+    // `highlights` rather than as a pager prop (see HighlightsProvider), so a
+    // field quietly dropped from that object leaves the ribbon drawable and
+    // never drawn -- with no type error, because the page still compiles.
+    render(<MushafPage {...props} highlights={{ ...props.highlights, khatmPage: 106 }} />);
+    expect(screen.getByTestId('khatm-ribbon')).toBeTruthy();
+
+    cleanup();
+    render(<MushafPage {...props} highlights={{ ...props.highlights, khatmPage: 107 }} />);
+    expect(screen.queryByTestId('khatm-ribbon')).toBeNull();
+  });
+
   it('draws pages 1 and 2 as their occupied block, not on the full grid', () => {
     // The only two pages the layout does not fill. On a 15-line grid al-Fatiha
     // sat in the top half of the screen over half a page of blank paper; the

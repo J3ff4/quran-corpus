@@ -59,6 +59,7 @@ const props = {
   initialPage: 106,
   landingAyah: null,
   bookmarkedKeys: new Set<string>(),
+  khatmPage: null,
   playingAyah: null,
   focusPage: null,
   uiLocale: 'en' as const,

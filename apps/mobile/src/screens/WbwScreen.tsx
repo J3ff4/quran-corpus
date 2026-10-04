@@ -6,6 +6,7 @@ import { createExpoSqliteClient, type ExpoSqliteLike, type MobileDataClient } fr
 import type { Word } from '@quran-corpus/data/mobile';
 import { AdjacentNavButton } from '@/components/AdjacentNav';
 import { Icon } from '@/components/icons/Icon';
+import { ArabicSizeStepper } from '@/components/ArabicSizeStepper';
 import { HeaderCard } from '@/components/HeaderCard';
 import { LanguageSheet } from '@/components/LanguageSheet';
 import { SearchHeaderButton } from '@/components/SearchHeaderButton';
@@ -371,6 +372,9 @@ export function WbwScreen({ surahId, from: initialFrom }: WbwScreenProps) {
                   <Icon name="globe" color={theme.accent} />
                 </Pressable>
               </View>
+              {/* Arabic size, two taps instead of a trip to Settings (R-C6).
+                  The same stored value Settings writes. */}
+              <ArabicSizeStepper uiLocale={uiLocale} />
               <SegmentedControl
                 options={DENSITY_OPTIONS.map((option) => ({
                   value: option.value,

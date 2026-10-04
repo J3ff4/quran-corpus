@@ -22,26 +22,6 @@ function shiftDay(day: string, delta: number): string {
   return shifted.toISOString().slice(0, 10);
 }
 
-/**
- * Consecutive reading days ending today or yesterday.
- *
- * Yesterday counts (decision 22 is "any reading", and a streak that resets at
- * midnight tells a 40-day reader they have 0 the moment they open the app).
- * Anything older is a broken streak.
- */
-export function streakFrom(days: readonly string[], today: string): number {
-  const seen = new Set(days);
-  let cursor = seen.has(today) ? today : shiftDay(today, -1);
-  if (!seen.has(cursor)) return 0;
-
-  let streak = 0;
-  while (seen.has(cursor)) {
-    streak += 1;
-    cursor = shiftDay(cursor, -1);
-  }
-  return streak;
-}
-
 /** Days the weekly log covers. Exported because the screen queries the same
  *  window it renders: two independent 7s would let the fetched range and the
  *  drawn range drift apart silently. */

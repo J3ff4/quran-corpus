@@ -25,6 +25,7 @@ import {
 import { useThemeColors } from '@/theme/themeContext';
 
 import { BismillahLine } from './BismillahLine';
+import { KhatmRibbon } from './KhatmRibbon';
 import { MushafLineRow } from './MushafLineRow';
 import { PageCorners } from './PageCorners';
 import { SurahBand } from './SurahBand';
@@ -61,6 +62,11 @@ export interface MushafPageProps {
   onWordLongPress: (word: MushafWord) => void;
   /** A tap anywhere on the page. Toggles the chrome (ruling 3). */
   onTap: () => void;
+  /** A prop, not `useReducedMotion()` read here: that hook reaches the settings
+   *  store, and a page is rendered by suites that mock neither. The reader
+   *  already holds the value, and it changes only when the device setting does
+   *  -- so it costs the pager nothing to pass a stable boolean down. */
+  reduceMotion: boolean;
 }
 
 /** The ayahs this page touches, in mushaf order, deduplicated. */
@@ -98,6 +104,7 @@ export function MushafPage({
   uiLocale,
   onWordLongPress,
   onTap,
+  reduceMotion,
 }: MushafPageProps) {
   const theme = useThemeColors();
   const { ready } = useMushafPageFont(page);
@@ -198,6 +205,11 @@ export function MushafPage({
       renderToHardwareTextureAndroid
       style={{ width, height, backgroundColor: theme.background }}
     >
+      {/* Absolute, so it hangs in the corner without entering the line grid's
+          flex flow. Inside the Pressable rather than beside it: the page is
+          what gets rasterised into the hardware layer, and a ribbon painted
+          outside that layer would re-draw on every frame of a turn. */}
+      <KhatmRibbon marked={highlights.khatmPage === page} reduceMotion={reduceMotion} />
       <View
         style={{
           flex: 1,

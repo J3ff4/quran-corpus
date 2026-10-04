@@ -607,26 +607,148 @@ Build and install as in S4a Task 11 — no native dependency is added here, so `
 
 | # | Check | Result |
 |---|---|---|
-| 700 | Unmarked pages show no ribbon anywhere in the book | |
-| 701 | Tap the ribbon button → ribbon drops onto the page in madder crimson | |
-| 702 | Kill the app, reopen → ribbon still on the same page | |
-| 703 | Mark a page that opens mid-ayah; stored coordinate is that page's own first ayah, not the previous page's | |
-| 704 | Mark a second page → the first ribbon is gone (one mark, R-C1) | |
-| 705 | Tap the button on the marked page → ribbon lifts | |
-| 706 | Reading on past the mark does not move it (it is deliberate, not automatic) | |
-| 707 | The automatic continue-reading position still works and is unaffected | |
-| 708 | Ribbon colour reads as silk on both light and dark paper | |
-| 709 | Reduced motion → ribbon appears with no drop | |
-| 710 | TalkBack: the button says mark/lift; the ribbon is not a second node | |
-| 711 | Font stepper in the reader: four steps, both ends disabled correctly | |
-| 712 | Font stepper in morphology: same four steps, same stored value | |
-| 713 | Change the size in the kebab → Settings shows the new value, and vice versa | |
-| 714 | Mushaf has **no** kebab and **no** size control (R-C5, R-C6) | |
-| 715 | Upgrade path: install over the previous build — existing bookmarks, notes and position all survive | |
+| 700 | Unmarked pages show no ribbon anywhere in the book | **PASS** — swept 414-419; ribbon drawn only on the marked page, 0 ribbon px elsewhere |
+| 701 | Tap the ribbon button → ribbon drops onto the page in madder crimson | **PASS** — ribbon appears in `rgb(194,81,90)` = `#C4515A`, the dark-paper token |
+| 702 | Kill the app, reopen → ribbon still on the same page | **PASS** — `am force-stop` + relaunch, ribbon still on the same page |
+| 703 | Mark a page that opens mid-ayah; stored coordinate is that page's own first ayah, not the previous page's | **BLOCKED** — see note below; no device with a virgin `reading_history` |
+| 704 | Mark a second page → the first ribbon is gone (one mark, R-C1) | **PASS** — marked 416, 414's ribbon gone; one mark only |
+| 705 | Tap the button on the marked page → ribbon lifts | **PASS** — button flips to "Lift the mark"; ribbon gone, and still gone after a restart |
+| 706 | Reading on past the mark does not move it (it is deliberate, not automatic) | **PASS** — marked 416, read on to 419, returned: mark still exactly on 416 |
+| 707 | The automatic continue-reading position still works and is unaffected | **PASS** — read to 418, Home shows "Al-Ahzab 33:1" (page 418), not the marked 416 |
+| 708 | Ribbon colour reads as silk on both light and dark paper | **PASS** (measured) — `#A8323C` on `#FAF8F3` = **6.21:1**; `#C4515A` on `#151412` = **4.10:1**; both clear AA non-text. "Reads as silk" is the owner's call |
+| 709 | Reduced motion → ribbon appears with no drop | **PASS** (2026-10-04, vc91) — upgraded from PARTIAL. The earlier run was right that a single screencap cannot resolve a 220ms drop; sampling one frame per repeat at a known delay can. Twelve samples with Reduce animations on returned only 0 or the settled 220px at full opacity — no intermediate height, no partial fade. See 718. |
+| 710 | TalkBack: the button says mark/lift; the ribbon is not a second node | **PASS** (2026-10-04, vc91) — verified against the accessibility tree, which is what TalkBack reads. The button's `content-desc` is "Mark this page" unmarked and "Lift the mark" marked. The ribbon contributes four `ViewGroup` nodes, every one with empty desc, empty text, `focusable=false`, `clickable=false`, so screen-reader navigation never stops on them: the focusable set is header, page number, 7 ayahs, 3 chrome buttons, reciter, play, 5 tabs — no ribbon. Spoken output itself still unheard; the tree is unambiguous. |
+| 711 | Font stepper in the reader: four steps, both ends disabled correctly | **PASS** — Small/Medium/Large/Extra large; up disabled at top, down at bottom, no wrap |
+| 712 | Font stepper in morphology: same four steps, same stored value | **PASS** — same stepper on the WbW screen, carrying the value set in the reader |
+| 713 | Change the size in the kebab → Settings shows the new value, and vice versa | **PASS** both ways — morphology → Settings showed Large; Settings → reader showed Extra large |
+| 714 | Mushaf has **no** kebab and **no** size control (R-C5, R-C6) | **PASS** — mushaf chrome exposes only Go to / Mark / Search / Reciter / Play |
+| 715 | Upgrade path: install over the previous build — existing bookmarks, notes and position all survive | **PASS** — vc87→vc88 in place; bookmark, note text and position all survived the v5 migration |
+
+**Device run 2026-10-03, vc89, OnePlus GM1917 (`adb-358b6f97`).** 13 PASS, 1 PARTIAL,
+1 BLOCKED, 1 NOT RUN.
+
+**A crash fixed first (`d02c5ce`).** vc88 killed the process outright on opening the
+Mushaf tab: `khatmRibbonTranslateY` was a plain module function called from inside
+`useAnimatedStyle`'s body, which runs on the UI thread, and Worklets throws fatally
+rather than hopping threads. `'worklet';` on the helper, as `bookmarkExit`'s `rowExit`
+has carried since the identical crash on Bookmarks in September. **No test can catch
+this class:** vitest does not run `react-native-reanimated/plugin`, so the directive is
+an inert string literal under test and its absence fails nothing. Verified instead in
+the shipped bundle — two worklets from `KhatmRibbon.tsx` where the crashing build had
+one.
+
+**Why 703 is blocked, and why that is not a defect.** `setKhatmPage`'s `ON CONFLICT`
+branch updates `khatm_page` alone, by design and by its own docstring: on a database
+that has been read, the automatic position is not ours to move. The `surahId`/`ayahNumber`
+it takes therefore reach the file only through the INSERT branch, which exists to satisfy
+`reading_history`'s NOT NULL coordinates on a virgin row. So the `position === 1` choice
+has observable consequences **only on a device that has never recorded a reading
+position** — and the phone under test has years of one. The tablet dropped off the adb
+bridge mid-run. This check needs a fresh install on a second device; it cannot be run by
+wiping the owner's phone.
+
+**One unexplained observation, not reproducing.** On the very first launch of vc89 the
+ribbon was drawn on page 414, and after navigating two pages away and back it was gone,
+with the button reading "Mark this page" and enabled (so the read had succeeded and
+returned null, not errored). Every subsequent mark survived navigation, a force-stop and
+a cold start. The only `clearKhatmPage` caller is `lift`, which was not tapped. The
+likeliest origin is the vc88 crash loop that immediately preceded it — the process was
+dying on every mushaf mount. Flagged rather than buried; worth one look if it recurs.
 
 Check 715 is not optional. The user DB survives app updates and this phase migrates it; installing over a previous build is the only way to test the migration that will actually run on the owner's phone. A debug-signed local APK **cannot** upgrade over an EAS build — if the installed build is an EAS one, this check needs a matching signature or it is recorded as **not run**, not as a pass.
 
-- [ ] Record every result, fill the Verification Log, commit, push. **Do not open the PR.**
+- [x] Record every result, fill the Verification Log, commit, push. **Do not open the PR.**
+
+### Task 6: The ribbon's exit, and a khatm entry on Home (follow-up, 2026-10-03)
+
+Owner asked for two things after the device run:
+
+1. **The ribbon had no exit.** `if (!marked) return null` unmounted the view in the
+   same render that cleared the mark, so the retract animated a shared value nothing
+   was drawing — a lift read as the ribbon blinking out. Fix: keep it drawn until the
+   exit lands (`drawn` state + `withTiming`'s completion through `runOnJS`, the shape
+   `BookmarksScreen`'s row exit already uses), and make the exit a **retract**, not a
+   reverse drop: the silk rises its whole 56dp length under a clipping parent, no
+   fade, 280ms — pulled out of the book rather than evaporating (owner's call over a
+   symmetric 24dp rise and over a fade-only exit).
+   `khatmRibbonTranslateY` is **deleted**: offset and opacity are now plain shared
+   values the style worklet reads directly, so there is no imported call inside
+   `useAnimatedStyle` and no way back to the vc88 crash class.
+2. **A khatm entry on Home.** Owner ruling: it **replaces the day-streak counter**
+   (half-width, beside Roots studied) rather than taking a card of its own. Streak
+   display, its `getReadingDays` read and `counters.ts`'s `streakFrom` are deleted —
+   git holds them if it comes back. Marked → the page number over "Khatm page";
+   read landed with no mark → "Start khatm"; still loading or unreadable → a dash,
+   never the invitation (an unreadable mark is not an absent one).
+   The page reaches the mushaf through `src/mushaf/pageRequest.ts`, a one-shot module
+   store in the shape of `chromeVisibility` beside it, **not** a route param: the
+   mushaf is a tab and stays mounted, so a param sticks to the route and a second tap
+   on the same card would be a value that never changes. `router.navigate`, not
+   `push` — pushing a tab stacks a second copy of it.
+
+| # | Check | Result |
+|---|---|---|
+| 716 | Lift the mark → the ribbon RETRACTS upward under the page's top edge; no blink, no fade | **PASS** (measured) — through the retract the ribbon's top stays pinned at the page edge (y=241 in every frame) while its bottom rises: heights 220 → 205 → 199 → 161 → 112 → 78 → gone. Not a blink (six intermediate heights), not a fade (colour holds `rgb(192,79,88)` at h=78, the same silk as at rest — a fade would blend toward the page's `rgb(21,20,18)`). |
+| 717 | Mark again right after a lift → the drop is the short 24dp fall, not a 56dp one | **PASS** (measured) — across ten samples of the drop the visible height never starts below **202px**; the retract, sampled by the same detector on the same page, reached **78px**. So the detector can see a short ribbon when one exists, and the enter branch never produces one: the fall is the 24dp `DROP`, not the 56dp `LENGTH`. |
+| 718 | Reduced motion → a lift removes the ribbon at once, with no retract | **PASS** (measured) — with Reduce animations on, twelve samples across both directions returned only two values: 0 or the full 220px at full opacity. No intermediate height, no partial fade. The same sampling with the setting off produced **eleven** distinct intermediate heights. |
+| 719 | Home shows the marked page as a number over "Khatm page", where the streak used to be | **PASS** — Home's card row is exactly two half-width cards, Khatm page and Roots studied. The khatm card reads **401** over "Khatm page" with the crimson ribbon glyph. No day-streak counter anywhere on the screen. |
+| 720 | No mark on the file → the card reads "Start khatm"; tapping opens the mushaf where it would have opened anyway | **PASS** — lifted, the card reads **"Start khatm"** with the glyph muted to paper. Tapping it landed on a screen **byte-identical** to the one the plain Mushaf tab lands on (md5 equal, mean abs diff 0.0) — it opens where it would have opened anyway. No "—" placeholder flicker on arrival (the `settled` fix). |
+| 721 | Marked → tap the card: the mushaf opens on exactly that page. Back to Home, tap again: it jumps again | **PASS** — tapped the card, got page 401; returned to Home and tapped again, got page 401 a second time, **byte-identical** to the first (md5 equal). The one-shot re-arms. |
+| 722 | Roots studied is untouched — same half-width card, same weekly bars | **PASS** — same half-width card, same `0`, same seven weekly bars, unchanged between the marked and unmarked captures. |
+
+**Device run 2026-10-04, vc91, OnePlus GM1917 (`adb-358b6f97`).** 716-722 all PASS, and
+709/710 upgraded off the back of the same technique. Nothing left failing.
+
+**How the motion checks were measured, since the obvious way does not work.** A screencap
+costs ~280ms end to end, so a burst of them samples a 220ms animation exactly once — the
+first frame, and then nothing until it is over. That is why the vc89 run could only call
+709 PARTIAL. The fix is to stop sampling one run and start sampling many: fire the toggle,
+`sleep` a known fraction of a second, take **one** frame, and repeat with a different
+delay. Each repeat contributes one point and the points reconstruct the curve. On this
+device `screenrecord` does not exist and `settings put` is blocked, so this is the only
+instrument available — and it is enough, because the three properties under test (height,
+top edge, saturation) are all readable from a still.
+
+The detector matters as much as the sampling. The drop fades in from `fade: 0`, so a
+strict colour match for the settled silk is blind to its first half; the measurements
+above use a loose "reddish and clearly above the page's near-black" mask and report the
+implied opacity, which is what makes 717's floor of 202px meaningful rather than an
+artefact of the threshold.
+
+**703 is still blocked, and for a new reason.** It needs a virgin `reading_history`. The
+tablet (`adb-R52XC0AYMZZ`, now on vc91) would have supplied one, but it is PIN-locked and
+a lockscreen is not something to work around; the OnePlus has years of reading position
+and `pm clear` on the owner's phone is not a test, it is data loss. Unblocks on the next
+device with a fresh install.
+
+Gates on the implementation: mobile `type-check` 0 (**both halves** — `tsconfig.json`
+AND `tsconfig.test.json`, which is what CI runs; an earlier pass ran only the first and
+reported 0 while 109 errors stood in four mushaf suites), `eslint` 0, 134 files /
+1651 tests green. Mutation-checked: the retract distance, the `drawn` mount, the
+invitation's error gate, the request's clearing (which caught a vacuous test of its own
+first), the cold-vs-warm branch, `useUserDbOnFocus`'s settled flag and `getKhatmPage`'s
+read-side range check each break a named test when reverted.
+
+**§5 DOES need an independent review, and it ran.** The earlier waiver here was scoped
+to Task 6 and written as though it covered the branch: Task 6 alone touches no data
+layer, but the branch carries migration 5, `setKhatmPage`/`clearKhatmPage` and a new
+`RangeError` validator — all three §5 triggers at once. `/code-review` ran 2026-10-03
+on the whole branch; findings and dispositions below.
+
+### `/code-review` 2026-10-03 — dispositions
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | `type-check` red: `khatmPage` and `reduceMotion` made required, 4 suites not updated (109 errors) | **Fixed.** `highlights.test.ts` literals + `marks()`, `MushafPager`/`MushafReader`/`MushafRotation` prop objects. Real, mine, CI-blocking — the earlier gate ran only `tsc --noEmit`, not the `-p tsconfig.test.json` half the script and CI both run. |
+| 3 | Home card swaps "Start khatm" for the placeholder on every focus/resume | **Fixed in the shared hook.** `useUserDbOnFocus` narrowed `loading` on `data === null`, a proxy for "never resolved" that is wrong for any load whose own answer is null. Now a `settled` flag. Fixes every future null-answering consumer, not just this card. |
+| 4 | `getKhatmPage` returns the row unvalidated; `pageRequest`'s docstring claims a guarantee it lacks | **Fixed.** Symmetric range check on read, out-of-range/non-numeric read as no mark rather than thrown (a corrupt row must not take Home down). Docstring now credits the read guard, not the write guard. |
+| 7 | `onToggleMark`'s `useCallback` is inert — depends on `khatm`, a fresh object each render | **Fixed.** Depends on `khatm.mark`/`khatm.lift`, which are `useCallback`-stable. |
+| 5 | §5 waiver scoped to Task 6, written as if it covered the PR; checks 716-722 blank | **Fixed** (waiver above). Checks run on vc91, 2026-10-04: 716-722 all PASS, and 709/710 upgraded in the same pass. |
+| 2 | `KhatmRibbon` animates inside the page's hardware layer | **Deferred to the device run, not declined.** The claim is plausible and the counter-argument in the inline comment is weak — a turn animates the pager, not the ribbon. But the only honest verdict is a framestats gap measurement (3 repeats, gaps inside the animation window), and that needs the owner's phone. Added as check 723.  **Resolved 2026-10-04: not supported.** Check 723 measured it — one extra dropped frame per mark+lift, at a different phase each repeat, against a control that drops frames too. No change made. |
+| 6 | Arabic size stepper rebuilds the reader's offset table with no re-anchor | **Real, out of scope here.** Pre-existing in kind — reachable from Settings before this branch — but the new stepper puts it one tap away mid-read. Filed as issue #110 rather than fixed inside a branch already carrying three §5 triggers. |
+| 8 | `reading_days` is now write-only | **Accepted, no change.** One row per reading day costs nothing and the plan deliberately keeps the write so a returning streak needs no backfill. The dead `getReadingDays` re-export through `userRepository` goes when something next touches that file. |
+
+| 723 | Mark and lift on a dense page → framestats gaps inside the 220/280ms window, 3 repeats, vs. the same page untouched | **PASS, and finding 2 is not supported.** 90Hz (11.11ms frames), 3 repeats each, idle gaps >100ms excluded. Control (chrome reveal+hide on the same page, ribbon untouched): max gap **22.5ms**, no gap above two frames. Mark+lift: max gap **33.4ms**, exactly one such gap per repeat. One extra dropped frame — and it lands at a different phase each time (t+290ms, t+713ms, t+1025ms; the last **after** both animations had ended), so it is not a stall tied to the drop or the retract. Test runs also had *fewer* two-frame gaps than the control (7 vs 13) and a lower p95 frame duration (23.3ms vs 26.5ms). No hardware-layer thrash. |
 
 ## Acceptance criteria
 

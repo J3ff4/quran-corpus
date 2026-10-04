@@ -66,6 +66,7 @@ const marks = (landingProgress: number) => ({
   playing: null,
   landingProgress,
   pressed: null,
+  khatmPage: null,
 });
 
 afterEach(() => {
@@ -86,6 +87,7 @@ const props = {
   onPageChange: vi.fn(),
   onWordLongPress: vi.fn(),
   onTap: vi.fn(),
+  reduceMotion: false,
 };
 
 /** Fires a whole finger turn through React, so the window state it sets is

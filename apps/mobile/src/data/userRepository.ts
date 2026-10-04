@@ -5,8 +5,10 @@
 // for both the schema and the statements that read it.
 export {
   NOTE_MAX_LENGTH,
+  clearKhatmPage,
   countDistinctRootsViewed,
   getBookmarks,
+  getKhatmPage,
   getLastReadingPosition,
   getReadingDays,
   getRootViewsByDay,
@@ -18,6 +20,8 @@ export {
   saveSetting,
   setBookmark,
   setBookmarkNote,
+  setKhatmPage,
   type Bookmark,
+  type KhatmPageInput,
   type ReadingPosition,
 } from '@quran-corpus/data/user-db';

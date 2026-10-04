@@ -52,7 +52,7 @@ vi.mock('expo-router', async () => {
   };
 });
 
-function Probe({ load }: { load: (client: unknown) => Promise<string> }) {
+function Probe({ load }: { load: (client: unknown) => Promise<string | null> }) {
   const { data, loading, error } = useUserDbOnFocus(load, 'Unable to load');
   return (
     <div>
@@ -118,6 +118,31 @@ describe('useUserDbOnFocus', () => {
 
     second.resolve('fresh');
     await waitFor(() => expect(screen.getByText('fresh')).toBeTruthy());
+  });
+
+  it('settles a read whose own answer is null, instead of re-reporting a spinner', async () => {
+    // `loading` used to be narrowed on `data === null`, which is only a proxy
+    // for "never resolved". A load that legitimately answers null -- getKhatmPage
+    // when no page is marked -- never satisfied it, so every focus and every
+    // resume re-raised loading for the whole read. On Home that is not a
+    // spinner but a label: the khatm card swapped the words "Start khatm" for
+    // its placeholder and back, on every return to the tab.
+    const second = deferred<string | null>();
+    let reads = 0;
+    render(<Probe load={() => (++reads === 1 ? Promise.resolve(null) : second.promise)} />);
+
+    await waitFor(() => expect(screen.getByText('idle')).toBeTruthy());
+    expect(screen.getByText('no-data')).toBeTruthy();
+
+    act(() => {
+      mocks.focusCallbacks.at(-1)?.();
+    });
+
+    expect(screen.getByText('idle')).toBeTruthy();
+
+    await act(async () => {
+      second.resolve(null);
+    });
   });
 
   it('reloads when the app is resumed on a screen that never lost focus', async () => {
