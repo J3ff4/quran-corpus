@@ -43,8 +43,13 @@ a `sleep` between them or every one after the first is dropped.
 **Device settings changed for this run**, recorded so they can be put back:
 screen timeout 10min -> 30min, continuous play OFF -> ON, reciter Husary (Murattal)
 -> Abdul Basit (Murattal), theme -> Light, interface language -> Russian and back to
-English. Ringer was already SILENT and was left alone. All are restored at the end
-of the run.
+**Device settings changed for this run**, all now RESTORED: screen timeout
+30min -> 10min, continuous play -> off, reciter -> Mahmoud Khalil Al-Husary
+(Murattal), theme -> System, interface language -> English, Reduce animations ->
+off, OS font scale -> 1.0, Arabic size -> Medium, word-by-word layout -> Dense.
+The ringer was already SILENT and was left alone. The two bookmarks this device
+carried (An-Nahl 16:90, Aal-Imran 3:191) were deleted by checks 162 and 163 and
+have been re-created, both without notes, as they were.
 
 ## Results
 
@@ -125,6 +130,29 @@ of the run.
 | 146 | OS font scale at maximum, reader header | **PASS** | OS font scale 1.35 (the device maximum; `settings put system font_scale` works on this tablet where it is blocked on the OnePlus). The collapsed header reads "Al-Baqara ⌄" centred and uncut, back arrow left, kebab right, the two surah chevrons flanking the Translation/Words control below. Nothing clipped or overlapping -- the Task 8 Step 4 risk does not bite. NOTE: the header name is empty at the top of a surah at EVERY font scale -- that is the collapsing-header pattern (the name lives in the content plate until you scroll past it), not a defect; verified by A/B at 1.0 and 1.35. |
 | 147 | Dark theme, both new chevrons | **PASS** | Dark theme, al-Baqara so both chevrons are enabled: glyphs reach luminance 237 on grounds of 30 and 18, i.e. **14.24:1** and **16.00:1**. Plainly visible against the glass; not the invisible-on-dark case. |
 
+| 79 *(m6f)* | Play a single ayah | **PASS** | The OTHER check 79 -- the checklist uses the number twice, for m6e's rail-vs-wrapped (resolved, above) and for m6f's "Play a single ayah". Covered by the audio run: tap to first sound measured at 820ms against a ~2s budget (STOPPED -> BUFFERING at 1.58s, PLAYING at 2.40s on the same clock), and the bar shows a moving position -- the scrubber read 0:02 / -0:02 on a 4.7s track and tracked three seeks exactly. |
+| 148 | **Upgrade over the M6r build without clearing app data** | **BLOCKED** | The migration's real test is an upgrade over the M6r build with app data intact. That already happened when vc92 was installed on this device, and it cannot be re-run without first installing the older build and downgrading the data -- which would risk the owner's user DB for no new information. The surviving evidence is indirect but real: two pre-existing bookmarks were present and intact under vc92, each with an empty note. |
+| 149 | Scroll a list of 60+ bookmarks | **BLOCKED** | Needs 60+ bookmarks; this device has 2. Seeding 58 more into the owner's user DB and deleting them again is a larger write than any check requires. Wants a seeded device. (The 1000-row frequency list in check 93 exercises the same list component's scrolling and its last row clears the tab pill.) |
+| 150 | Add, edit and clear a note | **PASS** | Full cycle. Add: note saved, card shows it, the row action flips "Add note" -> "Edit note". Edit: appended text saved and redisplayed. Clear: emptied and saved, action back to "Add note", and the BOOKMARK SURVIVES -- still "2 ayahs · 2 surahs", both cards present. Persistence verified across an `am force-stop` + relaunch mid-cycle. Cancel on an edit also discards correctly (a 500-char edit was abandoned and the original 24-char note came back). |
+| 151 | Type past 500 characters | **PASS** | Measured by appending 50-character chunks and reading the field back out of the accessibility tree each time: 357 -> 407 -> 457 -> **500** -> 500 -> 500. Two further chunks add nothing, so the cap is exactly 500 and nothing is silently lost. The counter reads "Characters left · 0" in the warning colour at the cap. NOTE: a single 520-char `input text` burst lands only ~333 of its characters -- that is adb dropping, not the field, which is why the chunked method is the one that proves anything here. |
+| 152 | A note in Arabic, Uzbek and Russian | **BLOCKED** | `adb shell input text` is ASCII-only -- Arabic raises "Exception occurred while executing 'text'", and Uzbek's oʻ/gʻ and Cyrillic are non-ASCII too. No stock adb path sets the clipboard to paste from either. Needs the owner typing on the on-screen keyboard. |
+| 153 | All three tabs | **PASS** | Recent is newest-first, with a known insertion order: 3:191 was bookmarked last and is listed first, 16:90 second. By surah groups under surah headers ("Aal-Imran" header, then the card). With notes lists only noted bookmarks -- "No notes yet" while neither had one, and the noted card appeared once a note was added. |
+| 154 | Un-bookmark an ayah that carries a note | **PASS** | Un-bookmarking a noted ayah raises a confirm; Cancel keeps both the bookmark and its text (verified in the reader, check 168); Delete removes both (verified on the bookmarks card, check 163). No dialog at all when the bookmark carries no note -- check 162's row went straight out. |
+| 155 | Menu, both themes | PASS, check undercounts the rows | Menu renders cleanly in both themes -- four cards with icon, title, subtitle and chevron, consistent spacing. The check says THREE rows; there are FOUR: Morphology, Bookmarks, Settings, About & credits, plus an "On this device" privacy note below them. Morphology was added after the check was written. All four were opened during this run and each landed on the right screen. |
+| 156 | Change every setting, kill the app, reopen | **PASS** | Changed every setting, `am force-stop`, relaunched. Persisted: UI locale (Uzbek), theme (Dark), reciter (Abdul Basit), Arabic size (Large -- verified by pill geometry, x=1127..1240 identical before and after, since the control exposes no selected state to the tree, issue #91), WbW layout, Reduce animations. Continuous play and note content were verified across separate restarts earlier (checks 87 and 150). |
+| 157 | Switch UI locale to Uzbek, then Russian | PASS, one exception | Uzbek: Menu is Menyu / Morfologiya / Xatcho'plar / Sozlamalar / Dastur haqida; Settings is O'qish, Arab yozuvi o'lchami, Kichik/O'rtacha/Katta/Juda katta, Qiroat, Qori, Ketma-ket ijro, Ko'rinish, Mavzu, Tizim/Yorug'/Qorong'i, Animatsiyalarni kamaytirish, Til, Interfeys; About is Quran Corpus haqida, Matn va tarjima, "Usmoniy yozuvidagi Qur'on matni, Tanzil'dan", "Manba tasdig'i tugallanmagan". Russian verified under check 94. The only English left is correct: source names, reciter names, the language name "English" itself, and "GNU General Public License" as a licence's legal name. EXCEPTION: the header up-affordance announces "Navigate up" in English in every locale -- React Navigation's default label, not one of ours. |
+| 158 | About | **PASS** | Every source named, in four groups. Text and translation: Tanzil, corpus.quran.com (GNU General Public License), QUL, Saheeh International, Tasnim, Abu Adel, vkorane.ru. Dictionary: Lane's Lexicon (via qurandev/roots, public domain), Hans Wehr, and the editorial roots written for this app. Recitation: everyayah.com and ten reciters. Typefaces: Newsreader, Hafs, KFGQPC, surah-name-v2/v4. The **OFL notice is present** -- "SIL Open Font License 1.1. Copyright 2020 The Newsreader Project Authors." S1's GPL obligations are discharged in place: the source offer renders between the credit groups and "Read the GNU General Public License" opens a screen carrying the full GPLv2 text. Nothing truncated -- the last card's two-line body ends "...One glyph per surah at PUA codepoint 0xE000 + surah number." Unapproved sources carry an honest "Source approval incomplete" badge. |
+| 159 | Full pass over all nine sub-phases' screens in one session | PASS, with one regression | This run IS the full pass -- every sub-phase's screens exercised in one session on one build. The app reads as one design: the same glass surfaces, the same `SegmentedControl` in all six places it appears, the same confirm sheet in the reader and on the bookmarks card, consistent accent and typography across Home, Surahs, Mushaf, Dictionary, Menu, reader, Words, Bookmarks, Settings and About, and both themes coherent throughout. One regression found and filed: **check 141 / issue #112**. Nothing else from an earlier sub-phase had regressed. |
+| 160 | Bookmarks → Recent, look at the first card | **PASS** | The first card clears the segmented control: the control's pill ends at y~358 and the card's top edge is at y~437, ~79 physical px of page ground between them, visible in the capture. Not flush. |
+| 161 | Tap a card on its Arabic text, its note, and its empty space | **PASS** | Tapping the card's Arabic text (400,461) and its empty space (400,560) both open the reader at An-Nahl 16:90. Tapping the note icon opens the Add-note sheet and does NOT navigate; the delete icon raises the confirm sheet (163) and does not navigate either. |
+| 162 | Trash icon on a bookmark with **no** note | **PASS** | Trash on a bookmark with no note: the row went at once with no sheet, and the header count dropped "2 ayahs · 2 surahs" -> "1 ayah · 1 surah" -- correctly singularised. Force-stop and relaunch: still gone, still 1. |
+| 163 | Trash icon on a bookmark **with** a note | **PASS** | Trash on a noted bookmark raises the app's own glass sheet in the dark palette -- "Delete this bookmark? / Its note will be deleted with it. This cannot be undone." with Cancel and a red Delete -- not a white Material dialog. Cancel kept the row AND its note text; Delete removed both, taking the count to "0 ayahs · 0 surahs". |
+| 164 | Swipe a row left | **PASS** | A full left swipe reveals a red delete panel with a trash glyph and slides the card off it; tapping the panel behaved exactly as 162 (no note -> row gone at once). A partial swipe released springs back with the card in its normal position and nothing deleted. |
+| 165 | Compare the three tabs | **PASS** | Recent reads "An-Nahl 16:90" (surah + reference); By surah reads the bare "3:191" under an "Aal-Imran" header. Exactly the split the check asks for. |
+| 166 | Switch tabs in **all five** segmented controls (Bookmarks, Dictionary, Surahs, word-by-word, the reader header) | **PASS** | All five controls are ONE component -- `SegmentedControl`, called from DictionaryScreen:367, BookmarksScreen:366, SurahsScreen:334, WbwScreen:378 and ReaderHeader:129 (and the mushaf's PageJumpSheet:68, a sixth the check does not list). The slide is measured on the Bookmarks control: with motion on the pill passes through intermediate geometry -- width 634 at 30ms and 826 at 100ms before settling at 879 -- where under Reduce animations it reads 1869..2748 w=879 at EVERY delay from 30ms, i.e. it jumps. On mount it is already in place: entering the Surahs tab, the pill is x=20..818 at 30ms and identical 2s later. The source backs both halves -- `place(target, false)` on first placement, commented "without it every mount slides the pill in". |
+| 167 | TalkBack, swipe through one bookmark row | **PASS** | Three separate accessibility targets per row and no fourth: "Open An-Nahl 16:90", "Add note"/"Edit note", "Delete bookmark". The card itself is not a target -- its taps route through the link. |
+| 168 | Reader: un-bookmark an ayah that carries a note | **PASS** | Un-bookmarking a noted ayah in the READER raises the same glass sheet as 163, word for word and in the same layout, not the Material dialog M6h shipped. Cancel kept the bookmark and its note. |
+
 ## What the checklist itself got wrong
 
 Three checks and two more are no longer runnable as written, and that is a finding
@@ -143,21 +171,19 @@ about the checklist, not a gap in the build:
 
 ## Still to run
 
-Checks 148-190 (m6h bookmarks and notes, m6i settings and about, m6j sheet chrome,
-m6l row estimation), plus two deferred to a single screen-off batch at the end:
-**82**'s "audio continues while locked" half, and **88** (airplane mode), which
-cannot run earlier because both devices reach `adb` over the wifi the test switches
-off.
+Checks 169-190 (m6j sheet chrome, m6l row estimation), plus two deferred to a
+single screen-off batch at the end: **82**'s "audio continues while locked" half
+and **88** (airplane mode), which cannot run earlier because both devices reach
+`adb` over the wifi the test switches off.
 
-**86 needs the owner.** An audio-focus loss cannot be provoked from `adb` without
-driving a third-party app's UI or playing arbitrary media on the owner's tablet. It
-wants a real incoming call, or another audio app started by hand mid-recitation.
+**86 needs the owner** -- an audio-focus loss cannot be provoked from `adb` without
+driving a third-party app's UI or playing arbitrary media on the owner's tablet.
+**143 and 144 need TalkBack running**; label and state were verified present but the
+spoken output was not (issue #34). **148, 149 and 152 are blocked** for the reasons
+in their rows: a migration that cannot be re-run without risking the user DB, a
+60-bookmark list this device does not have, and `input text` being ASCII-only.
 
-**143 and 144 need TalkBack running.** Label and state were both verified present,
-on the device and in the source that built this APK, but the spoken output was not:
-turning TalkBack on changes every gesture on the owner's tablet and would break the
-harness mid-run. Issue #34 stays open for the listen.
-
-Note the checklist numbers **155-159 are used twice**, by m6i settings-and-about and
-by m6h bookmarks-and-notes. Both sets still have to run; the collision is in the
-source plans, not here.
+One real numbering collision: **79 is used twice**, by m6e (rail vs wrapped) and by
+m6f (play a single ayah). Both are answered above. The 148-168 range only *looks*
+like a collision -- m6h takes 148-154 and 160-168, m6i takes 155-159, and they
+interleave cleanly.
