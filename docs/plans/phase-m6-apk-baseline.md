@@ -100,6 +100,31 @@ of the run.
 | 95 | Search "qwl" | PASS, same deviation as the Expo Go run | The check as written cannot hold: a Buckwalter root is neither a verse reference nor translation text, so "qwl" returns the ROOTS arm alone. Three queries, one per kind, each opening the right screen: qwl -> ROOTS -> قول's root page; 16:90 -> the GO TO card -> reader at An-Nahl Ayah 90; mercy -> VERSES (31:3, 10:86, 27:77, 17:24) -> reader at Luqman with Ayah 3 in view. NOTE: an "Edl" search first read "Roots · 0"; reading the field back out of the a11y tree showed the query was stale, and a clean "Edl" gives Roots · 43. No case-sensitivity defect -- both arms lowercase. |
 | 96 | Concordance tap into 16:90 | **PASS** | Root عدل (28 occurrences, concordance order 2:48:16, 2:123:12 ... matching the DB exactly). Scrolled to the 16:90:4 row and tapped it: lands on An-Nahl with Ayah 90 at the top of the view (y398), 91 and 92 below. The M5c deep-link fix holds from the concordance caller. |
 
+| 124 | Surahs tab → Juz | **PASS** | Thirty juz rows, every one collapsed (no ranges in the tree), each subtitle a count. Counts cross-checked against the corpus: all 30 agree with `select juz, count(*) from ayahs group by juz`, summing to 6236. D42's assumption reads right. |
+| 125 | Tap Juz 1 | **PASS** | Tapping Juz 1 expands it in place to "Al-Fatiha, Ayahs 1–7" and "Al-Baqara, Ayahs 1–141" (7 + 141 = 148, the row's own count) and the juz list stays on screen -- 54 juz nodes still present, the reader did not open. |
+| 126 | Tap `Al-Baqarah 1–141` | **PASS** | Tapping "Al-Baqara, Ayahs 1–141" opens the reader at 2:1 (Ayah 1 first, surah plate above it). |
+| 127 | Expand Juz 2 with Juz 1 open | **PASS** | With Juz 1 open, expanding Juz 2 leaves both open: Al-Fatiha 1–7 and Al-Baqara 1–141 still listed, plus Al-Baqara 142–252 (= 111, Juz 2's count). Juz 1 also survived a round trip into the reader and back. |
+| 128 | Tap Juz 1 again | **PASS** | Tapping Juz 1 again drops its two ranges and leaves the row; Juz 2's range is untouched, so only the tapped juz collapsed. |
+| 129 | Juz → Surah → Juz | **PASS** | Juz -> Surah -> Juz leaves zero expanded ranges. D44 holds. |
+| 130 | Surahs tab → Revealed | **PASS** | Revealed opens with both eras expanded and the counts on the headers: MECCAN 86, MEDINAN 28, matching `select revelation_type, count(*) from surahs` exactly. Rows are in revelation order and agree with the DB's order_number (1 Al-Alaq, 4 Al-Muddaththir, 7 At-Takwir). |
+| 131 | Collapse Meccan | **PASS** | Collapsing Meccan leaves its header at y=214 and lifts MEDINAN to y=350, directly beneath it. Zero Meccan surah rows remain. |
+| 132 | Expand Meccan again | **PASS** | Re-expanding restores the list identically -- MECCAN at y214, first row "1, Al-Alaq" at y294, then 4/7/10/13/16/19 down the left column, same geometry as before the collapse. |
+| 133 | Read 2:50 in Mushaf → Translation | PASS, check off by one ayah | Read page 8 in the Mushaf (the page holding 2:50), then Home: "Continue reading Al-Baqara 2:49", and opening it puts Ayah 49 at the top. The check says 2:50; the mushaf records the ayah the PAGE OPENS IN, and `mushaf_layout` confirms page 8's first ayah by seq is 2:49 and that 2:49 begins on page 8. So the recorded position is right and the check's number is wrong. The substance -- not 2:1 -- holds. |
+| 134 | …→ back to Mushaf | **PASS** | Returning to the Mushaf tab after that round trip leaves it on page 8, still holding 2:49-2:51. |
+| 135 | 2:50 → Words chip | **PASS** | Words from the reader at 2:49 opens on the chunk "Ayahs 45–54", which contains ayah 50. |
+| 136 | Page Words to 2:55, press back | **PASS** | Next-ayahs on Words moves to "Ayahs 55–64"; one Back puts the reader on Ayah 55 at the top. The Words position propagates back. |
+| 137 | Open 2:1 from the surah list, immediately switch mode | **PASS** | Opening al-Baqara from the surah list lands on Ayah 1, and tapping Words immediately opens "Ayahs 1–10" with Ayah 1 first. No jump -- the race this check targets does not bite. |
+| 138 | Next-surah chevron in al-Baqarah | **PASS** | Sampled one frame per repeat at six delays. Incoming content's leftmost ink sits at x=680 (40ms) and x=654 (80ms) -- a gap on the left, content pushed right -- and is full width (x~50) from 120ms on, i.e. it enters from the right. The back arrow's ink spans x=96..113 in ALL SIX frames: it does not animate. |
+| 139 | Press back after paging three surahs | **PASS** | Paged al-Baqara -> Aal-Imran -> An-Nisa -> Al-Maidah, then ONE system Back returned to the Surahs list rather than walking the three. D48 holds. |
+| 140 | Chevrons in al-Fatihah and an-Nas | **PASS** | Measured rather than eyeballed, and symmetric. Surah 1: Previous ink depth 66 vs Next 219. Surah 114: Previous 217 vs Next 66. Both chevrons are present in the accessibility tree at both ends -- neither vanishes. OBSERVATION: the dimmed state computes to 1.93:1 against its ground, under the 3:1 non-text minimum; exempt because the control is disabled, but it is faint. |
+| 141 | Play 2:50, then page to Aal-Imran | **FAIL** -- regression, issue #112 | Paging to the next surah hides the reader's bar but does NOT stop playback. `state=PLAYING(3)` with position advancing 2727 -> 5725 over 3s at speed 1.0, and continuous play kept walking al-Baqara underneath -- paging back revealed it had reached Ayah 13. Because the reader is a pushed stack screen the MiniPlayer never renders over it, so the recitation is audible, advancing, and has no transport anywhere on screen. The M6r Expo Go run recorded PASS for this check, so it is a regression; traced to `2996092a` (phase M8, one recitation engine), which replaced the surah-keyed `useRecitation` with an app-wide engine plus an ownership test that governs only painting. |
+| 142 | Words screen chevrons | **PASS** | Words screen's Next-surah chevron pages to Aal-Imran and opens at "Ayahs 1–10", Ayah 1 first. |
+| 143 | TalkBack on a juz row | **PARTIAL** | Label and state are both present in the shipped build: the row's accessible name is "Juz 1, 148 ayahs" (juz + count, read off the device), and `BrowseList.tsx:114` attaches `accessibilityState: { expanded }` on disclosures only -- surah rows deliberately omit it so a navigating row is not announced as collapsed. The spoken output is still unverified: enabling TalkBack changes every gesture on the owner's tablet and would break the harness mid-run. Issue #34 stays open for the listen. |
+| 144 | TalkBack on an era header | **PARTIAL** | Same shape. Era header's accessible name is "Meccan, 86" / "Medinan, 28" (era + count, read off the device) and `BrowseList.tsx:410` sets `accessibilityState={{ expanded: section.expanded !== false }}` from `SurahsScreen.tsx:297`. Spoken output still owed -- issue #34. |
+| 145 | Reduce animations on, page a surah | **PASS** | With Reduce animations on, the incoming surah's leftmost ink is at x=47 at EVERY sampled delay (40/80/120/180ms), against x=680 and x=654 at 40/80ms with motion on. The slide is gone. The cross-fade itself resolves faster than this instrument's ~40ms floor, so it is asserted as "not a slide" rather than measured as a fade. |
+| 146 | OS font scale at maximum, reader header | **PASS** | OS font scale 1.35 (the device maximum; `settings put system font_scale` works on this tablet where it is blocked on the OnePlus). The collapsed header reads "Al-Baqara ⌄" centred and uncut, back arrow left, kebab right, the two surah chevrons flanking the Translation/Words control below. Nothing clipped or overlapping -- the Task 8 Step 4 risk does not bite. NOTE: the header name is empty at the top of a surah at EVERY font scale -- that is the collapsing-header pattern (the name lives in the content plate until you scroll past it), not a defect; verified by A/B at 1.0 and 1.35. |
+| 147 | Dark theme, both new chevrons | **PASS** | Dark theme, al-Baqara so both chevrons are enabled: glyphs reach luminance 237 on grounds of 30 and 18, i.e. **14.24:1** and **16.00:1**. Plainly visible against the glass; not the invisible-on-dark case. |
+
 ## What the checklist itself got wrong
 
 Three checks and two more are no longer runnable as written, and that is a finding
@@ -118,17 +143,21 @@ about the checklist, not a gap in the build:
 
 ## Still to run
 
-Checks 124-190 (m6r reader navigation, m6h bookmarks and notes, m6i settings and
-about, m6j sheet chrome, m6l row estimation), plus two deferred to a single
-screen-off batch at the end of the run: **82**'s "audio continues while locked"
-half, and **88** (airplane mode), which cannot be done earlier because both
-devices reach `adb` over the same wifi the test would switch off.
+Checks 148-190 (m6h bookmarks and notes, m6i settings and about, m6j sheet chrome,
+m6l row estimation), plus two deferred to a single screen-off batch at the end:
+**82**'s "audio continues while locked" half, and **88** (airplane mode), which
+cannot run earlier because both devices reach `adb` over the wifi the test switches
+off.
 
-**86 needs the owner.** An audio-focus loss cannot be provoked from `adb`
-without driving a third-party app's UI or playing arbitrary media on the owner's
-tablet. It wants a real incoming call, or another audio app started by hand while
-a recitation runs.
+**86 needs the owner.** An audio-focus loss cannot be provoked from `adb` without
+driving a third-party app's UI or playing arbitrary media on the owner's tablet. It
+wants a real incoming call, or another audio app started by hand mid-recitation.
 
-Note the checklist numbers **155-159 are used twice**, by m6i settings-and-about
-and by m6h bookmarks-and-notes. Both sets still have to run; the collision is in
-the source plans, not here.
+**143 and 144 need TalkBack running.** Label and state were both verified present,
+on the device and in the source that built this APK, but the spoken output was not:
+turning TalkBack on changes every gesture on the owner's tablet and would break the
+harness mid-run. Issue #34 stays open for the listen.
+
+Note the checklist numbers **155-159 are used twice**, by m6i settings-and-about and
+by m6h bookmarks-and-notes. Both sets still have to run; the collision is in the
+source plans, not here.
