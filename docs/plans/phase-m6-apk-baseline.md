@@ -213,18 +213,24 @@ about the checklist, not a gap in the build:
 
 ## Still to run
 
-Two checks, both needing the screen off, batched to the end of the run because
-either can cost the `adb` connection: **82**'s "audio continues while locked" half
-and **88** (airplane mode) — both devices reach `adb` over the wifi check 88
-switches off.
+**88 (airplane mode) — owed, deferred by the owner 2026-10-04.** It needs the
+tablet's wifi off, and wifi is the only transport `adb` reaches it on, so running it
+costs the connection and possibly a re-pair at the device. It wants a USB-connected
+device, where wifi can be toggled without losing `adb`.
 
 **86 needs the owner** — an audio-focus loss cannot be provoked from `adb` without
 driving a third-party app's UI or playing arbitrary media on the owner's tablet; it
-wants a real incoming call or another audio app started by hand mid-recitation.
-**143 and 144 need TalkBack running**; label and state were verified present but not
-the spoken output (issue #34). **148, 149 and 152 are blocked** for the reasons in
-their rows: a migration that cannot be re-run without risking the user DB, a
-60-bookmark list this device does not have, and `input text` being ASCII-only.
+wants a real incoming call, or another audio app started by hand mid-recitation.
+
+**143 and 144 need TalkBack running.** Label and state were both verified present —
+on the device and in the source that built this APK — but not the spoken output.
+Turning TalkBack on changes every gesture on the owner's tablet and would have
+broken the harness mid-run. Issue #34 stays open for the listen.
+
+**148, 149 and 152 are blocked** for the reasons in their rows: a migration that
+cannot be re-run without risking the user DB, a 60-bookmark list this device does
+not have, and `adb shell input text` being ASCII-only.
 
 **The phone still owes the layout checks.** Everything here ran at 876dp, an
-expanded window class. Behaviour carries over; phone layout does not.
+expanded window class, so S4a's responsive layout is what rendered. Checks that
+assert behaviour carry over to the phone; checks that assert phone layout do not.
