@@ -51,6 +51,25 @@ The ringer was already SILENT and was left alone. The two bookmarks this device
 carried (An-Nahl 16:90, Aal-Imran 3:191) were deleted by checks 162 and 163 and
 have been re-created, both without notes, as they were.
 
+## Result
+
+**116 of M6's 117 checks run on the APK: 103 PASS, 1 FAIL, 2 PARTIAL, 4 BLOCKED**,
+plus 3 obsolete, 2 superseded and 1 already-resolved rows that are findings about
+the checklist rather than the build. Check 88 is the one outstanding.
+
+The one failure is **141**, filed as **issue #112**: paging to another surah hides
+the reader's transport but does not stop the recitation, which keeps playing and
+keeps advancing through the previous surah with no transport anywhere on screen.
+The M6r Expo Go run recorded that check as PASS, so it is a regression, traced to
+`2996092a` (phase M8).
+
+What the APK proved that Expo Go could not: the media3 session really registers
+(`active=true`, surah and reciter in its metadata, a MediaStyle notification, audio
+continuing with the screen asleep and the keyguard up), decision 28's Arabic shaping
+holds on the release bundle, and the release build's scrolling is clean under load
+(39570 frames at 0.00% janky on the 1000-row frequency list, 11110 at 0.05% through
+al-Baqara).
+
 ## Results
 
 | # | Check | Verdict | Evidence |
@@ -90,7 +109,7 @@ have been re-created, both without notes, as they were.
 
 | 80 | Scrub | **PASS** | Scrub, measured on ayah 7 (15.02s track). Drags to 20/50/90% read 0:03/-0:12, 0:07/-0:07, 0:13/-0:01 -- every pair sums to the track length and the fill matches the drag. Backward seeks verified too, so the result cannot be confused with elapsed time. NOTE: dumpsys media_session position goes stale while PAUSED (read 274ms where the UI read 0:11); the UI is the instrument here. |
 | 81 | Continuous play through a surah boundary case (al-Fatiha, 7 ayahs) | **PASS** | Continuous play across al-Fatiha, sampled 3393x over 130s. Exactly SEVEN tracks (5224/6347/4571/4702/6922/5433/15020 ms), then STOPPED at 52.3s and still stopped 77s later. Does not wrap, does not restart. Reader bar parks on "Ayah 7 - Play", resumable. |
-| 82 | Lock the screen mid-ayah | **PARTIAL** | Lock-screen controls: notification is posted, MediaStyle, category=transport, flags=NO_CLEAR|FOREGROUND_SERVICE, bound via android.mediaSession token; android.title="Al-Fatiha", android.text="Mahmoud Khalil Al-Husary (Murattal)" -- surah AND reciter, as required. Session active=true. Carries no Notification.Action buttons: media3 lets the system draw transport from the session. OBSERVATION: vis=PRIVATE, so content on a secure lock screen depends on the user's sensitive-notification setting. "Audio continues while locked" deferred to the screen-off batch. |
+| 82 | Lock the screen mid-ayah | **PASS** | Both halves. Controls: the media session is active=true with metadata "An-Nahl, Mahmoud Khalil Al-Husary (Murattal)" -- surah AND reciter -- behind a MediaStyle notification (category=transport, flags=NO_CLEAR|FOREGROUND_SERVICE, android.title="An-Nahl", android.text the reciter) bound by an android.mediaSession token; it carries no Notification.Action buttons because media3 lets the system draw transport from the session. Continuity: with the screen asleep and isKeyguardShowing=true, position advanced 1798 -> 4804 (t+3s) -> 10814 (t+8s) at speed 1.0 on a 33.5s track. OBSERVATION: vis=PRIVATE, so what a secure lock screen shows of the content depends on the viewer's sensitive-notification setting. |
 | 83 | Lock-screen transport, Android 13+ | **PASS** | Transport keys dispatched to the session: MEDIA_PAUSE -> PAUSED(2) at 1657ms; MEDIA_PLAY -> PLAYING(3) resuming 1657->2972; MEDIA_NEXT -> position reset to 2 with buffered 6347 (= ayah 2's length), i.e. it advanced. OBSERVATION: the legacy PlaybackState bitmask 7339979 omits SKIP_TO_NEXT(32) and SKIP_TO_PREVIOUS(16) though next demonstrably works -- affects legacy controllers reading the bitmask, not media3's own command set. |
 | 84 | Listen across an ayah boundary | **PASS** | Six ayah seams measured from state transitions: 190, 130, 130, 150, 150, 120 ms. Max 190ms against a ~1s fail threshold. Every seam passes through BUFFERING, so each ayah is fetched fresh -- these numbers are wifi numbers and would widen on a slow link. Cold start from tap to sound: 820ms. |
 | 85 | Play with the device in silent mode | **PASS** | Ringer was already SILENT (mode_ringer=0) for the entire run, so all seven ayahs above played under it. Explicit re-check: STREAM_MUSIC Muted=false at volume 8/15 on speaker, positions advancing 0 -> 1872 -> 4876. Structural reason: ringer-affected streams = SYSTEM|RING|NOTIFICATION|DTMF, which excludes STREAM_MUSIC. |
