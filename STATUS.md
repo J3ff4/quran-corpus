@@ -7,9 +7,39 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-10-04
+Updated: 2026-10-06
 
 ## Now
+
+**2026-10-06 — PR #115 merged (squash `eb8fbfe`). The small meem: drawn only where
+the mushaf draws one.** CI green both jobs. Fix lives in the FONT, not the corpus —
+`ayahs.text_uthmani` untouched (DB mtime 2026-09-21; 4807 U+06ED / 2445 U+06E2 / 22
+U+06D8 all still there). Pristine fonts recoverable at `0ef0dadd^`, sha256s in
+`packages/scraper/scraper/hafs_meem.py`.
+
+- **Two populations, one rule: which SIDE the meem sits on.** Meem on the side the
+  tanween does NOT occupy = staggering flag (6,643; U+06ED after fathatan/dammatan,
+  U+06E2 after kasratan) — mushaf draws a staggered tanween, no meem. Meem on the
+  tanween's OWN side = genuine iqlab (609: 99 kasratan+U+06ED, 240 fathatan/dammatan+
+  U+06E2, 270 noon+U+06E2). Waqf lazim U+06D8 (22) is a different codepoint, untouched.
+- **Patch = GSUB `rlig` ligature** collapsing each flag pair to the bare tanween, **+
+  U+06ED anchor** (0,0) → (191,1320) in all 10 mark records (9 MarkBasePos + 1
+  MarkLigPos over `Allah`). The null anchor drew the mark 760 units up through the
+  letter. KFGQPC v2.2 has the same defect — no upgrade out. Re-run
+  `uv run scraper hafs-low-meem` after any font bump; idempotent; the shipped-font
+  tests fail until it runs.
+- **Font EULA forbids modification; shipping a patched copy = owner decision
+  2026-10-06.** About credit no longer claims "used under its EULA".
+- **Tests read the table AND shape real words** (uharfbuzz, new scraper dev dep):
+  flags leave no glyph, every iqlab family + waqf sign still render, iqlab meem
+  clears the kasratan. 40 tests.
+- **`/code-review`: 10 findings, 9 fixed.** Declined: move flag stripping into
+  `stripQuranicAnnotations` instead — owner ruled font. Lever still open: it would
+  also keep flags out of copy/paste; the anchor half needs the font edit regardless.
+- **#114 closed invalid** — `words.text_arabic` keeping only the 99 kasratan U+06ED was
+  correct all along; the "missing" 4,708 are flags.
+- **Owed:** device checks 272/273 on vc94 (`quran-corpus-vc94.apk`). The post-build
+  commit changed only the MarkLigPos anchor, which no corpus word reaches.
 
 **2026-10-04 — PR #111 merged (squash `4523324`). Phase S4c: the khatm ribbon, a
 Home card for it, and the Arabic size stepper.** CI green both jobs. One deliberate
