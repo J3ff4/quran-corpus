@@ -1,6 +1,9 @@
 """The low-meem anchor repair, and a guard on the fonts we actually ship."""
 
+import os
+import tempfile
 from collections.abc import Callable
+from functools import cache
 from pathlib import Path
 
 import pytest
@@ -276,3 +279,162 @@ def _drop_flag_ligatures(font: TTFont) -> None:
                     ligatures[first] = kept
                 else:
                     del ligatures[first]
+
+
+# --- what a shaper actually draws ----------------------------------------
+#
+# Everything above reads the GSUB table. A ligature can be present, resolve to
+# the right glyph and be referenced by rlig, and still never fire -- so these
+# run the real shaper over real words and assert the glyphs that come out.
+
+WAQF_SIGN = "\u06d8"
+
+#: (label, text, codepoint, must the glyph be in the shaped output?)
+SHAPED_CASES = [
+    (
+        "18:2 tanziilan, fathatan flag",
+        "\u062a\u064e\u0646\u0632\u0650\u064a\u0644\u064b\u06ed\u0627",
+        LOW_MEEM,
+        False,
+    ),
+    (
+        "2:41 musaddiqan, fathatan flag",
+        "\u0645\u064f\u0635\u064e\u062f\u0651\u0650\u0642\u064b\u06ed\u0627",
+        LOW_MEEM,
+        False,
+    ),
+    (
+        "2:2 hudan, fathatan flag",
+        "\u0647\u064f\u062f\u064b\u06ed\u0649",
+        LOW_MEEM,
+        False,
+    ),
+    (
+        "2:17 zulumaatin, kasratan flag",
+        "\u0638\u064f\u0644\u064f\u0645\u064e\u0670\u062a\u064d\u06e2",
+        HIGH_MEEM,
+        False,
+    ),
+    (
+        "2:41 kaafirin, kasratan IQLAB",
+        "\u0643\u064e\u0627\u0641\u0650\u0631\u064d\u06ed",
+        LOW_MEEM,
+        True,
+    ),
+    (
+        "18:15 bisultaanin, kasratan IQLAB",
+        "\u0628\u0650\u0633\u064f\u0644\u0652\u0637\u064e\u0670\u0646\u064d\u06ed",
+        LOW_MEEM,
+        True,
+    ),
+    ("19:4 akun, noon IQLAB", "\u0623\u064e\u0643\u064f\u0646\u06e2", HIGH_MEEM, True),
+    (
+        "2:26 waqf lazim",
+        "\u0645\u064e\u062b\u064e\u0644\u064b\u06ed\u0627 " + WAQF_SIGN,
+        WAQF_LAZIM,
+        True,
+    ),
+]
+
+
+@cache
+def _sfnt(path: Path) -> str:
+    """A path HarfBuzz can open.
+
+    It cannot read a compressed woff2, so the web font is decompressed to a
+    plain sfnt first -- which is what a browser does before shaping it too.
+    The tables under test are carried through untouched, so this still
+    exercises the bytes we ship rather than a rebuilt font.
+    """
+    font = TTFont(str(path))
+    if font.flavor is None:
+        return str(path)
+    font.flavor = None
+    handle, plain = tempfile.mkstemp(suffix=".ttf")
+    os.close(handle)
+    font.save(plain)
+    return plain
+
+
+def _shaped_glyph_names(path: Path, text: str) -> list[str]:
+    import uharfbuzz as hb
+
+    font = TTFont(str(path))
+    order = font.getGlyphOrder()
+    shaper = hb.Font(hb.Face(hb.Blob.from_file_path(_sfnt(path))))
+    buffer = hb.Buffer()
+    buffer.add_str(text)
+    # Script, direction and language from the text itself, exactly as a real
+    # text engine does -- pinning them by hand here could assert a pass under
+    # a configuration the apps never use.
+    buffer.guess_segment_properties()
+    hb.shape(shaper, buffer, {})
+    return [order[info.codepoint] for info in buffer.glyph_infos]
+
+
+@pytest.mark.parametrize("path", SHIPPED, ids=lambda p: p.name)
+@pytest.mark.parametrize(
+    ("label", "text", "codepoint", "present"),
+    SHAPED_CASES,
+    ids=[case[0] for case in SHAPED_CASES],
+)
+def test_the_shaper_draws_a_meem_only_where_the_mushaf_draws_one(
+    path: Path, label: str, text: str, codepoint: int, present: bool
+) -> None:
+    """The flags must leave no glyph, the iqlab meems and the waqf sign must.
+
+    The two populations use the same characters and differ only by which side
+    the meem sits on, so each case is named for the ayah it came from and what
+    the KFGQPC mushaf page font draws there -- checked by rendering those
+    pages' own glyphs, not by reading the rule back off our own constant.
+    """
+    font = TTFont(str(path))
+    glyph = font.getBestCmap()[codepoint]
+    names = _shaped_glyph_names(path, text)
+    assert (glyph in names) is present, (
+        f"{path.name}: {label}: U+{codepoint:04X} ({glyph}) "
+        f"{'missing from' if present else 'still in'} {names}"
+    )
+
+
+@pytest.mark.parametrize("path", SHIPPED, ids=lambda p: p.name)
+def test_the_shaped_iqlab_meem_clears_the_kasratan(path: Path) -> None:
+    """Both marks hang off the base's one below anchor and the font has no mkmk
+    entry for either, so nothing but this anchor keeps them apart. At the old
+    y820 they overlapped by 44.5% of the meem's ink; the bounding boxes have to
+    be disjoint, or the fix renders two marks as one blob."""
+    import uharfbuzz as hb
+    from fontTools.pens.boundsPen import BoundsPen
+
+    font = TTFont(str(path))
+    glyphs = font.getGlyphSet()
+    order = font.getGlyphOrder()
+    cmap = font.getBestCmap()
+    meem, kasratan = cmap[LOW_MEEM], cmap[KASRATAN]
+
+    shaper = hb.Font(hb.Face(hb.Blob.from_file_path(_sfnt(path))))
+    buffer = hb.Buffer()
+    buffer.add_str("\u0643\u064e\u0627\u0641\u0650\u0631\u064d\u06ed")  # 2:41 kaafirin
+    buffer.guess_segment_properties()
+    hb.shape(shaper, buffer, {})
+
+    boxes: dict[str, tuple[float, float]] = {}
+    x = y = 0
+    for info, position in zip(buffer.glyph_infos, buffer.glyph_positions, strict=True):
+        name = order[info.codepoint]
+        pen = BoundsPen(glyphs)
+        glyphs[name].draw(pen)
+        if pen.bounds and name in (meem, kasratan):
+            boxes[name] = (
+                pen.bounds[1] + y + position.y_offset,
+                pen.bounds[3] + y + position.y_offset,
+            )
+        x += position.x_advance
+        y += position.y_advance
+
+    assert set(boxes) == {meem, kasratan}, f"{path.name}: shaped {sorted(boxes)}"
+    meem_top, kasratan_bottom = boxes[meem][1], boxes[kasratan][0]
+    assert meem_top < kasratan_bottom, (
+        f"{path.name}: the meem's top ({meem_top:.0f}) is not below the "
+        f"kasratan's bottom ({kasratan_bottom:.0f}) -- the two marks collide"
+    )
