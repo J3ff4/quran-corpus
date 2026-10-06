@@ -304,6 +304,22 @@ the APK when the build window reopens.
     ships `usePressScale` with no consumer, so "it does not shrink" passes
     whether or not the hook honours the setting. Run it with 53.
 
+## Hafs Low-Meem Fix Smoke Test
+
+One check, on a physical device and in a browser. `uni06ED`'s mark anchor is
+invisible to vitest, to the type-checker and to any unit test — the only thing
+that can see a mark's position is a shaper drawing it.
+
+272. Reader → **18:2**, **20:4** and **19:5**, in **both themes**. Every tanween
+     that carries the ghunna meem shows it as a small meem **below** the word,
+     clear of the letters — not punched through the middle of `تَنزِيلًۭا`
+     or `بَأْسًۭا`. Then **2:41** (`كَافِرٍۭ`): the meem sits below the
+     kasratan with a visible gap, not on top of it. Then **19:4**
+     (`أَكُنۢ`): that meem is a different mark (U+06E2, after a plain noon)
+     and must still sit **above** the letter — if it moved, the patch
+     overreached. Repeat the first three on the web reader, which ships the
+     same font as a woff2.
+
 ## Current Status
 
 M0-M2 are complete. M3 (morphology) is implemented on `feat/m3-morphology`: an offline reader over a bundled SQLite DB, per-segment coloured word morphology behind a bottom sheet, word-detail and root screens, a word-by-word grid, and Hafs font loading with English/Uzbek/Russian translations. M3b then fixed the defects found on the first two device runs — sheet spring, basmala placement, navigation headers, the word-by-word screen's chrome, a four-step Arabic size setting and an in-app reduce-animations switch.

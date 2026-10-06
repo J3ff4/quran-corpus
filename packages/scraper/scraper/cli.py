@@ -920,5 +920,34 @@ def derive_root_glosses_cmd(db: str, languages: tuple[str, ...]) -> None:
         click.echo(f"{language_code}: {covered} of {total} roots covered")
 
 
+@main.command("hafs-low-meem")
+@click.argument("fonts", nargs=-1, type=click.Path(exists=True, dir_okay=False))
+def hafs_low_meem_cmd(fonts: tuple[str, ...]) -> None:
+    """Repair U+06ED's mark anchor in the shipped Hafs fonts.
+
+    Idempotent, so it is safe to re-run after a font upgrade -- and it must be
+    re-run, because every KFGQPC release so far carries the same defect. See
+    scraper/hafs_meem.py for what the defect is and why the anchor is where it is.
+    """
+    from .hafs_meem import PATCHED, patch_low_meem
+
+    targets = [Path(f) for f in fonts] or [
+        Path("../../apps/mobile/assets/fonts/hafs.ttf"),
+        Path("../../apps/web/src/app/fonts/hafs.18.woff2"),
+    ]
+    for target in targets:
+        if not target.exists():
+            raise click.ClickException(f"missing font {target}")
+        try:
+            changed = patch_low_meem(target)
+        except ValueError as exc:
+            raise click.ClickException(str(exc)) from exc
+        click.echo(
+            f"{target.name}: {changed} lookup(s) re-anchored to {PATCHED}"
+            if changed
+            else f"{target.name}: already patched"
+        )
+
+
 if __name__ == "__main__":
     main()
