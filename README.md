@@ -304,6 +304,40 @@ the APK when the build window reopens.
     ships `usePressScale` with no consumer, so "it does not shrink" passes
     whether or not the hook honours the setting. Run it with 53.
 
+## Hafs Small-Meem Fix Smoke Test
+
+Two checks, on a physical device and in a browser. Neither the GSUB ligature
+nor `uni06ED`'s mark anchor is visible to vitest, to the type-checker or to any
+unit test — the only thing that can see a mark get substituted or positioned is
+a shaper drawing it.
+
+The Uthmani text uses a small meem next to a tanween for two unrelated jobs and
+the two checks split on that. 6,643 of them flag a *staggered* tanween and the
+mushaf draws no mark for them at all; 609 are genuine iqlab meems and must
+render. See `packages/scraper/scraper/hafs_meem.py` for the full rule.
+
+272. **The flags must be gone.** Reader → **18:2** (`تَنزِيلًۭا`), **20:4**
+     (`بَأْسًۭا`) and **2:17** (`ظُلُمَٰتٍۢ`), in **both themes**. None of
+     these words shows a small meem anywhere — not below the letters, not
+     punched through them, and not above. The tanween alone. (Before the fix
+     the first two drew a meem through the middle of the word and the third
+     drew one above it.) Then **2:26**: the waqf lazim sign `ۘ` after
+     `مَثَلًۭا` is a *different* character that must still be there — it is
+     the small high meem standing alone between two words.
+
+273. **The iqlab meems must stay.** Reader → **2:41** (`كَافِرٍۭ بِهِۦ`): a
+     small meem sits **below** the kasratan with a visible gap, not fused into
+     it and not through the letters. Then **19:4** (`أَكُنۢ`): that meem is
+     U+06E2 after a plain noon and must still sit **above** the letter — if it
+     moved or vanished, the patch overreached.
+
+     On the **web** reader, 272 proves nothing: it paints `words.text_arabic`,
+     which already carries exactly the 609 genuine iqlab meems and none of the
+     6,643 flags, so the flags were never on screen there. Run 273 instead —
+     **18:15** (`بِسُلْطَٰنٍۭ`) for the low meem and **19:4** for the high one.
+     It ships the same font as a woff2, and the anchor fix is what it is
+     testing.
+
 ## Current Status
 
 M0-M2 are complete. M3 (morphology) is implemented on `feat/m3-morphology`: an offline reader over a bundled SQLite DB, per-segment coloured word morphology behind a bottom sheet, word-detail and root screens, a word-by-word grid, and Hafs font loading with English/Uzbek/Russian translations. M3b then fixed the defects found on the first two device runs — sheet spring, basmala placement, navigation headers, the word-by-word screen's chrome, a four-step Arabic size setting and an in-app reduce-animations switch.

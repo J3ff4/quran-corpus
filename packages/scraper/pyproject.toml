@@ -16,7 +16,9 @@ dependencies = [
   "click>=8.1.0",
   "lxml>=5.3.0",
   "defusedxml>=0.0.1",
-  "fonttools>=4.60.0",
+  # [woff] pulls brotli: without it fontTools cannot even *open* the web
+  # app's hafs.18.woff2, let alone re-save it (scraper/hafs_meem.py).
+  "fonttools[woff]>=4.60.0",
 ]
 
 [project.optional-dependencies]
@@ -37,6 +39,10 @@ dev = [
   "pytest-asyncio>=0.24.0",
   "ruff>=0.7.0",
   "mypy>=1.13.0",
+  # The only thing that can see a mark get substituted or positioned is a
+  # shaper drawing it: the structural shape of a GSUB table says nothing
+  # about whether the ligature fires (tests/test_hafs_meem.py).
+  "uharfbuzz>=0.39.0",
 ]
 
 [tool.ruff.lint]
