@@ -83,7 +83,7 @@ const sources: Source[] = [
     provides: 'The mushaf Arabic typeface used to render Quranic text.',
     license: 'KFGQPC EULA',
     note:
-      'Arabic mushaf typeface, © 2010 KFGQPC, used under its EULA for Quranic display. This app ships a modified copy, in two respects. The Uthmani text appends a small meem to a tanween to flag a staggered (mutarakkib) tanween, which KFGQPC\u2019s own mushaf page fonts draw as a staggered tanween and no mark at all; this face has no such glyph, so it drew a literal meem on 6,643 of them. A ligature was added so those are not drawn. Separately, U+06ED \u2014 the small low meem of a genuine iqlab, 99 of them \u2014 carries a null anchor that places it through the letter instead of below it, and that anchor was corrected. No outline, character mapping or other positioning was touched.',
+      'Arabic mushaf typeface, © 2010 KFGQPC. This app ships a modified copy, in two respects. The Uthmani text appends a small meem to a tanween to flag a staggered (mutarakkib) tanween, which KFGQPC\u2019s own mushaf page fonts draw as a staggered tanween and no mark at all; this face has no such glyph, so it drew a literal meem on 6,643 of them. A ligature was added so those are not drawn. Separately, U+06ED \u2014 the small low meem of a genuine iqlab, 99 of them \u2014 carries a null anchor that places it through the letter instead of below it, and that anchor was corrected. No outline, character mapping or other positioning was touched.',
   },
   {
     name: 'surah-name-v4 (quranfonts.com)',
