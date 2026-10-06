@@ -15,7 +15,7 @@ and draws a literal meem that the mushaf does not have. Verified against the
 KFGQPC page fonts we already ship for the mushaf tab: 2:2 `hudan` and 2:17
 `zulumaatin` both carry the flag and neither draws a meem.
 
-**The iqlab meem (339 marks, genuine).** Before a beh the noon sound becomes
+**The iqlab meem (609 marks, genuine).** Before a beh the noon sound becomes
 a meem, and the mushaf marks it with a real small meem on the tanween's *own*
 side -- U+06ED below a kasratan, U+06E2 above a fathatan or dammatan, and
 U+06E2 above a plain noon. These must render. U+06E2's anchors are sound;
@@ -52,12 +52,13 @@ The pre-patch files, for anyone checking our copies against upstream:
         apps/web/src/app/fonts/hafs.18.woff2    (the same font, subsetted)
 
 Both re-save byte-for-byte identical `glyf`, `name`, `post` and glyph order,
-and an identical cmap *mapping*; exactly 9 of the 361 mark records move, all
-of them U+06ED's, and one lookup is appended to GSUB. The cmap, head, GSUB
-and GPOS tables do re-serialize (cmap 668 -> 556 bytes, because fontTools
-shares one offset between the two identical format-4 subtables; head's
-`modified` and `checkSumAdjustment` always change), so a licence audit should
-diff the mapping and the outlines, not the table bytes.
+and an identical cmap *mapping*; exactly 10 of the 402 mark-attachment
+records move, all of them U+06ED's, and one lookup is appended to GSUB.
+The cmap, head, GSUB and GPOS tables do re-serialize (cmap 668 -> 556
+bytes, because fontTools shares one offset between the two identical
+format-4 subtables; head's `modified` and `checkSumAdjustment` always
+change), so a licence audit should diff the mapping and the outlines, not
+the table bytes.
 """
 
 from pathlib import Path
@@ -99,7 +100,11 @@ UNPATCHED = (0, 0)
 #: against every other glyph in the word) across all five tanween contexts.
 PATCHED = (191, 1320)
 
-_MARK_TO_BASE = 4
+#: MarkBasePos and MarkLigPos. U+06ED sits in both: nine mark-to-base
+#: lookups and one mark-to-ligature lookup over the `Allah` ligature. No
+#: corpus word puts a low meem on that ligature today, but a null anchor left
+#: there is the same defect waiting for one.
+_MARK_ATTACH = (4, 5)
 _LIGATURE = 4
 _RLIG = "rlig"
 
@@ -115,30 +120,31 @@ class PatchResult(NamedTuple):
         return bool(self.anchors or self.ligatures)
 
 
-def mark_records(font: TTFont, label: str) -> list:
-    """Every MarkBasePos record that positions the low meem.
+def mark_records(font: TTFont, label: str, codepoint: int = LOW_MEEM) -> list:
+    """Every mark-attachment record that positions `codepoint`.
 
-    Nine of them in both v0.18 and v2.2: the font repeats the mark array per
-    base-coverage group, so patching one lookup fixes only the bases in that
-    group and leaves the mark broken everywhere else.
+    Ten for the low meem in both v0.18 and v2.2: the font repeats the mark
+    array per base-coverage group (nine MarkBasePos lookups) and once more for
+    the ligature (one MarkLigPos), so patching one lookup fixes only the bases
+    in that group and leaves the mark broken everywhere else.
 
     `label` names the font in the error messages -- a path, not the reader's
     internals, so this works on a font that was built rather than opened.
     """
-    glyph = font.getBestCmap().get(LOW_MEEM)
+    glyph = font.getBestCmap().get(codepoint)
     if glyph is None:
-        raise ValueError(f"{label}: no glyph for U+06ED")
+        raise ValueError(f"{label}: no glyph for U+{codepoint:04X}")
 
     records = []
     for lookup in font["GPOS"].table.LookupList.Lookup:
-        if lookup.LookupType != _MARK_TO_BASE:
+        if lookup.LookupType not in _MARK_ATTACH:
             continue
         for subtable in lookup.SubTable:
             glyphs = subtable.MarkCoverage.glyphs
             if glyph in glyphs:
                 records.append(subtable.MarkArray.MarkRecord[glyphs.index(glyph)])
     if not records:
-        raise ValueError(f"{label}: U+06ED attaches to no base")
+        raise ValueError(f"{label}: U+{codepoint:04X} attaches to no base")
     return records
 
 
@@ -163,6 +169,28 @@ def _flag_pairs(font: TTFont, label: str) -> list[tuple[str, str]]:
     return pairs
 
 
+def ligatures(font: TTFont):
+    """Every two-glyph GSUB ligature, as (lookup index, first, second, result)."""
+    for index, lookup in enumerate(font["GSUB"].table.LookupList.Lookup):
+        if lookup.LookupType != _LIGATURE:
+            continue
+        for subtable in lookup.SubTable:
+            for first, entries in getattr(subtable, "ligatures", {}).items():
+                for ligature in entries:
+                    if len(ligature.Component) == 1:
+                        yield index, first, ligature.Component[0], ligature.LigGlyph
+
+
+def rlig_lookups(font: TTFont) -> set[int]:
+    """Lookup indices some `rlig` feature record references -- the ones that fire."""
+    return {
+        index
+        for record in font["GSUB"].table.FeatureList.FeatureRecord
+        if record.FeatureTag == _RLIG
+        for index in record.Feature.LookupListIndex
+    }
+
+
 def stagger_ligatures(path: Path) -> set[tuple[str, str, str]]:
     """Every (first, component, result) our flag-suppressing lookup provides.
 
@@ -172,36 +200,29 @@ def stagger_ligatures(path: Path) -> set[tuple[str, str, str]]:
     """
     font = TTFont(str(path))
     wanted = {first for first, _ in _flag_pairs(font, path.name)}
-    found = set()
-    for lookup in font["GSUB"].table.LookupList.Lookup:
-        if lookup.LookupType != _LIGATURE:
-            continue
-        for subtable in lookup.SubTable:
-            for first, ligatures in getattr(subtable, "ligatures", {}).items():
-                if first not in wanted:
-                    continue
-                for ligature in ligatures:
-                    if len(ligature.Component) == 1:
-                        found.add((first, ligature.Component[0], ligature.LigGlyph))
-    return found
+    return {
+        (first, second, result)
+        for _, first, second, result in ligatures(font)
+        if first in wanted
+    }
 
 
 def suppress_stagger_flags(font: TTFont, label: str) -> int:
     """Ligate each tanween+flag pair back to the bare tanween. Returns pairs added.
 
-    Idempotent: a font that already carries all three is left alone. The
-    lookup goes into `rlig`, which is on by default for Arabic and runs before
-    GPOS, so the flag is gone before any mark anchor is consulted.
+    Idempotent: a font that already carries all three is left alone. "Carries"
+    means the pair resolves to the bare tanween *in a lookup rlig fires* -- a
+    ligature to some other glyph, or one no feature references, is not ours
+    and does not count as done. The lookup goes into `rlig`, which is on by
+    default for Arabic and runs before GPOS, so the flag is gone before any
+    mark anchor is consulted.
     """
     pairs = _flag_pairs(font, label)
+    firing = rlig_lookups(font)
     have = {
-        (first, ligature.Component[0])
-        for lookup in font["GSUB"].table.LookupList.Lookup
-        if lookup.LookupType == _LIGATURE
-        for subtable in lookup.SubTable
-        for first, ligatures in getattr(subtable, "ligatures", {}).items()
-        for ligature in ligatures
-        if len(ligature.Component) == 1
+        (first, second)
+        for index, first, second, result in ligatures(font)
+        if result == first and index in firing
     }
     missing = [(first, meem) for first, meem in pairs if (first, meem) not in have]
     if not missing:
@@ -266,8 +287,8 @@ def patch_low_meem(path: Path) -> PatchResult:
         record.MarkAnchor.XCoordinate, record.MarkAnchor.YCoordinate = PATCHED
         moved += 1
 
-    ligatures = suppress_stagger_flags(font, path.name)
-    result = PatchResult(anchors=moved, ligatures=ligatures)
+    added = suppress_stagger_flags(font, path.name)
+    result = PatchResult(anchors=moved, ligatures=added)
     if result.changed:
         font.save(str(path))
     return result

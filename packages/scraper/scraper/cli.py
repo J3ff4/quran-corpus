@@ -926,8 +926,8 @@ def hafs_low_meem_cmd(fonts: tuple[str, ...]) -> None:
     """Repair the small-meem defects in the shipped Hafs fonts.
 
     Two edits: a GSUB ligature that swallows the 6,643 tanween staggering
-    flags the mushaf draws no meem for, and a real mark anchor for the 339
-    genuine iqlab meems. Idempotent, so it is safe to re-run after a font
+    flags the mushaf draws no meem for, and a real mark anchor for U+06ED, the
+    low meem of the 99 kasratan iqlabs. Idempotent, so it is safe to re-run after a font
     upgrade -- and it must be re-run, because every KFGQPC release so far
     carries the same defect. See scraper/hafs_meem.py for the full rule.
     """

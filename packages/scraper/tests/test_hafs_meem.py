@@ -1,24 +1,25 @@
 """The low-meem anchor repair, and a guard on the fonts we actually ship."""
 
-import os
-import tempfile
 from collections.abc import Callable
-from functools import cache
 from pathlib import Path
 
 import pytest
 from fontTools.ttLib import TTFont
 
 from scraper.hafs_meem import (
+    DAMMATAN,
+    FATHATAN,
     HIGH_MEEM,
     KASRATAN,
     LOW_MEEM,
     PATCHED,
     STAGGER_FLAGS,
     UNPATCHED,
+    ligatures,
     low_meem_anchors,
     mark_records,
     patch_low_meem,
+    rlig_lookups,
     stagger_ligatures,
     suppress_stagger_flags,
 )
@@ -57,16 +58,10 @@ def test_shipped_font_leaves_the_high_meem_exactly_as_upstream_set_it(
     nine lookups and a null anchor in the ninth -- odd, but upstream's, and left
     alone. Pinned exactly so a patch that widened its reach fails here."""
     font = TTFont(str(path))
-    glyph = font.getBestCmap()[0x06E2]
-    seen = set()
-    for lookup in font["GPOS"].table.LookupList.Lookup:
-        if lookup.LookupType != 4:
-            continue
-        for subtable in lookup.SubTable:
-            glyphs = subtable.MarkCoverage.glyphs
-            if glyph in glyphs:
-                record = subtable.MarkArray.MarkRecord[glyphs.index(glyph)]
-                seen.add((record.MarkAnchor.XCoordinate, record.MarkAnchor.YCoordinate))
+    seen = {
+        (record.MarkAnchor.XCoordinate, record.MarkAnchor.YCoordinate)
+        for record in mark_records(font, path.name, HIGH_MEEM)
+    }
     # (0, 0) literal, not UNPATCHED: that constant means "the low meem's
     # shipped defect value". Upstream's null anchor on the *high* meem in
     # its ninth lookup is an unrelated fact that happens to share the value,
@@ -91,11 +86,12 @@ def _unpatch(font: TTFont) -> None:
 
 
 def test_patch_moves_every_lookup(tmp_path: Path) -> None:
-    """The font repeats its mark array per base-coverage group. Patching one
-    lookup would fix the meem on some bases and leave it broken on the rest."""
+    """The font repeats its mark array per base-coverage group, and once more
+    for the `Allah` ligature. Patching one lookup would fix the meem on some
+    bases and leave it broken on the rest."""
     font = _rewrite(tmp_path, _unpatch)
 
-    assert patch_low_meem(font).anchors == 9
+    assert patch_low_meem(font).anchors == 10
     assert set(low_meem_anchors(font)) == {PATCHED}
 
 
@@ -172,23 +168,11 @@ def test_the_flag_lookup_is_registered_in_rlig(path: Path) -> None:
     font = TTFont(str(path))
     cmap = font.getBestCmap()
     firsts = {cmap[tanween] for tanween, _ in STAGGER_FLAGS}
-    gsub = font["GSUB"].table
 
-    carrying = {
-        index
-        for index, lookup in enumerate(gsub.LookupList.Lookup)
-        if lookup.LookupType == 4
-        for subtable in lookup.SubTable
-        if firsts & set(getattr(subtable, "ligatures", {}))
-    }
+    carrying = {index for index, first, _, _ in ligatures(font) if first in firsts}
     assert carrying, f"{path.name}: no lookup ligates a tanween"
 
-    rlig = {
-        index
-        for record in gsub.FeatureList.FeatureRecord
-        if record.FeatureTag == "rlig"
-        for index in record.Feature.LookupListIndex
-    }
+    rlig = rlig_lookups(font)
     assert carrying & rlig, (
         f"{path.name}: the flag ligatures live in lookup(s) {sorted(carrying)}, "
         f"none of which rlig references {sorted(rlig)} -- they would never fire"
@@ -204,35 +188,34 @@ def test_shipped_font_never_ligates_a_meem_that_has_to_render(path: Path) -> Non
       rather than on the exact pair would eat them.
     * U+06D8 -- the waqf lazim sign, 22 of them. A *different* codepoint that
       merely shares the name "small high meem"; always follows a space.
+    * fathatan/dammatan + U+06E2 -- 240 more tanween iqlabs, the mirror of the
+      kasratan case. Same characters as the kasratan *flag*, so "U+06E2 after
+      any tanween" would have eaten them.
     * noon + U+06E2 -- 270 iqlab meems on a plain noon sakinah, including
       19:4, the control case in the device checklist. Not a tanween pair, so
       "strip U+06E2" would have killed them.
+
+    Only two-glyph ligatures are walked: no flag or iqlab pair is longer.
     """
     font = TTFont(str(path))
     cmap = font.getBestCmap()
     must_render = {
         (cmap[KASRATAN], cmap[LOW_MEEM]),
+        (cmap[FATHATAN], cmap[HIGH_MEEM]),
+        (cmap[DAMMATAN], cmap[HIGH_MEEM]),
         (cmap[0x0646], cmap[HIGH_MEEM]),
     }
     waqf = cmap[WAQF_LAZIM]
 
-    for lookup in font["GSUB"].table.LookupList.Lookup:
-        if lookup.LookupType != 4:
-            continue
-        for subtable in lookup.SubTable:
-            for first, ligatures in getattr(subtable, "ligatures", {}).items():
-                for ligature in ligatures:
-                    if not ligature.Component:
-                        continue
-                    pair = (first, ligature.Component[0])
-                    assert pair not in must_render, (
-                        f"{path.name}: {pair} is ligated away, but that mark "
-                        f"renders in the mushaf"
-                    )
-                    assert waqf != first and waqf not in ligature.Component, (
-                        f"{path.name}: the waqf lazim sign U+06D8 is consumed by "
-                        f"a ligature ({first} + {ligature.Component})"
-                    )
+    for _, first, second, _ in ligatures(font):
+        assert (first, second) not in must_render, (
+            f"{path.name}: {(first, second)} is ligated away, but that mark "
+            f"renders in the mushaf"
+        )
+        assert waqf not in (first, second), (
+            f"{path.name}: the waqf lazim sign U+06D8 is consumed by "
+            f"a ligature ({first} + {second})"
+        )
 
 
 def test_suppress_is_idempotent_and_adds_nothing_twice(tmp_path: Path) -> None:
@@ -256,6 +239,47 @@ def test_a_font_missing_the_ligature_is_detected(tmp_path: Path) -> None:
     assert stagger_ligatures(dest) == set()
 
     font = TTFont(str(dest))
+    assert suppress_stagger_flags(font, "test") == len(STAGGER_FLAGS)
+
+
+def _retarget_flag_ligatures(font: TTFont) -> None:
+    flags = {first for first, _ in _flag_glyph_pairs(font)}
+    wrong = font.getBestCmap()[LOW_MEEM]
+    for lookup in font["GSUB"].table.LookupList.Lookup:
+        for subtable in lookup.SubTable if lookup.LookupType == 4 else ():
+            for first in flags & set(getattr(subtable, "ligatures", {})):
+                for ligature in subtable.ligatures[first]:
+                    ligature.LigGlyph = wrong
+
+
+def _unregister_flag_lookups(font: TTFont) -> None:
+    flags = {first for first, _ in _flag_glyph_pairs(font)}
+    ours = {index for index, first, _, _ in ligatures(font) if first in flags}
+    for record in font["GSUB"].table.FeatureList.FeatureRecord:
+        record.Feature.LookupListIndex = [
+            i for i in record.Feature.LookupListIndex if i not in ours
+        ]
+        record.Feature.LookupCount = len(record.Feature.LookupListIndex)
+
+
+def _flag_glyph_pairs(font: TTFont) -> set[tuple[str, str]]:
+    cmap = font.getBestCmap()
+    return {(cmap[tanween], cmap[meem]) for tanween, meem in STAGGER_FLAGS}
+
+
+@pytest.mark.parametrize(
+    "corrupt",
+    [_retarget_flag_ligatures, _unregister_flag_lookups],
+    ids=["wrong result glyph", "not in rlig"],
+)
+def test_a_flag_ligature_that_cannot_work_is_not_already_patched(
+    tmp_path: Path, corrupt: Callable[[TTFont], None]
+) -> None:
+    """A future KFGQPC release could ship its own ligature on a flag pair -- to
+    a staggered composite, or parked in a lookup no feature fires. Either one
+    looks like ours in the lookup list, and counting it as done would print
+    "already patched" over 6,643 meems that still draw."""
+    font = TTFont(str(_rewrite(tmp_path, corrupt)))
     assert suppress_stagger_flags(font, "test") == len(STAGGER_FLAGS)
 
 
@@ -327,6 +351,18 @@ SHAPED_CASES = [
         LOW_MEEM,
         True,
     ),
+    (
+        "2:10 aliimun, dammatan IQLAB",
+        "\u0623\u064e\u0644\u0650\u064a\u0645\u064c\u06e2",
+        HIGH_MEEM,
+        True,
+    ),
+    (
+        "2:95 abadan, fathatan IQLAB",
+        "\u0623\u064e\u0628\u064e\u062f\u064b\u06e2\u0627",
+        HIGH_MEEM,
+        True,
+    ),
     ("19:4 akun, noon IQLAB", "\u0623\u064e\u0643\u064f\u0646\u06e2", HIGH_MEEM, True),
     (
         "2:26 waqf lazim",
@@ -337,39 +373,41 @@ SHAPED_CASES = [
 ]
 
 
-@cache
-def _sfnt(path: Path) -> str:
-    """A path HarfBuzz can open.
+@pytest.fixture(scope="session")
+def shape(tmp_path_factory: pytest.TempPathFactory):
+    """Shape `text` with the font at `path`; returns (font, hb buffer).
 
-    It cannot read a compressed woff2, so the web font is decompressed to a
-    plain sfnt first -- which is what a browser does before shaping it too.
-    The tables under test are carried through untouched, so this still
-    exercises the bytes we ship rather than a rebuilt font.
+    HarfBuzz cannot read a compressed woff2, so the web font is decompressed
+    to a plain sfnt first -- which is what a browser does before shaping it
+    too. The tables under test are carried through untouched, so this still
+    exercises the bytes we ship rather than a rebuilt font. Each font is
+    parsed once per session, and the decompressed copy lives in pytest's own
+    temp dir rather than leaking into /tmp.
     """
-    font = TTFont(str(path))
-    if font.flavor is None:
-        return str(path)
-    font.flavor = None
-    handle, plain = tempfile.mkstemp(suffix=".ttf")
-    os.close(handle)
-    font.save(plain)
-    return plain
-
-
-def _shaped_glyph_names(path: Path, text: str) -> list[str]:
     import uharfbuzz as hb
 
-    font = TTFont(str(path))
-    order = font.getGlyphOrder()
-    shaper = hb.Font(hb.Face(hb.Blob.from_file_path(_sfnt(path))))
-    buffer = hb.Buffer()
-    buffer.add_str(text)
-    # Script, direction and language from the text itself, exactly as a real
-    # text engine does -- pinning them by hand here could assert a pass under
-    # a configuration the apps never use.
-    buffer.guess_segment_properties()
-    hb.shape(shaper, buffer, {})
-    return [order[info.codepoint] for info in buffer.glyph_infos]
+    loaded: dict[Path, tuple[TTFont, hb.Font]] = {}
+
+    def run(path: Path, text: str) -> tuple[TTFont, hb.Buffer]:
+        if path not in loaded:
+            font = TTFont(str(path))
+            sfnt = path
+            if font.flavor is not None:
+                font.flavor = None
+                sfnt = tmp_path_factory.mktemp("sfnt") / f"{path.stem}.ttf"
+                font.save(str(sfnt))
+            loaded[path] = (font, hb.Font(hb.Face(hb.Blob.from_file_path(str(sfnt)))))
+        font, shaper = loaded[path]
+        buffer = hb.Buffer()
+        buffer.add_str(text)
+        # Script, direction and language from the text itself, exactly as a
+        # real text engine does -- pinning them by hand here could assert a
+        # pass under a configuration the apps never use.
+        buffer.guess_segment_properties()
+        hb.shape(shaper, buffer, {})
+        return font, buffer
+
+    return run
 
 
 @pytest.mark.parametrize("path", SHIPPED, ids=lambda p: p.name)
@@ -379,7 +417,7 @@ def _shaped_glyph_names(path: Path, text: str) -> list[str]:
     ids=[case[0] for case in SHAPED_CASES],
 )
 def test_the_shaper_draws_a_meem_only_where_the_mushaf_draws_one(
-    path: Path, label: str, text: str, codepoint: int, present: bool
+    shape, path: Path, label: str, text: str, codepoint: int, present: bool
 ) -> None:
     """The flags must leave no glyph, the iqlab meems and the waqf sign must.
 
@@ -388,9 +426,10 @@ def test_the_shaper_draws_a_meem_only_where_the_mushaf_draws_one(
     the KFGQPC mushaf page font draws there -- checked by rendering those
     pages' own glyphs, not by reading the rule back off our own constant.
     """
-    font = TTFont(str(path))
+    font, buffer = shape(path, text)
     glyph = font.getBestCmap()[codepoint]
-    names = _shaped_glyph_names(path, text)
+    order = font.getGlyphOrder()
+    names = [order[info.codepoint] for info in buffer.glyph_infos]
     assert (glyph in names) is present, (
         f"{path.name}: {label}: U+{codepoint:04X} ({glyph}) "
         f"{'missing from' if present else 'still in'} {names}"
@@ -398,28 +437,24 @@ def test_the_shaper_draws_a_meem_only_where_the_mushaf_draws_one(
 
 
 @pytest.mark.parametrize("path", SHIPPED, ids=lambda p: p.name)
-def test_the_shaped_iqlab_meem_clears_the_kasratan(path: Path) -> None:
+def test_the_shaped_iqlab_meem_clears_the_kasratan(shape, path: Path) -> None:
     """Both marks hang off the base's one below anchor and the font has no mkmk
     entry for either, so nothing but this anchor keeps them apart. At the old
     y820 they overlapped by 44.5% of the meem's ink; the bounding boxes have to
     be disjoint, or the fix renders two marks as one blob."""
-    import uharfbuzz as hb
     from fontTools.pens.boundsPen import BoundsPen
 
-    font = TTFont(str(path))
+    kaafirin = "\u0643\u064e\u0627\u0641\u0650\u0631\u064d\u06ed"  # 2:41
+    font, buffer = shape(path, kaafirin)
     glyphs = font.getGlyphSet()
     order = font.getGlyphOrder()
     cmap = font.getBestCmap()
     meem, kasratan = cmap[LOW_MEEM], cmap[KASRATAN]
 
-    shaper = hb.Font(hb.Face(hb.Blob.from_file_path(_sfnt(path))))
-    buffer = hb.Buffer()
-    buffer.add_str("\u0643\u064e\u0627\u0641\u0650\u0631\u064d\u06ed")  # 2:41 kaafirin
-    buffer.guess_segment_properties()
-    hb.shape(shaper, buffer, {})
-
+    # Only vertical extents matter: both marks hang off one anchor, so no
+    # horizontal offset can keep them apart.
     boxes: dict[str, tuple[float, float]] = {}
-    x = y = 0
+    y = 0
     for info, position in zip(buffer.glyph_infos, buffer.glyph_positions, strict=True):
         name = order[info.codepoint]
         pen = BoundsPen(glyphs)
@@ -429,7 +464,6 @@ def test_the_shaped_iqlab_meem_clears_the_kasratan(path: Path) -> None:
                 pen.bounds[1] + y + position.y_offset,
                 pen.bounds[3] + y + position.y_offset,
             )
-        x += position.x_advance
         y += position.y_advance
 
     assert set(boxes) == {meem, kasratan}, f"{path.name}: shaped {sorted(boxes)}"
