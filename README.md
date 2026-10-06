@@ -317,8 +317,10 @@ that can see a mark's position is a shaper drawing it.
      kasratan with a visible gap, not on top of it. Then **19:4**
      (`أَكُنۢ`): that meem is a different mark (U+06E2, after a plain noon)
      and must still sit **above** the letter — if it moved, the patch
-     overreached. Repeat the first three on the web reader, which ships the
-     same font as a woff2.
+     overreached. On the web reader the same five ayahs prove nothing: it
+     paints `words.text_arabic`, which keeps the low meem only after a
+     kasratan (99 words of 4,807 — issue #114). Use **18:15**
+     (`بِسُلْطَٰنٍۭ`) instead; it ships the same font as a woff2.
 
 ## Current Status
 
