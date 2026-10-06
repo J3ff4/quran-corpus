@@ -923,11 +923,13 @@ def derive_root_glosses_cmd(db: str, languages: tuple[str, ...]) -> None:
 @main.command("hafs-low-meem")
 @click.argument("fonts", nargs=-1, type=click.Path(exists=True, dir_okay=False))
 def hafs_low_meem_cmd(fonts: tuple[str, ...]) -> None:
-    """Repair U+06ED's mark anchor in the shipped Hafs fonts.
+    """Repair the small-meem defects in the shipped Hafs fonts.
 
-    Idempotent, so it is safe to re-run after a font upgrade -- and it must be
-    re-run, because every KFGQPC release so far carries the same defect. See
-    scraper/hafs_meem.py for what the defect is and why the anchor is where it is.
+    Two edits: a GSUB ligature that swallows the 6,643 tanween staggering
+    flags the mushaf draws no meem for, and a real mark anchor for the 339
+    genuine iqlab meems. Idempotent, so it is safe to re-run after a font
+    upgrade -- and it must be re-run, because every KFGQPC release so far
+    carries the same defect. See scraper/hafs_meem.py for the full rule.
     """
     from .hafs_meem import PATCHED, patch_low_meem
 
@@ -939,12 +941,13 @@ def hafs_low_meem_cmd(fonts: tuple[str, ...]) -> None:
         if not target.exists():
             raise click.ClickException(f"missing font {target}")
         try:
-            changed = patch_low_meem(target)
+            result = patch_low_meem(target)
         except ValueError as exc:
             raise click.ClickException(str(exc)) from exc
         click.echo(
-            f"{target.name}: {changed} lookup(s) re-anchored to {PATCHED}"
-            if changed
+            f"{target.name}: {result.anchors} lookup(s) re-anchored to {PATCHED}, "
+            f"{result.ligatures} staggering-flag ligature(s) added"
+            if result.changed
             else f"{target.name}: already patched"
         )
 

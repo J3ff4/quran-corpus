@@ -507,7 +507,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceSurahNamesRu':
       'The Russian name and meaning of each surah. Licence not yet cleared.',
     'about.sourceHafs':
-      'The Arabic face the Quran text itself is set in. Shipped modified: one mark anchor corrected so the small low meem sits below the letter, not through it.',
+      'The Arabic face the Quran text itself is set in. Shipped modified: a ligature so the 6,643 staggered-tanween flags draw no meem, as in the printed mushaf, and one corrected anchor so the 99 iqlab meems sit below the letter rather than through it.',
     'about.sourceMushafLayout': 'Mushaf page and line layout, from the Quran.com v4 API (Quranic Universal Library). King Fahd Glorious Quran Printing Complex edition.',
     'about.sourceMushafFont': 'The page fonts the mushaf pages are printed with, one per page. King Fahd Glorious Quran Printing Complex, via the Quranic Universal Library.',
     // Names the host, not a reciter: ten of them are selectable now, so a
@@ -765,7 +765,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceSurahNamesRu':
       'Har bir suraning ruscha nomi va ma’nosi. Litsenziya hali tekshirilmagan.',
     'about.sourceHafs':
-      'Qur’on matni shu arabcha shriftda teriladi. O‘zgartirilgan holda yetkaziladi: kichik pastki mim harf ustidan emas, ostidan tushishi uchun bitta belgi nuqtasi to‘g‘rilandi.',
+      'Qur’on matni shu arabcha shriftda teriladi. O‘zgartirilgan holda yetkaziladi: 6 643 ta siljigan tanvin belgisi, bosma mushafdagidek, mim sifatida chizilmasligi uchun ligatura qo‘shildi; 99 ta iqlob mimi harf ustidan emas, ostidan tushishi uchun bitta belgi nuqtasi to‘g‘rilandi.',
     'about.sourceMushafLayout': 'Mushaf sahifa va satr joylashuvi, Quran.com v4 API (Quranic Universal Library) dan. Shoh Fahd Qur’on bosmaxonasi nashri.',
     'about.sourceMushafFont': 'Mushaf sahifalari teriladigan shriftlar, har sahifaga bittadan. Shoh Fahd Qur’on bosmaxonasi, Quranic Universal Library orqali.',
     'about.sourceAudio': 'Har bir oyat uchun oqim orqali audio. Qori Sozlamalarda tanlanadi; ilova ijro eta oladigan barcha qorilar quyida.',
@@ -1011,7 +1011,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceSurahNamesRu':
       'Русское название и значение каждой суры. Лицензия ещё не проверена.',
     'about.sourceHafs':
-      'Арабский шрифт, которым набран сам текст Корана. Поставляется изменённым: исправлена одна точка привязки, чтобы малая нижняя мим стояла под буквой, а не сквозь неё.',
+      'Арабский шрифт, которым набран сам текст Корана. Поставляется изменённым: добавлена лигатура, чтобы 6 643 знака смещённого танвина не рисовались как мим, как и в печатном мусхафе, и исправлена одна точка привязки, чтобы 99 мимов икляба стояли под буквой, а не сквозь неё.',
     'about.sourceMushafLayout': 'Разметка страниц и строк мусхафа, из Quran.com v4 API (Quranic Universal Library). Издание Комплекса имени короля Фахда.',
     'about.sourceMushafFont': 'Постраничные шрифты, которыми набраны страницы мусхафа, по одному на страницу. Комплекс имени короля Фахда, через Quranic Universal Library.',
     'about.sourceAudio': 'Потоковое аудио по аятам. Чтец выбирается в настройках; ниже перечислены все, кого приложение может воспроизвести.',

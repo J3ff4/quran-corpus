@@ -1,20 +1,48 @@
-"""Repair the small low meem in KFGQPC HAFS Uthmanic Script.
+"""Repair the two meem defects in KFGQPC HAFS Uthmanic Script.
 
-`uni06ED` (ARABIC SMALL LOW MEEM) ships with the *high* meem's outline --
-bbox y 49..760, identical to `uni06E2` -- assigned to the below-mark class
-but carrying a null MarkAnchor of (0, 0). HarfBuzz therefore lands the
-glyph's origin on the base's below anchor and draws 760 units straight up
-through the letter. That is the stray meem the reader showed on 2,875 of
-the 6,236 ayahs: every tanween in the Uthmani text that carries this mark.
+The Uthmani text uses a small meem next to a tanween for two unrelated jobs,
+and this font renders neither correctly.
 
-KFGQPC v2.2 carries the identical defect in the identical nine lookups, so
-there is no upgrade out of it, and RN cannot fall back per-character inside
-one `Text` run without splitting the run and breaking Arabic shaping on
-Android. Giving the mark a real anchor is the whole fix: outlines, cmap and
-mark classes are untouched.
+**The staggering flag (6,643 marks, not meems at all).** The Madani mushaf
+draws a tanween *staggered* (mutarakkib) when the next word begins with an
+idgham or ikhfa letter, and *stacked* (mutatabiq) otherwise. Unicode has no
+staggered tanween, so the source encodes the distinction by appending the
+meem from the side the tanween does not occupy -- U+06ED below a fathatan or
+dammatan, U+06E2 above a kasratan. It is a presentation flag, and a font is
+meant to swallow it into a staggered glyph. This font has no staggered
+tanween glyph and no ligature for the sequence, so the flag falls through
+and draws a literal meem that the mushaf does not have. Verified against the
+KFGQPC page fonts we already ship for the mushaf tab: 2:2 `hudan` and 2:17
+`zulumaatin` both carry the flag and neither draws a meem.
 
-The font's EULA forbids modification; shipping a patched copy is an
-explicit owner decision (2026-10-06), recorded in the About credits.
+**The iqlab meem (339 marks, genuine).** Before a beh the noon sound becomes
+a meem, and the mushaf marks it with a real small meem on the tanween's *own*
+side -- U+06ED below a kasratan, U+06E2 above a fathatan or dammatan, and
+U+06E2 above a plain noon. These must render. U+06E2's anchors are sound;
+U+06ED ships with the *high* meem's outline (bbox y 49..760, identical to
+U+06E2), assigned to the below-mark class but carrying a null MarkAnchor of
+(0, 0). HarfBuzz lands the origin on the base's below anchor and draws the
+glyph 760 units straight up through the letter. That is the stray meem the
+reader showed.
+
+So the repair is two edits, and the side a meem sits on is the whole rule:
+
+* a GSUB `rlig` ligature consumes each flag pair back to the bare tanween;
+* U+06ED gets a real anchor, tuned for the one case that survives the
+  ligature -- kasratan + meem, which has to clear the kasratan's own strokes.
+
+Nothing else moves. U+06D8 (SMALL HIGH MEEM INITIAL FORM, the waqf lazim
+sign, 22 of them) is a different codepoint that always follows a space, and
+the 270 iqlab meems after a plain noon are not a tanween pair, so neither can
+match a ligature keyed on exact tanween+meem pairs.
+
+KFGQPC v2.2 carries the identical anchor defect in the identical nine
+lookups, so there is no upgrade out of it, and RN cannot fall back
+per-character inside one `Text` run without splitting the run and breaking
+Arabic shaping on Android.
+
+The font's EULA forbids modification; shipping a patched copy is an explicit
+owner decision (2026-10-06), recorded in the About credits.
 
 The pre-patch files, for anyone checking our copies against upstream:
 
@@ -23,29 +51,68 @@ The pre-patch files, for anyone checking our copies against upstream:
     8c00e7a7d5f773bcfb1642fdcfba505dbd81975fef39f14718827a32d075020c
         apps/web/src/app/fonts/hafs.18.woff2    (the same font, subsetted)
 
-Both re-save byte-for-byte identical outlines, cmap, glyph order and name
-table; exactly 9 of the 361 mark records move, all of them U+06ED's.
+Both re-save byte-for-byte identical `glyf`, `name`, `post` and glyph order,
+and an identical cmap *mapping*; exactly 9 of the 361 mark records move, all
+of them U+06ED's, and one lookup is appended to GSUB. The cmap, head, GSUB
+and GPOS tables do re-serialize (cmap 668 -> 556 bytes, because fontTools
+shares one offset between the two identical format-4 subtables; head's
+`modified` and `checkSumAdjustment` always change), so a licence audit should
+diff the mapping and the outlines, not the table bytes.
 """
 
 from pathlib import Path
+from typing import NamedTuple
 
 from fontTools.ttLib import TTFont
+from fontTools.ttLib.tables import otTables
 
 LOW_MEEM = 0x06ED
+HIGH_MEEM = 0x06E2
+
+FATHATAN = 0x064B
+DAMMATAN = 0x064C
+KASRATAN = 0x064D
+
+#: Tanween + the meem from the side the tanween does *not* occupy. Never a
+#: meem: the mushaf draws a staggered tanween here and no mark at all. Keyed
+#: as exact codepoint pairs so nothing else can match -- in particular not
+#: U+06D8 (waqf lazim, always after a space) and not U+06E2 after a plain
+#: noon (iqlab, 270 of them), both of which must keep rendering.
+STAGGER_FLAGS = (
+    (FATHATAN, LOW_MEEM),
+    (DAMMATAN, LOW_MEEM),
+    (KASRATAN, HIGH_MEEM),
+)
 
 #: What the font ships with -- a null anchor, which is the defect.
 UNPATCHED = (0, 0)
 
 #: Where the mark belongs. x191 is the glyph's own horizontal centre
-#: ((14 + 369) / 2); y820 sits above the glyph's top (760) so the whole
-#: outline hangs *below* the base's anchor. Tuned against the hardest case,
-#: kasratan + meem (99 ayahs): `uni06ED` is absent from the mkmk lookup, so
-#: two below-marks on one base cannot separate themselves. At y773 -- the
-#: value that aligns the meem's top with kasra's -- the two collide; y820
-#: clears them by the same gap an independent font (me_quran) leaves.
-PATCHED = (191, 820)
+#: ((14 + 369) / 2). y is measured against the *only* sequence that still
+#: reaches this anchor once the flags are ligated away: kasratan + meem, the
+#: 99 iqlab words. Both marks hang off the base's single below anchor, so the
+#: meem has to clear the kasratan's strokes on its own -- the kasratan ends
+#: 413 units below that anchor and the meem's outline tops out at 760, so the
+#: gap is `y - 1173` and the two touch at anything below y1173. y1320 leaves
+#: 147 units, the same order of gap the mushaf's own page glyphs show, and is
+#: the shallowest value measured collision-free (0% rasterised ink overlap
+#: against every other glyph in the word) across all five tanween contexts.
+PATCHED = (191, 1320)
 
 _MARK_TO_BASE = 4
+_LIGATURE = 4
+_RLIG = "rlig"
+
+
+class PatchResult(NamedTuple):
+    """What a run actually changed, so a re-run can report "already patched"."""
+
+    anchors: int
+    ligatures: int
+
+    @property
+    def changed(self) -> bool:
+        return bool(self.anchors or self.ligatures)
 
 
 def mark_records(font: TTFont, label: str) -> list:
@@ -84,8 +151,97 @@ def low_meem_anchors(path: Path) -> list[tuple[int, int]]:
     ]
 
 
-def patch_low_meem(path: Path) -> int:
-    """Move the low meem's anchor to `PATCHED`, in place. Returns lookups changed.
+def _flag_pairs(font: TTFont, label: str) -> list[tuple[str, str]]:
+    """`STAGGER_FLAGS` as glyph names, or a clear error naming what is absent."""
+    cmap = font.getBestCmap()
+    pairs = []
+    for tanween, meem in STAGGER_FLAGS:
+        for codepoint in (tanween, meem):
+            if codepoint not in cmap:
+                raise ValueError(f"{label}: no glyph for U+{codepoint:04X}")
+        pairs.append((cmap[tanween], cmap[meem]))
+    return pairs
+
+
+def stagger_ligatures(path: Path) -> set[tuple[str, str, str]]:
+    """Every (first, component, result) our flag-suppressing lookup provides.
+
+    Read back from the saved font rather than from `STAGGER_FLAGS`, so a test
+    asserting the font carries them is not just re-reading the constant it is
+    supposed to be checking.
+    """
+    font = TTFont(str(path))
+    wanted = {first for first, _ in _flag_pairs(font, path.name)}
+    found = set()
+    for lookup in font["GSUB"].table.LookupList.Lookup:
+        if lookup.LookupType != _LIGATURE:
+            continue
+        for subtable in lookup.SubTable:
+            for first, ligatures in getattr(subtable, "ligatures", {}).items():
+                if first not in wanted:
+                    continue
+                for ligature in ligatures:
+                    if len(ligature.Component) == 1:
+                        found.add((first, ligature.Component[0], ligature.LigGlyph))
+    return found
+
+
+def suppress_stagger_flags(font: TTFont, label: str) -> int:
+    """Ligate each tanween+flag pair back to the bare tanween. Returns pairs added.
+
+    Idempotent: a font that already carries all three is left alone. The
+    lookup goes into `rlig`, which is on by default for Arabic and runs before
+    GPOS, so the flag is gone before any mark anchor is consulted.
+    """
+    pairs = _flag_pairs(font, label)
+    have = {
+        (first, ligature.Component[0])
+        for lookup in font["GSUB"].table.LookupList.Lookup
+        if lookup.LookupType == _LIGATURE
+        for subtable in lookup.SubTable
+        for first, ligatures in getattr(subtable, "ligatures", {}).items()
+        for ligature in ligatures
+        if len(ligature.Component) == 1
+    }
+    missing = [(first, meem) for first, meem in pairs if (first, meem) not in have]
+    if not missing:
+        return 0
+
+    subtable = otTables.LigatureSubst()
+    subtable.ligatures = {}
+    for first, meem in missing:
+        ligature = otTables.Ligature()
+        ligature.Component = [meem]
+        ligature.CompCount = 2
+        # The tanween alone: the flag is consumed and nothing is drawn for it.
+        ligature.LigGlyph = first
+        subtable.ligatures.setdefault(first, []).append(ligature)
+
+    lookup = otTables.Lookup()
+    lookup.LookupType = _LIGATURE
+    lookup.LookupFlag = 0
+    lookup.SubTable = [subtable]
+    lookup.SubTableCount = 1
+
+    gsub = font["GSUB"].table
+    gsub.LookupList.Lookup.append(lookup)
+    index = len(gsub.LookupList.Lookup) - 1
+    gsub.LookupList.LookupCount = len(gsub.LookupList.Lookup)
+
+    registered = 0
+    for record in gsub.FeatureList.FeatureRecord:
+        if record.FeatureTag != _RLIG:
+            continue
+        record.Feature.LookupListIndex.append(index)
+        record.Feature.LookupCount = len(record.Feature.LookupListIndex)
+        registered += 1
+    if not registered:
+        raise ValueError(f"{label}: no {_RLIG} feature to hang the lookup on")
+    return len(missing)
+
+
+def patch_low_meem(path: Path) -> PatchResult:
+    """Apply both repairs in place. Returns what changed.
 
     Idempotent: re-running on an already-patched font is a no-op, so the
     command can be re-run after a font upgrade without stacking offsets. An
@@ -103,12 +259,15 @@ def patch_low_meem(path: Path) -> int:
             f"expected {UNPATCHED} (unpatched) or {PATCHED} (already patched)"
         )
 
-    changed = 0
+    moved = 0
     for record in records:
         if (record.MarkAnchor.XCoordinate, record.MarkAnchor.YCoordinate) == PATCHED:
             continue
         record.MarkAnchor.XCoordinate, record.MarkAnchor.YCoordinate = PATCHED
-        changed += 1
-    if changed:
+        moved += 1
+
+    ligatures = suppress_stagger_flags(font, path.name)
+    result = PatchResult(anchors=moved, ligatures=ligatures)
+    if result.changed:
         font.save(str(path))
-    return changed
+    return result
