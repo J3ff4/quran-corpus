@@ -288,6 +288,22 @@ def test_snapshot_missing_an_ayah_writes_nothing(tmp_path):
     assert not _baks(tmp_path)
 
 
+def test_missing_snapshot_file_aborts_cleanly(tmp_path):
+    db, _ = _setup(tmp_path)
+    with pytest.raises(ImportAborted, match="snapshot not found"):
+        import_qul_ru(db, tmp_path / "nope.sqlite")
+    assert not _baks(tmp_path)
+
+
+def test_snapshot_path_with_uri_characters_opens_the_right_file(tmp_path):
+    db = tmp_path / "c.db"
+    make_corpus(db, WORDS)
+    snap = tmp_path / "a?b#c" / "s.sqlite"
+    snap.parent.mkdir()
+    _snapshot(snap, PAGES)
+    assert import_qul_ru(db, snap).rows == 5
+
+
 @pytest.mark.parametrize(
     "blob", [b"not gzip", gzip.compress(b"x")[:-4], gzip.compress(b"\xff")]
 )

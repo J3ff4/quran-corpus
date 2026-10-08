@@ -202,11 +202,14 @@ def _plan(
 
 def import_qul_ru(corpus_db: Path, snapshot: Path = SNAPSHOT_PATH) -> ImportSummary:
     target = corpus_db.resolve()  # apps/web/quran.db is a symlink
+    if not snapshot.is_file():
+        raise ImportAborted(f"snapshot not found: {snapshot}")
     words = corpus_ayahs(target)  # tasnim_align's reader, read-only
     database = ScraperDatabase(str(target))
     con = database.connection
     con.execute("PRAGMA foreign_keys = ON")
-    snap = sqlite3.connect(f"file:{snapshot}?mode=ro", uri=True)
+    # as_uri() percent-encodes, so a ? or # in the path cannot open another file.
+    snap = sqlite3.connect(f"{snapshot.resolve().as_uri()}?mode=ro", uri=True)
     try:
         # Aborts before any data write and before the backup. ScraperDatabase above has
         # already run its additive migrations; on the live DB those are no-ops.

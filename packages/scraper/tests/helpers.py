@@ -16,7 +16,7 @@ def make_corpus(path: Path, words: dict[tuple[int, int], list[str]]) -> None:
             "INSERT OR IGNORE INTO surahs (id, name_arabic, name_translit,"
             " name_translation, revelation_type, ayah_count, order_number)"
             " VALUES (?,?,?,?,'meccan',?,?)",
-            (surah, "س", "s", "S", len(words), surah),
+            (surah, "س", "s", "S", sum(s == surah for s, _ in words), surah),
         )
         cur = con.execute(
             "INSERT INTO ayahs (surah_id, ayah_number, text_uthmani) VALUES (?,?,?)",
