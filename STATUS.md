@@ -7,9 +7,33 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-10-06
+Updated: 2026-10-08
 
 ## Now
+
+**2026-10-08 — PR #118 merged (squash `78f185b3`). M13 PR A: Russian word-by-word
+from Quran Academy (QUL resource 97).** CI green both jobs. Ships BEFORE a grant by
+owner override (#116); credit reads `© Quran Academy — permission requested`.
+
+- **Live corpus imported**: 77,429 rows over 76,295 cards, 1,111 spans. Backup
+  `~/quran-data/quran.db.bak-m13-20261008T031527605541`. Importer
+  (`uv run scraper import-qul-ru`) is all-or-nothing: every error listed, nothing
+  written, DELETE scoped to `source='quranacademy'`. Snapshot stays in
+  `~/quran-data/refdata/qul-ru-wbw/`, never git.
+- **Dictionary**: « » and leading и/а/но/или stripped in chips + root lists; root
+  lists fold a trailing `!`/`?` (owner ruling 2026-10-08). ru/uz/uz-Cyrl root lists
+  re-derived.
+- **Bracket dimming** on every WBW gloss surface, all languages (shared
+  `splitGlossBrackets`). Web dim 4.73 light / 7.15-7.62 dark.
+- **Mobile**: DB `m13a`, versionCode 95, build script throws unless ru glosses =
+  words. Device vc95 A1-A10 PASS (mushaf long-press + Cyrillic search by owner).
+- **Reviews**: `/code-review` + SDD final review + CodeRabbit (3 Minor, all fixed).
+- **Not language-aware on web (pre-existing)**: `/word/...` shows no gloss; lemma
+  chips ignore content language.
+- **Filed #117**: WBW deep link to another surah ignored after in-screen paging.
+- **Owner owes**: copy DB + deploy homelab, check `/surah/1/words?lang=ru` and
+  `/about`, THEN send #116 draft A (it says "already live").
+- **Next**: M13 PR B (word-gloss search, Tasks 10-15) on `feat/m13b-word-search`.
 
 **2026-10-06 — PR #115 merged (squash `eb8fbfe`). The small meem: drawn only where
 the mushaf draws one.** CI green both jobs. Fix lives in the FONT, not the corpus —
