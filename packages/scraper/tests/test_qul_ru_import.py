@@ -22,7 +22,7 @@ from scraper.qul_ru_import import (
     validate_ru_gloss,
 )
 from scraper.tasnim_align import base_form
-from tests.conftest import make_corpus
+from tests.helpers import make_corpus
 
 
 def _page(*cards: tuple[str, str]) -> str:
@@ -43,6 +43,7 @@ def test_same_word_accepts_qul_doubled_kaanna_only():
     assert same_word("كتب", "كتب")
     assert not same_word("كتاب", "كتب")
     assert not same_word("كانا", "كان")  # tail is not ours' suffix
+    assert not same_word("منن", "من")  # a repeated tail on any other word
 
 
 def test_align_one_to_one():
@@ -97,6 +98,11 @@ def test_clean_ru_gloss(raw, want):
     assert clean_ru_gloss(raw) == want
 
 
+def test_unmeasured_look_alike_is_refused_not_rewritten():
+    assert clean_ru_gloss("Mир") == "Mир"
+    assert validate_ru_gloss("Mир") == "latin character 'M'"
+
+
 def test_homoglyph_fix_skipped_when_a_real_latin_letter_is_present():
     assert clean_ru_gloss("Cлово Q") == "Cлово Q"  # left for validate to refuse
     assert validate_ru_gloss("Cлово Q") == "latin character 'C'"
@@ -108,7 +114,9 @@ def test_homoglyph_fix_skipped_when_a_real_latin_letter_is_present():
         ("", "empty"),
         ("я" * 121, "too long (121 > 120)"),
         ("слово ب", "arabic character 'ب'"),
-        ("слово\x07", "control character"),
+        ("слово\x07", "control or format character"),
+        ("сло\u200bво", "control or format character"),
+        ("\u202eслово", "control or format character"),
     ],
 )
 def test_validate_ru_gloss_refuses(text, reason):
@@ -278,6 +286,19 @@ def test_snapshot_missing_an_ayah_writes_nothing(tmp_path):
         import_qul_ru(db, snap)
     assert _ru(db) == []
     assert not _baks(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "blob", [b"not gzip", gzip.compress(b"x")[:-4], gzip.compress(b"\xff")]
+)
+def test_corrupt_page_is_listed_with_the_rest(tmp_path, blob):
+    # Bad header, truncated stream, non-UTF-8 body: each joins the report.
+    db, snap = _setup(tmp_path, pages={(1, 1): _page(("بِسْمِ", "/"))})
+    _sql(snap, "INSERT INTO raw VALUES (1, 2, ?, 'x')", (blob,))
+    with pytest.raises(ImportAborted) as err:
+        import_qul_ru(db, snap)
+    assert "2 problems" in str(err.value) and "1:2" in str(err.value)
+    assert _ru(db) == []
 
 
 def test_snapshot_ayah_unknown_to_the_corpus_writes_nothing(tmp_path):

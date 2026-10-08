@@ -11,7 +11,8 @@ import gzip
 import html
 import re
 import sqlite3
-import unicodedata  # validate_ru_gloss: control-character category
+import unicodedata  # validate_ru_gloss: control/format-character category
+import zlib
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -54,11 +55,13 @@ def parse_cards(page: str) -> list[tuple[str, str]]:
     return [(_text(ar), _text(ru)) for ar, ru in _CARD.findall(page)]
 
 
+_KAANNA = base_form("كَأَن")
+
+
 def same_word(card: str, ours: str) -> bool:
-    # QUL writes كَأَن as «كَأَنأَن» in 7 ayahs: the word plus a repeat of its own tail.
-    tail = card[len(ours) :]
-    doubled = card.startswith(ours) and tail != "" and ours.endswith(tail)
-    return card == ours or doubled
+    # QUL writes كَأَن as «كَأَنأَن» in 7 ayahs. Only that word: a general "repeated
+    # tail" rule would also accept a misaligned card (من against منن).
+    return card == ours or (ours == _KAANNA and card == base_form("كَأَنأَن"))
 
 
 def align_ayah(
@@ -82,9 +85,10 @@ def align_ayah(
     return rows
 
 
-# The 9 measured Latin look-alikes, each typed inside a Russian word.
-_HOMOGLYPHS = "AaBCcEeHKMOoPpTXxy"
-_TO_CYRILLIC = str.maketrans(_HOMOGLYPHS, "АаВСсЕеНКМОоРрТХху")
+# The Latin look-alikes measured in the snapshot (9 cards). Any other Latin letter
+# is refused by validate_ru_gloss, so new drift aborts instead of being rewritten.
+_HOMOGLYPHS = "ACKc"
+_TO_CYRILLIC = str.maketrans(_HOMOGLYPHS, "АСКс")
 _LATIN = re.compile(r"[A-Za-z]")
 _EDGE_SLASH = re.compile(r"^/+|/+$")
 # Sentence punctuation the verse needed, not the word. Repeated, so ", -" goes too
@@ -114,8 +118,10 @@ def validate_ru_gloss(text: str) -> str | None:
         return reason
     if (m := _LATIN.search(text)) is not None:
         return f"latin character {m.group()!r}"
-    if any(unicodedata.category(c) == "Cc" for c in text):
-        return "control character"
+    # Cf too: zero-width and bidi marks are invisible, break search like U+00AD did,
+    # and a bidi override can reverse the gloss on screen.
+    if any(unicodedata.category(c)[0] == "C" for c in text):
+        return "control or format character"
     return None
 
 
@@ -166,7 +172,8 @@ def _plan(
             rows = align_ayah(
                 parse_cards(gzip.decompress(pages[key]).decode()), words[key]
             )
-        except AlignError as err:
+        # A corrupt page is one more listed problem, not a traceback hiding the rest.
+        except (AlignError, OSError, EOFError, zlib.error, UnicodeDecodeError) as err:
             errors.append(f"{key[0]}:{key[1]} {err}")
             continue
         by_head: dict[int, list[Row]] = {}
@@ -200,7 +207,9 @@ def import_qul_ru(corpus_db: Path, snapshot: Path = SNAPSHOT_PATH) -> ImportSumm
     con.execute("PRAGMA foreign_keys = ON")
     snap = sqlite3.connect(f"file:{snapshot}?mode=ro", uri=True)
     try:
-        planned = _plan(words, con, snap)  # aborts before any write, before any backup
+        # Aborts before any data write and before the backup. ScraperDatabase above has
+        # already run its additive migrations; on the live DB those are no-ops.
+        planned = _plan(words, con, snap)
         # Timestamped to the microsecond, never overwritten: a re-run (R7) must not
         # replace the pre-M13 copy with the state of the first import.
         stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%f")
