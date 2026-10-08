@@ -99,6 +99,8 @@ https://claude.ai/artifact/1XVstTdauPzdXo3gyCpV3R (private).
 | R17 | Top 50 by matched-word count (each word in a span counts), ties by key ascending. Non-Arabic queries of 3+ chars, prefix per token via `buildFtsMatch`. Matches any language. A row shows its best matched gloss, preferring the content language. It is tagged when that gloss's language ≠ the content language, with `uz-Cyrl` counted as `uz`. Matched terms are highlighted. |
 | R18 | One plan, two PRs. PR A = Tasks 1-9. PR B = Tasks 10-15, branched from main after PR A merges. |
 | R19 | Web: I run a local prod build and hand off; the owner deploys. The phase closes on the owner's confirmation. |
+| R20 | (2026-10-07, found by the Task 1 review on the real snapshot) The R9 trailing strip **never empties a gloss**. QUL glosses the particle أَن as a bare `:` on 38 cards (quoted speech follows); those keep `:`. Russian stays at 77,429 rows. |
+| R21 | (same) Strip Arabic combining marks (1 card, 44:2, a stray tanween inside a Russian word) and U+00AD soft hyphens (20 cards; invisible, and they break search) from Russian glosses. #116 draft A's list of fixes says so. |
 
 **D1 — needs owner confirmation at plan review.** The grill said a lemma-less row "opens
 the reader at the first occurrence with its word sheet". Neither app's reader takes a
@@ -435,6 +437,19 @@ def import_qul_ru(corpus_db: Path, snapshot: Path = SNAPSHOT_PATH) -> ImportSumm
   - Rename `tasnim_align._corpus_ayahs` → `corpus_ayahs` (public; one caller, `align_all`).
   - Run `uv run pytest tests/test_tasnim_import.py tests/test_tasnim_align.py`: green, unchanged.
   - Commit: `refactor(scraper): share the corpus fixture and corpus_ayahs`.
+- [ ] **Step 0b: R20 + R21 in `clean_ru_gloss` (Task 1's function).**
+  - Extract the Arabic-combining-mark filter inside `tasnim_import.clean_gloss` (:104-111) into a public `strip_arabic_marks(text: str) -> str` in `tasnim_import.py`. Make `clean_gloss` call it, with its behaviour unchanged (its tests stay green).
+  - `clean_ru_gloss` then starts with `text = strip_arabic_marks(text).replace("\u00ad", "")` and ends with `return _TRAILING.sub("", text) or text`. Comment the `or text`: R20, 38 أَن cards glossed `:`.
+  - Tests in `tests/test_qul_ru_import.py`:
+    - `clean_ru_gloss(":") == ":"`
+    - `clean_ru_gloss("Клянусь \u064cКнигой") == "Клянусь Книгой"`
+    - `clean_ru_gloss("сло\u00adво,") == "слово"`
+  - Replace `test_validate_rejects_a_gloss_cleaned_to_empty` with two cases: `"/"` still cleans to empty and is refused, and `":"`, `"–"`, `", –"` survive as themselves.
+  - Mutation-check:
+    - drop `or text` → the `:` case fails;
+    - drop the U+00AD replace → the soft-hyphen case fails;
+    - drop `strip_arabic_marks` → the tanween case fails.
+  - Commit: `fix(scraper): keep colon-only glosses, strip stray marks and soft hyphens`.
 - [ ] **Step 1: failing tests.** Use `make_corpus` (a real DB via `ScraperDatabase`, no `languages` rows).
 ```python
 def _snapshot(path: Path, pages: dict[tuple[int, int], str]) -> None:
@@ -900,7 +915,8 @@ of git.
 - [ ] **Step 4: verify** (python, `mode=ro`):
   - ru/quranacademy = 77,429 rows.
   - 0 rows match `[A-Za-z]`.
-  - 0 rows end in `[,.;:–—]`.
+  - 0 rows end in `[,.;:–—]` except the 38 (+ their covered words) that are exactly `:` (R20);
+  - 0 rows contain U+00AD or an Arabic combining mark (R21).
   - 2,483 rows (± the covered-word repeats) end in `[!?]`; record the number.
   - `COUNT(DISTINCT gloss_group)` where not null = 1,111.
   - Every group sits in one ayah.
