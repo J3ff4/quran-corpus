@@ -49,3 +49,4 @@ export { categorizeFormLabel, type FormCategory } from './morphology/formCategor
 // prevent.
 export type * from './types.js';
 export { groupByGlossSpan } from './text/glossSpans.js';
+export { splitGlossBrackets, type GlossRun } from './text/glossBrackets.js';
