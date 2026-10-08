@@ -1,3 +1,5 @@
+import { GlossRuns } from './GlossRuns';
+
 /** A word's gloss, tagged with its language when that is not the one asked for.
  *
  *  The fallback tag is the whole reason this is shared: the reader popover,
@@ -16,7 +18,7 @@ export function GlossText({
 }) {
   return (
     <>
-      {gloss ?? '—'}
+      {gloss ? <GlossRuns gloss={gloss} /> : '—'}
       {gloss && glossLang && pageLang && glossLang !== pageLang && (
         <span className="ml-1 text-xs text-paper-400" aria-label={`in ${glossLang}`}>
           ({glossLang})

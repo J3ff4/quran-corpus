@@ -144,3 +144,30 @@ describe('cleanGlossList', () => {
     ]);
   });
 });
+
+describe('Russian dictionary lists', () => {
+  it('drops every guillemet, edge or not', () => {
+    expect(cleanGloss('«Слово')).toBe('Слово');
+    expect(cleanGloss('сказали «мир»')).toBe('сказали мир');
+  });
+
+  it('strips a leading Russian conjunction', () => {
+    expect(cleanGloss('и Слово')).toBe('Слово');
+    expect(cleanGloss('А что')).toBe('что');
+    expect(cleanGloss('но не')).toBe('не');
+    expect(cleanGloss('или же')).toBe('же');
+  });
+
+  it('keeps то and так', () => {
+    expect(cleanGloss('то, что')).toBe('то, что');
+    expect(cleanGloss('так как')).toBe('так как');
+  });
+
+  it('guards a Russian conjunction lemma', () => {
+    expect(cleanGlossList(['или', 'или же'], 5)).toEqual(['или', 'или же']);
+  });
+
+  it('keeps brackets and the literal note', () => {
+    expect(cleanGloss('(досл. слово) [другое]')).toBe('(досл. слово) [другое]');
+  });
+});

@@ -155,3 +155,4 @@ export type {
 // here so apps/mobile can type its repository seam without a cast.
 export type { QueryClient, QueryRow, QueryArg } from './queryClient.js';
 export { groupByGlossSpan } from './text/glossSpans.js';
+export { splitGlossBrackets, type GlossRun } from './text/glossBrackets.js';

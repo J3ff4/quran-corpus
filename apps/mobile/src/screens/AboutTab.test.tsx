@@ -117,6 +117,17 @@ describe('AboutTab', () => {
     expect(screen.getByTestId('pending-Tasnim').textContent).toBe('Source approval incomplete');
   });
 
+  it('credits Quran Academy for the Russian word-by-word, with its permission marked as requested', () => {
+    render(<AboutTab />);
+
+    // A different party from the Russian verse translator, shipped under the
+    // owner override of #116 before any grant: the pill keeps it from reading
+    // as a cleared licence.
+    expect(screen.getByText('Quran Academy')).toBeTruthy();
+    expect(screen.getByTestId('pending-Quran Academy').textContent).toBe('Source approval incomplete');
+    expect(screen.getByText(/© Quran Academy — permission requested/)).toBeTruthy();
+  });
+
   it('marks an uncleared licence as uncleared, and leaves a cleared one unmarked', () => {
     render(<AboutTab />);
 

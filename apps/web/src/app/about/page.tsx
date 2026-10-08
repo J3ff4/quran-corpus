@@ -78,6 +78,13 @@ const sources: Source[] = [
     note: 'Human translation, not machine output: it replaced the machine-translated Uzbek glosses this app shipped previously, which are gone. Tasnim glosses phrases as well as single words, so one gloss may sit under several Arabic words. The Cyrillic word-by-word is transliterated from Tasnim’s Latin; the Cyrillic verse translation is Tasnim’s own. Marked (en) where an Uzbek gloss is not available.',
   },
   {
+    name: 'Quran Academy',
+    href: 'https://holyquran.academy',
+    provides: 'Russian word-by-word glosses, via the Quranic Universal Library (QUL, resource 97).',
+    license: '© Quran Academy — permission requested',
+    note: 'Published before a written grant, under an owner decision recorded in issue #116; it is removed on the rights holder’s request. Changes are presentation only: sentence punctuation at a gloss’s end is removed (a gloss that is only a colon is kept), nine Latin look-alike letters typed inside Russian words are corrected to Cyrillic, and three stray slashes, one stray Arabic vowel mark and invisible soft hyphens are removed.',
+  },
+  {
     name: 'KFGQPC Uthmanic Hafs (King Fahd Glorious Quran Printing Complex)',
     href: 'https://fonts.qurancomplex.gov.sa',
     provides: 'The mushaf Arabic typeface used to render Quranic text.',

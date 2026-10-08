@@ -83,12 +83,13 @@ describe('WordPopover', () => {
 
   it('renders the English gloss when provided', () => {
     render(<WordPopover word={word} gloss="In (the) name" onClose={vi.fn()} />);
-    expect(screen.getByText('In (the) name')).toBeInTheDocument();
+    // The (the) aside is its own dimmed span, so match the joined text.
+    expect(document.body.textContent).toContain('In (the) name');
   });
 
   it('does not render a gloss when none is provided', () => {
     render(<WordPopover word={word} onClose={vi.fn()} />);
-    expect(screen.queryByText('In (the) name')).toBeNull();
+    expect(document.body.textContent).not.toContain('In (the) name');
   });
 
   it('calls onClose when close button is clicked', () => {

@@ -92,6 +92,18 @@ def strip_markup(text: str) -> str:
 _HOMOGLYPHS = str.maketrans({"\u0435": "e"})
 
 
+def strip_arabic_marks(text: str) -> str:
+    """Drop Arabic combining marks (tanween, maddah...) and nothing else."""
+    return "".join(
+        c
+        for c in text
+        if not (
+            unicodedata.combining(c)
+            and any(lo <= ord(c) <= hi for lo, hi in _ARABIC_RANGES)
+        )
+    )
+
+
 def clean_gloss(text: str) -> str:
     """Repair what the source got wrong, before deciding whether to keep it.
 
@@ -101,14 +113,7 @@ def clean_gloss(text: str) -> str:
     the gloss column -- that is what validate_gloss refuses, and it still does,
     on the Arabic LETTERS that remain after this.
     """
-    stripped = "".join(
-        c
-        for c in text.translate(_HOMOGLYPHS)
-        if not (
-            unicodedata.combining(c)
-            and any(lo <= ord(c) <= hi for lo, hi in _ARABIC_RANGES)
-        )
-    )
+    stripped = strip_arabic_marks(text.translate(_HOMOGLYPHS))
     return _WHITESPACE.sub(" ", stripped).strip()
 
 

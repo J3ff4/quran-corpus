@@ -1,4 +1,5 @@
 import type { ReaderWord } from '../../lib/readerWord';
+import { GlossRuns } from '../shared/GlossRuns';
 
 interface MorphologySummaryProps {
   word: ReaderWord;
@@ -27,7 +28,11 @@ export function MorphologySummary({ word, gloss }: MorphologySummaryProps) {
         <p className="mb-1 text-lg text-paper-500" dir="ltr">{word.transliteration}</p>
       )}
 
-      {gloss && <p className="mb-4 text-base text-paper-700 dark:text-paper-300" dir="ltr">{gloss}</p>}
+      {gloss && (
+        <p className="mb-4 text-base text-paper-700 dark:text-paper-300" dir="ltr">
+          <GlossRuns gloss={gloss} />
+        </p>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {word.pos_tag && <span className={`${chip} font-medium`}>{word.pos_tag}</span>}

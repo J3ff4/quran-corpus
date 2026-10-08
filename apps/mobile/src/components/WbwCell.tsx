@@ -8,6 +8,7 @@ import type { Gloss } from '@/data/corpusRepository';
 import type { UiLocaleCode } from '@/i18n/languages';
 
 import { GlossLangTag } from './GlossLangTag';
+import { GlossRuns } from './GlossRuns';
 import { SegmentedWord } from './SegmentedWord';
 
 /**
@@ -122,7 +123,7 @@ export function WbwCell({
             numberOfLines={glossLines}
             style={{ color: theme.text, fontSize: typography.caption - 1, textAlign: 'center' }}
           >
-            {gloss?.text ?? ''}
+            {gloss ? <GlossRuns text={gloss.text} /> : ''}
           </Text>
           <GlossLangTag gloss={gloss} uiLocale={uiLocale} fontSize={typography.caption - 3} />
         </>

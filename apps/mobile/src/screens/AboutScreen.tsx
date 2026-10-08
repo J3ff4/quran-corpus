@@ -62,6 +62,10 @@ const GROUPS: { title: UiStringKey; credits: Credit[] }[] = [
       // rest of the uncleared set -- this row is what makes that auditable.
       { name: 'QUL', body: 'about.sourceMushafLayout', pending: true },
       ...TRANSLATION_CREDITS,
+      // The Russian word-by-word glosses: a different party from the verse
+      // translator above, shipped under the owner override of #116 before
+      // any grant -- hence pending.
+      { name: 'Quran Academy', body: 'about.sourceWbwRu', pending: true },
       // The surah NAMES, not the verse translation -- a different party
       // from whoever translated the text, so it cannot ride on the
       // translator credit above. Pending like the rest of the uncleared

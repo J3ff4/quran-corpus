@@ -67,6 +67,12 @@ describe('About page', () => {
     expect(screen.queryAllByText(/NLLB/i)).toHaveLength(0);
   });
 
+  it('credits Quran Academy for the Russian word-by-word, permission marked as requested', () => {
+    render(<About />);
+    expect(screen.getAllByText(/Quran Academy/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/permission requested/)).toBeInTheDocument();
+  });
+
   it('credits the KFGQPC Uthmanic Hafs mushaf font', () => {
     render(<About />);
     expect(screen.getAllByText(/KFGQPC/i).length).toBeGreaterThan(0);

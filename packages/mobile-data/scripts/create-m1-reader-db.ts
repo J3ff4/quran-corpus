@@ -36,6 +36,8 @@ export interface M1ReaderDbContractSummary {
   languages: string[];
   /** Every translation row in the file, selected or not. See the check below. */
   translationsTotal: number;
+  /** Quran Academy's Russian word glosses (M13): one per word, covered words included. */
+  ruGlosses: number;
   selectedTranslations: Record<keyof typeof selectedTranslators, TranslationContractSummary>;
 }
 
@@ -201,7 +203,7 @@ export async function validateM1ReaderDbContract(dbPath = targetDbPath): Promise
   const db = createDatabase(`file:${dbPath}`);
 
   try {
-    const [surahs, ayahs, words, languages, translations, translationsTotal] = await Promise.all([
+    const [surahs, ayahs, words, languages, translations, translationsTotal, ruGlosses] = await Promise.all([
       db.execute('SELECT count(*) AS n FROM surahs'),
       db.execute('SELECT count(*) AS n FROM ayahs'),
       db.execute('SELECT count(*) AS n FROM words'),
@@ -223,6 +225,7 @@ export async function validateM1ReaderDbContract(dbPath = targetDbPath): Promise
         args: SELECTED_TRANSLATOR_ENTRIES.flat(),
       }),
       db.execute('SELECT count(*) AS n FROM translations'),
+      db.execute("SELECT count(*) AS n FROM word_glosses WHERE language_code = 'ru' AND source = 'quranacademy'"),
     ]);
 
     const selectedTranslations = Object.fromEntries(
@@ -247,6 +250,7 @@ export async function validateM1ReaderDbContract(dbPath = targetDbPath): Promise
       words: numberValue(words.rows[0]?.n),
       languages: languages.rows.map((row) => String(row.code)),
       translationsTotal: numberValue(translationsTotal.rows[0]?.n),
+      ruGlosses: numberValue(ruGlosses.rows[0]?.n),
       selectedTranslations,
     };
 
@@ -276,6 +280,12 @@ export async function validateM1ReaderDbContract(dbPath = targetDbPath): Promise
           `Expected 6236 ${languageCode} rows for ${translation.translator}, found ${translation.rows}`,
         );
       }
+    }
+
+    // The importer is all-or-nothing, so anything short of one per word is a bundle
+    // built from a corpus the M13 import never ran on.
+    if (summary.ruGlosses !== summary.words) {
+      throw new Error(`Expected ${summary.words} Russian word glosses, found ${summary.ruGlosses}`);
     }
 
     return summary;
