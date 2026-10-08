@@ -219,6 +219,8 @@ describeWithDb('M1 reader DB artifact', () => {
       languages: ['en', 'ru', 'uz'],
       // 6236 x the four selected sets, and nothing else. See below.
       translationsTotal: 24944,
+      // M13: one Quran Academy gloss per word.
+      ruGlosses: 77429,
       selectedTranslations: {
         en: { translator: 'Saheeh International', rows: 6236 },
         ru: { translator: 'Abu Adel', rows: 6236 },

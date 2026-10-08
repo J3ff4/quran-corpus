@@ -44,7 +44,9 @@ import type * as ExpoSQLite from 'expo-sqlite';
 // after it IS a content change, and would show the old translations. One bump
 // covers both: nothing has shipped 's2' yet, so it is still a version no phone
 // holds. It bumps again the next time the asset changes after S2 ships.
-export const corpusDbVersion = 's2';
+//
+// 'm13a': Quran Academy's Russian word glosses (77,429 rows) and the ru root lists.
+export const corpusDbVersion = 'm13a';
 export const corpusDbFileName = `quran-corpus-${corpusDbVersion}.db`;
 
 /** The user's own database, which lives in the same directory as the extracts
