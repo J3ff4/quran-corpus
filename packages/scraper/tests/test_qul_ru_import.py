@@ -103,8 +103,24 @@ def test_validate_ru_gloss_refuses(text, reason):
 
 
 def test_validate_rejects_a_gloss_cleaned_to_empty():
-    for raw in ("–", ",", "/", ", –"):
-        assert validate_ru_gloss(clean_ru_gloss(raw)) == "empty"
+    assert validate_ru_gloss(clean_ru_gloss("/")) == "empty"
+
+
+@pytest.mark.parametrize("raw", [":", "–", ", –"])
+def test_a_punctuation_only_gloss_survives_as_itself(raw):
+    # R20: QUL glosses the particle أَن as a bare ":" on 38 cards.
+    assert clean_ru_gloss(raw) == raw
+    assert validate_ru_gloss(clean_ru_gloss(raw)) is None
+
+
+def test_clean_strips_a_stray_arabic_mark_inside_a_russian_word():
+    # R21: 44:2 carries a tanween (U+064C) glued onto a Russian word.
+    assert clean_ru_gloss("Клянусь \u064cКнигой") == "Клянусь Книгой"
+
+
+def test_clean_strips_soft_hyphens():
+    # R21: U+00AD is invisible and breaks search.
+    assert clean_ru_gloss("сло\u00adво,") == "слово"
 
 
 def test_validate_accepts_kept_punctuation():

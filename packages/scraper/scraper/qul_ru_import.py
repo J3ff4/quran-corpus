@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from .tasnim_align import base_form
-from .tasnim_import import validate_gloss
+from .tasnim_import import strip_arabic_marks, validate_gloss
 
 SOURCE = "quranacademy"
 LANGUAGE = "ru"
@@ -89,13 +89,18 @@ _TRAILING = re.compile(r"(?:\s*[,.;:–—])+$")
 
 
 def clean_ru_gloss(text: str) -> str:
+    # R21: a stray tanween inside a Russian word (44:2); U+00AD is invisible and
+    # breaks search (20 cards).
+    text = strip_arabic_marks(text).replace("\u00ad", "")
     latin = set(_LATIN.findall(text))
     # Only when every Latin letter is a look-alike: a real Latin word is not ours to
     # rewrite, and validate_ru_gloss refuses it instead.
     if latin and latin <= set(_HOMOGLYPHS):
         text = text.translate(_TO_CYRILLIC)
     text = _EDGE_SLASH.sub("", text).strip()
-    return _TRAILING.sub("", text)
+    # `or text`: R20, the particle أَن is glossed as a bare ":" on 38 cards. The
+    # strip never empties a gloss, so those keep ":" (and "/" is already "").
+    return _TRAILING.sub("", text) or text
 
 
 def validate_ru_gloss(text: str) -> str | None:
