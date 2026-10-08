@@ -1460,7 +1460,7 @@ Russian WBW then falls back to English with the `(en)` tag, which is the pre-M13
 
 | # | Check | Result |
 |---|---|---|
-| WA1 | Background classes per host + measured ratios (Task 5 Step 1) | |
+| WA1 | Background classes per host + measured ratios (Task 5 Step 1) | Dim `text-paper-600 dark:text-paper-400`. Cell, span, row (`WbwWordCell`/`WbwGlossSpan`/`WbwWordRow`) and `/word/...` (`WordDetailView`): no bg class, inherit body `bg-paper-50 dark:bg-night-300` (layout.tsx:84), hover moves border/ring only: 4.73 light / 7.62 dark. `WordPopover` sheet `bg-paper-50 dark:bg-night-200` (WordPopover.tsx:36): 4.73 / 7.15. No host on paper-100. |
 | WA2 | `/surah/1/words`, Russian: glosses, spans, dimming; light + dark | |
 | WA3 | Reader popover + `/word/2/2/1`: dimming | |
 | WA4 | `/dictionary/lemma/…` (قال) chips clean | |

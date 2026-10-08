@@ -19,7 +19,8 @@ describe('WbwWordCell', () => {
     render(<WbwWordCell cell={cell()} />);
     expect(screen.getByText('بِسْمِ')).toBeInTheDocument();
     expect(screen.getByText("bis'mi")).toBeInTheDocument();
-    expect(screen.getByText('In (the) name')).toBeInTheDocument();
+    // The (the) aside is its own dimmed span, so match the joined text.
+    expect(document.body.textContent).toContain('In (the) name');
   });
 
   it('links to the word detail page', () => {

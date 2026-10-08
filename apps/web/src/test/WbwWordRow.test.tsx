@@ -31,7 +31,8 @@ function renderRow(cellProps: WbwCell, pageLang?: string, glossSpan?: number) {
 describe('WbwWordRow', () => {
   it('renders translation, arabic, and a short POS code/label + grammar term (no full-analysis)', () => {
     renderRow(cell());
-    expect(screen.getByText('In (the) name')).toBeInTheDocument();
+    // The (the) aside is its own dimmed span, so match the joined text.
+    expect(document.body.textContent).toContain('In (the) name');
     expect(screen.getByText("bis'mi")).toBeInTheDocument();
     expect(screen.getByText('بِسْمِ')).toBeInTheDocument();
     expect(screen.getByText('P – Preposition')).toBeInTheDocument();
