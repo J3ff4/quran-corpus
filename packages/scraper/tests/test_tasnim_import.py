@@ -9,7 +9,6 @@ from pathlib import Path
 import pytest
 
 from scraper import tasnim_import
-from scraper.db import ScraperDatabase
 from scraper.tasnim_import import (
     clean_gloss,
     export_mt_glosses,
@@ -17,30 +16,7 @@ from scraper.tasnim_import import (
     strip_markup,
     validate_gloss,
 )
-
-
-def _corpus(path: Path, words: dict[tuple[int, int], list[str]]) -> None:
-    """A real corpus DB via ScraperDatabase, so the schema is schema.sql's."""
-    db = ScraperDatabase(str(path))
-    con = db._conn
-    for (surah, ayah), texts in words.items():
-        con.execute(
-            "INSERT OR IGNORE INTO surahs (id, name_arabic, name_translit,"
-            " name_translation, revelation_type, ayah_count, order_number)"
-            " VALUES (?,?,?,?,'meccan',?,?)",
-            (surah, "س", "s", "S", len(words), surah),
-        )
-        cur = con.execute(
-            "INSERT INTO ayahs (surah_id, ayah_number, text_uthmani) VALUES (?,?,?)",
-            (surah, ayah, " ".join(texts)),
-        )
-        for position, text in enumerate(texts, start=1):
-            con.execute(
-                "INSERT INTO words (ayah_id, position, text_arabic) VALUES (?,?,?)",
-                (cur.lastrowid, position, text),
-            )
-    con.commit()
-    db.close()
+from tests.conftest import make_corpus
 
 
 def _tasnim(path: Path, rows, *, names=(), verses=()) -> None:
@@ -68,7 +44,7 @@ def _tasnim(path: Path, rows, *, names=(), verses=()) -> None:
 
 def _run(tmp_path, words, rows, **kw):
     corpus, tasnim = tmp_path / "c.db", tmp_path / "t.db"
-    _corpus(corpus, words)
+    make_corpus(corpus, words)
     _tasnim(tasnim, rows, **kw)
     summary = import_tasnim(
         corpus,
@@ -135,7 +111,7 @@ def test_the_mt_rows_are_exported_before_they_are_deleted(tmp_path):
     # 'uz'. The export is the only copy of 75539 machine-translated glosses
     # once the delete runs.
     corpus = tmp_path / "c.db"
-    _corpus(corpus, {(1, 1): ["لَا", "رَيْبَ"]})
+    make_corpus(corpus, {(1, 1): ["لَا", "رَيْبَ"]})
     con = sqlite3.connect(corpus)
     con.execute(
         "INSERT INTO word_glosses (word_id, language_code, gloss_text, source)"
@@ -155,7 +131,7 @@ def test_the_export_covers_every_language_the_delete_can_reach(tmp_path):
     # under 'uz-Cyrl' -- nothing writes one today -- must still be exported and
     # counted, or the guard would pass while that row is deleted with no copy.
     corpus = tmp_path / "c.db"
-    _corpus(corpus, {(1, 1): ["لَا", "رَيْبَ"]})
+    make_corpus(corpus, {(1, 1): ["لَا", "رَيْبَ"]})
     con = sqlite3.connect(corpus)
     con.execute(
         "INSERT INTO word_glosses (word_id, language_code, gloss_text, source)"
@@ -180,7 +156,7 @@ def test_the_import_refuses_to_delete_mt_rows_it_did_not_export(tmp_path):
     # The assert the plan asks for, as code: a short export followed by a
     # delete is 75539 glosses gone with no copy anywhere.
     corpus = tmp_path / "c.db"
-    _corpus(corpus, {(1, 1): ["لَا"]})
+    make_corpus(corpus, {(1, 1): ["لَا"]})
     con = sqlite3.connect(corpus)
     con.execute(
         "INSERT INTO word_glosses (word_id, language_code, gloss_text, source)"
@@ -209,7 +185,7 @@ def test_a_short_export_stops_the_delete(monkeypatch, tmp_path):
     # than the table holds is the one failure that loses glosses permanently:
     # the delete runs, and the copy is incomplete.
     corpus = tmp_path / "c.db"
-    _corpus(corpus, {(1, 1): ["لَا", "رَيْبَ"]})
+    make_corpus(corpus, {(1, 1): ["لَا", "رَيْبَ"]})
     con = sqlite3.connect(corpus)
     con.execute(
         "INSERT INTO word_glosses (word_id, language_code, gloss_text, source)"
@@ -297,7 +273,7 @@ def test_a_rerun_does_not_destroy_the_mt_export(tmp_path):
     export.write_text('{"gloss_text": "the only copy"}\n', encoding="utf-8")
     corpus = tmp_path / "c.db"
     tasnim = tmp_path / "t.db"
-    _corpus(corpus, {(1, 1): ["لَا"]})
+    make_corpus(corpus, {(1, 1): ["لَا"]})
     _tasnim(tasnim, [(1, 1, "لَا", "yo'q")])
     summary = import_tasnim(
         corpus, tasnim, export_path=export, rejects_path=tmp_path / "r.tsv"
@@ -312,7 +288,7 @@ def test_a_rerun_leaves_no_stale_gloss_group(tmp_path):
     # phrase, so two unrelated spans would read as one gloss. The delete is
     # what removes it -- the upsert only ever touches words the run reaches.
     corpus = tmp_path / "c.db"
-    _corpus(corpus, {(1, 1): ["لَا"], (1, 2): ["رَيْبَ"]})
+    make_corpus(corpus, {(1, 1): ["لَا"], (1, 2): ["رَيْبَ"]})
     con = sqlite3.connect(corpus)
     stale = con.execute("SELECT id FROM words ORDER BY id DESC LIMIT 1").fetchone()[0]
     con.execute(
@@ -394,7 +370,7 @@ def test_no_mt_gloss_survives_the_import(tmp_path):
     # mixture of two sources under one language code, with `source` the only
     # thing distinguishing them and nothing reading it.
     corpus = tmp_path / "c.db"
-    _corpus(corpus, {(1, 1): ["لَا", "رَيْبَ"], (1, 2): ["قُلْ"]})
+    make_corpus(corpus, {(1, 1): ["لَا", "رَيْبَ"], (1, 2): ["قُلْ"]})
     con = sqlite3.connect(corpus)
     con.execute(
         "INSERT INTO word_glosses (word_id, language_code, gloss_text, source)"
@@ -456,7 +432,7 @@ def test_a_hand_reviewed_gloss_is_exported_before_it_is_deleted(tmp_path):
     # that deletes them without carrying them out destroys them for good -- and
     # a guard counting only 'mt' compares 0 against 0 and calls that success.
     corpus = tmp_path / "c.db"
-    _corpus(corpus, {(1, 1): ["لَا", "رَيْبَ"], (1, 2): ["قُلْ"]})
+    make_corpus(corpus, {(1, 1): ["لَا", "رَيْبَ"], (1, 2): ["قُلْ"]})
     con = sqlite3.connect(corpus)
     con.execute(
         "INSERT INTO word_glosses (word_id, language_code, gloss_text, source)"
@@ -498,7 +474,7 @@ def test_the_delete_cannot_reach_a_language_the_export_guard_never_counts(tmp_pa
     # row under any other language was destroyed with no copy in the export AND
     # no mismatch to catch it -- a silent deletion that reported success.
     corpus = tmp_path / "c.db"
-    _corpus(corpus, {(1, 1): ["لَا"]})
+    make_corpus(corpus, {(1, 1): ["لَا"]})
     con = sqlite3.connect(corpus)
     con.execute(
         "INSERT INTO languages (code, name_native, name_english, direction)"

@@ -281,7 +281,7 @@ def resolve_override(
     return resolved
 
 
-def _corpus_ayahs(db: Path) -> dict[tuple[int, int], list[tuple[int, str]]]:
+def corpus_ayahs(db: Path) -> dict[tuple[int, int], list[tuple[int, str]]]:
     con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
     try:
         rows = con.execute(
@@ -332,7 +332,7 @@ def align_all(
     silently overruled by a lucky automatic match.
     """
     overrides = overrides or {}
-    corpus = _corpus_ayahs(corpus_db)
+    corpus = corpus_ayahs(corpus_db)
     # A key naming no real ayah ("4:360") would never be applied and never be
     # reported -- the ayah would simply land in `unaligned`, which reads as
     # "Tasnim has no data here" rather than "your override never fired".
