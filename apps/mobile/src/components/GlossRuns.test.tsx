@@ -25,8 +25,9 @@ describe('GlossRuns', () => {
 
     expect(screen.getByText('(the)').style.color).toBe(rgb(themeColors.light.mutedText));
     expect(screen.getByTestId('host').textContent).toBe('(the) Symbols');
-    // The undimmed remainder carries no colour of its own: the host's wins.
     expect(screen.getByText('(the)').parentElement).toBe(screen.getByTestId('host'));
+    // The undimmed remainder is a bare text node of the host, so the host's colour wins.
+    expect(screen.getByText('Symbols', { exact: false })).toBe(screen.getByTestId('host'));
   });
 
   it('mutedText is AA on every gloss host', () => {

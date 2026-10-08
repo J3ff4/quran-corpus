@@ -13,6 +13,8 @@ describe('GlossRuns', () => {
     const dim = screen.getByText('(the)');
     expect(dim.tagName).toBe('SPAN');
     expect(dim.className).toContain('text-paper-600');
+    // paper-600 alone fails AA on night-300.
+    expect(dim.className).toContain('dark:text-paper-400');
     expect(screen.getByText('Symbols', { exact: false }).className ?? '').not.toContain(
       'text-paper-600',
     );
