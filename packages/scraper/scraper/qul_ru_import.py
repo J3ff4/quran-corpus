@@ -26,8 +26,9 @@ SOURCE = "quranacademy"
 LANGUAGE = "ru"
 SNAPSHOT_PATH = Path.home() / "quran-data/refdata/qul-ru-wbw/qul_ru_wbw.sqlite"
 
-# Proven over all 6,236 pages. Drift in QUL's markup surfaces as an AlignError,
-# never as a silent partial import: a lost card leaves cards unused or a word unmatched.
+# Proven over all 6,236 pages. Most drift in QUL's markup surfaces as an AlignError
+# (cards unused, or a word unmatched). A card lost mid-ayah does not: its word is
+# absorbed as covered, the same shape as a real span.
 _CARD = re.compile(
     r"qpc-hafs[^>]*>(.*?)</div>\s*"
     r'<div class="text-sm text-gray-600 russian">(.*?)</div>',

@@ -351,6 +351,36 @@ def test_foreign_ru_row_aborts_before_backup(tmp_path):
     assert not _baks(tmp_path)
 
 
+def test_adjacent_spans_get_their_own_groups(tmp_path):
+    # 24 live ayahs hold two spans side by side; one shared id would merge them.
+    words = {(1, 1): ["مِن", "قَبْلِكَ", "رَبِّ", "بِسْمِ"]}
+    pages = {(1, 1): _page(("مِن", "из прежнего"), ("رَبِّ", "Господа"))}
+    db, snap = _setup(tmp_path, words=words, pages=pages)
+    assert import_qul_ru(db, snap).groups == 2
+    g = [r[3] for r in _ru(db)]
+    assert g[0] == g[1] is not None and g[2] == g[3] is not None and g[0] != g[2]
+
+
+def test_backup_reads_through_an_uncheckpointed_wal(tmp_path):
+    # backup(), not a byte copy: the live DB is WAL-mode, and a copy of the main
+    # file alone misses every commit still sitting in the -wal.
+    db, snap = _setup(tmp_path)
+    writer = sqlite3.connect(db)
+    try:
+        writer.execute("PRAGMA journal_mode=WAL")
+        writer.execute("PRAGMA wal_autocheckpoint=0")
+        writer.execute(
+            "INSERT INTO surahs (id, name_arabic, name_translit, name_translation,"
+            " revelation_type, ayah_count, order_number)"
+            " VALUES (99, 'س', 's', 'S', 'meccan', 1, 99)"
+        )
+        writer.commit()
+        s = import_qul_ru(db, snap)
+    finally:
+        writer.close()
+    assert _sql(s.backup, "SELECT COUNT(*) FROM surahs WHERE id = 99") == [(1,)]
+
+
 def test_backup_holds_the_pre_import_state(tmp_path):
     real = tmp_path / "real"
     real.mkdir()
