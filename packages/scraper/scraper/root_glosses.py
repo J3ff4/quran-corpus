@@ -13,6 +13,7 @@ rebuilds. Ties break alphabetically on the folded form.
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from collections import Counter
 from collections.abc import Iterable
@@ -22,6 +23,9 @@ __all__ = ["TOP_N", "derive_root_glosses", "rank_glosses"]
 # Enough for the head of the distribution without turning the dictionary entry
 # into a word list; the long tail is reachable through the concordance.
 TOP_N = 8
+
+
+_TONE = re.compile(r"[\s!?]+$")
 
 
 def _fold(text: str) -> str:
@@ -40,6 +44,10 @@ def rank_glosses(glosses: Iterable[str], cap: int = TOP_N) -> list[tuple[str, in
         # « » are the source's quoting, not part of the meaning, and unbalanced
         # pairs are common: «слово and слово» are one gloss, not two (R10).
         text = " ".join(raw.replace("«", "").replace("»", "").split())
+        # A trailing ! or ? is the verse's tone, not the word's meaning: «сатаны!»
+        # counts as «сатаны» (owner ruling 2026-10-08; lemma chips already do this).
+        # Word-by-word cells keep them (R9).
+        text = _TONE.sub("", text)
         key = _fold(text)
         # A gloss with no letter or digit is punctuation the source left
         # behind, never a meaning.

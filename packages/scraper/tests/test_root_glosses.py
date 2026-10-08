@@ -18,6 +18,11 @@ def test_guillemets_do_not_split_a_gloss():
     assert rank_glosses(["«слово", "слово»", "слово"]) == [("слово", 3)]
 
 
+def test_trailing_tone_marks_do_not_split_a_gloss():
+    assert rank_glosses(["сатаны", "сатаны!", "сатаны ?!"]) == [("сатаны", 3)]
+    assert rank_glosses(["!"]) == []
+
+
 def test_ties_break_alphabetically():
     # Insertion order is deliberately anti-alphabetical: a rank that merely
     # preserved dict order would pass on "yozdi" first.
