@@ -93,7 +93,7 @@ https://claude.ai/artifact/1XVstTdauPzdXo3gyCpV3R (private).
 | R11 | Lemma chips: strip a leading `и / а / но / или` with the existing `ownWord` guard. `то`, `так` stay. *Reading:* chips only. `root_glosses` has no conjunction strip for any language today, and R11 adds none. |
 | R12 | No lemmatizer; inflected forms stay as written. «досл.» and `[]` stay in the lists. Derive ru `root_glosses`. |
 | R13 | Bracket dimming: on every WBW gloss surface (cell, span, reader popover, word sheet, mushaf word sheet, word screen), in both apps and **all** languages. Colour only, AA ≥ 4.5:1 on the real background, no size change. The bracket glyphs dim with their content. Nesting dims as one outer span; a gloss wholly in brackets dims entirely. One splitter in `packages/data/client`. |
-| R14 | PR B search: new `word_gloss_fts(word_id, language_code, body)` with ai/ad/au triggers on `word_glosses` + backfill self-heal. Indexes every language (+~17 MB accepted). |
+| R14 | PR B search: new `word_gloss_fts` with ai/ad/au triggers on `word_glosses` + backfill self-heal. Indexes every language (+~17 MB accepted). *Implementation:* an external-content fts5 over `word_glosses` (rowid = id), which comes in at ~5.5 MB, inside the accepted budget (review finding, 2026-10-07). |
 | R15 | A "Words" section after verses, before roots. Verse hits unchanged. |
 | R16 | One row per lemma; a word with no lemma groups by its folded Arabic surface. A lemma row opens the lemma page. The plan opens a lemma-less row on the existing word screen `/word/s/a/p` (see D1). |
 | R17 | Top 50 by matched-word count (each word in a span counts), ties by key ascending. Non-Arabic queries of 3+ chars, prefix per token via `buildFtsMatch`. Matches any language. A row shows its best matched gloss, preferring the content language. It is tagged when that gloss's language ≠ the content language, with `uz-Cyrl` counted as `uz`. Matched terms are highlighted. |
@@ -134,7 +134,9 @@ instead, Task 13/14 each gain a route param and a landing hook.
 | `root_glosses` | uz 7,220 · uz-Cyrl 7,220 · ru 0 |
 | Words with NULL `lemma_buckwalter` | 3,307 (3,277 PRON, 30 INL); distinct lemmas 4,832 |
 | `languages` | ar, en, ru, uz, uz-Cyrl (ru already present) |
-| Word-gloss FTS size | all languages +17.1 MB; ru alone +4.45 MB |
+| Word-gloss FTS size | contentful: all languages +17.1 MB (ru alone +4.45). **External content (chosen): 3 languages +4.08 MB** vs 12.67 contentful, same rows |
+| unicode61 `remove_diacritics 2` | folds Latin only: `cafe`→café yes; `елк*`→ёлка **no**; `мои`→мой **no** (1,192 ru glosses contain ё) |
+| Abbreviation endings (т.д., т.е., досл., пр., др.) | **0** of 76,295 cards, so the trailing-`.` strip truncates none |
 | Word-search grouping query, server, current 3 languages (scratch copy) | `the*` 2,307 groups 39 ms · `and*` 1,414 / 20 ms · `allah*` 156 / 7 ms · `mercy*` 9 / 1 ms; index build 0.6 s |
 | Web dim AA (light, `text-paper-600`) | 4.73 on paper-50 · **4.38 on paper-100 (fails)** · 5.02 on white |
 | Web dim AA (dark, `dark:text-paper-400`) | 7.62 on night-300 · 6.66 night-100 · 6.16 night-50 |
@@ -146,7 +148,7 @@ instead, Task 13/14 each gain a route param and a landing hook.
 
 1. **A gloss that cleans to nothing** (`–`, `,`, `/`): import must abort naming the word, never write `""`. → Task 1 test `test_validate_rejects_a_gloss_cleaned_to_empty`.
 2. **Unbalanced brackets in en/uz** (measured 0 only for ru): a stray `)` or an unclosed `(` must not dim the rest of the gloss, and the runs must re-join to the input exactly. → Task 4 tests.
-3. **FTS syntax in a query** (`"`, `*`, `NEAR`, `OR`, `-`): Words must not throw, and verses must still return. → Task 12 test `ignores fts syntax`.
+3. **FTS syntax in a query** (`"`, `*`, `NEAR`, `OR`, `-`): Words must not throw, and verses must still return. → Task 12 tests `ignores fts syntax` and `search() still returns verses when word_gloss_fts is missing`.
 4. **Mixed or short queries**: `al الله` (contains Arabic) and `ab` (2 chars) → no Words; ` mercy ` with spaces → trimmed. → Task 12 tests.
 5. **Lemma-less fold**: two PRON surfaces differing only in harakat merge into one row with a summed count, and the row links to the lowest word id. → Task 12 test.
 
@@ -180,7 +182,7 @@ instead, Task 13/14 each gain a route param and a landing hook.
 - `packages/data/src/{types,constants,queries/search,index,mobile}.ts`.
 - `packages/scraper/tests/test_db.py` — the FTS self-heal through `ScraperDatabase`.
 - `packages/mobile-data/scripts/{pruneForMobile,create-m1-reader-db}.ts`.
-- Web: `app/api/search/route.ts`, `components/search/SearchResults.tsx`, `lib/routes.ts`, tests.
+- Web: `app/api/search/route.ts`, `components/search/SearchResults.tsx`, tests.
 - Mobile: `data/corpusRepository.ts`, `screens/SearchScreen.tsx`, `i18n/uiStrings.ts`, tests, `openCorpusDb.ts`, `app.json`.
 
 ---
@@ -196,6 +198,13 @@ instead, Task 13/14 each gain a route param and a landing hook.
 **Files:** Create `packages/scraper/scraper/qul_ru_import.py` and
 `packages/scraper/tests/test_qul_ru_import.py`.
 
+**Interfaces — Consumes:** `scraper.tasnim_align.base_form` (the M9 tier-1 normalizer:
+marks, tatweel and hamza seats folded, with the letter-spanning-class trap already
+guarded). Re-measured 2026-10-07 on the full snapshot with `base_form` in place of the
+spike's own folder: **0 unaligned, 1,134 covered, 76,295 cards**, identical. Do **not**
+write a second Arabic folder, and do not use `tasnim_align.skeleton`, which is the looser
+tier-2 consonant form.
+
 **Interfaces — Produces:**
 ```python
 SOURCE = "quranacademy"
@@ -210,8 +219,7 @@ class Row(NamedTuple):
     head: int       # word_id that owns the card; == word_id unless covered
 
 def parse_cards(page: str) -> list[tuple[str, str]]       # (arabic, russian)
-def skeleton(s: str) -> str
-def same_word(card: str, ours: str) -> bool               # both already skeletons
+def same_word(card: str, ours: str) -> bool               # both already base_form'd
 def align_ayah(cards: Sequence[tuple[str, str]],
                words: Sequence[tuple[int, str]]) -> list[Row]   # raises AlignError
 def clean_ru_gloss(text: str) -> str
@@ -221,7 +229,8 @@ def validate_ru_gloss(text: str) -> str | None             # reason, or None if 
 - [ ] **Step 1: failing tests.** Every Russian string here is invented.
 ```python
 from scraper.qul_ru_import import (AlignError, Row, align_ayah, clean_ru_gloss,
-    parse_cards, same_word, skeleton, validate_ru_gloss)
+    parse_cards, same_word, validate_ru_gloss)
+from scraper.tasnim_align import base_form
 
 def _page(*cards: tuple[str, str]) -> str:
     return "".join(
@@ -233,13 +242,8 @@ def test_parse_cards_strips_markup_entities_and_html_whitespace():
     page = _page(("<span>بِسْمِ</span>", "<b>во</b>\n  имя &amp; слово"), ("ٱللَّهِ", "тест"))
     assert parse_cards(page) == [("بِسْمِ", "во имя & слово"), ("ٱللَّهِ", "тест")]
 
-def test_skeleton_keeps_letters():
-    # The M9 trap: a mark class spanning letters empties every string.
-    assert skeleton("بِسْمِ") == "بسم"
-    assert skeleton("ٱلرَّحْمَٰنِ") == "الرحمن"
-
 def test_same_word_accepts_qul_doubled_kaanna_only():
-    assert same_word(skeleton("كَأَنأَن"), skeleton("كَأَن"))
+    assert same_word(base_form("كَأَنأَن"), base_form("كَأَن"))
     assert same_word("كتب", "كتب")
     assert not same_word("كتاب", "كتب")
     assert not same_word("كانا", "كان")   # tail is not ours' suffix
@@ -303,11 +307,12 @@ from __future__ import annotations
 
 import html
 import re
-import unicodedata
+import unicodedata  # validate_ru_gloss: control-character category
 from collections.abc import Sequence
 from pathlib import Path
 from typing import NamedTuple
 
+from .tasnim_align import base_form
 from .tasnim_import import validate_gloss
 
 SOURCE = "quranacademy"
@@ -342,23 +347,6 @@ def parse_cards(page: str) -> list[tuple[str, str]]:
     return [(_text(ar), _text(ru)) for ar, ru in _CARD.findall(page)]
 
 
-_FOLDS = (("ٱأإآ", "ا"), ("ىی", "ي"), ("ؤ", "و"), ("ئ", "ي"), ("ة", "ه"))
-
-
-def skeleton(s: str) -> str:
-    """Bare letters: marks, tatweel and pause signs out; alef/yeh/waw/teh-marbuta folded.
-
-    Strips by Unicode category, never by a hand-typed range -- the M9 trap was a mark
-    class that spanned letters and emptied every string.
-    """
-    s = unicodedata.normalize("NFD", s)
-    s = "".join(c for c in s if unicodedata.category(c) != "Mn" and c not in "ـ۞۩")
-    for chars, to in _FOLDS:
-        for c in chars:
-            s = s.replace(c, to)
-    return re.sub(r"[^آ-ي]", "", s)
-
-
 def same_word(card: str, ours: str) -> bool:
     # QUL writes كَأَن as «كَأَنأَن» in 7 ayahs: the word plus a repeat of its own tail.
     tail = card[len(ours):]
@@ -373,7 +361,7 @@ def align_ayah(cards: Sequence[tuple[str, str]], words: Sequence[tuple[int, str]
     head: int | None = None
     gloss = ""
     for word_id, arabic in words:
-        if j < len(cards) and same_word(skeleton(cards[j][0]), skeleton(arabic)):
+        if j < len(cards) and same_word(base_form(cards[j][0]), base_form(arabic)):
             head, gloss = word_id, cards[j][1]
             j += 1
         elif head is None:
@@ -442,9 +430,12 @@ class ImportSummary(NamedTuple):
 def import_qul_ru(corpus_db: Path, snapshot: Path = SNAPSHOT_PATH) -> ImportSummary
 ```
 
-- [ ] **Step 1: failing tests.** Reuse the `_corpus` helper shape from
-  `tests/test_tasnim_import.py:22` (a real DB via `ScraperDatabase`). Lift it into
-  `tests/conftest.py` only if a third caller appears; until then, copy the ~20 lines.
+- [ ] **Step 0: extract, don't copy (§3).**
+  - Move `_corpus` from `tests/test_tasnim_import.py:22` into `tests/conftest.py` as a plain function `make_corpus(path, words)`. Its existing callers import it. Add **no** `languages` rows to it, so tests prove the importer writes its own FK target.
+  - Rename `tasnim_align._corpus_ayahs` → `corpus_ayahs` (public; one caller, `align_all`).
+  - Run `uv run pytest tests/test_tasnim_import.py tests/test_tasnim_align.py`: green, unchanged.
+  - Commit: `refactor(scraper): share the corpus fixture and corpus_ayahs`.
+- [ ] **Step 1: failing tests.** Use `make_corpus` (a real DB via `ScraperDatabase`, no `languages` rows).
 ```python
 def _snapshot(path: Path, pages: dict[tuple[int, int], str]) -> None:
     con = sqlite3.connect(path)
@@ -464,7 +455,7 @@ def _ru(db: Path) -> list[tuple]:
 
 def test_import_writes_cleaned_rows_and_one_span(tmp_path):
     db, snap = tmp_path / "c.db", tmp_path / "s.sqlite"
-    _corpus(db, WORDS); _snapshot(snap, PAGES)
+    make_corpus(db, WORDS); _snapshot(snap, PAGES)
     s = import_qul_ru(db, snap)
     assert (s.rows, s.cards, s.groups) == (5, 4, 1)
     rows = _ru(db)
@@ -478,20 +469,25 @@ def test_no_latin_letter_survives(tmp_path):
 def test_unaligned_ayah_writes_nothing(tmp_path):
     # (1,2) loses its first card -> AlignError; a pre-existing ru row must survive.
     ...; with pytest.raises(ImportAborted, match="1:2"): import_qul_ru(db, snap)
-    assert _ru(db) == before and not list(tmp_path.glob("*.bak-m13"))
+    assert _ru(db) == before and not list(tmp_path.glob("*.bak-m13-*"))
 
 def test_invalid_gloss_writes_nothing(tmp_path):      # a card "–" -> cleaned empty
 def test_snapshot_missing_an_ayah_writes_nothing(tmp_path):
 def test_rerun_is_idempotent(tmp_path):              # run twice -> identical _ru(db)
-def test_foreign_ru_row_rolls_everything_back(tmp_path):
+def test_writes_its_own_languages_row(tmp_path):     # fresh make_corpus DB, no 'ru' -> import succeeds
+def test_keeps_an_existing_ru_languages_row(tmp_path):  # seeded ('ru','X','Y','ltr') survives unchanged
+def test_foreign_ru_row_aborts_before_backup(tmp_path):
     # seed one ru row source='other' on word 1 plus an older quranacademy row on word 2;
-    # import raises sqlite3.IntegrityError; both seeded rows still there, nothing else.
+    # ImportAborted naming "1 ru rows from other sources"; both seeded rows still there,
+    # and no *.bak-m13-* file.
 def test_backup_holds_the_pre_import_state(tmp_path):
     # s.backup opens as sqlite and has 0 ru rows; it sits beside the RESOLVED db path.
+def test_a_rerun_never_overwrites_an_earlier_backup(tmp_path):
+    # two runs -> two distinct *.bak-m13-* files; the first still has 0 ru rows.
 ```
   Write each `...` body in full while implementing. Each one names its assert as above.
 - [ ] **Step 2: run, watch them fail.**
-- [ ] **Step 3: implement.** New imports: `gzip`, `sqlite3`, `from .db import ScraperDatabase`.
+- [ ] **Step 3: implement.** New imports: `gzip`, `sqlite3`, `from datetime import UTC, datetime`, `from .db import ScraperDatabase`, and `corpus_ayahs` added to the `.tasnim_align` import.
 ```python
 class ImportAborted(RuntimeError):
     """Validation failed; nothing was written."""
@@ -505,16 +501,21 @@ class ImportSummary(NamedTuple):
 _MAX_REPORTED = 20
 
 
-def _plan(corpus: sqlite3.Connection, snapshot: sqlite3.Connection) -> list[tuple[int, str, int | None]]:
+def _plan(
+    words: dict[tuple[int, int], list[tuple[int, str]]],
+    con: sqlite3.Connection,
+    snapshot: sqlite3.Connection,
+) -> list[tuple[int, str, int | None]]:
     """Every (word_id, gloss, group) to write, or ImportAborted listing what failed."""
-    words: dict[tuple[int, int], list[tuple[int, str]]] = {}
-    for s, a, wid, ar in corpus.execute(
-        "SELECT y.surah_id, y.ayah_number, w.id, w.text_arabic FROM words w"
-        " JOIN ayahs y ON y.id = w.ayah_id ORDER BY y.surah_id, y.ayah_number, w.position"
-    ):
-        words.setdefault((s, a), []).append((wid, ar))
     pages = {(s, a): gz for s, a, gz in snapshot.execute("SELECT surah, ayah, html_gz FROM raw")}
-    errors = [f"{s}:{a} missing from snapshot" for s, a in sorted(words.keys() - pages.keys())]
+    # R7, checked here rather than left to the INSERT's UNIQUE failure: refused with a
+    # reason, and before the backup, so a refused run leaves no .bak behind.
+    foreign = con.execute(
+        "SELECT COUNT(*) FROM word_glosses WHERE language_code = ? AND source IS NOT ?",
+        (LANGUAGE, SOURCE),
+    ).fetchone()[0]
+    errors = [f"{foreign} ru rows from other sources; refusing to share 'ru' with them"] if foreign else []
+    errors += [f"{s}:{a} missing from snapshot" for s, a in sorted(words.keys() - pages.keys())]
     errors += [f"{s}:{a} not in corpus" for s, a in sorted(pages.keys() - words.keys())]
     out: list[tuple[int, str, int | None]] = []
     group = 0
@@ -544,21 +545,36 @@ def _plan(corpus: sqlite3.Connection, snapshot: sqlite3.Connection) -> list[tupl
 
 def import_qul_ru(corpus_db: Path, snapshot: Path = SNAPSHOT_PATH) -> ImportSummary:
     target = corpus_db.resolve()          # apps/web/quran.db is a symlink
+    words = corpus_ayahs(target)          # tasnim_align's reader, read-only
     database = ScraperDatabase(str(target))
     con = database.connection
     con.execute("PRAGMA foreign_keys = ON")
     snap = sqlite3.connect(f"file:{snapshot}?mode=ro", uri=True)
     try:
-        planned = _plan(con, snap)        # aborts before any write, before any backup
-        backup = target.with_name(target.name + ".bak-m13")
+        planned = _plan(words, con, snap)  # aborts before any write, before any backup
+        # Timestamped, never overwritten: a re-run (R7) must not replace the pre-M13
+        # copy with the state of the first import.
+        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
+        backup = target.with_name(f"{target.name}.bak-m13-{stamp}")
+        if backup.exists():
+            raise ImportAborted(f"{backup} already exists")
         # backup(), not copyfile: the live DB is WAL-mode, and a byte copy drops the WAL.
-        with sqlite3.connect(backup) as dst:
+        dst = sqlite3.connect(backup)
+        try:
             con.backup(dst)
+        finally:
+            dst.close()
         with con:
+            # The FK target. Present on the live DB; INSERT OR IGNORE so a fresh DB
+            # imports and an existing row's names are never rewritten.
+            con.execute(
+                "INSERT OR IGNORE INTO languages (code, name_native, name_english, direction)"
+                " VALUES ('ru', 'Русский', 'Russian', 'ltr')"
+            )
             con.execute("DELETE FROM word_glosses WHERE language_code = ? AND source = ?",
                         (LANGUAGE, SOURCE))
-            # Plain INSERT: a ru row from any other source collides on
-            # UNIQUE(word_id, language_code) and rolls the whole run back (R7).
+            # Plain INSERT stays as a second line behind _plan's check: anything that
+            # still collides on UNIQUE(word_id, language_code) rolls the run back.
             con.executemany(
                 "INSERT INTO word_glosses (word_id, language_code, gloss_text, source, gloss_group)"
                 " VALUES (?, ?, ?, ?, ?)",
@@ -591,8 +607,10 @@ def import_qul_ru_cmd(db: str, snapshot: str | None) -> None:
 - [ ] **Step 5: mutation-checks.**
   - Move the backup above `_plan`: `test_unaligned_ayah_writes_nothing` fails on the `.bak` glob.
   - Delete `if errors: raise`: the unaligned and invalid tests fail.
-  - Change the plain INSERT to `INSERT OR REPLACE`: `test_foreign_ru_row_rolls_everything_back` fails.
-  - Unscope the DELETE (drop `AND source = ?`): the foreign-row test fails.
+  - Delete the `foreign` check: `test_foreign_ru_row_aborts_before_backup` fails, with an IntegrityError instead of ImportAborted.
+  - Delete the `languages` INSERT: `test_writes_its_own_languages_row` fails on the FK.
+  - Make it `INSERT OR REPLACE INTO languages`: `test_keeps_an_existing_ru_languages_row` fails.
+  - Drop the timestamp from the name: `test_a_rerun_never_overwrites…` fails.
 - [ ] **Step 6: commit.** `feat(scraper): import-qul-ru, all-or-nothing Russian word glosses`
 
 ### Task 3: Dictionary cleaning — « » and Russian conjunctions
@@ -878,7 +896,7 @@ of git.
   `Expected ${summary.words} Russian word glosses, found ${n}` unless it equals `summary.words`.
   Run it on the current asset (`pnpm --filter @quran-corpus/mobile-data exec tsx -e "…validateM1ReaderDbContract()…"`, or the existing test entry): **expect a throw (0 ≠ 77,429)**.
 - [ ] **Step 2: pre-flight.** No `next dev` or `expo start` writing; `ls -la /home/claude/quran-data/` has room for a ~164 MB `.bak`.
-- [ ] **Step 3: import.** `cd packages/scraper && uv run scraper import-qul-ru --db ../../apps/web/quran.db`. **Expected exactly**: `ru glosses 77429 rows over 76295 cards; 1111 spans; backup /home/claude/quran-data/quran.db.bak-m13`. **A different number means the code changed, not the data. Investigate before going on.**
+- [ ] **Step 3: import.** `cd packages/scraper && uv run scraper import-qul-ru --db ../../apps/web/quran.db`. **Expected exactly**: `ru glosses 77429 rows over 76295 cards; 1111 spans; backup /home/claude/quran-data/quran.db.bak-m13-<UTC stamp>`. **A different number means the code changed, not the data. Investigate before going on.**
 - [ ] **Step 4: verify** (python, `mode=ro`):
   - ru/quranacademy = 77,429 rows.
   - 0 rows match `[A-Za-z]`.
@@ -921,53 +939,59 @@ of git.
 
 **Interfaces — Produces:**
 ```sql
--- Word-gloss search (M13). rowid = word_glosses.id, so the triggers delete by rowid
--- and never need a key the table does not have. Same tokenizer as search_fts.
+-- Word-gloss search (M13). External content: the index stores no copy of the text,
+-- it reads word_glosses by rowid = word_glosses.id. Measured on the 3-language corpus:
+-- 4.08 MB against 12.67 MB for a contentful table. The column is NAMED gloss_text
+-- because external content maps fts columns to content columns by name.
 CREATE VIRTUAL TABLE IF NOT EXISTS word_gloss_fts USING fts5(
-  word_id UNINDEXED,
-  language_code UNINDEXED,
-  body,
+  gloss_text,
+  content = 'word_glosses',
+  content_rowid = 'id',
   tokenize = 'unicode61 remove_diacritics 2'
 );
 
+-- External content means the triggers must hand fts5 the OLD text to delete it:
+-- the 'delete' command, never a plain DELETE, which would corrupt the index.
 CREATE TRIGGER IF NOT EXISTS trg_word_glosses_ai AFTER INSERT ON word_glosses BEGIN
-  INSERT INTO word_gloss_fts (rowid, word_id, language_code, body)
-  VALUES (NEW.id, NEW.word_id, NEW.language_code, NEW.gloss_text);
+  INSERT INTO word_gloss_fts (rowid, gloss_text) VALUES (NEW.id, NEW.gloss_text);
 END;
 
 CREATE TRIGGER IF NOT EXISTS trg_word_glosses_ad AFTER DELETE ON word_glosses BEGIN
-  DELETE FROM word_gloss_fts WHERE rowid = OLD.id;
+  INSERT INTO word_gloss_fts (word_gloss_fts, rowid, gloss_text)
+  VALUES ('delete', OLD.id, OLD.gloss_text);
 END;
 
 CREATE TRIGGER IF NOT EXISTS trg_word_glosses_au AFTER UPDATE ON word_glosses BEGIN
-  DELETE FROM word_gloss_fts WHERE rowid = OLD.id;
-  INSERT INTO word_gloss_fts (rowid, word_id, language_code, body)
-  VALUES (NEW.id, NEW.word_id, NEW.language_code, NEW.gloss_text);
+  INSERT INTO word_gloss_fts (word_gloss_fts, rowid, gloss_text)
+  VALUES ('delete', OLD.id, OLD.gloss_text);
+  INSERT INTO word_gloss_fts (rowid, gloss_text) VALUES (NEW.id, NEW.gloss_text);
 END;
 
--- Self-heal: a DB whose glosses predate the table gets them indexed the first time
--- the schema is applied, by the scraper (ScraperDatabase) and by web runMigrations
--- alike, from this one statement. From then on the triggers keep it in step, so
--- "empty" is the only stale state there is. The uncorrelated NOT EXISTS is a
--- constant SQLite evaluates once, before the scan, so a healthy index costs one probe.
-INSERT INTO word_gloss_fts (rowid, word_id, language_code, body)
-SELECT id, word_id, language_code, gloss_text FROM word_glosses
-WHERE NOT EXISTS (SELECT 1 FROM word_gloss_fts);
+-- Self-heal: a DB whose glosses predate the index gets it built the first time the
+-- schema is applied, by the scraper (ScraperDatabase) and by web runMigrations alike,
+-- from this one statement. The emptiness probe reads the _docsize shadow table, NOT
+-- word_gloss_fts itself: an external-content table reads through to word_glosses and
+-- is never "empty" while glosses exist. Verified 2026-10-07: heals, idempotent,
+-- triggers then pass fts5 'integrity-check'.
+INSERT INTO word_gloss_fts (word_gloss_fts) SELECT 'rebuild'
+WHERE NOT EXISTS (SELECT 1 FROM word_gloss_fts_docsize)
+  AND EXISTS (SELECT 1 FROM word_glosses);
 ```
 - [ ] **Step 1: failing tests.**
-  - `migrate.test.ts`: seed a DB with the **pre-M13** schema (the current `SCHEMA_SQL` minus the block above) and 2 glosses. Run `runMigrations`; `SELECT count(*) FROM word_gloss_fts` = 2.
-  - Insert, update and delete one gloss; a `MATCH` finds the new text, then the updated text, then nothing.
-  - `runMigrations` twice: still 2 rows, not 4.
-  - `test_db.py`: same seed, open via `ScraperDatabase`, 2 rows indexed.
+  - `migrate.test.ts`: seed a DB with the **pre-M13** schema (the current `SCHEMA_SQL` minus the block above) and 2 glosses. Run `runMigrations`; `SELECT count(*) FROM word_gloss_fts_docsize` = 2 and `MATCH` finds both.
+  - Insert, update and delete one gloss; a `MATCH` finds the new text, then the updated text (and not the old), then nothing. After all three, `INSERT INTO word_gloss_fts(word_gloss_fts) VALUES('integrity-check')` does not throw.
+  - `runMigrations` twice: `_docsize` still 2.
+  - `test_db.py`: same seed, open via `ScraperDatabase`, `_docsize` = 2.
 - [ ] **Step 2: run, watch them fail.**
 - [ ] **Step 3: add the block** to `schema.sql`. Then `pnpm --filter @quran-corpus/data generate:schema` (never hand-edit), and build.
 - [ ] **Step 4: green**, both suites. Confirm `splitStatements` and the Python splitter keep trigger bodies whole (the existing `trg_translations_*` prove the shape).
 - [ ] **Step 5: mutation-checks.**
   - Delete the self-heal INSERT and regenerate: the seed test fails.
+  - Point the heal's probe at `word_gloss_fts` instead of `_docsize`: the seed test fails (never heals).
+  - Make `trg_word_glosses_ad` a plain `DELETE FROM word_gloss_fts WHERE rowid = OLD.id`: the integrity-check fails.
   - Delete `trg_word_glosses_au` and regenerate: the update test fails.
-  - Drop `WHERE NOT EXISTS`: the twice test fails.
   - **Regenerate after each mutate and each restore**, or the check is vacuous.
-- [ ] **Step 6: commit.** `feat(data): word_gloss_fts with triggers and a backfill self-heal`
+- [ ] **Step 6: commit.** `feat(data): word_gloss_fts (external content) with triggers and a self-heal`
 
 ### Task 11: `markGlossMatches` (pure)
 
@@ -985,8 +1009,14 @@ it('prefix-matches a term of 3+ chars, case-folded', () =>
   expect(markGlossMatches('The Merciful', 'merc')).toBe(`The ${M('Merciful')}`));
 it('exact-matches a term under 3 chars, like termToMatch', () =>
   expect(markGlossMatches('in it', 'in')).toBe(`${M('in')} it`));
-it('folds diacritics the way unicode61 remove_diacritics 2 does', () =>
-  expect(markGlossMatches('ёлка', 'елк')).toBe(M('ёлка')));
+// unicode61 remove_diacritics 2 folds LATIN diacritics only. Verified 2026-10-07:
+// "cafe" matches café; "елк"* does NOT match ёлка; "мои" does NOT match мой.
+it('folds Latin diacritics like the tokenizer', () =>
+  expect(markGlossMatches('café', 'cafe')).toBe(M('café')));
+it('does not fold Cyrillic ё/й, because FTS does not', () => {
+  expect(markGlossMatches('ёлка', 'елк')).toBe('ёлка');
+  expect(markGlossMatches('мой мои', 'мои')).toBe(`мой ${M('мои')}`);
+});
 it('marks every term of a multi-term query', () =>
   expect(markGlossMatches('милостивый Господь', 'мил господ')).toBe(`${M('милостивый')} ${M('Господь')}`));
 it('leaves brackets and punctuation outside the mark', () =>
@@ -998,9 +1028,11 @@ it('returns the gloss untouched for a query with no letters', () =>
 - [ ] **Step 3: implement.**
 ```ts
 // A token as unicode61 sees one: a run of letters and digits. Folding mirrors
-// remove_diacritics 2 + case folding, so the mark lands on exactly what MATCHed.
+// remove_diacritics 2, which strips marks from LATIN letters only (ё, й survive),
+// plus case folding -- so the mark lands on exactly what MATCHed.
 const TOKEN = /[\p{L}\p{N}]+/gu;
-const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+const fold = (s: string) =>
+  s.normalize('NFD').replace(/(?<=[A-Za-z])\p{M}+/gu, '').normalize('NFC').toLowerCase();
 // Same floor as normalize.ts MIN_PREFIX_LENGTH: below it FTS is given an exact phrase.
 const MIN_PREFIX = 3;
 
@@ -1017,7 +1049,7 @@ export function markGlossMatches(gloss: string, query: string): string {
   });
 }
 ```
-- [ ] **Step 4: green.** **Step 5: mutation-check.** Remove the `\p{M}` strip and the `ёлка` test fails. Make every term prefix and the `in it` test fails.
+- [ ] **Step 4: green.** **Step 5: mutation-check.** Remove the lookbehind (strip every mark) and the `ёлка` test fails. Remove the strip entirely and the `café` test fails. Make every term prefix and the `in it` test fails.
 - [ ] **Step 6: commit.** `feat(data): markGlossMatches for word-gloss hits`
 
 ### Task 12: `searchWords` + `SearchResult.words`
@@ -1059,8 +1091,17 @@ glossLanguage?: string;
 export const WORD_HIT_LIMIT = 50;
 export async function searchWords(db: QueryClient, q: string, glossLanguage?: string): Promise<WordHit[]>
 ```
-`EMPTY_SEARCH_RESULT` gains a frozen `words: []`. `search()` runs
-`Promise.all([searchVerses(db, query, opts), searchWords(db, query, opts.glossLanguage), searchRoots(db, query)])`.
+`EMPTY_SEARCH_RESULT` gains a frozen `words: []`. `search()` runs:
+```ts
+const [verses, words, roots] = await Promise.all([
+  searchVerses(db, query, opts),
+  // Words is the newest arm and the only one on a table a deploy can outrun
+  // (DB_SKIP_MIGRATIONS=true): a missing or broken word_gloss_fts costs the Words
+  // section, never the verse hits beside it.
+  searchWords(db, query, opts.glossLanguage).catch((): WordHit[] => []),
+  searchRoots(db, query),
+]);
+```
 
 - [ ] **Step 1: failing tests** (`wordSearch.test.ts`, in-memory libsql through `runMigrations`, seeded with `words`/`ayahs`/`word_glosses`):
 ```ts
@@ -1082,6 +1123,12 @@ it('ignores fts syntax', async () => {
 });
 it('caps at 50');                                           // seed 51 lemmas
 it('search() returns words between verses and roots, verses unchanged with or without glossLanguage');
+it('search() still returns verses when word_gloss_fts is missing', async () => {
+  await db.execute('DROP TABLE word_gloss_fts');
+  const r = await search(db, 'merc', { glossLanguage: 'en' });
+  expect(r.words).toEqual([]);
+  expect(r.verses.length).toBeGreaterThan(0);
+});
 ```
   Write every body in full while implementing. Each one asserts exact `WordHit` objects.
 - [ ] **Step 2: run, watch them fail.**
@@ -1118,7 +1165,9 @@ export async function searchWords(db: QueryClient, q: string, glossLanguage?: st
                  CASE WHEN w.lemma_buckwalter IS NULL THEN w.text_arabic END AS surface,
                  MIN(w.lemma) AS lemma, MIN(w.text_arabic) AS text_arabic,
                  COUNT(DISTINCT w.id) AS n, MIN(w.id) AS first_id
-          FROM word_gloss_fts f JOIN words w ON w.id = f.word_id
+          FROM word_gloss_fts f
+          JOIN word_glosses g ON g.id = f.rowid
+          JOIN words w ON w.id = g.word_id
           WHERE word_gloss_fts MATCH ?
           GROUP BY w.lemma_buckwalter, surface`,
     args: [match],
@@ -1154,12 +1203,14 @@ export async function searchWords(db: QueryClient, q: string, glossLanguage?: st
   const [glossRows, firstRows] = await Promise.all([
     db.execute({
       sql: `SELECT w.lemma_buckwalter AS lemma_bw, w.text_arabic AS surface,
-                   f.language_code AS lang, f.body AS gloss, COUNT(*) AS c
-            FROM word_gloss_fts f JOIN words w ON w.id = f.word_id
+                   g.language_code AS lang, g.gloss_text AS gloss, COUNT(*) AS c
+            FROM word_gloss_fts f
+            JOIN word_glosses g ON g.id = f.rowid
+            JOIN words w ON w.id = g.word_id
             WHERE word_gloss_fts MATCH ?
               AND (w.lemma_buckwalter IN (${marks(lemmas.length)})
                    OR (w.lemma_buckwalter IS NULL AND w.text_arabic IN (${marks(surfaces.length)})))
-            GROUP BY w.lemma_buckwalter, w.text_arabic, f.language_code, f.body`,
+            GROUP BY w.lemma_buckwalter, w.text_arabic, g.language_code, g.gloss_text`,
       args: [match, ...lemmas, ...surfaces],
     }),
     db.execute({
@@ -1211,15 +1262,16 @@ export async function searchWords(db: QueryClient, q: string, glossLanguage?: st
   - Drop `tier` from the sort: the content-language test fails.
   - Return `best.lang` unconditionally: the content-language test fails on `gloss_lang`.
   - Remove the `ARABIC.test` guard: the Arabic case fails.
+  - Remove the `.catch` in `search()`: the missing-table test fails.
 - [ ] **Step 6: commit.** `feat(data): searchWords, a Words section in SearchResult`
 - [ ] **Step 7: STOP — §5.** Ask the owner to run `/code-review` on `main..HEAD` (Tasks 10-12). One pass.
 
 ### Task 13: Web — Words section
 
-**Files:** Modify `apps/web/src/lib/routes.ts`, `app/api/search/route.ts`,
+**Files:** Modify `app/api/search/route.ts`,
 `components/search/SearchResults.tsx` and `src/test/SearchResults.test.tsx`.
 
-- [ ] **Step 1: failing tests.**
+- [ ] **Step 1: failing tests.** The plan's own review finding: no hover fill on the row (AA).
   - Words render between the Verses and Roots `<h2>`s (DOM order).
   - A lemma row links to `lemmaPath(bw)`; a lemma-less row links to `/word/2/7/3`.
   - The highlight renders a `<mark>`.
@@ -1227,23 +1279,25 @@ export async function searchWords(db: QueryClient, q: string, glossLanguage?: st
   - No section when `words` is empty.
 - [ ] **Step 2: run, watch them fail.**
 - [ ] **Step 3: implement.**
-  - `routes.ts`: `export function wordPath(surah: number, ayah: number, position: number): string { return \`/word/${surah}/${ayah}/${position}\`; }`
+  - Links: lemma rows use `lemmaPath` (`lib/routes.ts`); lemma-less rows use the existing `wordHref({ surah, ayah, position })` (`lib/wordLocation.ts:13`). No new path builder.
   - `route.ts`: `const { content } = resolveLocale(await cookies()); const result = await search(db, q, { glossLanguage: content });`. Import `cookies` from `next/headers` and `resolveLocale` from `../../../lib/locale`. Verses are unchanged because `glossLanguage` never reaches `searchVerses`' SQL.
   - `SearchResults.tsx`: destructure `words`, add it to `empty`, and insert the section after verses:
 ```tsx
 {words.length > 0 && (
-  <section>
+  <section className="mb-6">
     <h2 className="mb-2 text-sm font-semibold text-paper-500">Words</h2>
     <ul className="space-y-1">
       {words.map((w) => (
         <li key={w.lemma_buckwalter ?? `${w.surah_id}:${w.ayah_number}:${w.position}`}>
           <Link
-            href={w.lemma_buckwalter ? lemmaPath(w.lemma_buckwalter) : wordPath(w.surah_id, w.ayah_number, w.position)}
+            href={w.lemma_buckwalter ? lemmaPath(w.lemma_buckwalter) : wordHref({ surah: w.surah_id, ayah: w.ayah_number, position: w.position })}
             onClick={onNavigate}
-            className="flex items-baseline gap-3 rounded-lg px-2 py-1.5 hover:bg-paper-100 dark:hover:bg-night-100"
+            // No hover fill: text-paper-600 measures 4.38:1 on paper-100, under AA.
+            // Hover underlines the gloss instead; the row keeps the page background.
+            className="group flex items-baseline gap-3 rounded-lg px-2 py-1.5"
           >
             <span className="font-arabic text-lg" dir="rtl">{w.arabic}</span>
-            <span className="min-w-0 flex-1 text-sm" dir="ltr">
+            <span className="min-w-0 flex-1 text-sm group-hover:underline" dir="ltr">
               <Highlighted text={w.gloss} />
               {w.gloss_lang && <span className="ml-1 text-xs text-paper-600 dark:text-paper-400">({w.gloss_lang})</span>}
             </span>
@@ -1257,6 +1311,7 @@ export async function searchWords(db: QueryClient, q: string, glossLanguage?: st
 ```
   The heading copies the existing Roots `<h2>` class on purpose: one style per section heading.
 - [ ] **Step 4: green**, plus web lint and type-check. **Step 5: mutation-check.** Render the section after roots and the order test fails.
+  The `(lang)` tag and count sit on the page background only (`paper-50` 4.73 / `night-300` 7.62). Record that in WB1.
 - [ ] **Step 6: commit.** `feat(web/search): Words section from word-gloss matches`
 
 ### Task 14: Mobile — Words section
@@ -1285,10 +1340,17 @@ the `nothing` check at :290), `i18n/uiStrings.ts` (`'search.words'`) and
 **Files:** Modify `packages/mobile-data/scripts/pruneForMobile.ts`,
 `create-m1-reader-db.ts`, `apps/mobile/src/data/openCorpusDb.ts` and `app.json`.
 
-- [ ] **Step 1: contract (failing first).** `validateM1ReaderDbContract` throws unless `SELECT count(*) FROM word_gloss_fts` equals `SELECT count(*) FROM word_glosses`. Run it on the PR A asset and **expect a throw** (no table).
+- [ ] **Step 1: contract (failing first).** `validateM1ReaderDbContract` throws unless:
+  - `SELECT count(*) FROM word_gloss_fts_docsize` equals `SELECT count(*) FROM word_glosses`;
+  - `INSERT INTO word_gloss_fts(word_gloss_fts) VALUES('integrity-check')` passes (run it on the copy, before the seal).
+
+  Run it on the PR A asset and **expect a throw** (no table).
 - [ ] **Step 2: compact.** In `pruneOpenDb`, after the `search_fts` optimize: `await db.execute("INSERT INTO word_gloss_fts(word_gloss_fts) VALUES('optimize')");`. The comment: the PR A delete+insert left tombstones; same reasoning as above it.
-- [ ] **Step 3: migrate the live DB.** Take a `.bak` first: `python3 -c "import sqlite3; s=sqlite3.connect('/home/claude/quran-data/quran.db'); d=sqlite3.connect('/home/claude/quran-data/quran.db.bak-m13b'); s.backup(d)"`. Then apply the schema through the scraper: `cd packages/scraper && uv run python -c "from scraper.db import ScraperDatabase; ScraperDatabase('../../apps/web/quran.db').close()"`. Verify that `word_gloss_fts` count = `word_glosses` count (en 77,429 + uz 77,424 + uz-Cyrl 77,424 + ru 77,429 = 309,706) and that `MATCH '"милост"*'` returns rows.
-- [ ] **Step 4: size.** VACUUM a scratch copy and record the canonical size before and after (expect ~+17 MB). Run `corpusDbVersion` `'m13a'` → `'m13b'`, then `pnpm generate:m1-db`, then the contract. Record the asset size.
+- [ ] **Step 3: migrate the live DB.** Take a `.bak` first: `python3 -c "import sqlite3; s=sqlite3.connect('/home/claude/quran-data/quran.db'); d=sqlite3.connect('/home/claude/quran-data/quran.db.bak-m13b'); s.backup(d)"`. Then apply the schema through the scraper: `cd packages/scraper && uv run python -c "from scraper.db import ScraperDatabase; ScraperDatabase('../../apps/web/quran.db').close()"`. Then verify:
+  - `word_gloss_fts_docsize` count = `word_glosses` count (en 77,429 + uz 77,424 + uz-Cyrl 77,424 + ru 77,429 = 309,706);
+  - `integrity-check` passes;
+  - `MATCH '"милост"*'` returns rows.
+- [ ] **Step 4: size.** VACUUM a scratch copy and record the canonical size before and after (expect ≈ +5.5 MB: 4.08 MB measured for 3 languages, plus ru). Run `corpusDbVersion` `'m13a'` → `'m13b'`, then `pnpm generate:m1-db`, then the contract. Record the asset size.
 - [ ] **Step 5: versionCode** 95 → 96. Run the gates, then commit `chore(mobile): m13b corpus with the word-gloss index, versionCode 96`.
 - [ ] **Step 6: APK + device run WITH the owner** (as Task 9 Steps 1-2) → table **M13-B**.
 - [ ] **Step 7: web.** Prod build + start locally → table **M13-W(B)**.
@@ -1312,7 +1374,7 @@ Reversible to the pre-M13 state; no code reverts needed beyond the credit and co
        con.execute("DELETE FROM word_glosses WHERE language_code='ru' AND source='quranacademy'")
        con.execute("DELETE FROM root_glosses WHERE language_code='ru'")
    ```
-   After PR B, `trg_word_glosses_ad` empties the matching `word_gloss_fts` rows. Then `INSERT INTO word_gloss_fts(word_gloss_fts) VALUES('optimize')`.
+   After PR B, `trg_word_glosses_ad` removes the matching index entries. Then `INSERT INTO word_gloss_fts(word_gloss_fts) VALUES('optimize')` and `VALUES('integrity-check')`.
 3. Code, one commit:
    - remove the mobile `Quran Academy` credit and the `about.sourceWbwRu` strings (×3);
    - remove the web source entry;
@@ -1339,11 +1401,13 @@ Russian WBW then falls back to English with the `(en)` tag, which is the pre-M13
 | Row-height drift in WBW (M6l estimator) | Colour-only nested `Text`; no font or size change. Device check A5. |
 | Stopword queries slow on phone | Two-pass query; 39 ms server worst case. Device check B1 times `the`. Upgrade path: raise the floor to 4 chars for Latin only. |
 | Web 500 on search after PR B deploy | Deploy order (Task 15 Step 8). |
-| APK grows | PR A ≈ +4 MB (ru rows), PR B ≈ +17 MB (index), recorded at Tasks 8/15. |
+| APK grows | PR A ≈ +4 MB (ru rows), PR B ≈ +5.5 MB (external-content index), recorded at Tasks 8/15. |
+| External-content index drifts from `word_glosses` | Only triggers write it. Any write path that bypasses them (none exists; Python and TS both go through the schema's triggers) would leave stale rowids. The mobile contract runs `integrity-check` on every generated asset. |
+| Russian user types е for ё | FTS does not fold ё (measured), so `все` will not find `всё`. Verse search has the same limit today. Out of M13 scope; raise as a follow-up issue at PR B merge. |
 | Legal | Owner-accepted (R1). Runbook above; credit says "permission requested". |
 
-**Rollback:** PR A: restore `quran.db.bak-m13`, or follow the runbook. PR B: restore
-`quran.db.bak-m13b`, or `DROP TABLE word_gloss_fts` plus the 3 triggers (purely additive).
+**Rollback:** PR A: restore the **earliest** `quran.db.bak-m13-*` (the pre-M13 state), or follow the runbook. PR B: restore
+`quran.db.bak-m13b`, or drop the 3 triggers then `DROP TABLE word_gloss_fts` (purely additive).
 
 ---
 
@@ -1354,7 +1418,7 @@ Russian WBW then falls back to English with the `(en)` tag, which is the pre-M13
 - Lemma chips under Russian show no «», and no leading и/а/но/или (except the conjunction lemma itself).
 - Bracketed runs are dimmed on every WBW surface in en/uz/ru, both apps, both themes, AA ≥ 4.5.
 - Credits are visible on web and mobile with the exact R2 wording.
-- PR B: `word_gloss_fts` count = `word_glosses` count. Words section after verses and before roots. Rows grouped and capped at 50. Tags and highlights as R17.
+- PR B: `word_gloss_fts_docsize` count = `word_glosses` count, and `integrity-check` passes. Words section after verses and before roots. Rows grouped and capped at 50. Tags and highlights as R17.
 - Gates are green. `/code-review` ran and was answered at the Task 4 and Task 12 STOPs. Device tables M13-A and M13-B are filled. Owner confirmed both web deploys.
 
 ---
@@ -1407,6 +1471,23 @@ Russian WBW then falls back to English with the `(en)` tag, which is the pre-M13
 | WB2 | Verse hits identical to the PR A build for `mercy` and `милост` | |
 
 ---
+
+## Plan review log
+
+`/code-review` on the plan, 2026-10-07: 10 findings, 9 fixed in the plan, 1 declined.
+
+| # | Finding | Verdict |
+|---|---|---|
+| 1 | Importer never writes its `languages('ru')` FK target, so a fresh DB fails on the FK and the R7 test passes for the wrong reason | Fixed: `INSERT OR IGNORE` in the txn, plus tests for a fresh DB and an existing row |
+| 2 | `markGlossMatches` folds ё/й, which unicode61 does not | Fixed after verifying on SQLite: the fold is Latin-only. ё/е search noted as a follow-up risk |
+| 3 | A `word_gloss_fts` failure rejects the whole `search()` and takes verses with it | Fixed: `.catch(() => [])` on Words only, with a missing-table test |
+| 4 | A fixed `.bak-m13` is overwritten on a re-run, so the rollback restores the post-import state | Fixed: UTC-stamped name, refuses if it exists, `dst` closed explicitly |
+| 5 | The trailing-`.` strip truncates abbreviations | **Declined**: 0 of 76,295 cards end in т.д./т.е./досл./пр./др. (measured) |
+| 6 | `skeleton()` duplicates `tasnim_align.base_form`, the corpus loader is duplicated, and `_corpus` is copy-pasted (§3) | Fixed: reuse `base_form` (re-measured: identical 0 / 1,134 / 76,295), public `corpus_ayahs`, shared `make_corpus` |
+| 7 | `wordPath` duplicates `wordHref` | Fixed: use `wordHref` |
+| 8 | Words row hover is `paper-100`, under AA for `paper-600` text, and the section is missing `mb-6` | Fixed: no hover fill (underline instead), `mb-6` added |
+| 9 | The R7 collision surfaces as a raw IntegrityError after the backup | Fixed: `_plan` refuses foreign ru rows with a reason, before any backup |
+| 10 | A contentful fts5 duplicates every gloss | Fixed: external content, 4.08 MB vs 12.67 MB measured; `_docsize` heal probe; 'delete' triggers; `integrity-check` in the contract |
 
 ## Self-review
 
