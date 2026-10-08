@@ -16,7 +16,7 @@ from scraper.tasnim_import import (
     strip_markup,
     validate_gloss,
 )
-from tests.conftest import make_corpus
+from tests.helpers import make_corpus
 
 
 def _tasnim(path: Path, rows, *, names=(), verses=()) -> None:

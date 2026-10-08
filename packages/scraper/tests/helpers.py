@@ -1,4 +1,4 @@
-"""Shared test fixtures."""
+"""Shared test helpers (plain module, not conftest: no fixtures)."""
 
 from __future__ import annotations
 
