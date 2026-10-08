@@ -1445,26 +1445,26 @@ Russian WBW then falls back to English with the `(en)` tag, which is the pre-M13
 
 | # | Check | Result |
 |---|---|---|
-| A1 | Russian content: WBW 1:1-1:7 shows Russian glosses, no `(en)` tag | |
-| A2 | 2:4 (the measured "min + qablika" case) shows one gloss under two cells | |
-| A3 | 2:1-2:20: no gloss ends in `, . ; : – —`; `!` / `?` present where the source has them | |
-| A4 | Brackets dimmed in cell, span, word sheet, mushaf word sheet, word screen. Russian, English and Uzbek. Light + dark | |
-| A5 | Dense density: dim run inside the 1-line clamp; scroll 2:1→2:50 shows no row jump | |
-| A6 | Lemma قال, Russian: chips have no «», no leading и/а/но/или | |
-| A7 | Root قول, Russian: derived list present, no «» | |
-| A8 | About: Quran Academy credit + "Source approval incomplete" pill, in en/uz/ru UI | |
-| A9 | Cold start after the DB changed (`m13a`): extract ran, no ANR | |
-| A10 | Search `милост` still returns verses (unchanged path) | |
+| A1 | Russian content: WBW 1:1-1:7 shows Russian glosses, no `(en)` tag | PASS 2026-10-08 vc95: 1:1-1:7 Russian, no (en) tag |
+| A2 | 2:4 (the measured "min + qablika" case) shows one gloss under two cells | PASS: «до тебя» spans مِن قَبْلِكَ |
+| A3 | 2:1-2:20: no gloss ends in `, . ; : – —`; `!` / `?` present where the source has them | PASS: none end in , . ; : – — (bundled DB, 2:1-20); «О да [знайте]!», «глупцы?» keep ! ? |
+| A4 | Brackets dimmed in cell, span, word sheet, mushaf word sheet, word screen. Russian, English and Uzbek. Light + dark | PASS cell, span, word sheet, word screen; ru dark, en + uz light. mushaf sheet PASS (owner by hand; adb long-press does not fire) |
+| A5 | Dense density: dim run inside the 1-line clamp; scroll 2:1→2:50 shows no row jump | PASS: deep link lands on 2:45; dim runs inside 1-line cells; no jump scrolling 45-54 |
+| A6 | Lemma قال, Russian: chips have no «», no leading и/а/но/или | PASS: Скажи · Сказал он · Сказали они · Он сказал · сказал |
+| A7 | Root قول, Russian: derived list present, no «» | PASS: Russian list present, no «» |
+| A8 | About: Quran Academy credit + "Source approval incomplete" pill, in en/uz/ru UI | PASS en/uz/ru credit text + translated pill |
+| A9 | Cold start after the DB changed (`m13a`): extract ran, no ANR | PASS: stale s2 extract removed, Displayed +1.99s, no ANR |
+| A10 | Search `милост` still returns verses (unchanged path) | PASS (owner by hand) |
 
 ### M13-W(A) — local prod build
 
 | # | Check | Result |
 |---|---|---|
 | WA1 | Background classes per host + measured ratios (Task 5 Step 1) | Dim `text-paper-600 dark:text-paper-400`. Cell, span, row (`WbwWordCell`/`WbwGlossSpan`/`WbwWordRow`) and `/word/...` (`WordDetailView`): no bg class, inherit body `bg-paper-50 dark:bg-night-300` (layout.tsx:84), hover moves border/ring only: 4.73 light / 7.62 dark. `WordPopover` sheet `bg-paper-50 dark:bg-night-200` (WordPopover.tsx:36): 4.73 / 7.15. No host on paper-100. |
-| WA2 | `/surah/1/words`, Russian: glosses, spans, dimming; light + dark | |
-| WA3 | Reader popover + `/word/2/2/1`: dimming | |
-| WA4 | `/dictionary/lemma/…` (قال) chips clean | |
-| WA5 | `/about`: Quran Academy entry | |
+| WA2 | `/surah/1/words`, Russian: glosses, spans, dimming; light + dark | PASS 2026-10-08 prod build :3941: `/surah/2/words?lang=ru` Russian glosses, «до тебя» span, 2:10 span, 0 `(en)` tags; dim runs (следуют)/(есть)/(являются)/(досл. были лгущими); en dims (is)/(are) |
+| WA3 | Reader popover + `/word/2/2/1`: dimming | PASS popover (headless Chromium, 2:5:1 «Те (следуют)»): computed 4.73 light / 7.15 dark. `/word/…` renders no gloss at all (pre-existing: page passes none), nothing to dim |
+| WA4 | `/dictionary/lemma/…` (قال) chips clean | N/A on web: lemma chips are not language-aware (getLemmaEntry has no language, pre-existing); Russian chips verified on device A6 |
+| WA5 | `/about`: Quran Academy entry | PASS: Quran Academy entry, licence `permission requested`, note per Ruling 4 |
 
 ### M13-B — device, vc96 (with the owner)
 
