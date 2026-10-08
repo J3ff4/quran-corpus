@@ -7,14 +7,18 @@ The snapshot was scraped once (rate-limited, resumable) and is only ever re-pars
 
 from __future__ import annotations
 
+import gzip
 import html
 import re
+import sqlite3
 import unicodedata  # validate_ru_gloss: control-character category
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import NamedTuple
 
-from .tasnim_align import base_form
+from .db import ScraperDatabase
+from .tasnim_align import base_form, corpus_ayahs
 from .tasnim_import import strip_arabic_marks, validate_gloss
 
 SOURCE = "quranacademy"
@@ -113,3 +117,127 @@ def validate_ru_gloss(text: str) -> str | None:
     if any(unicodedata.category(c) == "Cc" for c in text):
         return "control character"
     return None
+
+
+# The name is the plan's public contract (cli.py, tests), a verdict rather than a fault.
+class ImportAborted(RuntimeError):  # noqa: N818
+    """Validation failed; nothing was written."""
+
+
+class ImportSummary(NamedTuple):
+    rows: int  # word_glosses rows written (== corpus words)
+    cards: int  # distinct glosses (== heads)
+    groups: int  # multi-word spans
+    backup: Path
+
+
+_MAX_REPORTED = 20
+
+
+def _plan(
+    words: dict[tuple[int, int], list[tuple[int, str]]],
+    con: sqlite3.Connection,
+    snapshot: sqlite3.Connection,
+) -> list[tuple[int, str, int | None]]:
+    """Every (word_id, gloss, group) to write, or ImportAborted listing what failed."""
+    pages = {
+        (s, a): gz
+        for s, a, gz in snapshot.execute("SELECT surah, ayah, html_gz FROM raw")
+    }
+    # R7, checked here rather than left to the INSERT's UNIQUE failure: refused with a
+    # reason, and before the backup, so a refused run leaves no .bak behind.
+    foreign = con.execute(
+        "SELECT COUNT(*) FROM word_glosses WHERE language_code = ? AND source IS NOT ?",
+        (LANGUAGE, SOURCE),
+    ).fetchone()[0]
+    errors = (
+        [f"{foreign} ru rows from other sources; refusing to share 'ru' with them"]
+        if foreign
+        else []
+    )
+    errors += [
+        f"{s}:{a} missing from snapshot" for s, a in sorted(words.keys() - pages.keys())
+    ]
+    errors += [f"{s}:{a} not in corpus" for s, a in sorted(pages.keys() - words.keys())]
+    out: list[tuple[int, str, int | None]] = []
+    group = 0
+    for key in sorted(words.keys() & pages.keys()):
+        try:
+            rows = align_ayah(
+                parse_cards(gzip.decompress(pages[key]).decode()), words[key]
+            )
+        except AlignError as err:
+            errors.append(f"{key[0]}:{key[1]} {err}")
+            continue
+        by_head: dict[int, list[Row]] = {}
+        for row in rows:
+            by_head.setdefault(row.head, []).append(row)
+        for head, members in by_head.items():
+            gloss = clean_ru_gloss(members[0].gloss)
+            if (reason := validate_ru_gloss(gloss)) is not None:
+                errors.append(
+                    f"{key[0]}:{key[1]} word {head}: {reason}: {members[0].gloss!r}"
+                )
+                continue
+            marker = None
+            if len(members) > 1:
+                group += 1
+                marker = group
+            out += [(m.word_id, gloss, marker) for m in members]
+    if errors:
+        raise ImportAborted(
+            f"{len(errors)} problems, nothing written:\n"
+            + "\n".join(errors[:_MAX_REPORTED])
+        )
+    return out
+
+
+def import_qul_ru(corpus_db: Path, snapshot: Path = SNAPSHOT_PATH) -> ImportSummary:
+    target = corpus_db.resolve()  # apps/web/quran.db is a symlink
+    words = corpus_ayahs(target)  # tasnim_align's reader, read-only
+    database = ScraperDatabase(str(target))
+    con = database.connection
+    con.execute("PRAGMA foreign_keys = ON")
+    snap = sqlite3.connect(f"file:{snapshot}?mode=ro", uri=True)
+    try:
+        planned = _plan(words, con, snap)  # aborts before any write, before any backup
+        # Timestamped to the microsecond, never overwritten: a re-run (R7) must not
+        # replace the pre-M13 copy with the state of the first import.
+        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%f")
+        backup = target.with_name(f"{target.name}.bak-m13-{stamp}")
+        if backup.exists():
+            raise ImportAborted(f"{backup} already exists")
+        # backup(), not copyfile: the live DB is WAL-mode, and a byte copy
+        # drops the WAL.
+        dst = sqlite3.connect(backup)
+        try:
+            con.backup(dst)
+        finally:
+            dst.close()
+        with con:
+            # The FK target. Present on the live DB; INSERT OR IGNORE so a fresh DB
+            # imports and an existing row's names are never rewritten.
+            con.execute(
+                "INSERT OR IGNORE INTO languages"
+                " (code, name_native, name_english, direction)"
+                " VALUES ('ru', 'Русский', 'Russian', 'ltr')"
+            )
+            con.execute(
+                "DELETE FROM word_glosses WHERE language_code = ? AND source = ?",
+                (LANGUAGE, SOURCE),
+            )
+            # Plain INSERT stays as a second line behind _plan's check: anything that
+            # still collides on UNIQUE(word_id, language_code) rolls the run back.
+            con.executemany(
+                "INSERT INTO word_glosses"
+                " (word_id, language_code, gloss_text, source, gloss_group)"
+                " VALUES (?, ?, ?, ?, ?)",
+                [(wid, LANGUAGE, gloss, SOURCE, grp) for wid, gloss, grp in planned],
+            )
+    finally:
+        snap.close()
+        database.close()
+    groups = len({g for _, _, g in planned if g is not None})
+    # One card per single-word row plus one per span.
+    cards = sum(1 for _, _, g in planned if g is None) + groups
+    return ImportSummary(rows=len(planned), cards=cards, groups=groups, backup=backup)

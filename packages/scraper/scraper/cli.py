@@ -920,6 +920,25 @@ def derive_root_glosses_cmd(db: str, languages: tuple[str, ...]) -> None:
         click.echo(f"{language_code}: {covered} of {total} roots covered")
 
 
+@main.command("import-qul-ru")
+@click.option("--db", default="quran.db", show_default=True, help="Corpus DB to write")
+@click.option(
+    "--snapshot", default=None, help="Raw QUL resource-97 snapshot (read-only)"
+)
+def import_qul_ru_cmd(db: str, snapshot: str | None) -> None:
+    """Import Quran Academy's Russian word-by-word glosses (QUL resource 97)."""
+    from .qul_ru_import import SNAPSHOT_PATH, ImportAborted, import_qul_ru
+
+    try:
+        s = import_qul_ru(Path(db), Path(snapshot) if snapshot else SNAPSHOT_PATH)
+    except ImportAborted as err:
+        raise click.ClickException(str(err)) from err
+    click.echo(
+        f"ru glosses {s.rows} rows over {s.cards} cards; "
+        f"{s.groups} spans; backup {s.backup}"
+    )
+
+
 @main.command("hafs-low-meem")
 @click.argument("fonts", nargs=-1, type=click.Path(exists=True, dir_okay=False))
 def hafs_low_meem_cmd(fonts: tuple[str, ...]) -> None:
