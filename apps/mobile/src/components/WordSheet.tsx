@@ -11,6 +11,7 @@ import { BottomSheet } from './BottomSheet';
 import { GlassSurface } from './GlassSurface';
 import { SegmentedWord } from './SegmentedWord';
 import { GlossLangTag } from './GlossLangTag';
+import { GlossRuns } from './GlossRuns';
 import { SegmentPill } from './SegmentPill';
 import { SheetRow } from './sheet';
 
@@ -130,7 +131,7 @@ export function WordSheet({
             textAlign: 'center',
           }}
         >
-          {gloss?.text ?? t(uiLocale, 'word.noGloss')}
+          {gloss ? <GlossRuns text={gloss.text} /> : t(uiLocale, 'word.noGloss')}
           {gloss?.isFallback ? ' ' : ''}
           <GlossLangTag gloss={gloss} uiLocale={uiLocale} fontSize={typography.caption} />
         </Text>

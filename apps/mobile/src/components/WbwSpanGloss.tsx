@@ -6,6 +6,7 @@ import type { Gloss } from '@/data/corpusRepository';
 import type { UiLocaleCode } from '@/i18n/languages';
 
 import { GlossLangTag } from './GlossLangTag';
+import { GlossRuns } from './GlossRuns';
 
 /** One gloss, under the span of words it covers. Extracted so WbwSpan says
  *  what it is about -- the merge -- and this says what a shared gloss looks
@@ -27,7 +28,7 @@ export function WbwSpanGloss({
         numberOfLines={glossLines}
         style={{ color: theme.text, fontSize: typography.caption - 1, textAlign: 'center' }}
       >
-        {gloss?.text ?? ''}
+        {gloss ? <GlossRuns text={gloss.text} /> : ''}
       </Text>
       <GlossLangTag gloss={gloss} uiLocale={uiLocale} fontSize={typography.caption - 3} />
     </View>

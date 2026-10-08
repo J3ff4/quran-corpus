@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { createExpoSqliteClient, type ExpoSqliteLike } from '@quran-corpus/mobile-data';
 import { GlossLangTag } from '@/components/GlossLangTag';
+import { GlossRuns } from '@/components/GlossRuns';
 import { SegmentedWord } from '@/components/SegmentedWord';
 import { SegmentPill } from '@/components/SegmentPill';
 import { getWordAtLocation, type WordSummary } from '@/data/corpusRepository';
@@ -109,7 +110,7 @@ export default function WordDetailRoute() {
           nesting Text breaks shaping across the boundary, and a gloss is never
           Arabic. */}
       <Text style={{ color: gloss ? theme.text : theme.mutedText, fontSize: typography.body }}>
-        {gloss?.text ?? t(uiLocale, 'word.noGloss')}
+        {gloss ? <GlossRuns text={gloss.text} /> : t(uiLocale, 'word.noGloss')}
         {gloss?.isFallback ? ' ' : ''}
         <GlossLangTag gloss={gloss} uiLocale={uiLocale} fontSize={typography.caption} />
 
