@@ -242,6 +242,7 @@ export type UiStringKey =
   | 'about.sourceEnglish'
   | 'about.sourceUzbek'
   | 'about.sourceRussian'
+  | 'about.sourceWbwRu'
   | 'about.sourceSurahNamesRu'
   | 'about.sourceHafs'
   | 'about.sourceMushafLayout'
@@ -504,6 +505,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceUzbek':
       'The Uzbek translation the reader shows, plus the Uzbek word-by-word glosses and surah names, in both scripts.',
     'about.sourceRussian': 'The Russian translation the reader shows.',
+    'about.sourceWbwRu': '© Quran Academy — permission requested. Russian word-by-word glosses, via QUL (resource 97).',
     'about.sourceSurahNamesRu':
       'The Russian name and meaning of each surah. Licence not yet cleared.',
     'about.sourceHafs':
@@ -762,6 +764,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceUzbek':
       'O‘quvchi ko‘rsatadigan o‘zbekcha tarjima, shuningdek har ikki yozuvda o‘zbekcha so‘zma-so‘z tarjima va sura nomlari.',
     'about.sourceRussian': 'O‘quvchi ko‘rsatadigan ruscha tarjima.',
+    'about.sourceWbwRu': '© Quran Academy — ruxsat so‘ralgan. Ruscha so‘zma-so‘z tarjima, QUL orqali (97-resurs).',
     'about.sourceSurahNamesRu':
       'Har bir suraning ruscha nomi va ma’nosi. Litsenziya hali tekshirilmagan.',
     'about.sourceHafs':
@@ -1008,6 +1011,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'about.sourceUzbek':
       'Узбекский перевод, который показывает читалка, а также узбекский пословный перевод и названия сур в обоих письменностях.',
     'about.sourceRussian': 'Русский перевод, который показывает читалка.',
+    'about.sourceWbwRu': '© Quran Academy — разрешение запрошено. Пословный перевод на русский, через QUL (ресурс 97).',
     'about.sourceSurahNamesRu':
       'Русское название и значение каждой суры. Лицензия ещё не проверена.',
     'about.sourceHafs':

@@ -11,6 +11,7 @@
 | Uzbek translation (Latin) | Existing PWA DB: Tasnim | Needs release sign-off | Needs release sign-off | uz | Not approved | Not approved |
 | Uzbek translation (Cyrillic) | Existing PWA DB: Tasnim, imported in M9 | Needs release sign-off | Needs release sign-off | uz-Cyrl | Not approved | Not approved |
 | Russian translation | Existing PWA DB: Abu Adel | Needs release sign-off | Needs release sign-off | ru | Not approved | Not approved |
+| Russian word-by-word glosses | QUL resource 97 (© Quran Academy), imported by scraper import-qul-ru in M13 | © Quran Academy — permission requested (#116 override) | Quran Academy, via QUL (resource 97) | ru | Owner override 2026-10-07 | Not approved |
 | Hafs font | Existing mobile asset: `apps/mobile/assets/fonts/hafs.18.woff2` | Needs release sign-off | Needs release sign-off | hafs | Not approved | Not approved |
 | Abdul Rashid Sufi audio metadata | Not approved | Not approved | Not approved | abdul-rashid-sufi | Not approved | Not approved |
 
