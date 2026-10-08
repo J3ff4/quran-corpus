@@ -11,6 +11,12 @@
 // definition -- these functions only tidy the presentation, they cannot turn
 // a contextual gloss into a dictionary sense.
 
+// The Russian glosses carry « » from the source's own quoting, and 2,963 of
+// them hold an unbalanced pair, so an edge-only strip would leave half-pairs
+// inside a chip (owner ruling R10). Dropped wherever they sit, before the
+// edge pass, so the punctuation they were shielding is then at the edge.
+const GUILLEMETS = /[«»]/g;
+
 // Everything that can sit at a gloss boundary without being part of the word:
 // the quote glyphs the corpus carries over from ayah-level speech marks
 // (straight + curly, single + double), sentence punctuation left over from the
@@ -32,9 +38,25 @@ const EDGE_NOISE = /^[\s"'‘’“”,.;:!?—–-]+|[\s"'‘’“”,.;:!?—
 // ("Allah sets forth" and "And Allah sets forth" are one meaning, and ضرب
 // spent two of its five chips saying it twice).
 //
+// The Russian list (и, а, но, или) does the same job for the Russian glosses;
+// то and так are deliberately absent, they are content words there. Latin `a`
+// is not Cyrillic `а`, so the two scripts cannot collide in one alternation.
+//
 // One list, two derived forms, so the strip and the ownership test below can
 // never drift apart.
-const CONJUNCTIONS = ['and', 'but', 'so', 'or', 'then', 'nor', 'yet'] as const;
+const CONJUNCTIONS = [
+  'and',
+  'but',
+  'so',
+  'or',
+  'then',
+  'nor',
+  'yet',
+  'и',
+  'а',
+  'но',
+  'или',
+] as const;
 const LEADING_CONJUNCTION = new RegExp(`^(${CONJUNCTIONS.join('|')})\\s+`, 'i');
 const CONJUNCTION_WORDS: ReadonlySet<string> = new Set(CONJUNCTIONS);
 
@@ -42,7 +64,9 @@ const CONJUNCTION_WORDS: ReadonlySet<string> = new Set(CONJUNCTIONS);
  *  always safe -- no word is ever removed, so it is also what decides the
  *  head gloss in cleanGlossList before any stripping happens. */
 function tidy(gloss: string): string {
-  return gloss.replace(EDGE_NOISE, '').replace(/\s+/g, ' ').trim();
+  return gloss
+    .replace(GUILLEMETS, '')
+    .replace(EDGE_NOISE, '').replace(/\s+/g, ' ').trim();
 }
 
 /**

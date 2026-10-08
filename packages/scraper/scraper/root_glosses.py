@@ -37,7 +37,9 @@ def rank_glosses(glosses: Iterable[str], cap: int = TOP_N) -> list[tuple[str, in
     # spelling Tasnim used more.
     spellings: dict[str, Counter[str]] = {}
     for raw in glosses:
-        text = " ".join(raw.split())
+        # « » are the source's quoting, not part of the meaning, and unbalanced
+        # pairs are common: «слово and слово» are one gloss, not two (R10).
+        text = " ".join(raw.replace("«", "").replace("»", "").split())
         key = _fold(text)
         # A gloss with no letter or digit is punctuation the source left
         # behind, never a meaning.
