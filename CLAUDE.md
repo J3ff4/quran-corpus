@@ -243,7 +243,7 @@ Stop and ask rather than guess on: schema changes, adding a dependency, anything
 
 ## 13. Subagent Model Floor + Compaction
 
-- **Minimum model: Sonnet.** Never dispatch a subagent on Haiku. The floor is `claude-sonnet-4-6` (or newer Sonnet/Opus). Haiku is too weak for the code-quality bar required here.
+- **Minimum model: Opus 5.0.** Never dispatch a subagent on Sonnet or Haiku. The floor is `claude-opus-5` (or newer Opus). Anything weaker falls short of the code-quality bar required here.
 - **Compact after every completed task.** When running Subagent-Driven Development, trigger a context compaction after each task's review cycle passes before dispatching the next task's implementer.
 - **Compact after every completed + approved phase.** In addition to per-task compaction, trigger a compaction once a full phase is complete and the user has approved it, before starting the next phase. Both levels are mandatory: task-level and phase-level.
 
