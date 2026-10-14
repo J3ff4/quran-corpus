@@ -6,7 +6,7 @@ import { markGlossMatches } from '../text/glossMatch.js';
 export const WORD_HIT_LIMIT = 50;
 const MIN_QUERY_CHARS = 3;
 const MAX_QUERY_LENGTH = 100; // same cap as searchVerses
-const ARABIC = /[؀-ۿݐ-ݿࢠ-ࣿ]/;
+const ARABIC = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/;
 const sameLang = (a: string, b: string) =>
   (a === 'uz-Cyrl' ? 'uz' : a) === (b === 'uz-Cyrl' ? 'uz' : b);
 const marks = (n: number) => Array.from({ length: n }, () => '?').join(',');
@@ -56,16 +56,16 @@ export async function searchWords(
     const key = lemmaBw ?? `~${normalizeArabic(surface ?? '')}`;
     const n = r['n'] as number;
     const firstId = r['first_id'] as number;
-    const arabic = (lemmaBw ? (r['lemma'] as string | null) : null) ?? (r['text_arabic'] as string);
+    const arabic = (lemmaBw != null ? (r['lemma'] as string | null) : null) ?? (r['text_arabic'] as string);
     const g = groups.get(key);
     if (!g) {
-      groups.set(key, { key, lemmaBw, arabic, count: n, firstId, surfaces: surface ? [surface] : [] });
+      groups.set(key, { key, lemmaBw, arabic, count: n, firstId, surfaces: surface != null ? [surface] : [] });
       continue;
     }
     // Only lemma-less keys repeat. Their raw surfaces are disjoint word sets, so the
     // distinct counts add exactly.
     g.count += n;
-    if (surface) g.surfaces.push(surface);
+    if (surface != null) g.surfaces.push(surface);
     if (firstId < g.firstId) {
       g.firstId = firstId;
       g.arabic = arabic;
@@ -76,8 +76,10 @@ export async function searchWords(
     .slice(0, WORD_HIT_LIMIT);
   if (top.length === 0) return [];
 
-  const lemmas = top.flatMap((g) => (g.lemmaBw ? [g.lemmaBw] : []));
-  const surfaces = top.flatMap((g) => (g.lemmaBw ? [] : g.surfaces));
+  // `!= null`, never truthiness: '' is a real key (a wiped text_arabic, say), and a
+  // key missing from both lists would leave its row with no gloss.
+  const lemmas = top.flatMap((g) => (g.lemmaBw != null ? [g.lemmaBw] : []));
+  const surfaces = top.flatMap((g) => (g.lemmaBw != null ? [] : g.surfaces));
   const ids = top.map((g) => g.firstId);
   const [glossRows, firstRows] = await Promise.all([
     db.execute({
@@ -100,7 +102,8 @@ export async function searchWords(
   ]);
 
   // Best gloss per key: exact content language, then the same language in the other
-  // script, then any; within a tier the most frequent, then alphabetical.
+  // script, then any; within a tier the most frequent, then alphabetical, then by
+  // language so one spelling in two languages does not resolve by SQL row order.
   const tier = (lang: string) =>
     !glossLanguage ? 2 : lang === glossLanguage ? 0 : sameLang(lang, glossLanguage) ? 1 : 2;
   const counts = new Map<string, Map<string, { lang: string; gloss: string; c: number }>>();
@@ -119,7 +122,8 @@ export async function searchWords(
 
   return top.map((g) => {
     const best = [...(counts.get(g.key)?.values() ?? [])].sort(
-      (a, b) => tier(a.lang) - tier(b.lang) || b.c - a.c || cmp(a.gloss, b.gloss),
+      (a, b) =>
+        tier(a.lang) - tier(b.lang) || b.c - a.c || cmp(a.gloss, b.gloss) || cmp(a.lang, b.lang),
     )[0]!;
     const at = first.get(g.firstId)!;
     return {

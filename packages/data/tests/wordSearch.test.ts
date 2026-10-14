@@ -158,11 +158,38 @@ describe('searchWords', () => {
 
   it('ignores fts syntax', async () => {
     await word(10, 1, 1, 'رَحْمَةً', RAHMA, { en: 'mercy' });
-    for (const q of ['merc"', 'merc*', 'NEAR(merc)', 'merc OR x', '-merc', '!!!', '"""']) {
-      await expect(searchWords(db, q)).resolves.toBeDefined();
-    }
-    // Still a literal search: the quote is just punctuation.
-    expect(await searchWords(db, 'merc"', 'en')).toHaveLength(1);
+    const mercy = [hit({ lemma_buckwalter: 'raHomap', arabic: 'رَحْمَة', gloss: M('mercy'), count: 1 })];
+    // Operators are literal text: punctuation drops out of the phrase, words stay words.
+    const cases: [string, WordHit[]][] = [
+      ['merc"', mercy],
+      ['merc*', mercy],
+      ['-merc', mercy],
+      ['NEAR(merc)', []], // the phrase "near merc", not a NEAR query
+      ['merc OR x', []], // "merc"* AND "OR"* AND "x", not a disjunction
+      ['!!!', []],
+      ['"""', []],
+    ];
+    for (const [q, want] of cases) expect(await searchWords(db, q, 'en'), q).toEqual(want);
+  });
+
+  it('keeps a row whose key is the empty string', async () => {
+    // '' is a key like any other: the IN-lists must test for null, not truthiness.
+    await word(60, 1, 1, 'كَلِمَةٌ', ['', 'كَلِمَة'], { en: 'mercy' });
+    await word(61, 2, 1, '', null, { en: 'mercy' });
+    expect(await searchWords(db, 'merc', 'en')).toEqual([
+      hit({ lemma_buckwalter: '', arabic: 'كَلِمَة', gloss: M('mercy'), count: 1 }),
+      hit({ arabic: '', gloss: M('mercy'), count: 1, ayah_number: 2 }),
+    ]);
+  });
+
+  it('breaks a full gloss tie by language', async () => {
+    // Same text, count and tier in two languages. SQL emits the uz row first (its word's
+    // surface sorts first), so only the language tie-break picks en.
+    await word(70, 1, 1, 'بَ', RAHMA, { uz: 'mercy' });
+    await word(71, 2, 1, 'تَ', RAHMA, { en: 'mercy' });
+    expect(await searchWords(db, 'merc', 'ru')).toEqual([
+      hit({ lemma_buckwalter: 'raHomap', arabic: 'رَحْمَة', gloss: M('mercy'), gloss_lang: 'en', count: 2 }),
+    ]);
   });
 
   it('caps at 50', async () => {
