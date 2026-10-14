@@ -1,10 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('@quran-corpus/data', () => ({
-  EMPTY_SEARCH_RESULT: { jump: null, verses: [], roots: [] },
+  EMPTY_SEARCH_RESULT: { jump: null, verses: [], words: [], roots: [] },
   search: vi.fn(async (_db: unknown, q: string) => ({
     jump: null,
     verses: [{ surah_id: 1, ayah_number: 1, source: 'en', snippet: `hit:${q}` }],
+    words: [],
     roots: [],
   })),
 }));
@@ -25,7 +26,7 @@ describe('GET /api/search', () => {
   });
   it('returns empty result for a blank query', async () => {
     const body = await (await GET(req('   '))).json();
-    expect(body).toEqual({ jump: null, verses: [], roots: [] });
+    expect(body).toEqual({ jump: null, verses: [], words: [], roots: [] });
   });
   it('returns empty result for an over-long query', async () => {
     const body = await (await GET(req('x'.repeat(101)))).json();

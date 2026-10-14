@@ -103,7 +103,7 @@ vi.mock('react-native', async () => {
   };
 });
 
-const EMPTY = { jump: null, verses: [], roots: [] };
+const EMPTY = { jump: null, verses: [], words: [], roots: [] };
 
 // The debounce inside SearchScreen is 200ms; anything asserting "did not
 // query" has to actually wait past it, or it is checking t=0, which is
@@ -138,6 +138,7 @@ describe('SearchScreen', () => {
     mocks.searchCorpus.mockResolvedValue({
       jump: null,
       verses: [{ surah_id: 2, ayah_number: 255, source: 'ar', snippet: 'ٱللَّهُ' }],
+      words: [],
       roots: [],
     });
 
@@ -182,6 +183,7 @@ describe('SearchScreen', () => {
       land({
         jump: null,
         verses: [{ surah_id: 2, ayah_number: 255, source: 'ar', snippet: '\u0671\u0644\u0644\u064e\u0651\u0647\u064f' }],
+        words: [],
         roots: [],
       });
       await settle();
@@ -228,6 +230,7 @@ describe('SearchScreen', () => {
         { surah_id: 1, ayah_number: 2, source: 'uz', snippet: 'Allah nomi bilan' },
         { surah_id: 1, ayah_number: 1, source: 'ar', snippet: 'بسم الله' },
       ],
+      words: [],
       roots: [],
     });
 
@@ -252,6 +255,7 @@ describe('SearchScreen', () => {
         highlightPosition: null,
       },
       verses: [{ surah_id: 2, ayah_number: 255, source: 'ar', snippet: 'ٱللَّهُ' }],
+      words: [],
       roots: [],
     });
 
@@ -292,6 +296,7 @@ describe('SearchScreen', () => {
         highlightPosition: null,
       },
       verses: [],
+      words: [],
       roots: [],
     });
 
@@ -320,6 +325,7 @@ describe('SearchScreen', () => {
         highlightPosition: null,
       },
       verses: [],
+      words: [],
       roots: [],
     });
     render(<SearchScreen />);
@@ -350,6 +356,7 @@ describe('SearchScreen', () => {
         highlightPosition: null,
       },
       verses: [],
+      words: [],
       roots: [],
     });
 
@@ -370,6 +377,7 @@ describe('SearchScreen', () => {
         highlightPosition: null,
       },
       verses: [],
+      words: [],
       roots: [],
     });
 
@@ -392,6 +400,7 @@ describe('SearchScreen', () => {
         highlightPosition: null,
       },
       verses: [],
+      words: [],
       roots: [],
     });
 
@@ -518,6 +527,7 @@ describe('SearchScreen', () => {
         highlightPosition: null,
       },
       verses: [{ surah_id: 1, ayah_number: 1, source: 'ar', snippet: 'bismi' }],
+      words: [],
       roots: [{ id: 7, root_buckwalter: 'rHm', root_arabic: 'رحم', occurrence_count: 339 }],
     });
     render(<SearchScreen />);
@@ -619,6 +629,7 @@ describe('SearchScreen results grid', () => {
         { surah_id: 2, ayah_number: 255, source: 'ar', snippet: 'ٱللَّهُ' },
         { surah_id: 3, ayah_number: 1, source: 'ar', snippet: 'الٓمٓ' },
       ],
+      words: [],
       roots: [],
     });
   });

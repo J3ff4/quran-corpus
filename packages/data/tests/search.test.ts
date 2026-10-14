@@ -502,6 +502,6 @@ describe('search orchestrator', () => {
     expect(Array.isArray(res.roots)).toBe(true);
   });
   it('returns an empty shape for a blank query', async () => {
-    expect(await search(db, '  ')).toEqual({ jump: null, verses: [], roots: [] });
+    expect(await search(db, '  ')).toEqual({ jump: null, verses: [], words: [], roots: [] });
   });
 });

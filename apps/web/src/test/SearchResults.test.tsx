@@ -19,7 +19,7 @@ vi.mock('next/link', () => ({
   ),
 }));
 
-const base: SearchResult = { jump: null, verses: [], roots: [] };
+const base: SearchResult = { jump: null, verses: [], words: [], roots: [] };
 
 describe('SearchResults', () => {
   it('renders a verse snippet with <mark> around sentinels', () => {

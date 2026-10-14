@@ -10,5 +10,6 @@ import type { SearchResult } from './types.js';
 export const EMPTY_SEARCH_RESULT: SearchResult = Object.freeze({
   jump: null,
   verses: Object.freeze([]) as unknown as SearchResult['verses'],
+  words: Object.freeze([]) as unknown as SearchResult['words'],
   roots: Object.freeze([]) as unknown as SearchResult['roots'],
 }) as SearchResult;
