@@ -69,6 +69,40 @@ describe('searchCorpus', () => {
     expect(args).toContain('uz');
     expect(args).toContain('uz-Cyrl');
   });
+
+  it("picks the Words row's gloss in the reader's language", async () => {
+    // One lemma glossed in English and Russian. Handed the reader's language,
+    // search prefers the Russian gloss and leaves it untagged; without it the
+    // English gloss wins on alphabetical order and carries an `en` tag.
+    const client = {
+      execute: async (stmt: string | { sql: string; args?: SqlValue[] }) => {
+        const sql = typeof stmt === 'string' ? stmt : stmt.sql;
+        if (sql.includes('COUNT(DISTINCT w.id)')) {
+          return {
+            rows: [{ lemma_bw: 'kitAb', surface: null, lemma: 'كِتَٰب', text_arabic: 'كِتَٰب', n: 3, first_id: 9 }],
+          };
+        }
+        if (sql.includes('g.language_code AS lang')) {
+          return {
+            rows: [
+              { lemma_bw: 'kitAb', surface: 'كِتَٰب', lang: 'en', gloss: 'book', c: 1 },
+              { lemma_bw: 'kitAb', surface: 'كِتَٰب', lang: 'ru', gloss: 'книга', c: 1 },
+            ],
+          };
+        }
+        if (sql.includes('FROM words w JOIN ayahs a')) {
+          return { rows: [{ id: 9, surah_id: 2, ayah_number: 2, position: 2 }] };
+        }
+        return { rows: [] as MobileRow[] };
+      },
+    } as unknown as MobileDataClient;
+
+    const { words } = await searchCorpus(client, 'book', 'ru');
+
+    expect(words).toHaveLength(1);
+    expect(words[0]!.gloss).toBe('книга');
+    expect(words[0]!.gloss_lang).toBeNull();
+  });
 });
 
 describe('getSurahList', () => {
