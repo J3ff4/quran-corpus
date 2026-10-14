@@ -156,3 +156,4 @@ export type {
 export type { QueryClient, QueryRow, QueryArg } from './queryClient.js';
 export { groupByGlossSpan } from './text/glossSpans.js';
 export { splitGlossBrackets, type GlossRun } from './text/glossBrackets.js';
+export { markGlossMatches } from './text/glossMatch.js';
