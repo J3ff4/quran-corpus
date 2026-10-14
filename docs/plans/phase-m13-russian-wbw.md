@@ -1483,7 +1483,7 @@ Russian WBW then falls back to English with the `(en)` tag, which is the pre-M13
 
 | # | Check | Result |
 |---|---|---|
-| WB1 | Search sheet: Words section order, links, `(lang)` tag via the cookie content language | |
+| WB1 | Search sheet: Words section order, links, `(lang)` tag via the cookie content language | (lang)/count on page bg only: paper-50 4.73, night-300 7.62 |
 | WB2 | Verse hits identical to the PR A build for `mercy` and `милост` | |
 
 ---

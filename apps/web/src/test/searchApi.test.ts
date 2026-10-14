@@ -10,7 +10,10 @@ vi.mock('@quran-corpus/data', () => ({
   })),
 }));
 vi.mock('../lib/db', () => ({ getDatabase: vi.fn(async () => ({})) }));
+let cookieJar: { get(name: string): { value: string } | undefined } = { get: () => undefined };
+vi.mock('next/headers', () => ({ cookies: async () => cookieJar }));
 
+import { search } from '@quran-corpus/data';
 import { GET } from '../app/api/search/route';
 
 function req(q: string): Request {
@@ -23,6 +26,12 @@ describe('GET /api/search', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.verses[0].snippet).toBe('hit:throne');
+  });
+  it('passes the content language from the locale cookie as glossLanguage', async () => {
+    cookieJar = { get: (n) => (n === 'ui-locale' ? { value: 'ru' } : undefined) };
+    await GET(req('book'));
+    expect(vi.mocked(search)).toHaveBeenLastCalledWith(expect.anything(), 'book', { glossLanguage: 'ru' });
+    cookieJar = { get: () => undefined };
   });
   it('returns empty result for a blank query', async () => {
     const body = await (await GET(req('   '))).json();
