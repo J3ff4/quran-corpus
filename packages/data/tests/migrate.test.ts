@@ -465,10 +465,26 @@ describe('word_gloss_fts schema', () => {
     await d.execute('DELETE FROM word_glosses WHERE id = 3');
     expect(await match(d, 'fig')).toEqual([]);
 
+    // A non-text update must not touch the index (trigger is gated on gloss_text).
+    await d.execute("UPDATE word_glosses SET source = 'x' WHERE id = 1");
+    expect(await match(d, 'lantern')).toEqual([1]);
+
     // External content: a trigger that removes a row without handing fts5 the
     // old text leaves the index disagreeing with word_glosses. rank = 1 is
     // load-bearing: a bare 'integrity-check' only checks the index against
     // itself and passes on exactly that corruption.
+    await expect(
+      d.execute("INSERT INTO word_gloss_fts (word_gloss_fts, rank) VALUES ('integrity-check', 1)"),
+    ).resolves.toBeDefined();
+    d.close();
+  });
+
+  it('moves the MATCH when gloss_text changes, and the index stays consistent', async () => {
+    const d = await seedPreM13();
+    await runMigrations(d);
+    await d.execute("UPDATE word_glosses SET gloss_text = 'the lamp' WHERE id = 1");
+    expect(await match(d, 'lantern')).toEqual([]);
+    expect(await match(d, 'lamp')).toEqual([1]);
     await expect(
       d.execute("INSERT INTO word_gloss_fts (word_gloss_fts, rank) VALUES ('integrity-check', 1)"),
     ).resolves.toBeDefined();

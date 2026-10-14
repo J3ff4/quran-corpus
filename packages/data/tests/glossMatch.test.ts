@@ -23,6 +23,11 @@ describe('markGlossMatches', () => {
     ));
   it('leaves brackets and punctuation outside the mark', () =>
     expect(markGlossMatches('(the) Lord,', 'lord')).toBe(`(the) ${M('Lord')},`));
+  // FTS sees each whitespace term as ONE phrase; only its last token is a prefix.
+  it("marks an apostrophe term's last piece as a prefix", () =>
+    expect(markGlossMatches("o'g'illari", "o'g'il")).toBe(`${M('o')}'${M('g')}'${M('illari')}`));
+  it('keeps every piece but the last of a term exact', () =>
+    expect(markGlossMatches('abc abcdef def', 'abc-de')).toBe(`${M('abc')} abcdef ${M('def')}`));
   it('returns the gloss untouched for a query with no letters', () =>
     expect(markGlossMatches('слово', '"*')).toBe('слово'));
 });

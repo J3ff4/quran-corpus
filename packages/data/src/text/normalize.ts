@@ -167,6 +167,15 @@ export function buildFtsMatch(s: string): string {
     .join(' AND ');
 }
 
+/** Longer than any real query, and short enough that the worst case stays
+ *  cheap: an Arabic term expands over 14 proclitics, so the cost of a query is
+ *  its term count times 14 prefix scans, on the phone's UI thread. Shared by
+ *  searchVerses and searchWords. */
+export const MAX_QUERY_LENGTH = 100;
+
+/** `uz-Cyrl` and `uz` are one language in two scripts: fold the script away. */
+export const foldUzScript = (lang: string): string => (lang === 'uz-Cyrl' ? 'uz' : lang);
+
 // Two of the three `uz` translation sets are Cyrillic-only (Alauddin Mansour,
 // Muhammad Sodik Muhammad Yusuf), so a Latin-typed Uzbek query never matches
 // them. (The set the reader actually shows, Tasnim, is Latin under `uz` and

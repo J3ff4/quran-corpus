@@ -1,14 +1,18 @@
 import type { QueryClient } from '../queryClient.js';
 import type { WordHit } from '../types.js';
-import { buildFtsMatch, normalizeArabic } from '../text/normalize.js';
+import {
+  buildFtsMatch,
+  foldUzScript,
+  MAX_QUERY_LENGTH,
+  normalizeArabic,
+  stripQuranicAnnotations,
+} from '../text/normalize.js';
 import { markGlossMatches } from '../text/glossMatch.js';
 
 export const WORD_HIT_LIMIT = 50;
 const MIN_QUERY_CHARS = 3;
-const MAX_QUERY_LENGTH = 100; // same cap as searchVerses
 const ARABIC = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/;
-const sameLang = (a: string, b: string) =>
-  (a === 'uz-Cyrl' ? 'uz' : a) === (b === 'uz-Cyrl' ? 'uz' : b);
+const sameLang = (a: string, b: string) => foldUzScript(a) === foldUzScript(b);
 const marks = (n: number) => Array.from({ length: n }, () => '?').join(',');
 const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
@@ -128,7 +132,7 @@ export async function searchWords(
     const at = first.get(g.firstId)!;
     return {
       lemma_buckwalter: g.lemmaBw,
-      arabic: g.arabic,
+      arabic: stripQuranicAnnotations(g.arabic),
       gloss: markGlossMatches(best.gloss, term),
       gloss_lang: glossLanguage && sameLang(best.lang, glossLanguage) ? null : best.lang,
       count: g.count,

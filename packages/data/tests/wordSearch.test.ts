@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createDatabase, type Client } from '../src/db.js';
 import { runMigrations } from '../src/migrate.js';
 import { search } from '../src/queries/search.js';
@@ -192,6 +192,13 @@ describe('searchWords', () => {
     ]);
   });
 
+  // U+06DF renders as a stray circle in the UI font; every reader of lemma strips it.
+  it('strips Quranic annotation marks from arabic', async () => {
+    await word(10, 1, 1, 'قَالُوا\u06df', ['qaAla', 'قَالُوا\u06df'], { en: 'they said' });
+    const hits = await searchWords(db, 'said', 'en');
+    expect(hits.map((h) => h.arabic)).toEqual(['قَالُوا']);
+  });
+
   it('caps at 50', async () => {
     for (let i = 0; i <= WORD_HIT_LIMIT; i += 1) {
       const bw = `L${String(i).padStart(2, '0')}`;
@@ -226,10 +233,17 @@ describe('search() with words', () => {
     expect(without.words).toEqual([hit({ ...row, gloss_lang: 'en' })]);
   });
 
-  it('search() still returns verses when word_gloss_fts is missing', async () => {
+  it('search() still returns verses when word_gloss_fts is missing, and warns once', async () => {
     await db.execute('DROP TABLE word_gloss_fts');
-    const r = await search(db, 'merc', { glossLanguage: 'en' });
-    expect(r.words).toEqual([]);
-    expect(r.verses.length).toBeGreaterThan(0);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const r = await search(db, 'merc', { glossLanguage: 'en' });
+      expect(r.words).toEqual([]);
+      expect(r.verses.length).toBeGreaterThan(0);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0]![0]).toBe('word search skipped; Words section empty');
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
