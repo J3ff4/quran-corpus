@@ -6,6 +6,7 @@ import {
   splitStatements,
   stripLineComments,
 } from '../src/migrate.js';
+import { SCHEMA_SQL } from '../src/schema.generated.js';
 import type { Client } from '@libsql/client';
 
 let db: Client;
@@ -391,6 +392,86 @@ describe('search_fts schema', () => {
     const hit = await d.execute("SELECT surah_id, source FROM search_fts WHERE search_fts MATCH 'throne'");
     expect(hit.rows).toHaveLength(1);
     expect(hit.rows[0]!['source']).toBe('en');
+    d.close();
+  });
+});
+
+describe('word_gloss_fts schema', () => {
+  // A corpus DB from before M13: every statement of today's schema except the
+  // ones that create or fill word_gloss_fts, with glosses already in it.
+  async function seedPreM13(): Promise<Client> {
+    const d = createDatabase('file::memory:');
+    const preM13 = splitStatements(stripLineComments(SCHEMA_SQL))
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0 && !s.startsWith('PRAGMA') && !s.includes('word_gloss_fts'));
+    for (const statement of preM13) await d.execute(statement);
+    await d.execute("INSERT INTO surahs VALUES (1,'a','A','A','meccan',7,1)");
+    await d.execute("INSERT INTO ayahs (id,surah_id,ayah_number,text_uthmani) VALUES (1,1,1,'x')");
+    await d.execute("INSERT INTO languages VALUES ('en','English','English','ltr')");
+    await d.execute("INSERT INTO languages VALUES ('ru','Русский','Russian','ltr')");
+    for (const id of [1, 2, 3]) {
+      await d.execute({
+        sql: "INSERT INTO words (id,ayah_id,position,text_arabic) VALUES (?,1,?,'x')",
+        args: [id, id],
+      });
+    }
+    await d.execute(
+      "INSERT INTO word_glosses (id,word_id,language_code,gloss_text) VALUES (1,1,'en','the lantern'),(2,2,'ru','светильник')",
+    );
+    return d;
+  }
+
+  const docsize = async (d: Client): Promise<number> =>
+    Number((await d.execute('SELECT count(*) AS n FROM word_gloss_fts_docsize')).rows[0]!['n']);
+
+  const match = async (d: Client, q: string): Promise<number[]> =>
+    (
+      await d.execute({
+        sql: 'SELECT rowid FROM word_gloss_fts WHERE word_gloss_fts MATCH ? ORDER BY rowid',
+        args: [q],
+      })
+    ).rows.map((r) => Number(r['rowid']));
+
+  it('heals the index onto glosses that predate it', async () => {
+    const d = await seedPreM13();
+    await runMigrations(d);
+    expect(await docsize(d)).toBe(2);
+    expect(await match(d, 'lantern')).toEqual([1]);
+    expect(await match(d, 'светильник')).toEqual([2]);
+    d.close();
+  });
+
+  it('heals once: a second run leaves the index as it was', async () => {
+    const d = await seedPreM13();
+    await runMigrations(d);
+    await runMigrations(d);
+    expect(await docsize(d)).toBe(2);
+    d.close();
+  });
+
+  it('keeps the index in step with insert, update and delete', async () => {
+    const d = await seedPreM13();
+    await runMigrations(d);
+
+    await d.execute(
+      "INSERT INTO word_glosses (id,word_id,language_code,gloss_text) VALUES (3,3,'en','olive tree')",
+    );
+    expect(await match(d, 'olive')).toEqual([3]);
+
+    await d.execute("UPDATE word_glosses SET gloss_text = 'fig tree' WHERE id = 3");
+    expect(await match(d, 'fig')).toEqual([3]);
+    expect(await match(d, 'olive')).toEqual([]);
+
+    await d.execute('DELETE FROM word_glosses WHERE id = 3');
+    expect(await match(d, 'fig')).toEqual([]);
+
+    // External content: a trigger that removes a row without handing fts5 the
+    // old text leaves the index disagreeing with word_glosses. rank = 1 is
+    // load-bearing: a bare 'integrity-check' only checks the index against
+    // itself and passes on exactly that corruption.
+    await expect(
+      d.execute("INSERT INTO word_gloss_fts (word_gloss_fts, rank) VALUES ('integrity-check', 1)"),
+    ).resolves.toBeDefined();
     d.close();
   });
 });
