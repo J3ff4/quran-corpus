@@ -42,11 +42,11 @@ import type * as ExpoSQLite from 'expo-sqlite';
 // the `if (info.exists)` early return, keeps its 164.8 MB extract, and the
 // 37.8 MB of storage this phase buys lands on fresh installs only. The prune
 // after it IS a content change, and would show the old translations. One bump
-// covers both: nothing has shipped 's2' yet, so it is still a version no phone
-// holds. It bumps again the next time the asset changes after S2 ships.
+// covered both, because 's2' had not shipped yet.
 //
 // 'm13a': Quran Academy's Russian word glosses (77,429 rows) and the ru root lists.
-export const corpusDbVersion = 'm13a';
+// 'm13b': word_gloss_fts, the word-gloss search index over all 309,706 glosses.
+export const corpusDbVersion = 'm13b';
 export const corpusDbFileName = `quran-corpus-${corpusDbVersion}.db`;
 
 /** The user's own database, which lives in the same directory as the extracts
