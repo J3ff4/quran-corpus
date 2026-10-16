@@ -136,3 +136,41 @@ it('prunes and seals on one connection, the way the generator does', async () =>
   const header = await readFile(path);
   expect([header[18], header[19]]).toEqual([1, 1]);
 });
+
+it('compacts the word-gloss index a delete + reinsert left tombstones in', async () => {
+  // A re-import replaces glosses by delete + insert, through the triggers.
+  // Comparative, for the reason the search_fts case gives: one fixture through
+  // pruneOpenDb, its twin left as it was.
+  async function churned(name: string) {
+    const db = await seed(join(dir, name));
+    for (let id = 1; id <= 20; id += 1) {
+      await db.execute({
+        sql: "INSERT INTO words (id, ayah_id, position, text_arabic) VALUES (?,1,?,'x')",
+        args: [id, id],
+      });
+      await db.execute({
+        sql: "INSERT INTO word_glosses (word_id, language_code, gloss_text) VALUES (?,'ru',?)",
+        args: [id, `old gloss ${id}`],
+      });
+    }
+    await db.execute("DELETE FROM word_glosses WHERE language_code = 'ru'");
+    for (let id = 1; id <= 20; id += 1) {
+      await db.execute({
+        sql: "INSERT INTO word_glosses (word_id, language_code, gloss_text) VALUES (?,'ru',?)",
+        args: [id, `new gloss ${id}`],
+      });
+    }
+    return db;
+  }
+
+  const optimized = await churned('wopt.db');
+  await pruneOpenDb(optimized);
+  const after = await optimized.execute('SELECT count(*) AS n FROM word_gloss_fts_data');
+  optimized.close();
+
+  const plain = await churned('wplain.db');
+  const before = await plain.execute('SELECT count(*) AS n FROM word_gloss_fts_data');
+  plain.close();
+
+  expect(Number(after.rows[0]?.n)).toBeLessThan(Number(before.rows[0]?.n));
+});

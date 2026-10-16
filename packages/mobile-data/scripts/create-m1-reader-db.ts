@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { access, copyFile, mkdir, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createDatabase } from '@quran-corpus/data';
+import { createDatabase, type Client } from '@quran-corpus/data';
 import {
   selectedTranslators,
   type SelectedTranslatorLanguage,
@@ -38,6 +38,8 @@ export interface M1ReaderDbContractSummary {
   translationsTotal: number;
   /** Quran Academy's Russian word glosses (M13): one per word, covered words included. */
   ruGlosses: number;
+  /** Rows in word_gloss_fts (M13 PR B): one per word_glosses row, every language. */
+  wordGlossIndex: number;
   selectedTranslations: Record<keyof typeof selectedTranslators, TranslationContractSummary>;
 }
 
@@ -199,6 +201,37 @@ export function parseM1TranslationSelection(
   ) as Record<SelectedTranslatorLanguage, string>;
 }
 
+/**
+ * The word-gloss search index (M13 PR B) covers every gloss and agrees with it.
+ *
+ * External content: word_gloss_fts stores no text, only an index over
+ * word_glosses kept in step by the schema's triggers. So the failure to catch is
+ * drift -- a write that bypassed them leaves rows search cannot find, or rowids
+ * that point at text which no longer says what was indexed.
+ *
+ * Two checks, in this order:
+ *  - _docsize holds one row per indexed document. Querying word_gloss_fts itself
+ *    would read through to word_glosses and count the content, not the index.
+ *  - `integrity-check` with rank 1. The plain form verifies only the index's own
+ *    structure and passes both drifts above (measured on libsql 3.45.1); rank 1
+ *    also compares it against the content table.
+ *
+ * A corpus that predates the index throws `no such table`.
+ */
+export async function checkWordGlossIndex(db: Pick<Client, 'execute'>): Promise<number> {
+  const [indexed, glosses] = await Promise.all([
+    db.execute('SELECT count(*) AS n FROM word_gloss_fts_docsize'),
+    db.execute('SELECT count(*) AS n FROM word_glosses'),
+  ]);
+  const indexedRows = numberValue(indexed.rows[0]?.n);
+  const glossRows = numberValue(glosses.rows[0]?.n);
+  if (indexedRows !== glossRows) {
+    throw new Error(`word_gloss_fts indexes ${indexedRows} of ${glossRows} word glosses`);
+  }
+  await db.execute("INSERT INTO word_gloss_fts (word_gloss_fts, rank) VALUES ('integrity-check', 1)");
+  return indexedRows;
+}
+
 export async function validateM1ReaderDbContract(dbPath = targetDbPath): Promise<M1ReaderDbContractSummary> {
   const db = createDatabase(`file:${dbPath}`);
 
@@ -251,6 +284,7 @@ export async function validateM1ReaderDbContract(dbPath = targetDbPath): Promise
       languages: languages.rows.map((row) => String(row.code)),
       translationsTotal: numberValue(translationsTotal.rows[0]?.n),
       ruGlosses: numberValue(ruGlosses.rows[0]?.n),
+      wordGlossIndex: await checkWordGlossIndex(db),
       selectedTranslations,
     };
 
