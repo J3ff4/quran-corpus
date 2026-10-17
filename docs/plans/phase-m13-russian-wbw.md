@@ -1390,7 +1390,7 @@ Reversible to the pre-M13 state; no code reverts needed beyond the credit and co
        con.execute("DELETE FROM word_glosses WHERE language_code='ru' AND source='quranacademy'")
        con.execute("DELETE FROM root_glosses WHERE language_code='ru'")
    ```
-   After PR B, `trg_word_glosses_ad` removes the matching index entries. Then `INSERT INTO word_gloss_fts(word_gloss_fts) VALUES('optimize')` and `VALUES('integrity-check')`.
+   After PR B, `trg_word_glosses_ad` removes the matching index entries. Then `INSERT INTO word_gloss_fts(word_gloss_fts) VALUES('optimize')` and `INSERT INTO word_gloss_fts(word_gloss_fts, rank) VALUES('integrity-check', 1)`. Rank 1 is required: on an external-content table the plain form passes even when the index has drifted (measured, Task 15).
 3. Code, one commit:
    - remove the mobile `Quran Academy` credit and the `about.sourceWbwRu` strings (×3);
    - remove the web source entry;
@@ -1418,7 +1418,7 @@ Russian WBW then falls back to English with the `(en)` tag, which is the pre-M13
 | Stopword queries slow on phone | Two-pass query; 39 ms server worst case. Device check B1 times `the`. Upgrade path: raise the floor to 4 chars for Latin only. |
 | Web 500 on search after PR B deploy | Deploy order (Task 15 Step 8). |
 | APK grows | PR A ≈ +4 MB (ru rows), PR B ≈ +5.5 MB (external-content index), recorded at Tasks 8/15. |
-| External-content index drifts from `word_glosses` | Only triggers write it. Any write path that bypasses them (none exists; Python and TS both go through the schema's triggers) would leave stale rowids. The mobile contract runs `integrity-check` on every generated asset. |
+| External-content index drifts from `word_glosses` | Only triggers write it. Any write path that bypasses them (none exists; Python and TS both go through the schema's triggers) would leave stale rowids. The mobile contract runs `integrity-check` with rank 1 (the plain form is blind to external-content drift) on every generated asset. |
 | Russian user types е for ё | FTS does not fold ё (measured), so `все` will not find `всё`. Verse search has the same limit today. Out of M13 scope; raise as a follow-up issue at PR B merge. |
 | Legal | Owner-accepted (R1). Runbook above; credit says "permission requested". |
 
@@ -1470,21 +1470,21 @@ Russian WBW then falls back to English with the `(en)` tag, which is the pre-M13
 
 | # | Check | Result |
 |---|---|---|
-| B1 | `милост`: Words section between verses and roots, grouped, counted; `the` returns without a visible stall (time it) | |
-| B2 | Russian content, query `mercy`: rows carry `(en)` | |
-| B3 | Latin Uzbek query (`rahm`): uz rows, no tag under Uzbek | |
-| B4 | Arabic query: no Words section | |
-| B5 | 2-char query: no Words section | |
-| B6 | Lemma row → lemma page; lemma-less row (`они` / `them`) → word screen at its first occurrence | |
-| B7 | Highlight visible in light + dark | |
-| B8 | Cold start after `m13b`: extract ran, no ANR | |
+| B1 | `милост`: Words section between verses and roots, grouped, counted; `the` returns without a visible stall (time it) | PASS 2026-10-17 OnePlus 7 Pro: `Милост` (owner-typed) → Verses, then Words: 16 Russian rows grouped per lemma with counts (رَحْمَة милость 67 … سُحْق 1), highlighted, no tag; no Roots for this query. Timing `them`→`the` ~511 ms keypress→results vs control `merc` ~496 ms, no spinner frame |
+| B2 | Russian content, query `mercy`: rows carry `(en)` | PASS: `mercy` under Русский content: rows tagged `(en)`, order Verses → Words → Roots, long glosses wrap |
+| B3 | Latin Uzbek query (`rahm`): uz rows, no tag under Uzbek | PASS: `rahm` under O'zbek content: Uzbek rows, no tag |
+| B4 | Arabic query: no Words section | PASS: `رحمة` (owner-typed): Verses only to the list end, no Words section |
+| B5 | 2-char query: no Words section | PASS: `th`: Roots only, no Words section |
+| B6 | Lemma row → lemma page; lemma-less row (`они` / `them`) → word screen at its first occurrence | PASS: رَحْمَة row → lemma page (114 occurrences); lemma-less لَهُمْ "for them" → word screen 2:11 word 3 |
+| B7 | Highlight visible in light + dark | PASS: highlight visible in light (`mercy`) and dark (`rahm`) |
+| B8 | Cold start after `m13b`: extract ran, no ANR | PASS: cold start Displayed +1.86 s, no ANR/FATAL; m13b DB live (Words section needs `word_gloss_fts`) |
 
 ### M13-W(B) — local prod build
 
 | # | Check | Result |
 |---|---|---|
-| WB1 | Search sheet: Words section order, links, `(lang)` tag via the cookie content language | (lang)/count on page bg only: paper-50 4.73, night-300 7.62 |
-| WB2 | Verse hits identical to the PR A build for `mercy` and `милост` | |
+| WB1 | Search sheet: Words section order, links, `(lang)` tag via the cookie content language | PASS 2026-10-16 prod build :3941, headless Chromium 390px. h2 order Verses → Words → Roots (`милост` has no Roots). Rows link `/dictionary/lemma/…` (e.g. raHomap); `<mark>` on every row checked. ru cookie + `mercy`: rows tagged `(en)`; en cookie: no tag; ru + `милост`: Russian glosses, no tag. Lemma-less rows exist (`они` 2:4:11, `them` 2:11:3); their `/word/…` link is unit-tested (Task 13). (lang)/count on page bg only: paper-50 4.73, night-300 7.62 |
+| WB2 | Verse hits identical to the PR A build for `mercy` and `милост` | PASS: main's `packages/data` (built in scratch) `search()` vs this build's `/api/search` on the live migrated DB: 50/50 verses identical (ids, order, snippets) for both queries, with no cookie, `ui-locale=en` and `ui-locale=ru` |
 
 ---
 
