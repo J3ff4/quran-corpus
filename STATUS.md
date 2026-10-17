@@ -7,9 +7,31 @@ Drifts stale between sessions/accounts — verify anything below against `git lo
 hamza-seat "ready to merge" when both had been merged for days, one iterated further
 since. Full rewrite below reflects re-verified ground truth as of today.)
 
-Updated: 2026-10-08
+Updated: 2026-10-17
 
 ## Now
+
+**2026-10-17 — PR #119 merged (squash `7e4a0a86`). M13 PR B: word-gloss search.**
+CI green both jobs. Search gains a **Words** section (Verses → Words → Roots) on web
+and mobile, matched against word-by-word glosses in every language.
+
+- **Schema**: external-content fts5 `word_gloss_fts` over `word_glosses` (rowid=id),
+  ai/ad/au triggers (au = `OF gloss_text WHEN changed`), backfill self-heal guarded on
+  `_docsize`. Drift check = `('integrity-check', 1)`; the bare form passes on drift.
+- **Live DB migrated**: docsize 309,706 = glosses. Backup `quran.db.bak-m13b`.
+  Deploy snapshot `~/quran-data/quran.db.deploy-m13b` (sha256 `1483e279…`) already
+  carries the index, so prod web (`DB_SKIP_MIGRATIONS=true`) needs no migrate step.
+- **search()**: Words errors are caught + `console.warn`'d; verses never fail on them
+  (owner ruling). 3-char floor, 100-char cap, Arabic excluded, MATCH bound + quoted.
+  Timing on the live corpus: `the` ~80 ms end to end.
+- **Mobile**: DB `m13b`, versionCode 96, asset contract checks the index. Device vc96
+  B1-B8 PASS (Милост + رحمة typed by owner). Web WB1/WB2 PASS.
+- **Reviews**: `/code-review` (5 fixed), SDD final review (7 Minor, all fixed `58e2d514`).
+- **Filed**: #121 plural forms ("1 occurrences"; ru needs 3), #122 ё/е fold.
+- **Deploy (W1)**: no prod existed. PR #120 (`6b9f4025`) adds the `apps/web` Dockerfile
+  + `docs/plans/phase-w1-first-deploy.md`; homelab session runs Tasks 3-4 on CT 100.
+  Task 5 (Caddy/tunnel) blocked until `qurancorpusly` is registered. Supersedes PR A's
+  "copy DB + deploy" line below; #116 draft A still waits for the site to be live.
 
 **2026-10-08 — PR #118 merged (squash `78f185b3`). M13 PR A: Russian word-by-word
 from Quran Academy (QUL resource 97).** CI green both jobs. Ships BEFORE a grant by
