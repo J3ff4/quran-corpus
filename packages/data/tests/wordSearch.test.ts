@@ -165,7 +165,7 @@ describe('searchWords', () => {
       ['merc*', mercy],
       ['-merc', mercy],
       ['NEAR(merc)', []], // the phrase "near merc", not a NEAR query
-      ['merc OR x', []], // "merc"* AND "OR"* AND "x", not a disjunction
+      ['merc OR x', []], // "merc"* AND "OR" AND "x" (2 chars: under the prefix floor), not a disjunction
       ['!!!', []],
       ['"""', []],
     ];

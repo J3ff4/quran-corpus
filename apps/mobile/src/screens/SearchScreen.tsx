@@ -471,13 +471,20 @@ export function SearchScreen() {
               {t(uiLocale, 'search.words').toUpperCase()}
             </Text>
             <View testID="search-group-words" style={groupStyle}>
-              {result.words.map((w) => (
+              {result.words.map((w) => {
+              // gloss_lang is set only when the gloss fell back to another
+              // language; name it the way a verse row names its language.
+              const languageLabel =
+                w.gloss_lang === null
+                  ? null
+                  : (crossLanguageLabel(w.gloss_lang, queryLanguage) ?? w.gloss_lang);
+              return (
               <ResultCard
                 key={w.lemma_buckwalter ?? `${w.surah_id}:${w.ayah_number}:${w.position}`}
                 testID="search-word"
                 // Read without the match marks: they are control characters,
                 // and TalkBack would spell them out or swallow the word.
-                accessibilityLabel={`${w.arabic}, ${w.gloss.replaceAll('\u0002', '').replaceAll('\u0003', '')}, ${w.count} ${t(uiLocale, 'dictionary.occurrences')}`}
+                accessibilityLabel={`${w.arabic}, ${w.gloss.replaceAll('\u0002', '').replaceAll('\u0003', '')}${languageLabel === null ? '' : `, ${languageLabel}`}, ${w.count} ${t(uiLocale, 'dictionary.occurrences')}`}
                 // A lemma has a page of its own; a lemma-less word can only
                 // open itself.
                 onPress={() =>
@@ -506,9 +513,16 @@ export function SearchScreen() {
                     highlightBackground={theme.accentWash}
                     style={{ color: theme.text, fontSize: typography.body, flexShrink: 1 }}
                   />
-                  {w.gloss_lang === null ? null : (
-                    <Text style={{ color: theme.mutedText, fontSize: typography.caption }}>
-                      ({w.gloss_lang})
+                  {languageLabel === null ? null : (
+                    <Text
+                      testID="search-word-language"
+                      style={{
+                        color: theme.mutedText,
+                        fontSize: typography.caption,
+                        fontWeight: '600',
+                      }}
+                    >
+                      {languageLabel}
                     </Text>
                   )}
                   <Text
@@ -523,7 +537,8 @@ export function SearchScreen() {
                   </Text>
                 </View>
               </ResultCard>
-              ))}
+              );
+              })}
             </View>
           </>
         ) : null}

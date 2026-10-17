@@ -133,7 +133,10 @@ export function SearchResults({
                       <span className="ml-1 text-xs text-paper-600 dark:text-paper-400">({w.gloss_lang})</span>
                     )}
                   </span>
-                  <span className="text-xs tabular-nums text-paper-600 dark:text-paper-400">{w.count}</span>
+                  <span className="text-xs tabular-nums text-paper-600 dark:text-paper-400">
+                    {w.count}
+                    <span className="sr-only"> occurrences</span>
+                  </span>
                 </Link>
               </li>
             ))}

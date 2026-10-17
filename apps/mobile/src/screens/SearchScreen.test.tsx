@@ -561,7 +561,8 @@ describe('SearchScreen words', () => {
       lemma_buckwalter: 'r~aHoma`n',
       arabic: 'رَحْمَٰن',
       gloss: '\u0002Merciful\u0003 one',
-      gloss_lang: 'ru',
+      // An English fallback under the uz-Cyrl reader the settings mock sets.
+      gloss_lang: 'en',
       count: 57,
       surah_id: 1,
       ayah_number: 1,
@@ -630,8 +631,12 @@ describe('SearchScreen words', () => {
     await renderWith({ words: WORDS });
 
     const [tagged, untagged] = screen.getAllByTestId('search-word');
-    expect(tagged!.textContent).toContain('(ru)');
-    expect(untagged!.textContent).not.toContain('(');
+    // The native name, as a verse row labels its language -- not the raw code.
+    expect(tagged!.querySelector('[data-testid="search-word-language"]')?.textContent).toBe(
+      'English',
+    );
+    expect(tagged!.textContent).not.toContain('(en)');
+    expect(untagged!.querySelector('[data-testid="search-word-language"]')).toBeNull();
     // The matched token is marked, the way a verse snippet's is.
     expect(tagged!.querySelector('[data-testid="snippet-mark"]')?.textContent).toBe('Merciful');
     expect(tagged!.textContent).toContain('57');
@@ -641,7 +646,11 @@ describe('SearchScreen words', () => {
     await renderWith({ words: WORDS });
 
     expect(screen.getAllByTestId('search-word')[0]!.getAttribute('aria-label')).toBe(
-      'رَحْمَٰن, Merciful one, 57 occurrences',
+      'رَحْمَٰن, Merciful one, English, 57 occurrences',
+    );
+    // No language for a gloss in the reader's own language.
+    expect(screen.getAllByTestId('search-word')[1]!.getAttribute('aria-label')).toBe(
+      'يَٰٓأَيُّهَا, O you, 4 occurrences',
     );
   });
 

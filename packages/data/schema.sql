@@ -296,7 +296,7 @@ END;
 -- live DB gets the index from the scraper/migrate step, not from web startup. The emptiness probe reads the _docsize shadow table, NOT
 -- word_gloss_fts itself: an external-content table reads through to word_glosses and
 -- is never "empty" while glosses exist. Verified 2026-10-07: heals, idempotent,
--- triggers then pass fts5 'integrity-check'.
+-- triggers then pass fts5 ('integrity-check', 1) (the bare form passes on drift).
 INSERT INTO word_gloss_fts (word_gloss_fts) SELECT 'rebuild'
 WHERE NOT EXISTS (SELECT 1 FROM word_gloss_fts_docsize)
   AND EXISTS (SELECT 1 FROM word_glosses);

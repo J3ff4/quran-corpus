@@ -370,6 +370,21 @@ def test_word_gloss_fts_heals_onto_a_pre_m13_db(tmp_path) -> None:
     assert [r[0] for r in hits] == [2]
     db.close()
 
+    # Heals once: a gloss the index lacks must stay out on reopen. 'rebuild' is
+    # idempotent on its own, so only this proves the emptiness guard (2 -> 3).
+    raw = sqlite3.connect(p)
+    raw.execute("DROP TRIGGER trg_word_glosses_ai")
+    raw.execute(
+        "INSERT INTO word_glosses (id, word_id, language_code, gloss_text)"
+        " VALUES (3, 3, 'en', 'olive tree')"
+    )
+    raw.commit()
+    raw.close()
+    db = ScraperDatabase(p)
+    n = db._conn.execute("SELECT count(*) FROM word_gloss_fts_docsize").fetchone()[0]
+    assert n == 2
+    db.close()
+
 
 def test_get_roots_without_forms(tmp_path):
     from scraper.db import ScraperDatabase

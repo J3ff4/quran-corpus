@@ -441,9 +441,16 @@ describe('word_gloss_fts schema', () => {
     d.close();
   });
 
-  it('heals once: a second run leaves the index as it was', async () => {
+  it('heals once: a second run does not rebuild a populated index', async () => {
     const d = await seedPreM13();
     await runMigrations(d);
+    // 'rebuild' is idempotent on its own, so a plain second run proves nothing.
+    // Put a gloss in word_glosses that the index does not have: only an
+    // unguarded rebuild on the second run would pick it up (2 -> 3).
+    await d.execute('DROP TRIGGER trg_word_glosses_ai');
+    await d.execute(
+      "INSERT INTO word_glosses (id,word_id,language_code,gloss_text) VALUES (3,3,'en','olive tree')",
+    );
     await runMigrations(d);
     expect(await docsize(d)).toBe(2);
     d.close();
@@ -466,7 +473,13 @@ describe('word_gloss_fts schema', () => {
     expect(await match(d, 'fig')).toEqual([]);
 
     // A non-text update must not touch the index (trigger is gated on gloss_text).
+    // MATCH alone cannot see a needless delete+insert reindex; the segment count
+    // in _data can (it grows by one per reindex).
+    const segments = async (): Promise<number> =>
+      Number((await d.execute('SELECT count(*) AS n FROM word_gloss_fts_data')).rows[0]!['n']);
+    const before = await segments();
     await d.execute("UPDATE word_glosses SET source = 'x' WHERE id = 1");
+    expect(await segments()).toBe(before);
     expect(await match(d, 'lantern')).toEqual([1]);
 
     // External content: a trigger that removes a row without handing fts5 the

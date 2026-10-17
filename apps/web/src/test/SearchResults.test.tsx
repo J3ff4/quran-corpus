@@ -105,6 +105,11 @@ describe('SearchResults', () => {
       );
       expect(screen.getByRole('link', { name: /book/ })).toHaveAttribute('href', '/word/2/7/3');
     });
+    it('gives the count an accessible name', () => {
+      render(<SearchResults result={{ ...base, words: [word] }} />);
+      // jsdom joins the spans without the space a screen reader hears.
+      expect(screen.getByRole('link', { name: /230\s*occurrences/ })).toBeInTheDocument();
+    });
     it('wraps the gloss match in a <mark>', () => {
       const { container } = render(<SearchResults result={{ ...base, words: [word] }} />);
       expect(container.querySelector('mark')!.textContent).toBe('book');

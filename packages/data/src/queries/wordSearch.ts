@@ -28,7 +28,8 @@ interface Group {
 /** Words whose gloss matches, one row per lemma (R16/R17). Two FTS passes, both on the
  *  bound MATCH: the first groups and ranks; the second reads glosses for the top 50
  *  only, so a stopword query ("the*": 2,307 groups) never ships every gloss row to JS.
- *  Measured on the server: 39 ms worst case. */
+ *  Measured on the server: `the*` (2,307 groups) ~33 ms grouping pass, ~80 ms end to end,
+ *  live 4-language corpus 2026-10-17. */
 export async function searchWords(
   db: QueryClient,
   q: string,

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 
 vi.mock('@quran-corpus/data', () => ({
   EMPTY_SEARCH_RESULT: { jump: null, verses: [], words: [], roots: [] },
@@ -21,6 +21,10 @@ function req(q: string): Request {
 }
 
 describe('GET /api/search', () => {
+  // Reset here, not after the expect: a failed assertion would leak the cookie.
+  afterEach(() => {
+    cookieJar = { get: () => undefined };
+  });
   it('returns search results for a valid query', async () => {
     const res = await GET(req('throne'));
     expect(res.status).toBe(200);
@@ -31,7 +35,6 @@ describe('GET /api/search', () => {
     cookieJar = { get: (n) => (n === 'ui-locale' ? { value: 'ru' } : undefined) };
     await GET(req('book'));
     expect(vi.mocked(search)).toHaveBeenLastCalledWith(expect.anything(), 'book', { glossLanguage: 'ru' });
-    cookieJar = { get: () => undefined };
   });
   it('returns empty result for a blank query', async () => {
     const body = await (await GET(req('   '))).json();

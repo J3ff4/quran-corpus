@@ -1415,7 +1415,7 @@ Russian WBW then falls back to English with the `(en)` tag, which is the pre-M13
 | `.bak` misses WAL pages | `Connection.backup()`, asserted by `test_backup_holds_the_pre_import_state`. |
 | Dimmed text fails AA on some host | Measured per host in Task 5 Step 1 and Task 6's contrast test; `paper-100` = STOP. |
 | Row-height drift in WBW (M6l estimator) | Colour-only nested `Text`; no font or size change. Device check A5. |
-| Stopword queries slow on phone | Two-pass query; 39 ms server worst case. Device check B1 times `the`. Upgrade path: raise the floor to 4 chars for Latin only. |
+| Stopword queries slow on phone | Two-pass query; `the*` (2,307 groups) ~33 ms grouping pass, ~80 ms end to end, live 4-language corpus 2026-10-17. Device check B1 times `the`. Upgrade path: raise the floor to 4 chars for Latin only. |
 | Web 500 on search after PR B deploy | Deploy order (Task 15 Step 8). |
 | APK grows | PR A ≈ +4 MB (ru rows), PR B ≈ +5.5 MB (external-content index), recorded at Tasks 8/15. |
 | External-content index drifts from `word_glosses` | Only triggers write it. Any write path that bypasses them (none exists; Python and TS both go through the schema's triggers) would leave stale rowids. The mobile contract runs `integrity-check` with rank 1 (the plain form is blind to external-content drift) on every generated asset. |
