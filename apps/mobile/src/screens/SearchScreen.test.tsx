@@ -103,7 +103,7 @@ vi.mock('react-native', async () => {
   };
 });
 
-const EMPTY = { jump: null, verses: [], roots: [] };
+const EMPTY = { jump: null, verses: [], words: [], roots: [] };
 
 // The debounce inside SearchScreen is 200ms; anything asserting "did not
 // query" has to actually wait past it, or it is checking t=0, which is
@@ -138,6 +138,7 @@ describe('SearchScreen', () => {
     mocks.searchCorpus.mockResolvedValue({
       jump: null,
       verses: [{ surah_id: 2, ayah_number: 255, source: 'ar', snippet: 'ٱللَّهُ' }],
+      words: [],
       roots: [],
     });
 
@@ -182,6 +183,7 @@ describe('SearchScreen', () => {
       land({
         jump: null,
         verses: [{ surah_id: 2, ayah_number: 255, source: 'ar', snippet: '\u0671\u0644\u0644\u064e\u0651\u0647\u064f' }],
+        words: [],
         roots: [],
       });
       await settle();
@@ -228,6 +230,7 @@ describe('SearchScreen', () => {
         { surah_id: 1, ayah_number: 2, source: 'uz', snippet: 'Allah nomi bilan' },
         { surah_id: 1, ayah_number: 1, source: 'ar', snippet: 'بسم الله' },
       ],
+      words: [],
       roots: [],
     });
 
@@ -252,6 +255,7 @@ describe('SearchScreen', () => {
         highlightPosition: null,
       },
       verses: [{ surah_id: 2, ayah_number: 255, source: 'ar', snippet: 'ٱللَّهُ' }],
+      words: [],
       roots: [],
     });
 
@@ -292,6 +296,7 @@ describe('SearchScreen', () => {
         highlightPosition: null,
       },
       verses: [],
+      words: [],
       roots: [],
     });
 
@@ -320,6 +325,7 @@ describe('SearchScreen', () => {
         highlightPosition: null,
       },
       verses: [],
+      words: [],
       roots: [],
     });
     render(<SearchScreen />);
@@ -350,6 +356,7 @@ describe('SearchScreen', () => {
         highlightPosition: null,
       },
       verses: [],
+      words: [],
       roots: [],
     });
 
@@ -370,6 +377,7 @@ describe('SearchScreen', () => {
         highlightPosition: null,
       },
       verses: [],
+      words: [],
       roots: [],
     });
 
@@ -392,6 +400,7 @@ describe('SearchScreen', () => {
         highlightPosition: null,
       },
       verses: [],
+      words: [],
       roots: [],
     });
 
@@ -505,10 +514,8 @@ describe('SearchScreen', () => {
     // they were three near-identical lists of rows under three headers that
     // differed only in wording.
     //
-    // Three kinds, not the four the plan's draft test named: SearchResult
-    // carries jump, verses and roots. There is no lemma/"Words" arm in the
-    // data, and adding one is a packages/data query -- out of scope for M6g
-    // by its own constraint, and a §5 trigger besides.
+    // The Words arm (M13) has its own block below; this one keeps the three
+    // kinds M6g shipped.
     mocks.searchCorpus.mockResolvedValue({
       jump: {
         surah_id: 2,
@@ -518,6 +525,7 @@ describe('SearchScreen', () => {
         highlightPosition: null,
       },
       verses: [{ surah_id: 1, ayah_number: 1, source: 'ar', snippet: 'bismi' }],
+      words: [],
       roots: [{ id: 7, root_buckwalter: 'rHm', root_arabic: 'رحم', occurrence_count: 339 }],
     });
     render(<SearchScreen />);
@@ -542,6 +550,115 @@ describe('SearchScreen', () => {
     // reference. Neither used to show anything but the headword.
     expect(screen.getByTestId('search-root').textContent).toContain('339');
     expect(screen.getByTestId('search-verse').textContent).toContain('1:1');
+  });
+});
+
+describe('SearchScreen words', () => {
+  // A lemma hit, and a lemma-less one that can only open its own word. Glosses
+  // carry the \u0002…\u0003 marks the data layer wraps matched tokens in.
+  const WORDS = [
+    {
+      lemma_buckwalter: 'r~aHoma`n',
+      arabic: 'رَحْمَٰن',
+      gloss: '\u0002Merciful\u0003 one',
+      // An English fallback under the uz-Cyrl reader the settings mock sets.
+      gloss_lang: 'en',
+      count: 57,
+      surah_id: 1,
+      ayah_number: 1,
+      position: 3,
+    },
+    {
+      lemma_buckwalter: null,
+      arabic: 'يَٰٓأَيُّهَا',
+      gloss: 'O \u0002you\u0003',
+      gloss_lang: null,
+      count: 4,
+      surah_id: 2,
+      ayah_number: 7,
+      position: 3,
+    },
+  ];
+
+  beforeEach(() => {
+    mocks.push.mockReset();
+    mocks.searchCorpus.mockReset();
+  });
+  afterEach(cleanup);
+
+  async function renderWith(result: object) {
+    mocks.searchCorpus.mockResolvedValue({ ...EMPTY, ...result });
+    render(<SearchScreen />);
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'merciful' } });
+    await act(async () => {
+      await settle();
+    });
+  }
+
+  it('puts the Words section between verses and roots', async () => {
+    await renderWith({
+      verses: [{ surah_id: 1, ayah_number: 1, source: 'en', snippet: 'Merciful' }],
+      words: WORDS,
+      roots: [{ id: 7, root_buckwalter: 'rHm', root_arabic: 'رحم', occurrence_count: 339 }],
+    });
+
+    const testIds = Array.from(document.querySelectorAll('[data-testid]')).map((el) =>
+      el.getAttribute('data-testid'),
+    );
+    const verses = testIds.indexOf('search-heading-ayahs');
+    const words = testIds.indexOf('search-heading-words');
+    const roots = testIds.indexOf('search-heading-roots');
+    expect(verses).toBeGreaterThanOrEqual(0);
+    expect(words).toBeGreaterThan(verses);
+    expect(roots).toBeGreaterThan(words);
+    expect(screen.getByTestId('search-heading-words').textContent).toBe('WORDS');
+    // Every row inside its own group, not loose in the scroll view.
+    const group = screen.getByTestId('search-group-words');
+    expect(screen.getAllByTestId('search-word').every((row) => group.contains(row))).toBe(true);
+  });
+
+  it('opens the lemma page for a lemma row and the word itself otherwise', async () => {
+    await renderWith({ words: WORDS });
+
+    const [lemmaRow, bareRow] = screen.getAllByTestId('search-word');
+    fireEvent.click(lemmaRow!);
+    expect(mocks.push).toHaveBeenLastCalledWith(`/lemma/${encodeURIComponent('r~aHoma`n')}`);
+    fireEvent.click(bareRow!);
+    expect(mocks.push).toHaveBeenLastCalledWith('/word/2/7/3');
+  });
+
+  it('tags a gloss from another language, and only that one', async () => {
+    await renderWith({ words: WORDS });
+
+    const [tagged, untagged] = screen.getAllByTestId('search-word');
+    // The native name, as a verse row labels its language -- not the raw code.
+    expect(tagged!.querySelector('[data-testid="search-word-language"]')?.textContent).toBe(
+      'English',
+    );
+    expect(tagged!.textContent).not.toContain('(en)');
+    expect(untagged!.querySelector('[data-testid="search-word-language"]')).toBeNull();
+    // The matched token is marked, the way a verse snippet's is.
+    expect(tagged!.querySelector('[data-testid="snippet-mark"]')?.textContent).toBe('Merciful');
+    expect(tagged!.textContent).toContain('57');
+  });
+
+  it('names the row for TalkBack without the match marks', async () => {
+    await renderWith({ words: WORDS });
+
+    expect(screen.getAllByTestId('search-word')[0]!.getAttribute('aria-label')).toBe(
+      'رَحْمَٰن, Merciful one, English, 57 occurrences',
+    );
+    // No language for a gloss in the reader's own language.
+    expect(screen.getAllByTestId('search-word')[1]!.getAttribute('aria-label')).toBe(
+      'يَٰٓأَيُّهَا, O you, 4 occurrences',
+    );
+  });
+
+  it('is not "nothing found" when only words matched', async () => {
+    await renderWith({ words: WORDS });
+
+    expect(screen.getAllByTestId('search-word')).toHaveLength(2);
+    expect(screen.queryByText('Nothing found')).toBeNull();
   });
 });
 
@@ -619,6 +736,7 @@ describe('SearchScreen results grid', () => {
         { surah_id: 2, ayah_number: 255, source: 'ar', snippet: 'ٱللَّهُ' },
         { surah_id: 3, ayah_number: 1, source: 'ar', snippet: 'الٓمٓ' },
       ],
+      words: [],
       roots: [],
     });
   });

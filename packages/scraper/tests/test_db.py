@@ -338,6 +338,54 @@ def test_gloss_group_column_on_a_legacy_db(tmp_path) -> None:
     db.close()
 
 
+def test_word_gloss_fts_heals_onto_a_pre_m13_db(tmp_path) -> None:
+    # The scraper applies schema.sql too, so the same one-statement heal must
+    # build the index the first time ScraperDatabase opens a DB whose glosses
+    # predate it -- not only when apps/web runs its migrations.
+    from scraper.db import _SCHEMA_PATH, _split_statements, _strip_line_comments
+
+    p = str(tmp_path / "pre_m13.db")
+    raw = sqlite3.connect(p)
+    for stmt in _split_statements(_strip_line_comments(_SCHEMA_PATH.read_text())):
+        stmt = stmt.strip()
+        if (
+            stmt
+            and not stmt.upper().startswith("PRAGMA")
+            and "word_gloss_fts" not in stmt
+        ):
+            raw.execute(stmt)
+    raw.execute(
+        "INSERT INTO word_glosses (id, word_id, language_code, gloss_text)"
+        " VALUES (1, 1, 'en', 'the lantern'), (2, 2, 'ru', 'светильник')"
+    )
+    raw.commit()
+    raw.close()
+
+    db = ScraperDatabase(p)
+    n = db._conn.execute("SELECT count(*) FROM word_gloss_fts_docsize").fetchone()[0]
+    assert n == 2
+    hits = db._conn.execute(
+        "SELECT rowid FROM word_gloss_fts WHERE word_gloss_fts MATCH 'светильник'"
+    ).fetchall()
+    assert [r[0] for r in hits] == [2]
+    db.close()
+
+    # Heals once: a gloss the index lacks must stay out on reopen. 'rebuild' is
+    # idempotent on its own, so only this proves the emptiness guard (2 -> 3).
+    raw = sqlite3.connect(p)
+    raw.execute("DROP TRIGGER trg_word_glosses_ai")
+    raw.execute(
+        "INSERT INTO word_glosses (id, word_id, language_code, gloss_text)"
+        " VALUES (3, 3, 'en', 'olive tree')"
+    )
+    raw.commit()
+    raw.close()
+    db = ScraperDatabase(p)
+    n = db._conn.execute("SELECT count(*) FROM word_gloss_fts_docsize").fetchone()[0]
+    assert n == 2
+    db.close()
+
+
 def test_get_roots_without_forms(tmp_path):
     from scraper.db import ScraperDatabase
     from scraper.models import RootFormModel, RootModel

@@ -265,6 +265,7 @@ export type UiStringKey =
   | 'search.placeholder'
   | 'search.clearSearch'
   | 'search.verses'
+  | 'search.words'
   | 'search.roots'
   | 'search.empty'
   | 'search.noResults'
@@ -541,6 +542,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'search.placeholder': 'Verse, word or root',
     'search.clearSearch': 'Clear search',
     'search.verses': 'Verses',
+    'search.words': 'Words',
     'search.roots': 'Roots',
     'search.empty': 'Type a verse reference, a word, or a root',
     'search.noResults': 'Nothing found',
@@ -790,6 +792,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'search.placeholder': 'Oyat, so‘z yoki o‘zak',
     'search.clearSearch': 'Qidiruvni tozalash',
     'search.verses': 'Oyatlar',
+    'search.words': 'So‘zlar',
     'search.roots': 'O‘zaklar',
     'search.empty': 'Oyat raqami, so‘z yoki o‘zak kiriting',
     'search.noResults': 'Hech narsa topilmadi',
@@ -1037,6 +1040,7 @@ export const strings: Record<UiLocaleCode, Record<UiStringKey, string>> = {
     'search.placeholder': 'Аят, слово или корень',
     'search.clearSearch': 'Очистить поиск',
     'search.verses': 'Аяты',
+    'search.words': 'Слова',
     'search.roots': 'Корни',
     'search.empty': 'Введите номер аята, слово или корень',
     'search.noResults': 'Ничего не найдено',

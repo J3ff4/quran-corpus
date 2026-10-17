@@ -9,7 +9,7 @@ import * as clientEntry from '../src/client.js';
 // in the browser bundle and every interactive element fails to hydrate.
 describe('client entry (browser-safe)', () => {
   it('exposes the pure values client components need', () => {
-    expect(clientEntry.EMPTY_SEARCH_RESULT).toEqual({ jump: null, verses: [], roots: [] });
+    expect(clientEntry.EMPTY_SEARCH_RESULT).toEqual({ jump: null, verses: [], words: [], roots: [] });
     expect(clientEntry.rootFirstLetter('rHm')).toBeTypeOf('string');
     expect(clientEntry.compareRootsArabic('a', 'b')).toBeTypeOf('number');
   });

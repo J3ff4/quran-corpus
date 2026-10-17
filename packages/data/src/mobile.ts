@@ -43,6 +43,7 @@ export { getRootGlosses } from './queries/rootGlosses.js';
 export type { RootGloss } from './queries/rootGlosses.js';
 export { parseVerseRef, searchVerses, search, EMPTY_SEARCH_RESULT } from './queries/search.js';
 export type { VerseSearchOpts } from './queries/search.js';
+export { searchWords, WORD_HIT_LIMIT } from './queries/wordSearch.js';
 export {
   getRootByBuckwalter,
   getAllRoots,
@@ -149,6 +150,7 @@ export type {
   VerseHit,
   JumpVerse,
   SearchResult,
+  WordHit,
 } from './types.js';
 
 // The client contract mobile satisfies with its expo-sqlite adapter. Exported
@@ -156,3 +158,4 @@ export type {
 export type { QueryClient, QueryRow, QueryArg } from './queryClient.js';
 export { groupByGlossSpan } from './text/glossSpans.js';
 export { splitGlossBrackets, type GlossRun } from './text/glossBrackets.js';
+export { markGlossMatches } from './text/glossMatch.js';

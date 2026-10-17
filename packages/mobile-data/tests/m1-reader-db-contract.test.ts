@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createDatabase } from '@quran-corpus/data';
 import {
+  checkWordGlossIndex,
   parseM1TranslationSelection,
   resolveM1ReaderDbSource,
   syncM1ReaderDbAsset,
@@ -13,6 +14,7 @@ import {
 } from '../scripts/create-m1-reader-db';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+const schemaPath = resolve(repoRoot, 'packages/data/schema.sql');
 const dbPath = resolve(repoRoot, 'apps/mobile/assets/db/quran.db');
 // The bundled asset is generated (pnpm generate:m1-db) from a ~134 MB corpus DB
 // that is deliberately not in git, so a fresh clone does not have it. These
@@ -158,11 +160,12 @@ describe('M1 reader DB contract', () => {
     await source.execute('INSERT INTO marker (n) VALUES (7)');
     // syncM1ReaderDbAsset prunes the copy before sealing it, so the fixture
     // needs every table the prune touches -- even though this case is about the
-    // seal. Both of these were added after the prune step broke it: the
+    // seal. Each of these was added after the prune step broke it: the
     // translations table when the DELETE arrived, search_fts when the index
-    // compaction did. That is the point of the case. It runs the real
-    // generator, so it fails in 57 ms for anything the pipeline needs and the
-    // fixture lacks, where the real asset takes eight minutes to say the same.
+    // compaction did, word_gloss_fts when M13 PR B compacted that one too.
+    // That is the point of the case. It runs the real generator, so it fails
+    // in 57 ms for anything the pipeline needs and the fixture lacks, where
+    // the real asset takes eight minutes to say the same.
     // No triggers: those live in schema.sql, and nothing here inserts rows.
     await source.execute(
       'CREATE TABLE translations (id INTEGER PRIMARY KEY, ayah_id INTEGER, language_code TEXT, translator TEXT, text TEXT)',
@@ -173,6 +176,11 @@ describe('M1 reader DB contract', () => {
         ref_id UNINDEXED, body, tokenize = 'unicode61 remove_diacritics 2'
       )
     `);
+    // And word_gloss_fts, since the prune compacts that index too (M13 PR B).
+    await source.execute('CREATE TABLE word_glosses (id INTEGER PRIMARY KEY, gloss_text TEXT)');
+    await source.execute(
+      "CREATE VIRTUAL TABLE word_gloss_fts USING fts5(gloss_text, content = 'word_glosses', content_rowid = 'id')",
+    );
     source.close();
     // Guards the premise of the case: with a source that is not in WAL mode
     // there is nothing to seal and the assertions below would pass vacuously.
@@ -195,6 +203,74 @@ describe('M1 reader DB contract', () => {
     expect(Number(rows[0]?.n)).toBe(7);
   });
 
+});
+
+describe('word-gloss index check', () => {
+  // The real schema, so the fts declaration and its three triggers are the ones
+  // that ship. Three glosses on three words, all through trg_word_glosses_ai.
+  async function seedGlosses(name: string) {
+    const db = createDatabase(`file:${resolve(await createTempDir(), name)}`);
+    await db.executeMultiple(await readFile(schemaPath, 'utf8'));
+    await db.execute("INSERT INTO languages VALUES ('en','English','English','ltr')");
+    await db.execute("INSERT INTO surahs VALUES (1,'الفاتحة','Al-Fatihah','The Opener','meccan',7,5)");
+    await db.execute("INSERT INTO ayahs (id, surah_id, ayah_number, text_uthmani) VALUES (1,1,1,'بسم الله')");
+    for (const [id, gloss] of [[1, 'In (the) name'], [2, '(of) Allah'], [3, 'the Most Gracious']] as const) {
+      await db.execute({
+        sql: "INSERT INTO words (id, ayah_id, position, text_arabic) VALUES (?,1,?,'x')",
+        args: [id, id],
+      });
+      await db.execute({
+        sql: "INSERT INTO word_glosses (word_id, language_code, gloss_text) VALUES (?,'en',?)",
+        args: [id, gloss],
+      });
+    }
+    return db;
+  }
+
+  it('passes an index the triggers maintained, and reports its size', async () => {
+    const db = await seedGlosses('ok.db');
+    try {
+      await expect(checkWordGlossIndex(db)).resolves.toBe(3);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('rejects a corpus with no index at all (the PR A asset)', async () => {
+    const db = createDatabase(`file:${resolve(await createTempDir(), 'none.db')}`);
+    try {
+      await db.execute('CREATE TABLE word_glosses (id INTEGER PRIMARY KEY, gloss_text TEXT)');
+      await expect(checkWordGlossIndex(db)).rejects.toThrow(/no such table/);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('rejects glosses the index never saw', async () => {
+    // A write that bypassed trg_word_glosses_ai: the row exists, search cannot find it.
+    const db = await seedGlosses('missing.db');
+    try {
+      await db.execute('DROP TRIGGER trg_word_glosses_ai');
+      await db.execute("INSERT INTO words (id, ayah_id, position, text_arabic) VALUES (4,1,4,'x')");
+      await db.execute("INSERT INTO word_glosses (word_id, language_code, gloss_text) VALUES (4,'en','the Most Merciful')");
+      await expect(checkWordGlossIndex(db)).rejects.toThrow('word_gloss_fts indexes 3 of 4 word glosses');
+    } finally {
+      db.close();
+    }
+  });
+
+  it('rejects an index whose text no longer matches the glosses', async () => {
+    // Same row count either side, so only fts5's content comparison can see it:
+    // the index still answers 'Gracious' for a row that now says something else.
+    const db = await seedGlosses('stale.db');
+    try {
+      await db.execute('DROP TRIGGER trg_word_glosses_au');
+      await db.execute("UPDATE word_glosses SET gloss_text = 'the Beneficent' WHERE word_id = 3");
+      await expect(checkWordGlossIndex(db)).rejects.toThrow(/SQLITE_CORRUPT/);
+    } finally {
+      db.close();
+    }
+  });
 });
 
 describeWithDb('M1 reader DB artifact', () => {
@@ -221,6 +297,8 @@ describeWithDb('M1 reader DB artifact', () => {
       translationsTotal: 24944,
       // M13: one Quran Academy gloss per word.
       ruGlosses: 77429,
+      // M13 PR B: word_gloss_fts covers every gloss, en + uz + uz-Cyrl + ru.
+      wordGlossIndex: 309706,
       selectedTranslations: {
         en: { translator: 'Saheeh International', rows: 6236 },
         ru: { translator: 'Abu Adel', rows: 6236 },

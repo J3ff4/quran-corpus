@@ -292,6 +292,7 @@ export function SearchScreen() {
     !failed &&
     result.jump === null &&
     result.verses.length === 0 &&
+    result.words.length === 0 &&
     result.roots.length === 0;
 
   return (
@@ -454,6 +455,88 @@ export function SearchScreen() {
                     }
                   />
                 </ResultCard>
+              );
+              })}
+            </View>
+          </>
+        ) : null}
+
+        {result.words.length > 0 ? (
+          <>
+            <Text
+              testID="search-heading-words"
+              accessibilityRole="header"
+              style={heading}
+            >
+              {t(uiLocale, 'search.words').toUpperCase()}
+            </Text>
+            <View testID="search-group-words" style={groupStyle}>
+              {result.words.map((w) => {
+              // gloss_lang is set only when the gloss fell back to another
+              // language; name it the way a verse row names its language.
+              const languageLabel =
+                w.gloss_lang === null
+                  ? null
+                  : (crossLanguageLabel(w.gloss_lang, queryLanguage) ?? w.gloss_lang);
+              return (
+              <ResultCard
+                key={w.lemma_buckwalter ?? `${w.surah_id}:${w.ayah_number}:${w.position}`}
+                testID="search-word"
+                // Read without the match marks: they are control characters,
+                // and TalkBack would spell them out or swallow the word.
+                accessibilityLabel={`${w.arabic}, ${w.gloss.replaceAll('\u0002', '').replaceAll('\u0003', '')}${languageLabel === null ? '' : `, ${languageLabel}`}, ${w.count} ${t(uiLocale, 'dictionary.occurrences')}`}
+                // A lemma has a page of its own; a lemma-less word can only
+                // open itself.
+                onPress={() =>
+                  router.push(
+                    w.lemma_buckwalter === null
+                      ? `/word/${w.surah_id}/${w.ayah_number}/${w.position}`
+                      : `/lemma/${encodeURIComponent(w.lemma_buckwalter)}`,
+                  )
+                }
+                style={cardStyle}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <Text
+                    style={{
+                      color: theme.text,
+                      fontFamily: fonts.arabic,
+                      fontSize: 22,
+                      writingDirection: 'rtl',
+                    }}
+                  >
+                    {w.arabic}
+                  </Text>
+                  <SnippetText
+                    snippet={w.gloss}
+                    highlightColor={theme.accent}
+                    highlightBackground={theme.accentWash}
+                    style={{ color: theme.text, fontSize: typography.body, flexShrink: 1 }}
+                  />
+                  {languageLabel === null ? null : (
+                    <Text
+                      testID="search-word-language"
+                      style={{
+                        color: theme.mutedText,
+                        fontSize: typography.caption,
+                        fontWeight: '600',
+                      }}
+                    >
+                      {languageLabel}
+                    </Text>
+                  )}
+                  <Text
+                    style={{
+                      color: theme.mutedText,
+                      fontSize: typography.caption,
+                      fontVariant: ['tabular-nums'],
+                      marginLeft: 'auto',
+                    }}
+                  >
+                    {w.count}
+                  </Text>
+                </View>
+              </ResultCard>
               );
               })}
             </View>

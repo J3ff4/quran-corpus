@@ -68,5 +68,13 @@ export async function pruneOpenDb(
   // and unrepacked they ship inside the APK as holes.
   await db.execute("INSERT INTO search_fts(search_fts) VALUES('optimize')");
 
+  // The word-gloss index (M13 PR B) gets the same merge, though nothing above
+  // touches it: every delete through trg_word_glosses_ad (a re-import, the R3
+  // takedown) leaves a tombstone, and the 'rebuild' that first populated it
+  // leaves several segments. Measured 2026-10-16 on the live corpus, which had
+  // only the rebuild behind it: 2,364,674 -> 2,290,875 bytes of index. Same
+  // order constraint as above: before the VACUUM.
+  await db.execute("INSERT INTO word_gloss_fts(word_gloss_fts) VALUES('optimize')");
+
   return { translationsDeleted: Number(removed.rowsAffected ?? 0) };
 }

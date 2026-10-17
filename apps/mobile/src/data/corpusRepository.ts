@@ -680,6 +680,7 @@ export async function searchCorpus(
   return search(client, query, {
     translators: translatorsFor(languageCode),
     preferLanguage: languageCode,
+    glossLanguage: languageCode,
   });
 }
 

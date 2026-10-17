@@ -260,3 +260,43 @@ CREATE TRIGGER IF NOT EXISTS trg_translations_au AFTER UPDATE ON translations BE
   SELECT a.surah_id, a.ayah_number, NEW.language_code, NEW.id, NEW.text
   FROM ayahs a WHERE a.id = NEW.ayah_id;
 END;
+
+-- Word-gloss search (M13). External content: the index stores no copy of the text,
+-- it reads word_glosses by rowid = word_glosses.id. Measured on the 3-language corpus:
+-- 4.08 MB against 12.67 MB for a contentful table. The column is NAMED gloss_text
+-- because external content maps fts columns to content columns by name.
+CREATE VIRTUAL TABLE IF NOT EXISTS word_gloss_fts USING fts5(
+  gloss_text,
+  content = 'word_glosses',
+  content_rowid = 'id',
+  tokenize = 'unicode61 remove_diacritics 2'
+);
+
+-- External content means the triggers must hand fts5 the OLD text to delete it:
+-- the 'delete' command, never a plain DELETE, which would corrupt the index.
+CREATE TRIGGER IF NOT EXISTS trg_word_glosses_ai AFTER INSERT ON word_glosses BEGIN
+  INSERT INTO word_gloss_fts (rowid, gloss_text) VALUES (NEW.id, NEW.gloss_text);
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_word_glosses_ad AFTER DELETE ON word_glosses BEGIN
+  INSERT INTO word_gloss_fts (word_gloss_fts, rowid, gloss_text)
+  VALUES ('delete', OLD.id, OLD.gloss_text);
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_word_glosses_au AFTER UPDATE OF gloss_text ON word_glosses
+WHEN NEW.gloss_text IS NOT OLD.gloss_text BEGIN
+  INSERT INTO word_gloss_fts (word_gloss_fts, rowid, gloss_text)
+  VALUES ('delete', OLD.id, OLD.gloss_text);
+  INSERT INTO word_gloss_fts (rowid, gloss_text) VALUES (NEW.id, NEW.gloss_text);
+END;
+
+-- Self-heal: a DB whose glosses predate the index gets it built the first time the
+-- schema is applied, by the scraper (ScraperDatabase) and by web runMigrations alike,
+-- from this one statement. Production web runs DB_SKIP_MIGRATIONS=true, so there the
+-- live DB gets the index from the scraper/migrate step, not from web startup. The emptiness probe reads the _docsize shadow table, NOT
+-- word_gloss_fts itself: an external-content table reads through to word_glosses and
+-- is never "empty" while glosses exist. Verified 2026-10-07: heals, idempotent,
+-- triggers then pass fts5 ('integrity-check', 1) (the bare form passes on drift).
+INSERT INTO word_gloss_fts (word_gloss_fts) SELECT 'rebuild'
+WHERE NOT EXISTS (SELECT 1 FROM word_gloss_fts_docsize)
+  AND EXISTS (SELECT 1 FROM word_glosses);

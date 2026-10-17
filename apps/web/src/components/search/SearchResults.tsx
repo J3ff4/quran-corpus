@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { TypingText } from '../ui/TypingText';
 import type { SearchResult, JumpVerse, VerseHit } from '@quran-corpus/data/client';
-import { rootPath } from '../../lib/routes';
+import { lemmaPath, rootPath } from '../../lib/routes';
+import { wordHref } from '../../lib/wordLocation';
 
 // Snippet matches are wrapped by FTS5 in STX (code 2) / ETX (code 3) sentinel
 // bytes. Split on those bytes and wrap odd segments in <mark> as text nodes
@@ -72,8 +73,8 @@ export function SearchResults({
   result: SearchResult;
   onNavigate?: () => void;
 }) {
-  const { jump, verses, roots } = result;
-  const empty = !jump && verses.length === 0 && roots.length === 0;
+  const { jump, verses, words, roots } = result;
+  const empty = !jump && verses.length === 0 && words.length === 0 && roots.length === 0;
   if (empty) {
     return <TypingText text="No results." className="py-8 text-center text-paper-500" />;
   }
@@ -101,6 +102,41 @@ export function SearchResults({
                   >
                     <Highlighted text={v.snippet} />
                   </p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {words.length > 0 && (
+        <section className="mb-6">
+          <h2 className="mb-2 text-sm font-semibold text-paper-500">Words</h2>
+          <ul className="space-y-1">
+            {words.map((w) => (
+              <li key={w.lemma_buckwalter ?? `${w.surah_id}:${w.ayah_number}:${w.position}`}>
+                <Link
+                  href={
+                    w.lemma_buckwalter
+                      ? lemmaPath(w.lemma_buckwalter)
+                      : wordHref({ surah: w.surah_id, ayah: w.ayah_number, position: w.position })
+                  }
+                  onClick={onNavigate}
+                  // No hover fill: text-paper-600 measures 4.38:1 on paper-100, under AA.
+                  // Hover underlines the gloss instead; the row keeps the page background.
+                  className="group flex items-baseline gap-3 rounded-lg px-2 py-1.5"
+                >
+                  <span className="font-arabic text-lg" dir="rtl">{w.arabic}</span>
+                  <span className="min-w-0 flex-1 text-sm group-hover:underline" dir="ltr">
+                    <Highlighted text={w.gloss} />
+                    {w.gloss_lang && (
+                      <span className="ml-1 text-xs text-paper-600 dark:text-paper-400">({w.gloss_lang})</span>
+                    )}
+                  </span>
+                  <span className="text-xs tabular-nums text-paper-600 dark:text-paper-400">
+                    {w.count}
+                    <span className="sr-only"> occurrences</span>
+                  </span>
                 </Link>
               </li>
             ))}

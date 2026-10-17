@@ -223,9 +223,28 @@ export interface JumpVerse {
   highlightPosition: number | null;
 }
 
+/** One Words-section row: a lemma (or a lemma-less surface) whose gloss matched. */
+export interface WordHit {
+  /** Null for a lemma-less word (3,307 PRON/INL); that row is keyed by its folded surface. */
+  lemma_buckwalter: string | null;
+  /** The lemma's Arabic, or the first occurrence's own text when there is no lemma. */
+  arabic: string;
+  /** The gloss shown, matched tokens wrapped \u0002…\u0003 (VerseHit.snippet protocol). */
+  gloss: string;
+  /** The gloss's language, or null when it is the language asked for (uz-Cyrl ≡ uz). */
+  gloss_lang: string | null;
+  /** Distinct matched words in this row. */
+  count: number;
+  /** The first occurrence: lowest word id. */
+  surah_id: number;
+  ayah_number: number;
+  position: number;
+}
+
 export interface SearchResult {
   jump: JumpVerse | null;
   verses: VerseHit[];
+  words: WordHit[];
   roots: Root[];
 }
 

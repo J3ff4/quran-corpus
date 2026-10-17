@@ -1,15 +1,19 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 
 vi.mock('@quran-corpus/data', () => ({
-  EMPTY_SEARCH_RESULT: { jump: null, verses: [], roots: [] },
+  EMPTY_SEARCH_RESULT: { jump: null, verses: [], words: [], roots: [] },
   search: vi.fn(async (_db: unknown, q: string) => ({
     jump: null,
     verses: [{ surah_id: 1, ayah_number: 1, source: 'en', snippet: `hit:${q}` }],
+    words: [],
     roots: [],
   })),
 }));
 vi.mock('../lib/db', () => ({ getDatabase: vi.fn(async () => ({})) }));
+let cookieJar: { get(name: string): { value: string } | undefined } = { get: () => undefined };
+vi.mock('next/headers', () => ({ cookies: async () => cookieJar }));
 
+import { search } from '@quran-corpus/data';
 import { GET } from '../app/api/search/route';
 
 function req(q: string): Request {
@@ -17,15 +21,24 @@ function req(q: string): Request {
 }
 
 describe('GET /api/search', () => {
+  // Reset here, not after the expect: a failed assertion would leak the cookie.
+  afterEach(() => {
+    cookieJar = { get: () => undefined };
+  });
   it('returns search results for a valid query', async () => {
     const res = await GET(req('throne'));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.verses[0].snippet).toBe('hit:throne');
   });
+  it('passes the content language from the locale cookie as glossLanguage', async () => {
+    cookieJar = { get: (n) => (n === 'ui-locale' ? { value: 'ru' } : undefined) };
+    await GET(req('book'));
+    expect(vi.mocked(search)).toHaveBeenLastCalledWith(expect.anything(), 'book', { glossLanguage: 'ru' });
+  });
   it('returns empty result for a blank query', async () => {
     const body = await (await GET(req('   '))).json();
-    expect(body).toEqual({ jump: null, verses: [], roots: [] });
+    expect(body).toEqual({ jump: null, verses: [], words: [], roots: [] });
   });
   it('returns empty result for an over-long query', async () => {
     const body = await (await GET(req('x'.repeat(101)))).json();
