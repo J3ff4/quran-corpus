@@ -1,0 +1,14 @@
+**/node_modules
+**/.next
+**/dist
+**/*.db
+**/*.db-*
+**/.env*
+.git
+temp
+docs
+apps/mobile/*
+!apps/mobile/package.json
+packages/scraper
+packages/mobile-data/*
+!packages/mobile-data/package.json
