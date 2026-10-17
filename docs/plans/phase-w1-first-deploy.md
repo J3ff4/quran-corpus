@@ -10,7 +10,7 @@
 - `quran.db` is NOT in the image. It is a host directory bind-mounted rw at `/data`.
 - Caddy reverse-proxies the hostname to the container.
 
-**Tech:** Node 20 (`.nvmrc`), pnpm 10.34.3 (corepack), Next 15, `@libsql/client` (native, glibc), Docker compose, Caddy, Cloudflare Tunnel.
+**Tech:** Node 24 LTS (D6), pnpm 10.34.3 (corepack), Next 15, `@libsql/client` (native, glibc), Docker compose, Caddy, Cloudflare Tunnel.
 
 **State today (verified 2026-10-17):**
 - No prod exists.
@@ -33,7 +33,7 @@
 | Every DB page/route is `force-dynamic`; only `/offline` is static and DB-free | `apps/web/src/app/**` | `next build` needs no DB. DB is runtime-only. |
 | `DATABASE_URL` default `file:quran.db` (cwd-relative) | `apps/web/src/lib/db.ts:21` | Set `file:/data/quran.db` explicitly. |
 | `normalizeArabicJoinKeys` writes even under `DB_SKIP_MIGRATIONS=true` | `db.ts` (self-heal block) | Mount must be **rw**. Mount the **directory**, not the file: WAL needs `-wal`/`-shm` siblings. |
-| `@libsql/client` is native, externalized | `next.config.ts:9-20` | Use glibc base (`node:20-bookworm-slim`), not alpine. No `output: 'standalone'`: native external plus pnpm symlinks make tracing fiddly. |
+| `@libsql/client` is native, externalized | `next.config.ts:9-20` | Use glibc base (`node:24-bookworm-slim`), not alpine. No `output: 'standalone'`: native external plus pnpm symlinks make tracing fiddly. |
 | web imports `packages/data/dist`, which needs a build | `packages/data/package.json` exports | Build `@quran-corpus/web...` (deps first), not web alone. |
 | App sets HSTS `includeSubDomains` + strict nonce CSP | `next.config.ts`, `middleware.ts` | Serve only over HTTPS hostname. CSP has no external origins except `media-src https:` (audio). |
 | Workspace includes `apps/mobile` (285M assets), `packages/scraper` (423M, Python) | — | `.dockerignore` must drop them except the `package.json` files that frozen-lockfile needs. |
@@ -42,10 +42,11 @@
 
 | # | Decision | Recommendation |
 |---|---|---|
-| D1 | Public hostname | Owner names it. Tunnel + Caddy route need it. |
+| D1 | Public hostname | Owner 2026-10-17: name `qurancorpusly`, domain NOT registered yet. Task 5 blocked until it is; Tasks 1-4 + P2-P6 over the internal address proceed. |
 | D2 | How Caddy reaches the container | Same Docker network as Caddy if Caddy is a container on CT 100, so no host port. Else publish `127.0.0.1:3941:3000` (3941 = familiar dev port, free on CT 100). Homelab session reports which. |
 | D3 | `DB_SKIP_MIGRATIONS` | `true`. The DB arrives pre-migrated; keeps DDL out of the request path. |
 | D4 | Which DB file | `quran.db.deploy-m13b` (sha256 `1483e279…fc86d`, verified). It is a superset of main's schema, so main ignores `word_gloss_fts`. Deploying PR B later is then rebuild-only, with no DB swap. |
+| D6 | Node runtime | `node:24-bookworm-slim`. `.nvmrc` says 20, but 20 EOL'd 2026-04-30. Dev box runs 24. Bumping `.nvmrc` is a separate call. |
 | D5 | Compose file home | Homelab-only: it has host paths and network names. The repo gets Dockerfile + `.dockerignore` only. |
 
 ## Task 1 — Dockerfile + .dockerignore (CT 103, this repo)
@@ -54,57 +55,28 @@
 - Create: `apps/web/Dockerfile`
 - Create: `.dockerignore` (repo root; build context = root)
 
-- [ ] **Step 1: `.dockerignore`**
-```
-**/node_modules
-**/.next
-**/dist
-**/*.db
-**/*.db-*
-.git
-**/.env*
-temp
-docs
-apps/mobile/*
-!apps/mobile/package.json
-packages/scraper
-packages/mobile-data/*
-!packages/mobile-data/package.json
-```
+- [x] **Step 1: `.dockerignore`** — shipped as `/.dockerignore`.
   `packages/scraper` is Python, not a workspace project, so it is dropped whole. If `pnpm install --frozen-lockfile` then complains a workspace project is missing, re-include that `package.json`. Never drop `--frozen-lockfile`.
 
-- [ ] **Step 2: `apps/web/Dockerfile`**
-```dockerfile
-# ponytail: single stage, full workspace node_modules (~1GB image).
-# Slim it with output:'standalone' only if image size starts to matter.
-FROM node:20-bookworm-slim
-ENV NEXT_TELEMETRY_DISABLED=1
-RUN corepack enable
-WORKDIR /repo
-COPY . .
-RUN pnpm install --frozen-lockfile --filter "@quran-corpus/web..." \
- && pnpm --filter "@quran-corpus/web..." run build
-ENV NODE_ENV=production \
-    DATABASE_URL=file:/data/quran.db \
-    DB_SKIP_MIGRATIONS=true
-USER node
-WORKDIR /repo/apps/web
-EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s \
-  CMD node -e "fetch('http://127.0.0.1:3000/surah/1').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
-CMD ["pnpm", "exec", "next", "start", "-H", "0.0.0.0", "-p", "3000"]
-```
+- [x] **Step 2: `apps/web/Dockerfile`** — shipped as `apps/web/Dockerfile`: node:24-bookworm-slim, frozen filtered install + build, env defaults, `USER node`, healthcheck, `next start -H 0.0.0.0 -p 3000`.
   The healthcheck hits `/surah/1`, which reads the DB, so a missing or unreadable mount turns the container unhealthy.
 
-- [ ] **Step 3: verify without Docker** (CT 103 has none). Simulate the image's steps on a clean checkout:
+- [x] **Step 3: verify without Docker** (CT 103 has none). Simulate the image's steps on a clean checkout:
   - Run `git worktree add $CLAUDE_JOB_DIR/tmp/w1 HEAD`.
   - Install and build with the same two `pnpm` commands.
   - Run `DATABASE_URL=file:/home/claude/quran-data/quran.db.deploy-m13b DB_SKIP_MIGRATIONS=true NODE_ENV=production pnpm exec next start -p 3942`.
-  - Expect `/surah/1`, `/search?q=mercy` and `/dictionary` → 200. The response CSP header has a nonce.
+  - Expect `/surah/1`, `/api/search?q=mercy` and `/dictionary` → 200. The response CSP header has a nonce.
+  - **Result 2026-10-17 (Node 24.18, pnpm 10.34.3, context pruned per `.dockerignore`):**
+    - frozen install OK. Ignored build scripts esbuild/sharp/unrs-resolver are dev tooling; libsql ships prebuilt `linux-x64-gnu`.
+    - build OK.
+    - `/`, `/surah/1`, `/surah/2/words?lang=ru` (Аллах…), `/dictionary`, `/offline`, `/sw.js` all 200.
+    - `/api/search?q=mercy` 200: 50 verses, 8 roots.
+    - CSP nonce, HSTS, nosniff and DENY headers present.
+    - Healthcheck command exit 0. Log clean.
   - Kill the server and remove the worktree.
   - **Never** run `next build` in `apps/web` of the main checkout while `next dev` runs there. That breaks the dev server's shared `.next` (see memory).
-- [ ] **Step 4: self-review.** Check that `.dockerignore` drops `*.db`, so the DB never goes in the image. Check that `**/.env*` is excluded.
-- [ ] **Step 5: commit** `build(web): Dockerfile for production deploy`. Push and open the PR only on owner go. §5 does not trigger (build files).
+- [x] **Step 4: self-review.** Check that `.dockerignore` drops `*.db`, so the DB never goes in the image. Check that `**/.env*` is excluded.
+- [x] **Step 5: commit** `build(web): Dockerfile for production deploy`. Push and open the PR only on owner go. §5 does not trigger (build files).
 
 ## Task 2 — Merge (owner)
 
@@ -177,7 +149,7 @@ Log results in the table below.
 |---|---|---|
 | P1 | `https://<D1>/` | Home renders. DevTools console has no CSP errors. |
 | P2 | `/surah/2/words?lang=ru` | Russian WBW glosses (M13-A is on main). |
-| P3 | `/search?q=mercy` | Verses + Roots. No Words section, because main lacks M13-B. That is correct. |
+| P3 | Search overlay `mercy` (`/search` is not a page; API is `/api/search?q=`) | Verses + Roots. No Words section, because main lacks M13-B. That is correct. |
 | P4 | Response headers | CSP with nonce, HSTS, nosniff, `X-Frame-Options: DENY`. |
 | P5 | Reload offline after a first visit | `/offline` page served by the service worker. |
 | P6 | `docker restart quran-web` | Back to healthy; P1 still passes. |
