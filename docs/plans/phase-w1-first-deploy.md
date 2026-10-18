@@ -10,7 +10,9 @@
 - `quran.db` is NOT in the image. It is a host directory bind-mounted rw at `/data`.
 - Caddy reverse-proxies the hostname to the container.
 
-**Tech:** Node 24 LTS (D6), pnpm 10.34.3 (corepack), Next 15, `@libsql/client` (native, glibc), Docker compose, Caddy, Cloudflare Tunnel.
+**Tech:** Node 24 LTS (D6), pnpm 10.34.3 (corepack, build only), Next 15, `@libsql/client` (native, glibc), Docker compose, Caddy. Public access needs a new `cloudflared` on CT 100 (none exists; the old one was on pve4, offline).
+
+**Deployed 2026-10-18:** `quran-corpus-web:a741fd9` healthy on CT 100, LAN-only at `https://quran.home`. Public hostname pending (Task 5).
 
 **State today (verified 2026-10-17):**
 - No prod exists.
@@ -20,7 +22,7 @@
 
 ## Global Constraints
 
-- Build from `main` unless the owner says otherwise. PR #119 (M13-B) is a draft.
+- Build from `main` unless the owner says otherwise. PR #119 (M13-B) merged `7e4a0a86`, so main includes word search.
 - No new deps. Docker and Caddy are infra, not package deps.
 - The DB never goes in git or in the image (§9).
 - No secrets. App env is only `DATABASE_URL`, `DB_SKIP_MIGRATIONS`, `NODE_ENV`; none are secret.
@@ -42,8 +44,8 @@
 
 | # | Decision | Recommendation |
 |---|---|---|
-| D1 | Public hostname | Owner 2026-10-17: name `qurancorpusly`, domain NOT registered yet. Task 5 blocked until it is; Tasks 1-4 + P2-P6 over the internal address proceed. |
-| D2 | How Caddy reaches the container | Same Docker network as Caddy if Caddy is a container on CT 100, so no host port. Else publish `127.0.0.1:3941:3000` (3941 = familiar dev port, free on CT 100). Homelab session reports which. |
+| D1 | Public hostname | Owner 2026-10-18: `quran.vatandosh.com` (supersedes `qurancorpusly`). A subdomain, not a path: `/quran` would need `basePath` + rebuild, and HSTS `includeSubDomains` on an apex covers every sibling subdomain. LAN interim: `quran.home` (Caddy `tls internal` + Pi-hole record). |
+| D2 | How Caddy reaches the container | **Path A** (reported 2026-10-18): Caddy is a container (`caddy:2-alpine`, `/opt/stack/docker-compose.yml`, Caddyfile `/opt/stack/caddy/Caddyfile`); quran-web joins network `stack_default`, no host port. Original rule: same Docker network as Caddy if Caddy is a container on CT 100, so no host port. Else publish `127.0.0.1:3941:3000` (3941 = familiar dev port, free on CT 100). Homelab session reports which. |
 | D3 | `DB_SKIP_MIGRATIONS` | `true`. The DB arrives pre-migrated; keeps DDL out of the request path. |
 | D4 | Which DB file | `quran.db.deploy-m13b` (sha256 `1483e279…fc86d`, verified). It is a superset of main's schema, so main ignores `word_gloss_fts`. Deploying PR B later is then rebuild-only, with no DB swap. |
 | D6 | Node runtime | `node:24-bookworm-slim`. `.nvmrc` says 20, but 20 EOL'd 2026-04-30. Dev box runs 24. Bumping `.nvmrc` is a separate call. |
@@ -80,16 +82,16 @@
 
 ## Task 2 — Merge (owner)
 
-- [ ] The owner merges the Task 1 PR to `main`. CT 100 builds from `main` (Global Constraints).
+- [x] The owner merges the Task 1 PR to `main` (#120, `6b9f4025`). CT 100 builds from `main` (Global Constraints).
 
 ## Task 3 — Host prep (CT 100, homelab session)
 
-- [ ] **Step 1: report before changing anything.**
+- [x] **Step 1: report before changing anything.** Result 2026-10-18: path A, network `stack_default`; no tunnel; 14G free; no `sqlite3`; SSH CT 100 → CT 103 refused (no key).
   - Caddy: container or host; its compose file and network name; where its Caddyfile lives.
   - How the Cloudflare Tunnel routes (to Caddy, or per-hostname).
   - Free disk (DB 177MB + image ~1GB).
   - Answers D2.
-- [ ] **Step 2: DB directory.**
+- [x] **Step 2: DB directory.** Result: DB relayed through pve1 (`pct pull 103` / `pct push 100`) since SSH was refused; sha256 verified on CT 103, pve1 and CT 100; main file only. sqlite check skipped (absent).
   - `mkdir -p /opt/quran-corpus/data`, then `chown 1000:1000` (image user `node` = uid 1000).
   - Pull the DB:
     - `scp claude@192.168.0.103:/home/claude/quran-data/quran.db.deploy-m13b /opt/quran-corpus/data/quran.db`
@@ -98,11 +100,11 @@
   - Verify:
     - `sqlite3 quran.db "SELECT count(*) FROM word_gloss_fts_docsize; PRAGMA quick_check;"` → `309706`, `ok`.
     - If `sqlite3` is absent, skip this check; the healthcheck covers readability.
-- [ ] **Step 3: source.** `git clone https://github.com/J3ff4/quran-corpus /opt/quran-corpus/src`, at `main`.
+- [x] **Step 3: source.** (cloned at `a741fd9`) `git clone https://github.com/J3ff4/quran-corpus /opt/quran-corpus/src`, at `main`.
 
 ## Task 4 — Compose service + first run (CT 100)
 
-- [ ] **Step 1:** `/opt/quran-corpus/compose.yaml`:
+- [x] **Step 1:** `/opt/quran-corpus/compose.yaml` (path A, `name: stack_default`):
 ```yaml
 services:
   quran-web:
@@ -123,13 +125,17 @@ networks:
     external: true
     name: <name reported in Task 3 Step 1>
 ```
-- [ ] **Step 2: build and run.**
+- [x] **Step 2: build and run.** Result: CT 100 RAM raised 2→4 GB for the build, then back to 2 GB; healthy, 0 `skipped`, ~170 MB RAM.
+  - Finding: `CMD pnpm exec` made corepack re-download pnpm on every start (its cache is root's, the container runs as `node`). Fixed in `apps/web/Dockerfile` (bin shim). Takes effect at the next rebuild.
   - `cd /opt/quran-corpus && GIT_SHA=$(git -C src rev-parse --short HEAD) docker compose up -d --build`
   - Wait for `docker inspect -f '{{.State.Health.Status}}' quran-web` to show `healthy`.
   - `docker logs quran-web` must contain no `skipped` warnings.
-- [ ] **Step 3: internal smoke.** From the Caddy container or host, request `http://quran-web:3000/surah/1` or `127.0.0.1:3941` → 200.
+- [x] **Step 3: internal smoke.** Result: 200 via the container's `stack_default` IP from CT 100 (exec into the Caddy container was not permitted). From the Caddy container or host, request `http://quran-web:3000/surah/1` or `127.0.0.1:3941` → 200.
 
 ## Task 5 — Caddy + tunnel (CT 100, owner go)
+
+- [x] **Interim (2026-10-18):** LAN site `quran.home { tls internal; reverse_proxy quran-web:3000 }` + Pi-hole record (CT 200, pve2). Owner confirmed it loads.
+- [ ] **Step 0:** owner creates a Cloudflare tunnel for `quran.vatandosh.com` and gives the homelab session its token; homelab session runs `cloudflared` on CT 100 (container on `stack_default`).
 
 - [ ] **Step 1:** Caddyfile site:
 ```
@@ -149,7 +155,7 @@ Log results in the table below.
 |---|---|---|
 | P1 | `https://<D1>/` | Home renders. DevTools console has no CSP errors. |
 | P2 | `/surah/2/words?lang=ru` | Russian WBW glosses (M13-A is on main). |
-| P3 | Search overlay `mercy` (`/search` is not a page; API is `/api/search?q=`) | Verses + Roots. No Words section, because main lacks M13-B. That is correct. |
+| P3 | Search overlay `mercy` (`/search` is not a page; API is `/api/search?q=`) | Verses → Words → Roots (M13-B merged). The gloss highlight renders as a mark, never raw `\u0002`/`\u0003`. |
 | P4 | Response headers | CSP with nonce, HSTS, nosniff, `X-Frame-Options: DENY`. |
 | P5 | Reload offline after a first visit | `/offline` page served by the service worker. |
 | P6 | `docker restart quran-web` | Back to healthy; P1 still passes. |
@@ -159,9 +165,10 @@ Log results in the table below.
 - **New build:**
   - `git -C src pull`, then `GIT_SHA=… docker compose up -d --build`.
   - Keep the previous `quran-corpus-web:<sha>` image for rollback.
-- **PR B, once merged:** rebuild only (D4). Then search `милост` → Words section with top row رَحْمَة "милость" 67.
+- **New build RAM:** raise CT 100 to 4 GB for `--build` (2 GB risks OOM), revert after. Homelab session, owner go.
+- **PR B:** shipped in the first build (D4). Then search `милост` → Words section with top row رَحْمَة "милость" 67.
 - **New DB:**
-  - scp to `quran.db.new` and verify the checksum.
+  - Relay through pve1 (`pct pull 103 …` / `pct push 100 …`) to `quran.db.new`; verify the checksum. CT 100 has no SSH key for CT 103.
   - `docker compose stop`.
   - Back up to `quran.db.bak-<date>`.
   - `rm -f quran.db-wal quran.db-shm`, then `mv quran.db.new quran.db`.
@@ -175,7 +182,7 @@ Log results in the table below.
 | `--frozen-lockfile` fails because `.dockerignore` hid a workspace `package.json` | Re-include that `package.json` (Task 1 Step 1 note). |
 | Mount read-only or wrong uid → writes fail | `normalizeArabicJoinKeys` failure is non-fatal (warn). WAL needs a writable dir: chown 1000 (Task 3 Step 2). |
 | HSTS `includeSubDomains` on the wrong host | Serve only on the D1 hostname over HTTPS. Never expose plain http publicly. |
-| Bad deploy | `docker compose down`. Caddy returns 502, nothing else is affected. Remove the Caddy site to take it fully offline. |
+| Bad deploy | `docker compose down`. Caddy returns 502, nothing else is affected. Remove the Caddy site to take it fully offline. Backups from 2026-10-18: `/opt/stack/caddy/Caddyfile.bak-2026-10-18`; Pi-hole `/etc/pihole/pihole.toml.bak-2026-10-18` (CT 200); snapshots CT 100 `pre-quran-w1`, CT 200 `pre-quran-dns`. |
 | DB swapped while the container runs | Runbook always stops first. Never `mv` over a live WAL DB. |
 
 ## Acceptance
@@ -189,9 +196,9 @@ Log results in the table below.
 
 | # | Result |
 |---|---|
-| P1 | |
-| P2 | |
-| P3 | |
-| P4 | |
-| P5 | |
-| P6 | |
+| P1 | Owner to confirm in a browser on `https://quran.home` (console free of CSP errors). |
+| P2 | PASS 2026-10-18 (internal): 200, "Аллах", ~640 Cyrillic words. |
+| P3 | API PASS 2026-10-18: verses 50, words 9 (top رَحْمَة "mercy" ×114), roots 8. Overlay order + highlight: owner to confirm in a browser. |
+| P4 | PASS 2026-10-18: CSP nonce, HSTS includeSubDomains, nosniff, `X-Frame-Options: DENY`. |
+| P5 | Owner to confirm in a browser. |
+| P6 | PASS 2026-10-18: healthy in ~5 s, `/` → 200. |
