@@ -22,4 +22,9 @@ EXPOSE 3000
 # /surah/1 reads the DB, so a missing or unreadable mount reports unhealthy.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s \
   CMD node -e "fetch('http://127.0.0.1:3000/surah/1').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
-CMD ["pnpm", "exec", "next", "start", "-H", "0.0.0.0", "-p", "3000"]
+# Start through pnpm's bin shim, not `pnpm exec`: corepack's pnpm is cached for
+# root, so as USER node it re-downloads pnpm on every start (needs internet).
+# Not `node .../next/dist/bin/next` either: the shim's NODE_PATH is what
+# resolves the externalized @libsql/client (a packages/data dep, not web's).
+# The shim ends in `exec node`, so node is still PID 1 and gets SIGTERM.
+CMD ["node_modules/.bin/next", "start", "-H", "0.0.0.0", "-p", "3000"]
