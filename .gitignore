@@ -117,3 +117,6 @@ apps/mobile/assets/fonts/mushaf/
 # outside the tree before deleting anything here (CLAUDE.md §9).
 packages/scraper/uz_mt_export.jsonl
 packages/scraper/uz_gloss_rejects.tsv
+
+# Session baton, overwritten each task (CLAUDE.md §13).
+HANDOFF.md

@@ -241,11 +241,17 @@ Stop and ask rather than guess on: schema changes, adding a dependency, anything
 
 -----
 
-## 13. Subagent Model Floor + Compaction
+## 13. Subagent Model Floor + Session Handoff
 
 - **Minimum model: Opus 5.0.** Never dispatch a subagent on Sonnet or Haiku. The floor is `claude-opus-5` (or newer Opus). Anything weaker falls short of the code-quality bar required here.
-- **Compact after every completed task.** When running Subagent-Driven Development, trigger a context compaction after each task's review cycle passes before dispatching the next task's implementer.
-- **Compact after every completed + approved phase.** In addition to per-task compaction, trigger a compaction once a full phase is complete and the user has approved it, before starting the next phase. Both levels are mandatory: task-level and phase-level.
+- **Hand off after every completed task.** Once a task's loop (§4) is done — tests green, committed, and its §5 review run if one was triggered — write `HANDOFF.md` at the repo root, then offer the owner `/clear`. The agent cannot clear its own context; it offers, the owner types it. A fresh session starts by reading `HANDOFF.md`, then verifying it against `git log` and `git status` (§14 — a handoff drifts like `STATUS.md`).
+  - `HANDOFF.md` is git-ignored and overwritten each time; it is a baton, not a ledger. Keep it short:
+    - **Done:** task id, branch, commit SHA(s), test/lint/type-check result.
+    - **Next:** the next task id and plan path (`docs/plans/phase-NN-<slug>.md`), first step to run.
+    - **Open:** owner decisions pending, §5 reviews owed, device checks owed, anything uncommitted.
+    - **Gotchas:** facts learned this task that the plan does not say and the next session would otherwise rediscover.
+  - Under Subagent-Driven Development the same rule applies per task, before the next implementer is dispatched.
+- **Hand off after every completed + approved phase.** Same handoff, written once the phase is complete and the owner has approved it, before the next phase starts. Both levels are mandatory: task-level and phase-level.
 
 -----
 
